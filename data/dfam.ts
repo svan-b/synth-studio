@@ -8,8 +8,8 @@ import type { DeviceSpec, Lesson } from '@/types';
 export const DFAM_SPEC: DeviceSpec = {
   name: 'DFAM - Drummer From Another Mother',
   manufacturer: 'Moog',
-  width: 1400,  // Scaled from 319mm
-  height: 800,  // Extended for all sections including sequencer
+  width: 1400,  // Scaled from 319mm (12.57")
+  height: 470,  // Scaled from 107mm (4.21") - 3:1 ratio
   controls: {
     // OSCILLATOR SECTION (Top Left)
     vco1_frequency: {
@@ -55,6 +55,38 @@ export const DFAM_SPEC: DeviceSpec = {
       units: '%',
       label: 'VCO 2 WAVE',
       options: ['TRI', 'SQR'],
+    },
+    vco1_eg: {
+      type: 'knob',
+      position: { x: 150, y: 120 },
+      min: -100,
+      max: 100,
+      default: 0,
+      units: '%',
+      bipolar: true,
+      label: 'VCO 1 EG AMT',
+      size: 'small',
+    },
+    vco2_eg: {
+      type: 'knob',
+      position: { x: 250, y: 120 },
+      min: -100,
+      max: 100,
+      default: 0,
+      units: '%',
+      bipolar: true,
+      label: 'VCO 2 EG AMT',
+      size: 'small',
+    },
+    fm_amount: {
+      type: 'knob',
+      position: { x: 100, y: 250 },
+      min: 0,
+      max: 100,
+      default: 0,
+      units: '%',
+      label: '1→2 FM AMT',
+      size: 'small',
     },
     hard_sync: {
       type: 'switch',
@@ -140,6 +172,16 @@ export const DFAM_SPEC: DeviceSpec = {
       units: '%',
       label: 'MODE',
       options: ['LP', 'HP'],
+    },
+    noise_vcf_mod: {
+      type: 'knob',
+      position: { x: 800, y: 180 },
+      min: 0,
+      max: 100,
+      default: 0,
+      units: '%',
+      label: 'NOISE/VCF MOD',
+      size: 'small',
     },
 
     // ENVELOPE DECAY SECTION

@@ -8,15 +8,7 @@ export default function Jack({ id, label, value, onChange, highlighted, type = '
   };
 
   return (
-    <div className="flex items-center gap-2 relative h-[16px]">
-      {/* Label - positioned to left of jack */}
-      <div
-        className="text-[7px] text-hardware-label uppercase font-label tracking-wider text-right leading-none"
-        style={{ width: '70px', flexShrink: 0 }}
-      >
-        {label}
-      </div>
-
+    <div className="flex flex-col items-center gap-0.5 relative">
       {/* Jack Socket */}
       <div
         onClick={handleClick}
@@ -26,8 +18,8 @@ export default function Jack({ id, label, value, onChange, highlighted, type = '
           ${highlighted ? 'ring-2 ring-teaching-current animate-pulse' : ''}
         `}
         style={{
-          width: '16px',
-          height: '16px',
+          width: '14px',
+          height: '14px',
         }}
       >
         <div
@@ -47,8 +39,8 @@ export default function Jack({ id, label, value, onChange, highlighted, type = '
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black"
             style={{
-              width: '6px',
-              height: '6px',
+              width: '5px',
+              height: '5px',
             }}
           />
         </div>
@@ -58,11 +50,19 @@ export default function Jack({ id, label, value, onChange, highlighted, type = '
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent animate-pulse"
             style={{
-              width: '4px',
-              height: '4px',
+              width: '3px',
+              height: '3px',
             }}
           />
         )}
+      </div>
+
+      {/* Label - below jack, very small */}
+      <div
+        className="text-[5px] text-hardware-label uppercase font-label tracking-tight text-center leading-none"
+        style={{ maxWidth: '45px', wordWrap: 'break-word' }}
+      >
+        {label.replace('PATCH_', '').replace('_', ' ')}
       </div>
     </div>
   );
