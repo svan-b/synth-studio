@@ -234,34 +234,34 @@ export default function DFAM() {
           <div style={{ fontSize: '6px', color: '#888', marginBottom: '10px', textAlign: 'center' }}>PATCH BAY</div>
           <PatchBay
             jacks={[
-              // Column 1 - IN/OUT (Left column)
+              // LEFT COLUMN - IN/OUT
               { id: 'trigger_in', label: 'TRIGGER', x: 20, y: 30, type: 'input' },
               { id: 'velocity_in', label: 'VELOCITY', x: 20, y: 60, type: 'input' },
-              { id: 'ext_audio_in', label: 'EXT AUDIO', x: 20, y: 90, type: 'input' },
-              { id: 'noise_level_in', label: 'NOISE LVL', x: 20, y: 120, type: 'input' },
-              { id: 'vcf_mod_in', label: 'VCF MOD', x: 20, y: 150, type: 'input' },
-              { id: 'fm_amt_in', label: '1-2 FM AMT', x: 20, y: 180, type: 'input' },
+              { id: 'ext_audio', label: 'EXT AUDIO', x: 20, y: 90, type: 'input' },
+              { id: 'noise_level', label: 'NOISE LEVEL', x: 20, y: 120, type: 'input' },
+              { id: 'vcf_mod', label: 'VCF MOD', x: 20, y: 150, type: 'input' },
+              { id: 'fm_amt', label: '1→2 FM AMT', x: 20, y: 180, type: 'input' },
               { id: 'tempo_in', label: 'TEMPO', x: 20, y: 210, type: 'input' },
               { id: 'trigger_out', label: 'TRIGGER', x: 20, y: 240, type: 'output' },
 
-              // Column 2 - VCA CV (Middle column)
-              { id: 'vca_cv_in', label: 'VCA CV', x: 55, y: 30, type: 'input' },
+              // MIDDLE COLUMN - VCA
+              { id: 'vca_cv', label: 'VCA CV', x: 55, y: 30, type: 'input' },
               { id: 'vca_decay_in', label: 'VCA DECAY', x: 55, y: 60, type: 'input' },
               { id: 'vcf_decay_in', label: 'VCF DECAY', x: 55, y: 90, type: 'input' },
               { id: 'vco_decay_in', label: 'VCO DECAY', x: 55, y: 120, type: 'input' },
-              { id: 'vco1_cv_in', label: 'VCO 1 CV', x: 55, y: 150, type: 'input' },
-              { id: 'vco2_cv_in', label: 'VCO 2 CV', x: 55, y: 180, type: 'input' },
+              { id: 'vco1_cv', label: 'VCO 1 CV', x: 55, y: 150, type: 'input' },
+              { id: 'vco2_cv', label: 'VCO 2 CV', x: 55, y: 180, type: 'input' },
               { id: 'run_stop_in', label: 'RUN/STOP', x: 55, y: 210, type: 'input' },
               { id: 'velocity_out', label: 'VELOCITY', x: 55, y: 240, type: 'output' },
 
-              // Column 3 - VCA (Right column - mostly outputs)
+              // RIGHT COLUMN - Outputs (mostly)
               { id: 'vca_out', label: 'VCA', x: 90, y: 30, type: 'output' },
               { id: 'vca_eg_out', label: 'VCA EG', x: 90, y: 60, type: 'output' },
               { id: 'vcf_eg_out', label: 'VCF EG', x: 90, y: 90, type: 'output' },
               { id: 'vco_eg_out', label: 'VCO EG', x: 90, y: 120, type: 'output' },
-              { id: 'vco1_out', label: 'VCO1', x: 90, y: 150, type: 'output' },
-              { id: 'vco2_out', label: 'VCO2', x: 90, y: 180, type: 'output' },
-              { id: 'adv_clock_in', label: 'ADV/CLOCK', x: 90, y: 210, type: 'input' },
+              { id: 'vco1_out', label: 'VCO 1', x: 90, y: 150, type: 'output' },
+              { id: 'vco2_out', label: 'VCO 2', x: 90, y: 180, type: 'output' },
+              { id: 'adv_clock', label: 'ADV/CLOCK', x: 90, y: 210, type: 'input' },
               { id: 'pitch_out', label: 'PITCH', x: 90, y: 240, type: 'output' },
             ]}
             onConnection={(from, to, color) => {
