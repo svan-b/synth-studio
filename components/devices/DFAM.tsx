@@ -13,7 +13,7 @@ export default function DFAM() {
   const spec = DFAM_SPEC;
 
   // Get current step if in teaching mode
-  const currentStepData = isTeachingMode && currentLesson?.device === device && currentLesson.steps[currentStep];
+  const currentStepData = (isTeachingMode && currentLesson?.device === device) ? currentLesson.steps[currentStep] : undefined;
   const highlightedControl = currentStepData?.control;
 
   const handleControlChange = (controlId: string, value: number | string) => {
@@ -37,21 +37,55 @@ export default function DFAM() {
     }
   };
 
-  const getControlProps = (controlId: string) => {
+  const getControlProps = (controlId: string): any => {
     const control = spec.controls[controlId];
     const value = getControlValue(device, controlId) ?? control.default;
     const isHighlighted = isTeachingMode && highlightedControl === controlId;
     const targetValue = currentStepData?.control === controlId ? currentStepData.targetValue : undefined;
 
-    return {
+    const baseProps = {
       id: controlId,
-      value: typeof value === 'number' ? value : 0,
-      ...control,
+      label: control.label,
+      position: control.position,
       onChange: (newValue: number | string) => handleControlChange(controlId, newValue),
       highlighted: isHighlighted,
-      targetValue: typeof targetValue === 'number' ? targetValue : undefined,
-      showTarget: isHighlighted && targetValue !== undefined,
     };
+
+    // Type-specific props
+    if (control.type === 'knob') {
+      return {
+        ...baseProps,
+        value: typeof value === 'number' ? value : control.default,
+        min: control.min,
+        max: control.max,
+        default: control.default,
+        defaultValue: control.default,
+        units: control.units,
+        bipolar: control.bipolar,
+        size: control.size,
+        targetValue: typeof targetValue === 'number' ? targetValue : undefined,
+        showTarget: isHighlighted && targetValue !== undefined,
+      };
+    }
+
+    if (control.type === 'switch') {
+      return {
+        ...baseProps,
+        value: typeof value === 'string' ? value : (control.options?.[0] || String(control.default)),
+        options: control.options || [],
+      };
+    }
+
+    if (control.type === 'button') {
+      return {
+        ...baseProps,
+        value: Boolean(value),
+        led: (control as any).led,
+        ledColor: (control as any).ledColor,
+      };
+    }
+
+    return baseProps;
   };
 
   return (

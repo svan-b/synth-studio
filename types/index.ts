@@ -19,6 +19,8 @@ export interface ControlSpec {
   size?: KnobSize;
   step?: number;
   options?: string[]; // for switches/selects
+  led?: boolean; // for buttons
+  ledColor?: string; // for buttons
 }
 
 export interface DeviceSpec {
