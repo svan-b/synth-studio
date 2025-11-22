@@ -190,6 +190,16 @@ export const DFAM_SPEC: DeviceSpec = {
       label: 'FILTER MODE',
       options: ['LP', 'HP'],
     },
+    noise_vcf_mod: {
+      type: 'knob',
+      position: { x: 1000, y: 320 },
+      min: 0,
+      max: 100,
+      default: 0,
+      units: '%',
+      label: 'NOISE/VCF MOD',
+      size: 'small',
+    },
 
     // VCA SECTION
     vca_decay: {
@@ -228,12 +238,47 @@ export const DFAM_SPEC: DeviceSpec = {
       type: 'knob',
       position: { x: 900, y: 480 },
       min: 10,
-      max: 300,
+      max: 500,
       default: 120,
       units: 'BPM',
       label: 'TEMPO',
       size: 'large',
     },
+
+    // Sequencer Steps
+    step1: { type: 'button', position: { x: 100, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 1', led: true },
+    step2: { type: 'button', position: { x: 180, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 2', led: true },
+    step3: { type: 'button', position: { x: 260, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 3', led: true },
+    step4: { type: 'button', position: { x: 340, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 4', led: true },
+    step5: { type: 'button', position: { x: 420, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 5', led: true },
+    step6: { type: 'button', position: { x: 500, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 6', led: true },
+    step7: { type: 'button', position: { x: 580, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 7', led: true },
+    step8: { type: 'button', position: { x: 660, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 8', led: true },
+
+    // Pitch row
+    pitch1: { type: 'knob', position: { x: 100, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 1', size: 'small' },
+    pitch2: { type: 'knob', position: { x: 180, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 2', size: 'small' },
+    pitch3: { type: 'knob', position: { x: 260, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 3', size: 'small' },
+    pitch4: { type: 'knob', position: { x: 340, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 4', size: 'small' },
+    pitch5: { type: 'knob', position: { x: 420, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 5', size: 'small' },
+    pitch6: { type: 'knob', position: { x: 500, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 6', size: 'small' },
+    pitch7: { type: 'knob', position: { x: 580, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 7', size: 'small' },
+    pitch8: { type: 'knob', position: { x: 660, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 8', size: 'small' },
+
+    // Velocity row
+    velocity1: { type: 'knob', position: { x: 100, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 1', size: 'small' },
+    velocity2: { type: 'knob', position: { x: 180, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 2', size: 'small' },
+    velocity3: { type: 'knob', position: { x: 260, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 3', size: 'small' },
+    velocity4: { type: 'knob', position: { x: 340, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 4', size: 'small' },
+    velocity5: { type: 'knob', position: { x: 420, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 5', size: 'small' },
+    velocity6: { type: 'knob', position: { x: 500, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 6', size: 'small' },
+    velocity7: { type: 'knob', position: { x: 580, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 7', size: 'small' },
+    velocity8: { type: 'knob', position: { x: 660, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 8', size: 'small' },
+
+    // Sequencer controls
+    run_stop: { type: 'button', position: { x: 780, y: 540 }, min: 0, max: 1, default: 0, units: '%', label: 'RUN/STOP', led: true },
+    adv_step: { type: 'button', position: { x: 780, y: 600 }, min: 0, max: 1, default: 0, units: '%', label: 'ADV/STEP', led: false },
+    trigger: { type: 'button', position: { x: 780, y: 660 }, min: 0, max: 1, default: 0, units: '%', label: 'TRIGGER', led: false },
   },
   presets: {
     classic_kick: {

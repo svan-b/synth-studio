@@ -1,5 +1,5 @@
 export type ControlType = 'knob' | 'button' | 'switch' | 'fader' | 'step-button' | 'jack';
-export type Units = 'Hz' | 'ms' | 'octaves' | '%' | 'dB' | 'semitones' | 'cents' | 'steps' | 'BPM';
+export type Units = 'Hz' | 'ms' | 'octaves' | '%' | 'dB' | 'semitones' | 'cents' | 'steps' | 'BPM' | 'V';
 export type KnobSize = 'small' | 'medium' | 'large';
 
 export interface Position {
