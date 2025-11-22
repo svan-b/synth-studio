@@ -8,11 +8,20 @@ export default function Jack({ id, label, value, onChange, highlighted, type = '
   };
 
   return (
-    <div className="flex flex-col items-center gap-1 relative">
+    <div className="flex items-center gap-2 relative h-[16px]">
+      {/* Label - positioned to left of jack */}
+      <div
+        className="text-[7px] text-hardware-label uppercase font-label tracking-wider text-right leading-none"
+        style={{ width: '70px', flexShrink: 0 }}
+      >
+        {label}
+      </div>
+
+      {/* Jack Socket */}
       <div
         onClick={handleClick}
         className={`
-          relative cursor-pointer
+          relative cursor-pointer flex-shrink-0
           transition-all duration-150
           ${highlighted ? 'ring-2 ring-teaching-current animate-pulse' : ''}
         `}
@@ -21,7 +30,6 @@ export default function Jack({ id, label, value, onChange, highlighted, type = '
           height: '16px',
         }}
       >
-        {/* Jack Socket */}
         <div
           className={`
             absolute inset-0
@@ -55,14 +63,6 @@ export default function Jack({ id, label, value, onChange, highlighted, type = '
             }}
           />
         )}
-      </div>
-
-      {/* Label */}
-      <div
-        className="text-[7px] text-hardware-label uppercase font-label tracking-wider text-center leading-tight"
-        style={{ maxWidth: '50px' }}
-      >
-        {label}
       </div>
     </div>
   );

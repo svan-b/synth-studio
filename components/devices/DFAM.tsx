@@ -255,49 +255,43 @@ export default function DFAM() {
         </div>
 
         {/* PATCH BAY SECTION */}
-        <div className="absolute right-[40px] top-[60px] bottom-[40px]">
-          <div className="text-[8px] font-label text-[#999] tracking-[0.2em] mb-3 border-b border-[#333] pb-1">
+        <div className="absolute right-[40px] top-[60px] w-[180px]">
+          <div className="text-[8px] font-label text-[#999] tracking-[0.2em] mb-4 border-b border-[#333] pb-1">
             PATCH BAY
           </div>
 
-          <div className="flex gap-[80px]">
-            {/* INPUTS Column */}
-            <div>
-              <div className="text-[7px] font-label text-[#777] tracking-[0.2em] mb-2">INPUTS</div>
-              <div className="flex flex-col gap-[6px]">
-                <Jack {...getControlProps('patch_in_trigger')} />
-                <Jack {...getControlProps('patch_in_vca_cv')} />
-                <Jack {...getControlProps('patch_in_velocity')} />
-                <Jack {...getControlProps('patch_in_vca_decay')} />
-                <Jack {...getControlProps('patch_in_ext_audio')} />
-                <Jack {...getControlProps('patch_in_vcf_decay')} />
-                <Jack {...getControlProps('patch_in_noise')} />
-                <Jack {...getControlProps('patch_in_vco_decay')} />
-                <Jack {...getControlProps('patch_in_vcf_mod')} />
-                <Jack {...getControlProps('patch_in_vco1_cv')} />
-                <Jack {...getControlProps('patch_in_vco2_cv')} />
-                <Jack {...getControlProps('patch_in_tempo')} />
-                <Jack {...getControlProps('patch_in_run_stop')} />
-                <Jack {...getControlProps('patch_in_advance')} />
-                <Jack {...getControlProps('patch_in_clock')} />
-              </div>
-            </div>
+          {/* Single column layout with all 24 jacks */}
+          <div className="flex flex-col gap-[14px]">
+            {/* INPUTS */}
+            <Jack {...getControlProps('patch_in_trigger')} />
+            <Jack {...getControlProps('patch_in_vca_cv')} />
+            <Jack {...getControlProps('patch_in_velocity')} />
+            <Jack {...getControlProps('patch_in_vca_decay')} />
+            <Jack {...getControlProps('patch_in_ext_audio')} />
+            <Jack {...getControlProps('patch_in_vcf_decay')} />
+            <Jack {...getControlProps('patch_in_noise')} />
+            <Jack {...getControlProps('patch_in_vco_decay')} />
+            <Jack {...getControlProps('patch_in_vcf_mod')} />
+            <Jack {...getControlProps('patch_in_vco1_cv')} />
+            <Jack {...getControlProps('patch_in_vco2_cv')} />
+            <Jack {...getControlProps('patch_in_tempo')} />
+            <Jack {...getControlProps('patch_in_run_stop')} />
+            <Jack {...getControlProps('patch_in_advance')} />
+            <Jack {...getControlProps('patch_in_clock')} />
 
-            {/* OUTPUTS Column */}
-            <div>
-              <div className="text-[7px] font-label text-[#777] tracking-[0.2em] mb-2">OUTPUTS</div>
-              <div className="flex flex-col gap-[12px]">
-                <Jack {...getControlProps('patch_out_vca')} />
-                <Jack {...getControlProps('patch_out_vca_eg')} />
-                <Jack {...getControlProps('patch_out_vcf_eg')} />
-                <Jack {...getControlProps('patch_out_vco_eg')} />
-                <Jack {...getControlProps('patch_out_vco1')} />
-                <Jack {...getControlProps('patch_out_vco2')} />
-                <Jack {...getControlProps('patch_out_trigger')} />
-                <Jack {...getControlProps('patch_out_velocity')} />
-                <Jack {...getControlProps('patch_out_pitch')} />
-              </div>
-            </div>
+            {/* Divider between inputs and outputs */}
+            <div className="h-[1px] bg-[#333] my-2" />
+
+            {/* OUTPUTS */}
+            <Jack {...getControlProps('patch_out_vca')} />
+            <Jack {...getControlProps('patch_out_vca_eg')} />
+            <Jack {...getControlProps('patch_out_vcf_eg')} />
+            <Jack {...getControlProps('patch_out_vco_eg')} />
+            <Jack {...getControlProps('patch_out_vco1')} />
+            <Jack {...getControlProps('patch_out_vco2')} />
+            <Jack {...getControlProps('patch_out_trigger')} />
+            <Jack {...getControlProps('patch_out_velocity')} />
+            <Jack {...getControlProps('patch_out_pitch')} />
           </div>
         </div>
 
