@@ -5,6 +5,7 @@ import { DFAM_SPEC } from '@/data/dfam';
 import Knob from '@/components/controls/Knob';
 import Button from '@/components/controls/Button';
 import Switch from '@/components/controls/Switch';
+import Jack from '@/components/controls/Jack';
 
 export default function DFAM() {
   const { deviceSettings, setControlValue, getControlValue, currentLesson, currentStep, isTeachingMode, completeStep } = useStudioStore();
@@ -120,77 +121,109 @@ export default function DFAM() {
           boxShadow: '0 10px 40px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.03)',
         }}
       >
-        {/* OSCILLATORS SECTION - Top Row */}
-        <div className="absolute" style={{ left: '100px', top: '120px' }}><Knob {...getControlProps('vco1_frequency')} /></div>
-        <div className="absolute" style={{ left: '100px', top: '240px' }}><Switch {...getControlProps('vco1_wave')} /></div>
-        <div className="absolute" style={{ left: '200px', top: '120px' }}><Knob {...getControlProps('vco1_eg')} /></div>
+        {/* OSCILLATORS SECTION - Top Left */}
+        <div className="absolute" style={{ left: '80px', top: '120px' }}><Knob {...getControlProps('vco1_frequency')} /></div>
+        <div className="absolute" style={{ left: '80px', top: '220px' }}><Switch {...getControlProps('vco1_wave')} /></div>
+        <div className="absolute" style={{ left: '150px', top: '120px' }}><Knob {...getControlProps('vco1_eg')} /></div>
 
-        <div className="absolute" style={{ left: '320px', top: '120px' }}><Knob {...getControlProps('vco2_frequency')} /></div>
-        <div className="absolute" style={{ left: '320px', top: '240px' }}><Switch {...getControlProps('vco2_wave')} /></div>
-        <div className="absolute" style={{ left: '420px', top: '120px' }}><Knob {...getControlProps('vco2_eg')} /></div>
+        <div className="absolute" style={{ left: '200px', top: '120px' }}><Knob {...getControlProps('vco2_frequency')} /></div>
+        <div className="absolute" style={{ left: '200px', top: '220px' }}><Switch {...getControlProps('vco2_wave')} /></div>
+        <div className="absolute" style={{ left: '250px', top: '120px' }}><Knob {...getControlProps('vco2_eg')} /></div>
 
-        <div className="absolute" style={{ left: '540px', top: '120px' }}><Knob {...getControlProps('vco_decay')} /></div>
-        <div className="absolute" style={{ left: '660px', top: '120px' }}><Knob {...getControlProps('fm_amount')} /></div>
-        <div className="absolute" style={{ left: '760px', top: '140px' }}><Button {...getControlProps('hard_sync')} /></div>
+        <div className="absolute" style={{ left: '100px', top: '250px' }}><Knob {...getControlProps('fm_amount')} /></div>
+        <div className="absolute" style={{ left: '280px', top: '170px' }}><Switch {...getControlProps('hard_sync')} /></div>
 
         {/* MIXER SECTION */}
-        <div className="absolute" style={{ left: '100px', top: '320px' }}><Knob {...getControlProps('vco1_level')} /></div>
-        <div className="absolute" style={{ left: '220px', top: '320px' }}><Knob {...getControlProps('vco2_level')} /></div>
-        <div className="absolute" style={{ left: '340px', top: '320px' }}><Knob {...getControlProps('noise')} /></div>
+        <div className="absolute" style={{ left: '80px', top: '300px' }}><Knob {...getControlProps('vco1_level')} /></div>
+        <div className="absolute" style={{ left: '200px', top: '300px' }}><Knob {...getControlProps('vco2_level')} /></div>
+        <div className="absolute" style={{ left: '320px', top: '300px' }}><Knob {...getControlProps('noise')} /></div>
 
         {/* FILTER SECTION */}
-        <div className="absolute" style={{ left: '520px', top: '320px' }}><Knob {...getControlProps('vcf_cutoff')} /></div>
-        <div className="absolute" style={{ left: '660px', top: '320px' }}><Knob {...getControlProps('vcf_resonance')} /></div>
-        <div className="absolute" style={{ left: '780px', top: '320px' }}><Knob {...getControlProps('vcf_eg')} /></div>
-        <div className="absolute" style={{ left: '880px', top: '320px' }}><Knob {...getControlProps('vcf_decay')} /></div>
-        <div className="absolute" style={{ left: '1000px', top: '340px' }}><Switch {...getControlProps('vcf_mode')} /></div>
-        <div className="absolute" style={{ left: '1000px', top: '320px' }}><Knob {...getControlProps('noise_vcf_mod')} /></div>
+        <div className="absolute" style={{ left: '500px', top: '140px' }}><Knob {...getControlProps('vcf_cutoff')} /></div>
+        <div className="absolute" style={{ left: '650px', top: '180px' }}><Knob {...getControlProps('vcf_resonance')} /></div>
+        <div className="absolute" style={{ left: '770px', top: '180px' }}><Knob {...getControlProps('vcf_eg')} /></div>
+        <div className="absolute" style={{ left: '650px', top: '280px' }}><Switch {...getControlProps('vcf_mode')} /></div>
+        <div className="absolute" style={{ left: '800px', top: '180px' }}><Knob {...getControlProps('noise_vcf_mod')} /></div>
+
+        {/* ENVELOPE DECAY SECTION */}
+        <div className="absolute" style={{ left: '80px', top: '430px' }}><Knob {...getControlProps('vco_decay')} /></div>
+        <div className="absolute" style={{ left: '200px', top: '430px' }}><Knob {...getControlProps('vcf_decay')} /></div>
+        <div className="absolute" style={{ left: '320px', top: '430px' }}><Knob {...getControlProps('vca_decay')} /></div>
 
         {/* VCA SECTION */}
-        <div className="absolute" style={{ left: '100px', top: '480px' }}><Knob {...getControlProps('vca_decay')} /></div>
-        <div className="absolute" style={{ left: '220px', top: '500px' }}><Switch {...getControlProps('vca_attack')} /></div>
-        <div className="absolute" style={{ left: '340px', top: '480px' }}><Knob {...getControlProps('volume')} /></div>
+        <div className="absolute" style={{ left: '500px', top: '430px' }}><Knob {...getControlProps('vca_eg')} /></div>
+        <div className="absolute" style={{ left: '620px', top: '430px' }}><Knob {...getControlProps('vca_level')} /></div>
 
         {/* SEQUENCER SECTION */}
-        <div className="absolute" style={{ left: '900px', top: '480px' }}><Knob {...getControlProps('tempo')} /></div>
+        <div className="absolute" style={{ left: '750px', top: '430px' }}><Knob {...getControlProps('tempo')} /></div>
 
-        {/* 8-step sequencer buttons */}
-        <div className="absolute" style={{ left: '100px', top: '520px' }}><Button {...getControlProps('step1')} /></div>
-        <div className="absolute" style={{ left: '180px', top: '520px' }}><Button {...getControlProps('step2')} /></div>
-        <div className="absolute" style={{ left: '260px', top: '520px' }}><Button {...getControlProps('step3')} /></div>
-        <div className="absolute" style={{ left: '340px', top: '520px' }}><Button {...getControlProps('step4')} /></div>
-        <div className="absolute" style={{ left: '420px', top: '520px' }}><Button {...getControlProps('step5')} /></div>
-        <div className="absolute" style={{ left: '500px', top: '520px' }}><Button {...getControlProps('step6')} /></div>
-        <div className="absolute" style={{ left: '580px', top: '520px' }}><Button {...getControlProps('step7')} /></div>
-        <div className="absolute" style={{ left: '660px', top: '520px' }}><Button {...getControlProps('step8')} /></div>
-
-        {/* PITCH row */}
-        <div className="absolute" style={{ left: '100px', top: '580px' }}><Knob {...getControlProps('pitch1')} /></div>
-        <div className="absolute" style={{ left: '180px', top: '580px' }}><Knob {...getControlProps('pitch2')} /></div>
-        <div className="absolute" style={{ left: '260px', top: '580px' }}><Knob {...getControlProps('pitch3')} /></div>
-        <div className="absolute" style={{ left: '340px', top: '580px' }}><Knob {...getControlProps('pitch4')} /></div>
-        <div className="absolute" style={{ left: '420px', top: '580px' }}><Knob {...getControlProps('pitch5')} /></div>
-        <div className="absolute" style={{ left: '500px', top: '580px' }}><Knob {...getControlProps('pitch6')} /></div>
-        <div className="absolute" style={{ left: '580px', top: '580px' }}><Knob {...getControlProps('pitch7')} /></div>
-        <div className="absolute" style={{ left: '660px', top: '580px' }}><Knob {...getControlProps('pitch8')} /></div>
+        {/* 8-step sequencer - PITCH row */}
+        <div className="absolute" style={{ left: '100px', top: '560px' }}><Knob {...getControlProps('pitch1')} /></div>
+        <div className="absolute" style={{ left: '200px', top: '560px' }}><Knob {...getControlProps('pitch2')} /></div>
+        <div className="absolute" style={{ left: '300px', top: '560px' }}><Knob {...getControlProps('pitch3')} /></div>
+        <div className="absolute" style={{ left: '400px', top: '560px' }}><Knob {...getControlProps('pitch4')} /></div>
+        <div className="absolute" style={{ left: '500px', top: '560px' }}><Knob {...getControlProps('pitch5')} /></div>
+        <div className="absolute" style={{ left: '600px', top: '560px' }}><Knob {...getControlProps('pitch6')} /></div>
+        <div className="absolute" style={{ left: '700px', top: '560px' }}><Knob {...getControlProps('pitch7')} /></div>
+        <div className="absolute" style={{ left: '800px', top: '560px' }}><Knob {...getControlProps('pitch8')} /></div>
 
         {/* VELOCITY row */}
         <div className="absolute" style={{ left: '100px', top: '640px' }}><Knob {...getControlProps('velocity1')} /></div>
-        <div className="absolute" style={{ left: '180px', top: '640px' }}><Knob {...getControlProps('velocity2')} /></div>
-        <div className="absolute" style={{ left: '260px', top: '640px' }}><Knob {...getControlProps('velocity3')} /></div>
-        <div className="absolute" style={{ left: '340px', top: '640px' }}><Knob {...getControlProps('velocity4')} /></div>
-        <div className="absolute" style={{ left: '420px', top: '640px' }}><Knob {...getControlProps('velocity5')} /></div>
-        <div className="absolute" style={{ left: '500px', top: '640px' }}><Knob {...getControlProps('velocity6')} /></div>
-        <div className="absolute" style={{ left: '580px', top: '640px' }}><Knob {...getControlProps('velocity7')} /></div>
-        <div className="absolute" style={{ left: '660px', top: '640px' }}><Knob {...getControlProps('velocity8')} /></div>
+        <div className="absolute" style={{ left: '200px', top: '640px' }}><Knob {...getControlProps('velocity2')} /></div>
+        <div className="absolute" style={{ left: '300px', top: '640px' }}><Knob {...getControlProps('velocity3')} /></div>
+        <div className="absolute" style={{ left: '400px', top: '640px' }}><Knob {...getControlProps('velocity4')} /></div>
+        <div className="absolute" style={{ left: '500px', top: '640px' }}><Knob {...getControlProps('velocity5')} /></div>
+        <div className="absolute" style={{ left: '600px', top: '640px' }}><Knob {...getControlProps('velocity6')} /></div>
+        <div className="absolute" style={{ left: '700px', top: '640px' }}><Knob {...getControlProps('velocity7')} /></div>
+        <div className="absolute" style={{ left: '800px', top: '640px' }}><Knob {...getControlProps('velocity8')} /></div>
 
-        {/* Sequencer controls */}
-        <div className="absolute" style={{ left: '780px', top: '540px' }}><Button {...getControlProps('run_stop')} /></div>
-        <div className="absolute" style={{ left: '780px', top: '600px' }}><Button {...getControlProps('adv_step')} /></div>
-        <div className="absolute" style={{ left: '780px', top: '660px' }}><Button {...getControlProps('trigger')} /></div>
+        {/* Sequencer buttons */}
+        <div className="absolute" style={{ left: '900px', top: '580px' }}><Button {...getControlProps('run_stop')} /></div>
+        <div className="absolute" style={{ left: '900px', top: '650px' }}><Button {...getControlProps('advance')} /></div>
 
-        {/* MOOG Logo - Bottom Right */}
-        <div className="absolute bottom-8 right-8">
+        {/* PATCH BAY - Right side, 2 columns */}
+        <div className="absolute" style={{ left: '1100px', top: '80px' }}>
+          <div className="flex flex-col gap-[40px]">
+            {/* Input jacks column */}
+            <div className="flex flex-col gap-[40px]">
+              <Jack {...getControlProps('patch_in_trigger')} />
+              <Jack {...getControlProps('patch_in_vca_cv')} />
+              <Jack {...getControlProps('patch_in_velocity')} />
+              <Jack {...getControlProps('patch_in_vca_decay')} />
+              <Jack {...getControlProps('patch_in_ext_audio')} />
+              <Jack {...getControlProps('patch_in_vcf_decay')} />
+              <Jack {...getControlProps('patch_in_noise')} />
+              <Jack {...getControlProps('patch_in_vco_decay')} />
+              <Jack {...getControlProps('patch_in_vcf_mod')} />
+              <Jack {...getControlProps('patch_in_vco1_cv')} />
+              <Jack {...getControlProps('patch_in_vco2_cv')} />
+              <Jack {...getControlProps('patch_in_tempo')} />
+              <Jack {...getControlProps('patch_in_run_stop')} />
+              <Jack {...getControlProps('patch_in_advance')} />
+              <Jack {...getControlProps('patch_in_clock')} />
+            </div>
+          </div>
+        </div>
+
+        <div className="absolute" style={{ left: '1240px', top: '80px' }}>
+          <div className="flex flex-col gap-[60px]">
+            {/* Output jacks column */}
+            <div className="flex flex-col gap-[60px]">
+              <Jack {...getControlProps('patch_out_vca')} />
+              <Jack {...getControlProps('patch_out_vca_eg')} />
+              <Jack {...getControlProps('patch_out_vcf_eg')} />
+              <Jack {...getControlProps('patch_out_vco_eg')} />
+              <Jack {...getControlProps('patch_out_vco1')} />
+              <Jack {...getControlProps('patch_out_vco2')} />
+              <Jack {...getControlProps('patch_out_trigger')} />
+              <Jack {...getControlProps('patch_out_velocity')} />
+              <Jack {...getControlProps('patch_out_pitch')} />
+            </div>
+          </div>
+        </div>
+
+        {/* MOOG Logo - Bottom Left */}
+        <div className="absolute bottom-8 left-8">
           <div className="text-[20px] font-bold text-[#ddd] tracking-[0.2em] leading-none">DFAM</div>
           <div className="text-[6px] font-label text-[#888] tracking-[0.15em] mt-0.5">DRUMMER FROM ANOTHER MOTHER</div>
           <div className="text-[6px] font-label text-[#888] tracking-[0.15em]">SEMI-MODULAR ANALOG PERCUSSION SYNTHESIZER</div>
@@ -199,7 +232,7 @@ export default function DFAM() {
 
         {/* Teaching Mode Indicator */}
         {isTeachingMode && currentLesson?.device === device && (
-          <div className="absolute top-4 left-4 text-[8px] text-teaching-current font-bold animate-pulse tracking-wider">
+          <div className="absolute top-4 right-[300px] text-[8px] text-teaching-current font-bold animate-pulse tracking-wider">
             ● TEACHING MODE
           </div>
         )}
