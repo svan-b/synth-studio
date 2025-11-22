@@ -2,6 +2,7 @@
 
 import { useStudioStore } from '@/store/studio';
 import { DFAM_SPEC } from '@/data/dfam';
+import PatchBay from '@/components/controls/PatchBay';
 
 export default function DFAM() {
   const { setControlValue, getControlValue } = useStudioStore();
@@ -26,7 +27,28 @@ export default function DFAM() {
       margin: '0 auto',
       background: '#0a0a0a',
       padding: '20px',
+      position: 'relative',
     }}>
+      {/* Wooden Side Cheeks */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-[30px] rounded-l-lg"
+        style={{
+          background: 'linear-gradient(90deg, #5C4033 0%, #6F5645 50%, #5C4033 100%)',
+          boxShadow: 'inset -2px 0 4px rgba(0,0,0,0.3), inset 2px 0 4px rgba(255,255,255,0.1)',
+          height: '390px',
+          marginTop: '20px',
+        }}
+      />
+      <div
+        className="absolute right-0 top-0 bottom-0 w-[30px] rounded-r-lg"
+        style={{
+          background: 'linear-gradient(90deg, #5C4033 0%, #6F5645 50%, #5C4033 100%)',
+          boxShadow: 'inset 2px 0 4px rgba(0,0,0,0.3), inset -2px 0 4px rgba(255,255,255,0.1)',
+          height: '390px',
+          marginTop: '20px',
+        }}
+      />
+
       {/* Fixed size panel */}
       <div style={{
         width: '980px',
@@ -198,54 +220,55 @@ export default function DFAM() {
           <div style={{ position: 'absolute', left: '-30px', top: '60px', fontSize: '5px', color: '#666', transform: 'rotate(-90deg)' }}>VEL</div>
         </div>
 
-        {/* PATCH BAY - 3 columns with proper labels */}
+        {/* PATCH BAY - Interactive with cables */}
         <div style={{
           position: 'absolute',
-          right: '15px',
+          right: '10px',
           top: '30px',
-          width: '180px',
-          height: '300px',
+          width: '120px',
+          height: '290px',
           background: '#0d0d0d',
           borderRadius: '4px',
-          padding: '10px',
+          padding: '8px',
         }}>
           <div style={{ fontSize: '6px', color: '#888', marginBottom: '10px', textAlign: 'center' }}>PATCH BAY</div>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gridTemplateRows: 'repeat(8, 1fr)',
-            gap: '8px 6px',
-          }}>
-            {/* Column 1 - INPUTS */}
-            <JackLabeled label="TRIGGER" />
-            <JackLabeled label="VCA CV" />
-            <JackLabeled label="VELOCITY" />
-            <JackLabeled label="VCA DEC" />
-            <JackLabeled label="EXT IN" />
-            <JackLabeled label="" />
-            <JackLabeled label="" />
-            <JackLabeled label="" />
+          <PatchBay
+            jacks={[
+              // Column 1 - INPUTS
+              { id: 'trigger_in', label: 'TRIGGER', x: 20, y: 30, type: 'input' },
+              { id: 'vca_cv_in', label: 'VCA CV', x: 20, y: 60, type: 'input' },
+              { id: 'velocity_in', label: 'VELOCITY', x: 20, y: 90, type: 'input' },
+              { id: 'vca_dec_in', label: 'VCA DEC', x: 20, y: 120, type: 'input' },
+              { id: 'ext_in', label: 'EXT IN', x: 20, y: 150, type: 'input' },
+              { id: 'empty1', label: '', x: 20, y: 180, type: 'input' },
+              { id: 'empty2', label: '', x: 20, y: 210, type: 'input' },
+              { id: 'empty3', label: '', x: 20, y: 240, type: 'input' },
 
-            {/* Column 2 - MORE INPUTS */}
-            <JackLabeled label="VCF DEC" />
-            <JackLabeled label="NOISE" />
-            <JackLabeled label="VCO DEC" />
-            <JackLabeled label="VCF MOD" />
-            <JackLabeled label="VCO1 CV" />
-            <JackLabeled label="" />
-            <JackLabeled label="" />
-            <JackLabeled label="" />
+              // Column 2 - MORE INPUTS
+              { id: 'vcf_dec_in', label: 'VCF DEC', x: 55, y: 30, type: 'input' },
+              { id: 'noise_in', label: 'NOISE', x: 55, y: 60, type: 'input' },
+              { id: 'vco_dec_in', label: 'VCO DEC', x: 55, y: 90, type: 'input' },
+              { id: 'vcf_mod_in', label: 'VCF MOD', x: 55, y: 120, type: 'input' },
+              { id: 'vco1_cv_in', label: 'VCO1 CV', x: 55, y: 150, type: 'input' },
+              { id: 'empty4', label: '', x: 55, y: 180, type: 'input' },
+              { id: 'empty5', label: '', x: 55, y: 210, type: 'input' },
+              { id: 'empty6', label: '', x: 55, y: 240, type: 'input' },
 
-            {/* Column 3 - MIXED */}
-            <JackLabeled label="VCO2 CV" />
-            <JackLabeled label="TEMPO" />
-            <JackLabeled label="RUN/STP" />
-            <JackLabeled label="ADV/CLK" />
-            <JackLabeled label="VCA OUT" />
-            <JackLabeled label="VCO EG" />
-            <JackLabeled label="VCO 1" />
-            <JackLabeled label="VCO 2" />
-          </div>
+              // Column 3 - OUTPUTS & MIXED
+              { id: 'vco2_cv_in', label: 'VCO2 CV', x: 90, y: 30, type: 'input' },
+              { id: 'tempo_in', label: 'TEMPO', x: 90, y: 60, type: 'input' },
+              { id: 'run_stop_in', label: 'RUN/STP', x: 90, y: 90, type: 'input' },
+              { id: 'adv_clk_in', label: 'ADV/CLK', x: 90, y: 120, type: 'input' },
+              { id: 'vca_out', label: 'VCA OUT', x: 90, y: 150, type: 'output' },
+              { id: 'vco_eg_out', label: 'VCO EG', x: 90, y: 180, type: 'output' },
+              { id: 'vco1_out', label: 'VCO 1', x: 90, y: 210, type: 'output' },
+              { id: 'vco2_out', label: 'VCO 2', x: 90, y: 240, type: 'output' },
+            ]}
+            onConnection={(from, to, color) => {
+              console.log(`Connected ${from} → ${to} (${color} cable)`);
+              // You can trigger lessons based on specific connections!
+            }}
+          />
         </div>
 
         {/* Logo */}
@@ -439,29 +462,3 @@ function Switch3Way({ value, onChange }: any) {
   );
 }
 
-// Jack with label
-function JackLabeled({ label }: { label: string }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-      <div style={{
-        width: '11px',
-        height: '11px',
-        borderRadius: '50%',
-        background: '#000',
-        border: '2px solid #444',
-      }} />
-      <div style={{
-        fontSize: '4px',
-        color: '#666',
-        textAlign: 'center',
-        lineHeight: '1',
-        maxWidth: '45px',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-      }}>
-        {label}
-      </div>
-    </div>
-  );
-}
