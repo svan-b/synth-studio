@@ -9,7 +9,7 @@ export const DFAM_SPEC: DeviceSpec = {
   name: 'DFAM - Drummer From Another Mother',
   manufacturer: 'Moog',
   width: 1400,  // Scaled from 319mm
-  height: 670,  // Extended for sequencer rows
+  height: 800,  // Extended for all sections including sequencer
   controls: {
     // OSCILLATOR SECTION (Top Left)
     vco1_frequency: {

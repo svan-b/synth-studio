@@ -130,9 +130,10 @@ export default function DFAM() {
         </div>
 
         {/* Section Dividers */}
-        <div className="absolute left-[400px] top-[40px] bottom-[80px] w-[1px] bg-[#333]" />
-        <div className="absolute left-[880px] top-[40px] bottom-[80px] w-[1px] bg-[#333]" />
+        <div className="absolute left-[400px] top-[40px] bottom-[40px] w-[1px] bg-[#333]" />
+        <div className="absolute left-[880px] top-[40px] bottom-[40px] w-[1px] bg-[#333]" />
         <div className="absolute left-[40px] right-[40px] top-[380px] h-[1px] bg-[#333]" />
+        <div className="absolute left-[40px] right-[400px] top-[520px] h-[1px] bg-[#333]" />
 
         {/* OSCILLATORS SECTION */}
         <div className="absolute left-[40px] top-[60px]">
@@ -215,7 +216,7 @@ export default function DFAM() {
         </div>
 
         {/* SEQUENCER SECTION */}
-        <div className="absolute left-[40px] bottom-[40px] right-[400px]">
+        <div className="absolute left-[40px] top-[530px] right-[400px]">
           <div className="text-[8px] font-label text-[#999] tracking-[0.2em] mb-3 border-b border-[#333] pb-1">
             8-STEP SEQUENCER
           </div>
