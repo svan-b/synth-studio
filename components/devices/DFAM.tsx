@@ -38,167 +38,145 @@ export default function DFAM() {
         margin: '0 auto',
       }}>
 
-        {/* TOP ROW - OSCILLATORS */}
+        {/* TOP ROW - OSCILLATORS - PROPERLY GROUPED */}
 
-        {/* 1. VCO DECAY */}
-        <div style={{ position: 'absolute', left: '40px', top: '50px' }}>
-          <label style={{ fontSize: '6px', color: '#666', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>VCO DECAY</label>
-          <KnobNoValue {...getControlProps('vco_decay')} size={40} />
+        {/* VCO DECAY - Standalone */}
+        <div style={{ position: 'absolute', left: '60px', top: '60px' }}>
+          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>VCO DECAY</label>
+          <KnobNoValue {...getControlProps('vco_decay')} size={35} />
         </div>
 
-        {/* 2. VCO 1 EG AMOUNT */}
-        <div style={{ position: 'absolute', left: '90px', top: '50px' }}>
-          <label style={{ fontSize: '6px', color: '#666', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>VCO 1 EG AMT</label>
-          <KnobNoValue {...getControlProps('vco1_eg')} size={40} bipolar />
+        {/* VCO 1 GROUP */}
+        <div style={{ position: 'absolute', left: '130px', top: '60px' }}>
+          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>VCO 1 EG AMT</label>
+          <KnobNoValue {...getControlProps('vco1_eg')} size={35} bipolar />
         </div>
-
-        {/* 3. SEQ PITCH MOD selector */}
-        <div style={{ position: 'absolute', left: '90px', top: '105px' }}>
-          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>SEQ PITCH MOD</label>
+        <div style={{ position: 'absolute', left: '180px', top: '60px' }}>
+          <label style={{ fontSize: '6px', color: '#888', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>VCO 1 FREQ</label>
+          <KnobNoValue {...getControlProps('vco1_frequency')} size={45} bipolar />
+        </div>
+        <div style={{ position: 'absolute', left: '180px', top: '120px' }}>
+          <label style={{ fontSize: '4px', color: '#666', position: 'absolute', top: '-8px', whiteSpace: 'nowrap' }}>WAVE</label>
+          <SwitchCompact {...getControlProps('vco1_wave')} />
+        </div>
+        <div style={{ position: 'absolute', left: '130px', top: '120px' }}>
+          <label style={{ fontSize: '4px', color: '#666', position: 'absolute', top: '-8px', whiteSpace: 'nowrap' }}>SEQ PITCH</label>
           <Switch3Way {...getControlProps('seq_pitch_mod')} />
         </div>
 
-        {/* 4. VCO 1 FREQUENCY */}
-        <div style={{ position: 'absolute', left: '140px', top: '50px' }}>
-          <label style={{ fontSize: '6px', color: '#666', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>VCO 1 FREQ</label>
-          <KnobNoValue {...getControlProps('vco1_frequency')} size={40} bipolar />
+        {/* 1→2 FM */}
+        <div style={{ position: 'absolute', left: '250px', top: '70px' }}>
+          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>1→2 FM</label>
+          <KnobNoValue {...getControlProps('fm_amount')} size={30} />
         </div>
 
-        {/* 5. VCO 1 WAVE */}
-        <div style={{ position: 'absolute', left: '140px', top: '105px' }}>
-          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>WAVE</label>
-          <SwitchCompact {...getControlProps('vco1_wave')} />
+        {/* VCO 2 GROUP */}
+        <div style={{ position: 'absolute', left: '320px', top: '60px' }}>
+          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>VCO 2 EG AMT</label>
+          <KnobNoValue {...getControlProps('vco2_eg')} size={35} bipolar />
         </div>
-
-        {/* 6. 1→2 FM AMOUNT */}
-        <div style={{ position: 'absolute', left: '190px', top: '50px' }}>
-          <label style={{ fontSize: '6px', color: '#666', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>1→2 FM AMT</label>
-          <KnobNoValue {...getControlProps('fm_amount')} size={40} />
+        <div style={{ position: 'absolute', left: '370px', top: '60px' }}>
+          <label style={{ fontSize: '6px', color: '#888', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>VCO 2 FREQ</label>
+          <KnobNoValue {...getControlProps('vco2_frequency')} size={45} bipolar />
         </div>
-
-        {/* 7. VCO 2 EG AMOUNT */}
-        <div style={{ position: 'absolute', left: '240px', top: '50px' }}>
-          <label style={{ fontSize: '6px', color: '#666', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>VCO 2 EG AMT</label>
-          <KnobNoValue {...getControlProps('vco2_eg')} size={40} bipolar />
-        </div>
-
-        {/* 8. VCO 2 FREQUENCY */}
-        <div style={{ position: 'absolute', left: '290px', top: '50px' }}>
-          <label style={{ fontSize: '6px', color: '#666', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>VCO 2 FREQ</label>
-          <KnobNoValue {...getControlProps('vco2_frequency')} size={40} bipolar />
-        </div>
-
-        {/* 9. VCO 2 WAVE */}
-        <div style={{ position: 'absolute', left: '290px', top: '105px' }}>
-          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>WAVE</label>
+        <div style={{ position: 'absolute', left: '370px', top: '120px' }}>
+          <label style={{ fontSize: '4px', color: '#666', position: 'absolute', top: '-8px', whiteSpace: 'nowrap' }}>WAVE</label>
           <SwitchCompact {...getControlProps('vco2_wave')} />
         </div>
-
-        {/* 10. HARD SYNC */}
-        <div style={{ position: 'absolute', left: '340px', top: '70px' }}>
-          <label style={{ fontSize: '6px', color: '#666', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>HARD SYNC</label>
+        <div style={{ position: 'absolute', left: '320px', top: '120px' }}>
+          <label style={{ fontSize: '4px', color: '#666', position: 'absolute', top: '-8px', whiteSpace: 'nowrap' }}>SYNC</label>
           <SwitchCompact {...getControlProps('hard_sync')} />
         </div>
 
-        {/* MIDDLE SECTION - MIXER, FILTER & VCA */}
-
-        {/* 11. VCO 1 LEVEL */}
-        <div style={{ position: 'absolute', left: '380px', top: '70px' }}>
+        {/* MIXER SECTION - Below oscillators */}
+        <div style={{ position: 'absolute', left: '130px', top: '170px' }}>
           <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>VCO 1</label>
           <KnobNoValue {...getControlProps('vco1_level')} size={30} />
         </div>
-
-        {/* 12. NOISE/EXT LEVEL */}
-        <div style={{ position: 'absolute', left: '420px', top: '70px' }}>
+        <div style={{ position: 'absolute', left: '180px', top: '170px' }}>
           <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>NOISE</label>
           <KnobNoValue {...getControlProps('noise')} size={30} />
         </div>
-
-        {/* 13. VCO 2 LEVEL */}
-        <div style={{ position: 'absolute', left: '460px', top: '70px' }}>
+        <div style={{ position: 'absolute', left: '230px', top: '170px' }}>
           <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>VCO 2</label>
           <KnobNoValue {...getControlProps('vco2_level')} size={30} />
         </div>
 
-        {/* 14. VCF (FILTER) SECTION */}
-        <div style={{ position: 'absolute', left: '520px', top: '50px' }}>
-          <label style={{ fontSize: '7px', color: '#888', position: 'absolute', top: '-15px', whiteSpace: 'nowrap' }}>CUTOFF</label>
+        {/* FILTER SECTION - Tight grouping */}
+        <div style={{ position: 'absolute', left: '450px', top: '60px' }}>
+          <label style={{ fontSize: '7px', color: '#888', position: 'absolute', top: '-14px', whiteSpace: 'nowrap' }}>CUTOFF</label>
           <KnobNoValue {...getControlProps('vcf_cutoff')} size={55} />
         </div>
-        <div style={{ position: 'absolute', left: '590px', top: '50px' }}>
-          <label style={{ fontSize: '6px', color: '#666', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>RESONANCE</label>
-          <KnobNoValue {...getControlProps('vcf_resonance')} size={40} />
+        <div style={{ position: 'absolute', left: '520px', top: '70px' }}>
+          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>RES</label>
+          <KnobNoValue {...getControlProps('vcf_resonance')} size={35} />
         </div>
-        <div style={{ position: 'absolute', left: '640px', top: '50px' }}>
-          <label style={{ fontSize: '6px', color: '#666', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>VCF EG AMT</label>
-          <KnobNoValue {...getControlProps('vcf_eg')} size={40} bipolar />
+        <div style={{ position: 'absolute', left: '580px', top: '70px' }}>
+          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>VCF EG AMT</label>
+          <KnobNoValue {...getControlProps('vcf_eg')} size={35} bipolar />
         </div>
-        <div style={{ position: 'absolute', left: '590px', top: '115px' }}>
-          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>VCF MODE</label>
+        <div style={{ position: 'absolute', left: '520px', top: '120px' }}>
+          <label style={{ fontSize: '4px', color: '#666', position: 'absolute', top: '-8px', whiteSpace: 'nowrap' }}>MODE</label>
           <SwitchCompact {...getControlProps('vcf_mode')} />
         </div>
-        <div style={{ position: 'absolute', left: '520px', top: '125px' }}>
+        <div style={{ position: 'absolute', left: '450px', top: '140px' }}>
           <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>VCF DECAY</label>
           <KnobNoValue {...getControlProps('vcf_decay')} size={30} />
         </div>
-        <div style={{ position: 'absolute', left: '640px', top: '125px' }}>
+        <div style={{ position: 'absolute', left: '520px', top: '140px' }}>
+          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>VCF EG</label>
+          <KnobNoValue {...getControlProps('vcf_eg')} size={30} />
+        </div>
+        <div style={{ position: 'absolute', left: '580px', top: '140px' }}>
           <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>NOISE MOD</label>
           <KnobNoValue {...getControlProps('noise_vcf_mod')} size={30} />
         </div>
 
-        {/* 15. VCA SECTION */}
-        <div style={{ position: 'absolute', left: '700px', top: '50px' }}>
+        {/* VCA SECTION - Far right of filter */}
+        <div style={{ position: 'absolute', left: '650px', top: '70px' }}>
           <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>VCA EG</label>
           <SwitchCompact {...getControlProps('vca_eg')} />
         </div>
-        <div style={{ position: 'absolute', left: '700px', top: '105px' }}>
+        <div style={{ position: 'absolute', left: '700px', top: '70px' }}>
           <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>VCA DECAY</label>
           <KnobNoValue {...getControlProps('vca_decay')} size={30} />
         </div>
         <div style={{ position: 'absolute', left: '750px', top: '70px' }}>
-          <label style={{ fontSize: '6px', color: '#666', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>VOLUME</label>
+          <label style={{ fontSize: '6px', color: '#888', position: 'absolute', top: '-12px', whiteSpace: 'nowrap' }}>VOLUME</label>
           <KnobNoValue {...getControlProps('vca_level')} size={40} />
         </div>
 
-        {/* BOTTOM LEFT - TEMPO & TRANSPORT */}
-
-        {/* 16. TEMPO */}
-        <div style={{ position: 'absolute', left: '100px', top: '180px' }}>
-          <label style={{ fontSize: '7px', color: '#888', position: 'absolute', top: '-15px', whiteSpace: 'nowrap' }}>TEMPO</label>
+        {/* TEMPO & TRANSPORT - Far left */}
+        <div style={{ position: 'absolute', left: '60px', top: '220px' }}>
+          <label style={{ fontSize: '7px', color: '#888', position: 'absolute', top: '-14px', whiteSpace: 'nowrap' }}>TEMPO</label>
           <KnobNoValue {...getControlProps('tempo')} size={55} />
         </div>
-
-        {/* 17. TRIGGER button */}
-        <div style={{ position: 'absolute', left: '40px', top: '180px' }}>
-          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>TRIGGER</label>
+        <div style={{ position: 'absolute', left: '60px', top: '300px' }}>
+          <label style={{ fontSize: '4px', color: '#666', position: 'absolute', top: '-8px', whiteSpace: 'nowrap' }}>TRIGGER</label>
           <ButtonCompact {...getControlProps('trigger')} momentary gray />
         </div>
-
-        {/* 18. RUN/STOP */}
-        <div style={{ position: 'absolute', left: '40px', top: '230px' }}>
-          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>RUN/STOP</label>
+        <div style={{ position: 'absolute', left: '60px', top: '310px' }}>
+          <label style={{ fontSize: '4px', color: '#666', position: 'absolute', top: '32px', whiteSpace: 'nowrap' }}>RUN/STOP</label>
           <ButtonCompact {...getControlProps('run_stop')} red />
         </div>
-
-        {/* 19. ADVANCE */}
-        <div style={{ position: 'absolute', left: '100px', top: '230px' }}>
-          <label style={{ fontSize: '5px', color: '#666', position: 'absolute', top: '-10px', whiteSpace: 'nowrap' }}>ADVANCE</label>
+        <div style={{ position: 'absolute', left: '120px', top: '310px' }}>
+          <label style={{ fontSize: '4px', color: '#666', position: 'absolute', top: '32px', whiteSpace: 'nowrap' }}>ADVANCE</label>
           <ButtonCompact {...getControlProps('advance')} momentary />
         </div>
 
-        {/* SEQUENCER SECTION */}
-        <div style={{ position: 'absolute', left: '250px', top: '180px' }}>
-          <div style={{ fontSize: '7px', color: '#888', marginBottom: '12px' }}>SEQUENCER</div>
+        {/* SEQUENCER - More compact (240px width) */}
+        <div style={{ position: 'absolute', left: '280px', top: '220px' }}>
+          <div style={{ fontSize: '6px', color: '#888', marginBottom: '8px' }}>SEQUENCER</div>
 
           {/* Step numbers */}
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
             {[1,2,3,4,5,6,7,8].map(n => (
-              <div key={n} style={{ fontSize: '6px', color: '#666', width: '25px', textAlign: 'center' }}>{n}</div>
+              <div key={n} style={{ fontSize: '5px', color: '#666', width: '25px', textAlign: 'center' }}>{n}</div>
             ))}
           </div>
 
-          {/* PITCH row */}
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
+          {/* PITCH row - 30px spacing */}
+          <div style={{ display: 'flex', gap: '5px', marginBottom: '6px' }}>
             {[1,2,3,4,5,6,7,8].map(i => (
               <div key={`p${i}`} style={{ textAlign: 'center' }}>
                 <KnobNoValue {...getControlProps(`pitch${i}`)} size={25} bipolar />
@@ -206,8 +184,8 @@ export default function DFAM() {
             ))}
           </div>
 
-          {/* VELOCITY row */}
-          <div style={{ display: 'flex', gap: '10px' }}>
+          {/* VELOCITY row - 30px spacing */}
+          <div style={{ display: 'flex', gap: '5px' }}>
             {[1,2,3,4,5,6,7,8].map(i => (
               <div key={`v${i}`} style={{ textAlign: 'center' }}>
                 <KnobNoValue {...getControlProps(`velocity${i}`)} size={25} />
@@ -216,16 +194,16 @@ export default function DFAM() {
           </div>
 
           {/* Row labels */}
-          <div style={{ position: 'absolute', left: '-35px', top: '20px', fontSize: '5px', color: '#666' }}>PITCH</div>
-          <div style={{ position: 'absolute', left: '-35px', top: '60px', fontSize: '5px', color: '#666' }}>VEL</div>
+          <div style={{ position: 'absolute', left: '-30px', top: '24px', fontSize: '5px', color: '#666', transform: 'rotate(-90deg)' }}>PITCH</div>
+          <div style={{ position: 'absolute', left: '-30px', top: '60px', fontSize: '5px', color: '#666', transform: 'rotate(-90deg)' }}>VEL</div>
         </div>
 
-        {/* PATCH BAY - 3 columns × 8 rows */}
+        {/* PATCH BAY - 3 columns with proper labels */}
         <div style={{
           position: 'absolute',
           right: '15px',
           top: '30px',
-          width: '170px',
+          width: '180px',
           height: '300px',
           background: '#0d0d0d',
           borderRadius: '4px',
@@ -236,37 +214,37 @@ export default function DFAM() {
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
             gridTemplateRows: 'repeat(8, 1fr)',
-            gap: '6px 4px',
+            gap: '8px 6px',
           }}>
-            {/* Column 1 - Inputs */}
-            <JackLabeled label="TRIG" />
+            {/* Column 1 - INPUTS */}
+            <JackLabeled label="TRIGGER" />
             <JackLabeled label="VCA CV" />
-            <JackLabeled label="VEL" />
+            <JackLabeled label="VELOCITY" />
             <JackLabeled label="VCA DEC" />
             <JackLabeled label="EXT IN" />
+            <JackLabeled label="" />
+            <JackLabeled label="" />
+            <JackLabeled label="" />
+
+            {/* Column 2 - MORE INPUTS */}
             <JackLabeled label="VCF DEC" />
             <JackLabeled label="NOISE" />
             <JackLabeled label="VCO DEC" />
-
-            {/* Column 2 - More Inputs */}
             <JackLabeled label="VCF MOD" />
-            <JackLabeled label="VCO 1 CV" />
-            <JackLabeled label="VCO 2 CV" />
+            <JackLabeled label="VCO1 CV" />
+            <JackLabeled label="" />
+            <JackLabeled label="" />
+            <JackLabeled label="" />
+
+            {/* Column 3 - MIXED */}
+            <JackLabeled label="VCO2 CV" />
             <JackLabeled label="TEMPO" />
             <JackLabeled label="RUN/STP" />
             <JackLabeled label="ADV/CLK" />
-            <JackLabeled label="VCA" />
-            <JackLabeled label="VCO 1" />
-
-            {/* Column 3 - Outputs */}
-            <JackLabeled label="VCO 2" />
-            <JackLabeled label="PITCH" />
-            <JackLabeled label="VCA EG" />
-            <JackLabeled label="VCF EG" />
+            <JackLabeled label="VCA OUT" />
             <JackLabeled label="VCO EG" />
-            <JackLabeled label="" />
-            <JackLabeled label="" />
-            <JackLabeled label="" />
+            <JackLabeled label="VCO 1" />
+            <JackLabeled label="VCO 2" />
           </div>
         </div>
 
@@ -372,8 +350,8 @@ function ButtonCompact({ value, onChange, red = false, momentary = false, gray =
     <button
       onClick={handleClick}
       style={{
-        width: '30px',
-        height: '30px',
+        width: '25px',
+        height: '25px',
         borderRadius: '50%',
         background: bgColor,
         border: '2px solid #333',
@@ -388,11 +366,11 @@ function ButtonCompact({ value, onChange, red = false, momentary = false, gray =
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: '8px',
-          height: '8px',
+          width: '6px',
+          height: '6px',
           borderRadius: '50%',
           background: red ? '#ff6666' : '#66ff66',
-          boxShadow: `0 0 6px ${red ? '#ff0000' : '#00ff00'}`,
+          boxShadow: `0 0 4px ${red ? '#ff0000' : '#00ff00'}`,
         }} />
       )}
     </button>
@@ -405,8 +383,8 @@ function SwitchCompact({ value, onChange }: any) {
     <button
       onClick={() => onChange(!value)}
       style={{
-        width: '20px',
-        height: '30px',
+        width: '18px',
+        height: '26px',
         background: '#1a1a1a',
         border: '2px solid #333',
         borderRadius: '4px',
@@ -415,12 +393,12 @@ function SwitchCompact({ value, onChange }: any) {
       }}
     >
       <div style={{
-        width: '12px',
-        height: '6px',
+        width: '10px',
+        height: '5px',
         background: value ? '#0f0' : '#333',
         position: 'absolute',
         left: '50%',
-        top: value ? '4px' : '18px',
+        top: value ? '3px' : '16px',
         transform: 'translateX(-50%)',
         borderRadius: '2px',
         transition: 'all 0.2s',
@@ -437,8 +415,8 @@ function Switch3Way({ value, onChange }: any) {
     <button
       onClick={() => onChange((position + 1) % 3)}
       style={{
-        width: '20px',
-        height: '36px',
+        width: '18px',
+        height: '32px',
         background: '#1a1a1a',
         border: '2px solid #333',
         borderRadius: '4px',
@@ -447,12 +425,12 @@ function Switch3Way({ value, onChange }: any) {
       }}
     >
       <div style={{
-        width: '12px',
-        height: '6px',
+        width: '10px',
+        height: '5px',
         background: '#0f0',
         position: 'absolute',
         left: '50%',
-        top: position === 0 ? '4px' : position === 1 ? '14px' : '24px',
+        top: position === 0 ? '3px' : position === 1 ? '13px' : '23px',
         transform: 'translateX(-50%)',
         borderRadius: '2px',
         transition: 'all 0.2s',
@@ -466,8 +444,8 @@ function JackLabeled({ label }: { label: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
       <div style={{
-        width: '12px',
-        height: '12px',
+        width: '11px',
+        height: '11px',
         borderRadius: '50%',
         background: '#000',
         border: '2px solid #444',
@@ -477,7 +455,7 @@ function JackLabeled({ label }: { label: string }) {
         color: '#666',
         textAlign: 'center',
         lineHeight: '1',
-        maxWidth: '40px',
+        maxWidth: '45px',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
