@@ -94,7 +94,7 @@ export default function DFAM() {
   };
 
   return (
-    <div className="relative mx-auto" style={{ width: '1260px' }}>
+    <div className="relative mx-auto" style={{ width: '1460px' }}>
       {/* Wooden Side Cheeks */}
       <div
         className="absolute left-0 top-0 bottom-0 w-[30px] rounded-l-lg"
@@ -111,237 +111,137 @@ export default function DFAM() {
         }}
       />
 
-      {/* Main Panel - Hardware-accurate layout */}
+      {/* Main Panel - 1400×380px (3.7:1 ratio) */}
       <div
-        className="relative bg-[#0a0a0a] mx-[30px] border-t-2 border-b-2 border-[#1a1a1a]"
+        className="relative bg-[#1a1a1a] mx-[30px] border-t-2 border-b-2 border-[#1a1a1a]"
         style={{
-          width: '1200px',
-          height: '450px',
+          width: '1400px',
+          height: '380px',
           boxShadow: '0 10px 40px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.03)',
         }}
       >
-        {/* TOP SECTION - Oscillators */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '30px',
-            left: '40px',
-            display: 'flex',
-            gap: '25px',
-            alignItems: 'flex-start',
-          }}
-        >
-          {/* VCO Decay */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
-            <Knob {...getControlProps('vco_decay')} />
-            <div style={{ fontSize: '7px', color: '#999', textTransform: 'uppercase' }}>SEQ PITCH MOD</div>
-          </div>
+        {/* TOP ROW - Oscillators (y: 40px) */}
+        <div className="absolute" style={{ left: '60px', top: '40px' }}><Knob {...getControlProps('vco_decay')} size="medium" /></div>
+        <div className="absolute" style={{ left: '120px', top: '40px' }}><Knob {...getControlProps('vco1_eg')} size="medium" /></div>
+        <div className="absolute" style={{ left: '180px', top: '40px' }}><Knob {...getControlProps('vco1_frequency')} size="medium" /></div>
+        <div className="absolute" style={{ left: '180px', top: '95px' }}><Switch {...getControlProps('vco1_wave')} /></div>
 
-          {/* VCO 1 Group */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-            <Knob {...getControlProps('vco1_eg')} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-            <Knob {...getControlProps('vco1_frequency')} />
-            <Switch {...getControlProps('vco1_wave')} />
-          </div>
+        <div className="absolute" style={{ left: '280px', top: '40px' }}><Knob {...getControlProps('fm_amount')} size="medium" /></div>
 
-          {/* FM Amount */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', marginTop: '20px' }}>
-            <Knob {...getControlProps('fm_amount')} />
-            <div style={{ fontSize: '6px', color: '#666' }}>1→2 FM AMOUNT</div>
-          </div>
+        <div className="absolute" style={{ left: '380px', top: '40px' }}><Knob {...getControlProps('vco2_eg')} size="medium" /></div>
+        <div className="absolute" style={{ left: '440px', top: '40px' }}><Knob {...getControlProps('vco2_frequency')} size="medium" /></div>
+        <div className="absolute" style={{ left: '440px', top: '95px' }}><Switch {...getControlProps('vco2_wave')} /></div>
 
-          {/* VCO 2 Group */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-            <Knob {...getControlProps('vco2_eg')} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-            <Knob {...getControlProps('vco2_frequency')} />
-            <Switch {...getControlProps('vco2_wave')} />
-          </div>
+        <div className="absolute" style={{ left: '540px', top: '60px' }}><Switch {...getControlProps('hard_sync')} /></div>
 
-          {/* Hard Sync */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', marginTop: '20px' }}>
-            <Switch {...getControlProps('hard_sync')} />
-          </div>
+        {/* MIDDLE ROW - Mixer & Filter (y: 140px) */}
+        <div className="absolute" style={{ left: '60px', top: '140px' }}><Knob {...getControlProps('tempo')} size="large" /></div>
+
+        <div className="absolute" style={{ left: '160px', top: '140px' }}><Knob {...getControlProps('vco1_level')} size="medium" /></div>
+        <div className="absolute" style={{ left: '220px', top: '140px' }}><Knob {...getControlProps('noise')} size="medium" /></div>
+        <div className="absolute" style={{ left: '280px', top: '140px' }}><Knob {...getControlProps('vco2_level')} size="medium" /></div>
+
+        <div className="absolute" style={{ left: '380px', top: '140px' }}><Knob {...getControlProps('vcf_cutoff')} size="large" /></div>
+        <div className="absolute" style={{ left: '480px', top: '140px' }}><Knob {...getControlProps('vcf_resonance')} size="medium" /></div>
+        <div className="absolute" style={{ left: '540px', top: '140px' }}><Knob {...getControlProps('vcf_eg')} size="medium" /></div>
+        <div className="absolute" style={{ left: '600px', top: '140px' }}><Knob {...getControlProps('vcf_decay')} size="medium" /></div>
+        <div className="absolute" style={{ left: '660px', top: '140px' }}><Knob {...getControlProps('noise_vcf_mod')} size="medium" /></div>
+
+        <div className="absolute" style={{ left: '540px', top: '195px' }}><Switch {...getControlProps('vcf_mode')} /></div>
+
+        <div className="absolute" style={{ left: '760px', top: '140px' }}><Knob {...getControlProps('vca_decay')} size="medium" /></div>
+        <div className="absolute" style={{ left: '820px', top: '140px' }}><Knob {...getControlProps('vca_eg')} size="medium" /></div>
+        <div className="absolute" style={{ left: '900px', top: '140px' }}><Knob {...getControlProps('vca_level')} size="medium" /></div>
+
+        {/* SEQUENCER SECTION (y: 240px) */}
+        <div className="absolute" style={{ left: '60px', top: '260px' }}><Button {...getControlProps('run_stop')} /></div>
+        <div className="absolute" style={{ left: '120px', top: '260px' }}><Button {...getControlProps('advance')} /></div>
+
+        {/* Step numbers */}
+        <div className="absolute" style={{ left: '200px', top: '235px', display: 'flex', gap: '6px' }}>
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+            <div key={i} style={{ width: '30px', textAlign: 'center', fontSize: '8px', color: '#666' }}>{i}</div>
+          ))}
         </div>
 
-        {/* MIDDLE SECTION - Mixer & Filter */}
+        {/* PITCH row */}
+        <div className="absolute" style={{ left: '200px', top: '250px' }}><Knob {...getControlProps('pitch1')} size="small" /></div>
+        <div className="absolute" style={{ left: '236px', top: '250px' }}><Knob {...getControlProps('pitch2')} size="small" /></div>
+        <div className="absolute" style={{ left: '272px', top: '250px' }}><Knob {...getControlProps('pitch3')} size="small" /></div>
+        <div className="absolute" style={{ left: '308px', top: '250px' }}><Knob {...getControlProps('pitch4')} size="small" /></div>
+        <div className="absolute" style={{ left: '344px', top: '250px' }}><Knob {...getControlProps('pitch5')} size="small" /></div>
+        <div className="absolute" style={{ left: '380px', top: '250px' }}><Knob {...getControlProps('pitch6')} size="small" /></div>
+        <div className="absolute" style={{ left: '416px', top: '250px' }}><Knob {...getControlProps('pitch7')} size="small" /></div>
+        <div className="absolute" style={{ left: '452px', top: '250px' }}><Knob {...getControlProps('pitch8')} size="small" /></div>
+
+        {/* VELOCITY row */}
+        <div className="absolute" style={{ left: '200px', top: '295px' }}><Knob {...getControlProps('velocity1')} size="small" /></div>
+        <div className="absolute" style={{ left: '236px', top: '295px' }}><Knob {...getControlProps('velocity2')} size="small" /></div>
+        <div className="absolute" style={{ left: '272px', top: '295px' }}><Knob {...getControlProps('velocity3')} size="small" /></div>
+        <div className="absolute" style={{ left: '308px', top: '295px' }}><Knob {...getControlProps('velocity4')} size="small" /></div>
+        <div className="absolute" style={{ left: '344px', top: '295px' }}><Knob {...getControlProps('velocity5')} size="small" /></div>
+        <div className="absolute" style={{ left: '380px', top: '295px' }}><Knob {...getControlProps('velocity6')} size="small" /></div>
+        <div className="absolute" style={{ left: '416px', top: '295px' }}><Knob {...getControlProps('velocity7')} size="small" /></div>
+        <div className="absolute" style={{ left: '452px', top: '295px' }}><Knob {...getControlProps('velocity8')} size="small" /></div>
+
+        {/* PATCH BAY - 3 columns × 9 rows (right side, x: 1000px) */}
         <div
+          className="absolute"
           style={{
-            position: 'absolute',
-            top: '160px',
-            left: '40px',
-            display: 'flex',
-            gap: '30px',
-            alignItems: 'center',
-          }}
-        >
-          {/* TEMPO - Large knob */}
-          <Knob {...getControlProps('tempo')} size="large" />
-
-          {/* Mixer Group - VCO levels */}
-          <div style={{ display: 'flex', gap: '20px' }}>
-            <Knob {...getControlProps('vco1_level')} />
-            <Knob {...getControlProps('noise')} />
-            <Knob {...getControlProps('vco2_level')} />
-          </div>
-
-          {/* Filter Group */}
-          <Knob {...getControlProps('vcf_cutoff')} size="large" />
-          <Knob {...getControlProps('vcf_resonance')} />
-          <Knob {...getControlProps('vcf_eg')} />
-          <Knob {...getControlProps('vcf_decay')} />
-          <Knob {...getControlProps('noise_vcf_mod')} />
-
-          {/* VCA Level (Volume) */}
-          <Knob {...getControlProps('vca_level')} />
-        </div>
-
-        {/* VCF Mode Switch - Below filter section */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '240px',
-            left: '580px',
-          }}
-        >
-          <Switch {...getControlProps('vcf_mode')} />
-        </div>
-
-        {/* BOTTOM SECTION - VCA & Sequencer */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '290px',
-            left: '40px',
-            display: 'flex',
-            gap: '30px',
-            alignItems: 'flex-start',
-          }}
-        >
-          {/* VCA Controls */}
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-            <Knob {...getControlProps('vca_decay')} />
-            <Knob {...getControlProps('vca_eg')} />
-          </div>
-
-          {/* 8-STEP SEQUENCER */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            {/* Step numbers */}
-            <div style={{
-              display: 'flex',
-              gap: '8px',
-              marginBottom: '5px',
-              paddingLeft: '12px',
-            }}>
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                <div key={i} style={{
-                  width: '35px',
-                  textAlign: 'center',
-                  fontSize: '10px',
-                  color: '#666',
-                  fontWeight: 'bold',
-                }}>
-                  {i}
-                </div>
-              ))}
-            </div>
-
-            {/* PITCH row */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                <Knob key={`pitch${i}`} {...getControlProps(`pitch${i}`)} size="small" />
-              ))}
-            </div>
-
-            {/* VELOCITY row */}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                <Knob key={`vel${i}`} {...getControlProps(`velocity${i}`)} size="small" />
-              ))}
-            </div>
-          </div>
-
-          {/* Sequencer Transport Buttons */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '30px' }}>
-            <Button {...getControlProps('run_stop')} />
-            <Button {...getControlProps('advance')} />
-          </div>
-        </div>
-
-        {/* PATCH BAY - Right side, 3 columns x 5 rows */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '30px',
             right: '30px',
-            background: '#0d0d0d',
-            borderRadius: '6px',
-            padding: '15px',
-            border: '1px solid #222',
-          }}
-        >
-          <div style={{
-            fontSize: '8px',
-            color: '#999',
-            textAlign: 'center',
-            marginBottom: '12px',
-            letterSpacing: '0.1em',
-            borderBottom: '1px solid #333',
-            paddingBottom: '8px',
-          }}>
-            PATCH BAY
-          </div>
-
-          <div style={{
+            top: '30px',
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '15px 12px',
-          }}>
-            {/* Column 1 - Inputs */}
-            <Jack {...getControlProps('patch_in_trigger')} />
-            <Jack {...getControlProps('patch_in_vca_cv')} />
-            <Jack {...getControlProps('patch_in_velocity')} />
+            gap: '30px 25px',
+          }}
+        >
+          {/* Row 1 */}
+          <Jack {...getControlProps('patch_in_trigger')} />
+          <Jack {...getControlProps('patch_in_vca_cv')} />
+          <Jack {...getControlProps('patch_in_velocity')} />
 
-            <Jack {...getControlProps('patch_in_vca_decay')} />
-            <Jack {...getControlProps('patch_in_ext_audio')} />
-            <Jack {...getControlProps('patch_in_vcf_decay')} />
+          {/* Row 2 */}
+          <Jack {...getControlProps('patch_in_vca_decay')} />
+          <Jack {...getControlProps('patch_in_ext_audio')} />
+          <Jack {...getControlProps('patch_in_vcf_decay')} />
 
-            <Jack {...getControlProps('patch_in_noise')} />
-            <Jack {...getControlProps('patch_in_vco_decay')} />
-            <Jack {...getControlProps('patch_in_vcf_mod')} />
+          {/* Row 3 */}
+          <Jack {...getControlProps('patch_in_noise')} />
+          <Jack {...getControlProps('patch_in_vco_decay')} />
+          <Jack {...getControlProps('patch_in_vcf_mod')} />
 
-            <Jack {...getControlProps('patch_in_vco1_cv')} />
-            <Jack {...getControlProps('patch_in_vco2_cv')} />
-            <Jack {...getControlProps('patch_in_tempo')} />
+          {/* Row 4 */}
+          <Jack {...getControlProps('patch_in_vco1_cv')} />
+          <Jack {...getControlProps('patch_in_vco2_cv')} />
+          <Jack {...getControlProps('patch_in_tempo')} />
 
-            <Jack {...getControlProps('patch_in_run_stop')} />
-            <Jack {...getControlProps('patch_in_advance')} />
-            <Jack {...getControlProps('patch_in_clock')} />
+          {/* Row 5 */}
+          <Jack {...getControlProps('patch_in_run_stop')} />
+          <Jack {...getControlProps('patch_in_advance')} />
+          <Jack {...getControlProps('patch_in_clock')} />
 
-            {/* Outputs */}
-            <Jack {...getControlProps('patch_out_vca')} />
-            <Jack {...getControlProps('patch_out_vca_eg')} />
-            <Jack {...getControlProps('patch_out_vcf_eg')} />
+          {/* Row 6 - Outputs */}
+          <Jack {...getControlProps('patch_out_vca')} />
+          <Jack {...getControlProps('patch_out_vca_eg')} />
+          <Jack {...getControlProps('patch_out_vcf_eg')} />
 
-            <Jack {...getControlProps('patch_out_vco_eg')} />
-            <Jack {...getControlProps('patch_out_vco1')} />
-            <Jack {...getControlProps('patch_out_vco2')} />
+          {/* Row 7 */}
+          <Jack {...getControlProps('patch_out_vco_eg')} />
+          <Jack {...getControlProps('patch_out_vco1')} />
+          <Jack {...getControlProps('patch_out_vco2')} />
 
-            <Jack {...getControlProps('patch_out_trigger')} />
-            <Jack {...getControlProps('patch_out_velocity')} />
-            <Jack {...getControlProps('patch_out_pitch')} />
-          </div>
+          {/* Row 8 */}
+          <Jack {...getControlProps('patch_out_trigger')} />
+          <Jack {...getControlProps('patch_out_velocity')} />
+          <Jack {...getControlProps('patch_out_pitch')} />
         </div>
 
         {/* MOOG Logo - Bottom Left */}
-        <div className="absolute bottom-8 left-8">
-          <div className="text-[20px] font-bold text-[#ddd] tracking-[0.2em] leading-none">DFAM</div>
-          <div className="text-[6px] font-label text-[#888] tracking-[0.15em] mt-0.5">DRUMMER FROM ANOTHER MOTHER</div>
-          <div className="text-[6px] font-label text-[#888] tracking-[0.15em]">SEMI-MODULAR ANALOG PERCUSSION SYNTHESIZER</div>
-          <div className="text-[9px] font-label text-[#666] tracking-[0.3em] mt-1">moog</div>
+        <div className="absolute bottom-6 left-8">
+          <div className="text-[18px] font-bold text-[#ddd] tracking-[0.2em] leading-none">DFAM</div>
+          <div className="text-[5px] font-label text-[#888] tracking-[0.15em] mt-0.5">DRUMMER FROM ANOTHER MOTHER</div>
+          <div className="text-[5px] font-label text-[#888] tracking-[0.15em]">SEMI-MODULAR ANALOG PERCUSSION SYNTHESIZER</div>
+          <div className="text-[8px] font-label text-[#666] tracking-[0.3em] mt-1">moog</div>
         </div>
 
         {/* Teaching Mode Indicator */}
@@ -354,9 +254,9 @@ export default function DFAM() {
         {/* Corner Screws */}
         {[
           { x: 15, y: 15 },
-          { x: 1185, y: 15 },
-          { x: 15, y: 435 },
-          { x: 1185, y: 435 },
+          { x: 1385, y: 15 },
+          { x: 15, y: 365 },
+          { x: 1385, y: 365 },
         ].map((pos, i) => (
           <div
             key={i}
