@@ -5,6 +5,7 @@ import { DFAM_SPEC } from '@/data/dfam';
 import Knob from '@/components/controls/Knob';
 import Button from '@/components/controls/Button';
 import Switch from '@/components/controls/Switch';
+import Jack from '@/components/controls/Jack';
 
 export default function DFAM() {
   const { deviceSettings, setControlValue, getControlValue, currentLesson, currentStep, isTeachingMode, completeStep } = useStudioStore();
@@ -12,19 +13,18 @@ export default function DFAM() {
   const device = 'DFAM';
   const spec = DFAM_SPEC;
 
-  // Get current step if in teaching mode
   const currentStepData = (isTeachingMode && currentLesson?.device === device) ? currentLesson.steps[currentStep] : undefined;
   const highlightedControl = currentStepData?.control;
 
-  const handleControlChange = (controlId: string, value: number | string) => {
-    setControlValue(device, controlId, value);
+  const handleControlChange = (controlId: string, value: number | string | boolean) => {
+    // Convert boolean to number for storage
+    const storageValue = typeof value === 'boolean' ? (value ? 1 : 0) : value;
+    setControlValue(device, controlId, storageValue);
 
-    // Check if this completes the current step
     if (currentStepData && controlId === currentStepData.control) {
       const targetValue = currentStepData.targetValue;
       const control = spec.controls[controlId];
 
-      // Check if value is close enough (5% tolerance)
       if (typeof targetValue === 'number' && typeof value === 'number') {
         const range = control.max - control.min;
         const tolerance = range * 0.05;
@@ -47,11 +47,10 @@ export default function DFAM() {
       id: controlId,
       label: control.label,
       position: control.position,
-      onChange: (newValue: number | string) => handleControlChange(controlId, newValue),
+      onChange: (newValue: number | string | boolean) => handleControlChange(controlId, newValue),
       highlighted: isHighlighted,
     };
 
-    // Type-specific props
     if (control.type === 'knob') {
       return {
         ...baseProps,
@@ -85,219 +84,255 @@ export default function DFAM() {
       };
     }
 
+    if (control.type === 'jack') {
+      return {
+        ...baseProps,
+        value: Boolean(value),
+        type: controlId.startsWith('patch_in_') ? 'input' : 'output',
+      };
+    }
+
     return baseProps;
   };
 
   return (
-    <div
-      className="relative bg-[#1a1a1a] rounded-lg border-4 border-[#3a3a3a] shadow-2xl mx-auto"
-      style={{
-        width: `${spec.width}px`,
-        minHeight: `${spec.height + 200}px`,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.8), inset 0 2px 4px rgba(255,255,255,0.05)',
-      }}
-    >
-      {/* DFAM Logo / Title */}
-      <div className="absolute top-6 left-8">
-        <h1 className="text-3xl font-bold text-hardware-label uppercase tracking-widest">
-          DFAM
-        </h1>
-        <p className="text-[11px] text-hardware-label font-label tracking-wider">
-          DRUMMER FROM ANOTHER MOTHER
-        </p>
-        <p className="text-[10px] text-hardware-label font-label mt-0.5">
-          MOOG
-        </p>
-      </div>
+    <div className="relative mx-auto" style={{ width: `${spec.width + 60}px` }}>
+      {/* Wooden Side Cheeks */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-[30px] rounded-l-lg"
+        style={{
+          background: 'linear-gradient(90deg, #5C4033 0%, #6F5645 50%, #5C4033 100%)',
+          boxShadow: 'inset -2px 0 4px rgba(0,0,0,0.3), inset 2px 0 4px rgba(255,255,255,0.1)',
+        }}
+      />
+      <div
+        className="absolute right-0 top-0 bottom-0 w-[30px] rounded-r-lg"
+        style={{
+          background: 'linear-gradient(90deg, #5C4033 0%, #6F5645 50%, #5C4033 100%)',
+          boxShadow: 'inset 2px 0 4px rgba(0,0,0,0.3), inset -2px 0 4px rgba(255,255,255,0.1)',
+        }}
+      />
 
-      {/* Main Grid Container */}
-      <div className="pt-24 px-8 pb-8">
+      {/* Main Panel */}
+      <div
+        className="relative bg-[#0a0a0a] mx-[30px] border-t-2 border-b-2 border-[#1a1a1a]"
+        style={{
+          width: `${spec.width}px`,
+          height: `${spec.height}px`,
+          boxShadow: '0 10px 40px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.03)',
+        }}
+      >
+        {/* MOOG Logo and Title */}
+        <div className="absolute top-4 left-6">
+          <div className="text-[9px] font-label text-[#666] tracking-[0.3em] mb-1">MOOG</div>
+          <div className="text-[24px] font-bold text-[#ddd] tracking-[0.2em] leading-none">DFAM</div>
+          <div className="text-[7px] font-label text-[#888] tracking-[0.15em] mt-1">DRUMMER FROM ANOTHER MOTHER</div>
+        </div>
 
-        {/* TOP ROW - OSCILLATORS */}
-        <div className="mb-8">
-          <div className="text-center mb-4">
-            <span className="font-label text-[11px] text-hardware-label uppercase tracking-widest border-b border-hardware-label pb-1">
-              OSCILLATORS
-            </span>
+        {/* Section Dividers */}
+        <div className="absolute left-[400px] top-[40px] bottom-[80px] w-[1px] bg-[#333]" />
+        <div className="absolute left-[880px] top-[40px] bottom-[80px] w-[1px] bg-[#333]" />
+        <div className="absolute left-[40px] right-[40px] top-[380px] h-[1px] bg-[#333]" />
+
+        {/* OSCILLATORS SECTION */}
+        <div className="absolute left-[40px] top-[60px]">
+          <div className="text-[8px] font-label text-[#999] tracking-[0.2em] mb-3 border-b border-[#333] pb-1 w-[320px]">
+            OSCILLATORS
           </div>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(8, 1fr)',
-            gap: '20px',
-            alignItems: 'start',
-            justifyItems: 'center'
-          }}>
-            {/* VCO 1 */}
-            <Knob {...getControlProps('vco1_frequency')} />
-            <Switch {...getControlProps('vco1_wave')} />
-            <Knob {...getControlProps('vco1_eg')} />
-            <Knob {...getControlProps('fm_amount')} />
-
-            {/* VCO 2 */}
-            <Knob {...getControlProps('vco2_frequency')} />
-            <Switch {...getControlProps('vco2_wave')} />
-            <Knob {...getControlProps('vco2_eg')} />
-            <div className="flex flex-col items-center">
-              <Button {...getControlProps('hard_sync')} led ledColor="#00ff00" />
+          <div className="flex gap-[40px]">
+            <div>
+              <Knob {...getControlProps('vco1_frequency')} />
+              <div className="mt-2">
+                <Switch {...getControlProps('vco1_wave')} />
+              </div>
+            </div>
+            <div>
+              <Knob {...getControlProps('vco2_frequency')} />
+              <div className="mt-2">
+                <Switch {...getControlProps('vco2_wave')} />
+              </div>
+            </div>
+            <div className="mt-4">
+              <Switch {...getControlProps('hard_sync')} />
             </div>
           </div>
         </div>
 
-        {/* MIDDLE SECTION - MIXER & FILTER */}
-        <div className="mb-8">
-          <div className="text-center mb-4">
-            <span className="font-label text-[11px] text-hardware-label uppercase tracking-widest border-b border-hardware-label pb-1">
-              MIXER & FILTER
-            </span>
+        {/* MIXER SECTION */}
+        <div className="absolute left-[40px] top-[260px]">
+          <div className="text-[8px] font-label text-[#999] tracking-[0.2em] mb-3 border-b border-[#333] pb-1 w-[320px]">
+            MIXER
           </div>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(9, 1fr)',
-            gap: '16px',
-            alignItems: 'start',
-            justifyItems: 'center'
-          }}>
+          <div className="flex gap-[40px]">
             <Knob {...getControlProps('vco1_level')} />
             <Knob {...getControlProps('vco2_level')} />
             <Knob {...getControlProps('noise')} />
-            <Knob {...getControlProps('vco_decay')} />
+          </div>
+        </div>
+
+        {/* FILTER SECTION */}
+        <div className="absolute left-[420px] top-[80px]">
+          <div className="text-[8px] font-label text-[#999] tracking-[0.2em] mb-3 border-b border-[#333] pb-1 w-[400px]">
+            FILTER — 4-POLE LADDER
+          </div>
+          <div className="flex gap-[40px] items-start">
             <Knob {...getControlProps('vcf_cutoff')} />
-            <Knob {...getControlProps('vcf_resonance')} />
+            <div>
+              <Knob {...getControlProps('vcf_resonance')} />
+              <div className="mt-4">
+                <Switch {...getControlProps('vcf_mode')} />
+              </div>
+            </div>
             <Knob {...getControlProps('vcf_eg')} />
-            <Knob {...getControlProps('vcf_decay')} />
-            <Knob {...getControlProps('noise_vcf_mod')} />
           </div>
         </div>
 
-        {/* LOWER SECTION - VCA */}
-        <div className="mb-8">
-          <div className="text-center mb-4">
-            <span className="font-label text-[11px] text-hardware-label uppercase tracking-widest border-b border-hardware-label pb-1">
-              VCA & MASTER
-            </span>
+        {/* ENVELOPES SECTION */}
+        <div className="absolute left-[40px] top-[400px]">
+          <div className="text-[8px] font-label text-[#999] tracking-[0.2em] mb-3 border-b border-[#333] pb-1 w-[800px]">
+            ENVELOPE GENERATORS
           </div>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '40px',
-            alignItems: 'start',
-            justifyItems: 'center',
-            maxWidth: '600px',
-            margin: '0 auto'
-          }}>
-            <Switch {...getControlProps('vca_attack')} />
-            <Knob {...getControlProps('vca_decay')} />
-            <Knob {...getControlProps('volume')} />
-            <Knob {...getControlProps('tempo')} />
+          <div className="flex gap-[40px]">
+            <div>
+              <Knob {...getControlProps('vco_decay')} />
+            </div>
+            <div>
+              <Knob {...getControlProps('vcf_decay')} />
+            </div>
+            <div>
+              <Knob {...getControlProps('vca_decay')} />
+            </div>
+            <div className="ml-[80px]">
+              <Knob {...getControlProps('vca_eg')} />
+            </div>
+            <div>
+              <Knob {...getControlProps('vca_level')} />
+            </div>
+            <div>
+              <Knob {...getControlProps('tempo')} />
+            </div>
           </div>
         </div>
 
-        {/* BOTTOM - SEQUENCER */}
-        <div className="border-t-2 border-hardware-label pt-6 mt-8">
-          <div className="text-center mb-4">
-            <span className="font-label text-[11px] text-hardware-label uppercase tracking-widest border-b border-hardware-label pb-1">
-              8-STEP SEQUENCER
-            </span>
+        {/* SEQUENCER SECTION */}
+        <div className="absolute left-[40px] bottom-[40px] right-[400px]">
+          <div className="text-[8px] font-label text-[#999] tracking-[0.2em] mb-3 border-b border-[#333] pb-1">
+            8-STEP SEQUENCER
           </div>
 
-          {/* Step Buttons */}
-          <div className="mb-3">
-            <div className="text-[9px] text-hardware-label text-center mb-2 font-label">STEPS</div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(8, 1fr)',
-              gap: '12px',
-              maxWidth: '720px',
-              margin: '0 auto'
-            }}>
-              <Button {...getControlProps('step1')} led ledColor="#ff0000" />
-              <Button {...getControlProps('step2')} led ledColor="#ff0000" />
-              <Button {...getControlProps('step3')} led ledColor="#ff0000" />
-              <Button {...getControlProps('step4')} led ledColor="#ff0000" />
-              <Button {...getControlProps('step5')} led ledColor="#ff0000" />
-              <Button {...getControlProps('step6')} led ledColor="#ff0000" />
-              <Button {...getControlProps('step7')} led ledColor="#ff0000" />
-              <Button {...getControlProps('step8')} led ledColor="#ff0000" />
-            </div>
+          {/* Pitch Row Label */}
+          <div className="text-[7px] font-label text-[#777] tracking-[0.2em] mb-1 ml-1">PITCH</div>
+          <div className="flex gap-[20px] mb-3">
+            <Knob {...getControlProps('pitch1')} />
+            <Knob {...getControlProps('pitch2')} />
+            <Knob {...getControlProps('pitch3')} />
+            <Knob {...getControlProps('pitch4')} />
+            <Knob {...getControlProps('pitch5')} />
+            <Knob {...getControlProps('pitch6')} />
+            <Knob {...getControlProps('pitch7')} />
+            <Knob {...getControlProps('pitch8')} />
           </div>
 
-          {/* Pitch Row */}
-          <div className="mb-3">
-            <div className="text-[9px] text-hardware-label text-center mb-2 font-label">PITCH (CV)</div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(8, 1fr)',
-              gap: '12px',
-              maxWidth: '720px',
-              margin: '0 auto'
-            }}>
-              <Knob {...getControlProps('pitch1')} />
-              <Knob {...getControlProps('pitch2')} />
-              <Knob {...getControlProps('pitch3')} />
-              <Knob {...getControlProps('pitch4')} />
-              <Knob {...getControlProps('pitch5')} />
-              <Knob {...getControlProps('pitch6')} />
-              <Knob {...getControlProps('pitch7')} />
-              <Knob {...getControlProps('pitch8')} />
-            </div>
-          </div>
-
-          {/* Velocity Row */}
-          <div className="mb-4">
-            <div className="text-[9px] text-hardware-label text-center mb-2 font-label">VELOCITY</div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(8, 1fr)',
-              gap: '12px',
-              maxWidth: '720px',
-              margin: '0 auto'
-            }}>
-              <Knob {...getControlProps('velocity1')} />
-              <Knob {...getControlProps('velocity2')} />
-              <Knob {...getControlProps('velocity3')} />
-              <Knob {...getControlProps('velocity4')} />
-              <Knob {...getControlProps('velocity5')} />
-              <Knob {...getControlProps('velocity6')} />
-              <Knob {...getControlProps('velocity7')} />
-              <Knob {...getControlProps('velocity8')} />
-            </div>
+          {/* Velocity Row Label */}
+          <div className="text-[7px] font-label text-[#777] tracking-[0.2em] mb-1 ml-1">VELOCITY</div>
+          <div className="flex gap-[20px] mb-3">
+            <Knob {...getControlProps('velocity1')} />
+            <Knob {...getControlProps('velocity2')} />
+            <Knob {...getControlProps('velocity3')} />
+            <Knob {...getControlProps('velocity4')} />
+            <Knob {...getControlProps('velocity5')} />
+            <Knob {...getControlProps('velocity6')} />
+            <Knob {...getControlProps('velocity7')} />
+            <Knob {...getControlProps('velocity8')} />
           </div>
 
           {/* Sequencer Controls */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '24px',
-            maxWidth: '400px',
-            margin: '0 auto',
-            marginTop: '20px'
-          }}>
-            <div className="flex flex-col items-center">
-              <Button {...getControlProps('run_stop')} led ledColor="#00ff00" />
-            </div>
-            <div className="flex flex-col items-center">
-              <Button {...getControlProps('adv_step')} />
-            </div>
-            <div className="flex flex-col items-center">
-              <Button {...getControlProps('trigger')} />
-            </div>
+          <div className="flex gap-6 mt-4">
+            <Button {...getControlProps('run_stop')} led ledColor="#00ff00" />
+            <Button {...getControlProps('advance')} />
           </div>
         </div>
-      </div>
 
-      {/* Bottom info */}
-      <div className="absolute bottom-4 left-8 right-8 flex justify-between items-center">
-        <div className="text-[9px] text-hardware-label font-label">
-          Digital Twin • All specs from official manual • 25+ Controls
-        </div>
-        {isTeachingMode && currentLesson?.device === device && (
-          <div className="text-[10px] text-teaching-current font-bold animate-pulse">
-            TEACHING MODE ACTIVE
+        {/* PATCH BAY SECTION */}
+        <div className="absolute right-[40px] top-[60px] bottom-[40px]">
+          <div className="text-[8px] font-label text-[#999] tracking-[0.2em] mb-3 border-b border-[#333] pb-1">
+            PATCH BAY
           </div>
-        )}
+
+          <div className="flex gap-[80px]">
+            {/* INPUTS Column */}
+            <div>
+              <div className="text-[7px] font-label text-[#777] tracking-[0.2em] mb-2">INPUTS</div>
+              <div className="flex flex-col gap-[6px]">
+                <Jack {...getControlProps('patch_in_trigger')} />
+                <Jack {...getControlProps('patch_in_vca_cv')} />
+                <Jack {...getControlProps('patch_in_velocity')} />
+                <Jack {...getControlProps('patch_in_vca_decay')} />
+                <Jack {...getControlProps('patch_in_ext_audio')} />
+                <Jack {...getControlProps('patch_in_vcf_decay')} />
+                <Jack {...getControlProps('patch_in_noise')} />
+                <Jack {...getControlProps('patch_in_vco_decay')} />
+                <Jack {...getControlProps('patch_in_vcf_mod')} />
+                <Jack {...getControlProps('patch_in_vco1_cv')} />
+                <Jack {...getControlProps('patch_in_vco2_cv')} />
+                <Jack {...getControlProps('patch_in_tempo')} />
+                <Jack {...getControlProps('patch_in_run_stop')} />
+                <Jack {...getControlProps('patch_in_advance')} />
+                <Jack {...getControlProps('patch_in_clock')} />
+              </div>
+            </div>
+
+            {/* OUTPUTS Column */}
+            <div>
+              <div className="text-[7px] font-label text-[#777] tracking-[0.2em] mb-2">OUTPUTS</div>
+              <div className="flex flex-col gap-[12px]">
+                <Jack {...getControlProps('patch_out_vca')} />
+                <Jack {...getControlProps('patch_out_vca_eg')} />
+                <Jack {...getControlProps('patch_out_vcf_eg')} />
+                <Jack {...getControlProps('patch_out_vco_eg')} />
+                <Jack {...getControlProps('patch_out_vco1')} />
+                <Jack {...getControlProps('patch_out_vco2')} />
+                <Jack {...getControlProps('patch_out_trigger')} />
+                <Jack {...getControlProps('patch_out_velocity')} />
+                <Jack {...getControlProps('patch_out_pitch')} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Info Bar */}
+        <div className="absolute bottom-2 left-6 right-6 flex justify-between items-center">
+          <div className="text-[7px] text-[#555] font-label tracking-wider">
+            60HP • 319mm × 107mm • 24 PATCH POINTS • SEMI-MODULAR ANALOG
+          </div>
+          {isTeachingMode && currentLesson?.device === device && (
+            <div className="text-[8px] text-teaching-current font-bold animate-pulse tracking-wider">
+              ● TEACHING MODE
+            </div>
+          )}
+        </div>
+
+        {/* Screw Mounts (decorative) */}
+        {[
+          { x: 20, y: 20 },
+          { x: spec.width - 20, y: 20 },
+          { x: 20, y: spec.height - 20 },
+          { x: spec.width - 20, y: spec.height - 20 },
+        ].map((pos, i) => (
+          <div
+            key={i}
+            className="absolute w-[8px] h-[8px] rounded-full bg-[#2a2a2a] border border-[#444]"
+            style={{
+              left: `${pos.x}px`,
+              top: `${pos.y}px`,
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[4px] h-[1px] bg-[#555]"
+            />
+          </div>
+        ))}
       </div>
     </div>
   );

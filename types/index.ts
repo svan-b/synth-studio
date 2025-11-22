@@ -101,3 +101,13 @@ export interface SwitchProps {
   onChange: (value: string) => void;
   highlighted?: boolean;
 }
+
+export interface JackProps {
+  id: string;
+  label: string;
+  value: boolean;
+  position?: Position;
+  onChange: (value: boolean) => void;
+  highlighted?: boolean;
+  type?: 'input' | 'output';
+}

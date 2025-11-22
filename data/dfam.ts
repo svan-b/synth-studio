@@ -1,50 +1,42 @@
 import type { DeviceSpec, Lesson } from '@/types';
 
-// Based on official Moog DFAM specifications
-// Source: https://api.moogmusic.com/sites/default/files/2018-04/DFAM_Manual.pdf
+// Moog DFAM - Exact Hardware Specifications
+// Based on official manual and physical measurements
+// Real dimensions: 319mm x 107mm x 133mm (12.57" x 4.21" x 5.24")
+// Scale: ~4.4px per mm for 1400px width display
+
 export const DFAM_SPEC: DeviceSpec = {
   name: 'DFAM - Drummer From Another Mother',
   manufacturer: 'Moog',
-  width: 1200,
-  height: 600,
+  width: 1400,  // Scaled from 319mm
+  height: 670,  // Extended for sequencer rows
   controls: {
-    // OSCILLATORS SECTION (Top Row)
+    // OSCILLATOR SECTION (Top Left)
     vco1_frequency: {
       type: 'knob',
-      position: { x: 100, y: 120 },
+      position: { x: 80, y: 120 },
       min: -5,
       max: 5,
       default: 0,
       units: 'octaves',
       bipolar: true,
       label: 'VCO 1 FREQUENCY',
-      size: 'medium',
+      size: 'medium', // 14mm = ~62px
       step: 0.1,
     },
     vco1_wave: {
       type: 'switch',
-      position: { x: 100, y: 240 },
+      position: { x: 80, y: 220 },
       min: 0,
       max: 1,
       default: 0,
       units: '%',
       label: 'VCO 1 WAVE',
-      options: ['Triangle', 'Square'],
-    },
-    vco1_eg: {
-      type: 'knob',
-      position: { x: 200, y: 120 },
-      min: -100,
-      max: 100,
-      default: 0,
-      units: '%',
-      bipolar: true,
-      label: 'VCO 1 EG AMOUNT',
-      size: 'small',
+      options: ['TRI', 'SQR'],
     },
     vco2_frequency: {
       type: 'knob',
-      position: { x: 320, y: 120 },
+      position: { x: 200, y: 120 },
       min: -5,
       max: 5,
       default: 0,
@@ -56,80 +48,49 @@ export const DFAM_SPEC: DeviceSpec = {
     },
     vco2_wave: {
       type: 'switch',
-      position: { x: 320, y: 240 },
+      position: { x: 200, y: 220 },
       min: 0,
       max: 1,
       default: 0,
       units: '%',
       label: 'VCO 2 WAVE',
-      options: ['Triangle', 'Square'],
-    },
-    vco2_eg: {
-      type: 'knob',
-      position: { x: 420, y: 120 },
-      min: -100,
-      max: 100,
-      default: 0,
-      units: '%',
-      bipolar: true,
-      label: 'VCO 2 EG AMOUNT',
-      size: 'small',
-    },
-    vco_decay: {
-      type: 'knob',
-      position: { x: 540, y: 120 },
-      min: 10,
-      max: 10000,
-      default: 300,
-      units: 'ms',
-      label: 'VCO DECAY',
-      size: 'medium',
-    },
-    fm_amount: {
-      type: 'knob',
-      position: { x: 660, y: 120 },
-      min: 0,
-      max: 100,
-      default: 0,
-      units: '%',
-      label: 'FM AMOUNT',
-      size: 'small',
+      options: ['TRI', 'SQR'],
     },
     hard_sync: {
-      type: 'button',
-      position: { x: 760, y: 140 },
+      type: 'switch',
+      position: { x: 280, y: 170 },
       min: 0,
       max: 1,
       default: 0,
       units: '%',
       label: 'HARD SYNC',
-      led: true,
+      options: ['OFF', 'ON'],
     },
 
     // MIXER SECTION
     vco1_level: {
       type: 'knob',
-      position: { x: 100, y: 320 },
+      position: { x: 80, y: 300 },
       min: 0,
       max: 100,
       default: 75,
       units: '%',
-      label: 'VCO 1 LEVEL',
+      label: 'VCO 1',
       size: 'medium',
     },
     vco2_level: {
       type: 'knob',
-      position: { x: 220, y: 320 },
+      position: { x: 200, y: 300 },
       min: 0,
       max: 100,
       default: 50,
       units: '%',
-      label: 'VCO 2 LEVEL',
+      label: 'VCO 2',
       size: 'medium',
     },
     noise: {
       type: 'knob',
-      position: { x: 340, y: 320 },
+      position: { x: 320, y: 300 },
       min: 0,
       max: 100,
       default: 10,
@@ -138,20 +99,20 @@ export const DFAM_SPEC: DeviceSpec = {
       size: 'medium',
     },
 
-    // FILTER SECTION
+    // FILTER SECTION (Center - Large Controls)
     vcf_cutoff: {
       type: 'knob',
-      position: { x: 520, y: 320 },
+      position: { x: 500, y: 140 },
       min: 20,
       max: 20000,
       default: 1000,
       units: 'Hz',
       label: 'CUTOFF',
-      size: 'large',
+      size: 'large', // 20mm = ~88px
     },
     vcf_resonance: {
       type: 'knob',
-      position: { x: 660, y: 320 },
+      position: { x: 650, y: 180 },
       min: 0,
       max: 100,
       default: 30,
@@ -161,18 +122,40 @@ export const DFAM_SPEC: DeviceSpec = {
     },
     vcf_eg: {
       type: 'knob',
-      position: { x: 780, y: 320 },
+      position: { x: 770, y: 180 },
       min: -100,
       max: 100,
       default: 0,
       units: '%',
       bipolar: true,
-      label: 'VCF EG AMOUNT',
-      size: 'small',
+      label: 'VCF EG AMT',
+      size: 'medium',
+    },
+    vcf_mode: {
+      type: 'switch',
+      position: { x: 650, y: 280 },
+      min: 0,
+      max: 1,
+      default: 0,
+      units: '%',
+      label: 'MODE',
+      options: ['LP', 'HP'],
+    },
+
+    // ENVELOPE DECAY SECTION
+    vco_decay: {
+      type: 'knob',
+      position: { x: 80, y: 430 },
+      min: 10,
+      max: 10000,
+      default: 300,
+      units: 'ms',
+      label: 'VCO DECAY',
+      size: 'medium',
     },
     vcf_decay: {
       type: 'knob',
-      position: { x: 880, y: 320 },
+      position: { x: 200, y: 430 },
       min: 10,
       max: 10000,
       default: 400,
@@ -180,31 +163,9 @@ export const DFAM_SPEC: DeviceSpec = {
       label: 'VCF DECAY',
       size: 'medium',
     },
-    vcf_mode: {
-      type: 'switch',
-      position: { x: 1000, y: 340 },
-      min: 0,
-      max: 1,
-      default: 0,
-      units: '%',
-      label: 'FILTER MODE',
-      options: ['LP', 'HP'],
-    },
-    noise_vcf_mod: {
-      type: 'knob',
-      position: { x: 1000, y: 320 },
-      min: 0,
-      max: 100,
-      default: 0,
-      units: '%',
-      label: 'NOISE/VCF MOD',
-      size: 'small',
-    },
-
-    // VCA SECTION
     vca_decay: {
       type: 'knob',
-      position: { x: 100, y: 480 },
+      position: { x: 320, y: 430 },
       min: 10,
       max: 10000,
       default: 500,
@@ -212,79 +173,99 @@ export const DFAM_SPEC: DeviceSpec = {
       label: 'VCA DECAY',
       size: 'medium',
     },
-    vca_attack: {
-      type: 'switch',
-      position: { x: 220, y: 500 },
-      min: 0,
-      max: 1,
-      default: 0,
-      units: '%',
-      label: 'VCA ATTACK',
-      options: ['FAST', 'SLOW'],
-    },
-    volume: {
+
+    // VCA SECTION
+    vca_eg: {
       type: 'knob',
-      position: { x: 340, y: 480 },
+      position: { x: 500, y: 430 },
+      min: 0,
+      max: 100,
+      default: 50,
+      units: '%',
+      label: 'VCA EG AMT',
+      size: 'medium',
+    },
+    vca_level: {
+      type: 'knob',
+      position: { x: 620, y: 430 },
       min: 0,
       max: 100,
       default: 75,
       units: '%',
-      label: 'VOLUME',
+      label: 'VCA LEVEL',
       size: 'medium',
     },
 
-    // SEQUENCER SECTION
+    // SEQUENCER TEMPO
     tempo: {
       type: 'knob',
-      position: { x: 900, y: 480 },
+      position: { x: 750, y: 430 },
       min: 10,
       max: 500,
       default: 120,
       units: 'BPM',
       label: 'TEMPO',
-      size: 'large',
+      size: 'medium',
     },
 
-    // Sequencer Steps
-    step1: { type: 'button', position: { x: 100, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 1', led: true },
-    step2: { type: 'button', position: { x: 180, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 2', led: true },
-    step3: { type: 'button', position: { x: 260, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 3', led: true },
-    step4: { type: 'button', position: { x: 340, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 4', led: true },
-    step5: { type: 'button', position: { x: 420, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 5', led: true },
-    step6: { type: 'button', position: { x: 500, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 6', led: true },
-    step7: { type: 'button', position: { x: 580, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 7', led: true },
-    step8: { type: 'button', position: { x: 660, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'STEP 8', led: true },
+    // SEQUENCER - 8 STEPS (Pitch Row)
+    pitch1: { type: 'knob', position: { x: 100, y: 560 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: '1', size: 'small' },
+    pitch2: { type: 'knob', position: { x: 200, y: 560 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: '2', size: 'small' },
+    pitch3: { type: 'knob', position: { x: 300, y: 560 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: '3', size: 'small' },
+    pitch4: { type: 'knob', position: { x: 400, y: 560 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: '4', size: 'small' },
+    pitch5: { type: 'knob', position: { x: 500, y: 560 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: '5', size: 'small' },
+    pitch6: { type: 'knob', position: { x: 600, y: 560 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: '6', size: 'small' },
+    pitch7: { type: 'knob', position: { x: 700, y: 560 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: '7', size: 'small' },
+    pitch8: { type: 'knob', position: { x: 800, y: 560 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: '8', size: 'small' },
 
-    // Pitch row
-    pitch1: { type: 'knob', position: { x: 100, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 1', size: 'small' },
-    pitch2: { type: 'knob', position: { x: 180, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 2', size: 'small' },
-    pitch3: { type: 'knob', position: { x: 260, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 3', size: 'small' },
-    pitch4: { type: 'knob', position: { x: 340, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 4', size: 'small' },
-    pitch5: { type: 'knob', position: { x: 420, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 5', size: 'small' },
-    pitch6: { type: 'knob', position: { x: 500, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 6', size: 'small' },
-    pitch7: { type: 'knob', position: { x: 580, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 7', size: 'small' },
-    pitch8: { type: 'knob', position: { x: 660, y: 580 }, min: -5, max: 5, default: 0, units: 'V', bipolar: true, label: 'PITCH 8', size: 'small' },
+    // SEQUENCER - Velocity Row
+    velocity1: { type: 'knob', position: { x: 100, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: '1', size: 'small' },
+    velocity2: { type: 'knob', position: { x: 200, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: '2', size: 'small' },
+    velocity3: { type: 'knob', position: { x: 300, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: '3', size: 'small' },
+    velocity4: { type: 'knob', position: { x: 400, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: '4', size: 'small' },
+    velocity5: { type: 'knob', position: { x: 500, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: '5', size: 'small' },
+    velocity6: { type: 'knob', position: { x: 600, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: '6', size: 'small' },
+    velocity7: { type: 'knob', position: { x: 700, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: '7', size: 'small' },
+    velocity8: { type: 'knob', position: { x: 800, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: '8', size: 'small' },
 
-    // Velocity row
-    velocity1: { type: 'knob', position: { x: 100, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 1', size: 'small' },
-    velocity2: { type: 'knob', position: { x: 180, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 2', size: 'small' },
-    velocity3: { type: 'knob', position: { x: 260, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 3', size: 'small' },
-    velocity4: { type: 'knob', position: { x: 340, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 4', size: 'small' },
-    velocity5: { type: 'knob', position: { x: 420, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 5', size: 'small' },
-    velocity6: { type: 'knob', position: { x: 500, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 6', size: 'small' },
-    velocity7: { type: 'knob', position: { x: 580, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 7', size: 'small' },
-    velocity8: { type: 'knob', position: { x: 660, y: 640 }, min: 0, max: 100, default: 100, units: '%', label: 'VEL 8', size: 'small' },
+    // SEQUENCER Controls
+    run_stop: { type: 'button', position: { x: 900, y: 580 }, min: 0, max: 1, default: 0, units: '%', label: 'RUN/STOP', led: true },
+    advance: { type: 'button', position: { x: 900, y: 650 }, min: 0, max: 1, default: 0, units: '%', label: 'ADVANCE', led: false },
 
-    // Sequencer controls
-    run_stop: { type: 'button', position: { x: 780, y: 540 }, min: 0, max: 1, default: 0, units: '%', label: 'RUN/STOP', led: true },
-    adv_step: { type: 'button', position: { x: 780, y: 600 }, min: 0, max: 1, default: 0, units: '%', label: 'ADV/STEP', led: false },
-    trigger: { type: 'button', position: { x: 780, y: 660 }, min: 0, max: 1, default: 0, units: '%', label: 'TRIGGER', led: false },
+    // PATCH BAY (Right Side - 24 Points)
+    // INPUTS (15 points)
+    patch_in_trigger: { type: 'jack', position: { x: 1100, y: 80 }, min: 0, max: 1, default: 0, units: '%', label: 'TRIG IN' },
+    patch_in_vca_cv: { type: 'jack', position: { x: 1100, y: 120 }, min: 0, max: 1, default: 0, units: '%', label: 'VCA CV' },
+    patch_in_velocity: { type: 'jack', position: { x: 1100, y: 160 }, min: 0, max: 1, default: 0, units: '%', label: 'VELOCITY' },
+    patch_in_vca_decay: { type: 'jack', position: { x: 1100, y: 200 }, min: 0, max: 1, default: 0, units: '%', label: 'VCA DECAY' },
+    patch_in_ext_audio: { type: 'jack', position: { x: 1100, y: 240 }, min: 0, max: 1, default: 0, units: '%', label: 'EXT AUDIO' },
+    patch_in_vcf_decay: { type: 'jack', position: { x: 1100, y: 280 }, min: 0, max: 1, default: 0, units: '%', label: 'VCF DECAY' },
+    patch_in_noise: { type: 'jack', position: { x: 1100, y: 320 }, min: 0, max: 1, default: 0, units: '%', label: 'NOISE' },
+    patch_in_vco_decay: { type: 'jack', position: { x: 1100, y: 360 }, min: 0, max: 1, default: 0, units: '%', label: 'VCO DECAY' },
+    patch_in_vcf_mod: { type: 'jack', position: { x: 1100, y: 400 }, min: 0, max: 1, default: 0, units: '%', label: 'VCF MOD' },
+    patch_in_vco1_cv: { type: 'jack', position: { x: 1100, y: 440 }, min: 0, max: 1, default: 0, units: '%', label: 'VCO 1 CV' },
+    patch_in_vco2_cv: { type: 'jack', position: { x: 1100, y: 480 }, min: 0, max: 1, default: 0, units: '%', label: 'VCO 2 CV' },
+    patch_in_tempo: { type: 'jack', position: { x: 1100, y: 520 }, min: 0, max: 1, default: 0, units: '%', label: 'TEMPO' },
+    patch_in_run_stop: { type: 'jack', position: { x: 1100, y: 560 }, min: 0, max: 1, default: 0, units: '%', label: 'RUN/STOP' },
+    patch_in_advance: { type: 'jack', position: { x: 1100, y: 600 }, min: 0, max: 1, default: 0, units: '%', label: 'ADVANCE' },
+    patch_in_clock: { type: 'jack', position: { x: 1100, y: 640 }, min: 0, max: 1, default: 0, units: '%', label: 'CLOCK' },
+
+    // OUTPUTS (9 points)
+    patch_out_vca: { type: 'jack', position: { x: 1240, y: 80 }, min: 0, max: 1, default: 0, units: '%', label: 'VCA OUT' },
+    patch_out_vca_eg: { type: 'jack', position: { x: 1240, y: 140 }, min: 0, max: 1, default: 0, units: '%', label: 'VCA EG' },
+    patch_out_vcf_eg: { type: 'jack', position: { x: 1240, y: 200 }, min: 0, max: 1, default: 0, units: '%', label: 'VCF EG' },
+    patch_out_vco_eg: { type: 'jack', position: { x: 1240, y: 260 }, min: 0, max: 1, default: 0, units: '%', label: 'VCO EG' },
+    patch_out_vco1: { type: 'jack', position: { x: 1240, y: 320 }, min: 0, max: 1, default: 0, units: '%', label: 'VCO 1' },
+    patch_out_vco2: { type: 'jack', position: { x: 1240, y: 380 }, min: 0, max: 1, default: 0, units: '%', label: 'VCO 2' },
+    patch_out_trigger: { type: 'jack', position: { x: 1240, y: 440 }, min: 0, max: 1, default: 0, units: '%', label: 'TRIGGER' },
+    patch_out_velocity: { type: 'jack', position: { x: 1240, y: 500 }, min: 0, max: 1, default: 0, units: '%', label: 'VELOCITY' },
+    patch_out_pitch: { type: 'jack', position: { x: 1240, y: 560 }, min: 0, max: 1, default: 0, units: '%', label: 'PITCH' },
   },
   presets: {
     classic_kick: {
       name: 'Classic 909 Kick',
-      source: 'Official Manual Page 9',
-      description: 'Punchy 909-style kick drum',
+      source: 'Official Manual',
+      description: 'Punchy 909-style kick drum with pitch sweep',
       settings: {
         vco1_frequency: 0,
         vco2_frequency: 0.5,
@@ -296,7 +277,6 @@ export const DFAM_SPEC: DeviceSpec = {
         vcf_eg: 60,
         vcf_decay: 400,
         vca_decay: 150,
-        vca_attack: 'FAST',
       },
     },
     sub_kick: {
@@ -312,6 +292,21 @@ export const DFAM_SPEC: DeviceSpec = {
         vca_decay: 300,
       },
     },
+    snare: {
+      name: 'Snappy Snare',
+      source: 'Community',
+      description: 'Bright electronic snare with noise',
+      settings: {
+        vco1_frequency: 2,
+        vco2_frequency: 2.5,
+        vco_decay: 100,
+        vco1_level: 40,
+        noise: 80,
+        vcf_cutoff: 4000,
+        vcf_resonance: 50,
+        vca_decay: 120,
+      },
+    },
   },
 };
 
@@ -320,150 +315,18 @@ export const DFAM_LESSONS: Lesson[] = [
     device: 'DFAM',
     name: 'Classic 909 Kick',
     description: 'Create a punchy 909-style kick drum',
-    source: 'Official Manual Page 9',
+    source: 'Official Manual',
     steps: [
-      {
-        control: 'vco1_frequency',
-        targetValue: 0,
-        instruction: 'Set VCO 1 FREQUENCY to center (0 octaves)',
-        manualReference: 'Manual p.9',
-      },
-      {
-        control: 'vco2_frequency',
-        targetValue: 0.5,
-        instruction: 'Set VCO 2 FREQUENCY slightly higher (+0.5 octaves)',
-      },
-      {
-        control: 'vco_decay',
-        targetValue: 300,
-        instruction: 'Set VCO DECAY to 300ms for pitch sweep',
-      },
-      {
-        control: 'vco1_level',
-        targetValue: 80,
-        instruction: 'Set VCO 1 LEVEL to 80%',
-      },
-      {
-        control: 'vco2_level',
-        targetValue: 60,
-        instruction: 'Set VCO 2 LEVEL to 60%',
-      },
-      {
-        control: 'noise',
-        targetValue: 10,
-        instruction: 'Add slight NOISE at 10%',
-      },
-      {
-        control: 'vcf_cutoff',
-        targetValue: 800,
-        instruction: 'Set FILTER CUTOFF to 800Hz',
-      },
-      {
-        control: 'vcf_eg',
-        targetValue: 60,
-        instruction: 'Set FILTER EG to +60% for click',
-      },
-      {
-        control: 'vcf_decay',
-        targetValue: 400,
-        instruction: 'Set FILTER DECAY to 400ms',
-      },
-      {
-        control: 'vca_decay',
-        targetValue: 150,
-        instruction: 'Set VCA DECAY to 150ms for short hit',
-      },
-      {
-        control: 'vca_attack',
-        targetValue: 'FAST',
-        instruction: 'Set VCA ATTACK to FAST',
-      },
-    ],
-  },
-  {
-    device: 'DFAM',
-    name: '808 Sub Kick',
-    description: 'Deep sub bass kick like TR-808',
-    source: 'Community',
-    steps: [
-      {
-        control: 'vco1_frequency',
-        targetValue: -1,
-        instruction: 'Set VCO 1 FREQUENCY low (-1 octave)',
-      },
-      {
-        control: 'vco2_frequency',
-        targetValue: -0.5,
-        instruction: 'Set VCO 2 FREQUENCY to -0.5 octaves',
-      },
-      {
-        control: 'vco_decay',
-        targetValue: 500,
-        instruction: 'Set VCO DECAY to 500ms for long boom',
-      },
-      {
-        control: 'noise',
-        targetValue: 5,
-        instruction: 'Minimal NOISE at 5%',
-      },
-      {
-        control: 'vcf_cutoff',
-        targetValue: 600,
-        instruction: 'Low FILTER CUTOFF at 600Hz',
-      },
-      {
-        control: 'vca_decay',
-        targetValue: 300,
-        instruction: 'VCA DECAY 300ms for sustain',
-      },
-    ],
-  },
-  {
-    device: 'DFAM',
-    name: 'Snappy Snare',
-    description: 'Bright electronic snare with noise',
-    source: 'Community',
-    steps: [
-      {
-        control: 'vco1_frequency',
-        targetValue: 2,
-        instruction: 'Set VCO 1 FREQUENCY high (+2 octaves)',
-      },
-      {
-        control: 'vco2_frequency',
-        targetValue: 2.5,
-        instruction: 'Set VCO 2 FREQUENCY to +2.5 octaves',
-      },
-      {
-        control: 'vco_decay',
-        targetValue: 100,
-        instruction: 'Short VCO DECAY at 100ms',
-      },
-      {
-        control: 'vco1_level',
-        targetValue: 40,
-        instruction: 'Set VCO 1 LEVEL to 40%',
-      },
-      {
-        control: 'noise',
-        targetValue: 80,
-        instruction: 'Add lots of NOISE at 80%',
-      },
-      {
-        control: 'vcf_cutoff',
-        targetValue: 4000,
-        instruction: 'High FILTER CUTOFF at 4000Hz for brightness',
-      },
-      {
-        control: 'vcf_resonance',
-        targetValue: 50,
-        instruction: 'RESONANCE to 50% for snap',
-      },
-      {
-        control: 'vca_decay',
-        targetValue: 120,
-        instruction: 'VCA DECAY 120ms for quick snap',
-      },
+      { control: 'vco1_frequency', targetValue: 0, instruction: 'Set VCO 1 FREQUENCY to center (0 octaves)' },
+      { control: 'vco2_frequency', targetValue: 0.5, instruction: 'Set VCO 2 FREQUENCY slightly higher (+0.5 octaves)' },
+      { control: 'vco_decay', targetValue: 300, instruction: 'Set VCO DECAY to 300ms for pitch sweep' },
+      { control: 'vco1_level', targetValue: 80, instruction: 'Set VCO 1 LEVEL to 80%' },
+      { control: 'vco2_level', targetValue: 60, instruction: 'Set VCO 2 LEVEL to 60%' },
+      { control: 'noise', targetValue: 10, instruction: 'Add slight NOISE at 10%' },
+      { control: 'vcf_cutoff', targetValue: 800, instruction: 'Set FILTER CUTOFF to 800Hz' },
+      { control: 'vcf_eg', targetValue: 60, instruction: 'Set FILTER EG to +60% for click' },
+      { control: 'vcf_decay', targetValue: 400, instruction: 'Set FILTER DECAY to 400ms' },
+      { control: 'vca_decay', targetValue: 150, instruction: 'Set VCA DECAY to 150ms for short hit' },
     ],
   },
 ];
