@@ -14,6 +14,7 @@ interface StudioState {
   currentStep: number;
   completedLessons: string[];
   isTeachingMode: boolean;
+  _pendingStepAdvance: boolean; // Prevents multiple auto-advances
 }
 
 interface StudioStore extends StudioState {
@@ -55,6 +56,7 @@ export const useStudioStore = create<StudioStore>()(
       currentStep: 0,
       completedLessons: [],
       isTeachingMode: false,
+      _pendingStepAdvance: false,
 
       // Device management
       setCurrentDevice: (device) => set({ currentDevice: device }),
@@ -78,8 +80,9 @@ export const useStudioStore = create<StudioStore>()(
         });
 
         // Auto-advance lesson step if value matches target
+        // Use a flag to prevent multiple rapid advances (debounce)
         const state = get();
-        if (state.isTeachingMode && state.currentLesson) {
+        if (state.isTeachingMode && state.currentLesson && !state._pendingStepAdvance) {
           const step = state.currentLesson.steps[state.currentStep];
           if (step && step.control === control) {
             // Check if value matches target (with tolerance for numbers)
@@ -95,10 +98,20 @@ export const useStudioStore = create<StudioStore>()(
             }
 
             if (isMatch && state.currentStep < state.currentLesson.steps.length - 1) {
-              // Small delay before advancing to give visual feedback
+              // Set flag to prevent duplicate advances
+              set({ _pendingStepAdvance: true });
+
+              // Delay before advancing to give visual feedback
               setTimeout(() => {
-                get().completeStep();
-              }, 500);
+                const currentState = get();
+                // Only advance if we're still on the same step
+                if (currentState._pendingStepAdvance) {
+                  set({
+                    currentStep: currentState.currentStep + 1,
+                    _pendingStepAdvance: false
+                  });
+                }
+              }, 800);
             }
           }
         }
@@ -185,13 +198,14 @@ export const useStudioStore = create<StudioStore>()(
           currentLesson: lesson,
           currentStep: 0,
           isTeachingMode: true,
+          _pendingStepAdvance: false,
         });
       },
 
       completeStep: () => {
         const state = get();
         if (state.currentLesson && state.currentStep < state.currentLesson.steps.length - 1) {
-          set({ currentStep: state.currentStep + 1 });
+          set({ currentStep: state.currentStep + 1, _pendingStepAdvance: false });
         }
       },
 
@@ -200,6 +214,7 @@ export const useStudioStore = create<StudioStore>()(
           currentLesson: undefined,
           currentStep: 0,
           isTeachingMode: false,
+          _pendingStepAdvance: false,
         });
       },
 

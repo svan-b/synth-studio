@@ -176,7 +176,7 @@ export interface Lesson {
   name: string;
   description: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
-  source: 'manual' | 'community';
+  source: string;  // e.g., 'Moog DFAM Manual - Patch Ideas', 'Community', etc.
   author?: string;
   estimatedMinutes?: number;
   prerequisites?: string[];  // Other lesson IDs
