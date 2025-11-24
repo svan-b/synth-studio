@@ -29,25 +29,19 @@ interface PatchBayProps {
   onDisconnection?: (from: string, to: string) => void;
 }
 
-// Cable colors for different signal types (matching DFAM manual conventions)
-const CABLE_COLORS = {
-  audio: '#22c55e',      // Green for audio signals
-  cv: '#f97316',         // Orange for CV/modulation
-  gate: '#ef4444',       // Red for gates/triggers
-  clock: '#06b6d4',      // Cyan for clock signals
-  envelope: '#a855f7',   // Purple for envelope outputs
-} as const;
-
-// Determine signal type based on jack label
-const getSignalType = (jackLabel: string): keyof typeof CABLE_COLORS => {
-  const label = jackLabel.toUpperCase();
-  if (label.includes('TRIGGER') || label.includes('GATE') || label.includes('RUN')) return 'gate';
-  if (label.includes('CLOCK') || label.includes('ADV')) return 'clock';
-  if (label.includes('EG') && !label.includes('AMT')) return 'envelope';
-  if (label.includes('VCA') && !label.includes('CV') && !label.includes('DECAY')) return 'audio';
-  if (label.includes('VCO 1') || label.includes('VCO 2') || label.includes('EXT AUDIO')) return 'audio';
-  return 'cv';
-};
+// Cable colors - cycle through these for each new cable
+const CABLE_COLOR_PALETTE = [
+  '#22c55e',  // Green
+  '#f97316',  // Orange
+  '#ef4444',  // Red
+  '#06b6d4',  // Cyan
+  '#a855f7',  // Purple
+  '#eab308',  // Yellow
+  '#ec4899',  // Pink
+  '#3b82f6',  // Blue
+  '#14b8a6',  // Teal
+  '#f43f5e',  // Rose
+];
 
 export default function PatchBay({ jacks, onConnection, onDisconnection }: PatchBayProps) {
   const [cables, setCables] = useState<Cable[]>([]);
@@ -57,8 +51,16 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
   } | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [jackPositions, setJackPositions] = useState<Record<string, JackPosition>>({});
+  const [colorIndex, setColorIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const jackRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Get next color in the palette
+  const getNextColor = useCallback(() => {
+    const color = CABLE_COLOR_PALETTE[colorIndex % CABLE_COLOR_PALETTE.length];
+    setColorIndex(prev => prev + 1);
+    return color;
+  }, [colorIndex]);
 
   // Calculate jack positions when component mounts or jacks change
   useEffect(() => {
@@ -83,7 +85,7 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
     };
 
     // Update on mount and resize
-    const timeoutId = setTimeout(updatePositions, 50);
+    const timeoutId = setTimeout(updatePositions, 100);
     window.addEventListener('resize', updatePositions);
 
     // Use ResizeObserver for more reliable updates
@@ -99,25 +101,24 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
     };
   }, [jacks]);
 
-  // Handle clicking on a jack
+  // Handle clicking on a jack - allow any-to-any connections
   const handleJackClick = useCallback((jack: PatchPoint, e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (!activeCable) {
-      // Start a new cable - outputs can start cables, inputs can receive them
-      if (jack.type === 'output') {
-        const signalType = getSignalType(jack.label);
-        setActiveCable({
-          fromId: jack.id,
-          color: CABLE_COLORS[signalType],
-        });
-      }
+      // Start a new cable from any jack
+      const color = getNextColor();
+      setActiveCable({
+        fromId: jack.id,
+        color,
+      });
     } else {
-      // Complete the cable connection
-      if (jack.type === 'input' && jack.id !== activeCable.fromId) {
-        // Check if this connection already exists
+      // Complete the cable connection - allow any-to-any, just not same jack
+      if (jack.id !== activeCable.fromId) {
+        // Check if this exact connection already exists (in either direction)
         const existingConnection = cables.find(
-          c => c.fromId === activeCable.fromId && c.toId === jack.id
+          c => (c.fromId === activeCable.fromId && c.toId === jack.id) ||
+               (c.fromId === jack.id && c.toId === activeCable.fromId)
         );
 
         if (!existingConnection) {
@@ -133,7 +134,7 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
       }
       setActiveCable(null);
     }
-  }, [activeCable, cables, onConnection]);
+  }, [activeCable, cables, onConnection, getNextColor]);
 
   // Handle clicking on a cable to remove it
   const handleCableClick = useCallback((cable: Cable, e: React.MouseEvent) => {
@@ -167,7 +168,7 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     // Natural cable sag increases with distance
-    const sag = Math.min(distance * 0.25, 30);
+    const sag = Math.min(distance * 0.3, 40);
 
     const midX = (fromPos.x + toPos.x) / 2;
     const midY = Math.max(fromPos.y, toPos.y) + sag;
@@ -176,8 +177,8 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
   }, []);
 
   // Check if a jack has a connection
-  const getJackConnection = useCallback((jackId: string): Cable | undefined => {
-    return cables.find(c => c.fromId === jackId || c.toId === jackId);
+  const getJackConnections = useCallback((jackId: string): Cable[] => {
+    return cables.filter(c => c.fromId === jackId || c.toId === jackId);
   }, [cables]);
 
   // Organize jacks by column
@@ -202,17 +203,14 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
       onMouseMove={handleMouseMove}
       className="relative select-none"
       style={{
-        minHeight: maxRows * 28 + 60,
+        minHeight: maxRows * 32 + 40,
         cursor: activeCable ? 'crosshair' : 'default',
       }}
     >
-      {/* Column Headers */}
+      {/* Header */}
       <div className="flex justify-between mb-2 px-1">
-        <div className="flex gap-1">
-          <span className="text-[6px] text-gray-500 font-bold w-[52px] text-center">INPUT</span>
-          <span className="text-[6px] text-gray-500 font-bold w-[52px] text-center">INPUT</span>
-        </div>
-        <span className="text-[6px] text-white font-bold w-[52px] text-center">OUTPUT</span>
+        <span className="text-[7px] text-gray-400 font-bold">IN / OUT</span>
+        <span className="text-[7px] text-white font-bold">OUTPUT</span>
       </div>
 
       {/* Jack Grid - 3 columns */}
@@ -227,15 +225,15 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
               className="flex flex-col gap-1"
               style={{
                 background: isOutputColumn ? '#1a1a1a' : '#0d0d0d',
-                padding: '6px 4px',
+                padding: '6px 3px',
                 borderRadius: '4px',
-                width: 52,
+                width: 54,
               }}
             >
               {columnJacks.map((jack) => {
-                const connection = getJackConnection(jack.id);
+                const connections = getJackConnections(jack.id);
                 const isActive = activeCable?.fromId === jack.id;
-                const canConnect = activeCable && jack.type === 'input';
+                const canConnect = activeCable && jack.id !== activeCable.fromId;
 
                 return (
                   <div
@@ -246,10 +244,10 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
                     <span
                       className="text-center leading-tight"
                       style={{
-                        fontSize: '5px',
-                        color: isOutputColumn ? '#ddd' : '#777',
+                        fontSize: '5.5px',
+                        color: isOutputColumn ? '#ddd' : '#888',
                         fontWeight: isOutputColumn ? 'bold' : 'normal',
-                        maxWidth: 44,
+                        maxWidth: 48,
                         lineHeight: 1.1,
                       }}
                     >
@@ -260,35 +258,43 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
                     <div
                       ref={(el) => { jackRefs.current[jack.id] = el; }}
                       onClick={(e) => handleJackClick(jack, e)}
-                      className="relative transition-transform duration-100"
+                      className="relative transition-all duration-100"
                       style={{
-                        width: 16,
-                        height: 16,
+                        width: 18,
+                        height: 18,
                         borderRadius: '50%',
-                        background: 'radial-gradient(circle at 30% 30%, #222 0%, #111 100%)',
+                        background: 'radial-gradient(circle at 30% 30%, #333 0%, #111 100%)',
                         border: `2px solid ${
                           isActive ? '#fff' :
-                          canConnect ? '#6b6' :
+                          canConnect ? '#8f8' :
                           isOutputColumn ? '#666' : '#444'
                         }`,
                         boxShadow: isOutputColumn
-                          ? '0 0 4px rgba(255, 255, 255, 0.15), inset 0 1px 3px rgba(0,0,0,0.6)'
+                          ? '0 0 6px rgba(255, 255, 255, 0.2), inset 0 1px 3px rgba(0,0,0,0.6)'
                           : 'inset 0 2px 4px rgba(0,0,0,0.7)',
-                        cursor: jack.type === 'output' || canConnect ? 'pointer' : 'default',
-                        transform: isActive || canConnect ? 'scale(1.15)' : 'scale(1)',
+                        cursor: 'pointer',
+                        transform: isActive || canConnect ? 'scale(1.2)' : 'scale(1)',
                       }}
                     >
-                      {/* Connection indicator dot */}
-                      {connection && (
+                      {/* Connection indicator - show first cable color */}
+                      {connections.length > 0 && (
                         <div
                           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
                           style={{
-                            width: 7,
-                            height: 7,
-                            background: connection.color,
-                            boxShadow: `0 0 4px ${connection.color}`,
+                            width: 8,
+                            height: 8,
+                            background: connections[0].color,
+                            boxShadow: `0 0 6px ${connections[0].color}`,
                           }}
                         />
+                      )}
+                      {/* Show connection count if multiple */}
+                      {connections.length > 1 && (
+                        <div
+                          className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-white text-black text-[6px] font-bold flex items-center justify-center"
+                        >
+                          {connections.length}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -302,15 +308,8 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
       {/* SVG Layer for Cables */}
       <svg
         className="absolute inset-0 pointer-events-none"
-        style={{ overflow: 'visible' }}
+        style={{ overflow: 'visible', zIndex: 10 }}
       >
-        <defs>
-          {/* Cable shadow filter */}
-          <filter id="cableShadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.5" />
-          </filter>
-        </defs>
-
         {/* Render completed cables */}
         {cables.map(cable => {
           const fromPos = jackPositions[cable.fromId];
@@ -323,8 +322,8 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
               {/* Cable shadow */}
               <path
                 d={drawCablePath(fromPos, toPos)}
-                stroke="rgba(0,0,0,0.5)"
-                strokeWidth="7"
+                stroke="rgba(0,0,0,0.6)"
+                strokeWidth="8"
                 fill="none"
                 strokeLinecap="round"
               />
@@ -337,7 +336,7 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
                 strokeLinecap="round"
                 style={{
                   cursor: 'pointer',
-                  filter: `drop-shadow(0 0 3px ${cable.color})`,
+                  filter: `drop-shadow(0 0 4px ${cable.color})`,
                 }}
                 onClick={(e) => handleCableClick(cable, e as unknown as React.MouseEvent)}
               />
@@ -345,7 +344,7 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
               <circle
                 cx={fromPos.x}
                 cy={fromPos.y}
-                r="7"
+                r="8"
                 fill="#222"
                 stroke={cable.color}
                 strokeWidth="2"
@@ -353,7 +352,7 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
               <circle
                 cx={toPos.x}
                 cy={toPos.y}
-                r="7"
+                r="8"
                 fill="#222"
                 stroke={cable.color}
                 strokeWidth="2"
@@ -370,14 +369,14 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
               stroke={activeCable.color}
               strokeWidth="5"
               fill="none"
-              opacity="0.7"
-              strokeDasharray="8,4"
+              opacity="0.8"
+              strokeDasharray="10,5"
               strokeLinecap="round"
             />
             <circle
               cx={jackPositions[activeCable.fromId].x}
               cy={jackPositions[activeCable.fromId].y}
-              r="7"
+              r="8"
               fill="#222"
               stroke={activeCable.color}
               strokeWidth="2"
@@ -386,19 +385,17 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
         )}
       </svg>
 
-      {/* Cable Color Legend */}
-      <div className="absolute -bottom-5 left-0 right-0 flex justify-center gap-3 text-[5px] text-gray-500">
-        <span><span style={{ color: CABLE_COLORS.audio }}>●</span> Audio</span>
-        <span><span style={{ color: CABLE_COLORS.cv }}>●</span> CV</span>
-        <span><span style={{ color: CABLE_COLORS.gate }}>●</span> Gate</span>
-        <span><span style={{ color: CABLE_COLORS.clock }}>●</span> Clock</span>
-        <span><span style={{ color: CABLE_COLORS.envelope }}>●</span> EG</span>
-      </div>
-
       {/* Instructions tooltip */}
       {!cables.length && !activeCable && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[7px] text-gray-600 text-center pointer-events-none">
-          Click OUTPUT jack to start patch
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[8px] text-gray-600 text-center pointer-events-none bg-black/50 px-2 py-1 rounded">
+          Click any jack to start patch
+        </div>
+      )}
+
+      {/* Cable count */}
+      {cables.length > 0 && (
+        <div className="absolute bottom-1 right-1 text-[7px] text-gray-500">
+          {cables.length} cable{cables.length !== 1 ? 's' : ''}
         </div>
       )}
     </div>
