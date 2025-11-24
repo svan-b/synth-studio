@@ -27,7 +27,7 @@ export default function Knob({
   const [startValue, setStartValue] = useState(value);
   const knobRef = useRef<HTMLDivElement>(null);
 
-  const { min, max, bipolar = false, units = '%', size = 'medium', label } = spec;
+  const { min, max, bipolar = false, units = '%', size = 'medium' } = spec;
 
   // Calculate rotation angle (-135deg to +135deg, 270deg total range)
   const valueToRotation = (val: number): number => {
@@ -38,29 +38,11 @@ export default function Knob({
   const rotation = valueToRotation(value);
   const targetRotation = targetValue !== undefined ? valueToRotation(targetValue) : undefined;
 
-  // Size classes
-  const sizeClasses = {
-    small: 'w-10 h-10',
-    medium: 'w-14 h-14',
-    large: 'w-18 h-18',
-  };
-
+  // Size in pixels - matching DFAM hardware proportions
   const sizePx = {
-    small: 40,
-    medium: 56,
-    large: 72,
-  };
-
-  const labelSizeClasses = {
-    small: 'text-[8px]',
-    medium: 'text-[9px]',
-    large: 'text-[10px]',
-  };
-
-  const valueSizeClasses = {
-    small: 'text-[10px]',
-    medium: 'text-[11px]',
-    large: 'text-[12px]',
+    small: 28,
+    medium: 42,
+    large: 56,
   };
 
   // Format display value
@@ -148,12 +130,7 @@ export default function Knob({
 
   return (
     <div className="flex flex-col items-center gap-1 select-none">
-      {/* Label */}
-      <div className={`font-label text-hardware-label uppercase tracking-wider text-center leading-tight ${labelSizeClasses[size]}`}>
-        {label}
-      </div>
-
-      {/* Knob */}
+      {/* Knob - DFAM style silver metallic */}
       <div
         ref={knobRef}
         className={`relative cursor-pointer rounded-full ${getTeachingClass()}`}
@@ -161,57 +138,66 @@ export default function Knob({
         onMouseDown={handleMouseDown}
         title={spec.description}
       >
-        {/* Knob body */}
+        {/* Outer ring / edge */}
         <div
-          className="w-full h-full rounded-full bg-gradient-to-b from-hardware-panel to-[#1a1a1a] border-2 border-[#3a3a3a]"
+          className="w-full h-full rounded-full"
           style={{
-            boxShadow: '0 4px 8px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.1)',
+            background: 'linear-gradient(135deg, #888 0%, #444 50%, #666 100%)',
+            padding: '2px',
+            boxShadow: '0 3px 6px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.2)',
           }}
         >
-          {/* Indicator line */}
+          {/* Main knob body - silver metallic */}
           <div
-            className="absolute w-full h-full transition-transform duration-50"
-            style={{ transform: `rotate(${rotation}deg)` }}
+            className="w-full h-full rounded-full"
+            style={{
+              background: 'radial-gradient(ellipse at 30% 30%, #ccc 0%, #999 30%, #666 70%, #444 100%)',
+              boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.3), inset 0 -2px 4px rgba(0,0,0,0.3)',
+            }}
           >
+            {/* Indicator line */}
             <div
-              className="absolute top-1 left-1/2 w-0.5 bg-hardware-led-on transform -translate-x-1/2 rounded-full"
-              style={{
-                height: `${currentPx * 0.25}px`,
-                boxShadow: '0 0 4px rgba(0,255,0,0.8)'
-              }}
-            />
-          </div>
-
-          {/* Target indicator (if teaching mode) */}
-          {showTarget && targetRotation !== undefined && !isCloseToTarget && (
-            <div
-              className="absolute w-full h-full"
-              style={{ transform: `rotate(${targetRotation}deg)` }}
+              className="absolute w-full h-full transition-transform duration-50"
+              style={{ transform: `rotate(${rotation}deg)` }}
             >
-              <div className="absolute top-0 left-1/2 w-1 h-2 bg-teaching-target transform -translate-x-1/2 rounded-full opacity-70" />
+              <div
+                className="absolute left-1/2 bg-black rounded-full transform -translate-x-1/2"
+                style={{
+                  top: '3px',
+                  width: '3px',
+                  height: `${currentPx * 0.28}px`,
+                  boxShadow: 'inset 0 1px 1px rgba(0,0,0,0.8)',
+                }}
+              />
             </div>
-          )}
 
-          {/* Center dot for bipolar */}
-          {bipolar && (
-            <div className="absolute top-1/2 left-1/2 w-1 h-1 bg-hardware-label rounded-full transform -translate-x-1/2 -translate-y-1/2" />
-          )}
+            {/* Target indicator (if teaching mode) */}
+            {showTarget && targetRotation !== undefined && !isCloseToTarget && (
+              <div
+                className="absolute w-full h-full opacity-60"
+                style={{ transform: `rotate(${targetRotation}deg)` }}
+              >
+                <div
+                  className="absolute top-0 left-1/2 w-1 h-3 bg-orange-500 transform -translate-x-1/2 rounded-full"
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Value display */}
+      {/* Value display - smaller, cleaner */}
       <div
-        className={`font-mono ${valueSizeClasses[size]} bg-black text-green-400 px-1.5 py-0.5 rounded border border-[#1a1a1a] min-w-[40px] text-center`}
-        style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.8), 0 0 6px rgba(0,255,0,0.15)' }}
+        className="font-mono text-[9px] text-green-400 bg-black/80 px-1 py-0.5 rounded min-w-[32px] text-center"
+        style={{ textShadow: '0 0 4px rgba(0,255,0,0.5)' }}
       >
         {formatValue(value, units)}
-        <span className="text-hardware-label ml-0.5 text-[8px]">{units}</span>
       </div>
 
       {/* Target value hint (if teaching mode) */}
       {showTarget && targetValue !== undefined && !isCloseToTarget && (
-        <div className="text-[8px] text-teaching-target font-mono">
-          → {formatValue(targetValue, units)}{units}
+        <div className="text-[7px] text-orange-400 font-mono">
+          → {formatValue(targetValue, units)}
         </div>
       )}
     </div>
