@@ -5,8 +5,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 interface PatchPoint {
   id: string;
   label: string;
-  x: number;
-  y: number;
+  column: number;
+  row: number;
   type: 'input' | 'output';
 }
 
@@ -21,7 +21,6 @@ interface Cable {
   fromId: string;
   toId: string | null;
   color: string;
-  isDrawing: boolean;
 }
 
 interface PatchBayProps {
@@ -41,7 +40,9 @@ const CABLE_COLORS = {
 const getSignalType = (jackLabel: string): keyof typeof CABLE_COLORS => {
   if (jackLabel.includes('TRIGGER') || jackLabel.includes('GATE') || jackLabel.includes('RUN')) return 'gate';
   if (jackLabel.includes('CLOCK') || jackLabel.includes('ADV')) return 'clock';
-  if (jackLabel.includes('CV') || jackLabel.includes('EG') || jackLabel.includes('DECAY') || jackLabel.includes('VELOCITY') || jackLabel.includes('PITCH') || jackLabel.includes('LEVEL') || jackLabel.includes('TEMPO') || jackLabel.includes('FM') || jackLabel.includes('MOD')) return 'cv';
+  if (jackLabel.includes('CV') || jackLabel.includes('EG') || jackLabel.includes('DECAY') ||
+      jackLabel.includes('VELOCITY') || jackLabel.includes('PITCH') || jackLabel.includes('LEVEL') ||
+      jackLabel.includes('TEMPO') || jackLabel.includes('FM') || jackLabel.includes('MOD')) return 'cv';
   return 'audio';
 };
 
@@ -89,8 +90,6 @@ export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
     };
   }, [jacks]);
 
-  const getJackById = useCallback((id: string) => jacks.find(j => j.id === id), [jacks]);
-
   const handleJackClick = useCallback((jack: PatchPoint) => {
     if (!activeCableFromId) {
       // Start new cable from output jack only
@@ -107,7 +106,6 @@ export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
           fromId: activeCableFromId,
           toId: jack.id,
           color: activeCableColor,
-          isDrawing: false,
         };
         setCables(prev => [...prev, newCable]);
 
@@ -134,7 +132,7 @@ export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
     const dx = toX - fromX;
     const dy = toY - fromY;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    const sag = Math.min(distance * 0.3, 40); // More sag for longer cables
+    const sag = Math.min(distance * 0.3, 40);
 
     const midX = (fromX + toX) / 2;
     const midY = Math.max(fromY, toY) + sag;
@@ -158,16 +156,18 @@ export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
     }
   }, [activeCableFromId]);
 
-  // Organize jacks by column for proper DFAM layout
-  const organizedJacks = jacks.reduce((acc, jack) => {
-    const col = jack.x < 30 ? 0 : jack.x < 55 ? 1 : jack.x < 80 ? 2 : 3;
-    if (!acc[col]) acc[col] = [];
-    acc[col].push(jack);
-    return acc;
-  }, {} as Record<number, PatchPoint[]>);
+  // Organize jacks by column (0, 1, 2 for DFAM's 3-column layout)
+  const organizedJacks: Record<number, PatchPoint[]> = { 0: [], 1: [], 2: [] };
+  jacks.forEach(jack => {
+    const col = jack.column;
+    if (col >= 0 && col <= 2) {
+      if (!organizedJacks[col]) organizedJacks[col] = [];
+      organizedJacks[col].push(jack);
+    }
+  });
 
-  // Sort each column by y position
-  Object.values(organizedJacks).forEach(col => col.sort((a, b) => a.y - b.y));
+  // Sort each column by row
+  Object.values(organizedJacks).forEach(col => col.sort((a, b) => a.row - b.row));
 
   return (
     <div
@@ -176,105 +176,115 @@ export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
       onMouseMove={handleMouseMove}
       style={{ position: 'relative', width: '100%', height: '100%' }}
     >
-      {/* Jack sockets organized in columns */}
+      {/* Header: IN / OUT */}
       <div style={{
         display: 'flex',
-        gap: '6px',
-        padding: '4px',
+        justifyContent: 'space-between',
+        marginBottom: '6px',
+        padding: '0 4px',
+      }}>
+        <span style={{ fontSize: '7px', color: '#888', fontWeight: 'bold' }}>IN</span>
+        <span style={{ fontSize: '7px', color: '#fff', fontWeight: 'bold' }}>OUT</span>
+      </div>
+
+      {/* Jack sockets organized in 3 columns */}
+      <div style={{
+        display: 'flex',
+        gap: '4px',
         position: 'relative',
         zIndex: 10,
       }}>
-        {[0, 1, 2, 3].map(colIndex => (
-          <div key={colIndex} style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px',
-            flex: 1,
-          }}>
-            {/* Column header */}
-            <div style={{
-              fontSize: '5px',
-              color: colIndex === 3 ? '#4a4' : '#666',
-              textAlign: 'center',
-              fontWeight: 'bold',
-              marginBottom: '2px',
-            }}>
-              {colIndex === 3 ? 'OUT' : 'IN'}
-            </div>
-
-            {(organizedJacks[colIndex] || []).map((jack) => (
-              <div
-                key={jack.id}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '1px',
-                }}
-              >
+        {[0, 1, 2].map(colIndex => {
+          const isOutputColumn = colIndex === 2;
+          return (
+            <div
+              key={colIndex}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+                flex: 1,
+                padding: '4px 2px',
+                borderRadius: '3px',
+                background: isOutputColumn ? '#1a1a1a' : '#0a0a0a',
+              }}
+            >
+              {(organizedJacks[colIndex] || []).map((jack) => (
                 <div
-                  ref={(el) => { jackRefs.current[jack.id] = el; }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleJackClick(jack);
-                  }}
+                  key={jack.id}
                   style={{
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '50%',
-                    background: '#111',
-                    border: `2px solid ${jack.type === 'output' ? '#5a5' : '#555'}`,
-                    cursor: 'pointer',
-                    position: 'relative',
-                    boxShadow: jack.type === 'output'
-                      ? '0 0 3px rgba(80, 200, 80, 0.3)'
-                      : 'inset 0 1px 2px rgba(0,0,0,0.5)',
-                    transition: 'transform 0.1s, box-shadow 0.1s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                    e.currentTarget.style.boxShadow = jack.type === 'output'
-                      ? '0 0 6px rgba(80, 200, 80, 0.6)'
-                      : '0 0 4px rgba(255, 255, 255, 0.2)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = jack.type === 'output'
-                      ? '0 0 3px rgba(80, 200, 80, 0.3)'
-                      : 'inset 0 1px 2px rgba(0,0,0,0.5)';
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '1px',
                   }}
                 >
-                  {/* Connection indicator */}
-                  {cables.some(c => c.fromId === jack.id || c.toId === jack.id) && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      width: '4px',
-                      height: '4px',
+                  {/* Label above jack */}
+                  <div style={{
+                    fontSize: '5px',
+                    color: isOutputColumn ? '#eee' : '#888',
+                    textAlign: 'center',
+                    lineHeight: '1.1',
+                    maxWidth: '45px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    fontWeight: isOutputColumn ? 'bold' : 'normal',
+                  }}>
+                    {jack.label}
+                  </div>
+                  {/* Jack socket */}
+                  <div
+                    ref={(el) => { jackRefs.current[jack.id] = el; }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleJackClick(jack);
+                    }}
+                    style={{
+                      width: '14px',
+                      height: '14px',
                       borderRadius: '50%',
-                      background: cables.find(c => c.fromId === jack.id || c.toId === jack.id)?.color || '#0f0',
-                    }} />
-                  )}
+                      background: '#111',
+                      border: `2px solid ${isOutputColumn ? '#888' : '#444'}`,
+                      cursor: 'pointer',
+                      position: 'relative',
+                      boxShadow: isOutputColumn
+                        ? '0 0 4px rgba(255, 255, 255, 0.2)'
+                        : 'inset 0 1px 3px rgba(0,0,0,0.6)',
+                      transition: 'transform 0.1s, box-shadow 0.1s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.15)';
+                      e.currentTarget.style.boxShadow = isOutputColumn
+                        ? '0 0 8px rgba(255, 255, 255, 0.4)'
+                        : '0 0 6px rgba(100, 200, 255, 0.3)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = isOutputColumn
+                        ? '0 0 4px rgba(255, 255, 255, 0.2)'
+                        : 'inset 0 1px 3px rgba(0,0,0,0.6)';
+                    }}
+                  >
+                    {/* Connection indicator */}
+                    {cables.some(c => c.fromId === jack.id || c.toId === jack.id) && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        background: cables.find(c => c.fromId === jack.id || c.toId === jack.id)?.color || '#0f0',
+                      }} />
+                    )}
+                  </div>
                 </div>
-                {/* Label */}
-                <div style={{
-                  fontSize: '4px',
-                  color: jack.type === 'output' ? '#8a8' : '#777',
-                  textAlign: 'center',
-                  lineHeight: '1.1',
-                  maxWidth: '35px',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}>
-                  {jack.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        ))}
+              ))}
+            </div>
+          );
+        })}
       </div>
 
       {/* SVG overlay for cables */}
@@ -301,8 +311,8 @@ export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
               {/* Cable shadow */}
               <path
                 d={drawCablePath(fromPos, toPos)}
-                stroke="rgba(0,0,0,0.4)"
-                strokeWidth="5"
+                stroke="rgba(0,0,0,0.5)"
+                strokeWidth="6"
                 fill="none"
                 strokeLinecap="round"
               />
@@ -310,19 +320,19 @@ export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
               <path
                 d={drawCablePath(fromPos, toPos)}
                 stroke={cable.color}
-                strokeWidth="3"
+                strokeWidth="4"
                 fill="none"
                 strokeLinecap="round"
                 style={{
-                  filter: `drop-shadow(0 0 2px ${cable.color})`,
+                  filter: `drop-shadow(0 0 3px ${cable.color})`,
                   pointerEvents: 'stroke',
                   cursor: 'pointer',
                 }}
                 onClick={(e) => handleCableClick(cable.id, e)}
               />
               {/* Cable plugs */}
-              <circle cx={fromPos.x} cy={fromPos.y} r="5" fill="#222" stroke={cable.color} strokeWidth="2" />
-              <circle cx={toPos.x} cy={toPos.y} r="5" fill="#222" stroke={cable.color} strokeWidth="2" />
+              <circle cx={fromPos.x} cy={fromPos.y} r="6" fill="#333" stroke={cable.color} strokeWidth="2" />
+              <circle cx={toPos.x} cy={toPos.y} r="6" fill="#333" stroke={cable.color} strokeWidth="2" />
             </g>
           );
         })}
@@ -333,17 +343,17 @@ export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
             <path
               d={drawCablePath(jackPositions[activeCableFromId], mousePos)}
               stroke={activeCableColor}
-              strokeWidth="3"
+              strokeWidth="4"
               fill="none"
               opacity="0.7"
-              strokeDasharray="5,5"
+              strokeDasharray="6,4"
               strokeLinecap="round"
             />
             <circle
               cx={jackPositions[activeCableFromId].x}
               cy={jackPositions[activeCableFromId].y}
-              r="5"
-              fill="#222"
+              r="6"
+              fill="#333"
               stroke={activeCableColor}
               strokeWidth="2"
             />
@@ -354,14 +364,14 @@ export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
       {/* Cable type legend */}
       <div style={{
         position: 'absolute',
-        bottom: '-25px',
+        bottom: '-22px',
         left: '0',
         right: '0',
         fontSize: '5px',
         color: '#666',
         display: 'flex',
         justifyContent: 'center',
-        gap: '8px',
+        gap: '6px',
       }}>
         <span style={{ color: '#00ff00' }}>● Audio</span>
         <span style={{ color: '#ffaa00' }}>● CV</span>
