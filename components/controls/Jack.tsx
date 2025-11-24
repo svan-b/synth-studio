@@ -1,10 +1,20 @@
 'use client';
 
-import type { JackProps } from '@/types';
+import type { JackSpec } from '@/types';
 
-export default function Jack({ id, label, value, onChange, highlighted, type = 'input' }: JackProps) {
+export interface JackProps {
+  id: string;
+  spec: JackSpec;
+  isConnected: boolean;
+  onConnect?: () => void;
+  highlighted?: boolean;
+}
+
+export default function Jack({ id, spec, isConnected, onConnect, highlighted }: JackProps) {
+  const { label, jackType } = spec;
+
   const handleClick = () => {
-    onChange(!value);
+    onConnect?.();
   };
 
   return (
@@ -21,14 +31,15 @@ export default function Jack({ id, label, value, onChange, highlighted, type = '
           width: '14px',
           height: '14px',
         }}
+        title={spec.description}
       >
         <div
           className={`
             absolute inset-0
             rounded-full
             border-2
-            ${type === 'input' ? 'border-[#666] bg-[#1a1a1a]' : 'border-[#888] bg-[#2a2a2a]'}
-            ${value ? 'bg-accent' : ''}
+            ${jackType === 'input' ? 'border-[#666] bg-[#1a1a1a]' : 'border-[#888] bg-[#2a2a2a]'}
+            ${isConnected ? 'bg-accent' : ''}
             shadow-inner
           `}
           style={{
@@ -46,7 +57,7 @@ export default function Jack({ id, label, value, onChange, highlighted, type = '
         </div>
 
         {/* Connection indicator */}
-        {value && (
+        {isConnected && (
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent animate-pulse"
             style={{
@@ -62,7 +73,7 @@ export default function Jack({ id, label, value, onChange, highlighted, type = '
         className="text-[5px] text-hardware-label uppercase font-label tracking-tight text-center leading-none"
         style={{ maxWidth: '45px', wordWrap: 'break-word' }}
       >
-        {label.replace('PATCH_', '').replace('_', ' ')}
+        {label}
       </div>
     </div>
   );

@@ -1,69 +1,90 @@
 'use client';
 
-import type { ButtonProps } from '@/types';
+import type { ButtonSpec } from '@/types';
+
+export interface ButtonProps {
+  id: string;
+  spec: ButtonSpec;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  highlighted?: boolean;
+}
 
 export default function Button({
   id,
-  label,
+  spec,
   value,
-  position,
-  led = false,
-  ledColor = '#00ff00',
   onChange,
   highlighted = false,
 }: ButtonProps) {
+  const { label, momentary = false, ledColor = '#00ff00' } = spec;
+
   const handleClick = () => {
-    onChange(!value);
+    if (momentary) {
+      // Fire and release
+      onChange(true);
+      setTimeout(() => onChange(false), 100);
+    } else {
+      // Toggle
+      onChange(!value);
+    }
   };
 
   const getTeachingClass = () => {
     if (!highlighted) return '';
-    return 'teaching-current';
+    return 'ring-2 ring-orange-500 ring-opacity-80 animate-pulse';
+  };
+
+  // Determine button color based on state and ledColor
+  const getButtonStyle = () => {
+    const isRed = ledColor === '#ff0000' || ledColor === 'red';
+
+    if (value) {
+      return {
+        background: ledColor,
+        boxShadow: `0 0 12px ${ledColor}, inset 0 -2px 4px rgba(0,0,0,0.3)`,
+      };
+    }
+
+    return {
+      background: isRed ? '#400000' : '#004000',
+      boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.6)',
+    };
   };
 
   return (
     <div
-      className={`flex flex-col items-center gap-2 select-none ${getTeachingClass()}`}
-      style={position ? { position: 'absolute', left: position.x, top: position.y } : {}}
+      className={`flex flex-col items-center gap-1.5 select-none ${getTeachingClass()}`}
+      title={spec.description}
     >
-      {/* LED indicator */}
-      {led && (
-        <div className="flex justify-center">
-          <div
-            className={`w-2 h-2 rounded-full ${value ? 'led-on' : 'led-off'}`}
-            style={{
-              backgroundColor: value ? ledColor : '#333',
-            }}
-          />
-        </div>
-      )}
+      {/* Label */}
+      <div className="font-label text-[8px] text-hardware-label uppercase tracking-wider text-center max-w-[60px] leading-tight">
+        {label}
+      </div>
 
       {/* Button */}
       <button
         onClick={handleClick}
-        className={`
-          w-12 h-12 rounded-full border-2 transition-all
-          ${value
-            ? 'bg-hardware-panel border-hardware-led-on shadow-inner'
-            : 'bg-gradient-to-b from-[#3a3a3a] to-[#2a2a2a] border-[#4a4a4a] shadow-lg'
-          }
-          hover:brightness-110 active:scale-95
-        `}
-        style={value ? {
-          boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.6)',
-        } : {
-          boxShadow: '0 4px 6px rgba(0,0,0,0.6), inset 0 1px 2px rgba(255,255,255,0.1)',
-        }}
+        className="relative w-8 h-8 rounded-full border-2 border-[#3a3a3a] transition-all active:scale-95 hover:brightness-110"
+        style={getButtonStyle()}
       >
-        <span className="text-xs font-label text-hardware-label uppercase">
-          {value ? 'ON' : 'OFF'}
-        </span>
+        {/* LED glow when active */}
+        {value && !momentary && (
+          <div
+            className="absolute inset-1 rounded-full"
+            style={{
+              background: `radial-gradient(circle, ${ledColor}88 0%, transparent 70%)`,
+            }}
+          />
+        )}
       </button>
 
-      {/* Label */}
-      <div className="font-label text-[9px] text-hardware-label uppercase tracking-wider text-center max-w-[60px]">
-        {label}
-      </div>
+      {/* State indicator for toggle buttons */}
+      {!momentary && (
+        <div className="font-mono text-[9px] text-hardware-label">
+          {value ? 'ON' : 'OFF'}
+        </div>
+      )}
     </div>
   );
 }

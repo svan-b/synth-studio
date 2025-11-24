@@ -2,28 +2,32 @@
 
 import { useState } from 'react';
 import { useStudioStore } from '@/store/studio';
-import { DFAM_LESSONS } from '@/data/dfam';
+import { deviceRegistry, lessonRegistry } from '@/data/devices';
 import DFAM from '@/components/devices/DFAM';
 import Instructions from '@/components/teaching/Instructions';
 import * as Select from '@radix-ui/react-select';
 import * as Dialog from '@radix-ui/react-dialog';
 
 export default function Home() {
-  const { currentDevice, setCurrentDevice, startLesson, isTeachingMode, resetLesson } = useStudioStore();
+  const { currentDevice, setCurrentDevice, startLesson, isTeachingMode, resetLesson, completedLessons } = useStudioStore();
   const [showLessonDialog, setShowLessonDialog] = useState(false);
 
+  // Device configuration with components
   const devices = [
-    { id: 'DFAM', name: 'Moog DFAM', component: DFAM, available: true },
-    { id: 'Mother-32', name: 'Moog Mother-32', available: false },
-    { id: 'Subharmonicon', name: 'Moog Subharmonicon', available: false },
-    { id: 'Analog Four', name: 'Elektron Analog Four MKII', available: false },
-    { id: 'Analog Rytm', name: 'Elektron Analog Rytm MKII', available: false },
-    { id: 'Sub 37', name: 'Moog Sub 37', available: false },
-    { id: 'Xone:96', name: 'Allen & Heath Xone:96', available: false },
+    { id: 'dfam', name: 'Moog DFAM', component: DFAM, available: true },
+    { id: 'mother32', name: 'Moog Mother-32', available: false },
+    { id: 'subharmonicon', name: 'Moog Subharmonicon', available: false },
+    { id: 'analog-four', name: 'Elektron Analog Four MKII', available: false },
+    { id: 'analog-rytm', name: 'Elektron Analog Rytm MKII', available: false },
+    { id: 'sub-37', name: 'Moog Sub 37', available: false },
+    { id: 'xone-96', name: 'Allen & Heath Xone:96', available: false },
   ];
 
+  // Get device spec for additional info
+  const deviceSpec = deviceRegistry.getDevice(currentDevice);
+
   // Get lessons for current device
-  const lessons = currentDevice === 'DFAM' ? DFAM_LESSONS : [];
+  const lessons = lessonRegistry.getLessonsForDevice(currentDevice);
 
   const handleStartLesson = (lessonIndex: number) => {
     startLesson(lessons[lessonIndex]);
@@ -32,6 +36,9 @@ export default function Home() {
 
   const currentDeviceData = devices.find(d => d.id === currentDevice);
   const DeviceComponent = currentDeviceData?.component;
+
+  // Check if lesson is completed
+  const isLessonCompleted = (lessonId: string) => completedLessons.includes(lessonId);
 
   return (
     <div className="min-h-screen bg-hardware-bg p-6">
@@ -61,7 +68,7 @@ export default function Home() {
                 </Select.Trigger>
 
                 <Select.Portal>
-                  <Select.Content className="overflow-hidden bg-hardware-panel border-2 border-[#3a3a3a] rounded shadow-2xl">
+                  <Select.Content className="overflow-hidden bg-hardware-panel border-2 border-[#3a3a3a] rounded shadow-2xl z-50">
                     <Select.Viewport className="p-1">
                       {devices.map((device) => (
                         <Select.Item
@@ -69,7 +76,7 @@ export default function Home() {
                           value={device.id}
                           disabled={!device.available}
                           className={`
-                            relative flex items-center px-6 py-2 text-sm rounded cursor-pointer
+                            relative flex items-center px-6 py-2 text-sm rounded cursor-pointer outline-none
                             ${device.available
                               ? 'text-white hover:bg-[#3a3a3a] data-[highlighted]:bg-[#3a3a3a]'
                               : 'text-hardware-label cursor-not-allowed opacity-50'
@@ -125,9 +132,10 @@ export default function Home() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-white">
-                  {currentDeviceData.name}
+                  {deviceSpec?.name || currentDeviceData.name}
                 </h2>
                 <p className="text-xs text-hardware-label mt-1">
+                  {deviceSpec?.manufacturer && `${deviceSpec.manufacturer} • `}
                   {lessons.length} lesson{lessons.length !== 1 ? 's' : ''} available •
                   All specifications verified from official manual
                 </p>
@@ -145,7 +153,7 @@ export default function Home() {
       {/* Device Display */}
       <main className="max-w-screen-2xl mx-auto">
         {DeviceComponent ? (
-          <div className="flex justify-center">
+          <div className="flex justify-center overflow-x-auto">
             <DeviceComponent />
           </div>
         ) : (
@@ -166,36 +174,62 @@ export default function Home() {
       {/* Lesson Selection Dialog */}
       <Dialog.Root open={showLessonDialog} onOpenChange={setShowLessonDialog}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-6 w-full max-w-md shadow-2xl">
+          <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-6 w-full max-w-lg shadow-2xl z-50">
             <Dialog.Title className="text-xl font-bold text-white mb-2">
               Choose a Lesson
             </Dialog.Title>
             <Dialog.Description className="text-sm text-hardware-label mb-4">
-              Select a lesson to begin guided practice with teaching indicators.
+              Select a lesson to begin guided practice. Controls will highlight to show you where to adjust.
             </Dialog.Description>
 
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {lessons.map((lesson, index) => (
                 <button
-                  key={index}
+                  key={lesson.id}
                   onClick={() => handleStartLesson(index)}
                   className="w-full text-left p-4 bg-[#1a1a1a] hover:bg-[#2a2a2a] border border-[#3a3a3a] rounded transition-all group"
                 >
                   <div className="flex items-start justify-between mb-1">
-                    <h4 className="font-bold text-white group-hover:text-teaching-current transition-colors">
-                      {lesson.name}
-                    </h4>
-                    <span className="text-xs text-hardware-label bg-[#2a2a2a] px-2 py-0.5 rounded">
-                      {lesson.steps.length} steps
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-white group-hover:text-teaching-current transition-colors">
+                        {lesson.name}
+                      </h4>
+                      {isLessonCompleted(lesson.id) && (
+                        <span className="text-xs text-green-500">✓ Completed</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        lesson.difficulty === 'beginner' ? 'bg-green-900 text-green-300' :
+                        lesson.difficulty === 'intermediate' ? 'bg-yellow-900 text-yellow-300' :
+                        'bg-red-900 text-red-300'
+                      }`}>
+                        {lesson.difficulty}
+                      </span>
+                      <span className="text-xs text-hardware-label bg-[#2a2a2a] px-2 py-0.5 rounded">
+                        {lesson.steps.length} steps
+                      </span>
+                    </div>
                   </div>
                   <p className="text-sm text-hardware-label mb-2">
                     {lesson.description}
                   </p>
-                  <p className="text-xs text-hardware-label italic">
-                    Source: {lesson.source}
-                  </p>
+                  <div className="flex items-center gap-2 text-xs text-hardware-label">
+                    <span>Source: {lesson.source}</span>
+                    {lesson.estimatedMinutes && (
+                      <>
+                        <span>•</span>
+                        <span>~{lesson.estimatedMinutes} min</span>
+                      </>
+                    )}
+                    {lesson.tags && lesson.tags.length > 0 && (
+                      <>
+                        <span>•</span>
+                        <span>{lesson.tags.slice(0, 3).join(', ')}</span>
+                      </>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
@@ -217,15 +251,19 @@ export default function Home() {
           Synth Studio • Digital Twin Learning System • All device specifications verified from official manuals
         </p>
         <p className="mt-1">
-          <a
-            href="https://api.moogmusic.com/sites/default/files/2018-04/DFAM_Manual.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-teaching-current transition-colors"
-          >
-            DFAM Manual
-          </a>
-          {' • '}
+          {deviceSpec?.manualUrl && (
+            <>
+              <a
+                href={deviceSpec.manualUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-teaching-current transition-colors"
+              >
+                {deviceSpec.name} Manual
+              </a>
+              {' • '}
+            </>
+          )}
           Built with Next.js 14, TypeScript, and Tailwind CSS
         </p>
       </footer>

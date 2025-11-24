@@ -1,29 +1,33 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import type { KnobProps } from '@/types';
+import type { KnobSpec, Units } from '@/types';
+
+export interface KnobProps {
+  id: string;
+  spec: KnobSpec;
+  value: number;
+  onChange: (value: number) => void;
+  highlighted?: boolean;
+  targetValue?: number;
+  showTarget?: boolean;
+}
 
 export default function Knob({
   id,
+  spec,
   value,
-  min,
-  max,
-  defaultValue,
-  bipolar = false,
-  units = '%',
-  size = 'medium',
-  label,
-  position,
   onChange,
   highlighted = false,
   targetValue,
-  isCorrect = false,
   showTarget = false,
 }: KnobProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [startValue, setStartValue] = useState(value);
   const knobRef = useRef<HTMLDivElement>(null);
+
+  const { min, max, bipolar = false, units = '%', size = 'medium', label } = spec;
 
   // Calculate rotation angle (-135deg to +135deg, 270deg total range)
   const valueToRotation = (val: number): number => {
@@ -36,28 +40,32 @@ export default function Knob({
 
   // Size classes
   const sizeClasses = {
-    small: 'w-12 h-12',
-    medium: 'w-16 h-16',
-    large: 'w-20 h-20',
+    small: 'w-10 h-10',
+    medium: 'w-14 h-14',
+    large: 'w-18 h-18',
+  };
+
+  const sizePx = {
+    small: 40,
+    medium: 56,
+    large: 72,
   };
 
   const labelSizeClasses = {
-    small: 'text-[9px]',
-    medium: 'text-[10px]',
-    large: 'text-[11px]',
+    small: 'text-[8px]',
+    medium: 'text-[9px]',
+    large: 'text-[10px]',
   };
 
   const valueSizeClasses = {
-    small: 'text-[11px]',
-    medium: 'text-[13px]',
-    large: 'text-[14px]',
+    small: 'text-[10px]',
+    medium: 'text-[11px]',
+    large: 'text-[12px]',
   };
 
   // Format display value
-  const formatValue = (val: number): string => {
+  const formatValue = (val: number, units: Units): string => {
     if (bipolar && val === 0) return '0';
-    if (bipolar && val > 0) return `+${val.toFixed(1)}`;
-    if (bipolar) return val.toFixed(1);
 
     if (units === 'Hz') {
       if (val >= 1000) return `${(val / 1000).toFixed(1)}k`;
@@ -67,11 +75,19 @@ export default function Knob({
       if (val >= 1000) return `${(val / 1000).toFixed(1)}s`;
       return val.toFixed(0);
     }
-    if (units === 'octaves' || units === 'semitones') {
-      return bipolar ? (val > 0 ? `+${val.toFixed(1)}` : val.toFixed(1)) : val.toFixed(1);
+    if (units === 'BPM') {
+      if (val >= 1000) return `${(val / 1000).toFixed(1)}k`;
+      return val.toFixed(0);
+    }
+    if (units === 'octaves' || units === 'V') {
+      const formatted = val.toFixed(1);
+      return bipolar && val > 0 ? `+${formatted}` : formatted;
+    }
+    if (units === '%') {
+      return Math.round(val).toString();
     }
 
-    return Math.round(val).toString();
+    return bipolar && val > 0 ? `+${val.toFixed(1)}` : val.toFixed(1);
   };
 
   // Mouse drag handling
@@ -94,6 +110,11 @@ export default function Knob({
       let newValue = startValue + delta;
       newValue = Math.max(min, Math.min(max, newValue));
 
+      // Snap to step if defined
+      if (spec.step) {
+        newValue = Math.round(newValue / spec.step) * spec.step;
+      }
+
       onChange(newValue);
     };
 
@@ -110,55 +131,59 @@ export default function Knob({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, startY, startValue, min, max, onChange]);
+  }, [isDragging, startY, startValue, min, max, spec.step, onChange]);
 
   // Check if value is close to target (5% tolerance)
-  const isCloseToTarget = targetValue !== undefined && Math.abs(value - targetValue) <= Math.abs(max - min) * 0.05;
+  const tolerance = Math.abs(max - min) * 0.05;
+  const isCloseToTarget = targetValue !== undefined && Math.abs(value - targetValue) <= tolerance;
 
   // Determine teaching class
   const getTeachingClass = () => {
     if (!highlighted) return '';
-    if (isCorrect || isCloseToTarget) return 'teaching-correct';
-    if (showTarget && targetValue !== undefined) {
-      return value < targetValue ? 'teaching-current' : 'teaching-wrong';
-    }
-    return 'teaching-current';
+    if (isCloseToTarget) return 'ring-2 ring-green-500 ring-opacity-80';
+    return 'ring-2 ring-orange-500 ring-opacity-80 animate-pulse';
   };
 
+  const currentPx = sizePx[size];
+
   return (
-    <div
-      className="flex flex-col items-center gap-1 select-none"
-      style={position ? { position: 'absolute', left: position.x, top: position.y } : {}}
-    >
+    <div className="flex flex-col items-center gap-1 select-none">
       {/* Label */}
-      <div className={`font-label text-hardware-label uppercase tracking-wider text-center ${labelSizeClasses[size]}`}>
+      <div className={`font-label text-hardware-label uppercase tracking-wider text-center leading-tight ${labelSizeClasses[size]}`}>
         {label}
       </div>
 
       {/* Knob */}
       <div
         ref={knobRef}
-        className={`relative ${sizeClasses[size]} cursor-pointer ${getTeachingClass()}`}
+        className={`relative cursor-pointer rounded-full ${getTeachingClass()}`}
+        style={{ width: currentPx, height: currentPx }}
         onMouseDown={handleMouseDown}
+        title={spec.description}
       >
         {/* Knob body */}
         <div
-          className="w-full h-full rounded-full bg-gradient-to-b from-hardware-panel to-[#1a1a1a] shadow-lg border-2 border-[#3a3a3a]"
+          className="w-full h-full rounded-full bg-gradient-to-b from-hardware-panel to-[#1a1a1a] border-2 border-[#3a3a3a]"
           style={{
             boxShadow: '0 4px 8px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.1)',
           }}
         >
           {/* Indicator line */}
           <div
-            className="absolute w-full h-full knob-rotate"
+            className="absolute w-full h-full transition-transform duration-50"
             style={{ transform: `rotate(${rotation}deg)` }}
           >
-            <div className="absolute top-1 left-1/2 w-0.5 h-3 bg-hardware-led-on transform -translate-x-1/2 rounded-full shadow-lg"
-                 style={{ boxShadow: '0 0 4px rgba(0,255,0,0.8)' }} />
+            <div
+              className="absolute top-1 left-1/2 w-0.5 bg-hardware-led-on transform -translate-x-1/2 rounded-full"
+              style={{
+                height: `${currentPx * 0.25}px`,
+                boxShadow: '0 0 4px rgba(0,255,0,0.8)'
+              }}
+            />
           </div>
 
           {/* Target indicator (if teaching mode) */}
-          {showTarget && targetRotation !== undefined && (
+          {showTarget && targetRotation !== undefined && !isCloseToTarget && (
             <div
               className="absolute w-full h-full"
               style={{ transform: `rotate(${targetRotation}deg)` }}
@@ -167,7 +192,7 @@ export default function Knob({
             </div>
           )}
 
-          {/* Center dot */}
+          {/* Center dot for bipolar */}
           {bipolar && (
             <div className="absolute top-1/2 left-1/2 w-1 h-1 bg-hardware-label rounded-full transform -translate-x-1/2 -translate-y-1/2" />
           )}
@@ -175,16 +200,18 @@ export default function Knob({
       </div>
 
       {/* Value display */}
-      <div className={`font-mono ${valueSizeClasses[size]} bg-black text-teaching-current px-2 py-0.5 rounded border border-[#1a1a1a] min-w-[48px] text-center`}
-           style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,255,0,0.2)' }}>
-        {formatValue(value)}
-        <span className="text-hardware-label ml-0.5 text-[9px]">{units}</span>
+      <div
+        className={`font-mono ${valueSizeClasses[size]} bg-black text-green-400 px-1.5 py-0.5 rounded border border-[#1a1a1a] min-w-[40px] text-center`}
+        style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.8), 0 0 6px rgba(0,255,0,0.15)' }}
+      >
+        {formatValue(value, units)}
+        <span className="text-hardware-label ml-0.5 text-[8px]">{units}</span>
       </div>
 
-      {/* Target value (if teaching mode) */}
+      {/* Target value hint (if teaching mode) */}
       {showTarget && targetValue !== undefined && !isCloseToTarget && (
-        <div className="text-[9px] text-teaching-target font-mono">
-          → {formatValue(targetValue)}{units}
+        <div className="text-[8px] text-teaching-target font-mono">
+          → {formatValue(targetValue, units)}{units}
         </div>
       )}
     </div>

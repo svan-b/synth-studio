@@ -1,47 +1,185 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { StudioState, Lesson } from '@/types';
+import type { Lesson, PatchConnection } from '@/types';
+
+interface DeviceState {
+  controlValues: Record<string, number | string | boolean>;
+  patchConnections: PatchConnection[];
+}
+
+interface StudioState {
+  currentDevice: string;
+  devices: Record<string, DeviceState>;
+  currentLesson?: Lesson;
+  currentStep: number;
+  completedLessons: string[];
+  isTeachingMode: boolean;
+}
 
 interface StudioStore extends StudioState {
+  // Device management
   setCurrentDevice: (device: string) => void;
-  setControlValue: (device: string, control: string, value: number | string) => void;
-  getControlValue: (device: string, control: string) => number | string | undefined;
+
+  // Control values
+  setControlValue: (device: string, control: string, value: number | string | boolean) => void;
+  getControlValue: (device: string, control: string) => number | string | boolean | undefined;
+  resetDeviceToDefaults: (device: string) => void;
+
+  // Patch connections
+  addPatchConnection: (device: string, from: string, to: string, color?: string) => void;
+  removePatchConnection: (device: string, from: string, to: string) => void;
+  clearPatchConnections: (device: string) => void;
+
+  // Teaching / Lessons
   startLesson: (lesson: Lesson) => void;
   completeStep: () => void;
   resetLesson: () => void;
   toggleTeachingMode: () => void;
   completeLesson: () => void;
+  isStepComplete: () => boolean;
 }
+
+// Helper to initialize device state
+const initDeviceState = (): DeviceState => ({
+  controlValues: {},
+  patchConnections: [],
+});
 
 export const useStudioStore = create<StudioStore>()(
   persist(
     (set, get) => ({
-      currentDevice: 'DFAM',
-      deviceSettings: {},
+      // Initial state
+      currentDevice: 'dfam',
+      devices: {},
       currentLesson: undefined,
       currentStep: 0,
       completedLessons: [],
       isTeachingMode: false,
 
+      // Device management
       setCurrentDevice: (device) => set({ currentDevice: device }),
 
+      // Control values
       setControlValue: (device, control, value) => {
-        set((state) => ({
-          deviceSettings: {
-            ...state.deviceSettings,
-            [device]: {
-              ...state.deviceSettings[device],
-              [control]: value,
+        set((state) => {
+          const deviceState = state.devices[device] || initDeviceState();
+          return {
+            devices: {
+              ...state.devices,
+              [device]: {
+                ...deviceState,
+                controlValues: {
+                  ...deviceState.controlValues,
+                  [control]: value,
+                },
+              },
             },
-          },
-        }));
+          };
+        });
+
+        // Auto-advance lesson step if value matches target
+        const state = get();
+        if (state.isTeachingMode && state.currentLesson) {
+          const step = state.currentLesson.steps[state.currentStep];
+          if (step && step.control === control) {
+            // Check if value matches target (with tolerance for numbers)
+            const target = step.targetValue;
+            let isMatch = false;
+
+            if (typeof target === 'number' && typeof value === 'number') {
+              // 5% tolerance for numeric values
+              const tolerance = Math.abs(target) * 0.05 || 0.5;
+              isMatch = Math.abs(value - target) <= tolerance;
+            } else {
+              isMatch = value === target;
+            }
+
+            if (isMatch && state.currentStep < state.currentLesson.steps.length - 1) {
+              // Small delay before advancing to give visual feedback
+              setTimeout(() => {
+                get().completeStep();
+              }, 500);
+            }
+          }
+        }
       },
 
       getControlValue: (device, control) => {
         const state = get();
-        return state.deviceSettings[device]?.[control];
+        return state.devices[device]?.controlValues[control];
       },
 
+      resetDeviceToDefaults: (device) => {
+        set((state) => ({
+          devices: {
+            ...state.devices,
+            [device]: initDeviceState(),
+          },
+        }));
+      },
+
+      // Patch connections
+      addPatchConnection: (device, from, to, color) => {
+        set((state) => {
+          const deviceState = state.devices[device] || initDeviceState();
+          // Check if connection already exists
+          const exists = deviceState.patchConnections.some(
+            c => c.from === from && c.to === to
+          );
+          if (exists) return state;
+
+          return {
+            devices: {
+              ...state.devices,
+              [device]: {
+                ...deviceState,
+                patchConnections: [
+                  ...deviceState.patchConnections,
+                  { from, to, color },
+                ],
+              },
+            },
+          };
+        });
+      },
+
+      removePatchConnection: (device, from, to) => {
+        set((state) => {
+          const deviceState = state.devices[device];
+          if (!deviceState) return state;
+
+          return {
+            devices: {
+              ...state.devices,
+              [device]: {
+                ...deviceState,
+                patchConnections: deviceState.patchConnections.filter(
+                  c => !(c.from === from && c.to === to)
+                ),
+              },
+            },
+          };
+        });
+      },
+
+      clearPatchConnections: (device) => {
+        set((state) => {
+          const deviceState = state.devices[device];
+          if (!deviceState) return state;
+
+          return {
+            devices: {
+              ...state.devices,
+              [device]: {
+                ...deviceState,
+                patchConnections: [],
+              },
+            },
+          };
+        });
+      },
+
+      // Teaching / Lessons
       startLesson: (lesson) => {
         set({
           currentLesson: lesson,
@@ -72,18 +210,61 @@ export const useStudioStore = create<StudioStore>()(
       completeLesson: () => {
         const state = get();
         if (state.currentLesson) {
-          const lessonId = `${state.currentLesson.device}-${state.currentLesson.name}`;
+          const lessonId = state.currentLesson.id;
           set((state) => ({
-            completedLessons: [...state.completedLessons, lessonId],
+            completedLessons: state.completedLessons.includes(lessonId)
+              ? state.completedLessons
+              : [...state.completedLessons, lessonId],
             currentLesson: undefined,
             currentStep: 0,
             isTeachingMode: false,
           }));
         }
       },
+
+      isStepComplete: () => {
+        const state = get();
+        if (!state.currentLesson) return false;
+
+        const step = state.currentLesson.steps[state.currentStep];
+        if (!step) return false;
+
+        const value = state.devices[state.currentDevice]?.controlValues[step.control];
+        if (value === undefined) return false;
+
+        const target = step.targetValue;
+        if (typeof target === 'number' && typeof value === 'number') {
+          const tolerance = Math.abs(target) * 0.05 || 0.5;
+          return Math.abs(value - target) <= tolerance;
+        }
+
+        return value === target;
+      },
     }),
     {
       name: 'synth-studio-storage',
+      version: 2, // Bump version to handle migration from old format
+      migrate: (persisted, version) => {
+        // Handle migration from v1 (old deviceSettings format)
+        if (version === 1 || version === 0) {
+          const old = persisted as Record<string, unknown> & { deviceSettings?: Record<string, Record<string, number | string>> };
+          if (old && old.deviceSettings) {
+            const devices: Record<string, DeviceState> = {};
+            Object.entries(old.deviceSettings).forEach(([device, settings]) => {
+              devices[device.toLowerCase()] = {
+                controlValues: settings as Record<string, number | string | boolean>,
+                patchConnections: [],
+              };
+            });
+            return {
+              ...old,
+              devices,
+              deviceSettings: undefined,
+            };
+          }
+        }
+        return persisted;
+      },
     }
   )
 );
