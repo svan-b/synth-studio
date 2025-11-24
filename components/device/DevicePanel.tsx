@@ -91,36 +91,24 @@ export default function DevicePanel({
   }, [spec.controls, getValue, onChange, isHighlighted, getTargetValue, isTeachingMode]);
 
   // Build patch bay jacks from spec
-  // x values determine column grouping in PatchBay:
-  // col 0: x < 30, col 1: 30-55, col 2: 55-80, col 3: x >= 80
+  // 3 columns: 0 & 1 = inputs, 2 = outputs
   const patchBayJacks = useMemo(() => {
     if (!spec.patchBay) return [];
 
     const jacks: Array<{
       id: string;
       label: string;
-      x: number;
-      y: number;
+      column: number;
+      row: number;
       type: 'input' | 'output';
     }> = [];
-
-    // Map column numbers to x positions for proper grouping
-    const columnToX = (col: number) => {
-      switch (col) {
-        case 0: return 15;
-        case 1: return 40;
-        case 2: return 65;
-        case 3: return 90;
-        default: return 15;
-      }
-    };
 
     spec.patchBay.inputs.forEach((input) => {
       jacks.push({
         id: input.id,
         label: input.label,
-        x: columnToX(input.column),
-        y: input.row * 20,
+        column: input.column,
+        row: input.row,
         type: 'input',
       });
     });
@@ -129,8 +117,8 @@ export default function DevicePanel({
       jacks.push({
         id: output.id,
         label: output.label,
-        x: columnToX(output.column),
-        y: output.row * 20,
+        column: output.column,
+        row: output.row,
         type: 'output',
       });
     });
