@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import type { DeviceSpec, KnobSpec, SwitchSpec, ButtonSpec, Lesson } from '@/types';
 import Knob from '@/components/controls/Knob';
 import Switch from '@/components/controls/Switch';
@@ -35,8 +35,8 @@ export default function DevicePanel({
     return currentLesson.steps[currentStep];
   }, [currentLesson, currentStep]);
 
-  // Get value for a control
-  const getValue = useCallback((controlId: string): number => {
+  // Get value for a control - direct function, not memoized to avoid stale closures
+  const getValue = (controlId: string): number => {
     if (values[controlId] !== undefined) {
       return values[controlId] as number;
     }
@@ -45,20 +45,20 @@ export default function DevicePanel({
       return controlSpec.default as number;
     }
     return 0;
-  }, [values, spec.controls]);
+  };
 
   // Check if control is highlighted
-  const isHighlighted = useCallback((controlId: string): boolean => {
+  const isHighlighted = (controlId: string): boolean => {
     return isTeachingMode && currentStepInfo?.control === controlId;
-  }, [isTeachingMode, currentStepInfo]);
+  };
 
   // Get target value for teaching
-  const getTargetValue = useCallback((controlId: string): number | undefined => {
+  const getTargetValue = (controlId: string): number | undefined => {
     if (!isTeachingMode || !currentStepInfo || currentStepInfo.control !== controlId) {
       return undefined;
     }
     return currentStepInfo.targetValue as number;
-  }, [isTeachingMode, currentStepInfo]);
+  };
 
   // Build patch bay jacks
   const patchBayJacks = useMemo(() => {
@@ -94,13 +94,14 @@ export default function DevicePanel({
     return jacks;
   }, [spec.patchBay]);
 
-  // Render a knob with configurable size
-  const renderKnob = useCallback((id: string, sizeOverride?: 'small' | 'medium' | 'large') => {
+  // Render a knob - direct function call for proper onChange binding
+  const renderKnob = (id: string, sizeOverride?: 'small' | 'medium' | 'large') => {
     const controlSpec = spec.controls[id] as KnobSpec;
     if (!controlSpec) return null;
     const finalSpec = sizeOverride ? { ...controlSpec, size: sizeOverride } : controlSpec;
     return (
       <Knob
+        key={id}
         id={id}
         spec={finalSpec}
         value={getValue(id)}
@@ -110,14 +111,15 @@ export default function DevicePanel({
         showTarget={isTeachingMode}
       />
     );
-  }, [spec.controls, getValue, onChange, isHighlighted, getTargetValue, isTeachingMode]);
+  };
 
   // Render a switch
-  const renderSwitch = useCallback((id: string) => {
+  const renderSwitch = (id: string) => {
     const controlSpec = spec.controls[id] as SwitchSpec;
     if (!controlSpec) return null;
     return (
       <Switch
+        key={id}
         id={id}
         spec={controlSpec}
         value={getValue(id)}
@@ -126,14 +128,15 @@ export default function DevicePanel({
         targetValue={getTargetValue(id)}
       />
     );
-  }, [spec.controls, getValue, onChange, isHighlighted, getTargetValue]);
+  };
 
   // Render a button
-  const renderButton = useCallback((id: string) => {
+  const renderButton = (id: string) => {
     const controlSpec = spec.controls[id] as ButtonSpec;
     if (!controlSpec) return null;
     return (
       <Button
+        key={id}
         id={id}
         spec={controlSpec}
         value={getValue(id) as unknown as boolean}
@@ -141,51 +144,27 @@ export default function DevicePanel({
         highlighted={isHighlighted(id)}
       />
     );
-  }, [spec.controls, getValue, onChange, isHighlighted]);
-
-  // Control group with label
-  const ControlGroup = ({ children, label, width = 'auto', className = '' }: {
-    children: React.ReactNode;
-    label?: string;
-    width?: string | number;
-    className?: string;
-  }) => (
-    <div className={`flex flex-col items-center ${className}`} style={{ width }}>
-      {label && (
-        <span className="text-[8px] text-gray-400 font-bold mb-1 tracking-wide text-center leading-tight whitespace-pre-line">
-          {label}
-        </span>
-      )}
-      {children}
-    </div>
-  );
-
-  // Section label
-  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-    <span className="text-[9px] text-white font-bold tracking-wide">
-      {children}
-    </span>
-  );
+  };
 
   return (
     <div
       className="relative rounded-lg"
       style={{
-        width: 1150,
+        width: 1200,
         background: '#1a1a1a',
         padding: '12px',
       }}
     >
       {/* Wooden Side Cheeks */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-[20px] rounded-l-lg"
+        className="absolute left-0 top-0 bottom-0 w-[24px] rounded-l-lg"
         style={{
           background: 'linear-gradient(90deg, #3d2b1f 0%, #5C4033 50%, #3d2b1f 100%)',
           boxShadow: 'inset -2px 0 4px rgba(0,0,0,0.5)',
         }}
       />
       <div
-        className="absolute right-0 top-0 bottom-0 w-[20px] rounded-r-lg"
+        className="absolute right-0 top-0 bottom-0 w-[24px] rounded-r-lg"
         style={{
           background: 'linear-gradient(90deg, #3d2b1f 0%, #5C4033 50%, #3d2b1f 100%)',
           boxShadow: 'inset 2px 0 4px rgba(0,0,0,0.5)',
@@ -194,220 +173,233 @@ export default function DevicePanel({
 
       {/* Main Black Panel */}
       <div
-        className="relative ml-[20px] mr-[20px] rounded"
+        className="relative ml-[24px] mr-[24px] rounded"
         style={{
           background: '#111',
-          padding: '16px 20px',
-          minHeight: '420px',
+          padding: '20px',
         }}
       >
         {/* Main layout: Controls on left, Patch Bay on right */}
-        <div className="flex gap-5">
+        <div className="flex gap-6">
           {/* Left side: All controls */}
           <div className="flex-1">
             {/* ============================================================ */}
-            {/* ROW 1: VCO Envelope + VCO 1 + Mixer + Filter + VCA */}
-            {/* Matches actual DFAM top row from left to right */}
+            {/* ROW 1: VCO DECAY, VCO 1 EG, VCO 1 FREQ, VCO 1 LEVEL, NOISE, CUTOFF, RESONANCE, VCA EG, VOLUME */}
             {/* ============================================================ */}
-            <div className="flex items-start gap-4 mb-5">
-              {/* VCO DECAY Section */}
-              <div className="flex flex-col items-center" style={{ width: 70 }}>
-                <SectionLabel>VCO DECAY</SectionLabel>
-                <div className="mt-1">{renderKnob('vco_decay', 'large')}</div>
-                <div className="mt-3">
-                  <span className="text-[7px] text-gray-500 block text-center mb-1">SEQ PITCH MOD</span>
+            <div className="flex items-start gap-3 mb-4">
+              {/* VCO DECAY with SEQ PITCH MOD */}
+              <div className="flex flex-col items-center">
+                <span className="text-[9px] text-white font-bold mb-1">VCO DECAY</span>
+                {renderKnob('vco_decay', 'large')}
+                <div className="mt-2 flex flex-col items-center">
+                  <span className="text-[6px] text-gray-500 mb-1">SEQ PITCH MOD</span>
                   {renderSwitch('seq_pitch_mod')}
                 </div>
               </div>
 
-              {/* VCO 1 Section */}
-              <div className="flex items-start gap-2" style={{ borderLeft: '1px solid #333', paddingLeft: 12 }}>
-                {/* VCO 1 EG Amount */}
-                <ControlGroup label="VCO 1\nEG AMT" width={55}>
-                  {renderKnob('vco1_eg_amount', 'medium')}
-                </ControlGroup>
+              {/* VCO 1 EG AMOUNT */}
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] text-gray-400 mb-1">VCO 1 EG AMT</span>
+                {renderKnob('vco1_eg_amount', 'medium')}
+              </div>
 
-                {/* VCO 1 Frequency with Wave Switch */}
-                <div className="flex flex-col items-center" style={{ width: 75 }}>
-                  <span className="text-[7px] text-gray-500 mb-1">VCO 1 WAVE</span>
+              {/* VCO 1 FREQUENCY with WAVE switch */}
+              <div className="flex flex-col items-center">
+                <span className="text-[9px] text-white font-bold mb-1">VCO 1 FREQUENCY</span>
+                {renderKnob('vco1_frequency', 'large')}
+                <div className="mt-1 flex flex-col items-center">
+                  <span className="text-[6px] text-gray-500 mb-1">VCO 1 WAVE</span>
                   {renderSwitch('vco1_wave')}
-                  <SectionLabel>VCO 1</SectionLabel>
-                  <div className="mt-1">{renderKnob('vco1_frequency', 'large')}</div>
                 </div>
               </div>
 
-              {/* FM Section */}
-              <div className="flex items-start gap-2" style={{ borderLeft: '1px solid #333', paddingLeft: 12 }}>
-                {/* 1→2 FM Amount */}
-                <div className="flex flex-col items-center" style={{ width: 60 }}>
-                  <ControlGroup label="1→2 FM\nAMT">
-                    {renderKnob('fm_amount', 'medium')}
-                  </ControlGroup>
-                  <div className="mt-2">
-                    <span className="text-[7px] text-gray-500 block text-center mb-1">HARD SYNC</span>
-                    {renderSwitch('hard_sync')}
-                  </div>
-                </div>
-
-                {/* VCO 2 EG Amount */}
-                <ControlGroup label="VCO 2\nEG AMT" width={55}>
-                  {renderKnob('vco2_eg_amount', 'medium')}
-                </ControlGroup>
-
-                {/* VCO 2 Frequency with Wave Switch */}
-                <div className="flex flex-col items-center" style={{ width: 75 }}>
-                  <span className="text-[7px] text-gray-500 mb-1">VCO 2 WAVE</span>
-                  {renderSwitch('vco2_wave')}
-                  <SectionLabel>VCO 2</SectionLabel>
-                  <div className="mt-1">{renderKnob('vco2_frequency', 'large')}</div>
-                </div>
-              </div>
-
-              {/* Mixer Section */}
-              <div className="flex flex-col items-center gap-1" style={{ borderLeft: '1px solid #333', paddingLeft: 12, width: 55 }}>
-                <SectionLabel>MIXER</SectionLabel>
-                <span className="text-[6px] text-gray-500">VCO 1</span>
+              {/* VCO 1 LEVEL */}
+              <div className="flex flex-col items-center">
+                <span className="text-[7px] text-gray-400 mb-1">VCO 1 LEVEL</span>
                 {renderKnob('vco1_level', 'small')}
-                <span className="text-[6px] text-gray-500 mt-1">VCO 2</span>
-                {renderKnob('vco2_level', 'small')}
-                <span className="text-[6px] text-gray-500 mt-1">NOISE</span>
+              </div>
+
+              {/* NOISE / EXT LEVEL */}
+              <div className="flex flex-col items-center">
+                <span className="text-[7px] text-gray-400 mb-1 text-center">NOISE /<br/>EXT LEVEL</span>
                 {renderKnob('noise_level', 'small')}
               </div>
 
-              {/* Filter Section */}
-              <div className="flex items-start gap-3" style={{ borderLeft: '1px solid #333', paddingLeft: 12 }}>
-                {/* VCF Mode Switch */}
-                <div className="flex flex-col items-center" style={{ width: 40 }}>
-                  <span className="text-[7px] text-gray-500 mb-1">VCF</span>
+              {/* Spacer */}
+              <div className="w-2" />
+
+              {/* CUTOFF with VCF switch */}
+              <div className="flex flex-col items-center">
+                <span className="text-[9px] text-white font-bold mb-1">CUTOFF</span>
+                {renderKnob('vcf_cutoff', 'large')}
+                <div className="mt-1 flex flex-col items-center">
+                  <span className="text-[6px] text-gray-500 mb-1">VCF</span>
                   {renderSwitch('vcf_mode')}
                 </div>
-
-                {/* Cutoff */}
-                <ControlGroup label="" width={70}>
-                  <SectionLabel>CUTOFF</SectionLabel>
-                  <div className="mt-1">{renderKnob('vcf_cutoff', 'large')}</div>
-                </ControlGroup>
-
-                {/* Resonance */}
-                <ControlGroup label="RESONANCE" width={60}>
-                  {renderKnob('vcf_resonance', 'medium')}
-                </ControlGroup>
-
-                {/* VCF EG Amount */}
-                <ControlGroup label="VCF EG\nAMT" width={55}>
-                  {renderKnob('vcf_eg_amount', 'medium')}
-                </ControlGroup>
-
-                {/* VCF Decay */}
-                <ControlGroup label="VCF\nDECAY" width={55}>
-                  {renderKnob('vcf_decay', 'medium')}
-                </ControlGroup>
-
-                {/* Noise/VCF Mod */}
-                <ControlGroup label="NOISE\nVCF MOD" width={55}>
-                  {renderKnob('noise_vcf_mod', 'small')}
-                </ControlGroup>
               </div>
 
-              {/* VCA Section */}
-              <div className="flex items-start gap-2" style={{ borderLeft: '1px solid #333', paddingLeft: 12 }}>
-                {/* VCA Mode Switch */}
-                <div className="flex flex-col items-center" style={{ width: 45 }}>
-                  <span className="text-[7px] text-gray-500 mb-1">VCA EG</span>
-                  {renderSwitch('vca_attack_mode')}
-                </div>
+              {/* RESONANCE */}
+              <div className="flex flex-col items-center">
+                <span className="text-[9px] text-white font-bold mb-1">RESONANCE</span>
+                {renderKnob('vcf_resonance', 'large')}
+              </div>
 
-                {/* VCA Decay */}
-                <ControlGroup label="VCA\nDECAY" width={55}>
-                  {renderKnob('vca_decay', 'medium')}
-                </ControlGroup>
+              {/* Spacer */}
+              <div className="w-2" />
 
-                {/* Volume */}
-                <ControlGroup label="" width={70}>
-                  <SectionLabel>VOLUME</SectionLabel>
-                  <div className="mt-1">{renderKnob('volume', 'large')}</div>
-                </ControlGroup>
+              {/* VCA EG switch */}
+              <div className="flex flex-col items-center">
+                <span className="text-[7px] text-gray-400 mb-1">VCA EG</span>
+                {renderSwitch('vca_attack_mode')}
+              </div>
+
+              {/* VOLUME */}
+              <div className="flex flex-col items-center">
+                <span className="text-[9px] text-white font-bold mb-1">VOLUME</span>
+                {renderKnob('volume', 'large')}
               </div>
             </div>
 
             {/* ============================================================ */}
-            {/* ROW 2: 8-Step Sequencer */}
+            {/* ROW 2: 1-2 FM, VCO 2 EG, VCO 2 FREQ, VCO 2 LEVEL, VCF DECAY, VCF EG, NOISE/VCF MOD, VCA DECAY */}
+            {/* ============================================================ */}
+            <div className="flex items-start gap-3 mb-4">
+              {/* 1-2 FM AMOUNT with HARD SYNC */}
+              <div className="flex flex-col items-center">
+                <span className="text-[9px] text-white font-bold mb-1">1→2 FM AMOUNT</span>
+                {renderKnob('fm_amount', 'large')}
+                <div className="mt-2 flex flex-col items-center">
+                  <span className="text-[6px] text-gray-500 mb-1">HARD SYNC</span>
+                  {renderSwitch('hard_sync')}
+                </div>
+              </div>
+
+              {/* VCO 2 EG AMOUNT */}
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] text-gray-400 mb-1">VCO 2 EG AMT</span>
+                {renderKnob('vco2_eg_amount', 'medium')}
+              </div>
+
+              {/* VCO 2 FREQUENCY with WAVE switch */}
+              <div className="flex flex-col items-center">
+                <span className="text-[9px] text-white font-bold mb-1">VCO 2 FREQUENCY</span>
+                {renderKnob('vco2_frequency', 'large')}
+                <div className="mt-1 flex flex-col items-center">
+                  <span className="text-[6px] text-gray-500 mb-1">VCO 2 WAVE</span>
+                  {renderSwitch('vco2_wave')}
+                </div>
+              </div>
+
+              {/* VCO 2 LEVEL */}
+              <div className="flex flex-col items-center">
+                <span className="text-[7px] text-gray-400 mb-1">VCO 2 LEVEL</span>
+                {renderKnob('vco2_level', 'small')}
+              </div>
+
+              {/* Spacer to align with row 1 */}
+              <div className="w-[40px]" />
+
+              {/* VCF DECAY */}
+              <div className="flex flex-col items-center">
+                <span className="text-[9px] text-white font-bold mb-1">VCF DECAY</span>
+                {renderKnob('vcf_decay', 'large')}
+              </div>
+
+              {/* VCF EG AMOUNT */}
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] text-gray-400 mb-1">VCF EG AMT</span>
+                {renderKnob('vcf_eg_amount', 'medium')}
+              </div>
+
+              {/* NOISE / VCF MOD */}
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] text-gray-400 mb-1 text-center">NOISE /<br/>VCF MOD</span>
+                {renderKnob('noise_vcf_mod', 'medium')}
+              </div>
+
+              {/* VCA DECAY */}
+              <div className="flex flex-col items-center">
+                <span className="text-[9px] text-white font-bold mb-1">VCA DECAY</span>
+                {renderKnob('vca_decay', 'large')}
+              </div>
+            </div>
+
+            {/* ============================================================ */}
+            {/* ROW 3: SEQUENCER / TRANSPORT */}
             {/* ============================================================ */}
             <div
               className="flex items-start gap-4 pt-4"
               style={{ borderTop: '1px solid #333' }}
             >
               {/* Transport Controls */}
-              <div className="flex items-start gap-3">
+              <div className="flex items-center gap-3">
                 {/* TRIGGER Button */}
-                <div className="flex flex-col items-center" style={{ width: 45 }}>
-                  <span className="text-[7px] text-gray-500 mb-1">TRIGGER</span>
+                <div className="flex flex-col items-center">
+                  <span className="text-[9px] text-white font-bold mb-1">TRIGGER</span>
                   {renderButton('trigger')}
                 </div>
 
                 {/* TEMPO */}
-                <div className="flex flex-col items-center" style={{ width: 70 }}>
-                  <SectionLabel>TEMPO</SectionLabel>
-                  <div className="mt-1">{renderKnob('tempo', 'large')}</div>
-                </div>
-
-                {/* RUN/STOP Button */}
-                <div className="flex flex-col items-center" style={{ width: 50 }}>
-                  <span className="text-[7px] text-gray-500 mb-1">RUN/STOP</span>
-                  {renderButton('run_stop')}
-                </div>
-
-                {/* ADVANCE Button */}
-                <div className="flex flex-col items-center" style={{ width: 50 }}>
-                  <span className="text-[7px] text-gray-500 mb-1">ADV/CLK</span>
-                  {renderButton('advance')}
+                <div className="flex flex-col items-center">
+                  <span className="text-[9px] text-white font-bold mb-1">TEMPO</span>
+                  {renderKnob('tempo', 'large')}
+                  <div className="flex gap-2 mt-2">
+                    <div className="flex flex-col items-center">
+                      <span className="text-[6px] text-gray-500 mb-1">RUN / STOP</span>
+                      {renderButton('run_stop')}
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-[6px] text-gray-500 mb-1">ADVANCE</span>
+                      {renderButton('advance')}
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* 8-Step Sequencer */}
-              <div className="flex-1" style={{ borderLeft: '1px solid #333', paddingLeft: 16 }}>
-                <div className="text-[8px] text-gray-500 mb-2 text-center font-bold">8-STEP SEQUENCER</div>
-
-                {/* Step Numbers and LEDs */}
-                <div className="flex justify-center gap-1 mb-1">
+              <div className="flex-1 ml-4">
+                {/* Step Numbers */}
+                <div className="flex gap-1 mb-1 ml-[50px]">
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                    <div key={`step-${n}`} className="flex flex-col items-center" style={{ width: 36 }}>
-                      {/* Step LED indicator */}
-                      <div
-                        className="w-2 h-2 rounded-full mb-1"
-                        style={{
-                          background: n === 1 ? '#ff3333' : '#331111',
-                          boxShadow: n === 1 ? '0 0 6px #ff3333' : 'none',
-                        }}
-                      />
-                      {/* Step number */}
-                      <span className="text-[8px] text-white font-bold">{n}</span>
+                    <div key={`step-${n}`} className="w-[38px] flex flex-col items-center">
+                      <span className="text-[10px] text-white font-bold">{n}</span>
                     </div>
                   ))}
                 </div>
 
                 {/* PITCH Row */}
-                <div className="flex items-center mb-1">
-                  <span className="text-[7px] text-gray-400 font-bold w-10 text-right mr-2">PITCH</span>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                      <div key={`pitch-${n}`} style={{ width: 36 }}>
-                        {renderKnob(`pitch_${n}`, 'small')}
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex items-center gap-1 mb-2">
+                  <span className="text-[8px] text-white font-bold w-[46px] text-right mr-1">PITCH</span>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <div key={`pitch-${n}`} className="w-[38px] flex justify-center">
+                      {renderKnob(`pitch_${n}`, 'small')}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Step LEDs */}
+                <div className="flex gap-1 mb-2 ml-[50px]">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <div key={`led-${n}`} className="w-[38px] flex justify-center">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{
+                          background: n === 1 ? '#ff3333' : '#331111',
+                          boxShadow: n === 1 ? '0 0 8px #ff3333' : 'none',
+                        }}
+                      />
+                    </div>
+                  ))}
                 </div>
 
                 {/* VELOCITY Row */}
-                <div className="flex items-center">
-                  <span className="text-[7px] text-gray-400 font-bold w-10 text-right mr-2">VEL</span>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                      <div key={`vel-${n}`} style={{ width: 36 }}>
-                        {renderKnob(`velocity_${n}`, 'small')}
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[8px] text-white font-bold w-[46px] text-right mr-1">VELOCITY</span>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <div key={`vel-${n}`} className="w-[38px] flex justify-center">
+                      {renderKnob(`velocity_${n}`, 'small')}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -418,11 +410,11 @@ export default function DevicePanel({
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-800">
               <div>
                 <div className="text-2xl font-black text-white tracking-tight">DFAM</div>
-                <div className="text-[7px] text-gray-500 tracking-widest">DRUMMER FROM ANOTHER MOTHER</div>
+                <div className="text-[8px] text-gray-500 tracking-widest">DRUMMER FROM ANOTHER MOTHER</div>
               </div>
               <div className="text-center">
-                <div className="text-[8px] text-gray-500">SEMI-MODULAR ANALOG</div>
-                <div className="text-[8px] text-gray-500">PERCUSSION SYNTHESIZER</div>
+                <div className="text-[9px] text-gray-500">SEMI-MODULAR ANALOG</div>
+                <div className="text-[9px] text-gray-500">PERCUSSION SYNTHESIZER</div>
               </div>
               <div
                 className="text-3xl font-serif italic text-white"
@@ -432,34 +424,25 @@ export default function DevicePanel({
               </div>
             </div>
           </div>
-          {/* End of Left side controls */}
 
           {/* Right side: Patch Bay */}
           <div
             className="flex-shrink-0 rounded"
             style={{
-              width: 185,
+              width: 180,
               background: '#0a0a0a',
-              padding: '10px',
+              padding: '8px',
               alignSelf: 'stretch',
-              display: 'flex',
-              flexDirection: 'column',
             }}
           >
-            <div className="text-[8px] text-gray-400 text-center font-bold mb-2 tracking-wide">
-              PATCH BAY
-            </div>
-            <div className="flex-1">
-              <PatchBay
-                jacks={patchBayJacks}
-                onConnection={(from, to, color) => {
-                  console.log(`Patched: ${from} → ${to} (${color})`);
-                }}
-              />
-            </div>
+            <PatchBay
+              jacks={patchBayJacks}
+              onConnection={(from, to, color) => {
+                console.log(`Patched: ${from} → ${to} (${color})`);
+              }}
+            />
           </div>
         </div>
-        {/* End of main flex layout */}
       </div>
     </div>
   );
