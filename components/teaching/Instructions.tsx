@@ -84,6 +84,11 @@ export default function Instructions() {
                   <p className={`text-xs leading-relaxed ${isCurrent ? 'text-white font-medium' : 'text-hardware-label'}`}>
                     {step.instruction}
                   </p>
+                  {isCurrent && step.explanation && (
+                    <p className="text-[10px] text-hardware-label mt-1 leading-relaxed">
+                      {step.explanation}
+                    </p>
+                  )}
                   {step.manualReference && (
                     <p className="text-[10px] text-hardware-label mt-1 italic">
                       {step.manualReference}
