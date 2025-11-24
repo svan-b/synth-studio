@@ -19,37 +19,42 @@ interface JackPosition {
 interface Cable {
   id: string;
   fromId: string;
-  toId: string | null;
+  toId: string;
   color: string;
 }
 
 interface PatchBayProps {
   jacks: PatchPoint[];
   onConnection?: (from: string, to: string, color: string) => void;
+  onDisconnection?: (from: string, to: string) => void;
 }
 
-// Cable colors for different signal types
+// Cable colors for different signal types (matching DFAM manual conventions)
 const CABLE_COLORS = {
-  audio: '#00ff00',      // Green for audio
-  cv: '#ffaa00',         // Orange for CV
-  gate: '#ff0000',       // Red for gates/triggers
-  clock: '#00ffff',      // Cyan for clock
-  modulation: '#ff00ff', // Magenta for modulation
+  audio: '#22c55e',      // Green for audio signals
+  cv: '#f97316',         // Orange for CV/modulation
+  gate: '#ef4444',       // Red for gates/triggers
+  clock: '#06b6d4',      // Cyan for clock signals
+  envelope: '#a855f7',   // Purple for envelope outputs
 } as const;
 
+// Determine signal type based on jack label
 const getSignalType = (jackLabel: string): keyof typeof CABLE_COLORS => {
-  if (jackLabel.includes('TRIGGER') || jackLabel.includes('GATE') || jackLabel.includes('RUN')) return 'gate';
-  if (jackLabel.includes('CLOCK') || jackLabel.includes('ADV')) return 'clock';
-  if (jackLabel.includes('CV') || jackLabel.includes('EG') || jackLabel.includes('DECAY') ||
-      jackLabel.includes('VELOCITY') || jackLabel.includes('PITCH') || jackLabel.includes('LEVEL') ||
-      jackLabel.includes('TEMPO') || jackLabel.includes('FM') || jackLabel.includes('MOD')) return 'cv';
-  return 'audio';
+  const label = jackLabel.toUpperCase();
+  if (label.includes('TRIGGER') || label.includes('GATE') || label.includes('RUN')) return 'gate';
+  if (label.includes('CLOCK') || label.includes('ADV')) return 'clock';
+  if (label.includes('EG') && !label.includes('AMT')) return 'envelope';
+  if (label.includes('VCA') && !label.includes('CV') && !label.includes('DECAY')) return 'audio';
+  if (label.includes('VCO 1') || label.includes('VCO 2') || label.includes('EXT AUDIO')) return 'audio';
+  return 'cv';
 };
 
-export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
+export default function PatchBay({ jacks, onConnection, onDisconnection }: PatchBayProps) {
   const [cables, setCables] = useState<Cable[]>([]);
-  const [activeCableFromId, setActiveCableFromId] = useState<string | null>(null);
-  const [activeCableColor, setActiveCableColor] = useState<string>('#00ff00');
+  const [activeCable, setActiveCable] = useState<{
+    fromId: string;
+    color: string;
+  } | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [jackPositions, setJackPositions] = useState<Record<string, JackPosition>>({});
   const containerRef = useRef<HTMLDivElement>(null);
@@ -78,241 +83,248 @@ export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
     };
 
     // Update on mount and resize
-    updatePositions();
+    const timeoutId = setTimeout(updatePositions, 50);
     window.addEventListener('resize', updatePositions);
 
-    // Delayed update to ensure layout is complete
-    const timeoutId = setTimeout(updatePositions, 100);
+    // Use ResizeObserver for more reliable updates
+    const observer = new ResizeObserver(updatePositions);
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
 
     return () => {
       window.removeEventListener('resize', updatePositions);
       clearTimeout(timeoutId);
+      observer.disconnect();
     };
   }, [jacks]);
 
-  const handleJackClick = useCallback((jack: PatchPoint) => {
-    if (!activeCableFromId) {
-      // Start new cable from output jack only
+  // Handle clicking on a jack
+  const handleJackClick = useCallback((jack: PatchPoint, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!activeCable) {
+      // Start a new cable - outputs can start cables, inputs can receive them
       if (jack.type === 'output') {
         const signalType = getSignalType(jack.label);
-        setActiveCableFromId(jack.id);
-        setActiveCableColor(CABLE_COLORS[signalType]);
+        setActiveCable({
+          fromId: jack.id,
+          color: CABLE_COLORS[signalType],
+        });
       }
     } else {
-      // Complete cable to input jack
-      if (jack.type === 'input' && jack.id !== activeCableFromId) {
-        const newCable: Cable = {
-          id: Date.now().toString(),
-          fromId: activeCableFromId,
-          toId: jack.id,
-          color: activeCableColor,
-        };
-        setCables(prev => [...prev, newCable]);
+      // Complete the cable connection
+      if (jack.type === 'input' && jack.id !== activeCable.fromId) {
+        // Check if this connection already exists
+        const existingConnection = cables.find(
+          c => c.fromId === activeCable.fromId && c.toId === jack.id
+        );
 
-        // Notify parent of connection for teaching mode
-        onConnection?.(activeCableFromId, jack.id, activeCableColor);
-
-        setActiveCableFromId(null);
+        if (!existingConnection) {
+          const newCable: Cable = {
+            id: `${activeCable.fromId}-${jack.id}-${Date.now()}`,
+            fromId: activeCable.fromId,
+            toId: jack.id,
+            color: activeCable.color,
+          };
+          setCables(prev => [...prev, newCable]);
+          onConnection?.(activeCable.fromId, jack.id, activeCable.color);
+        }
       }
+      setActiveCable(null);
     }
-  }, [activeCableFromId, activeCableColor, onConnection]);
+  }, [activeCable, cables, onConnection]);
 
-  const handleCableClick = useCallback((cableId: string, e: React.MouseEvent) => {
+  // Handle clicking on a cable to remove it
+  const handleCableClick = useCallback((cable: Cable, e: React.MouseEvent) => {
     e.stopPropagation();
-    setCables(prev => prev.filter(c => c.id !== cableId));
-  }, []);
+    setCables(prev => prev.filter(c => c.id !== cable.id));
+    onDisconnection?.(cable.fromId, cable.toId);
+  }, [onDisconnection]);
 
-  const drawCablePath = useCallback((fromPos: JackPosition, toPos: { x: number; y: number }) => {
-    const fromX = fromPos.x;
-    const fromY = fromPos.y;
-    const toX = toPos.x;
-    const toY = toPos.y;
-
-    // Create natural cable sag
-    const dx = toX - fromX;
-    const dy = toY - fromY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const sag = Math.min(distance * 0.3, 40);
-
-    const midX = (fromX + toX) / 2;
-    const midY = Math.max(fromY, toY) + sag;
-
-    return `M ${fromX} ${fromY} Q ${midX} ${midY} ${toX} ${toY}`;
-  }, []);
-
+  // Handle mouse move for drawing active cable
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (activeCableFromId && containerRef.current) {
+    if (activeCable && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       setMousePos({
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
       });
     }
-  }, [activeCableFromId]);
+  }, [activeCable]);
 
+  // Cancel active cable on background click
   const handleContainerClick = useCallback(() => {
-    if (activeCableFromId) {
-      setActiveCableFromId(null);
+    if (activeCable) {
+      setActiveCable(null);
     }
-  }, [activeCableFromId]);
+  }, [activeCable]);
 
-  // Organize jacks by column (0, 1, 2 for DFAM's 3-column layout)
-  const organizedJacks: Record<number, PatchPoint[]> = { 0: [], 1: [], 2: [] };
+  // Draw cable path with natural sag
+  const drawCablePath = useCallback((fromPos: JackPosition, toPos: { x: number; y: number }) => {
+    const dx = toPos.x - fromPos.x;
+    const dy = toPos.y - fromPos.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Natural cable sag increases with distance
+    const sag = Math.min(distance * 0.25, 30);
+
+    const midX = (fromPos.x + toPos.x) / 2;
+    const midY = Math.max(fromPos.y, toPos.y) + sag;
+
+    return `M ${fromPos.x} ${fromPos.y} Q ${midX} ${midY} ${toPos.x} ${toPos.y}`;
+  }, []);
+
+  // Check if a jack has a connection
+  const getJackConnection = useCallback((jackId: string): Cable | undefined => {
+    return cables.find(c => c.fromId === jackId || c.toId === jackId);
+  }, [cables]);
+
+  // Organize jacks by column
+  const organizedJacks: Record<number, PatchPoint[]> = {};
   jacks.forEach(jack => {
-    const col = jack.column;
-    if (col >= 0 && col <= 2) {
-      if (!organizedJacks[col]) organizedJacks[col] = [];
-      organizedJacks[col].push(jack);
+    if (!organizedJacks[jack.column]) {
+      organizedJacks[jack.column] = [];
     }
+    organizedJacks[jack.column].push(jack);
   });
 
   // Sort each column by row
   Object.values(organizedJacks).forEach(col => col.sort((a, b) => a.row - b.row));
+
+  // Get max rows across all columns
+  const maxRows = Math.max(...Object.values(organizedJacks).map(col => col.length), 0);
 
   return (
     <div
       ref={containerRef}
       onClick={handleContainerClick}
       onMouseMove={handleMouseMove}
-      style={{ position: 'relative', width: '100%', height: '100%' }}
+      className="relative select-none"
+      style={{
+        minHeight: maxRows * 28 + 60,
+        cursor: activeCable ? 'crosshair' : 'default',
+      }}
     >
-      {/* Header: IN / OUT */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        marginBottom: '6px',
-        padding: '0 4px',
-      }}>
-        <span style={{ fontSize: '7px', color: '#888', fontWeight: 'bold' }}>IN</span>
-        <span style={{ fontSize: '7px', color: '#fff', fontWeight: 'bold' }}>OUT</span>
+      {/* Column Headers */}
+      <div className="flex justify-between mb-2 px-1">
+        <div className="flex gap-1">
+          <span className="text-[6px] text-gray-500 font-bold w-[52px] text-center">INPUT</span>
+          <span className="text-[6px] text-gray-500 font-bold w-[52px] text-center">INPUT</span>
+        </div>
+        <span className="text-[6px] text-white font-bold w-[52px] text-center">OUTPUT</span>
       </div>
 
-      {/* Jack sockets organized in 3 columns */}
-      <div style={{
-        display: 'flex',
-        gap: '4px',
-        position: 'relative',
-        zIndex: 10,
-      }}>
+      {/* Jack Grid - 3 columns */}
+      <div className="flex gap-1 justify-between">
         {[0, 1, 2].map(colIndex => {
           const isOutputColumn = colIndex === 2;
+          const columnJacks = organizedJacks[colIndex] || [];
+
           return (
             <div
               key={colIndex}
+              className="flex flex-col gap-1"
               style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '3px',
-                flex: 1,
-                padding: '4px 2px',
-                borderRadius: '3px',
-                background: isOutputColumn ? '#1a1a1a' : '#0a0a0a',
+                background: isOutputColumn ? '#1a1a1a' : '#0d0d0d',
+                padding: '6px 4px',
+                borderRadius: '4px',
+                width: 52,
               }}
             >
-              {(organizedJacks[colIndex] || []).map((jack) => (
-                <div
-                  key={jack.id}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '1px',
-                  }}
-                >
-                  {/* Label above jack */}
-                  <div style={{
-                    fontSize: '5px',
-                    color: isOutputColumn ? '#eee' : '#888',
-                    textAlign: 'center',
-                    lineHeight: '1.1',
-                    maxWidth: '45px',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    fontWeight: isOutputColumn ? 'bold' : 'normal',
-                  }}>
-                    {jack.label}
-                  </div>
-                  {/* Jack socket */}
+              {columnJacks.map((jack) => {
+                const connection = getJackConnection(jack.id);
+                const isActive = activeCable?.fromId === jack.id;
+                const canConnect = activeCable && jack.type === 'input';
+
+                return (
                   <div
-                    ref={(el) => { jackRefs.current[jack.id] = el; }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleJackClick(jack);
-                    }}
-                    style={{
-                      width: '14px',
-                      height: '14px',
-                      borderRadius: '50%',
-                      background: '#111',
-                      border: `2px solid ${isOutputColumn ? '#888' : '#444'}`,
-                      cursor: 'pointer',
-                      position: 'relative',
-                      boxShadow: isOutputColumn
-                        ? '0 0 4px rgba(255, 255, 255, 0.2)'
-                        : 'inset 0 1px 3px rgba(0,0,0,0.6)',
-                      transition: 'transform 0.1s, box-shadow 0.1s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'scale(1.15)';
-                      e.currentTarget.style.boxShadow = isOutputColumn
-                        ? '0 0 8px rgba(255, 255, 255, 0.4)'
-                        : '0 0 6px rgba(100, 200, 255, 0.3)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.boxShadow = isOutputColumn
-                        ? '0 0 4px rgba(255, 255, 255, 0.2)'
-                        : 'inset 0 1px 3px rgba(0,0,0,0.6)';
-                    }}
+                    key={jack.id}
+                    className="flex flex-col items-center gap-0.5"
                   >
-                    {/* Connection indicator */}
-                    {cables.some(c => c.fromId === jack.id || c.toId === jack.id) && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '6px',
-                        height: '6px',
+                    {/* Label */}
+                    <span
+                      className="text-center leading-tight"
+                      style={{
+                        fontSize: '5px',
+                        color: isOutputColumn ? '#ddd' : '#777',
+                        fontWeight: isOutputColumn ? 'bold' : 'normal',
+                        maxWidth: 44,
+                        lineHeight: 1.1,
+                      }}
+                    >
+                      {jack.label}
+                    </span>
+
+                    {/* Jack Socket */}
+                    <div
+                      ref={(el) => { jackRefs.current[jack.id] = el; }}
+                      onClick={(e) => handleJackClick(jack, e)}
+                      className="relative transition-transform duration-100"
+                      style={{
+                        width: 16,
+                        height: 16,
                         borderRadius: '50%',
-                        background: cables.find(c => c.fromId === jack.id || c.toId === jack.id)?.color || '#0f0',
-                      }} />
-                    )}
+                        background: 'radial-gradient(circle at 30% 30%, #222 0%, #111 100%)',
+                        border: `2px solid ${
+                          isActive ? '#fff' :
+                          canConnect ? '#6b6' :
+                          isOutputColumn ? '#666' : '#444'
+                        }`,
+                        boxShadow: isOutputColumn
+                          ? '0 0 4px rgba(255, 255, 255, 0.15), inset 0 1px 3px rgba(0,0,0,0.6)'
+                          : 'inset 0 2px 4px rgba(0,0,0,0.7)',
+                        cursor: jack.type === 'output' || canConnect ? 'pointer' : 'default',
+                        transform: isActive || canConnect ? 'scale(1.15)' : 'scale(1)',
+                      }}
+                    >
+                      {/* Connection indicator dot */}
+                      {connection && (
+                        <div
+                          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                          style={{
+                            width: 7,
+                            height: 7,
+                            background: connection.color,
+                            boxShadow: `0 0 4px ${connection.color}`,
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           );
         })}
       </div>
 
-      {/* SVG overlay for cables */}
+      {/* SVG Layer for Cables */}
       <svg
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none',
-          zIndex: 5,
-        }}
+        className="absolute inset-0 pointer-events-none"
+        style={{ overflow: 'visible' }}
       >
+        <defs>
+          {/* Cable shadow filter */}
+          <filter id="cableShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.5" />
+          </filter>
+        </defs>
+
         {/* Render completed cables */}
         {cables.map(cable => {
           const fromPos = jackPositions[cable.fromId];
-          const toPos = cable.toId ? jackPositions[cable.toId] : null;
+          const toPos = jackPositions[cable.toId];
 
           if (!fromPos || !toPos) return null;
 
           return (
-            <g key={cable.id}>
+            <g key={cable.id} style={{ pointerEvents: 'stroke' }}>
               {/* Cable shadow */}
               <path
                 d={drawCablePath(fromPos, toPos)}
                 stroke="rgba(0,0,0,0.5)"
-                strokeWidth="6"
+                strokeWidth="7"
                 fill="none"
                 strokeLinecap="round"
               />
@@ -320,64 +332,75 @@ export default function PatchBay({ jacks, onConnection }: PatchBayProps) {
               <path
                 d={drawCablePath(fromPos, toPos)}
                 stroke={cable.color}
-                strokeWidth="4"
+                strokeWidth="5"
                 fill="none"
                 strokeLinecap="round"
                 style={{
-                  filter: `drop-shadow(0 0 3px ${cable.color})`,
-                  pointerEvents: 'stroke',
                   cursor: 'pointer',
+                  filter: `drop-shadow(0 0 3px ${cable.color})`,
                 }}
-                onClick={(e) => handleCableClick(cable.id, e)}
+                onClick={(e) => handleCableClick(cable, e as unknown as React.MouseEvent)}
               />
               {/* Cable plugs */}
-              <circle cx={fromPos.x} cy={fromPos.y} r="6" fill="#333" stroke={cable.color} strokeWidth="2" />
-              <circle cx={toPos.x} cy={toPos.y} r="6" fill="#333" stroke={cable.color} strokeWidth="2" />
+              <circle
+                cx={fromPos.x}
+                cy={fromPos.y}
+                r="7"
+                fill="#222"
+                stroke={cable.color}
+                strokeWidth="2"
+              />
+              <circle
+                cx={toPos.x}
+                cy={toPos.y}
+                r="7"
+                fill="#222"
+                stroke={cable.color}
+                strokeWidth="2"
+              />
             </g>
           );
         })}
 
         {/* Active cable being drawn */}
-        {activeCableFromId && jackPositions[activeCableFromId] && (
-          <>
+        {activeCable && jackPositions[activeCable.fromId] && (
+          <g>
             <path
-              d={drawCablePath(jackPositions[activeCableFromId], mousePos)}
-              stroke={activeCableColor}
-              strokeWidth="4"
+              d={drawCablePath(jackPositions[activeCable.fromId], mousePos)}
+              stroke={activeCable.color}
+              strokeWidth="5"
               fill="none"
               opacity="0.7"
-              strokeDasharray="6,4"
+              strokeDasharray="8,4"
               strokeLinecap="round"
             />
             <circle
-              cx={jackPositions[activeCableFromId].x}
-              cy={jackPositions[activeCableFromId].y}
-              r="6"
-              fill="#333"
-              stroke={activeCableColor}
+              cx={jackPositions[activeCable.fromId].x}
+              cy={jackPositions[activeCable.fromId].y}
+              r="7"
+              fill="#222"
+              stroke={activeCable.color}
               strokeWidth="2"
             />
-          </>
+          </g>
         )}
       </svg>
 
-      {/* Cable type legend */}
-      <div style={{
-        position: 'absolute',
-        bottom: '-22px',
-        left: '0',
-        right: '0',
-        fontSize: '5px',
-        color: '#666',
-        display: 'flex',
-        justifyContent: 'center',
-        gap: '6px',
-      }}>
-        <span style={{ color: '#00ff00' }}>● Audio</span>
-        <span style={{ color: '#ffaa00' }}>● CV</span>
-        <span style={{ color: '#ff0000' }}>● Gate</span>
-        <span style={{ color: '#00ffff' }}>● Clock</span>
+      {/* Cable Color Legend */}
+      <div className="absolute -bottom-5 left-0 right-0 flex justify-center gap-3 text-[5px] text-gray-500">
+        <span><span style={{ color: CABLE_COLORS.audio }}>●</span> Audio</span>
+        <span><span style={{ color: CABLE_COLORS.cv }}>●</span> CV</span>
+        <span><span style={{ color: CABLE_COLORS.gate }}>●</span> Gate</span>
+        <span><span style={{ color: CABLE_COLORS.clock }}>●</span> Clock</span>
+        <span><span style={{ color: CABLE_COLORS.envelope }}>●</span> EG</span>
       </div>
+
+      {/* Instructions tooltip */}
+      {!cables.length && !activeCable && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[7px] text-gray-600 text-center pointer-events-none">
+          Click OUTPUT jack to start patch
+        </div>
+      )}
     </div>
   );
 }
