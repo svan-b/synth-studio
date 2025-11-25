@@ -347,25 +347,28 @@ export default function DFAMCoordinatePanel({
 
         {/* DFAM Branding - positioned at absolute bottom, below all controls */}
         <div
-          className="absolute flex items-center justify-between"
+          className="absolute flex items-center"
           style={{
             left: mmToPx(8),
-            top: panelHeightPx + 5,
+            bottom: 4,
             width: mmToPx(225),
-            height: extraPadding - 10,
+            height: 22,
           }}
         >
-          <div>
-            <div className="text-lg font-black text-white tracking-tight">DFAM</div>
-            <div className="text-[4px] text-gray-600 tracking-widest">DRUMMER FROM ANOTHER MOTHER</div>
+          {/* Left: DFAM logo */}
+          <div style={{ width: '25%' }}>
+            <div className="text-lg font-black text-white tracking-tight leading-none">DFAM</div>
+            <div className="text-[4px] text-gray-600 tracking-widest leading-tight">DRUMMER FROM ANOTHER MOTHER</div>
           </div>
-          <div className="text-center">
-            <div className="text-[5px] text-gray-600">SEMI-MODULAR ANALOG</div>
-            <div className="text-[5px] text-gray-600">PERCUSSION SYNTHESIZER</div>
+          {/* Center: Product type - positioned explicitly */}
+          <div style={{ width: '50%' }} className="text-center">
+            <div className="text-[5px] text-gray-600 leading-tight">SEMI-MODULAR ANALOG</div>
+            <div className="text-[5px] text-gray-600 leading-tight">PERCUSSION SYNTHESIZER</div>
           </div>
+          {/* Right: Moog logo */}
           <div
-            className="text-lg font-serif italic text-white"
-            style={{ fontFamily: 'Georgia, serif' }}
+            style={{ width: '25%', fontFamily: 'Georgia, serif' }}
+            className="text-lg font-serif italic text-white text-right leading-none"
           >
             moog
           </div>
