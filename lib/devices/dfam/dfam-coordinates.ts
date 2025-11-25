@@ -179,7 +179,7 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
 
   // Transport controls - vertical arrangement
   trigger: { id: 'trigger', x: 25, y: 78 },
-  run_stop: { id: 'run_stop', x: 25, y: 95 },
+  run_stop: { id: 'run_stop', x: 25, y: 98 },
   advance: { id: 'advance', x: 55, y: 95 },
 
   // TEMPO knob - positioned left of step knobs
