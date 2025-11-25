@@ -78,13 +78,6 @@ export default function Button({
           />
         )}
       </button>
-
-      {/* State indicator for toggle buttons */}
-      {!momentary && (
-        <div className="font-mono text-[9px] text-hardware-label">
-          {value ? 'ON' : 'OFF'}
-        </div>
-      )}
     </div>
   );
 }
