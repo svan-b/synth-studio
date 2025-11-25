@@ -228,9 +228,9 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
               className="flex flex-col gap-1"
               style={{
                 background: isOutputColumn ? '#1a1a1a' : '#0d0d0d',
-                padding: '6px 3px',
+                padding: '6px 2px',
                 borderRadius: '4px',
-                width: 54,
+                width: 60,
               }}
             >
               {columnJacks.map((jack) => {
@@ -245,12 +245,11 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
                   >
                     {/* Label */}
                     <span
-                      className="text-center leading-tight"
+                      className="text-center leading-tight whitespace-nowrap overflow-visible"
                       style={{
-                        fontSize: '5.5px',
+                        fontSize: '5px',
                         color: isOutputColumn ? '#ddd' : '#888',
                         fontWeight: isOutputColumn ? 'bold' : 'normal',
-                        maxWidth: 48,
                         lineHeight: 1.1,
                       }}
                     >
