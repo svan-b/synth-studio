@@ -98,15 +98,15 @@ export default function DFAMCoordinatePanel({
         key={controlId}
         className="absolute flex flex-col items-center"
         style={{
-          left: mmToPx(position.x) - knobPx / 2 - 10,
-          top: mmToPx(position.y) - knobPx / 2 - (isSequencerKnob ? 0 : 12),
-          width: knobPx + 20,
+          left: mmToPx(position.x) - knobPx / 2 - 15,
+          top: mmToPx(position.y) - knobPx / 2 - (isSequencerKnob ? 0 : 14),
+          width: knobPx + 30,
         }}
       >
         {/* Label above knob */}
         {!isSequencerKnob && (
           <span
-            className="text-center text-white font-bold mb-0.5 whitespace-nowrap"
+            className="text-center text-white font-bold mb-0.5 whitespace-nowrap overflow-visible"
             style={{
               fontSize: size === 'large' ? '7px' : '6px',
               opacity: 0.9,
@@ -134,13 +134,16 @@ export default function DFAMCoordinatePanel({
     const position = CONTROL_POSITIONS[controlId];
     if (!controlSpec || !position) return null;
 
+    // Check if 3-position (horizontal) or 2-position (vertical) switch
+    const is3Position = controlSpec.options.length === 3;
+
     return (
       <div
         key={controlId}
         className="absolute"
         style={{
-          left: mmToPx(position.x) - 20,
-          top: mmToPx(position.y) - 15,
+          left: mmToPx(position.x) - (is3Position ? 20 : 8),
+          top: mmToPx(position.y) - (is3Position ? 8 : 12),
         }}
       >
         <Switch
