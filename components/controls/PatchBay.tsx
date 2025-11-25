@@ -207,10 +207,13 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
         cursor: activeCable ? 'crosshair' : 'default',
       }}
     >
-      {/* Header */}
-      <div className="flex justify-between mb-2 px-1">
-        <span className="text-[7px] text-gray-400 font-bold">IN / OUT</span>
-        <span className="text-[7px] text-white font-bold">OUTPUT</span>
+      {/* Header - matches DFAM manual styling */}
+      <div className="flex justify-center mb-2 px-1">
+        <span className="text-[8px] font-bold">
+          <span className="text-gray-400">IN</span>
+          <span className="text-gray-500"> / </span>
+          <span className="bg-white text-black px-1 rounded-sm">OUT</span>
+        </span>
       </div>
 
       {/* Jack Grid - 3 columns */}
@@ -385,10 +388,10 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
         )}
       </svg>
 
-      {/* Instructions tooltip */}
+      {/* Instructions tooltip - positioned at bottom */}
       {!cables.length && !activeCable && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[8px] text-gray-600 text-center pointer-events-none bg-black/50 px-2 py-1 rounded">
-          Click any jack to start patch
+        <div className="text-[7px] text-gray-500 text-center mt-2 pointer-events-none">
+          Click jack to patch
         </div>
       )}
 
