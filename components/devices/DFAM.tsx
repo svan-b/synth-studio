@@ -1,19 +1,20 @@
 'use client';
 
 import { useStudioStore } from '@/store/studio';
-import { DevicePanel } from '@/components/device';
+import DFAMCoordinatePanel from '@/components/devices/DFAMCoordinatePanel';
 import { DFAM as DFAMSpec, DFAM_LESSONS } from '@/data/devices';
 
 /**
  * DFAM Component - Moog Drummer From Another Mother
  *
- * This is a thin wrapper around the generic DevicePanel component.
+ * Uses coordinate-based positioning for pixel-perfect hardware accuracy.
  * All DFAM-specific data (controls, layout, specs) comes from data/devices/dfam.ts
+ * Coordinates are defined in lib/devices/dfam/dfam-coordinates.ts
  *
  * This architecture allows:
+ * - Pixel-perfect positioning based on actual hardware measurements
  * - Single source of truth for DFAM specifications
  * - Easy addition of new devices by creating new spec files
- * - Consistent rendering across all devices
  * - Teaching system that works with any device
  */
 export default function DFAM() {
@@ -42,7 +43,7 @@ export default function DFAM() {
   };
 
   return (
-    <DevicePanel
+    <DFAMCoordinatePanel
       spec={DFAMSpec}
       values={values}
       onChange={handleChange}

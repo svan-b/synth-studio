@@ -455,41 +455,49 @@ export const DFAM: DeviceSpec = {
   // ---------------------------------------------------------------------------
   // Patch Bay Configuration - Matches actual DFAM hardware exactly
   // Reference: Moog DFAM Manual Page 15-16
-  // 3 columns: 2 input columns (left/middle), 1 output column (right)
-  // 24 points total: 15 inputs + 9 outputs
+  // Layout by ROW (not column!):
+  //   Rows 0-5: IN | IN | OUT pattern
+  //   Row 6: IN | IN | IN (all inputs - TEMPO, RUN/STOP, ADV/CLOCK)
+  //   Row 7: OUT | OUT | OUT (all outputs - TRIGGER, VELOCITY, PITCH)
+  // Total: 15 inputs + 9 outputs = 24 jacks
   // ---------------------------------------------------------------------------
   patchBay: {
     inputs: [
-      // Column 0 (Left Input Column) - Per DFAM Manual
+      // Row 0: TRIGGER (in), VCA CV (in)
       { id: 'in_trigger', label: 'TRIGGER', jackType: 'input', signalType: 'trigger', column: 0, row: 0 },
-      { id: 'in_vca_cv', label: 'VCA CV', jackType: 'input', signalType: 'cv', column: 0, row: 1 },
-      { id: 'in_velocity', label: 'VELOCITY', jackType: 'input', signalType: 'cv', column: 0, row: 2 },
-      { id: 'in_vca_decay', label: 'VCA DECAY', jackType: 'input', signalType: 'cv', column: 0, row: 3 },
-      { id: 'in_ext_audio', label: 'EXT AUDIO', jackType: 'input', signalType: 'audio', column: 0, row: 4 },
-      { id: 'in_vcf_decay', label: 'VCF DECAY', jackType: 'input', signalType: 'cv', column: 0, row: 5 },
-      { id: 'in_noise_level', label: 'NOISE', jackType: 'input', signalType: 'cv', column: 0, row: 6 },
-      { id: 'in_vco_decay', label: 'VCO DECAY', jackType: 'input', signalType: 'cv', column: 0, row: 7 },
-
-      // Column 1 (Middle Input Column) - Per DFAM Manual
-      { id: 'in_vcf_mod', label: 'VCF MOD', jackType: 'input', signalType: 'cv', column: 1, row: 0 },
-      { id: 'in_vco1_cv', label: 'VCO 1 CV', jackType: 'input', signalType: 'cv', column: 1, row: 1 },
-      { id: 'in_fm_amount', label: '1→2 FM AMT', jackType: 'input', signalType: 'cv', column: 1, row: 2 },
-      { id: 'in_vco2_cv', label: 'VCO 2 CV', jackType: 'input', signalType: 'cv', column: 1, row: 3 },
-      { id: 'in_tempo', label: 'TEMPO', jackType: 'input', signalType: 'cv', column: 1, row: 4 },
-      { id: 'in_run_stop', label: 'RUN/STOP', jackType: 'input', signalType: 'gate', column: 1, row: 5 },
-      { id: 'in_adv_clock', label: 'ADV/CLOCK', jackType: 'input', signalType: 'clock', column: 1, row: 6 },
+      { id: 'in_vca_cv', label: 'VCA CV', jackType: 'input', signalType: 'cv', column: 1, row: 0 },
+      // Row 1: VELOCITY (in), VCA DECAY (in)
+      { id: 'in_velocity', label: 'VELOCITY', jackType: 'input', signalType: 'cv', column: 0, row: 1 },
+      { id: 'in_vca_decay', label: 'VCA DECAY', jackType: 'input', signalType: 'cv', column: 1, row: 1 },
+      // Row 2: EXT AUDIO (in), VCF DECAY (in)
+      { id: 'in_ext_audio', label: 'EXT AUDIO', jackType: 'input', signalType: 'audio', column: 0, row: 2 },
+      { id: 'in_vcf_decay', label: 'VCF DECAY', jackType: 'input', signalType: 'cv', column: 1, row: 2 },
+      // Row 3: NOISE LEVEL (in), VCO DECAY (in)
+      { id: 'in_noise_level', label: 'NOISE LEVEL', jackType: 'input', signalType: 'cv', column: 0, row: 3 },
+      { id: 'in_vco_decay', label: 'VCO DECAY', jackType: 'input', signalType: 'cv', column: 1, row: 3 },
+      // Row 4: VCF MOD (in), VCO 1 CV (in)
+      { id: 'in_vcf_mod', label: 'VCF MOD', jackType: 'input', signalType: 'cv', column: 0, row: 4 },
+      { id: 'in_vco1_cv', label: 'VCO 1 CV', jackType: 'input', signalType: 'cv', column: 1, row: 4 },
+      // Row 5: 1→2 FM AMT (in), VCO 2 CV (in)
+      { id: 'in_fm_amount', label: '1→2 FM AMT', jackType: 'input', signalType: 'cv', column: 0, row: 5 },
+      { id: 'in_vco2_cv', label: 'VCO 2 CV', jackType: 'input', signalType: 'cv', column: 1, row: 5 },
+      // Row 6: ALL INPUTS - TEMPO, RUN/STOP, ADV/CLOCK
+      { id: 'in_tempo', label: 'TEMPO', jackType: 'input', signalType: 'cv', column: 0, row: 6 },
+      { id: 'in_run_stop', label: 'RUN / STOP', jackType: 'input', signalType: 'gate', column: 1, row: 6 },
+      { id: 'in_adv_clock', label: 'ADV / CLOCK', jackType: 'input', signalType: 'clock', column: 2, row: 6 },
     ],
     outputs: [
-      // Column 2 (Output Column) - Per DFAM Manual
+      // Rows 0-5: Output column (column 2)
       { id: 'out_vca', label: 'VCA', jackType: 'output', signalType: 'audio', column: 2, row: 0 },
       { id: 'out_vca_eg', label: 'VCA EG', jackType: 'output', signalType: 'cv', column: 2, row: 1 },
       { id: 'out_vcf_eg', label: 'VCF EG', jackType: 'output', signalType: 'cv', column: 2, row: 2 },
       { id: 'out_vco_eg', label: 'VCO EG', jackType: 'output', signalType: 'cv', column: 2, row: 3 },
       { id: 'out_vco1', label: 'VCO 1', jackType: 'output', signalType: 'audio', column: 2, row: 4 },
       { id: 'out_vco2', label: 'VCO 2', jackType: 'output', signalType: 'audio', column: 2, row: 5 },
-      { id: 'out_trigger', label: 'TRIGGER', jackType: 'output', signalType: 'trigger', column: 2, row: 6 },
-      { id: 'out_velocity', label: 'VELOCITY', jackType: 'output', signalType: 'cv', column: 2, row: 7 },
-      { id: 'out_pitch', label: 'PITCH', jackType: 'output', signalType: 'cv', column: 2, row: 8 },
+      // Row 7: ALL OUTPUTS - TRIGGER, VELOCITY, PITCH
+      { id: 'out_trigger', label: 'TRIGGER', jackType: 'output', signalType: 'trigger', column: 0, row: 7 },
+      { id: 'out_velocity', label: 'VELOCITY', jackType: 'output', signalType: 'cv', column: 1, row: 7 },
+      { id: 'out_pitch', label: 'PITCH', jackType: 'output', signalType: 'cv', column: 2, row: 7 },
     ],
   },
 
