@@ -92,12 +92,12 @@ export const KNOB_SIZES = {
 // Row Y positions (center of controls) - based on 107mm panel height
 const ROW1_Y = 20;      // Top row of main knobs (about 19% from top)
 const ROW2_Y = 50;      // Second row of main knobs (about 47% from top)
-const SWITCH_Y1 = 36;   // Switches under row 1 knobs
+const SWITCH_Y1 = 38;   // Switches under row 1 knobs
 const SWITCH_Y2 = 66;   // Switches under row 2 knobs
 const SEQ_LABEL_Y = 75; // Step numbers
-const SEQ_PITCH_Y = 85; // Pitch knobs row
-const SEQ_LED_Y = 94;   // LED row
-const SEQ_VEL_Y = 102;  // Velocity knobs row
+const SEQ_PITCH_Y = 82; // Pitch knobs row
+const SEQ_LED_Y = 91;   // LED row (between pitch and velocity)
+const SEQ_VEL_Y = 99;   // Velocity knobs row
 
 // Column X positions for main sections - based on 305mm panel width
 // User-specified exact x-positions for each control
@@ -109,9 +109,11 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   // ROW 1: 8 positions at x = 18, 46, 74, 114, 148, 180, 205, 218
   // =========================================================================
 
-  // Position 1 (x=18): VCO DECAY knob + SEQ PITCH MOD switch
+  // Position 1 (x=18): VCO DECAY knob
   vco_decay: { id: 'vco_decay', x: 18, y: ROW1_Y },
-  seq_pitch_mod: { id: 'seq_pitch_mod', x: 18, y: SWITCH_Y1 },
+
+  // SEQ PITCH MOD switch - positioned to the right of VCO DECAY
+  seq_pitch_mod: { id: 'seq_pitch_mod', x: 32, y: SWITCH_Y1 },
 
   // Position 2 (x=46): VCO1 EG AMOUNT
   vco1_eg_amount: { id: 'vco1_eg_amount', x: 46, y: ROW1_Y },
@@ -120,7 +122,7 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   vco1_frequency: { id: 'vco1_frequency', x: 74, y: ROW1_Y },
   vco1_wave: { id: 'vco1_wave', x: 74, y: SWITCH_Y1 },
 
-  // Position 4 (x=114): VCO1 LEVEL, NOISE LEVEL (stacked or offset)
+  // Position 4 (x=114): VCO1 LEVEL, NOISE LEVEL (mixer section)
   vco1_level: { id: 'vco1_level', x: 114, y: ROW1_Y },
   noise_level: { id: 'noise_level', x: 134, y: ROW1_Y },
 
@@ -131,8 +133,8 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   // Position 6 (x=180): VCF RESONANCE
   vcf_resonance: { id: 'vcf_resonance', x: 180, y: ROW1_Y },
 
-  // Position 7 (x=205): VCA ATTACK MODE switch
-  vca_attack_mode: { id: 'vca_attack_mode', x: 205, y: ROW1_Y },
+  // Position 7 (x=205): VCA ATTACK MODE switch (between row 1 and row 2)
+  vca_attack_mode: { id: 'vca_attack_mode', x: 205, y: 28 },
 
   // Position 8 (x=218): VOLUME
   volume: { id: 'volume', x: 218, y: ROW1_Y },
@@ -141,9 +143,11 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   // ROW 2: 8 positions at x = 18, 46, 74, 114, 148, 180, 208, 232
   // =========================================================================
 
-  // Position 1 (x=18): FM AMOUNT + HARD SYNC switch
+  // Position 1 (x=18): FM AMOUNT knob
   fm_amount: { id: 'fm_amount', x: 18, y: ROW2_Y },
-  hard_sync: { id: 'hard_sync', x: 18, y: SWITCH_Y2 },
+
+  // HARD SYNC switch - positioned to the right of FM AMOUNT
+  hard_sync: { id: 'hard_sync', x: 32, y: SWITCH_Y2 },
 
   // Position 2 (x=46): VCO2 EG AMOUNT
   vco2_eg_amount: { id: 'vco2_eg_amount', x: 46, y: ROW2_Y },
@@ -169,48 +173,49 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
 
   // =========================================================================
   // SEQUENCER SECTION (bottom third of panel)
-  // TRIGGER(18), RUN/STOP(32), ADVANCE(46), TEMPO(75)
-  // Then 8 knobs starting at 95mm with 18mm spacing
+  // Transport buttons in vertical layout, TEMPO to the right
+  // Then 8 step knobs starting at 105mm with 15mm spacing
   // =========================================================================
 
-  // Transport controls (left side)
-  // Buttons positioned between pitch and velocity rows
-  trigger: { id: 'trigger', x: 18, y: SEQ_PITCH_Y },
-  run_stop: { id: 'run_stop', x: 32, y: SEQ_PITCH_Y + 8 },
-  advance: { id: 'advance', x: 50, y: SEQ_PITCH_Y + 8 },
-  tempo: { id: 'tempo', x: 75, y: SEQ_VEL_Y - 8 },
+  // Transport controls - vertical arrangement
+  trigger: { id: 'trigger', x: 25, y: 78 },
+  run_stop: { id: 'run_stop', x: 25, y: 95 },
+  advance: { id: 'advance', x: 55, y: 95 },
 
-  // Step sequencer - 8 pitch knobs starting at 95mm, 18mm spacing
-  pitch_1: { id: 'pitch_1', x: 95, y: SEQ_PITCH_Y },
-  pitch_2: { id: 'pitch_2', x: 113, y: SEQ_PITCH_Y },
-  pitch_3: { id: 'pitch_3', x: 131, y: SEQ_PITCH_Y },
-  pitch_4: { id: 'pitch_4', x: 149, y: SEQ_PITCH_Y },
-  pitch_5: { id: 'pitch_5', x: 167, y: SEQ_PITCH_Y },
-  pitch_6: { id: 'pitch_6', x: 185, y: SEQ_PITCH_Y },
-  pitch_7: { id: 'pitch_7', x: 203, y: SEQ_PITCH_Y },
-  pitch_8: { id: 'pitch_8', x: 221, y: SEQ_PITCH_Y },
+  // TEMPO knob - positioned left of step knobs
+  tempo: { id: 'tempo', x: 78, y: 88 },
+
+  // Step sequencer - 8 pitch knobs starting at 105mm, 15mm spacing
+  pitch_1: { id: 'pitch_1', x: 105, y: SEQ_PITCH_Y },
+  pitch_2: { id: 'pitch_2', x: 120, y: SEQ_PITCH_Y },
+  pitch_3: { id: 'pitch_3', x: 135, y: SEQ_PITCH_Y },
+  pitch_4: { id: 'pitch_4', x: 150, y: SEQ_PITCH_Y },
+  pitch_5: { id: 'pitch_5', x: 165, y: SEQ_PITCH_Y },
+  pitch_6: { id: 'pitch_6', x: 180, y: SEQ_PITCH_Y },
+  pitch_7: { id: 'pitch_7', x: 195, y: SEQ_PITCH_Y },
+  pitch_8: { id: 'pitch_8', x: 210, y: SEQ_PITCH_Y },
 
   // Step sequencer - 8 velocity knobs (aligned directly below pitch knobs)
-  velocity_1: { id: 'velocity_1', x: 95, y: SEQ_VEL_Y },
-  velocity_2: { id: 'velocity_2', x: 113, y: SEQ_VEL_Y },
-  velocity_3: { id: 'velocity_3', x: 131, y: SEQ_VEL_Y },
-  velocity_4: { id: 'velocity_4', x: 149, y: SEQ_VEL_Y },
-  velocity_5: { id: 'velocity_5', x: 167, y: SEQ_VEL_Y },
-  velocity_6: { id: 'velocity_6', x: 185, y: SEQ_VEL_Y },
-  velocity_7: { id: 'velocity_7', x: 203, y: SEQ_VEL_Y },
-  velocity_8: { id: 'velocity_8', x: 221, y: SEQ_VEL_Y },
+  velocity_1: { id: 'velocity_1', x: 105, y: SEQ_VEL_Y },
+  velocity_2: { id: 'velocity_2', x: 120, y: SEQ_VEL_Y },
+  velocity_3: { id: 'velocity_3', x: 135, y: SEQ_VEL_Y },
+  velocity_4: { id: 'velocity_4', x: 150, y: SEQ_VEL_Y },
+  velocity_5: { id: 'velocity_5', x: 165, y: SEQ_VEL_Y },
+  velocity_6: { id: 'velocity_6', x: 180, y: SEQ_VEL_Y },
+  velocity_7: { id: 'velocity_7', x: 195, y: SEQ_VEL_Y },
+  velocity_8: { id: 'velocity_8', x: 210, y: SEQ_VEL_Y },
 };
 
-// LED positions for sequencer (aligned with pitch/velocity knobs at 95mm, 18mm spacing)
+// LED positions for sequencer (aligned with pitch/velocity knobs at 105mm, 15mm spacing)
 export const SEQUENCER_LED_POSITIONS = [
-  { step: 1, x: 95, y: SEQ_LED_Y },
-  { step: 2, x: 113, y: SEQ_LED_Y },
-  { step: 3, x: 131, y: SEQ_LED_Y },
-  { step: 4, x: 149, y: SEQ_LED_Y },
-  { step: 5, x: 167, y: SEQ_LED_Y },
-  { step: 6, x: 185, y: SEQ_LED_Y },
-  { step: 7, x: 203, y: SEQ_LED_Y },
-  { step: 8, x: 221, y: SEQ_LED_Y },
+  { step: 1, x: 105, y: SEQ_LED_Y },
+  { step: 2, x: 120, y: SEQ_LED_Y },
+  { step: 3, x: 135, y: SEQ_LED_Y },
+  { step: 4, x: 150, y: SEQ_LED_Y },
+  { step: 5, x: 165, y: SEQ_LED_Y },
+  { step: 6, x: 180, y: SEQ_LED_Y },
+  { step: 7, x: 195, y: SEQ_LED_Y },
+  { step: 8, x: 210, y: SEQ_LED_Y },
 ];
 
 // ============================================================================
@@ -341,14 +346,42 @@ export function getControlsInSection(sectionName: string): ControlPosition[] {
 
 /**
  * Get knob size for a control
+ * Large knobs: main parameter knobs (VCO DECAY, FREQ, EG AMT, CUTOFF, etc.)
+ * Medium knobs: mixer level knobs and some modulation knobs
+ * Small knobs: sequencer pitch/velocity knobs
  */
 export function getKnobSize(controlId: string): 'large' | 'medium' | 'small' {
-  const largeKnobs = ['vco_decay', 'vco1_frequency', 'vco2_frequency', 'vcf_cutoff', 'vcf_resonance', 'vcf_decay', 'vca_decay', 'volume', 'tempo', 'fm_amount'];
-  const smallKnobs = ['vco1_eg_amount', 'vco2_eg_amount', 'vco1_level', 'vco2_level', 'noise_level', 'vcf_eg_amount', 'noise_vcf_mod',
+  const largeKnobs = [
+    'vco_decay',
+    'vco1_eg_amount',
+    'vco1_frequency',
+    'vco2_eg_amount',
+    'vco2_frequency',
+    'fm_amount',
+    'vcf_cutoff',
+    'vcf_resonance',
+    'vcf_decay',
+    'vcf_eg_amount',
+    'vca_decay',
+    'volume',
+    'tempo',
+  ];
+
+  const mediumKnobs = [
+    'vco1_level',
+    'vco2_level',
+    'noise_level',
+    'noise_vcf_mod',
+  ];
+
+  // Small knobs: sequencer pitch and velocity only
+  const smallKnobs = [
     'pitch_1', 'pitch_2', 'pitch_3', 'pitch_4', 'pitch_5', 'pitch_6', 'pitch_7', 'pitch_8',
-    'velocity_1', 'velocity_2', 'velocity_3', 'velocity_4', 'velocity_5', 'velocity_6', 'velocity_7', 'velocity_8'];
+    'velocity_1', 'velocity_2', 'velocity_3', 'velocity_4', 'velocity_5', 'velocity_6', 'velocity_7', 'velocity_8',
+  ];
 
   if (largeKnobs.includes(controlId)) return 'large';
+  if (mediumKnobs.includes(controlId)) return 'medium';
   if (smallKnobs.includes(controlId)) return 'small';
   return 'medium';
 }

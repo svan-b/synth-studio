@@ -270,14 +270,14 @@ export default function DFAMCoordinatePanel({
         }}
       >
 
-        {/* Step Numbers - aligned with sequencer knobs at 95mm, 18mm spacing */}
+        {/* Step Numbers - aligned with sequencer knobs at 105mm, 15mm spacing */}
         {[1, 2, 3, 4, 5, 6, 7, 8].map((n, i) => (
           <div
             key={`step-num-${n}`}
             className="absolute text-[10px] text-white font-bold text-center"
             style={{
-              left: mmToPx(95 + i * 18) - 8,
-              top: mmToPx(76),
+              left: mmToPx(105 + i * 15) - 8,
+              top: mmToPx(74),
               width: 16,
             }}
           >
@@ -285,16 +285,16 @@ export default function DFAMCoordinatePanel({
           </div>
         ))}
 
-        {/* Row labels for sequencer - on left side */}
+        {/* Row labels for sequencer - positioned left of step knobs */}
         <div
-          className="absolute text-[8px] text-white font-bold"
-          style={{ left: mmToPx(78), top: mmToPx(83) }}
+          className="absolute text-[7px] text-gray-400 font-bold"
+          style={{ left: mmToPx(95), top: mmToPx(80) }}
         >
           PITCH
         </div>
         <div
-          className="absolute text-[7px] text-white font-bold"
-          style={{ left: mmToPx(76), top: mmToPx(100) }}
+          className="absolute text-[6px] text-gray-400 font-bold"
+          style={{ left: mmToPx(93), top: mmToPx(97) }}
         >
           VELOCITY
         </div>
@@ -342,30 +342,29 @@ export default function DFAMCoordinatePanel({
           />
         </div>
 
-        {/* DFAM Branding - bottom of controls section */}
+        {/* DFAM Branding - positioned at absolute bottom, below all controls */}
         <div
-          className="absolute"
+          className="absolute flex items-center justify-between"
           style={{
             left: mmToPx(8),
-            bottom: mmToPx(2),
-            width: mmToPx(200),
+            top: panelHeightPx + 5,
+            width: mmToPx(225),
+            height: extraPadding - 10,
           }}
         >
-          <div className="flex items-end justify-between">
-            <div>
-              <div className="text-xl font-black text-white tracking-tight">DFAM</div>
-              <div className="text-[5px] text-gray-600 tracking-widest">DRUMMER FROM ANOTHER MOTHER</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[6px] text-gray-600">SEMI-MODULAR ANALOG</div>
-              <div className="text-[6px] text-gray-600">PERCUSSION SYNTHESIZER</div>
-            </div>
-            <div
-              className="text-xl font-serif italic text-white"
-              style={{ fontFamily: 'Georgia, serif' }}
-            >
-              moog
-            </div>
+          <div>
+            <div className="text-lg font-black text-white tracking-tight">DFAM</div>
+            <div className="text-[4px] text-gray-600 tracking-widest">DRUMMER FROM ANOTHER MOTHER</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[5px] text-gray-600">SEMI-MODULAR ANALOG</div>
+            <div className="text-[5px] text-gray-600">PERCUSSION SYNTHESIZER</div>
+          </div>
+          <div
+            className="text-lg font-serif italic text-white"
+            style={{ fontFamily: 'Georgia, serif' }}
+          >
+            moog
           </div>
         </div>
       </div>
