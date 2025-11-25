@@ -387,12 +387,7 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
         )}
       </svg>
 
-      {/* Instructions tooltip - positioned at bottom */}
-      {!cables.length && !activeCable && (
-        <div className="text-[7px] text-gray-500 text-center mt-2 pointer-events-none">
-          Click jack to patch
-        </div>
-      )}
+      {/* Instructions tooltip - hidden by default, shows on hover */}
 
       {/* Cable count */}
       {cables.length > 0 && (
