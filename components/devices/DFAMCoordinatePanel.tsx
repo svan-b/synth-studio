@@ -269,51 +269,14 @@ export default function DFAMCoordinatePanel({
           background: '#111',
         }}
       >
-        {/* Section Labels - Row 1 */}
-        <div className="absolute text-[8px] text-gray-500 font-bold" style={{ left: mmToPx(10), top: mmToPx(5) }}>
-          VCO<br/>ENVELOPE
-        </div>
-        <div className="absolute text-[9px] text-white font-bold" style={{ left: mmToPx(68), top: mmToPx(5) }}>
-          VCO 1
-        </div>
-        <div className="absolute text-[8px] text-gray-500 font-bold" style={{ left: mmToPx(100), top: mmToPx(5) }}>
-          MIXER
-        </div>
-        <div className="absolute text-[9px] text-white font-bold" style={{ left: mmToPx(140), top: mmToPx(5) }}>
-          VCF
-        </div>
-        <div className="absolute text-[9px] text-white font-bold" style={{ left: mmToPx(190), top: mmToPx(5) }}>
-          VCA
-        </div>
 
-        {/* Section Labels - Row 2 */}
-        <div className="absolute text-[8px] text-gray-500 font-bold" style={{ left: mmToPx(10), top: mmToPx(38) }}>
-          FM
-        </div>
-        <div className="absolute text-[9px] text-white font-bold" style={{ left: mmToPx(68), top: mmToPx(38) }}>
-          VCO 2
-        </div>
-        <div className="absolute text-[8px] text-gray-500 font-bold" style={{ left: mmToPx(130), top: mmToPx(38) }}>
-          VCF ENVELOPE
-        </div>
-
-        {/* Patch Bay Label */}
-        <div className="absolute text-[7px] text-gray-500" style={{ left: mmToPx(255), top: mmToPx(3) }}>
-          PATCH BAY
-        </div>
-
-        {/* Sequencer Section Label */}
-        <div className="absolute text-[9px] text-white font-bold" style={{ left: mmToPx(110), top: mmToPx(72) }}>
-          SEQUENCER
-        </div>
-
-        {/* Step Numbers */}
+        {/* Step Numbers - aligned with sequencer knobs at 95mm, 18mm spacing */}
         {[1, 2, 3, 4, 5, 6, 7, 8].map((n, i) => (
           <div
             key={`step-num-${n}`}
             className="absolute text-[10px] text-white font-bold text-center"
             style={{
-              left: mmToPx(68 + i * 17) - 8,
+              left: mmToPx(95 + i * 18) - 8,
               top: mmToPx(76),
               width: 16,
             }}
@@ -322,16 +285,16 @@ export default function DFAMCoordinatePanel({
           </div>
         ))}
 
-        {/* Row labels for sequencer */}
+        {/* Row labels for sequencer - on left side */}
         <div
           className="absolute text-[8px] text-white font-bold"
-          style={{ left: mmToPx(50), top: mmToPx(83) }}
+          style={{ left: mmToPx(78), top: mmToPx(83) }}
         >
           PITCH
         </div>
         <div
           className="absolute text-[7px] text-white font-bold"
-          style={{ left: mmToPx(48), top: mmToPx(100) }}
+          style={{ left: mmToPx(76), top: mmToPx(100) }}
         >
           VELOCITY
         </div>

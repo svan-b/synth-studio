@@ -100,106 +100,117 @@ const SEQ_LED_Y = 94;   // LED row
 const SEQ_VEL_Y = 102;  // Velocity knobs row
 
 // Column X positions for main sections - based on 305mm panel width
-// Controls section is about 215mm wide, patch bay is about 75mm on right
-const VCO_SECTION_X = 18;
-const VCO1_SECTION_X = 55;
-const MIXER_SECTION_X = 100;
-const FILTER_SECTION_X = 130;
-const VCA_SECTION_X = 185;
-const SEQ_SECTION_X = 18;
-const PATCHBAY_X = 220;
+// User-specified exact x-positions for each control
+// Row 1: 18, 46, 74, 114, 148, 180, 205, 218
+// Row 2: 18, 46, 74, 114, 148, 180, 208, 232
 
 export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   // =========================================================================
-  // ROW 1: VCO DECAY, VCO1 EG, VCO1 FREQ, VCO1 LEVEL, NOISE, CUTOFF, RES, VCA EG, VOL
+  // ROW 1: 8 positions at x = 18, 46, 74, 114, 148, 180, 205, 218
   // =========================================================================
 
-  // VCO Envelope Section (leftmost)
-  vco_decay: { id: 'vco_decay', x: VCO_SECTION_X, y: ROW1_Y },
-  seq_pitch_mod: { id: 'seq_pitch_mod', x: VCO_SECTION_X, y: SWITCH_Y1 },
+  // Position 1 (x=18): VCO DECAY knob + SEQ PITCH MOD switch
+  vco_decay: { id: 'vco_decay', x: 18, y: ROW1_Y },
+  seq_pitch_mod: { id: 'seq_pitch_mod', x: 18, y: SWITCH_Y1 },
 
-  // VCO 1 Section
-  vco1_eg_amount: { id: 'vco1_eg_amount', x: VCO1_SECTION_X, y: ROW1_Y },
-  vco1_frequency: { id: 'vco1_frequency', x: VCO1_SECTION_X + 25, y: ROW1_Y },
-  vco1_wave: { id: 'vco1_wave', x: VCO1_SECTION_X + 25, y: SWITCH_Y1 },
+  // Position 2 (x=46): VCO1 EG AMOUNT
+  vco1_eg_amount: { id: 'vco1_eg_amount', x: 46, y: ROW1_Y },
 
-  // Mixer Section (between VCO and VCF)
-  vco1_level: { id: 'vco1_level', x: MIXER_SECTION_X, y: ROW1_Y },
-  noise_level: { id: 'noise_level', x: MIXER_SECTION_X + 20, y: ROW1_Y },
+  // Position 3 (x=74): VCO1 FREQUENCY + VCO1 WAVE switch
+  vco1_frequency: { id: 'vco1_frequency', x: 74, y: ROW1_Y },
+  vco1_wave: { id: 'vco1_wave', x: 74, y: SWITCH_Y1 },
 
-  // Filter Section
-  vcf_cutoff: { id: 'vcf_cutoff', x: FILTER_SECTION_X, y: ROW1_Y },
-  vcf_mode: { id: 'vcf_mode', x: FILTER_SECTION_X, y: SWITCH_Y1 },
-  vcf_resonance: { id: 'vcf_resonance', x: FILTER_SECTION_X + 30, y: ROW1_Y },
+  // Position 4 (x=114): VCO1 LEVEL, NOISE LEVEL (stacked or offset)
+  vco1_level: { id: 'vco1_level', x: 114, y: ROW1_Y },
+  noise_level: { id: 'noise_level', x: 134, y: ROW1_Y },
 
-  // VCA Section (rightmost before patch bay)
-  vca_attack_mode: { id: 'vca_attack_mode', x: VCA_SECTION_X, y: ROW1_Y },
-  volume: { id: 'volume', x: VCA_SECTION_X + 22, y: ROW1_Y },
+  // Position 5 (x=148): VCF CUTOFF + VCF MODE switch
+  vcf_cutoff: { id: 'vcf_cutoff', x: 148, y: ROW1_Y },
+  vcf_mode: { id: 'vcf_mode', x: 148, y: SWITCH_Y1 },
+
+  // Position 6 (x=180): VCF RESONANCE
+  vcf_resonance: { id: 'vcf_resonance', x: 180, y: ROW1_Y },
+
+  // Position 7 (x=205): VCA ATTACK MODE switch
+  vca_attack_mode: { id: 'vca_attack_mode', x: 205, y: ROW1_Y },
+
+  // Position 8 (x=218): VOLUME
+  volume: { id: 'volume', x: 218, y: ROW1_Y },
 
   // =========================================================================
-  // ROW 2: FM, VCO2 EG, VCO2 FREQ, VCO2 LEVEL, VCF DECAY, VCF EG, NOISE MOD, VCA DECAY
+  // ROW 2: 8 positions at x = 18, 46, 74, 114, 148, 180, 208, 232
   // =========================================================================
 
-  // FM Section
-  fm_amount: { id: 'fm_amount', x: VCO_SECTION_X, y: ROW2_Y },
-  hard_sync: { id: 'hard_sync', x: VCO_SECTION_X, y: SWITCH_Y2 },
+  // Position 1 (x=18): FM AMOUNT + HARD SYNC switch
+  fm_amount: { id: 'fm_amount', x: 18, y: ROW2_Y },
+  hard_sync: { id: 'hard_sync', x: 18, y: SWITCH_Y2 },
 
-  // VCO 2 Section (aligned with VCO 1)
-  vco2_eg_amount: { id: 'vco2_eg_amount', x: VCO1_SECTION_X, y: ROW2_Y },
-  vco2_frequency: { id: 'vco2_frequency', x: VCO1_SECTION_X + 25, y: ROW2_Y },
-  vco2_wave: { id: 'vco2_wave', x: VCO1_SECTION_X + 25, y: SWITCH_Y2 },
-  vco2_level: { id: 'vco2_level', x: MIXER_SECTION_X, y: ROW2_Y },
+  // Position 2 (x=46): VCO2 EG AMOUNT
+  vco2_eg_amount: { id: 'vco2_eg_amount', x: 46, y: ROW2_Y },
 
-  // VCF Envelope Section (aligned with VCF)
-  vcf_decay: { id: 'vcf_decay', x: FILTER_SECTION_X, y: ROW2_Y },
-  vcf_eg_amount: { id: 'vcf_eg_amount', x: FILTER_SECTION_X + 30, y: ROW2_Y },
-  noise_vcf_mod: { id: 'noise_vcf_mod', x: FILTER_SECTION_X + 55, y: ROW2_Y },
+  // Position 3 (x=74): VCO2 FREQUENCY + VCO2 WAVE switch
+  vco2_frequency: { id: 'vco2_frequency', x: 74, y: ROW2_Y },
+  vco2_wave: { id: 'vco2_wave', x: 74, y: SWITCH_Y2 },
 
-  // VCA Envelope Section
-  vca_decay: { id: 'vca_decay', x: VCA_SECTION_X + 22, y: ROW2_Y },
+  // Position 4 (x=114): VCO2 LEVEL
+  vco2_level: { id: 'vco2_level', x: 114, y: ROW2_Y },
+
+  // Position 5 (x=148): VCF DECAY
+  vcf_decay: { id: 'vcf_decay', x: 148, y: ROW2_Y },
+
+  // Position 6 (x=180): VCF EG AMOUNT
+  vcf_eg_amount: { id: 'vcf_eg_amount', x: 180, y: ROW2_Y },
+
+  // Position 7 (x=208): NOISE VCF MOD
+  noise_vcf_mod: { id: 'noise_vcf_mod', x: 208, y: ROW2_Y },
+
+  // Position 8 (x=232): VCA DECAY
+  vca_decay: { id: 'vca_decay', x: 232, y: ROW2_Y },
 
   // =========================================================================
   // SEQUENCER SECTION (bottom third of panel)
+  // TRIGGER(18), RUN/STOP(32), ADVANCE(46), TEMPO(75)
+  // Then 8 knobs starting at 95mm with 18mm spacing
   // =========================================================================
 
   // Transport controls (left side)
-  trigger: { id: 'trigger', x: SEQ_SECTION_X, y: SEQ_PITCH_Y },
-  tempo: { id: 'tempo', x: SEQ_SECTION_X + 28, y: SEQ_PITCH_Y },
-  run_stop: { id: 'run_stop', x: SEQ_SECTION_X + 10, y: SEQ_VEL_Y + 3 },
-  advance: { id: 'advance', x: SEQ_SECTION_X + 35, y: SEQ_VEL_Y + 3 },
+  // Buttons positioned between pitch and velocity rows
+  trigger: { id: 'trigger', x: 18, y: SEQ_PITCH_Y },
+  run_stop: { id: 'run_stop', x: 32, y: SEQ_PITCH_Y + 8 },
+  advance: { id: 'advance', x: 50, y: SEQ_PITCH_Y + 8 },
+  tempo: { id: 'tempo', x: 75, y: SEQ_VEL_Y - 8 },
 
-  // Step sequencer - 8 pitch knobs (evenly spaced starting after transport)
-  // Spacing: each step is about 17mm apart
-  pitch_1: { id: 'pitch_1', x: 68, y: SEQ_PITCH_Y },
-  pitch_2: { id: 'pitch_2', x: 85, y: SEQ_PITCH_Y },
-  pitch_3: { id: 'pitch_3', x: 102, y: SEQ_PITCH_Y },
-  pitch_4: { id: 'pitch_4', x: 119, y: SEQ_PITCH_Y },
-  pitch_5: { id: 'pitch_5', x: 136, y: SEQ_PITCH_Y },
-  pitch_6: { id: 'pitch_6', x: 153, y: SEQ_PITCH_Y },
-  pitch_7: { id: 'pitch_7', x: 170, y: SEQ_PITCH_Y },
-  pitch_8: { id: 'pitch_8', x: 187, y: SEQ_PITCH_Y },
+  // Step sequencer - 8 pitch knobs starting at 95mm, 18mm spacing
+  pitch_1: { id: 'pitch_1', x: 95, y: SEQ_PITCH_Y },
+  pitch_2: { id: 'pitch_2', x: 113, y: SEQ_PITCH_Y },
+  pitch_3: { id: 'pitch_3', x: 131, y: SEQ_PITCH_Y },
+  pitch_4: { id: 'pitch_4', x: 149, y: SEQ_PITCH_Y },
+  pitch_5: { id: 'pitch_5', x: 167, y: SEQ_PITCH_Y },
+  pitch_6: { id: 'pitch_6', x: 185, y: SEQ_PITCH_Y },
+  pitch_7: { id: 'pitch_7', x: 203, y: SEQ_PITCH_Y },
+  pitch_8: { id: 'pitch_8', x: 221, y: SEQ_PITCH_Y },
 
   // Step sequencer - 8 velocity knobs (aligned directly below pitch knobs)
-  velocity_1: { id: 'velocity_1', x: 68, y: SEQ_VEL_Y },
-  velocity_2: { id: 'velocity_2', x: 85, y: SEQ_VEL_Y },
-  velocity_3: { id: 'velocity_3', x: 102, y: SEQ_VEL_Y },
-  velocity_4: { id: 'velocity_4', x: 119, y: SEQ_VEL_Y },
-  velocity_5: { id: 'velocity_5', x: 136, y: SEQ_VEL_Y },
-  velocity_6: { id: 'velocity_6', x: 153, y: SEQ_VEL_Y },
-  velocity_7: { id: 'velocity_7', x: 170, y: SEQ_VEL_Y },
-  velocity_8: { id: 'velocity_8', x: 187, y: SEQ_VEL_Y },
+  velocity_1: { id: 'velocity_1', x: 95, y: SEQ_VEL_Y },
+  velocity_2: { id: 'velocity_2', x: 113, y: SEQ_VEL_Y },
+  velocity_3: { id: 'velocity_3', x: 131, y: SEQ_VEL_Y },
+  velocity_4: { id: 'velocity_4', x: 149, y: SEQ_VEL_Y },
+  velocity_5: { id: 'velocity_5', x: 167, y: SEQ_VEL_Y },
+  velocity_6: { id: 'velocity_6', x: 185, y: SEQ_VEL_Y },
+  velocity_7: { id: 'velocity_7', x: 203, y: SEQ_VEL_Y },
+  velocity_8: { id: 'velocity_8', x: 221, y: SEQ_VEL_Y },
 };
 
-// LED positions for sequencer (aligned with pitch/velocity knobs)
+// LED positions for sequencer (aligned with pitch/velocity knobs at 95mm, 18mm spacing)
 export const SEQUENCER_LED_POSITIONS = [
-  { step: 1, x: 68, y: SEQ_LED_Y },
-  { step: 2, x: 85, y: SEQ_LED_Y },
-  { step: 3, x: 102, y: SEQ_LED_Y },
-  { step: 4, x: 119, y: SEQ_LED_Y },
-  { step: 5, x: 136, y: SEQ_LED_Y },
-  { step: 6, x: 153, y: SEQ_LED_Y },
-  { step: 7, x: 170, y: SEQ_LED_Y },
-  { step: 8, x: 187, y: SEQ_LED_Y },
+  { step: 1, x: 95, y: SEQ_LED_Y },
+  { step: 2, x: 113, y: SEQ_LED_Y },
+  { step: 3, x: 131, y: SEQ_LED_Y },
+  { step: 4, x: 149, y: SEQ_LED_Y },
+  { step: 5, x: 167, y: SEQ_LED_Y },
+  { step: 6, x: 185, y: SEQ_LED_Y },
+  { step: 7, x: 203, y: SEQ_LED_Y },
+  { step: 8, x: 221, y: SEQ_LED_Y },
 ];
 
 // ============================================================================
@@ -277,22 +288,6 @@ export const PATCH_JACK_POSITIONS: PatchJackPosition[] = [
   { id: 'out_velocity', label: 'VELOCITY', column: 1, row: 7, type: 'output', ...getJackPosition(1, 7) },
   { id: 'out_pitch', label: 'PITCH', column: 2, row: 7, type: 'output', ...getJackPosition(2, 7) },
 ];
-
-// ============================================================================
-// LABEL POSITIONS (for section headers)
-// ============================================================================
-
-export const SECTION_LABELS = {
-  vcoEnvelope: { text: 'VCO\nENVELOPE', x: VCO_SECTION_X, y: 5 },
-  vco1: { text: 'VCO 1', x: VCO_SECTION_X + 42, y: 5 },
-  vco2: { text: 'VCO 2', x: VCO_SECTION_X + 42, y: 38 },
-  mixer: { text: 'MIXER', x: MIXER_SECTION_X + 9, y: 5 },
-  vcf: { text: 'VCF', x: FILTER_SECTION_X + 14, y: 5 },
-  vcfEnvelope: { text: 'VCF\nENVELOPE', x: FILTER_SECTION_X + 28, y: 38 },
-  vca: { text: 'VCA', x: VCA_SECTION_X + 11, y: 5 },
-  sequencer: { text: 'SEQUENCER', x: SEQ_SECTION_X + 80, y: 68 },
-  patchBay: { text: 'PATCH BAY', x: PATCH_START_X + 20, y: 3 },
-};
 
 // ============================================================================
 // BRANDING POSITIONS
