@@ -208,9 +208,9 @@ export const SEQUENCER_LED_POSITIONS = [
 // Based on DFAM Manual page 15-16
 // ============================================================================
 
-const PATCH_START_X = 230;  // Start of patch bay section (mm)
+const PATCH_START_X = 248;  // Start of patch bay section (mm) - right side of panel
 const PATCH_START_Y = 12;   // Top of patch bay (mm)
-const PATCH_COL_SPACING = 20;  // mm between column centers
+const PATCH_COL_SPACING = 18;  // mm between column centers
 const PATCH_ROW_SPACING = 11;  // mm between row centers
 const JACK_DIAMETER = 7;    // mm (3.5mm jack visual size)
 

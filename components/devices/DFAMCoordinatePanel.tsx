@@ -276,7 +276,7 @@ export default function DFAMCoordinatePanel({
         </div>
 
         {/* Patch Bay Label */}
-        <div className="absolute text-[7px] text-gray-500" style={{ left: mmToPx(235), top: mmToPx(3) }}>
+        <div className="absolute text-[7px] text-gray-500" style={{ left: mmToPx(255), top: mmToPx(3) }}>
           PATCH BAY
         </div>
 
@@ -337,14 +337,14 @@ export default function DFAMCoordinatePanel({
           }}
         />
 
-        {/* Patch Bay Section */}
+        {/* Patch Bay Section - positioned on right side of panel */}
         <div
           className="absolute rounded"
           style={{
-            left: mmToPx(212),
-            top: mmToPx(10),
-            width: mmToPx(88),
-            height: mmToPx(95),
+            left: mmToPx(240),
+            top: mmToPx(8),
+            width: mmToPx(62),
+            height: mmToPx(98),
             background: '#0a0a0a',
             padding: mmToPx(2),
           }}
