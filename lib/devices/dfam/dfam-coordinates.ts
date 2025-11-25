@@ -231,40 +231,51 @@ export const getJackPosition = (column: number, row: number): { x: number; y: nu
 });
 
 // Complete patch jack positions with labels
-// Column 0: Left input column
-// Column 1: Middle input column
-// Column 2: Right output column
+// Layout from DFAM Manual - organized by ROWS, not columns!
+// Rows 1-6: IN | IN | OUT pattern
+// Row 7: IN | IN | IN (all inputs)
+// Row 8: OUT | OUT | OUT (all outputs)
+// Total: 15 inputs + 9 outputs = 24 jacks
 export const PATCH_JACK_POSITIONS: PatchJackPosition[] = [
-  // Column 0 - Left Input Column (8 jacks)
+  // Row 0: TRIGGER (in) | VCA CV (in) | VCA (out)
   { id: 'in_trigger', label: 'TRIGGER', column: 0, row: 0, type: 'input', ...getJackPosition(0, 0) },
-  { id: 'in_vca_cv', label: 'VCA CV', column: 0, row: 1, type: 'input', ...getJackPosition(0, 1) },
-  { id: 'in_velocity', label: 'VELOCITY', column: 0, row: 2, type: 'input', ...getJackPosition(0, 2) },
-  { id: 'in_vca_decay', label: 'VCA DECAY', column: 0, row: 3, type: 'input', ...getJackPosition(0, 3) },
-  { id: 'in_ext_audio', label: 'EXT AUDIO', column: 0, row: 4, type: 'input', ...getJackPosition(0, 4) },
-  { id: 'in_vcf_decay', label: 'VCF DECAY', column: 0, row: 5, type: 'input', ...getJackPosition(0, 5) },
-  { id: 'in_noise_level', label: 'NOISE', column: 0, row: 6, type: 'input', ...getJackPosition(0, 6) },
-  { id: 'in_vco_decay', label: 'VCO DECAY', column: 0, row: 7, type: 'input', ...getJackPosition(0, 7) },
-
-  // Column 1 - Middle Input Column (7 jacks + 1 empty)
-  { id: 'in_vcf_mod', label: 'VCF MOD', column: 1, row: 0, type: 'input', ...getJackPosition(1, 0) },
-  { id: 'in_vco1_cv', label: 'VCO 1 CV', column: 1, row: 1, type: 'input', ...getJackPosition(1, 1) },
-  { id: 'in_fm_amount', label: '1→2 FM', column: 1, row: 2, type: 'input', ...getJackPosition(1, 2) },
-  { id: 'in_vco2_cv', label: 'VCO 2 CV', column: 1, row: 3, type: 'input', ...getJackPosition(1, 3) },
-  { id: 'in_tempo', label: 'TEMPO', column: 1, row: 4, type: 'input', ...getJackPosition(1, 4) },
-  { id: 'in_run_stop', label: 'RUN/STOP', column: 1, row: 5, type: 'input', ...getJackPosition(1, 5) },
-  { id: 'in_adv_clock', label: 'ADV/CLK', column: 1, row: 6, type: 'input', ...getJackPosition(1, 6) },
-  // Row 7 empty in column 1
-
-  // Column 2 - Output Column (9 jacks, using rows 0-8)
+  { id: 'in_vca_cv', label: 'VCA CV', column: 1, row: 0, type: 'input', ...getJackPosition(1, 0) },
   { id: 'out_vca', label: 'VCA', column: 2, row: 0, type: 'output', ...getJackPosition(2, 0) },
+
+  // Row 1: VELOCITY (in) | VCA DECAY (in) | VCA EG (out)
+  { id: 'in_velocity', label: 'VELOCITY', column: 0, row: 1, type: 'input', ...getJackPosition(0, 1) },
+  { id: 'in_vca_decay', label: 'VCA DECAY', column: 1, row: 1, type: 'input', ...getJackPosition(1, 1) },
   { id: 'out_vca_eg', label: 'VCA EG', column: 2, row: 1, type: 'output', ...getJackPosition(2, 1) },
+
+  // Row 2: EXT AUDIO (in) | VCF DECAY (in) | VCF EG (out)
+  { id: 'in_ext_audio', label: 'EXT AUDIO', column: 0, row: 2, type: 'input', ...getJackPosition(0, 2) },
+  { id: 'in_vcf_decay', label: 'VCF DECAY', column: 1, row: 2, type: 'input', ...getJackPosition(1, 2) },
   { id: 'out_vcf_eg', label: 'VCF EG', column: 2, row: 2, type: 'output', ...getJackPosition(2, 2) },
+
+  // Row 3: NOISE LEVEL (in) | VCO DECAY (in) | VCO EG (out)
+  { id: 'in_noise_level', label: 'NOISE LEVEL', column: 0, row: 3, type: 'input', ...getJackPosition(0, 3) },
+  { id: 'in_vco_decay', label: 'VCO DECAY', column: 1, row: 3, type: 'input', ...getJackPosition(1, 3) },
   { id: 'out_vco_eg', label: 'VCO EG', column: 2, row: 3, type: 'output', ...getJackPosition(2, 3) },
+
+  // Row 4: VCF MOD (in) | VCO 1 CV (in) | VCO 1 (out)
+  { id: 'in_vcf_mod', label: 'VCF MOD', column: 0, row: 4, type: 'input', ...getJackPosition(0, 4) },
+  { id: 'in_vco1_cv', label: 'VCO 1 CV', column: 1, row: 4, type: 'input', ...getJackPosition(1, 4) },
   { id: 'out_vco1', label: 'VCO 1', column: 2, row: 4, type: 'output', ...getJackPosition(2, 4) },
+
+  // Row 5: 1→2 FM AMT (in) | VCO 2 CV (in) | VCO 2 (out)
+  { id: 'in_fm_amount', label: '1→2 FM AMT', column: 0, row: 5, type: 'input', ...getJackPosition(0, 5) },
+  { id: 'in_vco2_cv', label: 'VCO 2 CV', column: 1, row: 5, type: 'input', ...getJackPosition(1, 5) },
   { id: 'out_vco2', label: 'VCO 2', column: 2, row: 5, type: 'output', ...getJackPosition(2, 5) },
-  { id: 'out_trigger', label: 'TRIGGER', column: 2, row: 6, type: 'output', ...getJackPosition(2, 6) },
-  { id: 'out_velocity', label: 'VELOCITY', column: 2, row: 7, type: 'output', ...getJackPosition(2, 7) },
-  { id: 'out_pitch', label: 'PITCH', column: 2, row: 8, type: 'output', x: PATCH_START_X + 2 * PATCH_COL_SPACING, y: PATCH_START_Y + 8 * PATCH_ROW_SPACING },
+
+  // Row 6: TEMPO (in) | RUN/STOP (in) | ADV/CLOCK (in) - ALL INPUTS
+  { id: 'in_tempo', label: 'TEMPO', column: 0, row: 6, type: 'input', ...getJackPosition(0, 6) },
+  { id: 'in_run_stop', label: 'RUN / STOP', column: 1, row: 6, type: 'input', ...getJackPosition(1, 6) },
+  { id: 'in_adv_clock', label: 'ADV / CLOCK', column: 2, row: 6, type: 'input', ...getJackPosition(2, 6) },
+
+  // Row 7: TRIGGER (out) | VELOCITY (out) | PITCH (out) - ALL OUTPUTS
+  { id: 'out_trigger', label: 'TRIGGER', column: 0, row: 7, type: 'output', ...getJackPosition(0, 7) },
+  { id: 'out_velocity', label: 'VELOCITY', column: 1, row: 7, type: 'output', ...getJackPosition(1, 7) },
+  { id: 'out_pitch', label: 'PITCH', column: 2, row: 7, type: 'output', ...getJackPosition(2, 7) },
 ];
 
 // ============================================================================
