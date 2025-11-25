@@ -81,7 +81,7 @@ export default function DFAMCoordinatePanel({
     }));
   }, []);
 
-  // Render a knob at its coordinate position
+  // Render a knob at its coordinate position with label
   const renderKnob = (controlId: string) => {
     const controlSpec = spec.controls[controlId] as KnobSpec;
     const position = CONTROL_POSITIONS[controlId];
@@ -90,15 +90,31 @@ export default function DFAMCoordinatePanel({
     const size = getKnobSize(controlId);
     const knobPx = KNOB_SIZES[size].px;
 
+    // Determine if this is a sequencer knob (no label needed - numbers shown above)
+    const isSequencerKnob = controlId.startsWith('pitch_') || controlId.startsWith('velocity_');
+
     return (
       <div
         key={controlId}
         className="absolute flex flex-col items-center"
         style={{
-          left: mmToPx(position.x) - knobPx / 2,
-          top: mmToPx(position.y) - knobPx / 2,
+          left: mmToPx(position.x) - knobPx / 2 - 10,
+          top: mmToPx(position.y) - knobPx / 2 - (isSequencerKnob ? 0 : 12),
+          width: knobPx + 20,
         }}
       >
+        {/* Label above knob */}
+        {!isSequencerKnob && (
+          <span
+            className="text-center text-white font-bold mb-0.5 whitespace-nowrap"
+            style={{
+              fontSize: size === 'large' ? '7px' : '6px',
+              opacity: 0.9,
+            }}
+          >
+            {controlSpec.label}
+          </span>
+        )}
         <Knob
           id={controlId}
           spec={{ ...controlSpec, size }}
@@ -210,27 +226,33 @@ export default function DFAMCoordinatePanel({
 
   const buttonIds = ['trigger', 'run_stop', 'advance'];
 
+  // Add extra height for labels and value displays
+  const extraPadding = 30;
+
   return (
     <div
-      className="relative rounded-lg overflow-hidden"
+      className="relative rounded-lg"
       style={{
         width: totalWidthPx,
+        height: panelHeightPx + extraPadding,
         background: '#1a1a1a',
       }}
     >
       {/* Wooden Side Cheeks */}
       <div
-        className="absolute left-0 top-0 bottom-0 rounded-l-lg"
+        className="absolute left-0 top-0 rounded-l-lg"
         style={{
           width: cheekWidthPx,
+          height: panelHeightPx + extraPadding,
           background: 'linear-gradient(90deg, #3d2b1f 0%, #5C4033 50%, #3d2b1f 100%)',
           boxShadow: 'inset -2px 0 4px rgba(0,0,0,0.5)',
         }}
       />
       <div
-        className="absolute right-0 top-0 bottom-0 rounded-r-lg"
+        className="absolute right-0 top-0 rounded-r-lg"
         style={{
           width: cheekWidthPx,
+          height: panelHeightPx + extraPadding,
           background: 'linear-gradient(90deg, #3d2b1f 0%, #5C4033 50%, #3d2b1f 100%)',
           boxShadow: 'inset 2px 0 4px rgba(0,0,0,0.5)',
         }}
@@ -238,12 +260,12 @@ export default function DFAMCoordinatePanel({
 
       {/* Main Black Panel */}
       <div
-        className="relative rounded"
+        className="relative rounded overflow-visible"
         style={{
           marginLeft: cheekWidthPx,
           marginRight: cheekWidthPx,
           width: panelWidthPx,
-          height: panelHeightPx,
+          height: panelHeightPx + extraPadding,
           background: '#111',
         }}
       >
