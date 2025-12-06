@@ -12,6 +12,7 @@ export interface KnobProps {
   targetValue?: number;
   showTarget?: boolean;
   showLabel?: boolean;  // Whether to show label above knob
+  showValueOnHover?: boolean;  // Only show value on hover (for sequencer knobs)
 }
 
 /**
@@ -31,8 +32,10 @@ export default function Knob({
   targetValue,
   showTarget = false,
   showLabel = false,
+  showValueOnHover = false,
 }: KnobProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const [startY, setStartY] = useState(0);
   const [startValue, setStartValue] = useState(value);
   const knobRef = useRef<HTMLDivElement>(null);
@@ -138,6 +141,11 @@ export default function Knob({
 
   const currentPx = sizePx[size];
 
+  // Determine if value should be visible
+  // For hover-only mode: show when hovered or dragging
+  // Otherwise: always show
+  const shouldShowValue = showValueOnHover ? (isHovered || isDragging) : true;
+
   return (
     // Wrapper is exactly the knob size - position this at center
     <div
@@ -145,6 +153,8 @@ export default function Knob({
       className={`relative cursor-pointer select-none ${getTeachingClass()}`}
       style={{ width: currentPx, height: currentPx }}
       onMouseDown={handleMouseDown}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       title={spec.description}
     >
       {/* Label - positioned absolutely above the knob */}
@@ -210,16 +220,19 @@ export default function Knob({
       </div>
 
       {/* Value display - positioned below the knob */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 font-mono text-[9px] text-green-400 bg-black/80 px-1 py-0.5 rounded min-w-[32px] text-center"
-        style={{
-          top: '100%',
-          marginTop: '2px',
-          textShadow: '0 0 4px rgba(0,255,0,0.5)',
-        }}
-      >
-        {formatValue(value, units)}
-      </div>
+      {/* For sequencer knobs, only show on hover to avoid overlapping with LEDs */}
+      {shouldShowValue && (
+        <div
+          className={`absolute left-1/2 -translate-x-1/2 font-mono text-[9px] text-green-400 bg-black/90 px-1 py-0.5 rounded min-w-[32px] text-center ${showValueOnHover ? 'z-50 shadow-lg' : ''}`}
+          style={{
+            top: '100%',
+            marginTop: '2px',
+            textShadow: '0 0 4px rgba(0,255,0,0.5)',
+          }}
+        >
+          {formatValue(value, units)}
+        </div>
+      )}
 
       {/* Target value hint (if teaching mode) */}
       {showTarget && targetValue !== undefined && !isCloseToTarget && (
