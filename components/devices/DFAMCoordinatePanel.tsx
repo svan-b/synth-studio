@@ -92,6 +92,10 @@ export default function DFAMCoordinatePanel({
     // Determine if this is a sequencer knob (no label needed - numbers shown above)
     const isSequencerKnob = controlId.startsWith('pitch_') || controlId.startsWith('velocity_');
 
+    // Pitch knobs: show value on hover only (to avoid overlapping with LEDs below)
+    // Velocity knobs: always show value (nothing below them to overlap)
+    const isPitchKnob = controlId.startsWith('pitch_');
+
     return (
       <div
         key={controlId}
@@ -111,6 +115,7 @@ export default function DFAMCoordinatePanel({
           targetValue={getTargetValue(controlId)}
           showTarget={isTeachingMode}
           showLabel={!isSequencerKnob}
+          showValueOnHover={isPitchKnob}
         />
       </div>
     );
