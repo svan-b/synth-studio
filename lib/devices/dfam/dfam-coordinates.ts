@@ -117,77 +117,76 @@ const SEQ_PITCH_Y = 79; // Pitch knobs row
 const SEQ_LED_Y = 86;   // LED row (between pitch and velocity)
 const SEQ_VEL_Y = 93;   // Velocity knobs row - moved up to leave room for value displays
 
-// Column X positions for main sections - based on 305mm panel width
-// User-specified exact x-positions for each control
-// Row 1: 18, 46, 74, 114, 148, 180, 205, 218
-// Row 2: 18, 46, 74, 114, 148, 180, 208, 232
+// Column X positions - recalculated for even distribution across 240mm control area
+// (Panel is 305mm, but patch bay takes rightmost ~65mm)
+// Main knobs spaced ~28mm apart, mixer knobs closer together
 
 export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   // =========================================================================
-  // ROW 1: 8 positions at x = 18, 46, 74, 114, 148, 180, 205, 218
+  // ROW 1: Evenly distributed across control area
   // =========================================================================
 
-  // Position 1 (x=18): VCO DECAY knob
-  vco_decay: { id: 'vco_decay', x: 18, y: ROW1_Y },
+  // VCO DECAY - far left
+  vco_decay: { id: 'vco_decay', x: 20, y: ROW1_Y },
 
-  // SEQ PITCH MOD switch - positioned to the right of VCO DECAY
-  seq_pitch_mod: { id: 'seq_pitch_mod', x: 32, y: SWITCH_Y1 },
+  // SEQ PITCH MOD switch - to the right of VCO DECAY
+  seq_pitch_mod: { id: 'seq_pitch_mod', x: 36, y: SWITCH_Y1 },
 
-  // Position 2 (x=46): VCO1 EG AMOUNT
-  vco1_eg_amount: { id: 'vco1_eg_amount', x: 46, y: ROW1_Y },
+  // VCO1 EG AMOUNT
+  vco1_eg_amount: { id: 'vco1_eg_amount', x: 52, y: ROW1_Y },
 
-  // Position 3 (x=74): VCO1 FREQUENCY + VCO1 WAVE switch
-  vco1_frequency: { id: 'vco1_frequency', x: 74, y: ROW1_Y },
-  vco1_wave: { id: 'vco1_wave', x: 74, y: SWITCH_Y1 },
+  // VCO1 FREQUENCY + VCO1 WAVE switch (directly below)
+  vco1_frequency: { id: 'vco1_frequency', x: 84, y: ROW1_Y },
+  vco1_wave: { id: 'vco1_wave', x: 84, y: SWITCH_Y1 },
 
-  // Position 4 (x=114): VCO1 LEVEL, NOISE LEVEL (mixer section)
-  vco1_level: { id: 'vco1_level', x: 114, y: ROW1_Y },
-  noise_level: { id: 'noise_level', x: 134, y: ROW1_Y },
+  // Mixer section: VCO1 LEVEL, NOISE LEVEL (closer together)
+  vco1_level: { id: 'vco1_level', x: 116, y: ROW1_Y },
+  noise_level: { id: 'noise_level', x: 138, y: ROW1_Y },
 
-  // Position 5 (x=148): VCF CUTOFF + VCF MODE switch
-  vcf_cutoff: { id: 'vcf_cutoff', x: 148, y: ROW1_Y },
-  vcf_mode: { id: 'vcf_mode', x: 148, y: SWITCH_Y1 },
+  // VCF CUTOFF + VCF MODE switch (directly below)
+  vcf_cutoff: { id: 'vcf_cutoff', x: 162, y: ROW1_Y },
+  vcf_mode: { id: 'vcf_mode', x: 162, y: SWITCH_Y1 },
 
-  // Position 6 (x=180): VCF RESONANCE
-  vcf_resonance: { id: 'vcf_resonance', x: 180, y: ROW1_Y },
+  // VCF RESONANCE
+  vcf_resonance: { id: 'vcf_resonance', x: 190, y: ROW1_Y },
 
-  // Position 7 (x=205): VCA ATTACK MODE switch (between row 1 and row 2)
-  vca_attack_mode: { id: 'vca_attack_mode', x: 205, y: 28 },
+  // VCA ATTACK MODE switch (between row 1 and row 2, near VOLUME)
+  vca_attack_mode: { id: 'vca_attack_mode', x: 218, y: 32 },
 
-  // Position 8 (x=218): VOLUME
+  // VOLUME
   volume: { id: 'volume', x: 218, y: ROW1_Y },
 
   // =========================================================================
-  // ROW 2: 8 positions at x = 18, 46, 74, 114, 148, 180, 208, 232
+  // ROW 2: Matching row 1 spacing where applicable
   // =========================================================================
 
-  // Position 1 (x=18): FM AMOUNT knob
-  fm_amount: { id: 'fm_amount', x: 18, y: ROW2_Y },
+  // FM AMOUNT - far left (aligned with VCO DECAY)
+  fm_amount: { id: 'fm_amount', x: 20, y: ROW2_Y },
 
-  // HARD SYNC switch - positioned to the right of FM AMOUNT
-  hard_sync: { id: 'hard_sync', x: 32, y: SWITCH_Y2 },
+  // HARD SYNC switch - to the right of FM AMOUNT
+  hard_sync: { id: 'hard_sync', x: 36, y: SWITCH_Y2 },
 
-  // Position 2 (x=46): VCO2 EG AMOUNT
-  vco2_eg_amount: { id: 'vco2_eg_amount', x: 46, y: ROW2_Y },
+  // VCO2 EG AMOUNT (aligned with VCO1 EG AMOUNT)
+  vco2_eg_amount: { id: 'vco2_eg_amount', x: 52, y: ROW2_Y },
 
-  // Position 3 (x=74): VCO2 FREQUENCY + VCO2 WAVE switch
-  vco2_frequency: { id: 'vco2_frequency', x: 74, y: ROW2_Y },
-  vco2_wave: { id: 'vco2_wave', x: 74, y: SWITCH_Y2 },
+  // VCO2 FREQUENCY + VCO2 WAVE switch (directly below)
+  vco2_frequency: { id: 'vco2_frequency', x: 84, y: ROW2_Y },
+  vco2_wave: { id: 'vco2_wave', x: 84, y: SWITCH_Y2 },
 
-  // Position 4 (x=114): VCO2 LEVEL
-  vco2_level: { id: 'vco2_level', x: 114, y: ROW2_Y },
+  // VCO2 LEVEL (aligned with VCO1 LEVEL)
+  vco2_level: { id: 'vco2_level', x: 116, y: ROW2_Y },
 
-  // Position 5 (x=148): VCF DECAY
-  vcf_decay: { id: 'vcf_decay', x: 148, y: ROW2_Y },
+  // VCF DECAY
+  vcf_decay: { id: 'vcf_decay', x: 146, y: ROW2_Y },
 
-  // Position 6 (x=180): VCF EG AMOUNT
-  vcf_eg_amount: { id: 'vcf_eg_amount', x: 180, y: ROW2_Y },
+  // VCF EG AMOUNT
+  vcf_eg_amount: { id: 'vcf_eg_amount', x: 174, y: ROW2_Y },
 
-  // Position 7 (x=208): NOISE VCF MOD
-  noise_vcf_mod: { id: 'noise_vcf_mod', x: 208, y: ROW2_Y },
+  // NOISE VCF MOD
+  noise_vcf_mod: { id: 'noise_vcf_mod', x: 200, y: ROW2_Y },
 
-  // Position 8 (x=232): VCA DECAY
-  vca_decay: { id: 'vca_decay', x: 232, y: ROW2_Y },
+  // VCA DECAY
+  vca_decay: { id: 'vca_decay', x: 226, y: ROW2_Y },
 
   // =========================================================================
   // SEQUENCER SECTION (bottom third of panel)
