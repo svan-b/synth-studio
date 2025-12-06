@@ -206,7 +206,7 @@ export default function DFAMCoordinatePanel({
         className="absolute"
         style={{
           left: mmToPx(15),  // Same x as trigger/run_stop
-          top: mmToPx(90),   // Between trigger (80) and run_stop (100)
+          top: mmToPx(85),   // Between trigger (76) and run_stop (94)
           transform: 'translate(-50%, -50%)',
         }}
       >
@@ -319,7 +319,7 @@ export default function DFAMCoordinatePanel({
             className="absolute text-[10px] text-white font-bold text-center"
             style={{
               left: mmToPx(105 + i * 15) - 8,
-              top: mmToPx(74),
+              top: mmToPx(73),  // SEQ_LABEL_Y
               width: 16,
             }}
           >
@@ -330,13 +330,13 @@ export default function DFAMCoordinatePanel({
         {/* Row labels for sequencer - positioned left of step knobs */}
         <div
           className="absolute text-[7px] text-gray-400 font-bold"
-          style={{ left: mmToPx(95), top: mmToPx(80) }}
+          style={{ left: mmToPx(95), top: mmToPx(77) }}
         >
           PITCH
         </div>
         <div
           className="absolute text-[6px] text-gray-400 font-bold"
-          style={{ left: mmToPx(93), top: mmToPx(97) }}
+          style={{ left: mmToPx(93), top: mmToPx(91) }}
         >
           VELOCITY
         </div>
