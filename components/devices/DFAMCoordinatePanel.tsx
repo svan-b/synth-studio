@@ -14,7 +14,6 @@ import {
   SEQUENCER_LED_POSITIONS,
   mmToPx,
   getKnobSize,
-  KNOB_SIZES,
 } from '@/lib/devices/dfam/dfam-coordinates';
 
 interface DFAMCoordinatePanelProps {
@@ -81,14 +80,14 @@ export default function DFAMCoordinatePanel({
     }));
   }, []);
 
-  // Render a knob at its coordinate position with label
+  // Render a knob at its coordinate position
+  // With anchor-based positioning, the knob center = coordinate center
   const renderKnob = (controlId: string) => {
     const controlSpec = spec.controls[controlId] as KnobSpec;
     const position = CONTROL_POSITIONS[controlId];
     if (!controlSpec || !position) return null;
 
     const size = getKnobSize(controlId);
-    const knobPx = KNOB_SIZES[size].px;
 
     // Determine if this is a sequencer knob (no label needed - numbers shown above)
     const isSequencerKnob = controlId.startsWith('pitch_') || controlId.startsWith('velocity_');
@@ -96,25 +95,13 @@ export default function DFAMCoordinatePanel({
     return (
       <div
         key={controlId}
-        className="absolute flex flex-col items-center"
+        className="absolute"
         style={{
-          left: mmToPx(position.x) - knobPx / 2 - 15,
-          top: mmToPx(position.y) - knobPx / 2 - (isSequencerKnob ? 0 : 14),
-          width: knobPx + 30,
+          left: mmToPx(position.x),
+          top: mmToPx(position.y),
+          transform: 'translate(-50%, -50%)',  // Center the knob at the coordinate
         }}
       >
-        {/* Label above knob */}
-        {!isSequencerKnob && (
-          <span
-            className="text-center text-white font-bold mb-0.5 whitespace-nowrap overflow-visible"
-            style={{
-              fontSize: size === 'large' ? '7px' : '6px',
-              opacity: 0.9,
-            }}
-          >
-            {controlSpec.label}
-          </span>
-        )}
         <Knob
           id={controlId}
           spec={{ ...controlSpec, size }}
@@ -123,27 +110,27 @@ export default function DFAMCoordinatePanel({
           highlighted={isHighlighted(controlId)}
           targetValue={getTargetValue(controlId)}
           showTarget={isTeachingMode}
+          showLabel={!isSequencerKnob}
         />
       </div>
     );
   };
 
   // Render a switch at its coordinate position
+  // With anchor-based positioning, the switch center = coordinate center
   const renderSwitch = (controlId: string) => {
     const controlSpec = spec.controls[controlId] as SwitchSpec;
     const position = CONTROL_POSITIONS[controlId];
     if (!controlSpec || !position) return null;
-
-    // Check if 3-position (horizontal) or 2-position (vertical) switch
-    const is3Position = controlSpec.options.length === 3;
 
     return (
       <div
         key={controlId}
         className="absolute"
         style={{
-          left: mmToPx(position.x) - (is3Position ? 20 : 8),
-          top: mmToPx(position.y) - (is3Position ? 8 : 12),
+          left: mmToPx(position.x),
+          top: mmToPx(position.y),
+          transform: 'translate(-50%, -50%)',  // Center the switch at the coordinate
         }}
       >
         <Switch
@@ -159,6 +146,7 @@ export default function DFAMCoordinatePanel({
   };
 
   // Render a button at its coordinate position
+  // With anchor-based positioning, the button center = coordinate center
   const renderButton = (controlId: string) => {
     const controlSpec = spec.controls[controlId] as ButtonSpec;
     const position = CONTROL_POSITIONS[controlId];
@@ -169,8 +157,9 @@ export default function DFAMCoordinatePanel({
         key={controlId}
         className="absolute"
         style={{
-          left: mmToPx(position.x) - 16,
-          top: mmToPx(position.y) - 16,
+          left: mmToPx(position.x),
+          top: mmToPx(position.y),
+          transform: 'translate(-50%, -50%)',  // Center the button at the coordinate
         }}
       >
         <Button
@@ -185,14 +174,16 @@ export default function DFAMCoordinatePanel({
   };
 
   // Render sequencer LEDs
+  // Using transform-based centering for consistency
   const renderSequencerLEDs = () => {
     return SEQUENCER_LED_POSITIONS.map((led, index) => (
       <div
         key={`led-${led.step}`}
         className="absolute"
         style={{
-          left: mmToPx(led.x) - 6,
-          top: mmToPx(led.y) - 6,
+          left: mmToPx(led.x),
+          top: mmToPx(led.y),
+          transform: 'translate(-50%, -50%)',  // Center LED at coordinate
         }}
       >
         <div
