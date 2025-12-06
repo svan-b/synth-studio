@@ -219,12 +219,17 @@ export default function Knob({
         </div>
       </div>
 
-      {/* Value display - positioned below the knob */}
-      {/* For sequencer knobs, only show on hover to avoid overlapping with LEDs */}
+      {/* Value display - positioned below knob normally, ABOVE knob for hover-only mode */}
       {shouldShowValue && (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 font-mono text-[9px] text-green-400 bg-black/90 px-1 py-0.5 rounded min-w-[32px] text-center ${showValueOnHover ? 'z-50 shadow-lg' : ''}`}
-          style={{
+          className={`absolute left-1/2 -translate-x-1/2 font-mono text-[9px] text-green-400 bg-black/90 px-1 py-0.5 rounded min-w-[32px] text-center ${showValueOnHover ? 'z-50 shadow-lg border border-green-900' : ''}`}
+          style={showValueOnHover ? {
+            // For hover mode: show ABOVE the knob to avoid LED overlap
+            bottom: '100%',
+            marginBottom: '4px',
+            textShadow: '0 0 4px rgba(0,255,0,0.5)',
+          } : {
+            // Normal mode: show below
             top: '100%',
             marginTop: '2px',
             textShadow: '0 0 4px rgba(0,255,0,0.5)',
