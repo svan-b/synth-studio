@@ -145,12 +145,34 @@ export default function DFAMCoordinatePanel({
     );
   };
 
+  // Get button configuration based on DFAM manual layout
+  // - TRIGGER: small button with label to the right
+  // - RUN/STOP: large button with label to the left (or none, uses LED label)
+  // - ADVANCE: medium button with label above
+  const getButtonConfig = (controlId: string): {
+    labelPosition: 'above' | 'below' | 'left' | 'right' | 'none';
+    size: 'small' | 'medium' | 'large';
+  } => {
+    switch (controlId) {
+      case 'trigger':
+        return { labelPosition: 'right', size: 'small' };
+      case 'run_stop':
+        return { labelPosition: 'left', size: 'large' };
+      case 'advance':
+        return { labelPosition: 'above', size: 'medium' };
+      default:
+        return { labelPosition: 'above', size: 'medium' };
+    }
+  };
+
   // Render a button at its coordinate position
   // With anchor-based positioning, the button center = coordinate center
   const renderButton = (controlId: string) => {
     const controlSpec = spec.controls[controlId] as ButtonSpec;
     const position = CONTROL_POSITIONS[controlId];
     if (!controlSpec || !position) return null;
+
+    const { labelPosition, size } = getButtonConfig(controlId);
 
     return (
       <div
@@ -168,6 +190,32 @@ export default function DFAMCoordinatePanel({
           value={getValue(controlId) as unknown as boolean}
           onChange={(v) => onChange(controlId, v)}
           highlighted={isHighlighted(controlId)}
+          labelPosition={labelPosition}
+          size={size}
+        />
+      </div>
+    );
+  };
+
+  // Render the transport LED indicator (between TRIGGER and RUN/STOP)
+  // This small LED shows sequencer running state
+  const renderTransportLED = () => {
+    const isRunning = getValue('run_stop') as unknown as boolean;
+    return (
+      <div
+        className="absolute"
+        style={{
+          left: mmToPx(15),  // Same x as trigger/run_stop
+          top: mmToPx(90),   // Between trigger (80) and run_stop (100)
+          transform: 'translate(-50%, -50%)',
+        }}
+      >
+        <div
+          className="w-2 h-2 rounded-full"
+          style={{
+            background: isRunning ? '#ff3333' : '#331111',
+            boxShadow: isRunning ? '0 0 6px #ff3333' : 'none',
+          }}
         />
       </div>
     );
@@ -301,6 +349,9 @@ export default function DFAMCoordinatePanel({
 
         {/* Render all buttons */}
         {buttonIds.map(id => renderButton(id))}
+
+        {/* Render transport LED indicator (between TRIGGER and RUN/STOP) */}
+        {renderTransportLED()}
 
         {/* Render sequencer LEDs */}
         {renderSequencerLEDs()}

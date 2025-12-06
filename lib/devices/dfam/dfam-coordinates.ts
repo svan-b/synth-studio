@@ -188,17 +188,28 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
 
   // =========================================================================
   // SEQUENCER SECTION (bottom third of panel)
-  // Transport buttons in vertical layout, TEMPO to the right
-  // Then 8 step knobs starting at 105mm with 15mm spacing
+  // Transport layout based on DFAM Manual:
+  //   - TRIGGER: small button at top-left, label to right
+  //   - LED indicator below TRIGGER with "RUN/STOP" label to left
+  //   - RUN/STOP: large button below the LED indicator
+  //   - ADVANCE: positioned to the right, label above
+  //   - TEMPO: large knob to the right of transport
+  //   - Then 8 step knobs starting at 105mm with 15mm spacing
   // =========================================================================
 
-  // Transport controls - vertical arrangement
-  trigger: { id: 'trigger', x: 25, y: 78 },
-  run_stop: { id: 'run_stop', x: 25, y: 98 },
-  advance: { id: 'advance', x: 55, y: 95 },
+  // Transport controls - matching manual layout
+  // TRIGGER: small button at x=15, y=80 (top of transport section)
+  trigger: { id: 'trigger', x: 15, y: 80 },
 
-  // TEMPO knob - positioned left of step knobs
-  tempo: { id: 'tempo', x: 78, y: 88 },
+  // RUN/STOP: large button at x=15, y=100 (bottom of transport section)
+  // The LED indicator between trigger and run_stop is rendered separately
+  run_stop: { id: 'run_stop', x: 15, y: 100 },
+
+  // ADVANCE: positioned to the right of RUN/STOP
+  advance: { id: 'advance', x: 42, y: 95 },
+
+  // TEMPO knob - large knob to the right of transport controls
+  tempo: { id: 'tempo', x: 70, y: 88 },
 
   // Step sequencer - 8 pitch knobs starting at 105mm, 15mm spacing
   pitch_1: { id: 'pitch_1', x: 105, y: SEQ_PITCH_Y },

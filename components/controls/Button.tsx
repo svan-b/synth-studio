@@ -8,15 +8,17 @@ export interface ButtonProps {
   value: boolean;
   onChange: (value: boolean) => void;
   highlighted?: boolean;
+  labelPosition?: 'above' | 'below' | 'left' | 'right' | 'none';
+  size?: 'small' | 'medium' | 'large';
 }
 
 /**
  * Button Component - Anchor-Based Positioning
  *
- * The wrapper div is exactly the size of the button circle (32x32px).
+ * The wrapper div is exactly the size of the button circle.
  * This means when you position this component, the CENTER of the wrapper
  * is the CENTER of the button. Labels are absolutely positioned relative
- * to the button, not stacked in a flex column.
+ * to the button based on labelPosition prop.
  */
 export default function Button({
   id,
@@ -24,8 +26,19 @@ export default function Button({
   value,
   onChange,
   highlighted = false,
+  labelPosition = 'above',
+  size = 'medium',
 }: ButtonProps) {
   const { label, momentary = false, ledColor = '#00ff00' } = spec;
+
+  // Button sizes in pixels
+  const sizePx = {
+    small: 24,
+    medium: 32,
+    large: 40,
+  };
+
+  const currentSize = sizePx[size];
 
   const handleClick = () => {
     if (momentary) {
@@ -60,20 +73,38 @@ export default function Button({
     };
   };
 
+  // Get label positioning styles based on labelPosition
+  const getLabelStyle = (): React.CSSProperties => {
+    switch (labelPosition) {
+      case 'above':
+        return { bottom: '100%', marginBottom: '4px', left: '50%', transform: 'translateX(-50%)' };
+      case 'below':
+        return { top: '100%', marginTop: '4px', left: '50%', transform: 'translateX(-50%)' };
+      case 'left':
+        return { right: '100%', marginRight: '6px', top: '50%', transform: 'translateY(-50%)' };
+      case 'right':
+        return { left: '100%', marginLeft: '6px', top: '50%', transform: 'translateY(-50%)' };
+      default:
+        return {};
+    }
+  };
+
   return (
-    // Wrapper is exactly 32x32 - the button circle size
-    // Position this wrapper at center, and the button will be centered
+    // Wrapper is exactly the button size
     <div
-      className={`relative w-8 h-8 select-none ${getTeachingClass()}`}
+      className={`relative select-none ${getTeachingClass()}`}
+      style={{ width: currentSize, height: currentSize }}
       title={spec.description}
     >
-      {/* Label - positioned absolutely above the button */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 font-label text-[8px] text-hardware-label uppercase tracking-wider text-center whitespace-nowrap"
-        style={{ bottom: '100%', marginBottom: '4px' }}
-      >
-        {label}
-      </div>
+      {/* Label - positioned based on labelPosition prop */}
+      {labelPosition !== 'none' && (
+        <div
+          className="absolute font-label text-[8px] text-hardware-label uppercase tracking-wider whitespace-nowrap"
+          style={getLabelStyle()}
+        >
+          {label}
+        </div>
+      )}
 
       {/* Button - fills the wrapper */}
       <button
