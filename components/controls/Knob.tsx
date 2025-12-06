@@ -11,8 +11,17 @@ export interface KnobProps {
   highlighted?: boolean;
   targetValue?: number;
   showTarget?: boolean;
+  showLabel?: boolean;  // Whether to show label above knob
 }
 
+/**
+ * Knob Component - Anchor-Based Positioning
+ *
+ * The wrapper div is exactly the size of the knob circle (28/42/56px).
+ * This means when you position this component, the CENTER of the wrapper
+ * is the CENTER of the knob. Labels and value displays are absolutely
+ * positioned relative to the knob, not stacked in a flex column.
+ */
 export default function Knob({
   id,
   spec,
@@ -21,13 +30,14 @@ export default function Knob({
   highlighted = false,
   targetValue,
   showTarget = false,
+  showLabel = false,
 }: KnobProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
   const [startValue, setStartValue] = useState(value);
   const knobRef = useRef<HTMLDivElement>(null);
 
-  const { min, max, bipolar = false, units = '%', size = 'medium' } = spec;
+  const { min, max, bipolar = false, units = '%', size = 'medium', label } = spec;
 
   // Calculate rotation angle (-135deg to +135deg, 270deg total range)
   const valueToRotation = (val: number): number => {
@@ -129,74 +139,94 @@ export default function Knob({
   const currentPx = sizePx[size];
 
   return (
-    <div className="flex flex-col items-center gap-1 select-none">
+    // Wrapper is exactly the knob size - position this at center
+    <div
+      ref={knobRef}
+      className={`relative cursor-pointer select-none ${getTeachingClass()}`}
+      style={{ width: currentPx, height: currentPx }}
+      onMouseDown={handleMouseDown}
+      title={spec.description}
+    >
+      {/* Label - positioned absolutely above the knob */}
+      {showLabel && label && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 text-center text-white font-bold whitespace-nowrap"
+          style={{
+            bottom: '100%',
+            marginBottom: '2px',
+            fontSize: size === 'large' ? '7px' : '6px',
+            opacity: 0.9,
+          }}
+        >
+          {label}
+        </div>
+      )}
+
       {/* Knob - DFAM style silver metallic */}
       <div
-        ref={knobRef}
-        className={`relative cursor-pointer rounded-full ${getTeachingClass()}`}
-        style={{ width: currentPx, height: currentPx }}
-        onMouseDown={handleMouseDown}
-        title={spec.description}
+        className="absolute inset-0 rounded-full"
+        style={{
+          background: 'linear-gradient(135deg, #888 0%, #444 50%, #666 100%)',
+          padding: '2px',
+          boxShadow: '0 3px 6px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.2)',
+        }}
       >
-        {/* Outer ring / edge */}
+        {/* Main knob body - silver metallic */}
         <div
           className="w-full h-full rounded-full"
           style={{
-            background: 'linear-gradient(135deg, #888 0%, #444 50%, #666 100%)',
-            padding: '2px',
-            boxShadow: '0 3px 6px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.2)',
+            background: 'radial-gradient(ellipse at 30% 30%, #ccc 0%, #999 30%, #666 70%, #444 100%)',
+            boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.3), inset 0 -2px 4px rgba(0,0,0,0.3)',
           }}
         >
-          {/* Main knob body - silver metallic */}
+          {/* Indicator line */}
           <div
-            className="w-full h-full rounded-full"
-            style={{
-              background: 'radial-gradient(ellipse at 30% 30%, #ccc 0%, #999 30%, #666 70%, #444 100%)',
-              boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.3), inset 0 -2px 4px rgba(0,0,0,0.3)',
-            }}
+            className="absolute w-full h-full transition-transform duration-50"
+            style={{ transform: `rotate(${rotation}deg)` }}
           >
-            {/* Indicator line */}
             <div
-              className="absolute w-full h-full transition-transform duration-50"
-              style={{ transform: `rotate(${rotation}deg)` }}
+              className="absolute left-1/2 bg-black rounded-full transform -translate-x-1/2"
+              style={{
+                top: '3px',
+                width: '3px',
+                height: `${currentPx * 0.28}px`,
+                boxShadow: 'inset 0 1px 1px rgba(0,0,0,0.8)',
+              }}
+            />
+          </div>
+
+          {/* Target indicator (if teaching mode) */}
+          {showTarget && targetRotation !== undefined && !isCloseToTarget && (
+            <div
+              className="absolute w-full h-full opacity-60"
+              style={{ transform: `rotate(${targetRotation}deg)` }}
             >
               <div
-                className="absolute left-1/2 bg-black rounded-full transform -translate-x-1/2"
-                style={{
-                  top: '3px',
-                  width: '3px',
-                  height: `${currentPx * 0.28}px`,
-                  boxShadow: 'inset 0 1px 1px rgba(0,0,0,0.8)',
-                }}
+                className="absolute top-0 left-1/2 w-1 h-3 bg-orange-500 transform -translate-x-1/2 rounded-full"
               />
             </div>
-
-            {/* Target indicator (if teaching mode) */}
-            {showTarget && targetRotation !== undefined && !isCloseToTarget && (
-              <div
-                className="absolute w-full h-full opacity-60"
-                style={{ transform: `rotate(${targetRotation}deg)` }}
-              >
-                <div
-                  className="absolute top-0 left-1/2 w-1 h-3 bg-orange-500 transform -translate-x-1/2 rounded-full"
-                />
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Value display - smaller, cleaner */}
+      {/* Value display - positioned below the knob */}
       <div
-        className="font-mono text-[9px] text-green-400 bg-black/80 px-1 py-0.5 rounded min-w-[32px] text-center"
-        style={{ textShadow: '0 0 4px rgba(0,255,0,0.5)' }}
+        className="absolute left-1/2 -translate-x-1/2 font-mono text-[9px] text-green-400 bg-black/80 px-1 py-0.5 rounded min-w-[32px] text-center"
+        style={{
+          top: '100%',
+          marginTop: '2px',
+          textShadow: '0 0 4px rgba(0,255,0,0.5)',
+        }}
       >
         {formatValue(value, units)}
       </div>
 
       {/* Target value hint (if teaching mode) */}
       {showTarget && targetValue !== undefined && !isCloseToTarget && (
-        <div className="text-[7px] text-orange-400 font-mono">
+        <div
+          className="absolute left-1/2 -translate-x-1/2 text-[7px] text-orange-400 font-mono"
+          style={{ top: '100%', marginTop: '18px' }}
+        >
           → {formatValue(targetValue, units)}
         </div>
       )}

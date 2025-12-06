@@ -3,6 +3,21 @@
 // All coordinates based on Moog DFAM Manual and hardware measurements
 // Reference: https://api.moogmusic.com/sites/default/files/2018-04/DFAM_Manual.pdf
 // ============================================================================
+//
+// POSITIONING ARCHITECTURE:
+// -------------------------
+// All x,y coordinates specify the CENTER of each control in millimeters
+// from the top-left corner of the black panel (not including wooden cheeks).
+//
+// The rendering system uses CSS transform: translate(-50%, -50%) to center
+// each control at its coordinate. This means:
+//   - Control x,y = center of the control element (knob circle, button, switch)
+//   - Labels are positioned absolutely ABOVE the control (outside the wrapper)
+//   - Value displays are positioned absolutely BELOW the control
+//
+// To move a control, simply change its x/y values - these directly represent
+// where the control's visual center will appear.
+// ============================================================================
 
 export interface ControlPosition {
   id: string;

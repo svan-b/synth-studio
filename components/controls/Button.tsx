@@ -10,6 +10,14 @@ export interface ButtonProps {
   highlighted?: boolean;
 }
 
+/**
+ * Button Component - Anchor-Based Positioning
+ *
+ * The wrapper div is exactly the size of the button circle (32x32px).
+ * This means when you position this component, the CENTER of the wrapper
+ * is the CENTER of the button. Labels are absolutely positioned relative
+ * to the button, not stacked in a flex column.
+ */
 export default function Button({
   id,
   spec,
@@ -53,19 +61,24 @@ export default function Button({
   };
 
   return (
+    // Wrapper is exactly 32x32 - the button circle size
+    // Position this wrapper at center, and the button will be centered
     <div
-      className={`flex flex-col items-center gap-1.5 select-none ${getTeachingClass()}`}
+      className={`relative w-8 h-8 select-none ${getTeachingClass()}`}
       title={spec.description}
     >
-      {/* Label */}
-      <div className="font-label text-[8px] text-hardware-label uppercase tracking-wider text-center max-w-[60px] leading-tight">
+      {/* Label - positioned absolutely above the button */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 font-label text-[8px] text-hardware-label uppercase tracking-wider text-center whitespace-nowrap"
+        style={{ bottom: '100%', marginBottom: '4px' }}
+      >
         {label}
       </div>
 
-      {/* Button */}
+      {/* Button - fills the wrapper */}
       <button
         onClick={handleClick}
-        className="relative w-8 h-8 rounded-full border-2 border-[#3a3a3a] transition-all active:scale-95 hover:brightness-110"
+        className="absolute inset-0 rounded-full border-2 border-[#3a3a3a] transition-all active:scale-95 hover:brightness-110"
         style={getButtonStyle()}
       >
         {/* LED glow when active */}
