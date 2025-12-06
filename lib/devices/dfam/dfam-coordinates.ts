@@ -105,14 +105,17 @@ export const KNOB_SIZES = {
 // ============================================================================
 
 // Row Y positions (center of controls) - based on 107mm panel height
-const ROW1_Y = 20;      // Top row of main knobs (about 19% from top)
-const ROW2_Y = 50;      // Second row of main knobs (about 47% from top)
-const SWITCH_Y1 = 38;   // Switches under row 1 knobs
-const SWITCH_Y2 = 66;   // Switches under row 2 knobs
-const SEQ_LABEL_Y = 75; // Step numbers
-const SEQ_PITCH_Y = 82; // Pitch knobs row
-const SEQ_LED_Y = 91;   // LED row (between pitch and velocity)
-const SEQ_VEL_Y = 99;   // Velocity knobs row
+// Recalculated to match DFAM manual proportions and avoid overlaps
+const ROW1_Y = 18;      // Top row of main knobs
+const ROW2_Y = 48;      // Second row of main knobs
+const SWITCH_Y1 = 35;   // Switches under row 1 knobs (directly below)
+const SWITCH_Y2 = 63;   // Switches under row 2 knobs (directly below)
+
+// Sequencer section - compressed to fit within panel with space for branding
+const SEQ_LABEL_Y = 73; // Step numbers
+const SEQ_PITCH_Y = 79; // Pitch knobs row
+const SEQ_LED_Y = 86;   // LED row (between pitch and velocity)
+const SEQ_VEL_Y = 93;   // Velocity knobs row - moved up to leave room for value displays
 
 // Column X positions for main sections - based on 305mm panel width
 // User-specified exact x-positions for each control
@@ -198,18 +201,17 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   // =========================================================================
 
   // Transport controls - matching manual layout
-  // TRIGGER: small button at x=15, y=80 (top of transport section)
-  trigger: { id: 'trigger', x: 15, y: 80 },
+  // TRIGGER: small button at top of transport section
+  trigger: { id: 'trigger', x: 15, y: 76 },
 
-  // RUN/STOP: large button at x=15, y=100 (bottom of transport section)
-  // The LED indicator between trigger and run_stop is rendered separately
-  run_stop: { id: 'run_stop', x: 15, y: 100 },
+  // RUN/STOP: large button below trigger
+  run_stop: { id: 'run_stop', x: 15, y: 94 },
 
   // ADVANCE: positioned to the right of RUN/STOP
-  advance: { id: 'advance', x: 42, y: 95 },
+  advance: { id: 'advance', x: 42, y: 90 },
 
   // TEMPO knob - large knob to the right of transport controls
-  tempo: { id: 'tempo', x: 70, y: 88 },
+  tempo: { id: 'tempo', x: 68, y: 85 },
 
   // Step sequencer - 8 pitch knobs starting at 105mm, 15mm spacing
   pitch_1: { id: 'pitch_1', x: 105, y: SEQ_PITCH_Y },
