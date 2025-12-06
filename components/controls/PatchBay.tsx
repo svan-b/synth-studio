@@ -219,7 +219,6 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
       {/* Jack Grid - 3 columns */}
       <div className="flex gap-1 justify-between">
         {[0, 1, 2].map(colIndex => {
-          const isOutputColumn = colIndex === 2;
           const columnJacks = organizedJacks[colIndex] || [];
 
           return (
@@ -227,7 +226,7 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
               key={colIndex}
               className="flex flex-col gap-1"
               style={{
-                background: isOutputColumn ? '#1a1a1a' : '#0d0d0d',
+                background: '#0d0d0d',
                 padding: '6px 2px',
                 borderRadius: '4px',
                 width: 60,
@@ -237,26 +236,26 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
                 const connections = getJackConnections(jack.id);
                 const isActive = activeCable?.fromId === jack.id;
                 const canConnect = activeCable && jack.id !== activeCable.fromId;
+                const isOutput = jack.type === 'output';
 
                 return (
                   <div
                     key={jack.id}
                     className="flex flex-col items-center gap-0.5"
                   >
-                    {/* Label - outputs get black background with white text */}
+                    {/* Label - outputs get black background with white text based on jack.type */}
                     <span
                       className="text-center leading-tight whitespace-nowrap overflow-visible"
                       style={{
                         fontSize: '5px',
-                        color: isOutputColumn ? '#fff' : '#888',
+                        color: isOutput ? '#fff' : '#888',
                         fontWeight: 'bold',
                         lineHeight: 1.1,
-                        ...(isOutputColumn ? {
-                          background: '#000',
-                          padding: '1px 3px',
-                          borderRadius: '2px',
-                          border: '1px solid #333',
-                        } : {}),
+                        // All labels get same padding for alignment, but only outputs get visible background
+                        padding: '1px 3px',
+                        borderRadius: '2px',
+                        background: isOutput ? '#000' : 'transparent',
+                        border: isOutput ? '1px solid #444' : '1px solid transparent',
                       }}
                     >
                       {jack.label}
@@ -275,11 +274,9 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
                         border: `2px solid ${
                           isActive ? '#fff' :
                           canConnect ? '#8f8' :
-                          isOutputColumn ? '#666' : '#444'
+                          '#444'
                         }`,
-                        boxShadow: isOutputColumn
-                          ? '0 0 6px rgba(255, 255, 255, 0.2), inset 0 1px 3px rgba(0,0,0,0.6)'
-                          : 'inset 0 2px 4px rgba(0,0,0,0.7)',
+                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.7)',
                         cursor: 'pointer',
                         transform: isActive || canConnect ? 'scale(1.2)' : 'scale(1)',
                       }}
