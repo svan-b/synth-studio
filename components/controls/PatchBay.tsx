@@ -243,14 +243,20 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
                     key={jack.id}
                     className="flex flex-col items-center gap-0.5"
                   >
-                    {/* Label */}
+                    {/* Label - outputs get black background with white text */}
                     <span
                       className="text-center leading-tight whitespace-nowrap overflow-visible"
                       style={{
                         fontSize: '5px',
-                        color: isOutputColumn ? '#ddd' : '#888',
-                        fontWeight: isOutputColumn ? 'bold' : 'normal',
+                        color: isOutputColumn ? '#fff' : '#888',
+                        fontWeight: 'bold',
                         lineHeight: 1.1,
+                        ...(isOutputColumn ? {
+                          background: '#000',
+                          padding: '1px 3px',
+                          borderRadius: '2px',
+                          border: '1px solid #333',
+                        } : {}),
                       }}
                     >
                       {jack.label}

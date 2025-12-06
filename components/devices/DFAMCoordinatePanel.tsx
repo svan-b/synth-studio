@@ -361,17 +361,6 @@ export default function DFAMCoordinatePanel({
         {/* Render sequencer LEDs */}
         {renderSequencerLEDs()}
 
-        {/* Separator line above sequencer */}
-        <div
-          className="absolute bg-gray-700"
-          style={{
-            left: mmToPx(8),
-            top: mmToPx(70),
-            width: mmToPx(200),
-            height: 1,
-          }}
-        />
-
         {/* Patch Bay Section - positioned on right side of panel */}
         <div
           className="absolute rounded"
