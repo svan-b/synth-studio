@@ -347,16 +347,16 @@ export default function DFAMCoordinatePanel({
           </div>
         ))}
 
-        {/* Row labels for sequencer - positioned left of step knobs */}
+        {/* Row labels for sequencer - positioned left of step knobs with right alignment */}
         <div
-          className="absolute text-[7px] text-gray-400 font-bold"
-          style={{ left: mmToPx(95), top: mmToPx(77) }}
+          className="absolute text-[7px] text-gray-400 font-bold text-right"
+          style={{ left: mmToPx(86), top: mmToPx(77), width: mmToPx(12) }}
         >
           PITCH
         </div>
         <div
-          className="absolute text-[6px] text-gray-400 font-bold"
-          style={{ left: mmToPx(93), top: mmToPx(91) }}
+          className="absolute text-[6px] text-gray-400 font-bold text-right"
+          style={{ left: mmToPx(82), top: mmToPx(91), width: mmToPx(16) }}
         >
           VELOCITY
         </div>

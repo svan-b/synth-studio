@@ -146,6 +146,14 @@ export default function Knob({
   // Otherwise: always show
   const shouldShowValue = showValueOnHover ? (isHovered || isDragging) : true;
 
+  // Generate tick marks around the knob (from -135° to +135°, 270° range)
+  // More ticks for larger knobs
+  const tickCount = size === 'large' ? 11 : size === 'medium' ? 9 : 7;
+  const tickMarks = Array.from({ length: tickCount }, (_, i) => {
+    const angle = -135 + (i * 270) / (tickCount - 1);
+    return angle;
+  });
+
   return (
     // Wrapper is exactly the knob size - position this at center
     <div
@@ -171,6 +179,44 @@ export default function Knob({
           {label}
         </div>
       )}
+
+      {/* Tick marks around the knob edge */}
+      <div
+        className="absolute"
+        style={{
+          width: currentPx + 12,
+          height: currentPx + 12,
+          left: -6,
+          top: -6,
+        }}
+      >
+        {tickMarks.map((angle, i) => {
+          const isEndTick = i === 0 || i === tickCount - 1;
+          const isCenterTick = i === Math.floor(tickCount / 2);
+          return (
+            <div
+              key={angle}
+              className="absolute"
+              style={{
+                width: '100%',
+                height: '100%',
+                transform: `rotate(${angle}deg)`,
+              }}
+            >
+              <div
+                className="absolute left-1/2 -translate-x-1/2"
+                style={{
+                  top: 0,
+                  width: isEndTick || isCenterTick ? '2px' : '1px',
+                  height: isEndTick ? '4px' : isCenterTick ? '3px' : '2px',
+                  background: isEndTick ? '#888' : '#555',
+                  borderRadius: '1px',
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
 
       {/* Knob - DFAM style silver metallic */}
       <div
