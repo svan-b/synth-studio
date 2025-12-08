@@ -317,15 +317,16 @@ export default function DFAMCoordinatePanel({
         }}
       >
 
-        {/* Step Numbers - aligned with sequencer knobs at 105mm, 15mm spacing */}
+        {/* Step Numbers 1-8 above sequencer pitch row */}
         {[1, 2, 3, 4, 5, 6, 7, 8].map((n, i) => (
           <div
             key={`step-num-${n}`}
-            className="absolute text-[10px] text-white font-bold text-center"
+            className="absolute text-white font-bold text-center"
             style={{
-              left: mmToPx(105 + i * 15) - 8,
-              top: mmToPx(73),  // SEQ_LABEL_Y
-              width: 16,
+              left: mmToPx(105 + i * 15),
+              top: mmToPx(71),
+              transform: 'translateX(-50%)',
+              fontSize: '11px',
             }}
           >
             {n}
