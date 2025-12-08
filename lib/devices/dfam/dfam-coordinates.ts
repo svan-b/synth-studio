@@ -199,18 +199,18 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   //   - Then 8 step knobs starting at 105mm with 15mm spacing
   // =========================================================================
 
-  // Transport controls - matching manual layout
-  // TRIGGER: small button at top of transport section
-  trigger: { id: 'trigger', x: 15, y: 76 },
+  // Transport controls - matching DFAM manual layout
+  // TRIGGER: small button at top-left, label to right
+  trigger: { id: 'trigger', x: 20, y: 74 },
 
-  // RUN/STOP: large button below trigger
-  run_stop: { id: 'run_stop', x: 15, y: 94 },
+  // RUN/STOP: large button below LED indicator (LED+label rendered separately at y:84)
+  run_stop: { id: 'run_stop', x: 20, y: 96 },
 
-  // ADVANCE: positioned to the right of RUN/STOP
-  advance: { id: 'advance', x: 42, y: 90 },
+  // ADVANCE: positioned to the right of RUN/STOP, label above
+  advance: { id: 'advance', x: 52, y: 90 },
 
-  // TEMPO knob - large knob to the right of transport controls
-  tempo: { id: 'tempo', x: 68, y: 85 },
+  // TEMPO knob - large knob to the right of transport, label above
+  tempo: { id: 'tempo', x: 80, y: 82 },
 
   // Step sequencer - 8 pitch knobs starting at 105mm, 15mm spacing
   pitch_1: { id: 'pitch_1', x: 105, y: SEQ_PITCH_Y },
