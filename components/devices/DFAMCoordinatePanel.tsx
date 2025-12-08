@@ -202,31 +202,41 @@ export default function DFAMCoordinatePanel({
     );
   };
 
-  // Render the transport LED indicator with "RUN / STOP" label
-  // Matches DFAM manual: small LED with text label to the right
+  // Render the transport LED indicator at "10 o'clock" position on RUN/STOP button
+  // RUN/STOP button is at x:35, y:94, so LED at approximately x:27, y:87
   const renderTransportLED = () => {
     const isRunning = getValue('run_stop') as unknown as boolean;
     return (
-      <div
-        className="absolute flex items-center gap-1"
-        style={{
-          left: mmToPx(8),
-          top: mmToPx(84),
-        }}
-      >
-        {/* Small LED indicator */}
+      <>
+        {/* LED at 10 o'clock position relative to RUN/STOP button */}
         <div
-          className="w-2 h-2 rounded-full flex-shrink-0"
+          className="absolute"
           style={{
-            background: isRunning ? '#ff3333' : '#331111',
-            boxShadow: isRunning ? '0 0 6px #ff3333' : 'none',
+            left: mmToPx(27),
+            top: mmToPx(87),
+            transform: 'translate(-50%, -50%)',
           }}
-        />
-        {/* RUN/STOP label */}
-        <span className="text-[6px] text-gray-400 font-bold whitespace-nowrap">
-          RUN/STOP
-        </span>
-      </div>
+        >
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{
+              background: isRunning ? '#ff3333' : '#331111',
+              boxShadow: isRunning ? '0 0 6px #ff3333' : 'none',
+            }}
+          />
+        </div>
+        {/* RUN / STOP label below the LED */}
+        <div
+          className="absolute text-[6px] text-gray-400 font-bold"
+          style={{
+            left: mmToPx(35),
+            top: mmToPx(87),
+            transform: 'translateX(-50%)',
+          }}
+        >
+          RUN / STOP
+        </div>
+      </>
     );
   };
 
