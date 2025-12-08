@@ -172,8 +172,9 @@ export default function Knob({
           style={{
             bottom: '100%',
             marginBottom: '2px',
-            fontSize: size === 'large' ? '7px' : '6px',
+            fontSize: size === 'large' ? '9px' : size === 'medium' ? '8px' : '7px',
             opacity: 0.9,
+            letterSpacing: '0.3px',
           }}
         >
           {label}
