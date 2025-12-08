@@ -200,17 +200,19 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   // =========================================================================
 
   // Transport controls - matching DFAM manual layout
-  // TRIGGER: small button at top-left, label to right
-  trigger: { id: 'trigger', x: 20, y: 74 },
+  // Layout: TEMPO centered at top, RUN/STOP and ADVANCE parallel below it
 
-  // RUN/STOP: large button below LED indicator (LED+label rendered separately at y:84)
-  run_stop: { id: 'run_stop', x: 20, y: 96 },
+  // TRIGGER: small button at top-left
+  trigger: { id: 'trigger', x: 15, y: 76 },
 
-  // ADVANCE: positioned to the right of RUN/STOP, label above
-  advance: { id: 'advance', x: 52, y: 90 },
+  // TEMPO: large knob centered above RUN/STOP and ADVANCE
+  tempo: { id: 'tempo', x: 50, y: 76 },
 
-  // TEMPO knob - large knob to the right of transport, label above
-  tempo: { id: 'tempo', x: 80, y: 82 },
+  // RUN/STOP: large button below-left of TEMPO (LED at 10 o'clock rendered separately)
+  run_stop: { id: 'run_stop', x: 35, y: 94 },
+
+  // ADVANCE: button below-right of TEMPO, parallel with RUN/STOP
+  advance: { id: 'advance', x: 65, y: 94 },
 
   // Step sequencer - 8 pitch knobs starting at 105mm, 15mm spacing
   pitch_1: { id: 'pitch_1', x: 105, y: SEQ_PITCH_Y },
