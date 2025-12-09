@@ -403,14 +403,14 @@ export function getKnobSize(controlId: string): 'large' | 'medium' | 'small' {
   ];
 
   const mediumKnobs = [
-    'vco1_level',
-    'vco2_level',
-    'noise_level',
     'noise_vcf_mod',
   ];
 
-  // Small knobs: sequencer pitch and velocity only
+  // Small knobs: mixer level knobs and sequencer knobs
   const smallKnobs = [
+    'vco1_level',
+    'vco2_level',
+    'noise_level',
     'pitch_1', 'pitch_2', 'pitch_3', 'pitch_4', 'pitch_5', 'pitch_6', 'pitch_7', 'pitch_8',
     'velocity_1', 'velocity_2', 'velocity_3', 'velocity_4', 'velocity_5', 'velocity_6', 'velocity_7', 'velocity_8',
   ];
