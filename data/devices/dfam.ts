@@ -196,8 +196,8 @@ export const DFAM: DeviceSpec = {
       type: 'switch',
       label: 'HARD SYNC',
       description: 'Forces VCO 2 phase to reset with VCO 1. Creates aggressive, harmonically rich tones.',
-      options: ['OFF', 'ON'],
-      default: 0,
+      options: ['ON', 'OFF'],
+      default: 1,  // OFF is default (position 1)
       manualReference: 'Page 7 - HARD SYNC',
     },
 
@@ -222,8 +222,8 @@ export const DFAM: DeviceSpec = {
       type: 'switch',
       label: 'SEQ PITCH MOD',
       description: 'Selects which oscillator(s) receive pitch CV from sequencer',
-      options: ['VCO1', 'BOTH', 'VCO2'],
-      default: 1,  // BOTH is default
+      options: ['VCO 1&2', 'OFF', 'VCO 2'],
+      default: 0,  // VCO 1&2 is default (both oscillators)
       manualReference: 'Page 9 - SEQ PITCH MOD',
     },
 
@@ -517,9 +517,9 @@ export const DFAM: DeviceSpec = {
         vco1_wave: 0,
         vco2_wave: 0,
         fm_amount: 0,
-        hard_sync: 0,
+        hard_sync: 1,  // OFF
         vco_decay: 300,
-        seq_pitch_mod: 1,
+        seq_pitch_mod: 0,  // VCO 1&2 (both)
         vco1_level: 75,
         vco2_level: 50,
         noise_level: 0,
@@ -547,7 +547,7 @@ export const DFAM: DeviceSpec = {
         vco1_wave: 0,  // Triangle
         vco2_wave: 0,  // Triangle
         fm_amount: 0,
-        hard_sync: 0,
+        hard_sync: 1,  // OFF
         vco_decay: 150,
         vco1_level: 100,
         vco2_level: 70,
@@ -574,7 +574,7 @@ export const DFAM: DeviceSpec = {
         vco1_wave: 1,  // Square
         vco2_wave: 1,  // Square
         fm_amount: 20,
-        hard_sync: 0,
+        hard_sync: 1,  // OFF
         vco_decay: 80,
         vco1_level: 50,
         vco2_level: 40,
@@ -601,7 +601,7 @@ export const DFAM: DeviceSpec = {
         vco1_wave: 0,  // Triangle
         vco2_wave: 0,  // Triangle
         fm_amount: 10,
-        hard_sync: 0,
+        hard_sync: 1,  // OFF
         vco_decay: 400,
         vco1_level: 90,
         vco2_level: 60,
