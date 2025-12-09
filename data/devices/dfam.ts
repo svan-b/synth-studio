@@ -233,37 +233,37 @@ export const DFAM: DeviceSpec = {
 
     vco1_level: {
       type: 'knob',
-      label: 'VCO 1',
+      label: 'VCO 1 LEVEL',
       description: 'Level of Oscillator 1 in the mix',
       min: 0,
       max: 100,
       default: 75,
       units: '%',
-      size: 'medium',
+      size: 'small',
       manualReference: 'Page 8 - MIXER',
     },
 
     vco2_level: {
       type: 'knob',
-      label: 'VCO 2',
+      label: 'VCO 2 LEVEL',
       description: 'Level of Oscillator 2 in the mix',
       min: 0,
       max: 100,
       default: 50,
       units: '%',
-      size: 'medium',
+      size: 'small',
       manualReference: 'Page 8 - MIXER',
     },
 
     noise_level: {
       type: 'knob',
-      label: 'NOISE',
+      label: 'NOISE / EXT LEVEL',
       description: 'Level of white noise generator in the mix. Essential for snares and hi-hats.',
       min: 0,
       max: 100,
       default: 0,
       units: '%',
-      size: 'medium',
+      size: 'small',
       manualReference: 'Page 8 - MIXER',
     },
 
