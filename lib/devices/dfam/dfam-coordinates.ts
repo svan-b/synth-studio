@@ -154,8 +154,8 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   // VCF RESONANCE
   vcf_resonance: { id: 'vcf_resonance', x: 180, y: ROW1_Y },
 
-  // VCA ATTACK MODE switch - to the LEFT of VOLUME (per DFAM manual)
-  vca_attack_mode: { id: 'vca_attack_mode', x: 200, y: SWITCH_Y1 },
+  // VCA ATTACK MODE switch - midway between RESONANCE and VOLUME (per DFAM manual)
+  vca_attack_mode: { id: 'vca_attack_mode', x: 202, y: 22 },
 
   // VOLUME - aligned above VCA DECAY
   volume: { id: 'volume', x: 224, y: ROW1_Y },
