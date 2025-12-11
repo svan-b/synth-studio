@@ -61,8 +61,8 @@ export default function DFAM() {
     }
   });
 
-  // Connect to audio engine
-  const { isAudioReady, currentStep, initializeAudio, triggerSound } = useDFAMAudio({
+  // Connect to audio engine (currentStep from hook is tracked via activeStep state)
+  const { isAudioReady, initializeAudio, triggerSound } = useDFAMAudio({
     values,
     onStepChange: setActiveStep,
   });
