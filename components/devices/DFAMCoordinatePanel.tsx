@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import type { DeviceSpec, KnobSpec, SwitchSpec, ButtonSpec, Lesson } from '@/types';
 import Knob from '@/components/controls/Knob';
 import Switch from '@/components/controls/Switch';
@@ -20,9 +20,13 @@ interface DFAMCoordinatePanelProps {
   spec: DeviceSpec;
   values: Record<string, number | string | boolean>;
   onChange: (controlId: string, value: number | string | boolean) => void;
+  onResetControls?: () => void;
+  onClearCables?: () => void;
   currentLesson?: Lesson;
   currentStep?: number;
   isTeachingMode?: boolean;
+  activeSequencerStep?: number;
+  isAudioReady?: boolean;
 }
 
 /**
@@ -34,10 +38,23 @@ export default function DFAMCoordinatePanel({
   spec,
   values,
   onChange,
+  onResetControls,
+  onClearCables,
   currentLesson,
   currentStep = 0,
   isTeachingMode = false,
+  activeSequencerStep = 0,
+  isAudioReady = false,
 }: DFAMCoordinatePanelProps) {
+  // Track clear cables trigger
+  const [clearCablesTrigger, setClearCablesTrigger] = useState(0);
+
+  // Handle clear cables button click
+  const handleClearCablesClick = () => {
+    setClearCablesTrigger(prev => prev + 1);
+    onClearCables?.();
+  };
+
   // Get current lesson step info
   const currentStepInfo = useMemo(() => {
     if (!currentLesson || currentStep >= currentLesson.steps.length) return null;
@@ -242,26 +259,33 @@ export default function DFAMCoordinatePanel({
 
   // Render sequencer LEDs
   // Using transform-based centering for consistency
+  // LED lights up based on activeSequencerStep from audio engine
   const renderSequencerLEDs = () => {
-    return SEQUENCER_LED_POSITIONS.map((led, index) => (
-      <div
-        key={`led-${led.step}`}
-        className="absolute"
-        style={{
-          left: mmToPx(led.x),
-          top: mmToPx(led.y),
-          transform: 'translate(-50%, -50%)',  // Center LED at coordinate
-        }}
-      >
+    const isRunning = values.run_stop as boolean;
+
+    return SEQUENCER_LED_POSITIONS.map((led, index) => {
+      const isActive = isRunning && index === activeSequencerStep;
+
+      return (
         <div
-          className="w-3 h-3 rounded-full"
+          key={`led-${led.step}`}
+          className="absolute"
           style={{
-            background: index === 0 ? '#ff3333' : '#331111',
-            boxShadow: index === 0 ? '0 0 8px #ff3333' : 'none',
+            left: mmToPx(led.x),
+            top: mmToPx(led.y),
+            transform: 'translate(-50%, -50%)',  // Center LED at coordinate
           }}
-        />
-      </div>
-    ));
+        >
+          <div
+            className="w-3 h-3 rounded-full transition-all duration-75"
+            style={{
+              background: isActive ? '#ff3333' : '#331111',
+              boxShadow: isActive ? '0 0 8px #ff3333' : 'none',
+            }}
+          />
+        </div>
+      );
+    });
   };
 
   // Calculate display dimensions
@@ -318,6 +342,48 @@ export default function DFAMCoordinatePanel({
           boxShadow: 'inset 2px 0 4px rgba(0,0,0,0.5)',
         }}
       />
+
+      {/* Utility Buttons - positioned outside left side of panel */}
+      <div
+        className="absolute flex flex-col gap-2"
+        style={{
+          left: -80,
+          top: 10,
+        }}
+      >
+        {onResetControls && (
+          <button
+            onClick={onResetControls}
+            className="px-2 py-1 text-[10px] bg-gray-700 hover:bg-gray-600 text-white rounded whitespace-nowrap transition-colors"
+            title="Reset all knobs to default values"
+          >
+            Reset Knobs
+          </button>
+        )}
+        {onClearCables && (
+          <button
+            onClick={handleClearCablesClick}
+            className="px-2 py-1 text-[10px] bg-gray-700 hover:bg-gray-600 text-white rounded whitespace-nowrap transition-colors"
+            title="Remove all patch cables"
+          >
+            Clear Cables
+          </button>
+        )}
+        {/* Audio status indicator */}
+        <div
+          className="flex items-center gap-1 text-[9px] text-gray-500 mt-2"
+          title={isAudioReady ? 'Audio engine active' : 'Click any control to enable audio'}
+        >
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{
+              background: isAudioReady ? '#22c55e' : '#666',
+              boxShadow: isAudioReady ? '0 0 4px #22c55e' : 'none',
+            }}
+          />
+          <span>{isAudioReady ? 'Audio ON' : 'Audio OFF'}</span>
+        </div>
+      </div>
 
       {/* Main Black Panel */}
       <div
@@ -393,6 +459,7 @@ export default function DFAMCoordinatePanel({
             onConnection={(from, to, color) => {
               console.log(`Patched: ${from} → ${to} (${color})`);
             }}
+            clearAllTrigger={clearCablesTrigger}
           />
         </div>
 
