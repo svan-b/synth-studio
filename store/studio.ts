@@ -25,6 +25,7 @@ interface StudioStore extends StudioState {
   setControlValue: (device: string, control: string, value: number | string | boolean) => void;
   getControlValue: (device: string, control: string) => number | string | boolean | undefined;
   resetDeviceToDefaults: (device: string) => void;
+  resetControlsToSpec: (device: string, defaults: Record<string, number | string | boolean>) => void;
 
   // Patch connections
   addPatchConnection: (device: string, from: string, to: string, color?: string) => void;
@@ -129,6 +130,21 @@ export const useStudioStore = create<StudioStore>()(
             [device]: initDeviceState(),
           },
         }));
+      },
+
+      resetControlsToSpec: (device, defaults) => {
+        set((state) => {
+          const deviceState = state.devices[device] || initDeviceState();
+          return {
+            devices: {
+              ...state.devices,
+              [device]: {
+                ...deviceState,
+                controlValues: { ...defaults },
+              },
+            },
+          };
+        });
       },
 
       // Patch connections

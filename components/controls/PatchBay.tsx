@@ -27,6 +27,7 @@ interface PatchBayProps {
   jacks: PatchPoint[];
   onConnection?: (from: string, to: string, color: string) => void;
   onDisconnection?: (from: string, to: string) => void;
+  clearAllTrigger?: number;  // Increment to trigger clear all cables
 }
 
 // Cable colors - cycle through these for each new cable
@@ -43,7 +44,7 @@ const CABLE_COLOR_PALETTE = [
   '#f43f5e',  // Rose
 ];
 
-export default function PatchBay({ jacks, onConnection, onDisconnection }: PatchBayProps) {
+export default function PatchBay({ jacks, onConnection, onDisconnection, clearAllTrigger }: PatchBayProps) {
   const [cables, setCables] = useState<Cable[]>([]);
   const [activeCable, setActiveCable] = useState<{
     fromId: string;
@@ -61,6 +62,15 @@ export default function PatchBay({ jacks, onConnection, onDisconnection }: Patch
     setColorIndex(prev => prev + 1);
     return color;
   }, [colorIndex]);
+
+  // Clear all cables when trigger changes
+  useEffect(() => {
+    if (clearAllTrigger && clearAllTrigger > 0) {
+      setCables([]);
+      setActiveCable(null);
+      setColorIndex(0);
+    }
+  }, [clearAllTrigger]);
 
   // Calculate jack positions when component mounts or jacks change
   useEffect(() => {
