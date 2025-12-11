@@ -154,11 +154,11 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   // VCF RESONANCE
   vcf_resonance: { id: 'vcf_resonance', x: 180, y: ROW1_Y },
 
-  // VCA ATTACK MODE switch (between row 1 and row 2, near VOLUME)
-  vca_attack_mode: { id: 'vca_attack_mode', x: 220, y: 32 },
+  // VCA ATTACK MODE switch - to the LEFT of VOLUME (per DFAM manual)
+  vca_attack_mode: { id: 'vca_attack_mode', x: 190, y: SWITCH_Y1 },
 
-  // VOLUME
-  volume: { id: 'volume', x: 204, y: ROW1_Y },
+  // VOLUME - aligned above VCA DECAY
+  volume: { id: 'volume', x: 214, y: ROW1_Y },
 
   // =========================================================================
   // ROW 2: Matching row 1 spacing where applicable
@@ -188,11 +188,11 @@ export const CONTROL_POSITIONS: Record<string, ControlPosition> = {
   // VCF EG AMOUNT
   vcf_eg_amount: { id: 'vcf_eg_amount', x: 180, y: ROW2_Y },
 
-  // NOISE VCF MOD
-  noise_vcf_mod: { id: 'noise_vcf_mod', x: 204, y: ROW2_Y },
+  // NOISE VCF MOD - aligned below VCA EG switch
+  noise_vcf_mod: { id: 'noise_vcf_mod', x: 190, y: ROW2_Y },
 
-  // VCA DECAY
-  vca_decay: { id: 'vca_decay', x: 228, y: ROW2_Y },
+  // VCA DECAY - aligned below VOLUME
+  vca_decay: { id: 'vca_decay', x: 214, y: ROW2_Y },
 
   // =========================================================================
   // SEQUENCER SECTION (bottom third of panel)
