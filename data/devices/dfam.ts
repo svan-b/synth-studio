@@ -140,8 +140,8 @@ export const DFAM: DeviceSpec = {
       type: 'switch',
       label: 'VCO 1 WAVE',
       description: 'Selects triangle or square waveform for Oscillator 1',
-      options: ['TRI', 'SQR'],
-      default: 0,
+      options: ['SQR', 'TRI'],
+      default: 1,  // TRI is default (position 1)
       manualReference: 'Page 6 - WAVEFORM SELECT',
     },
 
@@ -175,8 +175,8 @@ export const DFAM: DeviceSpec = {
       type: 'switch',
       label: 'VCO 2 WAVE',
       description: 'Selects triangle or square waveform for Oscillator 2',
-      options: ['TRI', 'SQR'],
-      default: 0,
+      options: ['SQR', 'TRI'],
+      default: 1,  // TRI is default (position 1)
       manualReference: 'Page 6 - WAVEFORM SELECT',
     },
 
@@ -313,8 +313,8 @@ export const DFAM: DeviceSpec = {
       type: 'switch',
       label: 'VCF MODE',
       description: 'Switches between Low Pass and High Pass filter modes',
-      options: ['LP', 'HP'],
-      default: 0,  // LP default
+      options: ['HP', 'LP'],
+      default: 1,  // LP default (position 1)
       manualReference: 'Page 9 - FILTER MODE',
     },
 
@@ -514,8 +514,8 @@ export const DFAM: DeviceSpec = {
         vco2_frequency: 0,
         vco1_eg_amount: 0,
         vco2_eg_amount: 0,
-        vco1_wave: 0,
-        vco2_wave: 0,
+        vco1_wave: 1,  // TRI
+        vco2_wave: 1,  // TRI
         fm_amount: 0,
         hard_sync: 1,  // OFF
         vco_decay: 300,
@@ -526,7 +526,7 @@ export const DFAM: DeviceSpec = {
         vcf_cutoff: 1000,
         vcf_resonance: 0,
         vcf_eg_amount: 0,
-        vcf_mode: 0,
+        vcf_mode: 1,  // LP
         vcf_decay: 400,
         noise_vcf_mod: 0,
         vca_decay: 500,
@@ -544,8 +544,8 @@ export const DFAM: DeviceSpec = {
         vco2_frequency: -2,
         vco1_eg_amount: 80,
         vco2_eg_amount: 60,
-        vco1_wave: 0,  // Triangle
-        vco2_wave: 0,  // Triangle
+        vco1_wave: 1,  // Triangle
+        vco2_wave: 1,  // Triangle
         fm_amount: 0,
         hard_sync: 1,  // OFF
         vco_decay: 150,
@@ -555,7 +555,7 @@ export const DFAM: DeviceSpec = {
         vcf_cutoff: 800,
         vcf_resonance: 20,
         vcf_eg_amount: 60,
-        vcf_mode: 0,  // LP
+        vcf_mode: 1,  // LP
         vcf_decay: 200,
         vca_decay: 300,
         vca_attack_mode: 0,  // FAST
@@ -571,8 +571,8 @@ export const DFAM: DeviceSpec = {
         vco2_frequency: 1.5,
         vco1_eg_amount: 50,
         vco2_eg_amount: 40,
-        vco1_wave: 1,  // Square
-        vco2_wave: 1,  // Square
+        vco1_wave: 0,  // Square
+        vco2_wave: 0,  // Square
         fm_amount: 20,
         hard_sync: 1,  // OFF
         vco_decay: 80,
@@ -582,7 +582,7 @@ export const DFAM: DeviceSpec = {
         vcf_cutoff: 4000,
         vcf_resonance: 30,
         vcf_eg_amount: 40,
-        vcf_mode: 0,  // LP
+        vcf_mode: 1,  // LP
         vcf_decay: 100,
         vca_decay: 150,
         vca_attack_mode: 0,  // FAST
@@ -598,8 +598,8 @@ export const DFAM: DeviceSpec = {
         vco2_frequency: -0.5,
         vco1_eg_amount: 70,
         vco2_eg_amount: 50,
-        vco1_wave: 0,  // Triangle
-        vco2_wave: 0,  // Triangle
+        vco1_wave: 1,  // Triangle
+        vco2_wave: 1,  // Triangle
         fm_amount: 10,
         hard_sync: 1,  // OFF
         vco_decay: 400,
@@ -609,7 +609,7 @@ export const DFAM: DeviceSpec = {
         vcf_cutoff: 600,
         vcf_resonance: 40,
         vcf_eg_amount: 50,
-        vcf_mode: 0,  // LP
+        vcf_mode: 1,  // LP
         vcf_decay: 350,
         vca_decay: 500,
         vca_attack_mode: 0,  // FAST
@@ -794,7 +794,7 @@ export const DFAM_LESSONS: Lesson[] = [
       },
       {
         control: 'vcf_mode',
-        targetValue: 1,
+        targetValue: 0,
         instruction: 'Set VCF MODE to HP (High Pass)',
         explanation: 'High-pass filtering removes the low frequencies, leaving only the bright, sizzly top end.',
         manualReference: 'Page 9 - FILTER MODE',
@@ -848,7 +848,7 @@ export const DFAM_LESSONS: Lesson[] = [
       },
       {
         control: 'vcf_mode',
-        targetValue: 1,
+        targetValue: 0,
         instruction: 'Set VCF MODE to HP (High Pass)',
         explanation: 'High-pass for bright cymbal character.',
         manualReference: 'Page 9 - FILTER MODE',
@@ -973,14 +973,14 @@ export const DFAM_LESSONS: Lesson[] = [
       },
       {
         control: 'vco1_wave',
-        targetValue: 1,
+        targetValue: 0,
         instruction: 'Set VCO 1 WAVE to SQR (Square)',
         explanation: 'Square waves give cowbells their hollow, metallic character.',
         manualReference: 'Page 6 - WAVEFORM SELECT',
       },
       {
         control: 'vco2_wave',
-        targetValue: 1,
+        targetValue: 0,
         instruction: 'Set VCO 2 WAVE to SQR (Square)',
         explanation: 'Both oscillators as squares for maximum cowbell tone.',
         manualReference: 'Page 6 - WAVEFORM SELECT',
@@ -1102,7 +1102,7 @@ export const DFAM_LESSONS: Lesson[] = [
       },
       {
         control: 'vco1_wave',
-        targetValue: 0,
+        targetValue: 1,
         instruction: 'Set VCO 1 WAVE to TRI (Triangle)',
         explanation: 'Triangle waves give a softer, more natural tom tone.',
         manualReference: 'Page 6 - WAVEFORM SELECT',
@@ -1460,7 +1460,7 @@ export const DFAM_LESSONS: Lesson[] = [
       },
       {
         control: 'vco1_wave',
-        targetValue: 1,
+        targetValue: 0,
         instruction: 'Set VCO 1 WAVE to SQR (Square)',
         explanation: 'Square wave for a more aggressive, buzzier laser.',
         manualReference: 'Page 6 - WAVEFORM SELECT',
@@ -1500,7 +1500,7 @@ export const DFAM_LESSONS: Lesson[] = [
       },
       {
         control: 'vco1_wave',
-        targetValue: 0,
+        targetValue: 1,
         instruction: 'Set VCO 1 WAVE to TRI (Triangle)',
         explanation: 'Triangle wave for a warm, round conga tone.',
         manualReference: 'Page 6 - WAVEFORM SELECT',
