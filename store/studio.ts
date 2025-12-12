@@ -33,12 +33,15 @@ interface StudioStore extends StudioState {
   clearPatchConnections: (device: string) => void;
 
   // Teaching / Lessons
-  startLesson: (lesson: Lesson) => void;
+  startLesson: (lesson: Lesson, resetControls?: boolean, defaults?: Record<string, number | string | boolean>) => void;
   completeStep: () => void;
   resetLesson: () => void;
   toggleTeachingMode: () => void;
   completeLesson: () => void;
   isStepComplete: () => boolean;
+
+  // Internal - timeout tracking for cleanup
+  _pendingTimeoutId: ReturnType<typeof setTimeout> | null;
 }
 
 // Helper to initialize device state
@@ -58,6 +61,7 @@ export const useStudioStore = create<StudioStore>()(
       completedLessons: [],
       isTeachingMode: false,
       _pendingStepAdvance: false,
+      _pendingTimeoutId: null,
 
       // Device management
       setCurrentDevice: (device) => set({ currentDevice: device }),
@@ -91,8 +95,9 @@ export const useStudioStore = create<StudioStore>()(
             let isMatch = false;
 
             if (typeof target === 'number' && typeof value === 'number') {
-              // 5% tolerance for numeric values
-              const tolerance = Math.abs(target) * 0.05 || 0.5;
+              // Use 5% of target with a sensible minimum (0.1) for zero/small targets
+              // This is more consistent with range-based checks while being safe
+              const tolerance = Math.max(Math.abs(target) * 0.05, 0.1);
               isMatch = Math.abs(value - target) <= tolerance;
             } else {
               isMatch = value === target;
@@ -102,17 +107,22 @@ export const useStudioStore = create<StudioStore>()(
               // Set flag to prevent duplicate advances
               set({ _pendingStepAdvance: true });
 
-              // Delay before advancing to give visual feedback
-              setTimeout(() => {
+              // Store timeout ID so it can be cancelled if lesson is reset
+              const timeoutId = setTimeout(() => {
                 const currentState = get();
-                // Only advance if we're still on the same step
-                if (currentState._pendingStepAdvance) {
+                // Only advance if we're still in teaching mode with the same lesson
+                if (currentState._pendingStepAdvance &&
+                    currentState.isTeachingMode &&
+                    currentState.currentLesson?.id === state.currentLesson?.id) {
                   set({
                     currentStep: currentState.currentStep + 1,
-                    _pendingStepAdvance: false
+                    _pendingStepAdvance: false,
+                    _pendingTimeoutId: null
                   });
                 }
               }, 800);
+
+              set({ _pendingTimeoutId: timeoutId });
             }
           }
         }
@@ -209,12 +219,33 @@ export const useStudioStore = create<StudioStore>()(
       },
 
       // Teaching / Lessons
-      startLesson: (lesson) => {
+      startLesson: (lesson, resetControls = false, defaults) => {
+        const state = get();
+        // Clear any pending timeout from previous lesson
+        if (state._pendingTimeoutId) {
+          clearTimeout(state._pendingTimeoutId);
+        }
+
+        // Optionally reset controls to defaults when starting a new lesson
+        if (resetControls && defaults) {
+          const deviceState = state.devices[state.currentDevice] || initDeviceState();
+          set({
+            devices: {
+              ...state.devices,
+              [state.currentDevice]: {
+                ...deviceState,
+                controlValues: { ...defaults },
+              },
+            },
+          });
+        }
+
         set({
           currentLesson: lesson,
           currentStep: 0,
           isTeachingMode: true,
           _pendingStepAdvance: false,
+          _pendingTimeoutId: null,
         });
       },
 
@@ -226,11 +257,17 @@ export const useStudioStore = create<StudioStore>()(
       },
 
       resetLesson: () => {
+        const state = get();
+        // Clear any pending timeout to prevent stale advances
+        if (state._pendingTimeoutId) {
+          clearTimeout(state._pendingTimeoutId);
+        }
         set({
           currentLesson: undefined,
           currentStep: 0,
           isTeachingMode: false,
           _pendingStepAdvance: false,
+          _pendingTimeoutId: null,
         });
       },
 
@@ -265,7 +302,8 @@ export const useStudioStore = create<StudioStore>()(
 
         const target = step.targetValue;
         if (typeof target === 'number' && typeof value === 'number') {
-          const tolerance = Math.abs(target) * 0.05 || 0.5;
+          // Consistent with auto-advance: 5% of target with min 0.1
+          const tolerance = Math.max(Math.abs(target) * 0.05, 0.1);
           return Math.abs(value - target) <= tolerance;
         }
 

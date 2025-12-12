@@ -128,8 +128,12 @@ export default function Knob({
     };
   }, [isDragging, startY, startValue, min, max, spec.step, onChange]);
 
-  // Check if value is close to target (5% tolerance)
-  const tolerance = Math.abs(max - min) * 0.05;
+  // Check if value is close to target
+  // Use consistent tolerance with store: 5% of target with min 0.1
+  // This ensures visual highlighting matches step completion logic
+  const tolerance = targetValue !== undefined
+    ? Math.max(Math.abs(targetValue) * 0.05, 0.1)
+    : Math.abs(max - min) * 0.05;
   const isCloseToTarget = targetValue !== undefined && Math.abs(value - targetValue) <= tolerance;
 
   // Determine teaching class
