@@ -266,9 +266,6 @@ export default function Home() {
           )}
           Built with Next.js 14, TypeScript, and Tailwind CSS
         </p>
-        <p className="mt-2 text-[10px] text-gray-600">
-          Branch: claude/fix-button-positioning-012BCYb6Rp6acHz7pZt5A5SZ • Change: run_stop y-position only
-        </p>
       </footer>
     </div>
   );
