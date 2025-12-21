@@ -161,9 +161,9 @@ export const useStudioStore = create<StudioStore>()(
       addPatchConnection: (device, from, to, color) => {
         set((state) => {
           const deviceState = state.devices[device] || initDeviceState();
-          // Check if connection already exists
+          // Check if connection already exists (in either direction)
           const exists = deviceState.patchConnections.some(
-            c => c.from === from && c.to === to
+            c => (c.from === from && c.to === to) || (c.from === to && c.to === from)
           );
           if (exists) return state;
 
@@ -180,6 +180,41 @@ export const useStudioStore = create<StudioStore>()(
             },
           };
         });
+
+        // Auto-advance lesson step if patch matches target
+        const state = get();
+        if (state.isTeachingMode && state.currentLesson && !state._pendingStepAdvance) {
+          const step = state.currentLesson.steps[state.currentStep];
+          // Check if this is a patch step
+          if (step && step.patchFrom && step.patchTo) {
+            // Check if the connection matches (either direction)
+            const isMatch =
+              (from === step.patchFrom && to === step.patchTo) ||
+              (from === step.patchTo && to === step.patchFrom);
+
+            if (isMatch && state.currentStep < state.currentLesson.steps.length - 1) {
+              // Set flag to prevent duplicate advances
+              set({ _pendingStepAdvance: true });
+
+              // Store timeout ID so it can be cancelled if lesson is reset
+              const timeoutId = setTimeout(() => {
+                const currentState = get();
+                // Only advance if we're still in teaching mode with the same lesson
+                if (currentState._pendingStepAdvance &&
+                    currentState.isTeachingMode &&
+                    currentState.currentLesson?.id === state.currentLesson?.id) {
+                  set({
+                    currentStep: currentState.currentStep + 1,
+                    _pendingStepAdvance: false,
+                    _pendingTimeoutId: null
+                  });
+                }
+              }, 800);
+
+              set({ _pendingTimeoutId: timeoutId });
+            }
+          }
+        }
       },
 
       removePatchConnection: (device, from, to) => {
@@ -296,6 +331,19 @@ export const useStudioStore = create<StudioStore>()(
 
         const step = state.currentLesson.steps[state.currentStep];
         if (!step) return false;
+
+        // Check if this is a patch step
+        if (step.patchFrom && step.patchTo) {
+          const connections = state.devices[state.currentDevice]?.patchConnections || [];
+          // Check if connection exists (in either direction)
+          return connections.some(
+            c => (c.from === step.patchFrom && c.to === step.patchTo) ||
+                 (c.from === step.patchTo && c.to === step.patchFrom)
+          );
+        }
+
+        // Otherwise, check control value
+        if (!step.control) return false;
 
         const value = state.devices[state.currentDevice]?.controlValues[step.control];
         if (value === undefined) return false;

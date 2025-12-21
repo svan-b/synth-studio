@@ -25,6 +25,7 @@ export default function DFAM() {
     setControlValue,
     resetControlsToSpec,
     clearPatchConnections,
+    addPatchConnection,
     currentLesson,
     currentStep,
     isTeachingMode,
@@ -92,6 +93,11 @@ export default function DFAM() {
     clearPatchConnections(device);
   }, [clearPatchConnections]);
 
+  // Handle patch cable connections
+  const handlePatchConnection = useCallback((from: string, to: string, color: string) => {
+    addPatchConnection(device, from, to, color);
+  }, [addPatchConnection]);
+
   return (
     <DFAMCoordinatePanel
       spec={DFAMSpec}
@@ -99,6 +105,7 @@ export default function DFAM() {
       onChange={handleChange}
       onResetControls={handleResetControls}
       onClearCables={handleClearCables}
+      onPatchConnection={handlePatchConnection}
       currentLesson={currentLesson}
       currentStep={currentStep}
       isTeachingMode={isTeachingMode}

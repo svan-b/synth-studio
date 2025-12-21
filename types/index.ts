@@ -162,8 +162,15 @@ export interface PresetSpec {
 // ----------------------------------------------------------------------------
 
 export interface LessonStep {
-  control: string;  // Control ID
-  targetValue: number | string | boolean;
+  // For control adjustments
+  control?: string;  // Control ID (optional if this is a patch step)
+  targetValue?: number | string | boolean;
+
+  // For patch connection steps
+  patchFrom?: string;  // Output jack ID
+  patchTo?: string;    // Input jack ID
+
+  // Common fields
   instruction: string;
   explanation?: string;  // Why this setting matters
   manualReference?: string;
