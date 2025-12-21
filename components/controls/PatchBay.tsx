@@ -28,6 +28,8 @@ interface PatchBayProps {
   onConnection?: (from: string, to: string, color: string) => void;
   onDisconnection?: (from: string, to: string) => void;
   clearAllTrigger?: number;  // Increment to trigger clear all cables
+  // Teaching mode props
+  highlightedJacks?: { from: string; to: string } | null;  // Jacks to highlight for current lesson step
 }
 
 // Cable colors - cycle through these for each new cable
@@ -44,7 +46,7 @@ const CABLE_COLOR_PALETTE = [
   '#f43f5e',  // Rose
 ];
 
-export default function PatchBay({ jacks, onConnection, onDisconnection, clearAllTrigger }: PatchBayProps) {
+export default function PatchBay({ jacks, onConnection, onDisconnection, clearAllTrigger, highlightedJacks }: PatchBayProps) {
   const [cables, setCables] = useState<Cable[]>([]);
   const [activeCable, setActiveCable] = useState<{
     fromId: string;
@@ -247,6 +249,14 @@ export default function PatchBay({ jacks, onConnection, onDisconnection, clearAl
                 const isActive = activeCable?.fromId === jack.id;
                 const canConnect = activeCable && jack.id !== activeCable.fromId;
                 const isOutput = jack.type === 'output';
+                // Teaching mode: check if this jack should be highlighted
+                const isTeachingTarget = highlightedJacks &&
+                  (jack.id === highlightedJacks.from || jack.id === highlightedJacks.to);
+                // Check if the target connection already exists
+                const targetConnectionExists = highlightedJacks && cables.some(
+                  c => (c.fromId === highlightedJacks.from && c.toId === highlightedJacks.to) ||
+                       (c.fromId === highlightedJacks.to && c.toId === highlightedJacks.from)
+                );
 
                 return (
                   <div
@@ -275,7 +285,7 @@ export default function PatchBay({ jacks, onConnection, onDisconnection, clearAl
                     <div
                       ref={(el) => { jackRefs.current[jack.id] = el; }}
                       onClick={(e) => handleJackClick(jack, e)}
-                      className="relative transition-all duration-100"
+                      className={`relative transition-all duration-100 ${isTeachingTarget && !targetConnectionExists ? 'animate-pulse' : ''}`}
                       style={{
                         width: 18,
                         height: 18,
@@ -284,11 +294,17 @@ export default function PatchBay({ jacks, onConnection, onDisconnection, clearAl
                         border: `2px solid ${
                           isActive ? '#fff' :
                           canConnect ? '#8f8' :
+                          isTeachingTarget && !targetConnectionExists ? '#f97316' :
+                          targetConnectionExists && isTeachingTarget ? '#22c55e' :
                           '#444'
                         }`,
-                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.7)',
+                        boxShadow: isTeachingTarget && !targetConnectionExists
+                          ? '0 0 8px #f97316, inset 0 2px 4px rgba(0,0,0,0.7)'
+                          : targetConnectionExists && isTeachingTarget
+                          ? '0 0 8px #22c55e, inset 0 2px 4px rgba(0,0,0,0.7)'
+                          : 'inset 0 2px 4px rgba(0,0,0,0.7)',
                         cursor: 'pointer',
-                        transform: isActive || canConnect ? 'scale(1.2)' : 'scale(1)',
+                        transform: isActive || canConnect || (isTeachingTarget && !targetConnectionExists) ? 'scale(1.2)' : 'scale(1)',
                       }}
                     >
                       {/* Connection indicator - show first cable color */}

@@ -22,6 +22,7 @@ interface DFAMCoordinatePanelProps {
   onChange: (controlId: string, value: number | string | boolean) => void;
   onResetControls?: () => void;
   onClearCables?: () => void;
+  onPatchConnection?: (from: string, to: string, color: string) => void;
   currentLesson?: Lesson;
   currentStep?: number;
   isTeachingMode?: boolean;
@@ -40,6 +41,7 @@ export default function DFAMCoordinatePanel({
   onChange,
   onResetControls,
   onClearCables,
+  onPatchConnection,
   currentLesson,
   currentStep = 0,
   isTeachingMode = false,
@@ -60,6 +62,12 @@ export default function DFAMCoordinatePanel({
     if (!currentLesson || currentStep >= currentLesson.steps.length) return null;
     return currentLesson.steps[currentStep];
   }, [currentLesson, currentStep]);
+
+  // Get highlighted jacks for patch steps
+  const highlightedJacks = useMemo(() => {
+    if (!isTeachingMode || !currentStepInfo?.patchFrom || !currentStepInfo?.patchTo) return null;
+    return { from: currentStepInfo.patchFrom, to: currentStepInfo.patchTo };
+  }, [isTeachingMode, currentStepInfo]);
 
   // Get value for a control
   const getValue = (controlId: string): number => {
@@ -458,8 +466,10 @@ export default function DFAMCoordinatePanel({
             jacks={patchBayJacks}
             onConnection={(from, to, color) => {
               console.log(`Patched: ${from} → ${to} (${color})`);
+              onPatchConnection?.(from, to, color);
             }}
             clearAllTrigger={clearCablesTrigger}
+            highlightedJacks={highlightedJacks}
           />
         </div>
 
