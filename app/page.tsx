@@ -1,16 +1,52 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useStudioStore } from '@/store/studio';
 import { deviceRegistry, lessonRegistry } from '@/data/devices';
 import DFAM from '@/components/devices/DFAM';
+import { DFAM as DFAMSpec } from '@/data/devices';
 import Instructions from '@/components/teaching/Instructions';
+import ResponsiveDeviceContainer from '@/components/ui/ResponsiveDeviceContainer';
 import * as Select from '@radix-ui/react-select';
 import * as Dialog from '@radix-ui/react-dialog';
 
+// DFAM total width: 960px panel + 2 * 22.5px cheeks = ~1005px
+const DFAM_TOTAL_WIDTH = 1005;
+
 export default function Home() {
-  const { currentDevice, setCurrentDevice, startLesson, isTeachingMode, resetLesson, completedLessons } = useStudioStore();
+  const {
+    currentDevice,
+    setCurrentDevice,
+    startLesson,
+    isTeachingMode,
+    resetLesson,
+    completedLessons,
+    resetControlsToSpec,
+    clearPatchConnections,
+  } = useStudioStore();
   const [showLessonDialog, setShowLessonDialog] = useState(false);
+
+  // Build default values for reset
+  const specDefaults = useMemo(() => {
+    const defaults: Record<string, number | string | boolean> = {};
+    if (currentDevice === 'dfam') {
+      Object.entries(DFAMSpec.controls).forEach(([controlId, spec]) => {
+        if ('default' in spec && spec.default !== undefined) {
+          defaults[controlId] = spec.default;
+        }
+      });
+    }
+    return defaults;
+  }, [currentDevice]);
+
+  // Utility control handlers
+  const handleResetControls = useCallback(() => {
+    resetControlsToSpec(currentDevice, specDefaults);
+  }, [currentDevice, resetControlsToSpec, specDefaults]);
+
+  const handleClearCables = useCallback(() => {
+    clearPatchConnections(currentDevice);
+  }, [currentDevice, clearPatchConnections]);
 
   // Device configuration with components
   const devices = [
@@ -153,9 +189,17 @@ export default function Home() {
       {/* Device Display */}
       <main className="max-w-screen-2xl mx-auto">
         {DeviceComponent ? (
-          <div className="flex justify-center overflow-x-auto">
+          <ResponsiveDeviceContainer
+            baseWidth={DFAM_TOTAL_WIDTH}
+            minScale={0.65}
+            maxScale={1.0}
+            utilityControls={{
+              onResetControls: handleResetControls,
+              onClearCables: handleClearCables,
+            }}
+          >
             <DeviceComponent />
-          </div>
+          </ResponsiveDeviceContainer>
         ) : (
           <div className="bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-12 text-center">
             <h3 className="text-xl font-bold text-hardware-label mb-2">

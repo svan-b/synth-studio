@@ -351,48 +351,6 @@ export default function DFAMCoordinatePanel({
         }}
       />
 
-      {/* Utility Buttons - positioned outside left side of panel */}
-      <div
-        className="absolute flex flex-col gap-2"
-        style={{
-          left: -80,
-          top: 10,
-        }}
-      >
-        {onResetControls && (
-          <button
-            onClick={onResetControls}
-            className="px-2 py-1 text-[10px] bg-gray-700 hover:bg-gray-600 text-white rounded whitespace-nowrap transition-colors"
-            title="Reset all knobs to default values"
-          >
-            Reset Knobs
-          </button>
-        )}
-        {onClearCables && (
-          <button
-            onClick={handleClearCablesClick}
-            className="px-2 py-1 text-[10px] bg-gray-700 hover:bg-gray-600 text-white rounded whitespace-nowrap transition-colors"
-            title="Remove all patch cables"
-          >
-            Clear Cables
-          </button>
-        )}
-        {/* Audio status indicator */}
-        <div
-          className="flex items-center gap-1 text-[9px] text-gray-500 mt-2"
-          title={isAudioReady ? 'Audio engine active' : 'Click any control to enable audio'}
-        >
-          <div
-            className="w-2 h-2 rounded-full"
-            style={{
-              background: isAudioReady ? '#22c55e' : '#666',
-              boxShadow: isAudioReady ? '0 0 4px #22c55e' : 'none',
-            }}
-          />
-          <span>{isAudioReady ? 'Audio ON' : 'Audio OFF'}</span>
-        </div>
-      </div>
-
       {/* Main Black Panel */}
       <div
         className="relative rounded overflow-visible"

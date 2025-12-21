@@ -1,10 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import { useStudioStore } from '@/store/studio';
 import * as Progress from '@radix-ui/react-progress';
 
 export default function Instructions() {
   const { currentLesson, currentStep, isTeachingMode, resetLesson, completeLesson } = useStudioStore();
+  const [expandedStep, setExpandedStep] = useState<number | null>(null);
+
+  // Toggle expanded state for a step
+  const toggleExpanded = (index: number) => {
+    setExpandedStep(expandedStep === index ? null : index);
+  };
 
   if (!isTeachingMode || !currentLesson) {
     return null;
@@ -84,20 +91,52 @@ export default function Instructions() {
                   <p className={`text-xs leading-relaxed ${isCurrent ? 'text-white font-medium' : 'text-hardware-label'}`}>
                     {step.instruction}
                   </p>
-                  {isCurrent && step.explanation && (
-                    <p className="text-[10px] text-hardware-label mt-1 leading-relaxed">
-                      {step.explanation}
-                    </p>
+
+                  {/* Principle - shown inline for current step */}
+                  {isCurrent && step.principle && (
+                    <div className="mt-2 flex items-start gap-1.5">
+                      <span className="text-yellow-500 text-[10px]">💡</span>
+                      <p className="text-[11px] text-yellow-400/90 italic leading-relaxed">
+                        {step.principle}
+                      </p>
+                    </div>
                   )}
-                  {step.manualReference && (
-                    <p className="text-[10px] text-hardware-label mt-1 italic">
-                      {step.manualReference}
-                    </p>
-                  )}
-                  {isCurrent && (
+
+                  {/* Target value display */}
+                  {isCurrent && step.targetValue !== undefined && (
                     <p className="text-[10px] text-teaching-target mt-2 font-mono">
                       Target: {String(step.targetValue)}
                     </p>
+                  )}
+
+                  {/* Expandable section for explanation/details */}
+                  {isCurrent && (step.explanation || step.manualReference) && (
+                    <div className="mt-2">
+                      <button
+                        onClick={() => toggleExpanded(index)}
+                        className="text-[10px] text-hardware-label hover:text-white transition-colors flex items-center gap-1"
+                      >
+                        <span className="transform transition-transform" style={{ display: 'inline-block', transform: expandedStep === index ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                          ▶
+                        </span>
+                        {expandedStep === index ? 'Less' : 'Learn more'}
+                      </button>
+
+                      {expandedStep === index && (
+                        <div className="mt-2 pl-3 border-l border-[#444] space-y-1">
+                          {step.explanation && (
+                            <p className="text-[10px] text-hardware-label leading-relaxed">
+                              {step.explanation}
+                            </p>
+                          )}
+                          {step.manualReference && (
+                            <p className="text-[10px] text-hardware-label italic">
+                              📖 {step.manualReference}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

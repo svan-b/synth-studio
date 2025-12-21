@@ -161,6 +161,22 @@ export interface PresetSpec {
 // Teaching / Lessons
 // ----------------------------------------------------------------------------
 
+// Synthesis concept categories
+export type SynthConcept =
+  | 'oscillator-pitch'
+  | 'oscillator-waveform'
+  | 'envelope-attack'
+  | 'envelope-decay'
+  | 'envelope-shape'
+  | 'filter-cutoff'
+  | 'filter-resonance'
+  | 'modulation-source'
+  | 'modulation-depth'
+  | 'signal-routing'
+  | 'velocity-dynamics'
+  | 'timing-tempo'
+  | 'sequencer-pattern';
+
 export interface LessonStep {
   // For control adjustments
   control?: string;  // Control ID (optional if this is a patch step)
@@ -175,6 +191,10 @@ export interface LessonStep {
   explanation?: string;  // Why this setting matters
   manualReference?: string;
   audioExample?: string;  // URL to audio demo
+
+  // First principles teaching fields
+  concept?: SynthConcept;  // What concept this step teaches
+  principle?: string;      // One-liner fundamental truth about synthesis
 }
 
 export interface Lesson {
@@ -189,6 +209,7 @@ export interface Lesson {
   prerequisites?: string[];  // Other lesson IDs
   steps: LessonStep[];
   tags?: string[];  // e.g., ['kick', 'bass', 'percussion']
+  concepts?: SynthConcept[];  // List of concepts taught in this lesson
 }
 
 // ----------------------------------------------------------------------------

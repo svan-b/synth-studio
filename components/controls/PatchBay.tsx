@@ -155,8 +155,8 @@ export default function PatchBay({ jacks, onConnection, onDisconnection, clearAl
     onDisconnection?.(cable.fromId, cable.toId);
   }, [onDisconnection]);
 
-  // Handle mouse move for drawing active cable
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  // Handle pointer move for drawing active cable (unified mouse + touch support)
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (activeCable && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       setMousePos({
@@ -212,11 +212,12 @@ export default function PatchBay({ jacks, onConnection, onDisconnection, clearAl
     <div
       ref={containerRef}
       onClick={handleContainerClick}
-      onMouseMove={handleMouseMove}
+      onPointerMove={handlePointerMove}
       className="relative select-none"
       style={{
         minHeight: maxRows * 32 + 40,
         cursor: activeCable ? 'crosshair' : 'default',
+        touchAction: 'none', // Prevent scroll during cable drawing on touch devices
       }}
     >
       {/* Header - matches DFAM manual styling */}
