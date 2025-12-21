@@ -15,6 +15,7 @@ interface StudioState {
   completedLessons: string[];
   isTeachingMode: boolean;
   _pendingStepAdvance: boolean; // Prevents multiple auto-advances
+  clearCablesTrigger: number; // Increment to trigger PatchBay cable clear
 }
 
 interface StudioStore extends StudioState {
@@ -62,6 +63,7 @@ export const useStudioStore = create<StudioStore>()(
       isTeachingMode: false,
       _pendingStepAdvance: false,
       _pendingTimeoutId: null,
+      clearCablesTrigger: 0,
 
       // Device management
       setCurrentDevice: (device) => set({ currentDevice: device }),
@@ -249,6 +251,8 @@ export const useStudioStore = create<StudioStore>()(
                 patchConnections: [],
               },
             },
+            // Increment trigger to notify PatchBay to clear its internal cables
+            clearCablesTrigger: state.clearCablesTrigger + 1,
           };
         });
       },

@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import type { DeviceSpec, KnobSpec, SwitchSpec, ButtonSpec, Lesson } from '@/types';
+import { useStudioStore } from '@/store/studio';
 import Knob from '@/components/controls/Knob';
 import Switch from '@/components/controls/Switch';
 import Button from '@/components/controls/Button';
@@ -48,14 +49,8 @@ export default function DFAMCoordinatePanel({
   activeSequencerStep = 0,
   isAudioReady = false,
 }: DFAMCoordinatePanelProps) {
-  // Track clear cables trigger
-  const [clearCablesTrigger, setClearCablesTrigger] = useState(0);
-
-  // Handle clear cables button click
-  const handleClearCablesClick = () => {
-    setClearCablesTrigger(prev => prev + 1);
-    onClearCables?.();
-  };
+  // Get clear cables trigger from store (increments when clearPatchConnections is called)
+  const clearCablesTrigger = useStudioStore((state) => state.clearCablesTrigger);
 
   // Get current lesson step info
   const currentStepInfo = useMemo(() => {
