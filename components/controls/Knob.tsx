@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import type { KnobSpec, Units } from '@/types';
 
 export interface KnobProps {
@@ -85,48 +85,39 @@ export default function Knob({
     return bipolar && val > 0 ? `+${val.toFixed(1)}` : val.toFixed(1);
   };
 
-  // Mouse drag handling
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Pointer drag handling (unified mouse + touch support)
+  const handlePointerDown = (e: React.PointerEvent) => {
     setIsDragging(true);
     setStartY(e.clientY);
     setStartValue(value);
+    // Capture pointer to receive all events during drag
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
     e.preventDefault();
   };
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
 
-      const deltaY = startY - e.clientY;
-      const sensitivity = 0.5;
-      const range = max - min;
-      const delta = (deltaY * sensitivity * range) / 100;
+    const deltaY = startY - e.clientY;
+    const sensitivity = 0.5;
+    const range = max - min;
+    const delta = (deltaY * sensitivity * range) / 100;
 
-      let newValue = startValue + delta;
-      newValue = Math.max(min, Math.min(max, newValue));
+    let newValue = startValue + delta;
+    newValue = Math.max(min, Math.min(max, newValue));
 
-      // Snap to step if defined
-      if (spec.step) {
-        newValue = Math.round(newValue / spec.step) * spec.step;
-      }
-
-      onChange(newValue);
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+    // Snap to step if defined
+    if (spec.step) {
+      newValue = Math.round(newValue / spec.step) * spec.step;
     }
 
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, startY, startValue, min, max, spec.step, onChange]);
+    onChange(newValue);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    setIsDragging(false);
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  };
 
   // Check if value is close to target
   // Use consistent tolerance with store: 5% of target with min 0.1
@@ -163,8 +154,15 @@ export default function Knob({
     <div
       ref={knobRef}
       className={`relative cursor-pointer select-none ${getTeachingClass()}`}
-      style={{ width: currentPx, height: currentPx }}
-      onMouseDown={handleMouseDown}
+      style={{
+        width: currentPx,
+        height: currentPx,
+        touchAction: 'none', // Prevent scroll during drag on touch devices
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       title={spec.description}
