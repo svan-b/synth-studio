@@ -9,6 +9,7 @@ import { hub } from '@/lib/studio/hub';
 import { useDeviceModule, useEngineState } from '@/lib/studio/useHub';
 import SynthPanel, { type PatchController } from '@/components/panel/SynthPanel';
 import ResponsiveDeviceContainer from '@/components/ui/ResponsiveDeviceContainer';
+import { midiLearnTouch, useMidiFocus } from '@/lib/midi'; // external gear: MIDI learn + MIDI input
 
 // Computer keyboard → semitone offset (two rows like a DAW)
 const KEYMAP: Record<string, number> = {
@@ -93,6 +94,7 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
   );
 
   const onChange = useCallback((id: string, v: ControlValue) => {
+    midiLearnTouch(instance, id); // MIDI learn: remember the control you touched (no-op unless learning)
     if (mod.interceptChange && apiRef.current && mod.interceptChange(id, v, apiRef.current)) return;
     hub.setControl(instance, id, v);
   }, [mod, instance]);
@@ -110,6 +112,9 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
     setHeld(prev => { const s = new Set(prev); s.delete(n); return s; });
     hub.noteOff(instance, n);
   }, [instance]);
+
+  // MIDI input plays the focused instrument through the handlers above (keys light up)
+  useMidiFocus(instance, keyboardActive, handleNoteOn, handleNoteOff);
 
   // Computer keyboard: notes, Z/X octave, Space = transport (focused instrument only)
   useEffect(() => {

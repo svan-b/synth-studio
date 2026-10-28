@@ -17,6 +17,7 @@ import ReviewSession from '@/components/teaching/ReviewSession';
 import TransportBar from '@/components/studio/TransportBar';
 import StudioView from '@/components/studio/StudioView';
 import Welcome, { type WelcomeChoice } from '@/components/onboarding/Welcome';
+import MidiButton from '@/components/midi/MidiButton'; // external gear: MIDI settings
 
 type View = 'instrument' | 'studio';
 
@@ -131,6 +132,7 @@ function App() {
           <button onClick={() => setWelcomeOpen(true)} className="px-3 py-2 rounded-lg text-sm border border-[#3a3a3a] text-gray-300" title="Getting started">
             ?
           </button>
+          <MidiButton />
           <ProjectMenu
             onSave={() => downloadProject(entry ? `${entry.name} session` : 'My track')}
             onOpen={() => fileRef.current?.click()}
