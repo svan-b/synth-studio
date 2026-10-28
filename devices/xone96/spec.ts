@@ -121,17 +121,23 @@ function channelControls(ch: ChannelId): Record<string, ControlSpec> {
   } else {
     c[`${p}himid`] = mid('HI MID', 'Upper mids around 1.1 kHz: +10 / -27 dB (snare crack, vocal presence, stab bite).', MID_CUT_MAIN);
     c[`${p}lomid`] = mid('LO MID', 'Lower mids around 350 Hz: +10 / -27 dB (body and warmth - or mud when two tracks stack).', MID_CUT_MAIN);
-    c[`${p}snd1`] = {
-      type: 'knob', label: 'SEND 1', min: 0, max: 10, default: 0, units: 'none', format: fmt10,
-      description: 'Level sent to SND 1 (pre- or post-fader, see the SEND 1 switch). In the twin SND 1 feeds the stand-in delay, returned on channel A (RTN).',
-      manualReference: P.sends,
-    };
-    c[`${p}snd2`] = {
-      type: 'knob', label: 'SEND 2', min: 0, max: 10, default: 0, units: 'none', format: fmt10,
-      description: 'Post-fader level sent to SND 2. In the twin SND 2 feeds the stand-in reverb, returned on channel B (RTN).',
-      manualReference: P.sends,
-    };
   }
+  const loop = aux ? ` Careful: with INPUT on RTN, channel ${n}'s own sends feed its effect back into itself - dub-style feedback.` : '';
+  c[`${p}snd1`] = {
+    type: 'knob', label: 'SEND 1', min: 0, max: 10, default: 0, units: 'none', format: fmt10,
+    description: `Level sent to SND 1, after the fader unless PRE is lit. In the twin SND 1 feeds the stand-in delay, returned on channel A (RTN).${loop}`,
+    manualReference: P.sends,
+  };
+  c[`${p}snd2`] = {
+    type: 'knob', label: 'SEND 2', min: 0, max: 10, default: 0, units: 'none', format: fmt10,
+    description: `Post-fader level sent to SND 2. In the twin SND 2 feeds the stand-in reverb, returned on channel B (RTN).${loop}`,
+    manualReference: P.sends,
+  };
+  c[`${p}pre`] = {
+    type: 'button', label: 'PRE', default: false, ledColor: '#ffb020',
+    description: 'Take this channel\'s SEND 1 before the fader (lit), so the effect keeps getting signal with the fader down. Off: post-fader. SEND 2 is always post-fader.',
+    manualReference: P.sends,
+  } as ButtonSpec;
   return c;
 }
 
@@ -209,7 +215,7 @@ export const XONE96: DeviceSpec = {
     { id: 'filters', name: 'Xone:VCF filters', order: 7, controls: [...Object.keys(filterControls(1)), ...Object.keys(filterControls(2))] },
     { id: 'xfader', name: 'Crossfader and curves', order: 8, controls: ['xfader', 'xf_curve', 'fader_curve'] },
     { id: 'returns', name: 'Return channels C and D', order: 9, controls: [...Object.keys(returnControls('c')), ...Object.keys(returnControls('d'))] },
-    { id: 'master', name: 'Master, booth and monitor', order: 10, controls: ['master', 'booth', 'booth_lo', 'booth_mid', 'booth_hi', 'booth_mono', 'booth_mute', 'cue_mix', 'phones', 'split_cue', 'cue_post_eq', 'send1_pre'] },
+    { id: 'master', name: 'Master, booth and monitor', order: 10, controls: ['master', 'booth', 'booth_lo', 'booth_mid', 'booth_hi', 'booth_mono', 'booth_mute', 'cue_mix', 'phones', 'split_cue', 'cue_post_eq'] },
   ],
 
   controls: {
@@ -274,11 +280,6 @@ export const XONE96: DeviceSpec = {
     cue_post_eq: {
       type: 'button', label: 'POST EQ', default: true, ledColor: '#ffb020',
       description: 'Take the channel cue after the EQ (lit) or before it.', manualReference: P.cue,
-    },
-    send1_pre: {
-      type: 'switch', label: 'SEND 1', options: ['POST', 'PRE'], default: 0,
-      description: 'SEND 1 taken after the channel fader (POST) or before it (PRE, so the effect keeps going with the fader down). SEND 2 is always post-fader.',
-      manualReference: P.sends,
     },
 
     // --- Twin only -------------------------------------------------------------

@@ -212,7 +212,7 @@ const f2: Lesson = {
     },
     {
       kind: 'do', control: 'ch2_gain', targetValue: 0, concept: 'gain-staging',
-      instruction: 'Bring channel 2 GAIN back to 0 dB. Its meter averages around 0, with peaks near +3 to +6.',
+      instruction: 'Bring channel 2 GAIN back to 0 dB. Its meter averages around 0, with peaks near +6.',
       principle: 'Decibels are logarithmic: +6 dB roughly doubles the amplitude, -6 dB halves it.',
       explanation: 'That is the level the manual asks for: average around 0 and peaks around +6, leaving room above for EQ boosts and loud moments.',
       manualReference: REF.meters,
@@ -223,7 +223,7 @@ const f2: Lesson = {
       predict: {
         question: 'What will the meter show?',
         options: ['The +10 and PK! LEDs flash: little headroom is left', 'It stays the same', 'It switches off'], answer: 0,
-        explain: '+10 dB of gain lifts the peaks to around +14 dBu. The channel clips at +20 dBu, and PK! lights 5 dB before that, so it flickers.',
+        explain: '+10 dB of gain lifts the peaks to around +16 dBu. The channel clips at +20 dBu, and PK! lights 5 dB before that, so it flashes on every kick.',
       },
       principle: 'Headroom is the space between your normal level and the point where the circuit clips.',
       manualReference: REF.meters,
@@ -747,7 +747,7 @@ const f7: Lesson = {
       kind: 'predict', control: 'ch3_fader', targetValue: 0, concept: 'effects',
       instruction: 'Pull channel 3\'s fader all the way down.',
       predict: {
-        question: 'SEND 1 is set to POST and SEND 2 is always post-fader. What happens to the echoes and the reverb?',
+        question: 'Channel 3\'s PRE is off, and SEND 2 is always post-fader. What happens to the echoes and the reverb?',
         options: ['Their input stops, so they ring out and fade', 'They keep going at full level', 'They get louder'], answer: 0,
         explain: 'Post-fader sends are taken after the channel fader. Fader down means nothing new goes in, and the tails die away naturally.',
       },
@@ -755,17 +755,17 @@ const f7: Lesson = {
       manualReference: REF.sends,
     },
     {
-      kind: 'do', control: 'send1_pre', targetValue: 1, concept: 'effects',
-      instruction: 'Switch SEND 1 to PRE.',
+      kind: 'do', control: 'ch3_pre', targetValue: true, concept: 'effects',
+      instruction: 'Press channel 3\'s PRE button, beside SEND 1.',
       principle: 'A pre-fader send keeps feeding the effect when the channel fader is down.',
-      explanation: 'Now the delay hears the stabs even with their fader down, so you hear only the echoes - a dub-style "ghost" of the part.',
+      explanation: 'Now the delay hears the stabs even with their fader down, so you hear only the echoes - a dub-style "ghost" of the part. Each channel has its own PRE.',
       manualReference: REF.sends,
     },
     {
-      kind: 'listen', concept: 'effects', focus: ['send1_pre'],
-      instruction: 'Compare POST and PRE with the channel 3 fader down.',
+      kind: 'listen', concept: 'effects', focus: ['ch3_pre'],
+      instruction: 'Compare PRE off and on with the channel 3 fader down.',
       listen: {
-        a: { send1_pre: 0, ch3_fader: 0 }, b: { send1_pre: 1, ch3_fader: 0 }, labels: ['POST', 'PRE'],
+        a: { ch3_pre: false, ch3_fader: 0 }, b: { ch3_pre: true, ch3_fader: 0 }, labels: ['POST', 'PRE'],
         question: {
           question: 'Why do you hear echoes only with PRE?',
           options: ['PRE taps the channel before its fader', 'PRE turns the fader up', 'PRE adds reverb'], answer: 0,
@@ -787,11 +787,11 @@ const f7: Lesson = {
       checklist: [
         { text: 'Channel 3 fader up (7 or more)', check: s => num(s, 'ch3_fader') >= 7 },
         { text: 'Channel 3 SEND 1 between 3 and 9', check: s => num(s, 'ch3_snd1') >= 3 && num(s, 'ch3_snd1') <= 9 },
-        { text: 'SEND 1 on POST', check: s => num(s, 'send1_pre') === 0 },
+        { text: 'Channel 3 SEND 1 post-fader (PRE off)', check: s => !s.values.ch3_pre },
         { text: 'Channel A up (6 or more), INPUT on RTN', check: s => num(s, 'cha_fader') >= 6 && num(s, 'cha_input') === 2 },
       ],
-      hints: ['Bring channel 3 back up.', 'Set SEND 1 back to POST.', 'Channel 3 fader 9, SEND 1 6, channel A fader 8.'],
-      solution: { values: { ch3_fader: 9, ch3_snd1: 6, send1_pre: 0, cha_fader: 8, cha_input: 2 } },
+      hints: ['Bring channel 3 back up.', 'Switch channel 3\'s PRE off again.', 'Channel 3 fader 9, SEND 1 6, PRE off, channel A fader 8.'],
+      solution: { values: { ch3_fader: 9, ch3_snd1: 6, ch3_pre: false, cha_fader: 8, cha_input: 2 } },
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',
@@ -1035,14 +1035,13 @@ const p2: Lesson = {
     },
     {
       kind: 'do', control: 'ch1_filter', targetValue: 0, concept: 'filter-cutoff',
-      instruction: 'Now the exit: set channel 1\'s FILTER switch to 1 and press FILTER 1 ON.',
-      check: s => !!s.values.f1_on || num(s, 'ch1_filter') === 0,
+      instruction: 'Now the exit: set channel 1\'s FILTER switch to 1.',
       principle: 'A filter on the outgoing track lets it fade out in colour, not only in level.',
       manualReference: REF.filter,
     },
     {
       kind: 'do', control: 'f1_on', targetValue: true, concept: 'filter-cutoff',
-      instruction: 'Make sure FILTER 1 is ON (blue). It is a high-pass at 20 Hz.',
+      instruction: 'Press FILTER 1 ON (blue). It is a high-pass at 20 Hz, so nothing changes yet.',
       principle: 'A high-pass at its lowest setting is transparent.',
     },
     {
@@ -1503,7 +1502,7 @@ const e4: Lesson = {
         { text: 'No EQ boosts', check: s => ['ch1_hi', 'ch1_himid', 'ch1_lomid', 'ch1_lo'].every(c => num(s, c) <= 0.05) },
         { text: 'MASTER 1 back at unity (8)', check: s => Math.abs(num(s, 'master') - 8) <= 0.3 },
       ],
-      hints: ['Start with the EQ flat.', 'The FULL MIX peaks near +3 at 0 dB, and PK! is +15.', 'GAIN about +3 dB, all EQ centred, MASTER 1 at 8.'],
+      hints: ['Start with the EQ flat.', 'At 0 dB the FULL MIX peaks near +6; PK! is +15.', 'GAIN about +3 dB, all EQ centred, MASTER 1 at 8.'],
       solution: { values: { ch1_gain: 3, ch1_hi: 0, ch1_himid: 0, ch1_lomid: 0, ch1_lo: 0, master: 8 } },
     },
     {

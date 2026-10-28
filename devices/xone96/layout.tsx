@@ -42,6 +42,7 @@ const PRINT = '#4a5056';
 const FACE = 'linear-gradient(180deg, #d3d6d9 0%, #c8cbcf 55%, #bec2c6 100%)';
 const LINE = '1px solid #9aa0a6';
 const KNOB = '#f4f4f4'; // white pointer line on the black caps
+const TWIN_INK = '#b9c8d6'; // legends in the dark twin-only deck strip
 const LED_ON = (db: number) => (db >= 10 ? '#ff3b30' : db >= 3 ? '#ffb020' : '#2fd158');
 const LED_OFF = '#2a2e32';
 
@@ -308,10 +309,11 @@ function DeckColumn({ c, ch, w, compact }: { c: Ctx; ch: ChannelId; w: number; c
           {SOURCE_MENU.map(i => <option key={i} value={i}>{SOURCE_NAMES[i]}</option>)}
         </select>
         <label
-          style={{ fontSize: 8.5, fontWeight: 800, color: '#dfe6ec', background: '#24303b', border: '1px solid #3b4652', borderRadius: 4, padding: compact ? '4px 4px' : '5px 6px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+          style={{ fontSize: 8.5, fontWeight: 800, color: '#dfe6ec', background: '#24303b', border: '1px solid #3b4652', borderRadius: 4, padding: compact ? '4px 3px' : '5px 4px', cursor: 'pointer', whiteSpace: 'nowrap' }}
           title="Load your own audio file: it loops on this channel's USB input"
+          aria-label={`Load an audio file onto channel ${chName(ch)} USB`}
         >
-          {compact ? 'FILE' : 'LOAD FILE'}
+          FILE
           <input
             type="file"
             accept="audio/*"
@@ -364,6 +366,25 @@ function DeckDisplay({ c, compact }: { c: Ctx; compact: boolean }) {
         textShadow: '0 0 3px rgba(200,220,255,0.6)', overflow: 'hidden', pointerEvents: 'none',
       }}
     />
+  );
+}
+
+/** The front-edge headphone sockets: MONITOR (modelled, via YOU HEAR: PHONES) and PHONES 2 (not modelled) */
+function FrontJacks() {
+  const jack = (d: number) => (
+    <div style={{ width: d * K, height: d * K, borderRadius: '50%', background: 'radial-gradient(circle at 40% 35%, #555 0%, #111 70%)', border: '2px solid #7d8287', boxShadow: 'inset 0 2px 3px #000' }} />
+  );
+  const group = (name: string, note: string) => (
+    <div title={note} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>{jack(9)}{jack(6)}</div>
+      <div style={{ fontSize: 7, fontWeight: 800, color: INK, letterSpacing: 0.5 }}>{name}</div>
+    </div>
+  );
+  return (
+    <div style={{ display: 'flex', gap: 22, pointerEvents: 'auto' }} aria-hidden>
+      {group('MONITOR', 'MONITOR headphones (1/4" and 3.5 mm). In the twin, choose YOU HEAR: PHONES to listen.')}
+      {group('PHONES 2', 'PHONES 2: the second, independent cue system. Not modelled in the twin.')}
+    </div>
   );
 }
 
@@ -463,19 +484,17 @@ function fullStrip(ch: ChannelId): PanelElement[] {
       : [knob(`${p}himid`, kx, MY + 65, 10.5), knob(`${p}lomid`, kx, MY + 82, 10.5)]),
     knob(`${p}lo`, kx, MY + 99, 10.5),
     channelMeter(ch, cx + 5.5, MY + 37, 68),
-    buttons(`${p}filter`, cx, MY + 133, 1.25),
-    buttons(`${p}xf`, cx, MY + 146, 1.25),
-    push(`${p}cue`, cx, MY + 159, 15, 7, 'CUE', '#ff3b30'),
-    { kind: 'slider', control: `${p}fader`, x: cx, y: MY + 200, length: 60, capColor: '#1d1f21', label: 'none', value: 'hover' },
-    ...faderScale(cx, MY + 170, 60),
-    label(chName(ch), cx, MY + 240, 15, { weight: 900 }),
+    knob(`${p}snd1`, cx - 9, MY + 116, 8.5, { labelText: 'SEND 1' }),
+    knob(`${p}snd2`, cx + 9, MY + 116, 8.5, { labelText: 'SEND 2' }),
+    push(`${p}pre`, cx - 9, MY + 126, 9.5, 4.6, 'PRE', '#ffb020'),
+    buttons(`${p}filter`, cx, MY + 137, 1.25),
+    buttons(`${p}xf`, cx, MY + 149, 1.25),
+    push(`${p}cue`, cx, MY + 161, 15, 7, 'CUE', '#ff3b30'),
+    { kind: 'slider', control: `${p}fader`, x: cx, y: MY + 201, length: 60, capColor: '#1d1f21', label: 'none', value: 'hover' },
+    ...faderScale(cx, MY + 171, 60),
+    label(chName(ch), cx, MY + 241, 15, { weight: 900 }),
   ];
-  if (aux) {
-    els.push(label(ch === 'a' ? 'RTN A = SEND 1 RETURN' : 'RTN B = SEND 2 RETURN', cx, MY + 116, 5.5, { color: MUTED }));
-  } else {
-    els.push(knob(`${p}snd1`, cx - 9, MY + 119, 8.5, { labelText: 'SEND 1' }));
-    els.push(knob(`${p}snd2`, cx + 9, MY + 119, 8.5, { labelText: 'SEND 2' }));
-  }
+  if (aux) els.push(label(ch === 'a' ? 'RTN A ← SEND 1' : 'RTN B ← SEND 2', cx + 9, MY + 126, 5, { color: MUTED }));
   return els;
 }
 
@@ -537,9 +556,8 @@ function fullMaster(): PanelElement[] {
     knob('phones', c0 + 64, MY + 176, 11.5),
     push('split_cue', c0 + 20, MY + 200, 20, 7, 'SPLIT CUE', '#ff3b30'),
     push('cue_post_eq', c0 + 64, MY + 200, 18, 7, 'POST EQ', '#ffb020'),
-    buttons('send1_pre', c0 + 22, MY + 226, 1.1),
-    label('SEND 2: POST', c0 + 62, MY + 226, 6, { color: MUTED }),
-    buttons('fader_curve', cx, MY + 240, 1.0),
+    label('SEND 1: PRE PER CHANNEL · SEND 2: POST', cx, MY + 223, 5, { color: MUTED }),
+    buttons('fader_curve', cx, MY + 238, 1.0),
     label('XONE:96', cx, MY + 290, 23, { weight: 900, letterSpacing: 1, font: 'condensed' }),
     label('ANALOGUE DJ MIXER', cx, MY + 303, 6, { color: MUTED, letterSpacing: 1.5 }),
     label('6 + 2 CHANNELS · DUAL XONE:VCF', cx, MY + 310, 5.5, { color: MUTED, letterSpacing: 0.8 }),
@@ -556,13 +574,17 @@ function deckStripFull(): PanelElement[] {
     ...CHANNELS.map(deckCol),
     { kind: 'custom', x: 4, y: 40, w: 40, h: 6, render: c => <ViewToggle c={c} compact={false} /> },
     { kind: 'button', control: 'play', x: 259, y: 13, shape: 'round', w: 11, color: '#13261a', ledColor: '#22c55e', capText: 'PLAY', label: 'none', lit: ({ engine, values }) => (engine.synced ? !!engine.playing : !!values.play) },
-    knob('bpm', 275, 14, 8, { value: 'always', label: 'above', variant: 'moog-black' }),
+    knob('bpm', 275, 14, 8, { value: 'always', label: 'none' }),
+    label('BPM', 275, 7, 5.5, { color: TWIN_INK }),
     { kind: 'custom', x: 285, y: 5, w: 48, h: 17, render: c => <DeckDisplay c={c} compact={false} /> },
-    buttons('monitor_out', 296, 29, 0.9, { labelText: 'YOU HEAR (TWIN)' }),
-    label('STAND-IN FX UNIT', 268, 37, 5.5, { color: '#8fd3ff' }),
-    buttons('fx_time', 268, 43, 0.85, { label: 'none' }),
-    knob('fx_fdbk', 303, 42, 7),
-    knob('fx_size', 323, 42, 7),
+    label('YOU HEAR (TWIN)', 296, 25, 5.5, { color: TWIN_INK }),
+    buttons('monitor_out', 296, 30, 0.9, { label: 'none' }),
+    label('STAND-IN FX UNIT', 266, 37.5, 5.5, { color: '#8fd3ff' }),
+    buttons('fx_time', 266, 43.5, 0.85, { label: 'none' }),
+    knob('fx_fdbk', 303, 43, 7, { label: 'none' }),
+    label('FDBK', 303, 37.5, 5.5, { color: TWIN_INK }),
+    knob('fx_size', 323, 43, 7, { label: 'none' }),
+    label('REVERB', 323, 37.5, 5.5, { color: TWIN_INK }),
   ];
 }
 
@@ -585,7 +607,8 @@ function buildFull(): PanelLayout {
     // front lip
     { kind: 'section', x: 0, y: MY + 352, w: W, h: 58, background: 'linear-gradient(180deg, #b4b8bc 0%, #9fa4a9 100%)', radius: 3 },
     label('ALLEN&HEATH', 20, MY + 381, 16, { align: 'left', weight: 800, letterSpacing: 1.5 }),
-    label('XONE SERIES', W - 16, MY + 381, 8, { align: 'right', color: MUTED, letterSpacing: 3 }),
+    label('XONE SERIES', 150, MY + 381, 8, { align: 'left', color: MUTED, letterSpacing: 3 }),
+    { kind: 'custom', x: 236, y: MY + 362, w: 96, h: 38, render: () => <FrontJacks /> },
   ];
   return {
     width: W,
@@ -612,30 +635,28 @@ function compactStrip(ch: ChannelId): PanelElement[] {
   const p = `ch${ch}_`;
   const aux = isAux(ch);
   const l = cx - 10, r = cx + 4;
-  const y = (row: number) => TOP + 21 + row * 13.5;
+  const y = (row: number) => TOP + 26 + row * 16;
   const els: PanelElement[] = [
     { kind: 'section', x: cx - 19.5, y: TOP, w: 39, h: 164, border: LINE, radius: 2 },
     studioChip(ch, cx, TOP + 2, 37),
-    buttons(`${p}input`, cx, TOP + 11, 0.85),
-    knob(`${p}gain`, l, y(0), 9.5),
-    knob(`${p}hi`, r, y(0), 9.5),
+    buttons(`${p}input`, cx, TOP + 10.5, 0.85),
+    knob(`${p}gain`, l, y(0), 10),
+    knob(`${p}hi`, r, y(0), 10),
     ...(aux
-      ? [knob(`${p}midf`, l, y(1), 9), knob(`${p}mid`, r, y(1), 9.5)]
-      : [knob(`${p}himid`, l, y(1), 9.5), knob(`${p}lomid`, r, y(1), 9.5)]),
-    knob(`${p}lo`, l, y(2), 9.5),
-    channelMeter(ch, cx + 12.5, TOP + 15, 43, false),
-    buttons(`${p}filter`, cx - 2.5, TOP + 77, 1.1),
-    buttons(`${p}xf`, cx - 2.5, TOP + 88, 1.1),
-    push(`${p}cue`, cx + 13, TOP + 82.5, 10, 13, 'CUE', '#ff3b30'),
-    { kind: 'slider', control: `${p}fader`, x: cx, y: TOP + 124, length: 46, capColor: '#1d1f21', label: 'none', value: 'hover' },
-    ...faderScale(cx, TOP + 101, 46, 5.5),
-    label(chName(ch), cx, TOP + 159, 11, { weight: 900 }),
+      ? [knob(`${p}midf`, l, y(1), 9.5), knob(`${p}mid`, r, y(1), 10)]
+      : [knob(`${p}himid`, l, y(1), 10), knob(`${p}lomid`, r, y(1), 10)]),
+    knob(`${p}lo`, l, y(2), 10),
+    channelMeter(ch, cx + 12.5, TOP + 18, 58, false),
+    buttons(`${p}filter`, cx - 2.5, TOP + 88, 1.1),
+    buttons(`${p}xf`, cx - 2.5, TOP + 99, 1.1),
+    push(`${p}cue`, cx + 13.5, TOP + 94, 10, 12, 'CUE', '#ff3b30'),
+    { kind: 'slider', control: `${p}fader`, x: cx, y: TOP + 133, length: 42, capColor: '#1d1f21', label: 'none', value: 'hover' },
+    ...faderScale(cx, TOP + 112, 42, 5.5),
+    label(chName(ch), cx, TOP + 161, 10, { weight: 900 }),
   ];
-  if (aux) els.push(label(ch === 'a' ? 'RTN A ← SEND 1' : 'RTN B ← SEND 2', r, y(2), 5.5, { color: MUTED }));
-  else {
-    els.push(knob(`${p}snd1`, r, y(2), 8.5, { labelText: 'SEND 1' }));
-    els.push(knob(`${p}snd2`, r, y(3), 8.5, { labelText: 'SEND 2' }));
-  }
+  els.push(knob(`${p}snd1`, r, y(2), 9, { labelText: 'SEND 1' }));
+  els.push(knob(`${p}snd2`, r, y(3), 9, { labelText: 'SEND 2' }));
+  els.push(push(`${p}pre`, l, y(3) - 1, 9, 5, 'PRE', '#ffb020'));
   return els;
 }
 
@@ -670,8 +691,9 @@ function compactMaster(): PanelElement[] {
     label('MONITOR', x0 + 43, TOP + 100, 6, { color: INK }),
     knob('cue_mix', x0 + 15, TOP + 113, 9),
     knob('phones', x0 + 43, TOP + 113, 10),
-    buttons('send1_pre', x0 + 72, TOP + 110, 1.0),
-    label('SEND 2: POST', x0 + 72, TOP + 119, 5, { color: MUTED }),
+    label('SEND 1 PRE:', x0 + 72, TOP + 109, 5, { color: MUTED }),
+    label('per channel', x0 + 72, TOP + 114, 5, { color: MUTED }),
+    label('SEND 2: POST', x0 + 72, TOP + 120, 5, { color: MUTED }),
     push('split_cue', x0 + 17, TOP + 129, 20, 6.5, 'SPLIT CUE', '#ff3b30'),
     push('cue_post_eq', x0 + 45, TOP + 129, 18, 6.5, 'POST EQ', '#ffb020'),
     buttons('fader_curve', x0 + 43, TOP + 148, 0.95),
@@ -707,13 +729,17 @@ function deckStripCompact(): PanelElement[] {
     { kind: 'section', x: 1, y: 1, w: CW - 2, h: 25, background: '#0f1316', border: '1px solid #26313b', radius: 2, title: 'BUILT-IN DECKS · TWIN ONLY', titleColor: '#8fd3ff' },
     ...CHANNELS.map(deckCol),
     { kind: 'button', control: 'play', x: 251, y: 13, shape: 'round', w: 10, color: '#13261a', ledColor: '#22c55e', capText: 'PLAY', label: 'none', lit: ({ engine, values }) => (engine.synced ? !!engine.playing : !!values.play) },
-    knob('bpm', 265, 15, 7, { value: 'always', label: 'above' }),
+    knob('bpm', 265, 14, 7, { value: 'always', label: 'none' }),
+    label('BPM', 265, 7.5, 5, { color: TWIN_INK }),
     { kind: 'custom', x: 273, y: 4, w: 44, h: 13, render: c => <DeckDisplay c={c} compact /> },
     buttons('monitor_out', 297, 21.5, 0.75, { label: 'none' }),
-    label('YOU HEAR', 280, 21.5, 5, { color: '#8fd3ff', align: 'right' }),
-    buttons('fx_time', 337, 9, 0.75, { labelText: 'FX DELAY' }),
-    knob('fx_fdbk', 361, 13, 6.5),
-    knob('fx_size', 379, 13, 6.5),
+    label('YOU HEAR', 280, 21.5, 5, { color: TWIN_INK, align: 'right' }),
+    label('FX DELAY', 337, 5, 5, { color: TWIN_INK }),
+    buttons('fx_time', 337, 10, 0.75, { label: 'none' }),
+    knob('fx_fdbk', 361, 15, 6.5, { label: 'none' }),
+    label('FDBK', 361, 8.5, 5, { color: TWIN_INK }),
+    knob('fx_size', 379, 15, 6.5, { label: 'none' }),
+    label('REVERB', 379, 8.5, 5, { color: TWIN_INK }),
     { kind: 'custom', x: 389, y: 4, w: 30, h: 6, render: c => <ViewToggle c={c} compact /> },
   ];
 }

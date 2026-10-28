@@ -37,6 +37,8 @@ const P = {
 } as const;
 const NP = 20;
 const K_MAIN = 0, K_AUX = 1, K_RTN = 2;
+/** f*_type index of HPF+BPF+LPF (model.FILTER_TYPES) */
+const ALL_PASS = 6;
 
 export type StripId = ChannelId | ReturnId;
 /** The worklet node and slot of each strip */
@@ -137,14 +139,21 @@ export class Xone96Engine extends BaseEngine {
     }
 
     // --- the stand-in FX unit: SND 1 -> delay -> RTN A, SND 2 -> reverb -> RTN B -----
+    // Every channel has sends, A and B included, so a return can feed its own effect
+    // (dub feedback) as on the hardware. Web Audio allows a loop only through a
+    // DelayNode: the delay has one, and the reverb return gets one render quantum
+    // (2.7 ms, inaudible on a reverb with 20 ms predelay). The main path has none.
     this.delay = new Delay(ctx, 2);
     this.delay.tone.frequency.value = 4500;
     this.reverb = new Reverb2(ctx, 2.5, { lowCut: 120, highCut: 12000 });
     this.reverb.damping.value = 6000;
-    s14.connect(this.delay.input, 3);
-    s14.connect(this.reverb.input, 4);
+    for (const s of this.strips) {
+      s.connect(this.delay.input, 3);
+      s.connect(this.reverb.input, 4);
+    }
+    const loopGuard = ctx.createDelay(0.01);
     this.delay.output.connect(rtnA);
-    this.reverb.output.connect(rtnB);
+    this.reverb.output.connect(loopGuard).connect(rtnB);
 
     // --- studio routing targets ----------------------------------------------------
     this.inputs = {};
@@ -269,13 +278,12 @@ export class Xone96Engine extends BaseEngine {
     v[P.DIRECT] = fx.direct;
     v[P.F1] = fx.f1;
     v[P.F2] = fx.f2;
-    if (!aux) {
-      const s1 = sendLaw(this.num(`ch${id}_snd1`, 0));
-      const pre = this.num('send1_pre', 0) === 1;
-      v[P.S1PRE] = pre ? s1 : 0;
-      v[P.S1POST] = pre ? 0 : s1;
-      v[P.S2] = sendLaw(this.num(`ch${id}_snd2`, 0));
-    }
+    // SEND 1: pre- or post-fader per channel (PRE button); SEND 2: always post-fader
+    const s1 = sendLaw(this.num(`ch${id}_snd1`, 0));
+    const pre = this.bool(`ch${id}_pre`);
+    v[P.S1PRE] = pre ? s1 : 0;
+    v[P.S1POST] = pre ? 0 : s1;
+    v[P.S2] = sendLaw(this.num(`ch${id}_snd2`, 0));
     v[P.CUE] = this.bool(`ch${id}_cue`) ? 1 : 0;
     v[P.CUEPOST] = this.bool('cue_post_eq') ? 1 : 0;
     this.sendStrip(id, v);
@@ -302,8 +310,11 @@ export class Xone96Engine extends BaseEngine {
   private updateFilter(f: 0 | 1) {
     if (!this.started) return;
     const p = `f${f + 1}_`;
-    const mode = SVF_MODE_OF_TYPE[this.num(`${p}type`, f === 0 ? 0 : 2)] ?? 0;
-    const res = qToSvf(resToQ(this.num(`${p}res`, 2)));
+    const type = this.num(`${p}type`, f === 0 ? 0 : 2);
+    const mode = SVF_MODE_OF_TYPE[type] ?? 0;
+    const rv = this.num(`${p}res`, 2);
+    // All three switches on (HPF+BPF+LPF): neutral with RES at noon, a resonant peak above
+    const res = type === ALL_PASS ? Math.max(0, (rv - 5) / 5) : qToSvf(resToQ(rv));
     const freq = this.num(`${p}freq`, f === 0 ? 20 : 20000);
     const drive = crunchDrive(this.num(`${p}crunch`, 0));
     const now = this.ctx.currentTime;
@@ -333,6 +344,8 @@ export class Xone96Engine extends BaseEngine {
         this.num('monitor_out', 0),
         ret(1), ret(2),
         OUT_SCALE,
+        // With nothing cued the headphones hear the master mix
+        CHANNELS.some(c => this.bool(`ch${c}_cue`)) || RETURNS.some(r => this.bool(`rtn${r}_cue`)) ? 1 : 0,
       ],
     });
   }
@@ -354,13 +367,21 @@ export class Xone96Engine extends BaseEngine {
   protected onParam(id: string, value: ControlValue): void {
     const n = typeof value === 'number' ? value : value ? 1 : 0;
     const m = /^ch(a|b|[1-4])_/.exec(id);
-    if (m) { this.updateStrip(m[1] as ChannelId); return; }
+    if (m) {
+      this.updateStrip(m[1] as ChannelId);
+      if (id.endsWith('_cue')) this.updateMaster();
+      return;
+    }
     const r = /^rtn(c|d)_/.exec(id);
-    if (r) { this.updateReturn(r[1] as ReturnId); return; }
+    if (r) {
+      this.updateReturn(r[1] as ReturnId);
+      if (id.endsWith('_cue')) this.updateMaster();
+      return;
+    }
     switch (id) {
       case 'f1_type': case 'f1_freq': case 'f1_res': case 'f1_crunch': this.updateFilter(0); break;
       case 'f2_type': case 'f2_freq': case 'f2_res': case 'f2_crunch': this.updateFilter(1); break;
-      case 'f1_on': case 'f2_on': case 'xfader': case 'xf_curve': case 'fader_curve': case 'send1_pre': case 'cue_post_eq':
+      case 'f1_on': case 'f2_on': case 'xfader': case 'xf_curve': case 'fader_curve': case 'cue_post_eq':
         CHANNELS.forEach(c => this.updateStrip(c));
         break;
       case 'master': case 'booth': case 'booth_mono': case 'booth_mute': case 'booth_lo': case 'booth_mid': case 'booth_hi':

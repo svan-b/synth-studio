@@ -864,8 +864,8 @@ class XoneStripsProcessor extends AudioWorkletProcessor {
 // ============================================================================
 
 const M_MASTER = 0, M_BOOTH = 1, M_MONO = 2, M_MUTE = 3, M_BLO = 4, M_BMID = 5, M_BHI = 6, M_PHONES = 7, M_CUEMIX = 8;
-const M_SPLIT = 9, M_MONITOR = 10, M_F1 = 11, M_F2 = 12, M_OUT = 13;
-const NM = 14;
+const M_SPLIT = 9, M_MONITOR = 10, M_F1 = 11, M_F2 = 12, M_OUT = 13, M_CUEON = 14;
+const NM = 15;
 const BOOTH_CLIP = 0.1 * Math.pow(10, 18 / 20);
 
 class XoneMasterProcessor extends AudioWorkletProcessor {
@@ -875,7 +875,7 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
     this.cur = new Float64Array(NM);
     this.prev = new Float64Array(NM);
     for (const i of [M_MASTER, M_BOOTH, M_PHONES]) this.tgt[i] = this.cur[i] = 1;
-    this.tgt[M_OUT] = this.cur[M_OUT] = 2.5;
+    this.tgt[M_OUT] = this.cur[M_OUT] = 1.25;
     this.bq = new Float64Array(15);
     this.bz = new Float64Array(12);
     this.beq = [NaN, NaN, NaN];
@@ -966,14 +966,18 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
       const a0 = Math.cos(c0[M_CUEMIX] * HALF_PI), a1 = Math.cos(c[M_CUEMIX] * HALF_PI);
       const b0 = Math.sin(c0[M_CUEMIX] * HALF_PI), b1 = Math.sin(c[M_CUEMIX] * HALF_PI);
       const dg = (g1 - g0) / BLOCK, da = (a1 - a0) / BLOCK, db = (b1 - b0) / BLOCK;
-      let g = g0, ga = a0, gb = b0;
+      // Nothing cued: the headphones hear the master mix (w glides 0 -> 1 when a CUE goes on)
+      const w0 = c0[M_CUEON], dw = (c[M_CUEON] - w0) / BLOCK;
+      let g = g0, ga = a0, gb = b0, w = w0;
       for (let i = 0; i < BLOCK; i++) {
         const ql = cL ? cL[i] : 0, qr = cR ? cR[i] : 0;
         let l, r;
         if (split) { l = 0.5 * (ql + qr); r = 0.5 * (mL[i] + mR[i]); }
         else { l = ql * ga + mL[i] * gb; r = qr * ga + mR[i] * gb; }
+        l = w * l + (1 - w) * mL[i];
+        r = w * r + (1 - w) * mR[i];
         oL[i] = l * g; oR[i] = r * g;
-        g += dg; ga += da; gb += db;
+        g += dg; ga += da; gb += db; w += dw;
       }
     } else {
       // MASTER 1, +24 dBu output stage

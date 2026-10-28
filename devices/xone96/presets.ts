@@ -18,14 +18,15 @@ function desk(): Values {
   for (const c of ['a', 'b', '1', '2', '3', '4']) {
     v[`ch${c}_gain`] = 0; v[`ch${c}_hi`] = 0; v[`ch${c}_lo`] = 0; v[`ch${c}_fader`] = 10;
     v[`ch${c}_filter`] = 1; v[`ch${c}_xf`] = 1; v[`ch${c}_cue`] = false; v[`ch${c}_input`] = 2;
+    v[`ch${c}_snd1`] = 0; v[`ch${c}_snd2`] = 0; v[`ch${c}_pre`] = false;
     if (c === 'a' || c === 'b') { v[`ch${c}_mid`] = 0; v[`ch${c}_midf`] = 700; }
-    else { v[`ch${c}_himid`] = 0; v[`ch${c}_lomid`] = 0; v[`ch${c}_snd1`] = 0; v[`ch${c}_snd2`] = 0; }
+    else { v[`ch${c}_himid`] = 0; v[`ch${c}_lomid`] = 0; }
   }
   Object.assign(v, {
     cha_src: SRC.LEAD, chb_src: SRC.PAD, ch1_src: SRC.NONE, ch2_src: SRC.NONE, ch3_src: SRC.NONE, ch4_src: SRC.NONE,
     f1_on: false, f1_type: 0, f1_freq: 20, f1_res: 2, f1_crunch: 0,
     f2_on: false, f2_type: 2, f2_freq: 20000, f2_res: 2, f2_crunch: 0,
-    xfader: 5, xf_curve: 0, fader_curve: 0, send1_pre: 0,
+    xfader: 5, xf_curve: 0, fader_curve: 0,
     master: 8, booth: 7, booth_mono: false, booth_mute: false, booth_lo: 0, booth_mid: 0, booth_hi: 0,
     cue_mix: 0, phones: 6, split_cue: false, cue_post_eq: true, monitor_out: 0,
     rtnc_level: 0, rtnc_on: true, rtnc_cue: false, rtnd_level: 0, rtnd_on: true, rtnd_cue: false,
@@ -68,7 +69,7 @@ export const XONE96_PRESETS: Record<string, PresetSpec> = {
       cha_input: 2, cha_lo: -0.6, cha_fader: 9, fx_time: 1, fx_fdbk: 6,
     }),
   reverb_wash: preset('FX / Reverb wash',
-    'PAD on channel 4 drowning in SEND 2 (a 5 s reverb on channel B), DRUMS on channel 1. Pull the PAD fader down and the reverb tail stays: SEND 2 is post-fader, so it fades too - try it.',
+    'PAD on channel 4 drowning in SEND 2 (a 5 s reverb returned on channel B), DRUMS dry on channel 1. SEND 2 is post-fader: pull the PAD fader down and the reverb stops being fed, so its tail rings out on its own.',
     { ch1_src: SRC.DRUMS, ch4_src: SRC.PAD, ch4_snd2: 7, chb_input: 2, chb_fader: 9, fx_size: 5 }),
 
   // ---------------------------------------------------------------- Stems
