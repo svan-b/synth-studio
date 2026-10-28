@@ -8,6 +8,7 @@ import { DEVICES } from '@/devices';
 import DeviceHost from '@/components/DeviceHost';
 import type { PatchController } from '@/components/panel/SynthPanel';
 import Arranger from './Arranger';
+import StudioSets from './StudioSets';
 
 interface StudioViewProps {
   onAddInstrument: () => void;
@@ -68,6 +69,7 @@ export default function StudioView({ onAddInstrument, onFocus }: StudioViewProps
 
   return (
     <div className="space-y-3">
+      <StudioSets />
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <button onClick={onAddInstrument} className="px-3 py-2 rounded-lg bg-teaching-current text-black font-bold">+ Add instrument</button>
         <span className="text-gray-400">

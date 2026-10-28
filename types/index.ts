@@ -301,7 +301,10 @@ export interface LessonCheckState {
   instances: Record<string, { device: string; values: Record<string, ControlValue>; patches: PatchConnection[]; data: unknown }>;
   studioCables: { from: { instance: string; jack: string }; to: { instance: string; jack: string } }[];
   routes: Record<string, string>;
+  /** instance -> follows the studio clock (missing = default on for MIDI-syncable gear) */
+  sync: Record<string, boolean>;
   transport: { playing: boolean; bpm: number };
+  arrangement: { enabled: boolean; loop: boolean; sections: { name: string; bars: number; parts: Record<string, { pattern?: string; snapshot?: unknown; muted?: boolean }> }[] };
 }
 
 export interface Lesson {

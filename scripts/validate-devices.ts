@@ -185,7 +185,7 @@ function validate(id: string, mod: DeviceModule): Issue[] {
   const fakeState = (values: Record<string, ControlValue>): LessonCheckState => ({
     values, patches: [], data: mod.data?.initial(), engine: {},
     instances: { [id]: { device: id, values, patches: [], data: mod.data?.initial() } },
-    studioCables: [], routes: {}, transport: { playing: false, bpm: 120 },
+    studioCables: [], routes: {}, sync: {}, transport: { playing: false, bpm: 120 }, arrangement: { enabled: false, loop: true, sections: [] },
   });
   const checkValues = (vals: Record<string, ControlValue> | undefined, where: string) => {
     Object.entries(vals ?? {}).forEach(([cid, v]) => {
@@ -271,9 +271,42 @@ function validate(id: string, mod: DeviceModule): Issue[] {
   return out;
 }
 
+function validateStudioLessons(lessons: Lesson[]): Issue[] {
+  const out: Issue[] = [];
+  const st: LessonCheckState = {
+    values: {}, patches: [], data: undefined, engine: {}, instances: {}, studioCables: [], routes: {}, sync: {},
+    transport: { playing: false, bpm: 120 }, arrangement: { enabled: false, loop: true, sections: [] },
+  };
+  const ids = new Set<string>();
+  lessons.forEach(l => {
+    if (ids.has(l.id)) out.push({ level: 'error', msg: `lesson ${l.id}: duplicate id` });
+    ids.add(l.id);
+    if (l.device !== 'studio') out.push({ level: 'error', msg: `lesson ${l.id}: device should be 'studio'` });
+    l.steps.forEach((s, i) => {
+      const w = `lesson ${l.id} step ${i + 1}`;
+      [s.predict, s.quiz, s.listen?.question].forEach(mc => {
+        if (mc && (mc.answer < 0 || mc.answer >= mc.options.length)) out.push({ level: 'error', msg: `${w}: answer out of range` });
+      });
+      try { s.check?.(st); } catch (e) { out.push({ level: 'error', msg: `${w}: check() throws: ${e}` }); }
+      s.checklist?.forEach((c, ci) => { try { c.check?.(st); } catch (e) { out.push({ level: 'error', msg: `${w}: checklist[${ci}] throws: ${e}` }); } });
+      if (s.kind === 'reflect' && (!s.reflect?.prompt || !s.reflect?.model)) out.push({ level: 'error', msg: `${w}: reflect needs prompt and model` });
+    });
+    l.requires?.forEach(d => { if (!DEVICES.some(x => x.id === d)) out.push({ level: 'error', msg: `lesson ${l.id}: requires unknown device ${d}` }); });
+  });
+  return out;
+}
+
 (async () => {
   const only = process.argv.slice(2);
   let errors = 0;
+  if (!only.length || only.includes('studio')) {
+    const { STUDIO_LESSONS } = await import('../lib/studio/lessons');
+    const issues = validateStudioLessons(STUDIO_LESSONS);
+    const e = issues.filter(i => i.level === 'error');
+    errors += e.length;
+    console.log(`\nstudio lessons: ${STUDIO_LESSONS.length} lessons — ${e.length} errors, ${issues.length - e.length} warnings`);
+    issues.forEach(i => console.log(`  ${i.level === 'error' ? 'ERROR' : 'warn '} ${i.msg}`));
+  }
   for (const entry of DEVICES) {
     if (only.length && !only.includes(entry.id)) continue;
     const mod = (await entry.load()).default;

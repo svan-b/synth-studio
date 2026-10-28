@@ -25,6 +25,7 @@ const { chromium } = require('playwright');
       localStorage.setItem('synth-studio-storage', JSON.stringify({ state: { currentDevice: d, devices: {}, completedLessons: [], review: {}, focusMode: true,
         studio: { rack: [{ id: d, device: d }], cables: [], routes: {}, sync: {}, bpm: 120, swing: 0, arrangement: { enabled: false, loop: true, sections: [] } } }, version: 4 }));
       sessionStorage.setItem('seeded', '1');
+      localStorage.setItem('synth-studio-welcomed', '1');
     }
   }, device);
   await page.goto(base, { waitUntil: 'networkidle' });

@@ -259,7 +259,9 @@ export const useStudioStore = create<StudioStore>()(
           instances,
           studioCables: s.studio.cables,
           routes: s.studio.routes,
+          sync: s.studio.sync,
           transport: { playing: transport.playing, bpm: s.studio.bpm },
+          arrangement: s.studio.arrangement,
         };
       };
 
@@ -843,7 +845,9 @@ export function buildCheckState(instance: string, engine: Record<string, unknown
     instances,
     studioCables: s.studio.cables,
     routes: s.studio.routes,
+    sync: s.studio.sync,
     transport: { playing: transport.playing, bpm: s.studio.bpm },
+    arrangement: s.studio.arrangement,
   };
 }
 
