@@ -46,11 +46,12 @@ test('Start, then 24 clocks per beat at exact audio-clock times', () => {
 });
 
 test('output latency compensation and manual offset shift every message', () => {
+  // performance.now() + (tickTime - currentTime) * 1000 + outputLatency * 1000 (+ offset); baseLatency is not added
   const { transport, run, sent } = setup({ offsetMs: 5 }, { base: 0.01, out: 0.02 });
   transport.start();
   run(0.3);
-  near(sent[0].ts!, 1000 + 50 + 30 + 5 - 1, 1e-6, 'Start with 30 ms latency + 5 ms offset');
-  near(clocks(sent)[0].ts!, 1000 + 50 + 30 + 5, 1e-6, 'first clock');
+  near(sent[0].ts!, 1000 + 50 + 20 + 5 - 1, 1e-6, 'Start with 20 ms output latency + 5 ms offset');
+  near(clocks(sent)[0].ts!, 1000 + 50 + 20 + 5, 1e-6, 'first clock');
 });
 
 test('compensation off: raw audio-clock mapping', () => {

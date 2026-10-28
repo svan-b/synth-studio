@@ -20,6 +20,12 @@ import type { MidiMapping, MidiSettingsState, LearnTarget } from '@/store/midi';
 /** Engines that take raw MIDI (devices built around MIDI) */
 export interface MidiReceiver {
   receiveMidi(data: number[] | Uint8Array, timeStamp?: number): void;
+  /**
+   * Echo guard: true when messages from this input port must not reach the
+   * device - e.g. "Your synth" sending to the same hardware the notes came
+   * from, which would play every note twice (local control + MIDI).
+   */
+  ignoresInput?(portName: string): boolean;
 }
 
 export const isMidiReceiver = (x: unknown): x is MidiReceiver =>
@@ -127,17 +133,28 @@ export class MidiRouter {
       case 'pitchbend': this.bend(portName, msg.value, data, timeStamp); break;
       default: {
         const target = this.targetFor(portName);
-        if (target) this.deps.receiver(target)?.receiveMidi(Array.from(data), timeStamp);
+        if (target) this.receiverFor(target, portName)?.receiveMidi(Array.from(data), timeStamp);
       }
     }
     return msg;
+  }
+
+  /** The target's raw-MIDI receiver, unless it refuses this port (echo guard) */
+  private receiverFor(instance: string, port: string): MidiReceiver | null {
+    const r = this.deps.receiver(instance);
+    return r && !r.ignoresInput?.(port) ? r : null;
+  }
+
+  /** Echo guard for notes, which travel through noteOn/noteOff rather than receiveMidi */
+  private refuses(instance: string, port: string): boolean {
+    return !!this.deps.receiver(instance)?.ignoresInput?.(port);
   }
 
   private noteOn(port: string, channel: number, note: number, velocity: number) {
     const key = `${port}|${channel}|${note}`;
     if (this.active.has(key)) this.noteOff(port, channel, note); // retrigger: close the old one first
     const instance = this.targetFor(port);
-    if (!instance) return;
+    if (!instance || this.refuses(instance, port)) return;
     const top = this.focus[this.focus.length - 1];
     const sink = top && top.instance === instance ? top : null;
     this.active.set(key, { instance, sink });
@@ -189,7 +206,7 @@ export class MidiRouter {
     if (used) return;
 
     const target = this.targetFor(port);
-    if (!target) return;
+    if (!target || this.refuses(target, port)) return;
     const receiver = this.deps.receiver(target);
     if (receiver) {
       receiver.receiveMidi(Array.from(data), timeStamp);
@@ -216,7 +233,7 @@ export class MidiRouter {
 
   private bend(port: string, value: number, data: ArrayLike<number>, timeStamp: number) {
     const target = this.targetFor(port);
-    if (!target) return;
+    if (!target || this.refuses(target, port)) return;
     const receiver = this.deps.receiver(target);
     if (receiver) {
       receiver.receiveMidi(Array.from(data), timeStamp);

@@ -59,7 +59,12 @@ export const midiRouter = new MidiRouter({
 export const midiClockOut = new MidiClockOut({
   transport,
   ctx: () => (typeof window === 'undefined' ? null : getAudioContext()),
-  settings: () => useMidiStore.getState().clockOut,
+  settings: () => {
+    const { clockOut, clockIn } = useMidiStore.getState();
+    // Never send clock back to the device we follow (MIDI thru would loop it)
+    if (!clockIn.enabled || !clockIn.port) return clockOut;
+    return { ...clockOut, targets: clockOut.targets.filter(t => t.name !== clockIn.port) };
+  },
   resolve: ref => midi.findOutput(ref),
 });
 

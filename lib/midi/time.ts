@@ -6,16 +6,18 @@
 // performance.now() milliseconds. So:
 //
 //   timestamp = performance.now() + (audioTime - ctx.currentTime) * 1000
-//             + (ctx.baseLatency + ctx.outputLatency) * 1000     <- you HEAR audio this late
+//             + ctx.outputLatency * 1000       <- you HEAR the twins this much later
 //             + user offset
 //
 // Adding the output latency makes hardware sound together with the twins you
-// hear through your speakers. If you monitor the hardware back *through* the
+// hear through your speakers. ctx.baseLatency (the browser's own buffering) is
+// shown in the MIDI settings but not added: put it in the offset if your
+// hardware still sounds early. If you monitor the hardware back *through* the
 // studio (Audio input), use a negative offset of about the input latency.
 // ============================================================================
 
 export interface LatencyOptions {
-  /** Add the context's base + output latency (default true) */
+  /** Add the context's output latency (default true) */
   compensate?: boolean;
   /** Extra milliseconds (+ later, - earlier) */
   offsetMs?: number;
@@ -23,11 +25,16 @@ export interface LatencyOptions {
 
 type Ctx = Pick<BaseAudioContext, 'currentTime'> & { baseLatency?: number; outputLatency?: number };
 
-/** Seconds of audio output latency the browser reports (0 where it doesn't) */
+const seconds = (v: number | undefined) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
+
+/** Seconds of audio output latency the browser reports (0 where it doesn't, e.g. older Safari) */
 export function outputLatency(ctx: Ctx): number {
-  const base = Number.isFinite(ctx.baseLatency) ? Number(ctx.baseLatency) : 0;
-  const out = Number.isFinite(ctx.outputLatency) ? Number(ctx.outputLatency) : 0;
-  return Math.max(0, base) + Math.max(0, out);
+  return seconds(ctx.outputLatency);
+}
+
+/** Seconds of processing latency inside the browser (shown for information) */
+export function baseLatency(ctx: Ctx): number {
+  return seconds(ctx.baseLatency);
 }
 
 /** Map an audio-context time to a performance.now() timestamp for MIDIOutput.send */

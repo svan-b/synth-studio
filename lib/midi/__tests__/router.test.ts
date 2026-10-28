@@ -196,6 +196,37 @@ test('mappings to instruments not in the rack are ignored', () => {
   assert.equal(values.dfam.decay, undefined);
 });
 
+test('echo guard: a device refusing a port gets nothing from it; other ports still play it', () => {
+  const calls: string[] = [];
+  const raw: string[] = [];
+  const settings: Pick<MidiSettingsState, 'inputChannel' | 'inputTargets' | 'mappings'> = { inputChannel: 'omni', inputTargets: {}, mappings: [] };
+  const router = new MidiRouter({
+    settings: () => settings,
+    noteOn: (i, n) => calls.push(`on ${i} ${n}`),
+    noteOff: (i, n) => calls.push(`off ${i} ${n}`),
+    // "Your synth" sends to the hardware called "Sub 37": notes from the Sub 37's own keys must not echo back
+    receiver: () => ({ receiveMidi: d => { raw.push(Array.from(d).join(',')); }, ignoresInput: port => port === 'Sub 37' }),
+    spec: () => undefined,
+    value: () => undefined,
+    apply: () => undefined,
+    inRack: () => true,
+    fallbackFocus: () => 'midi-synth',
+    learn: () => ({ armed: false, target: null }),
+    addMapping: m => ({ ...m, id: 'x', createdAt: 0 }),
+  });
+  router.handle('Sub 37', [0x90, 60, 100]);
+  router.handle('Sub 37', [0x80, 60, 0]);
+  router.handle('Sub 37', [0xe0, 0, 80]);
+  router.handle('Sub 37', [0xb0, 74, 10]);
+  assert.deepEqual(calls, []);
+  assert.deepEqual(raw, []);
+  router.handle('Keystep', [0x90, 62, 100]);
+  router.handle('Keystep', [0x80, 62, 0]);
+  router.handle('Keystep', [0xb0, 74, 10]);
+  assert.deepEqual(calls, ['on midi-synth 62', 'off midi-synth 62']);
+  assert.deepEqual(raw, ['176,74,10']);
+});
+
 test('ccToValue covers every control kind', () => {
   assert.equal(ccToValue(SPECS.dfam.decay, 0), 0);
   assert.equal(ccToValue(SPECS.dfam.decay, 127), 10);
