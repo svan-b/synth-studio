@@ -76,6 +76,7 @@ interface Hold {
   timer: ReturnType<typeof setTimeout> | null;
 }
 
+const NO_STEPS: Readonly<Record<number, Step>> = Object.freeze({});
 const MODE_COLOR: Record<TrigKeysMode, string> = { trig: C.red, accent: C.pink, slide: C.yellow, pslide: C.cyan, mute: C.green };
 const range = (a: number, b: number) => Array.from({ length: Math.abs(b - a) + 1 }, (_, i) => Math.min(a, b) + i);
 
@@ -88,7 +89,8 @@ export default function TrigKeys(props: TrigKeysProps) {
   const page = pageOf(ctx, project, pattern, track, props.page);
   const pat = getPattern(project, pattern);
   const trk = pat.tracks[track];
-  const steps = trk?.steps ?? {};
+  // A stable fallback: the hold gesture compares the steps object to detect edits
+  const steps = trk?.steps ?? NO_STEPS;
   const len = trackLength(pat, track);
   const st = seqStateOf(ctx.engine);
   const playStep = st?.playing && st.pattern === pattern ? st.steps[track] ?? -1 : -1;
