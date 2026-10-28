@@ -203,9 +203,12 @@ export interface Step {
   cond?: TrigCondition;
   /** Retrig is on while this is set (Analog Rytm) */
   retrig?: Retrig;
-  /** Note slide from the previous note (Analog Four) */
+  /** Note slide: the previous note's pitch glides to this trig's note (Analog Four) */
   slide?: true;
-  /** Parameter slide from the previous trig's locks (Analog Four) */
+  /**
+   * Parameter slide: this trig's parameter values glide to the next trig's,
+   * arriving when the next trig is reached (Analog Four). See TrigEvent.slideTo.
+   */
   pslide?: true;
   /** Accent (Analog Rytm, also Analog Four) */
   accent?: true;
@@ -231,6 +234,11 @@ export interface Track extends TrackDefaults {
   speed?: Speed;
   /** Track muted in this pattern */
   mute?: boolean;
+  /**
+   * Track trig probability 0..100 % (missing = 100). Applies to the trigs of the
+   * track that have no trig condition (A4 OS 1.50 / AR OS 1.60).
+   */
+  prob?: number;
 }
 
 export interface Pattern {
@@ -242,9 +250,18 @@ export interface Pattern {
   scaleMode: ScaleMode;
   /** PER TRACK: master length in master steps (1..1024), MASTER_INF (0) = never restart all tracks */
   master: number;
-  /** PER TRACK: master change - steps the pattern plays before a cued pattern starts (1..1024), CHANGE_OFF (0) = at the master length */
+  /**
+   * PER TRACK: master change - master steps the pattern plays before a cued or
+   * chained pattern starts (1..1024). CHANGE_OFF (0) = at the master length; with
+   * the master length at INF too the pattern plays forever and a SEQUENTIAL
+   * change never happens (as on the hardware - DIRECT modes still work).
+   */
   change: number;
-  /** Swing 50..80 % (50 = straight): delays every even 16th */
+  /**
+   * Swing 50..80 % (50 = straight): the share of each pair of steps taken by the
+   * first one, so every second step (2, 4, 6...) is late by (swing-50)/50 of a
+   * step. Counted on the track's own steps, like the hardware's default swing trigs.
+   */
   swing: number;
   /** Opaque reference to the device's kit / sound setup ('' = none) */
   kit: string;
@@ -261,6 +278,8 @@ export interface SongRow {
   tempo?: number;
   /** Tracks muted while this row plays (replaces the pattern's own track mutes) */
   mutes?: number[];
+  /** Semitones added to every note while this row plays (Analog Four song transpose), -48..48 */
+  transpose?: number;
 }
 
 export interface Song {
@@ -301,15 +320,25 @@ export interface TrigEvent {
   time: number;
   /** Gate length in seconds; Infinity for LEN INF (the note-off comes with the next trig or stop) */
   duration: number;
+  /** MIDI note: the step's note (or the track default) plus any song-row transpose */
   note: number;
-  /** 1..127, after accent-free retrig velocity fading */
+  /** 1..127, after retrig velocity fading (accent is a separate flag) */
   velocity: number;
   /** The trig's parameter locks - apply for this note only. Shared with the project data: do not mutate. */
   locks: Readonly<Locks>;
   /** Lock trig: apply `locks` to the sounding voice, don't start a note */
   trigless: boolean;
+  /** Note slide: glide from the previous note to `note`. The previous gate stays open (no note-off) when they overlap. */
   slide: boolean;
+  /** Parameter slide starts here: glide this trig's values to `slideTo`'s */
   paramSlide: boolean;
+  /**
+   * Parameter slide target: the next trig on the track (its audio time and
+   * locks; parameters it doesn't lock glide back to the track values). Looked
+   * up in the playing pattern, so a pattern change before it may make it moot.
+   * Null unless `paramSlide`.
+   */
+  slideTo: { time: number; locks: Readonly<Locks> } | null;
   accent: boolean;
   /** This hit belongs to a retrigged step */
   retrig: boolean;
@@ -332,7 +361,10 @@ export interface SeqState {
   playing: boolean;
   /** Following the studio transport (MIDI-clock style) */
   following: boolean;
+  /** Play mode in effect (PATTERN while the song arranger drives the patterns) */
   mode: PlayMode;
+  /** The studio song arranger picked the playing pattern (selectPattern) */
+  arranged: boolean;
   /** Audible pattern */
   pattern: PatternId | null;
   /** Cued pattern (blinks on the hardware) */

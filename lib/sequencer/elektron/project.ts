@@ -159,6 +159,7 @@ function normalizeTrack(x: unknown, d: TrackDefaults): Track {
   if (typeof x.length === 'number') t.length = int(x.length, 1, MAX_STEPS, 16);
   if (typeof x.speed === 'string' && (SPEEDS as readonly string[]).includes(x.speed)) t.speed = x.speed as Speed;
   if (x.mute === true) t.mute = true;
+  if (typeof x.prob === 'number') { const pr = int(x.prob, 0, 100, 100); if (pr < 100) t.prob = pr; }
   return t;
 }
 
@@ -187,6 +188,7 @@ function normalizeRow(x: unknown, n: number): SongRow | null {
     const m = x.mutes.filter((t): t is number => typeof t === 'number' && Number.isInteger(t) && t >= 0 && t < n);
     r.mutes = Array.from(new Set(m)).sort((a, b) => a - b);
   }
+  if (typeof x.transpose === 'number') { const tr = int(x.transpose, -48, 48, 0); if (tr) r.transpose = tr; }
   return r;
 }
 
@@ -221,6 +223,21 @@ export function migrateProject(saved: unknown, tracks: number, defaults?: Partia
   if (typeof src.mode === 'string' && (PLAY_MODES as readonly string[]).includes(src.mode)) base.mode = src.mode as PlayMode;
   if (typeof src.changeMode === 'string' && (CHANGE_MODES as readonly string[]).includes(src.changeMode)) base.changeMode = src.changeMode as ChangeMode;
   return base;
+}
+
+/**
+ * DeviceModule.data for an Elektron-style instrument:
+ *
+ *   data: projectData({ tracks: 12, defaults: { note: 60, vel: 100 } }),
+ *
+ * `initial` creates an empty project; `migrate` repairs saved data and returns
+ * it unchanged (same object) when it already is a valid project of this size.
+ */
+export function projectData(opts: CreateProjectOptions): { initial: () => Project; migrate: (saved: unknown) => unknown } {
+  return {
+    initial: () => createProject(opts),
+    migrate: saved => (isProject(saved) && saved.tracks === Math.max(1, Math.round(opts.tracks)) ? saved : migrateProject(saved, opts.tracks, opts.defaults)),
+  };
 }
 
 /** Cheap structural check (does not validate every step) */
@@ -305,6 +322,21 @@ export function patternHasContent(pattern: Pattern | undefined): boolean {
   if (!pattern) return false;
   for (const t of pattern.tracks) for (const _ in t.steps) return true;
   return false;
+}
+
+/**
+ * DeviceModule.studio.patterns: the patterns that hold trigs, for the song
+ * arranger ("A01", or "A01 NAME" when named), in bank order.
+ */
+export function arrangerPatterns(data: unknown, tracks = 4): { id: PatternId; label?: string }[] {
+  const p = asProject(data, tracks);
+  const out: { id: PatternId; label?: string }[] = [];
+  for (const id of ALL_PATTERN_IDS) {
+    const pat = p.patterns[id];
+    if (!patternHasContent(pat)) continue;
+    out.push(pat!.name ? { id, label: `${id} ${pat!.name}` } : { id });
+  }
+  return out;
 }
 
 /** Sorted step indices of the track's note trigs (lesson checks: `trigSteps(...)` equals [0, 4, 8, 12]) */

@@ -213,6 +213,18 @@ export function setTrackMute(p: Project, id: PatternId, track: number, mute: boo
   });
 }
 
+/** Track trig probability 0..100 % for trigs without a condition (100 = always) */
+export function setTrackProb(p: Project, id: PatternId, track: number, prob: number): Project {
+  const v = clampInt(prob, 0, 100);
+  return withTrack(p, id, track, t => {
+    if ((t.prob ?? 100) === v) return t;
+    const next = { ...t };
+    if (v < 100) next.prob = v;
+    else delete next.prob;
+    return next;
+  });
+}
+
 /** PER TRACK length / speed of one track (null = follow the pattern) */
 export function setTrackScale(p: Project, id: PatternId, track: number, patch: { length?: number | null; speed?: Speed | null }): Project {
   return withTrack(p, id, track, t => {
@@ -242,7 +254,15 @@ export function updatePatternSettings(p: Project, id: PatternId, patch: PatternS
     if (patch.name !== undefined) n.name = String(patch.name).slice(0, 16);
     if (patch.length !== undefined) n.length = clampInt(patch.length, 1, MAX_STEPS);
     if (patch.speed !== undefined && (SPEEDS as readonly string[]).includes(patch.speed)) n.speed = patch.speed;
-    if (patch.scaleMode !== undefined) n.scaleMode = patch.scaleMode === 'track' ? 'track' : 'pattern';
+    if (patch.scaleMode !== undefined) {
+      const mode = patch.scaleMode === 'track' ? 'track' : 'pattern';
+      // Entering PER TRACK: the master length / change start at the pattern length, so playback doesn't change
+      if (mode === 'track' && pat.scaleMode !== 'track') {
+        if (patch.master === undefined) n.master = n.length;
+        if (patch.change === undefined) n.change = n.length;
+      }
+      n.scaleMode = mode;
+    }
     if (patch.master !== undefined) n.master = clampInt(patch.master, 0, MASTER_MAX);
     if (patch.change !== undefined) n.change = clampInt(patch.change, 0, MASTER_MAX);
     if (patch.swing !== undefined) n.swing = clampInt(patch.swing, SWING_MIN, SWING_MAX);
@@ -318,7 +338,9 @@ export function chainMove(p: Project, from: number, to: number): Project {
 // Song
 // ----------------------------------------------------------------------------
 
-export type SongRowPatch = { pattern?: PatternId; repeats?: number; length?: number | null; tempo?: number | null; mutes?: number[] | null };
+export type SongRowPatch = {
+  pattern?: PatternId; repeats?: number; length?: number | null; tempo?: number | null; mutes?: number[] | null; transpose?: number | null;
+};
 
 function patchRow(r: SongRow, patch: SongRowPatch, tracks: number): SongRow {
   const n: SongRow = { ...r };
@@ -330,6 +352,8 @@ function patchRow(r: SongRow, patch: SongRowPatch, tracks: number): SongRow {
   else if (patch.tempo !== undefined) n.tempo = Math.min(TEMPO_MAX, Math.max(TEMPO_MIN, Math.round(patch.tempo * 10) / 10));
   if (patch.mutes === null) delete n.mutes;
   else if (patch.mutes !== undefined) n.mutes = Array.from(new Set(patch.mutes.filter(t => t >= 0 && t < tracks))).sort((a, b) => a - b);
+  if (patch.transpose === null || patch.transpose === 0) delete n.transpose;
+  else if (patch.transpose !== undefined) n.transpose = clampInt(patch.transpose, -48, 48);
   return n;
 }
 

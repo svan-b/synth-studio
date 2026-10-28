@@ -12,6 +12,7 @@ import {
   interceptForLocks, migrateProject, patchStep, setChain, setLock, setPlayMode, setStep, songAddRow, toggleTrig,
   trigSteps, updatePatternSettings, updateSteps, setTrackScale, setTrackMute, compileCondition, conditionString,
   setChangeMode, getStep, setTrackDefault, mulberry32, clearPattern, copyPattern, pastePattern, songUpdateRow,
+  setTrackProb, projectData, arrangerPatterns, isProject,
   type LockOptions, type Pattern, type PatternId, type Project, type SequencerOptions, type Step, type TimerApi,
   type TransportLike, type TrigEvent,
 } from '../lib/sequencer/elektron';
@@ -257,6 +258,20 @@ test('patchStep drops empty fields', () => {
   eq(patchStep({ micro: 3, cond: '1:2', slide: true, locks: { a: 1 } }, { micro: 0, cond: '', slide: false, locks: {} }), {});
 });
 
+test('module helpers: projectData keeps valid saves, arrangerPatterns lists patterns with trigs', () => {
+  const pd = projectData({ tracks: 12, defaults: { note: 36 } });
+  const init = pd.initial() as Project;
+  eq([init.tracks, init.defaults[11].note, init.active], [12, 36, 'A01']);
+  ok(pd.migrate(init) === init, 'a valid project is returned as is (no store write)');
+  const fixed = pd.migrate({ tracks: 12, patterns: { A03: { tracks: [{ steps: { 2: {} } }] } } }) as Project;
+  ok(isProject(fixed) && fixed.tracks === 12, 'old data is migrated');
+  let p = setStep(init, 'C05', 3, 0, {});
+  p = updatePatternSettings(p, 'C05', { name: 'BREAK' });
+  p = setStep(p, 'A02', 0, 4, {});
+  p = updatePatternSettings(p, 'H16', { name: 'EMPTY' });
+  eq(arrangerPatterns(p, 12), [{ id: 'A02' }, { id: 'C05', label: 'C05 BREAK' }]);
+});
+
 test('copy / paste / clear pattern', () => {
   const p = proj(4, { 0: { 0: {}, 4: { note: 50 } } });
   const clip = copyPattern(p, 'A01');
@@ -357,13 +372,24 @@ test('swing delays every even 16th by (swing-50)/50 of a 16th', () => {
   nearAll(times(r).slice(0, 4), [T0, T0 + STEP120 + d, T0 + 2 * STEP120, T0 + 3 * STEP120 + d]);
 });
 
-test('swing at 2x only moves steps that start on an even 16th', () => {
+test('swing follows the track\'s own steps: at 2x every second 32nd moves by a share of a 32nd', () => {
+  // Hardware: swing trigs are step positions (default 2, 4, 6...), not the 16th grid
   const r = rig(proj(1, { 0: { 0: {}, 1: {}, 2: {}, 3: {} } }, { swing: 75, speed: '2x' }));
   r.seq.start();
   r.clock.advance(0.4);
   const h = STEP120 / 2;
-  const d = 0.5 * STEP120;
-  nearAll(times(r).slice(0, 4), [T0, T0 + h, T0 + 2 * h + d, T0 + 3 * h]);
+  const d = 0.5 * h;
+  nearAll(times(r).slice(0, 4), [T0, T0 + h + d, T0 + 2 * h, T0 + 3 * h + d]);
+});
+
+test('swing counts steps across loops: with an odd length the swung steps shift every loop', () => {
+  const r = rig(proj(1, { 0: { 0: {}, 1: {}, 2: {} } }, { swing: 60, length: 3 }));
+  r.seq.start();
+  r.clock.advance(T0 + 6 * STEP120 - STEP120);
+  const d = 0.2 * STEP120;
+  const late = r.trigs.map((e, i) => Math.abs(e.time - (T0 + i * STEP120 + d)) < 1e-9);
+  eq(r.trigs.map(e => e.step), [0, 1, 2, 0, 1, 2]);
+  eq(late, [false, true, false, true, false, true]);
 });
 
 test('positive micro timing: +12 = half a step later', () => {
@@ -528,6 +554,22 @@ test('probability: seeded, deterministic, roughly right', () => {
   ok(xs.every(x => x >= 0 && x < 1), 'rng range');
 });
 
+test('track probability: thins out trigs without a condition, leaves conditional trigs and PRE alone', () => {
+  let p = proj(1, { 0: { 0: {}, 1: { cond: '1:2' }, 2: { cond: 'PRE' } } }, { length: 4 });
+  p = setTrackProb(p, 'A01', 0, 30);
+  eq(p.patterns.A01.tracks[0].prob, 30);
+  const r = rig(p);
+  r.seq.start();
+  r.clock.advance(T0 + 400 * 4 * STEP120 - STEP120);
+  const plain = r.trigs.filter(e => e.step === 0).length;
+  const ab = r.trigs.filter(e => e.step === 1).map(e => e.loop);
+  const pre = r.trigs.filter(e => e.step === 2).map(e => e.loop);
+  ok(plain > 80 && plain < 160, `30% of 400 ~ 120 (got ${plain})`);
+  eq(ab.length, 200, 'A:B trigs ignore the track probability');
+  eq(pre, ab, 'PRE reads the 1:2 result, not the probability roll');
+  eq(setTrackProb(p, 'A01', 0, 100).patterns.A01.tracks[0].prob, undefined, '100 % is stored as nothing');
+});
+
 test('conditions are evaluated on muted tracks (NEI keeps working), but nothing plays', () => {
   let p = updatePatternSettings(proj(2, { 0: { 0: { cond: '1:2' } }, 1: { 0: { cond: 'NEI' } } }), 'A01', { length: 1 });
   p = setTrackMute(p, 'A01', 0, true);
@@ -629,6 +671,19 @@ test('slide keeps the previous gate open (legato into the slide note)', () => {
   eq(r.offs.map(o => o.note), [55], 'no off for the first note; the slide note ends the phrase');
   near(r.offs[0].time, T0 + 3 * STEP120);
   ok(r.trigs[1].slide, 'slide flag');
+});
+
+test('parameter slide: the slide trig carries the next trig\'s time and locks (gaps skipped, wraps)', () => {
+  const r = rig(proj(1, { 0: { 0: { pslide: true, locks: { cutoff: 10 } }, 3: { trigless: true, locks: { cutoff: 90 } }, 6: { pslide: true } } }, { length: 8, swing: 60 }));
+  r.seq.start();
+  r.clock.advance(T0 + 8 * STEP120 - STEP120);
+  const [a, b, c] = r.trigs;
+  ok(a.paramSlide && a.slideTo !== null, 'slide target present');
+  near(a.slideTo!.time, b.time, 1e-9, 'arrives at the next trig (swing included)');
+  eq(a.slideTo!.locks, { cutoff: 90 });
+  eq(b.slideTo, null, 'no slide on a plain trig');
+  near(c.slideTo!.time, T0 + 8 * STEP120, 1e-9, 'wraps to step 1 of the next loop');
+  eq(c.slideTo!.locks, { cutoff: 10 });
 });
 
 test('lock trigs carry locks without notes or note-offs', () => {
@@ -769,6 +824,48 @@ test('handleEvent routes the UI kit events', () => {
   ok(!r.seq.handleEvent('something-else'), 'unknown events are not handled');
 });
 
+test('DIRECT START waits for the next step, so the new pattern stays on the step grid', () => {
+  const p = setChangeMode(twoPatterns(), 'direct-start');
+  const tr = new FakeTransport();
+  const r = rig(p);
+  r.seq.follow(tr);
+  tr.start(0);
+  tr.run(6 * 5 + 2); // mid-step 5
+  r.seq.queuePattern('A02');
+  tr.run(20);
+  eq(r.patterns.map(x => x.id), ['A01', 'A02']);
+  near(r.patterns[1].time, tr.timeOf(36), 1e-9, 'on the step 7 boundary');
+  const first2 = r.trigs.find(e => e.note === 2)!;
+  eq(first2.step, 0);
+  near(first2.time, tr.timeOf(36));
+});
+
+test('PER TRACK with master length INF and CHG OFF: a SEQUENTIAL change never happens, DIRECT still does', () => {
+  let p = twoPatterns({ scaleMode: 'track', master: 0, change: 0 });
+  const r = rig(p);
+  r.seq.start();
+  r.clock.advance(T0 + 2 * STEP120);
+  r.seq.queuePattern('A02');
+  r.clock.advance(64 * STEP120);
+  eq(r.patterns.map(x => x.id), ['A01'], 'still the first pattern');
+  eq(r.seq.getState().queued, 'A02', 'the cued pattern keeps blinking');
+  eq(r.trigs.filter(e => e.note === 1).map(e => e.loop).slice(-1), [4], 'tracks loop on their own');
+  p = setChangeMode(p, 'direct-jump');
+  r.seq.setProject(p);
+  r.seq.queuePattern('A02');
+  r.clock.advance(0.3);
+  eq(r.patterns.map(x => x.id), ['A01', 'A02']);
+});
+
+test('entering PER TRACK keeps playback: master length and change start at the pattern length', () => {
+  let p = proj(1, { 0: { 0: {} } }, { length: 32 });
+  p = updatePatternSettings(p, 'A01', { scaleMode: 'track' });
+  eq([p.patterns.A01.master, p.patterns.A01.change], [32, 32]);
+  p = updatePatternSettings(p, 'A01', { scaleMode: 'pattern' });
+  p = updatePatternSettings(p, 'A01', { scaleMode: 'track', master: 0 });
+  eq([p.patterns.A01.master, p.patterns.A01.change], [0, 32]);
+});
+
 test('a lock trig with a condition only applies its locks when the condition passes', () => {
   const p = updatePatternSettings(proj(1, { 0: { 0: { trigless: true, cond: '1:2', locks: { x: 1 } } } }), 'A01', { length: 1 });
   const r = rig(p);
@@ -860,6 +957,32 @@ test('song: loop back to loopRow, and play from a row', () => {
   r.seq.start();
   r.clock.advance(T0 + (8 + 16 + 8 + 16) * STEP120 + 0.05);
   eq(r.rows.map(x => x.row), [1, 2, 1, 2, 1]);
+});
+
+test('song row transpose shifts the notes of that row only', () => {
+  let p = threePatterns();
+  p = songAddRow(p, { pattern: 'A02', repeats: 1, transpose: 5 });
+  p = songAddRow(p, { pattern: 'A02', repeats: 1 });
+  p = setPlayMode(p, 'song');
+  eq(p.song.rows[0].transpose, 5);
+  eq(songUpdateRow(p, 0, { transpose: 0 }).song.rows[0].transpose, undefined);
+  const r = rig(p);
+  r.seq.start();
+  r.clock.advance(T0 + 16 * STEP120 - STEP120);
+  eq(r.trigs.map(e => e.note), [7, 2]);
+});
+
+test('song rows still advance when a pattern\'s change length is INF', () => {
+  let p = threePatterns();
+  p = updatePatternSettings(p, 'A02', { scaleMode: 'track', master: 0, change: 0 });
+  p = songAddRow(p, { pattern: 'A02', repeats: 2 });
+  p = songAddRow(p, { pattern: 'B03', repeats: 1 });
+  p = setPlayMode(p, 'song');
+  const r = rig(p);
+  r.seq.start();
+  r.clock.advance(T0 + 16 * STEP120 + 0.05);
+  eq(r.rows.map(x => `${x.row}.${x.repeat}`), ['0.0', '0.1', '1.0']);
+  near(r.rows[2].time, T0 + 16 * STEP120, 1e-9, 'rows fall back to the pattern length');
 });
 
 test('song row patch: repeats edited while playing', () => {
@@ -967,6 +1090,87 @@ test('song mode on the transport: rows advance on ticks, row tempo is left to th
   eq(r.rows.map(x => `${x.row}.${x.repeat}`), ['0.0', '0.1', '1.0']);
   nearAll(r.rows.map(x => x.time), [0, 48, 96].map(t => tr.timeOf(t)));
   eq(r.tempos.length, 0);
+});
+
+/** Song-arranger stand-in: on bar ticks it picks each section's pattern, like lib/studio/arranger.ts */
+function arrangerOn(tr: FakeTransport, seq: ElektronSequencer, sections: PatternId[], viaEvent = false) {
+  return tr.onTick(t => {
+    if (t.tick % 96 !== 0) return;
+    const id = sections[t.bar % sections.length];
+    if (viaEvent) seq.handleEvent('arranger:pattern', { id, time: t.time });
+    else seq.selectPattern(id, t.time);
+  });
+}
+
+test('selectPattern (arranger): each bar line starts its section\'s pattern from step 1, overriding song mode', () => {
+  let p = threePatterns();
+  p = songAddRow(p, { pattern: 'A01', repeats: 4 });
+  p = setPlayMode(p, 'song');
+  const tr = new FakeTransport();
+  const r = rig(p);
+  arrangerOn(tr, r.seq, ['A02', 'B03', 'A02'], true); // registered first, as at app start
+  r.seq.follow(tr);
+  tr.start(0);
+  tr.run(96 * 3);
+  eq(r.patterns.map(x => x.id), ['A02', 'B03', 'A02']);
+  nearAll(r.patterns.map(x => x.time), [0, 96, 192].map(t => tr.timeOf(t)));
+  // A02 is 8 steps long: it loops inside its bar, then B03 starts on the bar line
+  eq(r.trigs.map(e => `${e.note}@${e.step}`), ['2@0', '2@0', '3@0', '2@0', '2@0']);
+  nearAll(r.trigs.map(e => e.time), [0, 48, 96, 192, 240].map(t => tr.timeOf(t)));
+  eq(r.rows.length, 0, 'the song does not run while arranged');
+  const s = r.seq.getState();
+  eq([s.arranged, s.mode], [true, 'pattern']);
+});
+
+test('selectPattern: a section starting mid-song (play from here) and a stop hand control back', () => {
+  const p = setPlayMode(songAddRow(threePatterns(), { pattern: 'A01', repeats: 1 }), 'song');
+  const tr = new FakeTransport();
+  const r = rig(p);
+  const off = arrangerOn(tr, r.seq, ['A01', 'B03']);
+  r.seq.follow(tr);
+  tr.start(0, 96 * 5); // "play from" bar 6 (a B03 section)
+  tr.run(10);
+  eq(r.trigs.map(e => e.note), [3], 'the section pattern starts from step 1, not aligned to tick 0');
+  near(r.trigs[0].time, tr.timeOf(96 * 5));
+  tr.stop();
+  off();
+  eq(r.seq.getState().arranged, false);
+  tr.start(0);
+  tr.run(10);
+  eq(r.rows.map(x => x.row), [0], 'without the arranger the song plays again');
+});
+
+test('selectPattern called late (after its tick was scheduled) stays lined up with the bar', () => {
+  let p = threePatterns();
+  p = setStep(p, 'B03', 0, 1, { note: 31 });
+  const tr = new FakeTransport();
+  const r = rig(p);
+  r.seq.follow(tr);
+  const off = arrangerOn(tr, r.seq, ['A01', 'B03']); // registered after the sequencer: always late
+  tr.start(0);
+  tr.run(96 + 20);
+  off();
+  const b = r.trigs.filter(e => e.pattern === 'B03');
+  eq(b.map(e => e.step), [1], 'step 1 was lost, step 2 plays on its grid position');
+  near(b[0].time, tr.timeOf(96 + 6));
+});
+
+test('selectPattern on the internal clock: switches on the tick at the given time; stopped = plays on start', () => {
+  const r = rig(threePatterns());
+  r.seq.selectPattern('B03');
+  r.seq.start();
+  r.clock.advance(0.2);
+  eq(r.patterns.map(x => x.id), ['B03']);
+  eq(r.seq.getState().arranged, true);
+  const at = T0 + 4 * STEP120;
+  r.seq.selectPattern('A02', at);
+  r.clock.advance(1);
+  eq(r.patterns.map(x => x.id), ['B03', 'A02']);
+  near(r.patterns[1].time, at, 1e-9);
+  r.seq.stop();
+  r.seq.start();
+  r.clock.advance(0.2);
+  eq(r.patterns[2].id, 'A01', 'after a stop the project\'s own selection plays');
 });
 
 test('works with the real studio Transport class (fake AudioContext, manual pump)', () => {

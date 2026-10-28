@@ -19,7 +19,8 @@
 //     new trig can still cut them
 // Pattern changes (SEQUENTIAL / DIRECT START / DIRECT JUMP / TEMP JUMP), chain
 // and song advance happen on tick boundaries computed from the pattern's change
-// length.
+// length. selectPattern(id, time) is the song arranger's hook: the pattern starts
+// from step 1 on the tick at `time` (a bar line) and plays until stop.
 //
 // Allocation: the tick path works on typed arrays and preallocated state; only
 // emitted TrigEvents (one small object per hit) and UI snapshots allocate.
@@ -113,6 +114,8 @@ interface CTrack {
   q: number;
   len: number;
   mute: boolean;
+  /** Track trig probability 0..100 for trigs without a condition */
+  prob: number;
   note: number;
   vel: number;
   nlen: number;
@@ -133,9 +136,11 @@ interface CPattern {
   q: number;
   /** Ticks after which every track restarts (0 = INF) */
   masterTicks: number;
-  /** Pattern change grid in ticks */
+  /** Pattern change grid in ticks (0 = INF: the pattern never hands over in SEQUENTIAL mode) */
   cycleTicks: number;
-  /** Swing as a fraction of a 16th (0 .. 0.6) */
+  /** A finite cycle for cued fills and song rows: cycleTicks, or the pattern length when INF */
+  loopTicks: number;
+  /** Swing: delay of every second step as a fraction of the step (0 .. 0.6) */
   swing: number;
 }
 
@@ -151,6 +156,7 @@ const SW_ROW = 5;
 const SW_MODE = 6;
 const SW_ROW_JUMP = 7;
 const SW_CHAIN_JUMP = 8;
+const SW_SELECT = 9;
 
 // UI event kinds
 const UI_STEP = 1;
@@ -228,6 +234,16 @@ export class ElektronSequencer {
   private rowRepTicks = 96;
   private rowRepeats = 1;
   private rowForce = false;
+  /** Song row transpose in semitones */
+  private transpose = 0;
+
+  // --- song arranger (selectPattern)
+  private selId: PatternId | null = null;
+  private selTime = 0;
+  /** Late selection (its tick was already scheduled): the tick its step 1 belongs to, else -1 */
+  private selOrigin = -1;
+  /** The arranger picked the playing pattern: PATTERN mode until stop */
+  private external = false;
 
   // --- next switch (recomputed lazily)
   private planDirty = true;
@@ -247,6 +263,8 @@ export class ElektronSequencer {
   private tStep: Int32Array;
   private tNext: Float64Array;
   private tLoop: Int32Array;
+  /** Steps the track has started in this pattern instance (swing: every second one) */
+  private tCount: Int32Array;
   private tCond: Int8Array;
   private tPre: Float64Array;
   private offT: Float64Array;
@@ -300,6 +318,7 @@ export class ElektronSequencer {
     this.tStep = new Int32Array(n).fill(-1);
     this.tNext = new Float64Array(n);
     this.tLoop = new Int32Array(n);
+    this.tCount = new Int32Array(n).fill(-1);
     this.tCond = new Int8Array(n).fill(-1);
     this.tPre = new Float64Array(n).fill(-1);
     this.offT = new Float64Array(n);
@@ -450,6 +469,27 @@ export class ElektronSequencer {
     this.changed();
   }
 
+  /**
+   * The studio song arranger's hook (engine.event('arranger:pattern', { id, time })):
+   * play `id` from step 1 starting on the tick at audio time `atTime` (a bar
+   * line), then loop it in PATTERN mode until playback stops, whatever the
+   * project's own play mode. Stopped: it plays from the top on the next start.
+   * Without `atTime` it starts on the next step.
+   * If the tick at `atTime` was already scheduled (the call came late), the
+   * pattern still lines up with `atTime` but joins on the next tick.
+   */
+  selectPattern(id: PatternId, atTime?: number): void {
+    if (!isPatternId(id)) return;
+    this.selId = id;
+    this.selTime = typeof atTime === 'number' && Number.isFinite(atTime) ? atTime : -Infinity;
+    this.selOrigin = -1;
+    if (this.cur && this.selTime !== -Infinity && this.selTime <= this.time + this.dur * 0.5) {
+      this.selOrigin = this.lastTick - Math.max(0, Math.round((this.time - this.selTime) / this.dur));
+    }
+    this.planDirty = true;
+    this.changed();
+  }
+
   /** Song row to play from: the next start, or now (per change mode) when the song is playing */
   playSong(row: number): void {
     const r = Math.max(0, Math.round(row));
@@ -490,9 +530,10 @@ export class ElektronSequencer {
   /** FILL for one pattern cycle, starting when the pattern next loops (stopped: the first cycle) */
   cueFill(): void {
     if (this.cur) {
-      const s = this.nextCycle(this.lastTick + 1);
+      const c = this.cur.loopTicks;
+      const s = this.nextOnGrid(this.lastTick + 1, this.patStart, c);
       this.cueStart = s;
-      this.cueEnd = s + this.cur.cycleTicks;
+      this.cueEnd = s + c;
     } else {
       this.cuePending = true;
     }
@@ -537,6 +578,9 @@ export class ElektronSequencer {
         return true;
       case 'seq:start': this.start(); return true;
       case 'seq:stop': this.stop(); return true;
+      case 'arranger:pattern':
+        if (typeof p.id === 'string') this.selectPattern(p.id, typeof p.time === 'number' ? p.time : undefined);
+        return true;
     }
     return false;
   }
@@ -634,8 +678,9 @@ export class ElektronSequencer {
     return this.base + (tick - this.T) * this.dur + this.transportSwing(tick);
   }
 
-  private swingAt(pos: number, cp: CPattern): number {
-    return cp.swing > 0 && pos % 12 === TICKS_PER_16TH ? cp.swing * TICKS_PER_16TH * this.dur : 0;
+  /** Pattern swing of the track's `count`-th step: every second step is late (the default swing trigs 2, 4, 6...) */
+  private swingOf(count: number, ct: CTrack, cp: CPattern): number {
+    return cp.swing > 0 && (count & 1) === 1 ? cp.swing * ct.q * this.dur : 0;
   }
 
   private processTick(T: number, time: number, dur: number): void {
@@ -653,6 +698,7 @@ export class ElektronSequencer {
       this.lastTick = T;
       return;
     }
+    if (this.selId !== null) this.planDirty = true; // re-predict the arranger's tick at the current tempo
     if (this.planDirty) this.plan();
     if (this.repTick >= 0 && T >= this.repTick && (this.swTick < 0 || T < this.swTick)) this.songRepeat(T);
     if (this.swTick >= 0 && T >= this.swTick) {
@@ -691,18 +737,44 @@ export class ElektronSequencer {
     this.tempReturn = null;
     this.rowJump = -1;
     this.chainJump = -1;
-    this.playMode = this.effectiveMode();
     if (!wasPlaying) this.o.onPlay?.(true, this.time);
-    this.enterMode(T, this.transport !== null && T > 0);
+    if (this.selId !== null && (this.selOrigin >= 0 || this.selTime <= this.time + this.dur * 0.5)) {
+      // The song arranger picked the pattern for this tick (transport start / play from a section)
+      const id = this.selId;
+      this.selId = null;
+      this.selOrigin = -1;
+      this.startId = null;
+      this.enterExternal();
+      this.install(id, T, T, false);
+    } else if (this.external && wasPlaying) {
+      // Realign (transport locate) while the arranger drives: keep its pattern, lined up with tick 0
+      this.install(this.curId, T, 0, true);
+    } else {
+      this.external = false;
+      this.playMode = this.effectiveMode();
+      this.enterMode(T, this.transport !== null && T > 0);
+    }
     if (this.cuePending && this.cur) {
       this.cuePending = false;
       this.cueStart = T;
-      this.cueEnd = T + this.cur.cycleTicks;
+      this.cueEnd = T + this.cur.loopTicks;
     }
     this.changed();
   }
 
+  /** The arranger takes over: PATTERN mode, nothing queued */
+  private enterExternal(): void {
+    this.external = true;
+    this.playMode = 'pattern';
+    this.queued = null;
+    this.direct = null;
+    this.tempReturn = null;
+    this.rowJump = -1;
+    this.chainJump = -1;
+  }
+
   private effectiveMode(): PlayMode {
+    if (this.external) return 'pattern';
     const p = this.project;
     if (p.mode === 'song' && p.song.rows.length) return 'song';
     if (p.mode === 'chain' && p.chain.length) return 'chain';
@@ -744,6 +816,7 @@ export class ElektronSequencer {
       if (fresh) {
         this.tStep[tr] = -1;
         this.tNext[tr] = T;
+        this.tCount[tr] = -1;
         continue;
       }
       const e = T - this.epoch;
@@ -751,11 +824,14 @@ export class ElektronSequencer {
       if (e - k * ct.q === 0) {
         this.tStep[tr] = k % ct.len === 0 ? -1 : (k - 1) % ct.len;
         this.tNext[tr] = T;
+        this.tCount[tr] = k - 1;
       } else {
         this.tStep[tr] = k % ct.len;
         this.tNext[tr] = this.epoch + (k + 1) * ct.q;
+        this.tCount[tr] = k;
       }
     }
+    this.transpose = 0;
     this.rowMuteOn = false;
     this.planDirty = true;
     this.o.onPattern?.(id, this.time);
@@ -768,6 +844,7 @@ export class ElektronSequencer {
     this.songRep = 0;
     this.rowStart = T;
     this.install(row.pattern, T, T, false);
+    this.transpose = row.transpose ?? 0;
     this.applyRowMutes();
     if (row.tempo && !this.transport) {
       const b = clamp(row.tempo, TEMPO_MIN, TEMPO_MAX);
@@ -812,8 +889,8 @@ export class ElektronSequencer {
     }
     this.tStep[tr] = s;
     this.tNext[tr] = T + ct.q;
-    const pos = T - this.epoch;
-    const grid = this.time + this.swingAt(pos, cp);
+    const count = ++this.tCount[tr];
+    const grid = this.time + this.swingOf(count, ct, cp);
     this.o.onStep?.(tr, s, grid);
     this.uiPush(UI_STEP, grid, tr, s, null);
     if (this.tPre[tr] === T) {
@@ -821,7 +898,7 @@ export class ElektronSequencer {
       return;
     }
     this.tPre[tr] = -1;
-    if (ct.kind[s] !== K_NONE) this.evalStep(tr, ct, s, this.tLoop[tr], T, pos, cp);
+    if (ct.kind[s] !== K_NONE) this.evalStep(tr, ct, s, this.tLoop[tr], T, count, cp, this.transpose);
   }
 
   /** Evaluate the track's upcoming step now if its negative micro timing needs it */
@@ -846,23 +923,34 @@ export class ElektronSequencer {
     }
     let s: number;
     let loop: number;
-    let pos: number;
+    let count: number;
     if (kind === 0) {
       const cur = this.tStep[tr];
       loop = this.tLoop[tr];
       s = cur < 0 ? 0 : cur + 1;
       if (cur >= 0 && s >= cp.tracks[tr].len) { s = 0; loop++; }
-      pos = B - this.epoch;
+      count = this.tCount[tr] + 1;
     } else {
       s = 0;
       loop = kind === 1 ? this.tLoop[tr] + 1 : 0;
-      pos = 0;
+      count = kind === 1 ? this.tCount[tr] + 1 : 0;
     }
     const ct = target.tracks[tr];
     const off = ct.early[s];
     if (off === 0 || B - off !== T || ct.kind[s] === K_NONE || this.tPre[tr] === B) return;
     this.tPre[tr] = B;
-    this.evalStep(tr, ct, s, loop, B, pos, target);
+    this.evalStep(tr, ct, s, loop, B, count, target, kind === 2 ? this.switchTranspose() : this.transpose);
+  }
+
+  /** Song transpose in effect after the planned switch */
+  private switchTranspose(): number {
+    const rows = this.project.song.rows;
+    switch (this.swKind) {
+      case SW_ROW: { const r = this.nextRowIndex(); return r < 0 ? 0 : rows[r].transpose ?? 0; }
+      case SW_ROW_JUMP: return rows[clamp(this.rowJump, 0, rows.length - 1)]?.transpose ?? 0;
+      case SW_MODE: return this.effectiveMode() === 'song' ? rows[clamp(this.songStart, 0, rows.length - 1)]?.transpose ?? 0 : 0;
+    }
+    return 0;
   }
 
   /** Pattern that the planned switch starts from step 1 (null when it continues mid-pattern or ends) */
@@ -870,6 +958,7 @@ export class ElektronSequencer {
     const p = this.project;
     switch (this.swKind) {
       case SW_SEQ: case SW_RETURN: case SW_CHAIN: case SW_CHAIN_JUMP: return this.swId;
+      case SW_SELECT: return this.selOrigin >= 0 ? null : this.swId;
       case SW_DIRECT: return this.direct?.mode === 'direct-start' ? this.direct.id : null;
       case SW_ROW: {
         const r = this.nextRowIndex();
@@ -894,14 +983,16 @@ export class ElektronSequencer {
     return clamp(song.loopRow ?? 0, 0, song.rows.length - 1);
   }
 
-  private evalStep(tr: number, ct: CTrack, s: number, loop: number, B: number, pos: number, cp: CPattern): void {
+  private evalStep(tr: number, ct: CTrack, s: number, loop: number, B: number, count: number, cp: CPattern, transpose: number): void {
     const step = ct.steps[s]!;
     const code = ct.cond[s];
-    const passed = code === C_NONE ? true : this.evalCond(tr, code, loop, B);
+    let passed = code === C_NONE ? true : this.evalCond(tr, code, loop, B);
+    // Track probability: only for trigs without a condition, and it is not a condition result (PRE/NEI ignore it)
+    if (code === C_NONE && ct.prob < 100) passed = this.rng() * 100 < ct.prob;
     if (!!this.runMute[tr] || (this.rowMuteOn ? !!this.rowMute[tr] : ct.mute)) return;
     if (!passed && !this.o.emitFailed) return;
     const stepSec = ct.q * this.dur;
-    let t = this.timeAt(B) + this.swingAt(pos, cp) + (ct.micro[s] / MICRO_PER_STEP) * stepSec;
+    let t = this.timeAt(B) + this.swingOf(count, ct, cp) + (ct.micro[s] / MICRO_PER_STEP) * stepSec;
     if (t < this.time) t = this.time;
     const li = clamp(step.len ?? ct.nlen, 0, NOTE_LENGTHS.length - 1);
     const ev: TrigEvent = {
@@ -910,12 +1001,13 @@ export class ElektronSequencer {
       pattern: cp.id,
       time: t,
       duration: NOTE_LENGTHS[li] * stepSec,
-      note: clamp(step.note ?? ct.note, 0, 127),
+      note: clamp((step.note ?? ct.note) + transpose, 0, 127),
       velocity: clamp(step.vel ?? ct.vel, 1, 127),
       locks: step.locks ?? EMPTY_LOCKS,
       trigless: ct.kind[s] === K_LOCK,
       slide: step.slide === true,
       paramSlide: step.pslide === true,
+      slideTo: step.pslide === true ? this.slideTarget(ct, s, B, count, cp) : null,
       accent: step.accent === true,
       retrig: false,
       retrigIndex: 0,
@@ -967,6 +1059,16 @@ export class ElektronSequencer {
 
   private isFill(tick: number): boolean {
     return this.fillHeld || this.fillLatched || (tick >= this.cueStart && tick < this.cueEnd);
+  }
+
+  /** Parameter slide target: the next trig (note or lock) on the track in this pattern - the step itself a loop later if it is alone */
+  private slideTarget(ct: CTrack, s: number, B: number, count: number, cp: CPattern): { time: number; locks: Readonly<Locks> } {
+    const len = ct.len;
+    let d = 1;
+    while (d < len && ct.kind[(s + d) % len] === K_NONE) d++;
+    const ns = (s + d) % len;
+    const time = this.timeAt(B + d * ct.q) + this.swingOf(count + d, ct, cp) + (ct.micro[ns] / MICRO_PER_STEP) * ct.q * this.dur;
+    return { time, locks: ct.steps[ns]?.locks ?? EMPTY_LOCKS };
   }
 
   // ==========================================================================
@@ -1058,6 +1160,10 @@ export class ElektronSequencer {
     this.cueStart = -1;
     this.cueEnd = -1;
     this.rowMuteOn = false;
+    this.transpose = 0;
+    this.external = false;
+    this.selId = null;
+    this.selOrigin = -1;
     this.uiLen = 0;
     this.uiHead = 0;
     this.uiId.fill(null);
@@ -1083,13 +1189,25 @@ export class ElektronSequencer {
   // Pattern changes, chains, songs
   // ==========================================================================
 
-  /** First tick >= t0 on the current pattern's change grid (never the pattern's own start) */
+  /** First tick >= t0 on the grid origin + k * c, k >= 1 (never the grid's own start) */
+  private nextOnGrid(t0: number, origin: number, c: number): number {
+    const k = Math.max(1, Math.ceil((t0 - origin) / c));
+    return origin + k * c;
+  }
+
+  /** First tick >= t0 on the current pattern's change grid; -1 when the change length is INF */
   private nextCycle(t0: number): number {
     const cp = this.cur;
     if (!cp) return t0;
-    const c = cp.cycleTicks;
-    const k = Math.max(1, Math.ceil((t0 - this.patStart) / c));
-    return this.patStart + k * c;
+    return cp.cycleTicks > 0 ? this.nextOnGrid(t0, this.patStart, cp.cycleTicks) : -1;
+  }
+
+  /** First master-step boundary at or after t0: immediate changes stay on the step grid */
+  private nextStepTick(t0: number): number {
+    const cp = this.cur;
+    if (!cp) return t0;
+    const e = t0 - this.epoch;
+    return e <= 0 ? t0 : this.epoch + Math.ceil(e / cp.q) * cp.q;
   }
 
   private plan(): void {
@@ -1103,42 +1221,55 @@ export class ElektronSequencer {
     const t0 = this.lastTick + 1;
     const p = this.project;
     if (this.direct) {
-      this.swTick = t0;
+      // DIRECT START waits for the next step so the new pattern stays on the grid; the jumps keep the position anyway
+      this.swTick = this.direct.mode === 'direct-start' ? this.nextStepTick(t0) : t0;
       this.swKind = SW_DIRECT;
       this.swId = this.direct.id;
       return;
     }
+    if (this.selId !== null) {
+      this.swKind = SW_SELECT;
+      this.swId = this.selId;
+      if (this.selOrigin >= 0) this.swTick = t0;
+      else if (this.selTime === -Infinity) this.swTick = this.nextStepTick(t0);
+      else this.swTick = Math.max(t0, this.T + Math.max(0, Math.ceil((this.selTime - this.base) / this.dur - 0.5)));
+      return;
+    }
     const immediate = p.changeMode !== 'sequential';
+    if (this.playMode === 'song') {
+      // Song rows change on their own grid (row length, or the pattern's change length)
+      const row = p.song.rows[this.songRow];
+      if (row) {
+        this.rowRepeats = row.repeats;
+        this.rowForce = !!row.length;
+        this.rowRepTicks = Math.max(1, row.length ? row.length * cp.q : cp.loopTicks);
+      }
+      const rowNext = this.nextOnGrid(t0, this.rowStart, this.rowRepTicks);
+      if (!row || this.effectiveMode() !== 'song') {
+        this.swTick = rowNext;
+        this.swKind = SW_MODE;
+        return;
+      }
+      if (this.rowJump >= 0) {
+        this.swTick = immediate ? this.nextStepTick(t0) : rowNext;
+        this.swKind = SW_ROW_JUMP;
+        return;
+      }
+      this.swTick = Math.max(t0, this.rowStart + this.rowRepeats * this.rowRepTicks);
+      this.swKind = SW_ROW;
+      if (this.songRep + 1 < this.rowRepeats) this.repTick = Math.max(t0, this.rowStart + (this.songRep + 1) * this.rowRepTicks);
+      return;
+    }
     const next = this.nextCycle(t0);
     if (this.effectiveMode() !== this.playMode) {
       this.swTick = next;
       this.swKind = SW_MODE;
       return;
     }
-    if (this.playMode === 'song') {
-      const row = p.song.rows[this.songRow];
-      if (!row) {
-        this.swTick = next;
-        this.swKind = SW_MODE;
-        return;
-      }
-      if (this.rowJump >= 0) {
-        this.swTick = immediate ? t0 : next;
-        this.swKind = SW_ROW_JUMP;
-        return;
-      }
-      this.rowRepeats = row.repeats;
-      this.rowForce = !!row.length;
-      this.rowRepTicks = Math.max(1, row.length ? row.length * cp.q : cp.cycleTicks);
-      this.swTick = Math.max(t0, this.rowStart + this.rowRepeats * this.rowRepTicks);
-      this.swKind = SW_ROW;
-      if (this.songRep + 1 < this.rowRepeats) this.repTick = Math.max(t0, this.rowStart + (this.songRep + 1) * this.rowRepTicks);
-      return;
-    }
     if (this.playMode === 'chain') {
       const chain = p.chain;
       if (this.chainJump >= 0) {
-        this.swTick = immediate ? t0 : next;
+        this.swTick = immediate ? this.nextStepTick(t0) : next;
         this.swKind = SW_CHAIN_JUMP;
         this.swId = chain[clamp(this.chainJump, 0, chain.length - 1)];
         return;
@@ -1224,6 +1355,17 @@ export class ElektronSequencer {
       case SW_MODE:
         this.enterMode(T);
         break;
+      case SW_SELECT: {
+        const id = this.selId!;
+        const origin = this.selOrigin;
+        this.selId = null;
+        this.selOrigin = -1;
+        this.enterExternal();
+        // Late call: line up with the tick it was meant for, joining mid-pattern
+        if (origin >= 0) this.install(id, T, origin, true);
+        else this.install(id, T, T, false);
+        break;
+      }
     }
     this.planDirty = true;
     this.plan();
@@ -1248,9 +1390,8 @@ export class ElektronSequencer {
       tracks[i] = this.compileTrack(t, tq, tl, i);
     }
     const masterTicks = perTrack ? (pat.master > 0 ? Math.round(pat.master) * q : 0) : len * q;
-    const cycleTicks = perTrack
-      ? pat.change > 0 ? Math.round(pat.change) * q : masterTicks > 0 ? masterTicks : len * q
-      : len * q;
+    // PER TRACK: CHG OFF follows the master length; both INF/OFF = the pattern never hands over
+    const cycleTicks = perTrack ? (pat.change > 0 ? Math.round(pat.change) * q : masterTicks) : len * q;
     const cp: CPattern = {
       id,
       src: pat,
@@ -1258,6 +1399,7 @@ export class ElektronSequencer {
       q,
       masterTicks,
       cycleTicks,
+      loopTicks: cycleTicks > 0 ? cycleTicks : len * q,
       swing: (clamp(pat.swing, SWING_MIN, SWING_MAX) - SWING_MIN) / 50,
     };
     this.patCache.set(pat, cp);
@@ -1275,6 +1417,7 @@ export class ElektronSequencer {
       q,
       len,
       mute: !!src.mute,
+      prob: typeof src.prob === 'number' ? clamp(Math.round(src.prob), 0, 100) : 100,
       note: clamp(Math.round(src.note), 0, 127),
       vel: clamp(Math.round(src.vel), 1, 127),
       nlen: clamp(Math.round(src.len), 0, NOTE_LENGTHS.length - 1),
@@ -1374,8 +1517,9 @@ export class ElektronSequencer {
       playing,
       following: this.transport !== null,
       mode: this.cur ? this.playMode : this.effectiveMode(),
+      arranged: this.external && this.cur !== null,
       pattern: audible,
-      queued: this.queued ?? this.direct?.id ?? pendingSwitch ?? (this.cur ? null : this.startId),
+      queued: this.queued ?? this.direct?.id ?? this.selId ?? pendingSwitch ?? (this.cur ? null : this.startId),
       steps: Array.from(this.aSteps),
       fill: this.fillHeld || this.fillLatched || (this.cur !== null && this.lastTick >= this.cueStart && this.lastTick < this.cueEnd),
       fillLatched: this.fillLatched,
