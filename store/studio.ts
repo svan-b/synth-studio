@@ -4,6 +4,7 @@ import type { ControlValue, DeviceSpec, Lesson, LessonCheckState, LessonStep, Pa
 import type { RackSlot, StudioCable } from '@/devices/types';
 import { isStepSatisfied, isValueOnTarget, valueToNorm, defaultOf } from '@/lib/controls/mapping';
 import { transport } from '@/lib/audio/transport';
+import { STORE_VERSION, upgradeDevices } from '@/lib/studio/upgrades';
 
 // ============================================================================
 // Synth Studio store
@@ -826,7 +827,7 @@ export const useStudioStore = create<StudioStore>()(
     },
     {
       name: 'synth-studio-storage',
-      version: 4,
+      version: STORE_VERSION,
       partialize: s => ({
         currentDevice: s.currentDevice,
         devices: s.devices,
@@ -849,10 +850,13 @@ export const useStudioStore = create<StudioStore>()(
           });
         }
         const currentDevice = (old.currentDevice as string) ?? 'dfam';
+        const studio = old.studio ?? defaultStudio(currentDevice);
+        // Controls whose meaning changed since this was saved keep sounding the same
+        devices = upgradeDevices(devices, studio.rack ?? [], 'store', version);
         return {
           currentDevice,
           devices,
-          studio: old.studio ?? defaultStudio(currentDevice),
+          studio,
           completedLessons: (old.completedLessons as string[]) ?? [],
           review: (old.review as Record<string, ReviewItem>) ?? {},
           focusMode: (old.focusMode as boolean) ?? true,

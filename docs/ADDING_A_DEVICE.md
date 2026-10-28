@@ -147,6 +147,15 @@ exactly like internal cables.
 - Elektron-style sequencing: use `lib/sequencer/elektron` and `components/sequencer`
   (see docs/ELEKTRON_SEQUENCER.md).
 
+## Changing what a control means
+Saved studios and project files must keep sounding the same after a rebuild. Renaming or
+removing a control is safe: unknown ids are ignored and missing ones take their default.
+Changing an existing control's range, unit or taper is not, because the old saved number
+would mean something else. In that case, add an entry to `lib/studio/upgrades.ts` that
+converts the old value, and bump `STORE_VERSION` and `PROJECT_VERSION`. Each upgrade runs
+once on older browser saves and project files. For example, the DFAM rebuild changed
+TEMPO from steps per minute to 16th-note BPM, so old values are divided by 4.
+
 ## Song arranger
 - Pattern-based instruments provide `studio.patterns(data) => [{ id, label }]` and handle
   `event('arranger:pattern', { id, time })` by switching pattern at audio `time` (a bar line).
