@@ -79,7 +79,7 @@ class EngineHub {
     transport.setSwing(st.studio.swing);
     this.reconcileRack();
     useStudioStore.subscribe((s, prev) => {
-      if (s.studio.rack !== prev.studio.rack) this.reconcileRack();
+      if (s.studio.rack !== prev.studio.rack || s.studio.off !== prev.studio.off) this.reconcileRack();
       if (s.devices !== prev.devices) this.pushAll();
       if (s.studio.routes !== prev.studio.routes || s.studio.rack !== prev.studio.rack) this.applyRouting();
       if (s.studio.cables !== prev.studio.cables) this.applyCables();
@@ -129,7 +129,10 @@ class EngineHub {
   }
 
   private reconcileRack() {
-    const rack = useStudioStore.getState().studio.rack;
+    const studio = useStudioStore.getState().studio;
+    const off = studio.off ?? {};
+    // Powered-off instruments keep their settings but free their engine
+    const rack = studio.rack.filter(r => !off[r.id]);
     const ids = new Set(rack.map(r => r.id));
     // Remove engines for slots that left the rack
     this.slots.forEach((slot, id) => {
@@ -141,7 +144,8 @@ class EngineHub {
       this.loadModule(r.device)
         .then(mod => {
           this.pending.delete(r.id);
-          if (!useStudioStore.getState().studio.rack.some(x => x.id === r.id)) return;
+          const now = useStudioStore.getState().studio;
+          if (!now.rack.some(x => x.id === r.id) || now.off?.[r.id]) return;
           this.createSlot(r.id, r.device, mod);
         })
         .catch(err => {
@@ -217,6 +221,10 @@ class EngineHub {
     slot.engine.dispose();
     this.slots.delete(instance);
     this.slotListeners.forEach(l => l());
+  }
+
+  isPowered(instance: string) {
+    return !useStudioStore.getState().studio.off?.[instance];
   }
 
   hasInstance(instance: string) {

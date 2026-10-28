@@ -26,6 +26,8 @@ export default function StudioView({ onAddInstrument, onFocus }: StudioViewProps
   const sync = useStudioStore(s => s.studio.sync);
   const setRoute = useStudioStore(s => s.setRoute);
   const setSync = useStudioStore(s => s.setSync);
+  const setPowered = useStudioStore(s => s.setPowered);
+  const off = useStudioStore(s => s.studio.off ?? {});
   const removeFromRack = useStudioStore(s => s.removeFromRack);
   const moveInRack = useStudioStore(s => s.moveInRack);
   const addStudioCable = useStudioStore(s => s.addStudioCable);
@@ -118,6 +120,14 @@ export default function StudioView({ onAddInstrument, onFocus }: StudioViewProps
                   </label>
                 )}
                 <div className="ml-auto flex items-center gap-1">
+                  <button
+                    onClick={() => setPowered(slot.id, !!off[slot.id])}
+                    className={`px-2 h-7 rounded text-[11px] font-bold ${off[slot.id] ? 'bg-[#2a2a2a] text-gray-500' : 'bg-green-900/60 text-green-300'}`}
+                    title={off[slot.id] ? 'Power on (starts its audio engine)' : 'Power off to save CPU - settings are kept'}
+                    aria-pressed={!off[slot.id]}
+                  >
+                    {off[slot.id] ? 'OFF' : 'ON'}
+                  </button>
                   <IconButton onClick={() => moveInRack(slot.id, -1)} disabled={i === 0} label="Move up">↑</IconButton>
                   <IconButton onClick={() => moveInRack(slot.id, 1)} disabled={i === rack.length - 1} label="Move down">↓</IconButton>
                   <IconButton onClick={() => setCollapsed(c => ({ ...c, [slot.id]: !c[slot.id] }))} label={collapsed[slot.id] ? 'Expand' : 'Collapse'}>
@@ -127,7 +137,9 @@ export default function StudioView({ onAddInstrument, onFocus }: StudioViewProps
                 </div>
               </header>
               {!collapsed[slot.id] && (
-                <DeviceHost instance={slot.id} compact keyboardActive={false} patchController={controller} zoomOverride="fit" />
+                <div style={{ opacity: off[slot.id] ? 0.45 : 1 }}>
+                  <DeviceHost instance={slot.id} compact keyboardActive={false} patchController={controller} zoomOverride="fit" />
+                </div>
               )}
             </section>
           );

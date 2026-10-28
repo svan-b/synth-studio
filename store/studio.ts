@@ -55,6 +55,8 @@ export interface StudioDoc {
   bpm: number;
   swing: number;
   arrangement: Arrangement;
+  /** instance -> powered off (engine freed to save CPU; settings kept) */
+  off?: Record<string, boolean>;
 }
 
 export interface ReviewItem {
@@ -133,6 +135,7 @@ interface StudioStore extends StudioStoreState {
   clearStudioCables: (instance?: string) => void;
   setRoute: (instance: string, route: string) => void;
   setSync: (instance: string, on: boolean) => void;
+  setPowered: (instance: string, on: boolean) => void;
   setBpm: (bpm: number) => void;
   setSwing: (swing: number) => void;
   setArrangement: (fn: (a: Arrangement) => Arrangement) => void;
@@ -570,6 +573,8 @@ export const useStudioStore = create<StudioStore>()(
         setRoute: (instance, route) => updateStudio(st => ({ ...st, routes: { ...st.routes, [instance]: route } })),
 
         setSync: (instance, on) => updateStudio(st => ({ ...st, sync: { ...st.sync, [instance]: on } })),
+
+        setPowered: (instance, on) => updateStudio(st => ({ ...st, off: { ...(st.off ?? {}), [instance]: !on } })),
 
         setBpm: bpm => {
           const b = Math.max(20, Math.min(300, Math.round(bpm * 10) / 10));
