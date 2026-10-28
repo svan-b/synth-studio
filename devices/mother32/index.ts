@@ -14,7 +14,7 @@ const mother32: DeviceModule = {
   transportControl: 'run_stop',
   worklets: ['/worklets/mother32-processors.js'],
   // REC is momentary UI state (SHIFT + RUN/STOP); Reset should not touch it
-  uiControls: ['rec'],
+  uiControls: ['rec', 'shift'],
   tips: [
     'Play the 13 keys on the panel or A–K on your computer keyboard. RUN/STOP (Space) plays the 32-step sequencer; while it runs, the keys transpose the pattern.',
     'Patch: tap an output (boxed legend), then tap an input - or drag between them. Tap a cable to unplug it. A cable into an input breaks that input\'s internal normal, exactly like the hardware.',

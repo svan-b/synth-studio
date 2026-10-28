@@ -101,10 +101,49 @@ function validate(id: string, mod: DeviceModule): Issue[] {
     if (n === 0) err(`jack "${j}" is in spec.patchBay but not on the panel`);
     if (n > 1) err(`jack "${j}" is placed ${n} times`);
   });
-  const hasDynamic = layout.elements.some(e => (e.kind === 'knob' || e.kind === 'stepgrid') && typeof e.control === 'function');
+  // Evaluate encoder/step-grid bindings across every combination of UI-state switches
+  const dynamic = layout.elements.filter(e => (e.kind === 'knob' || e.kind === 'stepgrid') && typeof e.control === 'function');
+  const hasDynamic = dynamic.length > 0;
+  if (hasDynamic) {
+    const defaults: Record<string, ControlValue> = {};
+    Object.entries(controls).forEach(([cid, c]) => { if ('default' in c && c.default !== undefined) defaults[cid] = c.default as ControlValue; });
+    const axes = (mod.uiControls ?? [])
+      .map(cid => controls[cid])
+      .map((c, i) => {
+        const cid = mod.uiControls![i];
+        if (!c) return null;
+        if (c.type === 'switch') return { cid, vals: c.options.map((_, k) => k) as ControlValue[] };
+        if (c.type === 'button') return { cid, vals: [false, true] as ControlValue[] };
+        if (c.type === 'knob' && c.step && (c.max - c.min) / c.step <= 32) {
+          const vals: ControlValue[] = [];
+          for (let v = c.min; v <= c.max + 1e-9; v += c.step) vals.push(+v.toFixed(6));
+          return { cid, vals };
+        }
+        return null;
+      })
+      .filter((a): a is { cid: string; vals: ControlValue[] } => !!a);
+    let combos: Record<string, ControlValue>[] = [{}];
+    for (const a of axes) {
+      const next: Record<string, ControlValue>[] = [];
+      for (const c of combos) for (const v of a.vals) next.push({ ...c, [a.cid]: v });
+      combos = next;
+      if (combos.length > 50000) { warn('too many UI-state combinations to check every binding'); break; }
+    }
+    for (const combo of combos) {
+      const ctx = { values: { ...defaults, ...combo }, engine: {} };
+      for (const el of dynamic) {
+        const fn = (el as { control: (c: typeof ctx) => string | null }).control;
+        let cid: string | null = null;
+        try { cid = fn(ctx); } catch (e) { err(`binding threw for ${JSON.stringify(combo)}: ${e}`); }
+        if (cid === null || cid === undefined) continue;
+        if (!controls[cid]) err(`binding returned unknown control "${cid}" for ${JSON.stringify(combo)}`);
+        else onPanel.add(cid);
+      }
+    }
+  }
   Object.entries(controls).forEach(([cid, c]) => {
     if (!onPanel.has(cid) && !ui.has(cid) && c.type !== 'pattern' && c.type !== 'jack') {
-      (hasDynamic ? warn : err)(`control "${cid}" is not placed on the panel${hasDynamic ? ' (fine if an encoder binding reaches it)' : ''}`);
+      (hasDynamic ? warn : err)(`control "${cid}" is not on the panel${hasDynamic ? ' and no encoder binding reaches it (fine only if a custom element edits it)' : ''}`);
     }
   });
 
