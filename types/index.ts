@@ -278,6 +278,8 @@ export interface LessonStep {
   autoplay?: boolean;
   /** Hint ladder - revealed one at a time on request (guidance that fades) */
   hints?: string[];
+  /** One way to satisfy an open challenge - used by "show me" and the automated lesson runner */
+  solution?: { values?: Record<string, ControlValue>; patches?: PatchConnection[]; data?: unknown };
 }
 
 export interface MultipleChoice {
@@ -299,7 +301,10 @@ export interface LessonCheckState {
   instances: Record<string, { device: string; values: Record<string, ControlValue>; patches: PatchConnection[]; data: unknown }>;
   studioCables: { from: { instance: string; jack: string }; to: { instance: string; jack: string } }[];
   routes: Record<string, string>;
+  /** instance -> follows the studio clock (missing = default on for MIDI-syncable gear) */
+  sync: Record<string, boolean>;
   transport: { playing: boolean; bpm: number };
+  arrangement: { enabled: boolean; loop: boolean; sections: { name: string; bars: number; parts: Record<string, { pattern?: string; snapshot?: unknown; muted?: boolean }> }[] };
 }
 
 export interface Lesson {

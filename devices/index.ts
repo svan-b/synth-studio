@@ -63,6 +63,14 @@ export const DEVICES: DeviceEntry[] = [
     tagline: 'Analog DJ mixer with dual VCF filters and FX sends',
     load: () => import('./xone96'),
   },
+  {
+    id: 'studio-clock',
+    name: 'Studio Clock',
+    manufacturer: 'Synth Studio',
+    category: 'Studio',
+    tagline: 'The studio tempo as patchable clock, reset and run voltages',
+    load: () => import('./studio-clock'),
+  },
 ];
 
 export const getDeviceEntry = (id: string) => DEVICES.find(d => d.id === id);

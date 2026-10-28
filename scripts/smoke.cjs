@@ -23,6 +23,7 @@ const fs = require('fs');
       if (!sessionStorage.getItem('seeded')) {
         localStorage.setItem('synth-studio-storage', JSON.stringify({ state: { currentDevice: d, devices: {}, completedLessons: [] }, version: 3 }));
         sessionStorage.setItem('seeded', '1');
+      localStorage.setItem('synth-studio-welcomed', '1');
       }
     }, device);
     await page.goto(base, { waitUntil: 'networkidle' });
@@ -31,10 +32,10 @@ const fs = require('fs');
     const info = { overflowX: await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth) };
 
     if (name === 'desktop') {
-      const unlock = page.getByRole('button', { name: /enable audio/i });
+      const unlock = page.getByRole('button', { name: /enable audio|tap for sound/i });
       if (await unlock.count()) await unlock.click(); else await page.mouse.click(4, 4);
       await page.waitForTimeout(800);
-      info.audio = (await page.getByRole('button', { name: /audio/i }).first().innerText()).trim();
+      info.audio = (await page.getByRole('button', { name: /^(audio|tap for sound|starting|audio error)/i }).first().innerText()).trim();
       const peak = ms => page.evaluate(async ms => {
         let m = 0; const t0 = performance.now();
         while (performance.now() - t0 < ms) { m = Math.max(m, window.__synthLevel ? window.__synthLevel() : 0); await new Promise(r => setTimeout(r, 15)); }

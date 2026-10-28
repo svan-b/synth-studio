@@ -1,190 +1,317 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { Lesson } from '@/types';
 import type { DeviceModule } from '@/devices/types';
-import { DEVICES, getDeviceEntry } from '@/devices';
-import { useStudioStore } from '@/store/studio';
+import { DEVICES } from '@/devices';
+import { useStudioStore, dueReviewItems } from '@/store/studio';
+import { hub } from '@/lib/studio/hub';
+import { arranger } from '@/lib/studio/arranger';
+import { STUDIO_LESSONS } from '@/lib/studio/lessons';
+import { downloadProject, importProject } from '@/lib/studio/project';
 import DeviceHost from '@/components/DeviceHost';
-import Instructions, { conceptLabel } from '@/components/teaching/Instructions';
+import Instructions from '@/components/teaching/Instructions';
+import LessonBrowser from '@/components/teaching/LessonBrowser';
+import ReviewSession from '@/components/teaching/ReviewSession';
+import TransportBar from '@/components/studio/TransportBar';
+import StudioView from '@/components/studio/StudioView';
+import Welcome, { type WelcomeChoice } from '@/components/onboarding/Welcome';
 
-type Difficulty = 'all' | Lesson['difficulty'];
+type View = 'instrument' | 'studio';
 
 export default function Home() {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    hub.init();
+    arranger.init();
+    setHydrated(true);
+  }, []);
+  if (!hydrated) return <div className="min-h-screen bg-hardware-bg" />;
+  return <App />;
+}
+
+function App() {
   const currentDevice = useStudioStore(s => s.currentDevice);
+  const rack = useStudioStore(s => s.studio.rack);
   const setCurrentDevice = useStudioStore(s => s.setCurrentDevice);
+  const addToRack = useStudioStore(s => s.addToRack);
   const startLesson = useStudioStore(s => s.startLesson);
   const isTeaching = useStudioStore(s => s.isTeachingMode);
   const currentLesson = useStudioStore(s => s.currentLesson);
+  const lessonInstance = useStudioStore(s => s.lessonInstance);
   const completed = useStudioStore(s => s.completedLessons);
-  const [mod, setMod] = useState<{ id: string; deviceModule: DeviceModule } | null>(null);
-  const [lessonsOpen, setLessonsOpen] = useState(false);
+  const review = useStudioStore(s => s.review);
+  const deviceOf = useStudioStore(s => s.deviceOf);
+  const [view, setView] = useState<View>('instrument');
+  const [module, setModule] = useState<DeviceModule | null>(null);
   const [devicesOpen, setDevicesOpen] = useState(false);
-  const [difficulty, setDifficulty] = useState<Difficulty>('all');
-  const [hydrated, setHydrated] = useState(false);
+  const [lessonsOpen, setLessonsOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [projectMsg, setProjectMsg] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
 
-  // Persisted store hydrates on the client; avoid rendering the wrong device first
-  useEffect(() => setHydrated(true), []);
+  // First visit: welcome screen
+  useEffect(() => {
+    try { if (!localStorage.getItem('synth-studio-welcomed')) setWelcomeOpen(true); } catch { /* private mode */ }
+  }, []);
+  const closeWelcome = () => {
+    setWelcomeOpen(false);
+    try { localStorage.setItem('synth-studio-welcomed', '1'); } catch { /* ignore */ }
+  };
+  const onWelcome = (c: WelcomeChoice) => {
+    closeWelcome();
+    hub.ensureAudio();
+    if (c === 'learn') { setCurrentDevice('sub37'); setView('instrument'); setTimeout(() => setLessonsOpen(true), 300); }
+    if (c === 'explore') setDevicesOpen(true);
+    if (c === 'track' || c === 'moog-studio') setView('studio');
+  };
 
-  const entry = getDeviceEntry(currentDevice) ?? DEVICES[0];
-  const deviceModule = mod?.id === entry.id ? mod.deviceModule : null;
-  const lessons = useMemo(() => deviceModule?.lessons ?? [], [deviceModule]);
-  const shownLessons = difficulty === 'all' ? lessons : lessons.filter(l => l.difficulty === difficulty);
-  const onModuleLoaded = useCallback((m: DeviceModule) => setMod({ id: m.spec.id, deviceModule: m }), []);
+  const focusInstance = rack.some(r => r.id === currentDevice) ? currentDevice : rack[0]?.id;
+  const focusDevice = focusInstance ? deviceOf(focusInstance) : 'dfam';
+  const entry = DEVICES.find(d => d.id === focusDevice);
+  const onModuleLoaded = useCallback((m: DeviceModule) => setModule(m), []);
+  const lessons = useMemo(() => [...(module?.spec.id === focusDevice ? module.lessons : []), ...STUDIO_LESSONS], [module, focusDevice]);
+  const dueCount = dueReviewItems(review).length;
 
   const nextLesson = useMemo(() => {
     if (!currentLesson) return undefined;
-    const i = lessons.findIndex(l => l.id === currentLesson.id);
-    return i >= 0 ? lessons[i + 1] : undefined;
+    const pool = currentLesson.device === 'studio' ? STUDIO_LESSONS : lessons;
+    const sorted = [...pool].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    const i = sorted.findIndex(l => l.id === currentLesson.id);
+    return i >= 0 ? sorted[i + 1] : undefined;
   }, [lessons, currentLesson]);
 
-  const completedHere = lessons.filter(l => completed.includes(l.id)).length;
+  const focus = (instance: string) => {
+    setCurrentDevice(instance);
+    setView('instrument');
+  };
+
+  const begin = (lesson: Lesson) => {
+    hub.ensureAudio();
+    startLesson(lesson);
+    setLessonsOpen(false);
+    setView(lesson.device === 'studio' ? 'studio' : 'instrument');
+  };
+
+  const labelFor = (id: string) => {
+    const r = rack.find(x => x.id === id);
+    const e = DEVICES.find(d => d.id === r?.device);
+    return r?.label ?? (id.includes('#') ? `${e?.name ?? id} ${id.split('#')[1]}` : e?.name ?? id);
+  };
+
+  const coachVisible = isTeaching && currentLesson && (
+    currentLesson.device === 'studio' ? true : view === 'instrument' && lessonInstance === focusInstance
+  );
 
   return (
-    <div className="min-h-screen bg-hardware-bg px-3 py-4 sm:px-6">
-      <header className="max-w-[1800px] mx-auto mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white leading-none">SYNTH STUDIO</h1>
-          <p className="text-xs text-hardware-label mt-1">Playable digital twins · learn synthesis by doing</p>
+    <div className="min-h-screen bg-hardware-bg px-3 py-3 sm:px-5">
+      <header className="max-w-[1800px] mx-auto mb-3 flex flex-wrap items-center gap-3">
+        <div className="mr-2">
+          <h1 className="text-xl font-bold text-white leading-none">SYNTH STUDIO</h1>
+          <p className="text-[11px] text-hardware-label mt-0.5">Play it. Patch it. Understand it.</p>
         </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
+        <TransportBar />
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setDevicesOpen(true)}
-            className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm bg-hardware-panel border-2 border-[#3a3a3a] text-white hover:brightness-110 min-w-[220px] justify-between"
+            onClick={() => setReviewOpen(true)}
+            className={`px-3 py-2 rounded-lg text-sm border ${dueCount ? 'border-sky-500 text-sky-200 bg-sky-950/40' : 'border-[#3a3a3a] text-gray-300'}`}
+            title="Spaced review of what you've learned"
           >
-            <span className="text-left leading-tight">
-              <span className="block text-[10px] uppercase tracking-wider text-hardware-label">{entry.manufacturer}</span>
-              <span className="font-bold">{entry.name}</span>
-            </span>
-            <span className="text-hardware-label">▼</span>
+            Daily review{dueCount ? ` (${dueCount})` : ''}
           </button>
           <button
             onClick={() => setLessonsOpen(true)}
-            disabled={!lessons.length}
-            className="px-5 py-3 bg-teaching-current text-black font-bold rounded-lg text-sm hover:brightness-110 disabled:opacity-40"
+            className="px-4 py-2 bg-teaching-current text-black font-bold rounded-lg text-sm hover:brightness-110"
           >
             {isTeaching ? 'Lessons' : 'Start a lesson'}
-            {lessons.length > 0 && <span className="ml-2 text-[11px] font-normal">{completedHere}/{lessons.length}</span>}
+            {lessons.length > 0 && <span className="ml-2 text-[11px] font-normal">{lessons.filter(l => completed.includes(l.id)).length}/{lessons.length}</span>}
           </button>
+          <button onClick={() => setWelcomeOpen(true)} className="px-3 py-2 rounded-lg text-sm border border-[#3a3a3a] text-gray-300" title="Getting started">
+            ?
+          </button>
+          <ProjectMenu
+            onSave={() => downloadProject(entry ? `${entry.name} session` : 'My track')}
+            onOpen={() => fileRef.current?.click()}
+            onNew={() => { if (confirm('Start a new empty project? Save first if you want to keep this one.')) useStudioStore.getState().newProject(); }}
+          />
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={async e => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              try { setProjectMsg(`Loaded “${await importProject(f)}”`); } catch (err) { setProjectMsg(String(err)); }
+              e.target.value = '';
+              setTimeout(() => setProjectMsg(null), 4000);
+            }}
+          />
         </div>
       </header>
 
+      {projectMsg && <p className="max-w-[1800px] mx-auto text-xs text-sky-300 mb-2">{projectMsg}</p>}
+
+      {/* Rack tabs: Studio overview + one tab per instrument */}
+      <nav className="max-w-[1800px] mx-auto mb-3 flex items-center gap-1.5 overflow-x-auto pb-1" aria-label="Instruments">
+        <TabButton active={view === 'studio'} onClick={() => setView('studio')}>
+          ◫ Studio <span className="text-[10px] text-gray-400 ml-1">{rack.length}</span>
+        </TabButton>
+        {rack.map(r => (
+          <TabButton key={r.id} active={view === 'instrument' && r.id === focusInstance} onClick={() => focus(r.id)}>
+            {labelFor(r.id)}
+          </TabButton>
+        ))}
+        <button onClick={() => setDevicesOpen(true)} className="px-3 py-2 rounded-lg text-sm text-gray-300 border border-dashed border-[#444] hover:border-[#666] whitespace-nowrap">
+          + Instrument
+        </button>
+      </nav>
+
       <main className="max-w-[1800px] mx-auto flex flex-col lg:flex-row gap-4 items-start">
         <div className="flex-1 min-w-0 w-full">
-          {hydrated && <DeviceHost entry={entry} onModuleLoaded={onModuleLoaded} />}
+          {view === 'studio' ? (
+            <StudioView onAddInstrument={() => setDevicesOpen(true)} onFocus={focus} />
+          ) : focusInstance ? (
+            <DeviceHost instance={focusInstance} keyboardActive onModuleLoaded={onModuleLoaded} />
+          ) : null}
         </div>
-        {isTeaching && currentLesson?.device === entry.id && (
-          <Instructions
-            spec={deviceModule?.spec ?? null}
-            onNextLesson={nextLesson ? () => startLesson(nextLesson) : undefined}
-          />
+        {coachVisible && (
+          <Instructions spec={module?.spec ?? null} onNextLesson={nextLesson ? () => begin(nextLesson) : undefined} />
         )}
       </main>
 
       <footer className="max-w-[1800px] mx-auto mt-8 text-center text-[11px] text-hardware-label space-y-1">
         <p>Synth Studio · educational recreations, not affiliated with Moog, Elektron or Allen &amp; Heath.</p>
-        {deviceModule?.spec.manualUrl && (
+        {module?.spec.manualUrl && (
           <p>
-            <a href={deviceModule.spec.manualUrl} target="_blank" rel="noopener noreferrer" className="hover:text-teaching-current underline">
-              {deviceModule.spec.manufacturer} {deviceModule.spec.name} manual
+            <a href={module.spec.manualUrl} target="_blank" rel="noopener noreferrer" className="hover:text-teaching-current underline">
+              {module.spec.manufacturer} {module.spec.name} manual
             </a>
           </p>
         )}
       </footer>
 
-      {/* Device picker */}
+      <Welcome open={welcomeOpen} onClose={closeWelcome} onChoose={onWelcome} />
+
+      {/* Instrument picker */}
       <Dialog.Root open={devicesOpen} onOpenChange={setDevicesOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-2xl shadow-2xl z-50 max-h-[85vh] overflow-y-auto">
-            <Dialog.Title className="text-lg font-bold text-white mb-1">Choose an instrument</Dialog.Title>
-            <Dialog.Description className="text-xs text-hardware-label mb-4">Every instrument is playable, patchable and comes with guided lessons.</Dialog.Description>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {DEVICES.map(d => (
-                <button
-                  key={d.id}
-                  onClick={() => { setCurrentDevice(d.id); setDevicesOpen(false); }}
-                  className={`text-left p-3 rounded border transition-colors ${d.id === entry.id ? 'border-teaching-current bg-[#132013]' : 'border-[#3a3a3a] bg-[#1a1a1a] hover:bg-[#242424]'}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-wider text-hardware-label">{d.manufacturer}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#2a2a2a] text-gray-400">{d.category}</span>
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-3xl shadow-2xl z-50 max-h-[88vh] overflow-y-auto">
+            <Dialog.Title className="text-lg font-bold text-white mb-1">Instruments</Dialog.Title>
+            <Dialog.Description className="text-xs text-hardware-label mb-4">
+              Open an instrument, or add another one to the studio. Everything in the studio plays together.
+            </Dialog.Description>
+            {(['Percussion', 'Synthesizer', 'Groovebox', 'DJ Mixer', 'Studio', 'External'] as const).map(cat => {
+              const items = DEVICES.filter(d => d.category === cat);
+              if (!items.length) return null;
+              return (
+                <div key={cat} className="mb-4">
+                  <h4 className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">{cat}</h4>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {items.map(d => {
+                      const inRack = rack.some(r => r.device === d.id);
+                      return (
+                        <div key={d.id} className={`p-3 rounded border ${inRack ? 'border-[#3f5a3f] bg-[#132013]' : 'border-[#3a3a3a] bg-[#1a1a1a]'}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] uppercase tracking-wider text-hardware-label">{d.manufacturer}</span>
+                            {inRack && <span className="text-[10px] text-green-400">in studio</span>}
+                          </div>
+                          <div className="font-bold text-white mt-0.5">{d.name}</div>
+                          <div className="text-[11px] text-gray-400 mt-0.5 leading-snug">{d.tagline}</div>
+                          <div className="flex gap-2 mt-2">
+                            <button onClick={() => { focus(d.id); setDevicesOpen(false); }} className="px-3 py-1.5 rounded bg-teaching-current text-black text-xs font-bold">
+                              {inRack ? 'Open' : 'Open'}
+                            </button>
+                            {inRack && (
+                              <button onClick={() => { const id = addToRack(d.id, { duplicate: true }); focus(id); setDevicesOpen(false); }} className="px-3 py-1.5 rounded bg-[#2a2a2a] text-white text-xs">
+                                Add another
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="font-bold text-white mt-0.5">{d.name}</div>
-                  <div className="text-[11px] text-gray-400 mt-0.5 leading-snug">{d.tagline}</div>
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 flex justify-end">
-              <Dialog.Close asChild>
-                <button className="px-4 py-2 bg-[#3a3a3a] text-white rounded text-sm">Close</button>
-              </Dialog.Close>
+                </div>
+              );
+            })}
+            <div className="mt-2 flex justify-end">
+              <Dialog.Close asChild><button className="px-4 py-2 bg-[#3a3a3a] text-white rounded text-sm">Close</button></Dialog.Close>
             </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Lesson browser */}
+      {/* Lessons */}
       <Dialog.Root open={lessonsOpen} onOpenChange={setLessonsOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-xl shadow-2xl z-50 max-h-[88vh] flex flex-col">
-            <Dialog.Title className="text-lg font-bold text-white">{entry.name} lessons</Dialog.Title>
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-2xl shadow-2xl z-50 max-h-[90vh] flex flex-col">
+            <Dialog.Title className="text-lg font-bold text-white">{entry?.name ?? 'Instrument'} lessons</Dialog.Title>
             <Dialog.Description className="text-xs text-hardware-label mb-3">
-              Controls light up orange until they are set right, then turn green and the lesson moves on.
+              Short, hands-on lessons. You will predict, listen, match sounds by ear and explain ideas in your own words - the
+              things that make learning stick.
             </Dialog.Description>
-            <div className="flex gap-1 mb-3">
-              {(['all', 'beginner', 'intermediate', 'advanced'] as Difficulty[]).map(d => (
-                <button
-                  key={d}
-                  onClick={() => setDifficulty(d)}
-                  className={`px-3 py-1 rounded-full text-xs capitalize ${difficulty === d ? 'bg-white text-black' : 'bg-[#262626] text-gray-300'}`}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-            <div className="space-y-2 overflow-y-auto min-h-0 flex-1 pr-1">
-              {shownLessons.map(lesson => (
-                <button
-                  key={lesson.id}
-                  onClick={() => { startLesson(lesson); setLessonsOpen(false); }}
-                  className="w-full text-left p-3 bg-[#1a1a1a] hover:bg-[#242424] border border-[#3a3a3a] rounded group"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="font-bold text-white group-hover:text-teaching-current text-sm">
-                      {lesson.name}
-                      {completed.includes(lesson.id) && <span className="ml-2 text-xs text-green-500 font-normal">✓ done</span>}
-                    </h4>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${lesson.difficulty === 'beginner' ? 'bg-green-900 text-green-300' : lesson.difficulty === 'intermediate' ? 'bg-yellow-900 text-yellow-300' : 'bg-red-900 text-red-300'}`}>
-                        {lesson.difficulty}
-                      </span>
-                      <span className="text-[10px] text-hardware-label bg-[#2a2a2a] px-1.5 py-0.5 rounded">{lesson.steps.length} steps</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-hardware-label mt-1">{lesson.description}</p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {lesson.steps.some(s => s.patchFrom) && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#2a1f12] text-orange-300">patching</span>}
-                    {(lesson.concepts ?? []).slice(0, 4).map(c => (
-                      <span key={c} className="text-[10px] px-1.5 py-0.5 rounded bg-[#1c2430] text-sky-300">{conceptLabel(c)}</span>
-                    ))}
-                    {lesson.estimatedMinutes && <span className="text-[10px] text-gray-500 px-1">~{lesson.estimatedMinutes} min</span>}
-                  </div>
-                </button>
-              ))}
-              {!shownLessons.length && <p className="text-sm text-gray-500 text-center py-6">No lessons at this level yet.</p>}
-            </div>
+            <LessonBrowser lessons={lessons} completed={completed} onStart={begin} />
             <div className="mt-3 flex justify-end">
-              <Dialog.Close asChild>
-                <button className="px-4 py-2 bg-[#3a3a3a] text-white rounded text-sm">Close</button>
-              </Dialog.Close>
+              <Dialog.Close asChild><button className="px-4 py-2 bg-[#3a3a3a] text-white rounded text-sm">Close</button></Dialog.Close>
             </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      {/* Daily review */}
+      <Dialog.Root open={reviewOpen} onOpenChange={setReviewOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-lg shadow-2xl z-50 max-h-[88vh] overflow-y-auto">
+            <Dialog.Title className="text-lg font-bold text-white mb-1">Daily review</Dialog.Title>
+            <Dialog.Description className="text-xs text-hardware-label mb-3">A few quick questions from earlier lessons, timed to come back just before you would forget them.</Dialog.Description>
+            {reviewOpen && <ReviewSession onClose={() => setReviewOpen(false)} />}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap border ${active ? 'bg-[#2a2a2a] border-[#555] text-white font-bold' : 'bg-[#171717] border-[#2a2a2a] text-gray-300 hover:text-white'}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ProjectMenu({ onSave, onOpen, onNew }: { onSave: () => void; onOpen: () => void; onNew: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(o => !o)} className="px-3 py-2 rounded-lg text-sm border border-[#3a3a3a] text-gray-300" aria-expanded={open}>
+        Project ▾
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 w-56 bg-[#1b1b1b] border border-[#3a3a3a] rounded-lg shadow-2xl z-30 p-1" onMouseLeave={() => setOpen(false)}>
+          <MenuItem onClick={() => { onSave(); setOpen(false); }}>Save project to a file</MenuItem>
+          <MenuItem onClick={() => { onOpen(); setOpen(false); }}>Open project file…</MenuItem>
+          <MenuItem onClick={() => { onNew(); setOpen(false); }}>New empty project</MenuItem>
+          <p className="text-[10px] text-gray-500 px-2 py-1.5">Your work also saves automatically in this browser. Use REC in the top bar to bounce a WAV.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="w-full text-left px-2 py-1.5 rounded text-sm text-gray-200 hover:bg-[#2a2a2a]">
+      {children}
+    </button>
   );
 }
