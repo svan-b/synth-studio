@@ -23,6 +23,7 @@ const fs = require('fs');
       if (!sessionStorage.getItem('seeded')) {
         localStorage.setItem('synth-studio-storage', JSON.stringify({ state: { currentDevice: d, devices: {}, completedLessons: [] }, version: 3 }));
         sessionStorage.setItem('seeded', '1');
+      localStorage.setItem('synth-studio-welcomed', '1');
       }
     }, device);
     await page.goto(base, { waitUntil: 'networkidle' });

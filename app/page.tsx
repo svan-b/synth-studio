@@ -16,6 +16,7 @@ import LessonBrowser from '@/components/teaching/LessonBrowser';
 import ReviewSession from '@/components/teaching/ReviewSession';
 import TransportBar from '@/components/studio/TransportBar';
 import StudioView from '@/components/studio/StudioView';
+import Welcome, { type WelcomeChoice } from '@/components/onboarding/Welcome';
 
 type View = 'instrument' | 'studio';
 
@@ -49,6 +50,23 @@ function App() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [projectMsg, setProjectMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+
+  // First visit: welcome screen
+  useEffect(() => {
+    try { if (!localStorage.getItem('synth-studio-welcomed')) setWelcomeOpen(true); } catch { /* private mode */ }
+  }, []);
+  const closeWelcome = () => {
+    setWelcomeOpen(false);
+    try { localStorage.setItem('synth-studio-welcomed', '1'); } catch { /* ignore */ }
+  };
+  const onWelcome = (c: WelcomeChoice) => {
+    closeWelcome();
+    hub.ensureAudio();
+    if (c === 'learn') { setCurrentDevice('sub37'); setView('instrument'); setTimeout(() => setLessonsOpen(true), 300); }
+    if (c === 'explore') setDevicesOpen(true);
+    if (c === 'track' || c === 'moog-studio') setView('studio');
+  };
 
   const focusInstance = rack.some(r => r.id === currentDevice) ? currentDevice : rack[0]?.id;
   const focusDevice = focusInstance ? deviceOf(focusInstance) : 'dfam';
@@ -109,6 +127,9 @@ function App() {
           >
             {isTeaching ? 'Lessons' : 'Start a lesson'}
             {lessons.length > 0 && <span className="ml-2 text-[11px] font-normal">{lessons.filter(l => completed.includes(l.id)).length}/{lessons.length}</span>}
+          </button>
+          <button onClick={() => setWelcomeOpen(true)} className="px-3 py-2 rounded-lg text-sm border border-[#3a3a3a] text-gray-300" title="Getting started">
+            ?
           </button>
           <ProjectMenu
             onSave={() => downloadProject(entry ? `${entry.name} session` : 'My track')}
@@ -171,6 +192,8 @@ function App() {
           </p>
         )}
       </footer>
+
+      <Welcome open={welcomeOpen} onClose={closeWelcome} onChoose={onWelcome} />
 
       {/* Instrument picker */}
       <Dialog.Root open={devicesOpen} onOpenChange={setDevicesOpen}>
