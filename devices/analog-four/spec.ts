@@ -150,7 +150,7 @@ export const ANALOG_FOUR: DeviceSpec = {
   description: 'Four-voice analog synthesizer with a 64-step parameter-lock sequencer. Per voice: two oscillators with sub oscillators, noise, a 4-pole ladder low-pass, overdrive, a 2-pole multimode filter, three envelopes, two LFOs. FX track with chorus, delay and reverb; CV track; arpeggiator; performance macros.',
   manualUrl: 'https://www.elektron.se/support-downloads/analog-four-mkii',
   dimensions: { width: 385, height: 225, depth: 82 },
-  display: { width: 1386, height: 810, scale: 3.6 },
+  display: { width: 1194, height: 698, scale: 3.1 },
 
   signalFlow: [
     { id: 'sequencer', name: 'Sequencer', order: 1, description: 'Patterns of up to 64 steps per track, p-locks, conditions, chains and songs', controls: ['play', 'tempo', 'swing'] },

@@ -8,7 +8,7 @@
 
 export const PANEL_W = 381;
 export const PANEL_H = 221;
-export const PX_PER_MM = 3.6;
+export const PX_PER_MM = 3.1;
 
 export interface Box { x: number; y: number; w: number; h: number }
 
@@ -79,7 +79,7 @@ export const KNOBS = {
 
 /** Screen window (black glass) and the OLED inside it (top-left boxes) */
 export const SCREEN_WINDOW = { x: 109.8, y: 7.2, w: 95.6, h: 72.9 };
-export const OLED = { x: 115.4, y: 17.5, w: 84.4, h: 44.0 };
+export const OLED = { x: 113.0, y: 15.2, w: 89.2, h: 49.6 };
 
 /** LED strips (centres) */
 export const MODE_LEDS = [23.7, 42.8, 62.0, 81.1].map(x => ({ x, y: 133.0 }));

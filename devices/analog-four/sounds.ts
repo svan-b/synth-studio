@@ -119,7 +119,7 @@ export const SOUNDS: SoundDef[] = [
   {
     id: 'lead-whistle', name: 'Lead / Filter Whistle', category: 'Lead',
     desc: 'No oscillator at all: a self-oscillating ladder that tracks the keyboard, excited by a little noise.',
-    p: { osc1_lev: 0, noise_lev: 10, flt1_frq: 64, flt1_res: 127, flt1_trk: 32, amp_atk: 20, amp_sus: 120, amp_rel: 50, amp_rev: 40 },
+    p: { osc1_lev: 0, noise_lev: 10, flt1_frq: 64, flt1_res: 127, flt1_trk: 32, amp_atk: 20, amp_sus: 120, amp_rel: 50, amp_rev: 40, amp_vol: 124 },
     demo: LEAD_DEMO,
   },
 
@@ -173,7 +173,7 @@ export const SOUNDS: SoundDef[] = [
   {
     id: 'keys-ep', name: 'Keys / Tine Piano', category: 'Keys', recreates: 'an electric-piano tine tone',
     desc: 'Triangle with an AM bell, velocity to brightness, chorus: soft and expressive.',
-    p: { osc1_wav: 3, osc_am1: 1, osc2_wav: 3, osc2_tun: 12, flt1_frq: 96, flt1_dep: 10, amp_dec: 90, amp_sus: 30, amp_rel: 50, amp_cho: 60, amp_rev: 40, vmod_dst1: D('F1 FRQ'), vmod_dep1: 40, osc_trg: 1 },
+    p: { osc1_wav: 3, osc_am1: 1, osc2_wav: 3, osc2_tun: 12, flt1_frq: 96, flt1_dep: 10, amp_dec: 90, amp_sus: 30, amp_rel: 50, amp_cho: 60, amp_rev: 40, amp_vol: 124, vmod_dst1: D('F1 FRQ'), vmod_dep1: 40, osc_trg: 1 },
     demo: PLUCK_DEMO,
   },
   {
@@ -225,7 +225,7 @@ export const SOUNDS: SoundDef[] = [
   {
     id: 'fx-riser', name: 'FX / Noise Riser', category: 'FX',
     desc: 'Noise through a filter that LFO 1 (ONE mode, a ramp) opens over two bars.',
-    p: { osc1_lev: 0, noise_lev: 120, flt1_frq: 40, flt1_res: 40, lfo1_mod: 3, lfo1_wav: 5, lfo1_spd: 16, lfo1_mul: 2, lfo1_depa: 100, amp_atk: 96, amp_sus: 127, amp_rel: 60, amp_rev: 90 },
+    p: { osc1_lev: 0, noise_lev: 127, flt1_frq: 62, flt1_res: 56, lfo1_mod: 3, lfo1_wav: 5, lfo1_spd: 16, lfo1_mul: 2, lfo1_depa: 72, amp_atk: 72, amp_sus: 127, amp_rel: 60, amp_rev: 90, amp_vol: 120 },
     demo: [[0, 60, 94]],
   },
   {
@@ -281,7 +281,7 @@ export const SOUNDS: SoundDef[] = [
   {
     id: 'drum-rim', name: 'Drum / Rim Click', category: 'Drum',
     desc: 'A pulse at fixed pitch through a resonant band-pass, very short.',
-    p: { osc1_wav: 2, osc1_trk: 0, osc1_tun: 12, osc_trg: 1, flt1_frq: 100, flt2_typ: 2, flt2_frq: 90, flt2_res: 60, amp_dec: 20, amp_sus: 0, amp_rel: 14 },
+    p: { osc1_wav: 2, osc1_trk: 0, osc1_tun: 12, osc_trg: 1, flt1_frq: 100, flt2_typ: 2, flt2_frq: 90, flt2_res: 60, amp_dec: 24, amp_sus: 0, amp_rel: 14, amp_vol: 127 },
     demo: [[3, 60, 14], [11, 60, 14]],
   },
   {

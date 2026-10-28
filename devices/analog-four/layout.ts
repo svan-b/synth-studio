@@ -36,8 +36,8 @@ const label = (text: string, x: number, y: number, opts: Partial<Extract<PanelEl
 const elements: PanelElement[] = [
   // --- Screen window: black glass with the tag line and the name ------------------
   { kind: 'section', x: SCREEN_WINDOW.x, y: SCREEN_WINDOW.y, w: SCREEN_WINDOW.w, h: SCREEN_WINDOW.h, background: 'linear-gradient(180deg, #050506 0%, #0a0b0d 100%)', border: '1px solid #2c2f35', radius: 2.4 },
-  label('4 VOICE ANALOG TABLETOP SYNTHESIZER', SCREEN_WINDOW.x + SCREEN_WINDOW.w / 2, SCREEN_WINDOW.y + 4.6, { size: 8, color: '#b9bcc2', letterSpacing: 1.1 }),
-  label('ANALOG FOUR MKII', SCREEN_WINDOW.x + SCREEN_WINDOW.w / 2, SCREEN_WINDOW.y + SCREEN_WINDOW.h - 6.2, { size: 15, weight: 800, color: '#f1f2f4', letterSpacing: 2.4, font: 'condensed' }),
+  label('4 VOICE ANALOG TABLETOP SYNTHESIZER', SCREEN_WINDOW.x + SCREEN_WINDOW.w / 2, SCREEN_WINDOW.y + 4.2, { size: 7.5, color: '#b9bcc2', letterSpacing: 1 }),
+  label('ANALOG FOUR MKII', SCREEN_WINDOW.x + SCREEN_WINDOW.w / 2, SCREEN_WINDOW.y + SCREEN_WINDOW.h - 6.0, { size: 14, weight: 800, color: '#f1f2f4', letterSpacing: 2.2, font: 'condensed' }),
   { kind: 'display', x: OLED.x, y: OLED.y, w: OLED.w, h: OLED.h, style: 'oled', render: ctx => createElement(Screen, ctx) },
 
   // --- Pots and TRACK LEVEL ------------------------------------------------------
@@ -71,7 +71,6 @@ const elements: PanelElement[] = [
   ...Object.keys(KEYS).map(keyElement),
   { kind: 'custom', x: 0, y: 0, w: 1, h: 1, render: ctx => createElement(LedStrips, { ctx }) },
   label('OCTAVE', (KEYS.OCT_DOWN.x + KEYS.OCT_UP.x) / 2, 124.2, { size: 8, color: COL.legend }),
-  label('PATTERN MODE', 52.4, 128.6, { size: 7.5, color: COL.legend, letterSpacing: 1 }),
 
   // --- Keyboard, trig keys ----------------------------------------------------------
   {

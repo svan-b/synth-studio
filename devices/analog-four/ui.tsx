@@ -166,7 +166,7 @@ const pageKey = (name: string, label: string, rows: [string, string]): KeyDef =>
   },
   press: e => {
     if (e.func) { setView(e.ctx, V.SOUND); useFunc(e.ctx); return; }
-    if (!pageFor(e.track, V[name === 'FLTR' ? 'FLTR' : (name as 'OSC1')])) {
+    if (!pageFor(e.track, V[name as keyof typeof V])) {
       say(e.ctx, `${TRACK_NAMES[e.track]} has no ${label} page`);
       return;
     }
@@ -926,8 +926,8 @@ export function Screen(props: PanelContext) {
       return (
         <div key={i} style={{ textAlign: 'center', minWidth: 0 }}>
           <Arc norm={slotNorm(p, v)} bipolar={!!p.bipolar} locked={false} />
-          <div style={{ fontSize: 8, color: OLED_DIM, letterSpacing: 0.4, lineHeight: '9px' }}>{p.short}</div>
-          <div style={{ fontSize: 11, fontWeight: 700, lineHeight: '13px', whiteSpace: 'nowrap', overflow: 'hidden', color: locked ? '#050608' : OLED_ON, background: locked ? OLED_ON : 'transparent', borderRadius: 2, margin: '0 1px' }}>
+          <div style={{ fontSize: 9.5, color: OLED_DIM, letterSpacing: 0.3, lineHeight: '10px', fontWeight: 700 }}>{p.short}</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, lineHeight: '14px', whiteSpace: 'nowrap', overflow: 'hidden', color: locked ? '#050608' : OLED_ON, background: locked ? OLED_ON : 'transparent', borderRadius: 2, margin: '0 1px' }}>
             {txt}
           </div>
         </div>
@@ -945,19 +945,19 @@ export function Screen(props: PanelContext) {
   const foot = msg || (heldOn ? `TRIG ${held.map(s => s + 1).join(',')} · TURN A KNOB TO LOCK` : trackKind(track) === 'cv' ? 'CV TRACK: SEQUENCED, NO OUTPUT JACKS' : view === V.OSC1 && trackKind(track) === 'fx' ? 'NO AUDIO INPUTS IN THE STUDIO' : '');
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', color: OLED_ON, fontFamily: '"Helvetica Neue", Arial, sans-serif', userSelect: 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'center', fontSize: 10, lineHeight: '13px', gap: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', fontSize: 11, lineHeight: '13px', gap: 4 }}>
         <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', fontWeight: 700 }}>{touched ? touched.name : kitName}</span>
         <span>{bpm.toFixed(1)}</span>
         <span style={{ minWidth: 18, textAlign: 'right' }}>{icon}</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', fontSize: 10, lineHeight: '13px', gap: 5, borderBottom: `1px solid ${OLED_DIM}`, paddingBottom: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', fontSize: 11, lineHeight: '14px', gap: 5, borderBottom: `1px solid ${OLED_DIM}`, paddingBottom: 1 }}>
         <b style={{ background: OLED_ON, color: '#050608', padding: '0 3px', borderRadius: 2 }}>{TRACK_NAMES[track]}</b>
         <b style={{ flex: 1 }}>{title}</b>
         <span style={{ color: OLED_DIM }}>{songRow}</span>
         <b>{shownPattern}</b>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>{body}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, lineHeight: '11px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, lineHeight: '12px' }}>
         <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', color: msg ? '#050608' : OLED_DIM, background: msg ? OLED_ON : 'transparent', padding: msg ? '0 3px' : 0, borderRadius: 2 }}>{foot || ' '}</span>
         {levelId && (
           <span style={{ width: 36, height: 6, border: `1px solid ${OLED_DIM}`, position: 'relative' }} title="Track level">
@@ -1069,6 +1069,13 @@ export function SoundBrowserLegend({ ctx }: { ctx: CustomRenderContext }) {
 // Menus
 // ----------------------------------------------------------------------------
 
+/** A kit's project was written for its tempo: synced to the studio, move the studio tempo there too */
+function followKitTempo(ctx: CustomRenderContext, bpm: number) {
+  const st = useStudioStore.getState();
+  if (st.studio.sync[ctx.instance] === false) return;
+  if (Math.abs(st.studio.bpm - bpm) >= 0.5) st.setBpm(bpm);
+}
+
 function loadSound(ctx: CustomRenderContext, s: SoundDef, track: number) {
   useStudioStore.getState().setControlValues(ctx.instance, { ...soundTrackValues(s, track), ...(s.oct !== undefined ? { kb_oct: s.oct + 3 } : {}) });
   say(ctx, `${TRACK_NAMES[track]}: ${s.name.split(' / ')[1].toUpperCase()}`, 1500);
@@ -1118,6 +1125,7 @@ function KitMenu({ ctx }: { ctx: CustomRenderContext }) {
       vals.kit_project_loaded = i + 2;
     }
     useStudioStore.getState().setControlValues(ctx.instance, vals);
+    if (withProject) followKitTempo(ctx, kit.tempo);
     ctx.setUi({ [UIK.menu]: null });
     say(ctx, `${withProject ? 'PROJECT' : 'KIT'}: ${kit.name.split(' / ')[1].toUpperCase()}`);
   };
@@ -1214,8 +1222,18 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
     const proj = projectFor(kp);
     if (proj) ctx.updateData(() => proj);
     useStudioStore.getState().setControlValues(ctx.instance, { kit_project_loaded: kp });
+    const kit = KITS[kp - 2];
+    if (kit) followKitTempo(ctx, kit.tempo);
     if (proj) say(ctx, `PROJECT ${KIT_PROJECT_IDS[kp].toUpperCase()} LOADED`);
   }, [kp, kpl, pending, ctx]);
+
+  // LIVE RECORDING ends with playback (the studio transport may stop it)
+  const playing = !!ctx.engine.playing;
+  const wasPlaying = useRef(playing);
+  useEffect(() => {
+    if (wasPlaying.current && !playing && ctx.values.live_rec) ctx.setValue('live_rec', false);
+    wasPlaying.current = playing;
+  }, [playing, ctx]);
 
   // LIVE RECORDING: the engine reports played notes with their quantised step
   const rec = ctx.engine.recNote as { id: number; track: number; note: number; vel: number; step: number; pattern: string } | undefined;
