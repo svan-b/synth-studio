@@ -382,10 +382,9 @@ const vcoScenario = (id: string, label: string, opts: {
       }
       const ch = opts.subs ? 6 : 4;
       const pd: Record<string, number> = { frequency: 55 * Math.pow(2, i / 5) };
-      if (opts.mask !== undefined) pd.mask = opts.mask;
       if (opts.sync) pd.sync = 1;
       const init: AudioWorkletNodeOptions = { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [ch], parameterData: pd };
-      if (opts.subs) init.processorOptions = { subs: true };
+      if (opts.subs || opts.mask !== undefined) init.processorOptions = { subs: !!opts.subs, mask: opts.mask };
       const n = worklet(ctx, 'vco', init);
       if (lfoAmt) lfoAmt.connect(p(n, 'pitch'));
       if (modAmt) modAmt.connect(p(n, 'fm'));
@@ -414,9 +413,10 @@ const filterScenario = (id: string, label: string, processor: 'ladder' | 'svf', 
         continue;
       }
       const pd: Record<string, number> = { cutoff: 300 * Math.pow(2, i / 4), resonance: processor === 'svf' ? 0.6 : 0.7 };
-      if (opts.quality) pd.quality = opts.quality;
       if (processor === 'svf') pd.mode = i % 7;
-      const n = worklet(ctx, name, { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], parameterData: pd });
+      const init: AudioWorkletNodeOptions = { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], parameterData: pd };
+      if (opts.quality) init.processorOptions = { quality: opts.quality };
+      const n = worklet(ctx, name, init);
       src.connect(n);
       if (lfoAmt) lfoAmt.connect(p(n, 'cutoffCv'));
       n.connect(sum);

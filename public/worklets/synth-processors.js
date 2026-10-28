@@ -143,18 +143,8 @@ class VcoProcessor extends AudioWorkletProcessor {
       { name: 'fm', defaultValue: 0, minValue: -48000, maxValue: 48000, automationRate: 'a-rate' },
       { name: 'pw', defaultValue: 0.5, minValue: 0.02, maxValue: 0.98, automationRate: 'a-rate' },
       { name: 'sync', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      // --- new (defaults keep the old behaviour) ---
-      // Through-zero linear FM as a ratio of the exponential frequency: f = f0 * (1 + linFm) + fm
-      { name: 'linFm', defaultValue: 0, minValue: -64, maxValue: 64, automationRate: 'a-rate' },
-      // 1 = negative instantaneous frequency runs the phase backwards (through-zero), 0 = floor at 0 Hz
-      { name: 'thruZero', defaultValue: 1, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      // Analog drift: slow random pitch wander (cents, ~1 sigma) at roughly driftRate Hz
-      { name: 'drift', defaultValue: 0, minValue: 0, maxValue: 100, automationRate: 'k-rate' },
-      { name: 'driftRate', defaultValue: 0.25, minValue: 0.01, maxValue: 20, automationRate: 'k-rate' },
-      // Fixed per-instance tuning offset: tolerance (cents) x a random draw in -1..1 made at construction
-      { name: 'tolerance', defaultValue: 0, minValue: 0, maxValue: 100, automationRate: 'k-rate' },
-      // Output mask: 1 tri, 2 saw, 4 pulse, 8 sine, 16 sub1, 32 sub2. Masked outputs are silent and cost nothing.
-      { name: 'mask', defaultValue: 63, minValue: 0, maxValue: 63, automationRate: 'k-rate' },
+      // Settings that are not modulation inputs are processorOptions / { type: 'set' } messages,
+      // not AudioParams: every AudioParam costs ~3.5 ns/sample per node even when idle.
     ];
   }
 
@@ -162,23 +152,46 @@ class VcoProcessor extends AudioWorkletProcessor {
     super();
     const o = (options && options.processorOptions) || {};
     this.subs = !!o.subs;
-    this.optMask = typeof o.mask === 'number' ? (o.mask | 0) : 63;
     this.rng = makeRng(o.seed);
     this.phase = typeof o.phase === 'number' ? o.phase - Math.floor(o.phase) : this.rng();
     this.tolDraw = this.rng() * 2 - 1;
+    // settings (processorOptions, or later { type: 'set', ... } messages)
+    this.mask = 63;          // 1 tri, 2 saw, 4 pulse, 8 sine, 16 sub1, 32 sub2: masked outputs are silent and free
+    this.drift = 0;          // analog drift: slow random pitch wander, cents (~1 sigma)
+    this.driftRate = 0.25;   // its rough rate, Hz
+    this.tolerance = 0;      // fixed detune: tolerance (cents) x a random draw in -1..1 made at construction
+    this.thruZero = true;    // negative instantaneous frequency runs the phase backwards; false = stop at 0 Hz
+    this.fmRatio = false;    // true: `fm` is a ratio of the frequency (f = f0 * (1 + fm), constant FM index)
+    this.apply(o);
+    this.port.onmessage = e => { const m = e.data; if (m && m.type === 'set') this.apply(m); };
     this.lastSync = 0;
     this.lastPw = 0.5;
     this.dr1 = 0; this.dr2 = 0;
     this.s1 = 1; this.s2 = 1;          // sub flip-flops (+1 / -1)
     this.chGain = new Float64Array(6); // 0 = off, 1 = on (fades over one quantum on change)
+    this.g0s = new Float64Array(6);
+    this.g1s = new Float64Array(6);
     this.started = false;
     this.n = 0;
   }
 
+  /** Apply settings from processorOptions or a { type: 'set' } message */
+  apply(m) {
+    const num = (v, lo, hi) => (typeof v === 'number' && v === v ? clamp(v, lo, hi) : undefined);
+    const mask = num(m.mask, 0, 63);
+    if (mask !== undefined) this.mask = mask | 0;
+    const d = num(m.drift, 0, 100);
+    if (d !== undefined) this.drift = d;
+    const dr = num(m.driftRate, 0.01, 20);
+    if (dr !== undefined) this.driftRate = dr;
+    const t = num(m.tolerance, 0, 100);
+    if (t !== undefined) this.tolerance = t;
+    if (m.thruZero !== undefined) this.thruZero = !!m.thruZero;
+    if (m.fmRatio !== undefined) this.fmRatio = !!m.fmRatio;
+  }
+
   alloc(n) {
     this.n = n;
-    this.ph = new Float64Array(n);
-    this.pwb = new Float64Array(n);
     const cap = 4 * n + 16;
     this.evI = new Int32Array(cap);
     this.evK = new Int32Array(cap);
@@ -271,9 +284,8 @@ class VcoProcessor extends AudioWorkletProcessor {
     const nCh = Math.min(out.length, this.subs ? 6 : 4);
 
     // --- output mask (fade one quantum on change, so mask switches never click)
-    const mask = (params.mask[0] | 0) & this.optMask;
-    const g0s = this.g0s || (this.g0s = new Float64Array(6));
-    const g1s = this.g1s || (this.g1s = new Float64Array(6));
+    const mask = this.mask;
+    const g0s = this.g0s, g1s = this.g1s;
     if (!this.started) {
       // the initial mask applies immediately (no fade at start-up)
       for (let c = 0; c < 6; c++) this.chGain[c] = (mask >> c) & 1;
@@ -289,19 +301,19 @@ class VcoProcessor extends AudioWorkletProcessor {
       this.chGain[c] = want;
     }
     for (let c = nCh; c < out.length; c++) out[c].fill(0);
-    const triOn = g0s[0] > 0 || g1s[0] > 0;
-    const sawOn = g0s[1] > 0 || g1s[1] > 0;
-    const pulOn = g0s[2] > 0 || g1s[2] > 0;
+    const triOn = nCh > 0 && (g0s[0] > 0 || g1s[0] > 0);
+    const sawOn = nCh > 1 && (g0s[1] > 0 || g1s[1] > 0);
+    const pulOn = nCh > 2 && (g0s[2] > 0 || g1s[2] > 0);
     const sinOn = nCh > 3 && (g0s[3] > 0 || g1s[3] > 0);
     const subOn = this.subs && nCh > 4;
 
     // --- drift / tolerance (per quantum)
     let octOff = 0;
-    const tol = params.tolerance[0];
+    const tol = this.tolerance;
     if (tol > 0) octOff += (tol * this.tolDraw) / 1200;
-    const drift = params.drift[0];
+    const drift = this.drift;
     if (drift > 0) {
-      const a = 1 - Math.exp((-TWO_PI * params.driftRate[0] * n) / sr);
+      const a = 1 - Math.exp((-TWO_PI * this.driftRate * n) / sr);
       const w = this.rng() * 2 - 1;
       this.dr1 += a * (w - this.dr1);
       this.dr2 += a * (this.dr1 - this.dr2);
@@ -312,33 +324,42 @@ class VcoProcessor extends AudioWorkletProcessor {
     }
     const driftMul = octOff !== 0 ? Math.pow(2, octOff) : 1;
 
+    // FM: Hz added to the frequency (default), or with fmRatio a ratio of it (through-zero FM
+    // with a constant index across the keyboard): f = f0 * (rk * fm + 1) + hk * fm
+    const rk = this.fmRatio ? 1 : 0, hk = 1 - rk;
+    const tz = this.thruZero;
+
     if (!any) {
       // Nothing audible (every output masked): keep the phase running so a later enable stays coherent
-      let f = params.frequency[0] * Math.pow(2, params.pitch[0]) * driftMul * (1 + params.linFm[0]) + params.fm[0];
-      if (f < 0 && params.thruZero[0] < 0.5) f = 0;
+      const fm0 = params.fm[0];
+      let f = params.frequency[0] * Math.pow(2, params.pitch[0]) * driftMul * (rk * fm0 + 1) + hk * fm0;
+      if (f < 0 && !tz) f = 0;
       this.phase += (clamp(f, -0.45 * sr, 0.45 * sr) / sr) * n;
       this.phase -= Math.floor(this.phase);
       return true;
     }
 
     // --- frequency
-    const tz = params.thruZero[0] >= 0.5;
-    const fA = params.frequency, pA = params.pitch, fmA = params.fm, lA = params.linFm, pwA = params.pw;
-    const fC = fA.length === 1, pC = pA.length === 1, fmC = fmA.length === 1, lC = lA.length === 1;
+    const fA = params.frequency, pA = params.pitch, fmA = params.fm, pwA = params.pw;
+    const fC = fA.length === 1, pC = pA.length === 1, fmC = fmA.length === 1;
     const lim = 0.45 * sr, invSr = 1 / sr;
-    const constF = fC && pC && fmC && lC;
+    const constF = fC && pC && fmC;
     let dtC = 0;
     const pitchMul0 = pC ? Math.pow(2, pA[0]) * driftMul : 0;
     if (constF) {
-      let f = fA[0] * pitchMul0 * (1 + lA[0]) + fmA[0];
+      const fm0 = fmA[0];
+      let f = fA[0] * pitchMul0 * (rk * fm0 + 1) + hk * fm0;
       if (!tz && f < 0) f = 0;
       dtC = (f > lim ? lim : f < -lim ? -lim : f) * invSr;
     }
     const pwC = pwA.length === 1;
     const pw0 = pwA[0];
 
-    // --- phase pass: phase per sample + discontinuity events
-    const ph = this.ph, pwb = this.pwb;
+    // --- phase pass, fused with the naive waveforms: phase per sample + discontinuity events
+    const L = VCO_LAT;
+    const Wt = this.W[0], Ws = this.W[1], Wp = this.W[2], Wn = this.W[3];
+    // BLEP taps written past the end of the last quantum land on this quantum's first sample
+    const ct = Wt[L], cs = Ws[L], cp = Wp[L], cn = Wn[L];
     const syncIn = params.sync[0] > 0.5 && inputs[0] && inputs[0][0] ? inputs[0][0] : null;
     let last = this.lastSync;
     let pwPrev = this.lastPw;
@@ -348,12 +369,12 @@ class VcoProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < n; i++) {
       let dt = dtC;
       if (!constF) {
-        let f = (fC ? fA[0] : fA[i]) * (pC ? pitchMul0 : exp2(pA[i]) * driftMul) * (1 + (lC ? lA[0] : lA[i])) + (fmC ? fmA[0] : fmA[i]);
+        const fmv = fmC ? fmA[0] : fmA[i];
+        let f = (fC ? fA[0] : fA[i]) * (pC ? pitchMul0 : exp2(pA[i]) * driftMul) * (rk * fmv + 1) + hk * fmv;
         if (!tz && f < 0) f = 0;
         dt = (f > lim ? lim : f < -lim ? -lim : f) * invSr;
       }
       const pw = pwC ? pw0 : pwA[i];
-      if (!pwC) pwb[i] = pw;
       let ds = -1;
       if (syncIn !== null) {
         const s = syncIn[i];
@@ -375,82 +396,73 @@ class VcoProcessor extends AudioWorkletProcessor {
         this.push(i, ds, EV_RESET, qs >= 1 ? qs - 1 : qs < 0 ? qs + 1 : qs, dt, pwR);
         p = this.seg(i, dt >= 0 ? 0 : 1, tr, 1, dt, pwR, pw, needPw, needHalf);
       }
-      ph[i] = p;
+      const k = i + L;
+      if (triOn) { const x = p - 0.5; Wt[k] = 1 - 4 * (x < 0 ? -x : x); }
+      if (sawOn) Ws[k] = 2 * p - 1;
+      if (pulOn) Wp[k] = p < pw ? 1 : -1;
+      if (sinOn) Wn[k] = sin2pi(p);
       pwPrev = pw;
     }
     this.phase = p;
     this.lastSync = last;
     this.lastPw = pwPrev;
+    if (triOn) { Wt[L] += ct; Wt[n + L] = 0; }
+    if (sawOn) { Ws[L] += cs; Ws[n + L] = 0; }
+    if (pulOn) { Wp[L] += cp; Wp[n + L] = 0; }
+    if (sinOn) { Wn[L] += cn; Wn[n + L] = 0; }
 
-    // --- channel passes
+    // --- band-limit every discontinuity: polyBLEP for steps, polyBLAMP for slope changes
     const ne = this.ne;
     const evI = this.evI, evK = this.evK, evD = this.evD, evQ = this.evQ, evT = this.evT, evW = this.evW;
-    const L = VCO_LAT;
-
-    if (triOn) {
-      const W = this.W[0];
-      const c4 = W[L];
-      for (let i = 0; i < n; i++) { const x = ph[i] - 0.5; W[i + L] = 1 - 4 * (x < 0 ? -x : x); }
-      W[L] += c4; W[n + L] = 0;
-      for (let e = 0; e < ne; e++) {
-        const k = evI[e] + L, d = evD[e], dt = evT[e], adt = dt < 0 ? -dt : dt;
-        switch (evK[e]) {
-          case EV_WRAP_UP: case EV_WRAP_DOWN: addBlamp(W, k, d, 8 * adt); break;
-          case EV_HALF: addBlamp(W, k, d, -8 * adt); break;
-          case EV_RESET: {
-            const qs = evQ[e], x = qs - 0.5;
-            addBlep(W, k, d, -1 - (1 - 4 * (x < 0 ? -x : x)));
-            addBlamp(W, k, d, 4 * adt - (qs < 0.5 ? 4 : -4) * dt);
-            break;
+    for (let e = 0; e < ne; e++) {
+      const k = evI[e] + L, d = evD[e], dt = evT[e], adt = dt < 0 ? -dt : dt;
+      switch (evK[e]) {
+        case EV_WRAP_UP:
+          if (triOn) addBlamp(Wt, k, d, 8 * adt);
+          if (sawOn) addBlep(Ws, k, d, -2);
+          if (pulOn) addBlep(Wp, k, d, 2);
+          break;
+        case EV_WRAP_DOWN:
+          if (triOn) addBlamp(Wt, k, d, 8 * adt);
+          if (sawOn) addBlep(Ws, k, d, 2);
+          if (pulOn) addBlep(Wp, k, d, -2);
+          break;
+        case EV_HALF:
+          addBlamp(Wt, k, d, -8 * adt);
+          break;
+        case EV_PW:
+          addBlep(Wp, k, d, evQ[e]);
+          break;
+        case EV_RESET: {
+          const qs = evQ[e];
+          if (triOn) {
+            const x = qs - 0.5;
+            addBlep(Wt, k, d, -1 - (1 - 4 * (x < 0 ? -x : x)));
+            addBlamp(Wt, k, d, 4 * adt - (qs < 0.5 ? 4 : -4) * dt);
           }
+          if (sawOn) addBlep(Ws, k, d, (dt >= 0 ? -1 : 1) - (2 * qs - 1));
+          if (pulOn) addBlep(Wp, k, d, (dt >= 0 ? 1 : -1) - (qs < evW[e] ? 1 : -1));
+          if (sinOn) {
+            addBlep(Wn, k, d, -sin2pi(qs));
+            addBlamp(Wn, k, d, TWO_PI * dt * (1 - sin2pi(qs + 0.25)));
+          }
+          break;
         }
       }
-      this.emit(W, out[0], n, true, g0s[0], g1s[0]);
     }
-    if (sawOn) {
-      const W = this.W[1];
-      const c4 = W[L];
-      for (let i = 0; i < n; i++) W[i + L] = 2 * ph[i] - 1;
-      W[L] += c4; W[n + L] = 0;
-      for (let e = 0; e < ne; e++) {
-        const k = evI[e] + L;
-        switch (evK[e]) {
-          case EV_WRAP_UP: addBlep(W, k, evD[e], -2); break;
-          case EV_WRAP_DOWN: addBlep(W, k, evD[e], 2); break;
-          case EV_RESET: addBlep(W, k, evD[e], (evT[e] >= 0 ? -1 : 1) - (2 * evQ[e] - 1)); break;
-        }
-      }
-      this.emit(W, out[1], n, true, g0s[1], g1s[1]);
+
+    // --- outputs: delay-compensated, presence FIR on the edged waves, one pass for all channels
+    const oT = out[0], oS = out[1], oP = out[2], oN = sinOn ? out[3] : null;
+    for (let j = 0; j < n; j++) {
+      if (triOn) oT[j] = FIR_C * Wt[j + 1] + FIR_S * (Wt[j] + Wt[j + 2]);
+      if (sawOn) oS[j] = FIR_C * Ws[j + 1] + FIR_S * (Ws[j] + Ws[j + 2]);
+      if (pulOn) oP[j] = FIR_C * Wp[j + 1] + FIR_S * (Wp[j] + Wp[j + 2]);
+      if (oN) oN[j] = Wn[j + 1];
     }
-    if (pulOn) {
-      const W = this.W[2];
-      const c4 = W[L];
-      if (pwC) for (let i = 0; i < n; i++) W[i + L] = ph[i] < pw0 ? 1 : -1;
-      else for (let i = 0; i < n; i++) W[i + L] = ph[i] < pwb[i] ? 1 : -1;
-      W[L] += c4; W[n + L] = 0;
-      for (let e = 0; e < ne; e++) {
-        const k = evI[e] + L;
-        switch (evK[e]) {
-          case EV_WRAP_UP: addBlep(W, k, evD[e], 2); break;
-          case EV_WRAP_DOWN: addBlep(W, k, evD[e], -2); break;
-          case EV_PW: addBlep(W, k, evD[e], evQ[e]); break;
-          case EV_RESET: addBlep(W, k, evD[e], (evT[e] >= 0 ? 1 : -1) - (evQ[e] < evW[e] ? 1 : -1)); break;
-        }
-      }
-      this.emit(W, out[2], n, true, g0s[2], g1s[2]);
-    }
-    if (sinOn) {
-      const W = this.W[3];
-      const c4 = W[L];
-      for (let i = 0; i < n; i++) W[i + L] = sin2pi(ph[i]);
-      W[L] += c4; W[n + L] = 0;
-      for (let e = 0; e < ne; e++) {
-        if (evK[e] !== EV_RESET) continue;
-        const k = evI[e] + L, qs = evQ[e];
-        addBlep(W, k, evD[e], -sin2pi(qs));
-        addBlamp(W, k, evD[e], TWO_PI * evT[e] * (1 - sin2pi(qs + 0.25)));
-      }
-      this.emit(W, out[3], n, false, g0s[3], g1s[3]);
+    for (let c = 0; c < 4 && c < nCh; c++) {
+      if (!(g0s[c] > 0 || g1s[c] > 0)) continue;
+      if (g0s[c] !== g1s[c]) ramp(out[c], n, g0s[c], g1s[c]);
+      carry(this.W[c], n);
     }
     if (subOn) {
       // Sub-octave flip-flops clocked by every cycle start of the core (wraps and sync resets):
@@ -482,8 +494,8 @@ class VcoProcessor extends AudioWorkletProcessor {
           s1 = -s1;
           if (s1 > 0) { addBlep(W2, k, d, -2 * s2); s2 = -s2; }
         }
-        if (on1) this.emit(W1, out[4], n, true, g0s[4], g1s[4]);
-        if (on2) this.emit(W2, out[5], n, true, g0s[5], g1s[5]);
+        if (on1) this.emit(W1, out[4], n, g0s[4], g1s[4]);
+        if (on2) this.emit(W2, out[5], n, g0s[5], g1s[5]);
       } else {
         for (e = 0; e < ne; e++) {
           const kd = evK[e];
@@ -495,16 +507,23 @@ class VcoProcessor extends AudioWorkletProcessor {
     return true;
   }
 
-  /** Delay-compensated output with the presence FIR, gain ramp on mask changes, carry history */
-  emit(W, o, n, fir, g0, g1) {
-    if (fir) for (let j = 0; j < n; j++) o[j] = FIR_C * W[j + 1] + FIR_S * (W[j] + W[j + 2]);
-    else for (let j = 0; j < n; j++) o[j] = W[j + 1];
-    if (g0 !== g1) {
-      const step = (g1 - g0) / n;
-      for (let j = 0; j < n; j++) o[j] *= g0 + step * (j + 1);
-    }
-    W[0] = W[n]; W[1] = W[n + 1]; W[2] = W[n + 2]; W[3] = W[n + 3]; W[4] = W[n + 4];
+  /** Delay-compensated output with the presence FIR, gain ramp on mask changes, carry history (subs) */
+  emit(W, o, n, g0, g1) {
+    for (let j = 0; j < n; j++) o[j] = FIR_C * W[j + 1] + FIR_S * (W[j] + W[j + 2]);
+    if (g0 !== g1) ramp(o, n, g0, g1);
+    carry(W, n);
   }
+}
+
+/** Linear gain ramp g0 -> g1 over one quantum (mask changes fade instead of clicking) */
+function ramp(o, n, g0, g1) {
+  const step = (g1 - g0) / n;
+  for (let j = 0; j < n; j++) o[j] *= g0 + step * (j + 1);
+}
+
+/** Keep the work buffer's tail (latency history + BLEP carry) for the next quantum */
+function carry(W, n) {
+  W[0] = W[n]; W[1] = W[n + 1]; W[2] = W[n + 2]; W[3] = W[n + 3]; W[4] = W[n + 4];
 }
 
 // ============================================================================
@@ -542,21 +561,26 @@ class LadderProcessor extends AudioWorkletProcessor {
       { name: 'drive', defaultValue: 1, minValue: 0.1, maxValue: 10, automationRate: 'k-rate' },
       // 0 LP24, 1 LP12, 2 LP6, 3 HP24, 4 BP12, 5 HP12, 6 LP18
       { name: 'mode', defaultValue: 0, minValue: 0, maxValue: 6, automationRate: 'k-rate' },
-      // --- new ---
-      // 0 = 1x (today's model), 1 = 2x oversampled per-stage-tanh transistor core
-      { name: 'quality', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      // Passband (bass) loss compensation at high resonance for the low-pass modes: 0 = classic Moog, 1 = full
-      { name: 'comp', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+      // quality / comp are settings (processorOptions or { type: 'set' } messages), not AudioParams
     ];
   }
 
   constructor(options) {
     super();
     const o = (options && options.processorOptions) || {};
-    this.optQuality = o.quality ? 1 : 0;
+    this.quality = 0; // 0 = 1x (the original model), 1 = 2x oversampled per-stage-tanh transistor core
+    this.comp = 0;    // passband (bass) loss compensation at high resonance, low-pass modes: 0 = classic, 1 = full
+    this.apply(o);
+    this.port.onmessage = e => { const m = e.data; if (m && m.type === 'set') this.apply(m); };
     this.s = [0, 0, 0, 0];
     this.hb = new Float64Array(24); // halfband states: up0 x/y (3+3), up1 (3+3), dn0 (3+3), dn1 (3+3)
     this.lastQ = -1;
+  }
+
+  /** Apply settings from processorOptions or a { type: 'set' } message */
+  apply(m) {
+    if (m.quality !== undefined) this.quality = m.quality >= 0.5 ? 1 : 0;
+    if (typeof m.comp === 'number' && m.comp === m.comp) this.comp = clamp(m.comp, 0, 1);
   }
 
   process(inputs, outputs, params) {
@@ -570,8 +594,8 @@ class LadderProcessor extends AudioWorkletProcessor {
     if (mode < 0 || mode > 6) mode = 0;
     const m = LADDER_MIX[mode];
     const m0 = m[0], m1 = m[1], m2 = m[2], m3 = m[3], m4 = m[4];
-    const quality = params.quality[0] >= 0.5 || this.optQuality ? 1 : 0;
-    const comp = params.comp[0];
+    const quality = this.quality;
+    const comp = this.comp;
     const lpMode = mode === 0 || mode === 1 || mode === 2 || mode === 6;
     const doComp = comp > 0 && lpMode;
     if (quality !== this.lastQ) { this.hb.fill(0); this.lastQ = quality; }
@@ -725,38 +749,60 @@ class EnvProcessor extends AudioWorkletProcessor {
       { name: 'mode', defaultValue: 0, minValue: 0, maxValue: 2, automationRate: 'k-rate' },
       // 0 = exponential decay, 1 = linear
       { name: 'curve', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      // --- new (defaults keep the old behaviour) ---
-      // Delay before the attack and hold at the peak (seconds) -> DAHDSR
-      { name: 'delay', defaultValue: 0, minValue: 0, maxValue: 30, automationRate: 'k-rate' },
-      { name: 'hold', defaultValue: 0, minValue: 0, maxValue: 30, automationRate: 'k-rate' },
-      // Loop: AD cycles until reset; ADSR/AR repeat A-H-D-R while the gate is held
-      { name: 'loop', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      // Analog RC curves: attack charges toward 1.5 x peak and stops at the peak; exponential decay/release
-      { name: 'analog', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      // Curvature: + = more convex (RC-like: fast start), - = concave (slow start). 0 = mode default
-      { name: 'shape', defaultValue: 0, minValue: -1, maxValue: 1, automationRate: 'k-rate' },
+      // delay / hold / loop / analog / shape are settings (processorOptions or timed
+      // { type: 'set' } messages), not AudioParams - each AudioParam costs CPU on every quantum
     ];
   }
 
-  constructor() {
+  constructor(options) {
     super();
+    const o = (options && options.processorOptions) || {};
     this.value = 0;
     this.stage = ST_IDLE;
     this.peak = 1;
     this.count = 0;
     this.queue = [];
+    this.setQ = [];
     this.gateHigh = false;
     this.lastIn = 0;
     this.dstep = -1;
     this.curDelay = 0;
+    // settings (defaults = the original AD / ADSR / AR envelope)
+    this.delayT = 0;     // delay before the attack, seconds  } DAHDSR
+    this.holdT = 0;      // hold at the peak, seconds          }
+    this.loop = false;   // AD cycles until reset; ADSR / AR repeat A-H-D-R while the gate is held
+    this.analog = false; // RC curves: attack charges toward 1.5 x peak, exponential decay / release
+    this.shape = 0;      // curvature -1..1: + = more convex (fast start), - = concave (slow start)
+    this.apply(o);
     this.port.onmessage = (e) => {
       const m = e.data;
       if (!m) return;
       if (m.type === 'reset' || m.type === 'clear') { this.queue = []; this.value = 0; this.stage = ST_IDLE; this.gateHigh = false; return; }
-      if (typeof m.time !== 'number' || !(m.time === m.time)) m.time = 0; // no time = as soon as possible
+      const timed = typeof m.time === 'number' && m.time === m.time;
+      if (m.type === 'set') {
+        // settings apply from the render quantum that contains `time` (or right away)
+        if (!timed) { this.apply(m); return; }
+        this.setQ.push(m);
+        this.setQ.sort((a, b) => a.time - b.time);
+        return;
+      }
+      if (!timed) m.time = 0; // no time = as soon as possible
       this.queue.push(m);
       this.queue.sort((a, b) => a.time - b.time);
     };
+  }
+
+  /** Apply settings from processorOptions or a { type: 'set' } message */
+  apply(m) {
+    const num = (v, lo, hi) => (typeof v === 'number' && v === v ? clamp(v, lo, hi) : undefined);
+    const d = num(m.delay, 0, 30);
+    if (d !== undefined) this.delayT = d;
+    const h = num(m.hold, 0, 30);
+    if (h !== undefined) this.holdT = h;
+    if (m.loop !== undefined) this.loop = !!m.loop;
+    if (m.analog !== undefined) this.analog = !!m.analog;
+    const s = num(m.shape, -1, 1);
+    if (s !== undefined) this.shape = s;
   }
 
   fire(velocity) {
@@ -779,14 +825,19 @@ class EnvProcessor extends AudioWorkletProcessor {
     const attack = params.attack[0], decay = params.decay[0], sustain = params.sustain[0], release = params.release[0];
     const mode = Math.round(params.mode[0]);
     const linear = params.curve[0] > 0.5;
-    const delayT = params.delay[0], holdT = params.hold[0];
-    const loop = params.loop[0] > 0.5;
-    const analog = params.analog[0] > 0.5;
-    const shape = params.shape[0];
     const cvArr = params.timeCv;
     const cvConst = cvArr.length === 1;
     const sr = sampleRate;
     const t0 = currentTime;
+    const setQ = this.setQ;
+    if (setQ.length) {
+      const tEnd = t0 + n / sr;
+      while (setQ.length && setQ[0].time < tEnd) this.apply(setQ.shift());
+    }
+    const delayT = this.delayT, holdT = this.holdT;
+    const loop = this.loop;
+    const analog = this.analog;
+    const shape = this.shape;
     this.curDelay = delayT;
     let nextT = this.queue.length ? this.queue[0].time : Infinity;
 
@@ -1068,11 +1119,8 @@ class FdnReverbProcessor extends AudioWorkletProcessor {
       // Delay modulation depth 0..1 (up to +-0.5 ms) and base rate
       { name: 'mod', defaultValue: 0.5, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
       { name: 'modRate', defaultValue: 0.6, minValue: 0.05, maxValue: 5, automationRate: 'k-rate' },
-      // Input tone
-      { name: 'lowCut', defaultValue: 20, minValue: 10, maxValue: 2000, automationRate: 'k-rate' },
-      { name: 'highCut', defaultValue: 16000, minValue: 500, maxValue: 20000, automationRate: 'k-rate' },
-      { name: 'wet', defaultValue: 1, minValue: 0, maxValue: 4, automationRate: 'k-rate' },
-      { name: 'dry', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+      // lowCut / highCut (input tone) are settings (processorOptions or { type: 'set' } messages).
+      // Output is 100% wet: the Reverb2 wrapper mixes dry / wet with native gains.
     ];
   }
 
@@ -1081,6 +1129,11 @@ class FdnReverbProcessor extends AudioWorkletProcessor {
     const sr = sampleRate;
     const o = (options && options.processorOptions) || {};
     this.rng = makeRng(o.seed);
+    // settings: input tone
+    this.lowCut = 20;      // Hz
+    this.highCut = 16000;  // Hz
+    this.apply(o);
+    this.port.onmessage = e => { const m = e.data; if (m && m.type === 'set') this.apply(m); };
     // predelay: interleaved stereo ring buffer (up to 1 s)
     this.pdSize = pow2Ceil(sr * 1.0 + 8);
     this.pd = new Float32Array(this.pdSize * 2);
@@ -1123,6 +1176,12 @@ class FdnReverbProcessor extends AudioWorkletProcessor {
     this.quietNeed = Math.ceil(this.lnSize / 128) + 2;
   }
 
+  /** Apply settings from processorOptions or a { type: 'set' } message */
+  apply(m) {
+    if (typeof m.lowCut === 'number' && m.lowCut === m.lowCut) this.lowCut = clamp(m.lowCut, 10, 2000);
+    if (typeof m.highCut === 'number' && m.highCut === m.highCut) this.highCut = clamp(m.highCut, 500, 20000);
+  }
+
   process(inputs, outputs, params) {
     const out = outputs[0];
     const oL = out[0], oR = out.length > 1 ? out[1] : null;
@@ -1145,13 +1204,12 @@ class FdnReverbProcessor extends AudioWorkletProcessor {
     }
 
     const decay = params.decay[0], size = params.size[0], width = params.width[0];
-    const wet = params.wet[0], dry = params.dry[0];
     const modD = params.mod[0] * 0.0005 * sr;
     const scale = 0.25 + 0.75 * size;
 
     // --- per-quantum coefficients
-    const hcA = 1 - Math.exp((-TWO_PI * Math.min(params.highCut[0], 0.45 * sr)) / sr);
-    const lcA = Math.exp((-TWO_PI * params.lowCut[0]) / sr);
+    const hcA = 1 - Math.exp((-TWO_PI * Math.min(this.highCut, 0.45 * sr)) / sr);
+    const lcA = Math.exp((-TWO_PI * this.lowCut) / sr);
     const cw = Math.cos((TWO_PI * Math.min(params.damping[0], 0.49 * sr)) / sr);
     const sm = 1 - Math.exp(-n / (0.08 * sr)); // length glide (~80 ms) when size changes
     const rate = (params.modRate[0] * n) / sr;
@@ -1221,7 +1279,7 @@ class FdnReverbProcessor extends AudioWorkletProcessor {
     const SQ8 = 0.35355339059327373;
     // Output taps: two orthogonal Hadamard rows -> decorrelated L / R
     const ws = 0.5 * width, wm = 0.5;
-    const outG = FDN_OUT_GAIN * wet;
+    const outG = FDN_OUT_GAIN;
     let tail = 0;
 
     for (let i = 0; i < n; i++) {
@@ -1307,8 +1365,8 @@ class FdnReverbProcessor extends AudioWorkletProcessor {
       const yr = (y0 + y1 - y2 - y3 + y4 + y5 - y6 - y7) * SQ8;
       tail += sum * sum + yl * yl + yr * yr;
       const mid = (yl + yr) * wm, side = (yl - yr) * ws;
-      oL[i] = (mid + side) * outG + xl * dry;
-      if (oR) oR[i] = (mid - side) * outG + xr * dry;
+      oL[i] = (mid + side) * outG;
+      if (oR) oR[i] = (mid - side) * outG;
     }
     this.pdW = pdW; this.difW = w; this.lnW = lw;
     this.hxL = hxL; this.hyL = flush(hyL); this.hxR = hxR; this.hyR = flush(hyR);
@@ -1346,19 +1404,10 @@ class ChorusProcessor extends AudioWorkletProcessor {
       // Modulation depth and centre delay (seconds)
       { name: 'depth', defaultValue: 0.0018, minValue: 0, maxValue: 0.02, automationRate: 'k-rate' },
       { name: 'delay', defaultValue: 0.0035, minValue: 0.0005, maxValue: 0.05, automationRate: 'k-rate' },
-      // 1 = one BBD line (mono wet), 2 = two lines with opposite LFO phase (stereo)
-      { name: 'voices', defaultValue: 2, minValue: 1, maxValue: 2, automationRate: 'k-rate' },
       { name: 'feedback', defaultValue: 0, minValue: -0.95, maxValue: 0.95, automationRate: 'k-rate' },
       { name: 'width', defaultValue: 1, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      // Bucket-brigade band limit (2-pole) and wet low cut
-      { name: 'highCut', defaultValue: 9000, minValue: 500, maxValue: 20000, automationRate: 'k-rate' },
-      { name: 'lowCut', defaultValue: 30, minValue: 10, maxValue: 4000, automationRate: 'k-rate' },
-      // BBD input saturation 0..1
-      { name: 'drive', defaultValue: 0.15, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      // 0 = triangle (Juno), 1 = sine
-      { name: 'lfoShape', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      { name: 'wet', defaultValue: 1, minValue: 0, maxValue: 2, automationRate: 'k-rate' },
-      { name: 'dry', defaultValue: 0, minValue: 0, maxValue: 2, automationRate: 'k-rate' },
+      // voices / lfoShape / highCut / lowCut / drive are settings (processorOptions or
+      // { type: 'set' } messages). Output is 100% wet: the Chorus wrapper mixes dry / wet.
     ];
   }
 
@@ -1370,12 +1419,35 @@ class ChorusProcessor extends AudioWorkletProcessor {
     this.bufA = new Float32Array(size);
     this.bufB = new Float32Array(size);
     this.w = 0;
-    this.phase = typeof o.phase === 'number' ? o.phase : 0;
+    this.phase = typeof o.phase === 'number' ? o.phase - Math.floor(o.phase) : 0;
+    // settings
+    this.voices = 2;      // 1 = one BBD line (mono wet), 2 = two lines with opposite LFO phase (stereo)
+    this.lfoShape = 0;    // 0 = triangle (Juno), 1 = sine
+    this.highCut = 9000;  // bucket-brigade band limit (2-pole), Hz
+    this.lowCut = 30;     // wet low cut, Hz
+    this.drive = 0.15;    // BBD input saturation 0..1
+    this.apply(o);
+    this.port.onmessage = e => { const m = e.data; if (m && m.type === 'set') this.apply(m); };
     this.fbA = 0; this.fbB = 0;
     // 2-pole lowpass (TPT SVF) states per voice, one-pole highpass states
     this.a1 = 0; this.a2 = 0; this.b1 = 0; this.b2 = 0;
     this.hxA = 0; this.hyA = 0; this.hxB = 0; this.hyB = 0;
     this.d0 = -1;
+  }
+
+  /** Apply settings from processorOptions or a { type: 'set' } message */
+  apply(m) {
+    const num = (v, lo, hi) => (typeof v === 'number' && v === v ? clamp(v, lo, hi) : undefined);
+    const v = num(m.voices, 1, 2);
+    if (v !== undefined) this.voices = v >= 1.5 ? 2 : 1;
+    const s = num(m.lfoShape, 0, 1);
+    if (s !== undefined) this.lfoShape = s >= 0.5 ? 1 : 0;
+    const hc = num(m.highCut, 500, 20000);
+    if (hc !== undefined) this.highCut = hc;
+    const lc = num(m.lowCut, 10, 4000);
+    if (lc !== undefined) this.lowCut = lc;
+    const d = num(m.drive, 0, 1);
+    if (d !== undefined) this.drive = d;
   }
 
   process(inputs, outputs, params) {
@@ -1386,17 +1458,16 @@ class ChorusProcessor extends AudioWorkletProcessor {
     const iL = inp && inp[0], iR = inp && (inp[1] || inp[0]);
     const sr = sampleRate;
     const rate = params.rate[0], depth = params.depth[0] * sr;
-    const two = params.voices[0] >= 1.5;
+    const two = this.voices === 2;
     const fbk = params.feedback[0], width = params.width[0];
-    const wet = params.wet[0], dry = params.dry[0];
-    const drive = params.drive[0];
+    const drive = this.drive;
     const dG = 1 + 4 * drive, dN = 1 / dG;
-    const sine = params.lfoShape[0] >= 0.5;
+    const sine = this.lfoShape === 1;
     // BBD band limit: Butterworth 2-pole TPT
-    const g = Math.tan((Math.PI * Math.min(params.highCut[0], sr * 0.45)) / sr);
+    const g = Math.tan((Math.PI * Math.min(this.highCut, sr * 0.45)) / sr);
     const kq = 1.4142135623730951;
     const h1 = 1 / (1 + g * (g + kq)), h2 = g * h1, h3 = g * h2;
-    const hc = Math.exp((-TWO_PI * params.lowCut[0]) / sr);
+    const hc = Math.exp((-TWO_PI * this.lowCut) / sr);
     // centre delay glides (no zipper / pitch jumps)
     const dTarget = Math.min(params.delay[0] * sr, this.size - depth - 8);
     if (this.d0 < 0) this.d0 = dTarget;
@@ -1458,8 +1529,8 @@ class ChorusProcessor extends AudioWorkletProcessor {
       }
       w = (w + 1) & mask;
       const mid = 0.5 * (ya + yb), side = (ya - yb) * ws;
-      oL[i] = (mid + side) * wet + xl * dry;
-      if (oR !== oL) oR[i] = (mid - side) * wet + xr * dry;
+      oL[i] = mid + side;
+      if (oR !== oL) oR[i] = mid - side;
     }
     this.w = w; this.phase = ph; this.fbA = fbA; this.fbB = fbB;
     if (!Number.isFinite(a1 + a2 + b1 + b2 + hyA + hyB)) { a1 = a2 = b1 = b2 = hxA = hyA = hxB = hyB = 0; this.fbA = this.fbB = 0; bA.fill(0); bB.fill(0); }

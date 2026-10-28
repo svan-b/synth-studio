@@ -27,10 +27,10 @@ declare global {
 
 const VARIANTS: Variant[] = ['before', 'after'];
 
-function emptyResults(): BenchResults {
+/** Initial / reset state. Pass the user agent only on the client (the page is prerendered). */
+function emptyResults(userAgent = ''): BenchResults {
   return {
-    status: 'idle', progress: '', sampleRate: SR, seconds: SECONDS,
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    status: 'idle', progress: '', sampleRate: SR, seconds: SECONDS, userAgent,
     startedAt: '', framework: { emptyMs: 0, suspendMs: 0, suspends: 0 },
     devices: [], processors: [], errors: [],
   };
@@ -56,7 +56,7 @@ function readOptions(): { auto: boolean; opts: Options } {
 const fmt = (v: number, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '-');
 
 export default function BenchPage() {
-  const [res, setRes] = useState<BenchResults>(emptyResults);
+  const [res, setRes] = useState<BenchResults>(() => emptyResults());
   const [opts, setOpts] = useState<Options>({ reps: 3 });
   const running = useRef(false);
 
@@ -69,7 +69,7 @@ export default function BenchPage() {
   const run = useCallback(async (o: Options) => {
     if (running.current) return;
     running.current = true;
-    const r = emptyResults();
+    const r = emptyResults(navigator.userAgent);
     r.status = 'running';
     r.startedAt = new Date().toISOString();
     const onError = (e: ErrorEvent | PromiseRejectionEvent) => {
@@ -128,7 +128,9 @@ export default function BenchPage() {
   useEffect(() => {
     const { auto, opts: o } = readOptions();
     setOpts(o);
-    window.__benchResults = emptyResults();
+    const initial = emptyResults(navigator.userAgent);
+    window.__benchResults = initial;
+    setRes(initial);
     if (auto) void run(o);
   }, [run]);
 
