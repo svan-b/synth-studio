@@ -48,6 +48,11 @@ export class Transport {
   private _swing = 0; // 0..0.75 - delays every second 16th
   private _playing = false;
   private startTime = 0;
+  private startTick = 0;
+  /** Recently scheduled ticks (time, tick), for "where are we now" displays */
+  private recentTime = new Float64Array(128);
+  private recentTick = new Float64Array(128);
+  private recentN = 0;
   readonly lookahead = 0.1;
   readonly interval = 0.02;
 
@@ -60,7 +65,24 @@ export class Transport {
   get swing() { return this._swing; }
   /** Audio time playback (tick 0) started */
   get startedAt() { return this.startTime; }
+  /** Tick playback started from (0, or a song position) */
+  get startedAtTick() { return this.startTick; }
   get position() { return this.tickCount; }
+
+  /**
+   * The tick sounding at audio time `time` (the latest scheduled tick at or before it),
+   * or null before the first tick (stopped, or still counting in). Displays pass
+   * ctx.currentTime (+ output latency for what you hear).
+   */
+  tickAt(time: number): number | null {
+    if (!this._playing || time < this.startTime) return null;
+    const n = Math.min(this.recentN, 128);
+    for (let k = 1; k <= n; k++) {
+      const i = (this.recentN - k) & 127;
+      if (this.recentTime[i] <= time) return this.recentTick[i];
+    }
+    return null;
+  }
 
   setBpm(bpm: number) {
     const b = Math.max(20, Math.min(300, bpm));
@@ -86,6 +108,8 @@ export class Transport {
     this.tickCount = fromTick;
     this.nextTickTime = t;
     this.startTime = t;
+    this.startTick = fromTick;
+    this.recentN = 0;
     this.eventListeners.forEach(l => l({ type: 'start', time: t }));
     this.timer = setInterval(() => this.pump(), this.interval * 1000);
     this.pump();
@@ -146,6 +170,10 @@ export class Transport {
         bar: Math.floor(tick / (PPQN * 4)),
         sixteenth: Math.floor(tick / (PPQN / 4)),
       };
+      const r = this.recentN & 127;
+      this.recentTime[r] = ev.time;
+      this.recentTick[r] = tick;
+      this.recentN++;
       this.tickListeners.forEach(l => l(ev));
       this.tickCount++;
       this.nextTickTime += dur;

@@ -1,46 +1,119 @@
 // ============================================================================
-// Shared AudioContext
-// One context for the whole app, a master bus with a soft limiter, worklet
-// loading, and the iOS / Safari unlock dance (audio may only start inside a
-// user gesture, and the silent switch mutes Web Audio unless we ask for the
-// 'playback' audio session).
+// Shared AudioContext and the studio master
+//
+// One context for the whole app, worklet loading, and the iOS / Safari unlock
+// dance (audio may only start inside a user gesture, and the silent switch mutes
+// Web Audio unless we ask for the 'playback' audio session).
+//
+// The master is transparent by default:
+//
+//   instruments / returns ─► masterIn (unity) ─► master-bus worklet ─► masterOut ─┬─► speakers
+//                                                 optional EQ + glue (off)          ├─► analyser (__synthLevel, scope)
+//                                                 master gain                       └─► recorder tap
+//                                                 true-peak limiter -1 dBTP, 1.5 ms
+//                                                 BS.1770-4 meter
+//   metronome / count-in ─► monitor ─► speakers (never recorded)
+//
+// The limiter only acts on overs; below the ceiling the signal passes bit for bit,
+// 1.5 ms late (its look-ahead). Until the worklet has loaded, masterIn feeds masterOut
+// directly. There is no DynamicsCompressor anywhere on the path any more (the old one
+// squashed every instrument and added 6 ms of pre-delay).
 // ============================================================================
 
 let ctx: AudioContext | null = null;
-let master: GainNode | null = null;
+let masterIn: GainNode | null = null;
+let masterNode: AudioWorkletNode | null = null;
+let masterOut: GainNode | null = null;
+let monitor: GainNode | null = null;
 let analyser: AnalyserNode | null = null;
-let recordTap: AudioNode | null = null;
 let levelBuf: Float32Array<ArrayBuffer> | null = null;
 let workletPromise: Promise<void> | null = null;
+let studioWorkletPromise: Promise<void> | null = null;
 let unlockInstalled = false;
+let usedHint: LatencyPreference = 'interactive';
+let limiterFrames = 0;
 const readyListeners = new Set<(running: boolean) => void>();
 
 export const WORKLET_URL = '/worklets/synth-processors.js';
+export const STUDIO_WORKLET_URL = '/worklets/studio-processors.js';
+/** Limiter look-ahead, seconds (the only buffering on the live path) */
+export const LIMITER_LOOKAHEAD = 0.0015;
+/** Limiter ceiling, dBTP */
+export const LIMITER_CEILING_DB = -1;
+
+// ---------------------------------------------------------------------------
+// Latency preference (per browser; applied when the context is created)
+// ---------------------------------------------------------------------------
+
+export type LatencyPreference = 'interactive' | 'balanced';
+const LATENCY_KEY = 'synth-studio-latency';
+
+export function getLatencyPreference(): LatencyPreference {
+  try {
+    return localStorage.getItem(LATENCY_KEY) === 'balanced' ? 'balanced' : 'interactive';
+  } catch {
+    return 'interactive';
+  }
+}
+
+/** Saved for the next page load: an AudioContext's buffer size can't change while it runs */
+export function setLatencyPreference(p: LatencyPreference) {
+  try { localStorage.setItem(LATENCY_KEY, p); } catch { /* private mode */ }
+}
+
+export interface LatencyInfo {
+  /** The preference the running context was created with */
+  hint: LatencyPreference;
+  sampleRate: number;
+  /** Processing latency of the audio graph's buffer, seconds */
+  base: number;
+  /** Device / OS output latency, seconds (0 where the browser doesn't report it) */
+  output: number;
+  /** Master limiter look-ahead, seconds */
+  lookahead: number;
+  /** Key or pad to speaker, seconds */
+  total: number;
+}
+
+export function getLatencyInfo(): LatencyInfo | null {
+  if (!ctx) return null;
+  const base = ctx.baseLatency || 0;
+  const output = (ctx as AudioContext & { outputLatency?: number }).outputLatency || 0;
+  const lookahead = masterNode ? (limiterFrames || Math.round(LIMITER_LOOKAHEAD * ctx.sampleRate)) / ctx.sampleRate : 0;
+  return { hint: usedHint, sampleRate: ctx.sampleRate, base, output, lookahead, total: base + output + lookahead };
+}
+
+// ---------------------------------------------------------------------------
+// Context and master graph
+// ---------------------------------------------------------------------------
 
 function createContext(): AudioContext {
   const AC: typeof AudioContext =
     window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  const c = new AC({ latencyHint: 'interactive' });
+  usedHint = getLatencyPreference();
+  let c: AudioContext;
+  try {
+    c = new AC({ latencyHint: usedHint });
+  } catch {
+    c = new AC();
+  }
 
-  // Soft limiter so stacked voices and resonant filters never clip harshly
-  const limiter = c.createDynamicsCompressor();
-  limiter.threshold.value = -6;
-  limiter.knee.value = 6;
-  limiter.ratio.value = 12;
-  limiter.attack.value = 0.003;
-  limiter.release.value = 0.15;
+  masterIn = c.createGain();
+  masterIn.channelCount = 2;
+  masterIn.channelCountMode = 'explicit';
+  masterIn.channelInterpretation = 'speakers';
+  masterOut = c.createGain();
+  masterIn.connect(masterOut); // bypass until the master worklet is in
+  masterOut.connect(c.destination);
 
-  master = c.createGain();
-  master.gain.value = 0.8;
-  master.connect(limiter);
-  limiter.connect(c.destination);
+  monitor = c.createGain();
+  monitor.connect(c.destination);
 
-  // Output tap for the level meter (and automated audio tests)
+  // Output tap for the level meter, the scope and automated audio tests
   analyser = c.createAnalyser();
   analyser.fftSize = 2048;
   levelBuf = new Float32Array(analyser.fftSize);
-  limiter.connect(analyser);
-  recordTap = limiter;
+  masterOut.connect(analyser);
   (window as unknown as { __synthLevel?: () => number }).__synthLevel = getOutputLevel;
 
   c.addEventListener('statechange', () => notify(c.state === 'running'));
@@ -56,15 +129,22 @@ export function getAudioContext(): AudioContext {
   return ctx;
 }
 
+/** The studio master bus input (unity gain). Instruments are routed here by the hub. */
 export function getMasterBus(): AudioNode {
   getAudioContext();
-  return master!;
+  return masterIn!;
+}
+
+/** Straight to the speakers, bypassing the master and every recording (metronome, count-in) */
+export function getMonitorBus(): AudioNode {
+  getAudioContext();
+  return monitor!;
 }
 
 /** Post-limiter master signal (what you hear) - for recording */
 export function getRecordTap(): AudioNode {
   getAudioContext();
-  return recordTap!;
+  return masterOut!;
 }
 
 /** The master analyser - for scopes and meters */
@@ -93,11 +173,151 @@ export function onAudioStateChange(listener: (running: boolean) => void): () => 
   return () => readyListeners.delete(listener);
 }
 
-/** Load the AudioWorklet processors once per context */
+// ---------------------------------------------------------------------------
+// Master processor: settings and meter
+// ---------------------------------------------------------------------------
+
+export interface MasterEq {
+  on: boolean;
+  /** Low shelf at 100 Hz, dB */
+  low: number;
+  /** Tilt around 1 kHz: + brighter (highs up, lows down by the same amount), dB */
+  tilt: number;
+  /** High shelf at 10 kHz, dB */
+  high: number;
+}
+
+export interface MasterGlue {
+  on: boolean;
+  threshold: number;
+  ratio: number;
+  /** seconds */
+  attack: number;
+  /** seconds (ignored when auto) */
+  release: number;
+  auto: boolean;
+  makeup: number;
+  /** 0..1 wet share (parallel compression below 1) */
+  mix: number;
+}
+
+export interface MasterSettings {
+  /** Master gain before the limiter, linear */
+  gain: number;
+  eq: MasterEq;
+  glue: MasterGlue;
+}
+
+/** One meter frame from the master (every 50 ms). Linear peaks, LUFS or null below the gate. */
+export interface MasterMeterFrame {
+  peakL: number;
+  peakR: number;
+  /** True peak of the window (4x oversampled), linear */
+  tp: number;
+  /** Sample peak going into the limiter (after the master gain), linear */
+  inPeak: number;
+  /** Limiter gain reduction, dB (max over the window) */
+  gr: number;
+  /** Glue compressor gain reduction, dB */
+  glue: number;
+  m: number | null;
+  s: number | null;
+  i: number | null;
+}
+
+const meterListeners = new Set<(f: MasterMeterFrame) => void>();
+let lastMeter: MasterMeterFrame | null = null;
+let pendingSettings: Partial<MasterSettings> | null = null;
+
+export function onMasterMeter(l: (f: MasterMeterFrame) => void): () => void {
+  meterListeners.add(l);
+  return () => meterListeners.delete(l);
+}
+
+export function getLastMasterMeter(): MasterMeterFrame | null {
+  return lastMeter;
+}
+
+/** Restart the integrated loudness and the meter history */
+export function resetMasterMeter() {
+  masterNode?.port.postMessage({ type: 'reset' });
+}
+
+export function setMasterSettings(s: Partial<MasterSettings>) {
+  if (!masterNode) {
+    pendingSettings = { ...(pendingSettings ?? {}), ...s };
+    return;
+  }
+  const msg: Record<string, unknown> = { type: 'set' };
+  if (s.gain !== undefined) msg.gain = s.gain;
+  if (s.eq) msg.eq = { ...s.eq, lowFreq: 100, tiltFreq: 1000, highFreq: 10000 };
+  if (s.glue) msg.glue = { ...s.glue, knee: 6 };
+  masterNode.port.postMessage(msg);
+}
+
+/** True once the limiter and meter are on the master (after loadWorklets) */
+export function hasMasterProcessor(): boolean {
+  return !!masterNode;
+}
+
+/** Limiter latency in frames (the recorder uses it to align the master with the stems) */
+export function getMasterLatencyFrames(): number {
+  return masterNode ? limiterFrames || Math.round(LIMITER_LOOKAHEAD * (ctx?.sampleRate ?? 48000)) : 0;
+}
+
+function installMaster(c: AudioContext) {
+  if (masterNode || !masterIn || !masterOut) return;
+  const node = new AudioWorkletNode(c, 'master-bus', {
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    outputChannelCount: [2],
+    channelCount: 2,
+    channelCountMode: 'explicit',
+    channelInterpretation: 'speakers',
+    processorOptions: { ceiling: LIMITER_CEILING_DB, lookahead: LIMITER_LOOKAHEAD },
+  });
+  limiterFrames = Math.round(LIMITER_LOOKAHEAD * c.sampleRate);
+  node.port.onmessage = e => {
+    const d = e.data as { type: string; latency?: number } & MasterMeterFrame;
+    if (d.type === 'meter') {
+      lastMeter = d;
+      meterListeners.forEach(l => l(d));
+    } else if (d.type === 'ready' && d.latency) {
+      limiterFrames = d.latency;
+    }
+  };
+  // Make the new path before breaking the bypass (this runs before any engine starts)
+  masterIn.connect(node);
+  node.connect(masterOut);
+  masterIn.disconnect(masterOut);
+  masterNode = node;
+  if (pendingSettings) {
+    const s = pendingSettings;
+    pendingSettings = null;
+    setMasterSettings(s);
+  }
+}
+
+/** The studio worklets (recorder, master bus, meter bank), once per context */
+export function loadStudioWorklet(): Promise<void> {
+  const c = getAudioContext();
+  if (!studioWorkletPromise) {
+    studioWorkletPromise = c.audioWorklet.addModule(STUDIO_WORKLET_URL).catch(err => {
+      studioWorkletPromise = null;
+      throw err;
+    });
+  }
+  return studioWorkletPromise;
+}
+
+/** Load the AudioWorklet processors once per context, and put the limiter on the master */
 export function loadWorklets(): Promise<void> {
   const c = getAudioContext();
   if (!workletPromise) {
-    workletPromise = c.audioWorklet.addModule(WORKLET_URL).catch(err => {
+    workletPromise = Promise.all([
+      c.audioWorklet.addModule(WORKLET_URL),
+      loadStudioWorklet().then(() => installMaster(c)),
+    ]).then(() => undefined).catch(err => {
       workletPromise = null;
       throw err;
     });
@@ -109,6 +329,7 @@ const extraWorklets = new Map<string, Promise<void>>();
 
 /** Load a device-specific worklet module once */
 export function loadExtraWorklet(url: string): Promise<void> {
+  if (url === STUDIO_WORKLET_URL) return loadStudioWorklet();
   const c = getAudioContext();
   let p = extraWorklets.get(url);
   if (!p) {
