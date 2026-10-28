@@ -3,6 +3,7 @@
 // Thin wrappers over the AudioWorklet processors in public/worklets plus a few
 // native-node helpers (noise, constants, LFOs, effects).
 // Requires loadWorklets() to have resolved before construction.
+// API reference, design notes and CPU costs: docs/DSP.md.
 // ============================================================================
 
 /** Smoothly move an AudioParam to a new value (avoids zipper noise) */
