@@ -20,19 +20,24 @@ export const MIDI_SYNTH: DeviceSpec = {
   id: 'midi-synth',
   name: 'Your synth (MIDI)',
   manufacturer: 'Bring your own',
-  description: 'Plays and controls a hardware synth over MIDI: CC knobs, a 16-step sequencer locked to the studio and a keyboard',
-  dimensions: { width: 290, height: 170 },
-  display: { width: 1160, height: 680, scale: 4 },
+  description: 'Plays and controls a hardware synth over MIDI: CC knobs, program changes, a 16-step sequencer locked to the studio and a keyboard',
+  dimensions: { width: 290, height: 180 },
+  display: { width: 1160, height: 720, scale: 4 },
   signalFlow: [],
   controls: {
     ...knobs,
+    program: {
+      type: 'knob', label: 'PROGRAM', min: 0, max: 127, default: 0, step: 1, units: 'none', size: 'small',
+      format: v => String(Math.round(v) + 1),
+      description: 'Program change: recalls a sound stored in your synth. Synths show programs from 1; the MIDI message counts from 0.',
+    },
     play: {
       type: 'button', label: 'PLAY', default: false,
       description: 'Starts and stops the studio transport. The sequencer plays your synth in time with everything else.',
     },
     seq: {
       type: 'button', label: 'SEQ', default: true,
-      description: 'Sequencer on/off. Off: the studio plays, but no steps are sent (play your synth by hand).',
+      description: 'Sequencer on/off. Off: the studio plays, but no steps are sent (play your synth by hand, or let its own arpeggiator play).',
     },
     gate: {
       type: 'knob', label: 'GATE', min: 5, max: 100, default: 50, units: '%', size: 'small',

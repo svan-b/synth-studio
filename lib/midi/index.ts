@@ -13,18 +13,62 @@ import { hub } from '@/lib/studio/hub';
 import { transport } from '@/lib/audio/transport';
 import { getAudioContext } from '@/lib/audio/context';
 import { useStudioStore, getSpec } from '@/store/studio';
-import { useMidiLearn, useMidiStore } from '@/store/midi';
+import { useMidiLearn, useMidiStore, samePort, type PortRef } from '@/store/midi';
 import { midi, type MidiSnapshot } from './access';
 import { MidiRouter, isMidiReceiver, type FocusSink } from './router';
 import { MidiClockOut } from './clock-out';
 import { MidiClockIn } from './clock-in';
 import { ControlWriter, applyControlValues } from './apply';
 import { audioClock } from './time';
+import { practiceSynth, type PracticeStatus } from './practice-synth';
 
 export { midi } from './access';
 export type { MidiSnapshot, MidiPortInfo, IncomingMidi } from './access';
 export { midiLearnTouch, instanceLabel, controlLabel } from './learn';
 export { isMidiReceiver, type MidiReceiver } from './router';
+export { practiceSynth, PRACTICE_PORT, isPracticePort } from './practice-synth';
+
+// ----------------------------------------------------------------------------
+// Clock targets: the ports ticked in MIDI settings, plus every "Your synth"
+// with "Send MIDI clock" on. One port gets one clock, however many synths
+// share it (two parts of a multitimbral synth on one cable).
+// ----------------------------------------------------------------------------
+
+interface SynthClockRef { instance: string; port: PortRef }
+
+let synthTargetsCache: { rack: unknown; devices: unknown; off: unknown; refs: SynthClockRef[] } | null = null;
+
+/** "Your synth" instances in the rack (powered on) that send clock to their port */
+export function synthClockTargets(): SynthClockRef[] {
+  const st = useStudioStore.getState();
+  const { rack, off } = st.studio;
+  if (synthTargetsCache && synthTargetsCache.rack === rack && synthTargetsCache.devices === st.devices && synthTargetsCache.off === off) {
+    return synthTargetsCache.refs;
+  }
+  const refs: SynthClockRef[] = [];
+  rack.forEach(r => {
+    if (r.device !== 'midi-synth' || off?.[r.id]) return;
+    const d = st.devices[r.id]?.data as { clock?: boolean; port?: PortRef | null } | undefined;
+    if (d?.clock === true && d.port && typeof d.port.name === 'string') refs.push({ instance: r.id, port: d.port });
+  });
+  synthTargetsCache = { rack, devices: st.devices, off, refs };
+  return refs;
+}
+
+/** Every port that gets MIDI clock (deduplicated), minus the port we follow */
+export function clockTargets(): PortRef[] {
+  const { clockOut, clockIn } = useMidiStore.getState();
+  const out: PortRef[] = [];
+  [...clockOut.targets, ...synthClockTargets().map(s => s.port)].forEach(p => {
+    if (!out.some(q => samePort(q, p))) out.push(p);
+  });
+  // Never send clock back to the device we follow (MIDI thru would loop it)
+  if (!clockIn.enabled || !clockIn.port) return out;
+  return out.filter(t => t.name !== clockIn.port);
+}
+
+/** Does this port get MIDI clock? */
+export const isClockTarget = (port: PortRef | null | undefined) => !!port && clockTargets().some(t => samePort(t, port));
 
 const inRack = (instance: string) => useStudioStore.getState().studio.rack.some(r => r.id === instance);
 const specOf = (instance: string, control: string) => getSpec(useStudioStore.getState().deviceOf(instance))?.controls[control];
@@ -60,12 +104,7 @@ export const midiRouter = new MidiRouter({
 export const midiClockOut = new MidiClockOut({
   transport,
   ctx: () => (typeof window === 'undefined' ? null : getAudioContext()),
-  settings: () => {
-    const { clockOut, clockIn } = useMidiStore.getState();
-    // Never send clock back to the device we follow (MIDI thru would loop it)
-    if (!clockIn.enabled || !clockIn.port) return clockOut;
-    return { ...clockOut, targets: clockOut.targets.filter(t => t.name !== clockIn.port) };
-  },
+  settings: () => ({ ...useMidiStore.getState().clockOut, targets: clockTargets() }),
   resolve: ref => midi.findOutput(ref),
 });
 
@@ -80,10 +119,24 @@ export const midiClockIn = new MidiClockIn({
 export const midiActivity = new Map<string, number>();
 
 let initialised = false;
+let relessenQueued = false;
+
+/** Re-check the running lesson step (state outside the studio store changed) */
+function relessen() {
+  if (relessenQueued) return;
+  relessenQueued = true;
+  setTimeout(() => {
+    relessenQueued = false;
+    const st = useStudioStore.getState();
+    if (st.isTeachingMode) st.reevaluate();
+  }, 0);
+}
 
 export function initMidi() {
   if (initialised || typeof window === 'undefined') return;
   initialised = true;
+  // Test/automation hook (browser checks), like window.__synthStudio
+  (window as unknown as { __synthStudioMidi?: unknown }).__synthStudioMidi = { midi, practiceSynth, clockTargets, midiClockOut, useMidiStore, useMidiLearn };
   const allowed = () => {
     const disabled = new Set(useMidiStore.getState().disabledInputs);
     return (name: string) => !disabled.has(name);
@@ -95,7 +148,10 @@ export function initMidi() {
       midiClockIn.detach();
       if (s.clockIn.enabled) midiClockIn.attach();
     }
+    // Lesson steps can check MIDI settings (a learned mapping, a clock target)
+    if (s.mappings !== prev.mappings || s.clockOut !== prev.clockOut) relessen();
   });
+  midi.subscribe(relessen);
   midi.onGranted(() => {
     useMidiStore.getState().setAutoConnect(true);
     // Keep the audio -> MIDI clock mapping settled, so the first beat after Play is exact
@@ -122,6 +178,14 @@ const getServerSnapshot = () => (serverSnapshot ??= midi.getSnapshot());
 /** Live MIDI status and port lists */
 export function useMidiSnapshot(): MidiSnapshot {
   return useSyncExternalStore(midi.subscribe, midi.getSnapshot, getServerSnapshot);
+}
+
+let practiceServer: PracticeStatus | null = null;
+const getPracticeServer = () => (practiceServer ??= practiceSynth.getStatus());
+
+/** What the Practice synth is doing (programs, arpeggiator, clock, who listens) */
+export function usePracticeStatus(): PracticeStatus {
+  return useSyncExternalStore(practiceSynth.subscribe, practiceSynth.getStatus, getPracticeServer);
 }
 
 /**

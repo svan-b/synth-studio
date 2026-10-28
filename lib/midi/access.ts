@@ -8,6 +8,8 @@
 //   - only enabled inputs are opened: on Windows a MIDI port can be open in one
 //     app at a time, so ports you switch off are released for your DAW
 //   - send(port, bytes, timestamp) with timestamps in performance.now() time
+//   - virtual outputs (the built-in Practice synth) are listed and resolved
+//     like real ports - also where there is no Web MIDI at all (iPad, Safari)
 // ============================================================================
 
 import { midiSupport, type MidiSupport } from './support';
@@ -23,6 +25,8 @@ export interface MidiPortInfo {
   state: 'connected' | 'disconnected';
   /** Inputs: whether we are listening to it */
   open: boolean;
+  /** Built into Synth Studio (no hardware, works without Web MIDI) */
+  virtual?: boolean;
 }
 
 export interface MidiSnapshot {
@@ -53,6 +57,11 @@ export interface MidiOutputLike {
 
 const byName = (a: MidiPortInfo, b: MidiPortInfo) => a.name.localeCompare(b.name);
 
+/** A port that lives inside Synth Studio (Practice synth) */
+export interface VirtualOutput extends MidiOutputLike {
+  manufacturer?: string;
+}
+
 export class MidiService {
   private access: MIDIAccess | null = null;
   private listeners = new Set<Listener>();
@@ -61,6 +70,7 @@ export class MidiService {
   private attached = new Map<string, MIDIInput>();
   private inputAllowed: (name: string) => boolean = () => true;
   private grantedListeners = new Set<() => void>();
+  private virtual = new Map<string, VirtualOutput>();
   private snap: MidiSnapshot;
 
   constructor() {
@@ -88,6 +98,24 @@ export class MidiService {
 
   get ready() {
     return this.snap.status === 'ready';
+  }
+
+  /** List a built-in output next to the real ones (works without Web MIDI) */
+  addVirtualOutput(out: VirtualOutput) {
+    this.virtual.set(out.id, out);
+    if (this.access) this.refresh();
+    else this.set({ outputs: this.virtualInfos() });
+  }
+
+  private virtualInfos(): MidiPortInfo[] {
+    return [...this.virtual.values()].map(v => ({
+      id: v.id, name: v.name ?? v.id, manufacturer: v.manufacturer ?? '', type: 'output', state: 'connected', open: true, virtual: true,
+    }));
+  }
+
+  /** Real (hardware) ports only */
+  realOutputs(): MidiPortInfo[] {
+    return this.snap.outputs.filter(o => !o.virtual);
   }
 
   /** Ask for MIDI access. Call from a user gesture (button). Resolves true when granted. */
@@ -148,9 +176,12 @@ export class MidiService {
 
   /** Find an output by id, then by name */
   findOutput(ref: PortRef | string | null | undefined): MidiOutputLike | null {
-    if (!ref || !this.access) return null;
+    if (!ref) return null;
     const id = typeof ref === 'string' ? ref : ref.id;
     const name = typeof ref === 'string' ? ref : ref.name;
+    const v = this.virtual.get(id) ?? [...this.virtual.values()].find(x => !!name && x.name === name);
+    if (v) return v;
+    if (!this.access) return null;
     let found: MIDIOutput | null = null;
     this.access.outputs.forEach(o => { if (!found && o.id === id && o.state !== 'disconnected') found = o; });
     if (!found && name) this.access.outputs.forEach(o => { if (!found && o.name === name && o.state !== 'disconnected') found = o; });
@@ -201,7 +232,7 @@ export class MidiService {
     access.outputs.forEach(output => outputs.push(info(output, 'output', output.connection === 'open')));
     inputs.sort(byName);
     outputs.sort(byName);
-    this.set({ status: status ?? this.snap.status, inputs, outputs });
+    this.set({ status: status ?? this.snap.status, inputs, outputs: [...outputs, ...this.virtualInfos()] });
   }
 
   private dispatch(input: MIDIInput, e: MIDIMessageEvent) {

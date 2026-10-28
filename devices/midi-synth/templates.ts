@@ -45,6 +45,36 @@ const POPULAR = [
   'teenage-engineering-op-1-field', 'behringer-pro-800', 'behringer-deepmind-12',
 ];
 
+/** Manufacturers A-Z with how many instruments each has */
+export function manufacturers(devices: GuideIndexEntry[]): { name: string; count: number }[] {
+  const m = new Map<string, { name: string; count: number }>();
+  devices.forEach(d => {
+    const key = d.manufacturer.toLowerCase();
+    const cur = m.get(key);
+    if (cur) cur.count++;
+    else m.set(key, { name: d.manufacturer, count: 1 });
+  });
+  return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+/** One manufacturer's instruments, A-Z */
+export function byManufacturer(devices: GuideIndexEntry[], manufacturer: string): GuideIndexEntry[] {
+  const key = manufacturer.toLowerCase();
+  return devices
+    .filter(d => d.manufacturer.toLowerCase() === key)
+    .sort((a, b) => a.device.localeCompare(b.device, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+/** Results grouped under their manufacturer, keeping the ranking of each group's best match */
+export function groupResults(results: GuideIndexEntry[]): [string, GuideIndexEntry[]][] {
+  const groups = new Map<string, GuideIndexEntry[]>();
+  results.forEach(r => {
+    if (!groups.has(r.manufacturer)) groups.set(r.manufacturer, []);
+    groups.get(r.manufacturer)!.push(r);
+  });
+  return [...groups.entries()];
+}
+
 /** Every word of the query must appear in "manufacturer device" (any order) */
 export function searchGuide(devices: GuideIndexEntry[], query: string, limit = 60): GuideIndexEntry[] {
   const words = norm(query).split(' ').filter(Boolean);

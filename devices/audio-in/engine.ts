@@ -1,17 +1,25 @@
 // ============================================================================
-// Audio input engine: an audio interface input (or mic) as a studio instrument.
+// Audio input engine: your gear (through an audio interface or a mic) as a
+// studio instrument.
 //
-//   getUserMedia (echoCancellation / noiseSuppression / autoGainControl OFF -
-//   those are for voice calls and would mangle a synth) -> splitter -> mode
-//   matrix (IN 1, IN 2, L+R, STEREO) -> gain -> mute -> main output + jacks.
+//   source  -> splitter -> mode matrix (IN 1, IN 2, L+R, STEREO) -> GAIN -> MUTE -> out + jacks
+//   sources: getUserMedia (echoCancellation / noiseSuppression / autoGainControl
+//            OFF - those are for voice calls and would mangle a synth),
+//            the built-in Practice synth, or a 1 kHz line-up tone at -18 dBFS
+//   meters:  at the input (before GAIN: clipping here happens in your
+//            interface) and after GAIN (what the studio and a take receive);
+//            CLIP latches until you clear it, like a mixing desk
+//   takes:   records this input alone (after GAIN, before MUTE) to a WAV file
 //
-// The stream is only opened after you press Connect, or on load when the
+// A device input is only opened after you press Connect, or on load when the
 // browser already granted access (so a project never pops a permission prompt).
 // ============================================================================
 
 import type { ControlValue } from '@/types';
 import { BaseEngine } from '@/lib/audio/engine';
-import { asInputData, type AudioInData } from './config';
+import { encodeWav } from '@/lib/audio/recorder';
+import { practiceSynth } from '@/lib/midi/practice-synth';
+import { TONE_DBFS, asInputData, toDb, type AudioInData } from './config';
 
 export type InputStatus = 'off' | 'connecting' | 'live' | 'needs-permission' | 'error';
 
@@ -24,11 +32,29 @@ const MATRIX: Record<number, [number, number, number, number]> = {
 };
 
 const dbToGain = (db: number) => Math.pow(10, db / 20);
+const RECORDER_URL = '/worklets/studio-processors.js';
+const recorderModules = new WeakMap<BaseAudioContext, Promise<void>>();
+/** Full scale: a sample this close to 1.0 means the converter (or the studio gain) ran out of room */
+const CLIP = 0.999;
+
+export interface InputLevels {
+  /** After GAIN, 0..1+ linear */
+  l: number;
+  r: number;
+  /** Before GAIN (what arrives from the interface) */
+  inL: number;
+  inR: number;
+  /** Latched until clearClip(): after GAIN / at the input */
+  clip: boolean;
+  inputClip: boolean;
+}
 
 export class AudioInEngine extends BaseEngine {
   private cfg: AudioInData = asInputData(undefined);
   private stream: MediaStream | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
+  private stopPractice: (() => void) | null = null;
+  private tone: OscillatorNode | null = null;
   private splitIn!: ChannelSplitterNode;
   private matrix!: GainNode[];
   private merge!: ChannelMergerNode;
@@ -36,12 +62,16 @@ export class AudioInEngine extends BaseEngine {
   private mute!: GainNode;
   private meterL!: AnalyserNode;
   private meterR!: AnalyserNode;
+  private preL!: AnalyserNode;
+  private preR!: AnalyserNode;
   private meterBuf = new Float32Array(1024);
   private channels = 0;
   private connectSeq = 0;
   private wantKey = '';
-  private clipUntil = 0;
-  private onDeviceChange = () => { if (this.cfg.enabled && !this.stream) void this.connect(true); };
+  private clipped = false;
+  private inputClipped = false;
+  private take: { node: AudioWorkletNode; chunks: { l: Float32Array; r: Float32Array }[]; startedAt: number } | null = null;
+  private onDeviceChange = () => { if (this.cfg.enabled && this.cfg.source === 'device' && !this.stream) void this.connect(true); };
 
   protected build(): void {
     const ctx = this.ctx;
@@ -59,16 +89,21 @@ export class AudioInEngine extends BaseEngine {
     this.gain.connect(this.mute);
     this.mute.connect(this.out);
 
+    const analyser = () => { const a = ctx.createAnalyser(); a.fftSize = 1024; return a; };
+    // Input meters: straight from the source, before MODE and GAIN
+    this.preL = analyser();
+    this.preR = analyser();
+    this.splitIn.connect(this.preL, 0);
+    this.splitIn.connect(this.preR, 1);
     // Meters read the signal after GAIN, before MUTE (so you can set levels while muted)
     const meterSplit = ctx.createChannelSplitter(2);
-    this.meterL = ctx.createAnalyser();
-    this.meterR = ctx.createAnalyser();
-    [this.meterL, this.meterR].forEach(a => { a.fftSize = 1024; });
+    this.meterL = analyser();
+    this.meterR = analyser();
     this.gain.connect(meterSplit);
     meterSplit.connect(this.meterL, 0);
     meterSplit.connect(this.meterR, 1);
 
-    // Patchable outputs (post-mute), e.g. into a twin's external input
+    // Patchable outputs (post-mute), e.g. into a twin's external input or a plugin's IN
     const outSplit = ctx.createChannelSplitter(2);
     const outL = ctx.createGain();
     const outR = ctx.createGain();
@@ -80,9 +115,10 @@ export class AudioInEngine extends BaseEngine {
     if (typeof navigator !== 'undefined') navigator.mediaDevices?.addEventListener?.('devicechange', this.onDeviceChange);
     this.onDispose(() => {
       navigator.mediaDevices?.removeEventListener?.('devicechange', this.onDeviceChange);
+      this.discardTake();
       this.release();
     });
-    this.emit({ status: 'off' as InputStatus, channels: 0 });
+    this.emit({ status: 'off' as InputStatus, channels: 0, recording: false });
   }
 
   protected onParam(id: string, value: ControlValue): void {
@@ -102,35 +138,159 @@ export class AudioInEngine extends BaseEngine {
 
   protected onData(data: unknown): void {
     this.cfg = asInputData(data);
-    const key = `${this.cfg.enabled}|${this.cfg.deviceId ?? ''}`;
+    const key = `${this.cfg.enabled}|${this.cfg.source}|${this.cfg.deviceId ?? ''}`;
     if (key === this.wantKey) return;
     this.wantKey = key;
-    if (this.cfg.enabled) void this.connect(true);
-    else {
+    if (!this.cfg.enabled) {
       this.release();
-      this.emit({ status: 'off' as InputStatus, error: null, deviceLabel: null, channels: 0, inputLatency: null });
-    }
+      this.emit({ status: 'off' as InputStatus, error: null, deviceLabel: null, channels: 0, inputLatency: null, source: this.cfg.source });
+    } else if (this.cfg.source === 'practice') this.connectPractice();
+    else if (this.cfg.source === 'tone') this.connectTone();
+    else void this.connect(true);
   }
 
-  /** The Connect button (a user gesture, so the browser may ask for permission) */
+  /** Panel buttons and lesson auditions */
   event(name: string): void {
-    if (name === 'connect') void this.connect(false);
+    if (name === 'connect') {
+      if (this.cfg.source === 'practice') this.connectPractice();
+      else if (this.cfg.source === 'tone') this.connectTone();
+      else void this.connect(false);
+    }
+    if (name === 'clear-clip') { this.clipped = false; this.inputClipped = false; }
+    // "Hear it": a phrase from the Practice synth when that is what this input plays
+    if ((name === 'audition' || name === 'trigger') && this.cfg.enabled && this.cfg.source === 'practice') practiceSynth.demo(0);
   }
 
-  /** Peak levels since the last call, for the meter (0..1 linear) */
-  levels(): { l: number; r: number; clip: boolean } {
-    if (!this.started || !this.stream) return { l: 0, r: 0, clip: false };
-    const peak = (a: AnalyserNode) => {
-      a.getFloatTimeDomainData(this.meterBuf);
-      let p = 0;
-      for (let i = 0; i < this.meterBuf.length; i++) { const v = Math.abs(this.meterBuf[i]); if (v > p) p = v; }
-      return p;
-    };
-    const l = peak(this.meterL);
-    const r = peak(this.meterR);
-    const now = performance.now();
-    if (l >= 0.99 || r >= 0.99) this.clipUntil = now + 1200;
-    return { l, r, clip: now < this.clipUntil };
+  // --------------------------------------------------------------------------
+  // Meters
+  // --------------------------------------------------------------------------
+
+  private peak(a: AnalyserNode) {
+    a.getFloatTimeDomainData(this.meterBuf);
+    let p = 0;
+    for (let i = 0; i < this.meterBuf.length; i++) { const v = Math.abs(this.meterBuf[i]); if (v > p) p = v; }
+    return p;
+  }
+
+  /** Peak levels of the last ~20 ms, for the meters (0..1 linear) */
+  levels(): InputLevels {
+    if (!this.started || !this.live) return { l: 0, r: 0, inL: 0, inR: 0, clip: this.clipped, inputClip: this.inputClipped };
+    const l = this.peak(this.meterL);
+    const r = this.peak(this.meterR);
+    const inL = this.peak(this.preL);
+    const inR = this.channels === 1 ? inL : this.peak(this.preR);
+    if (l >= CLIP || r >= CLIP) this.clipped = true;
+    if (inL >= CLIP || inR >= CLIP) this.inputClipped = true;
+    return { l, r, inL, inR, clip: this.clipped, inputClip: this.inputClipped };
+  }
+
+  clearClip() {
+    this.clipped = false;
+    this.inputClipped = false;
+  }
+
+  private get live() {
+    return !!(this.stream || this.stopPractice || this.tone);
+  }
+
+  // --------------------------------------------------------------------------
+  // Takes: record this input to a WAV file
+  // --------------------------------------------------------------------------
+
+  get recording() {
+    return !!this.take;
+  }
+
+  async startTake(): Promise<void> {
+    if (this.take || !this.started) return;
+    const ctx = this.ctx;
+    let mod = recorderModules.get(ctx);
+    if (!mod) {
+      mod = ctx.audioWorklet.addModule(RECORDER_URL);
+      recorderModules.set(ctx, mod);
+      mod.catch(() => recorderModules.delete(ctx));
+    }
+    await mod;
+    const node = new AudioWorkletNode(ctx, 'recorder', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], channelCount: 2, channelCountMode: 'explicit' });
+    const take = { node, chunks: [] as { l: Float32Array; r: Float32Array }[], startedAt: ctx.currentTime };
+    node.port.onmessage = e => { if (e.data?.type === 'chunk') take.chunks.push({ l: e.data.l, r: e.data.r }); };
+    // After GAIN, before MUTE: a muted (direct-monitored) input still records
+    this.gain.connect(node);
+    const sink = ctx.createGain();
+    sink.gain.value = 0;
+    node.connect(sink).connect(ctx.destination);
+    node.port.postMessage('start');
+    this.take = take;
+    this.emit({ recording: true, takeStartedAt: performance.now() });
+  }
+
+  /** Stop and return the WAV, its length and its loudest peak */
+  stopTake(): Promise<{ blob: Blob; seconds: number; peakDb: number } | null> {
+    const take = this.take;
+    if (!take) return Promise.resolve(null);
+    this.take = null;
+    return new Promise(resolve => {
+      take.node.port.onmessage = e => {
+        if (e.data?.type === 'chunk') take.chunks.push({ l: e.data.l, r: e.data.r });
+        if (e.data?.type !== 'done') return;
+        try { this.gain.disconnect(take.node); } catch { /* */ }
+        take.node.disconnect();
+        let peak = 0;
+        let frames = 0;
+        take.chunks.forEach(c => {
+          frames += c.l.length;
+          for (let i = 0; i < c.l.length; i++) {
+            const v = Math.max(Math.abs(c.l[i]), Math.abs(c.r[i]));
+            if (v > peak) peak = v;
+          }
+        });
+        this.emit({ recording: false });
+        resolve({ blob: encodeWav(take.chunks, this.ctx.sampleRate), seconds: frames / this.ctx.sampleRate, peakDb: toDb(peak) });
+      };
+      take.node.port.postMessage('stop');
+    });
+  }
+
+  private discardTake() {
+    const take = this.take;
+    this.take = null;
+    if (!take) return;
+    try { this.gain.disconnect(take.node); } catch { /* */ }
+    take.node.disconnect();
+  }
+
+  // --------------------------------------------------------------------------
+  // Sources
+  // --------------------------------------------------------------------------
+
+  private connectPractice() {
+    ++this.connectSeq;
+    this.release();
+    this.stopPractice = practiceSynth.listen(this.splitIn);
+    this.channels = 2;
+    this.applyMode();
+    this.emit({
+      status: 'live' as InputStatus, error: null, source: 'practice', deviceLabel: 'Practice synth (built in)', channels: 2,
+      inputLatency: 0, sampleRate: this.ctx.sampleRate,
+    });
+  }
+
+  private connectTone() {
+    ++this.connectSeq;
+    this.release();
+    const osc = this.ctx.createOscillator();
+    osc.frequency.value = 1000;
+    const level = this.ctx.createGain();
+    level.gain.value = dbToGain(TONE_DBFS);
+    osc.connect(level).connect(this.splitIn);
+    osc.start();
+    this.tone = osc;
+    this.channels = 1;
+    this.applyMode();
+    this.emit({
+      status: 'live' as InputStatus, error: null, source: 'tone', deviceLabel: `Test tone · 1 kHz at ${TONE_DBFS} dBFS`, channels: 1,
+      inputLatency: 0, sampleRate: this.ctx.sampleRate,
+    });
   }
 
   private async connect(auto: boolean) {
@@ -139,9 +299,10 @@ export class AudioInEngine extends BaseEngine {
     if (!md?.getUserMedia) {
       this.emit({
         status: 'error' as InputStatus,
+        source: 'device',
         error: typeof window !== 'undefined' && window.isSecureContext === false
-          ? 'Audio input needs a secure page: open Synth Studio over https:// (or localhost).'
-          : 'This browser cannot open audio inputs.',
+          ? 'Audio input needs a secure page: open Synth Studio over https:// (or localhost). The Practice synth and the test tone work anyway.'
+          : 'This browser cannot open audio inputs. The Practice synth and the test tone still work.',
       });
       return;
     }
@@ -149,11 +310,11 @@ export class AudioInEngine extends BaseEngine {
       const granted = await microphoneGranted();
       if (seq !== this.connectSeq) return; // a Connect press took over
       if (!granted) {
-        this.emit({ status: 'needs-permission' as InputStatus, error: null });
+        this.emit({ status: 'needs-permission' as InputStatus, error: null, source: 'device' });
         return;
       }
     }
-    this.emit({ status: 'connecting' as InputStatus, error: null });
+    this.emit({ status: 'connecting' as InputStatus, error: null, source: 'device' });
     let stream: MediaStream | null = null;
     try {
       stream = await md.getUserMedia({ audio: constraints(this.cfg.deviceId), video: false });
@@ -173,7 +334,7 @@ export class AudioInEngine extends BaseEngine {
         return;
       }
     }
-    if (seq !== this.connectSeq || !this.started || !this.cfg.enabled) {
+    if (seq !== this.connectSeq || !this.started || !this.cfg.enabled || this.cfg.source !== 'device') {
       stream.getTracks().forEach(t => t.stop());
       return;
     }
@@ -198,12 +359,19 @@ export class AudioInEngine extends BaseEngine {
     });
     this.emit({
       status: 'live' as InputStatus,
+      source: 'device',
       error: null,
       deviceLabel: track?.label || 'Audio input',
       deviceId: settings.deviceId ?? null,
       channels: this.channels,
       inputLatency: typeof settings.latency === 'number' ? settings.latency : null,
       sampleRate: settings.sampleRate ?? null,
+      // Voice-call processing the browser actually applied (should all be false)
+      processing: {
+        echoCancellation: settings.echoCancellation ?? null,
+        noiseSuppression: settings.noiseSuppression ?? null,
+        autoGainControl: settings.autoGainControl ?? null,
+      },
     });
   }
 
@@ -216,18 +384,27 @@ export class AudioInEngine extends BaseEngine {
     this.source = null;
     this.stream?.getTracks().forEach(t => t.stop());
     this.stream = null;
+    this.stopPractice?.();
+    this.stopPractice = null;
+    if (this.tone) {
+      try { this.tone.stop(); this.tone.disconnect(); } catch { /* */ }
+      this.tone = null;
+    }
   }
 }
 
 function constraints(deviceId: string | null | undefined): MediaTrackConstraints {
-  return {
+  const c: MediaTrackConstraints & { latency?: ConstrainDouble } = {
     ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
     // Voice-call processing off: a synth needs the raw signal
     echoCancellation: false,
     noiseSuppression: false,
     autoGainControl: false,
     channelCount: { ideal: 2 },
+    // Ask for the smallest input buffer the browser offers (Chrome; ignored elsewhere)
+    latency: { ideal: 0 },
   };
+  return c;
 }
 
 async function findByLabel(label: string | null): Promise<string | null> {
