@@ -84,6 +84,12 @@ export interface DeviceModule {
     mixerInputs?: { id: string; label: string }[];
     /** Stereo/mono main output (default mono) */
     stereo?: boolean;
+    /**
+     * Pattern-based instruments: list the patterns that have content, for the
+     * song arranger. The engine must handle event('arranger:pattern', { id, time })
+     * by switching to that pattern at audio time `time` (a bar boundary).
+     */
+    patterns?: (data: unknown) => { id: string; label?: string }[];
   };
 }
 
