@@ -185,6 +185,6 @@ Moog's other patch material is only reachable by title: the *Moog Sound Studio* 
 It", "Bring Tha Noise", "Kix & Popz", "Mother the Drummer", "Grapefruit and Honey") and the
 *House of Electronicus* patch book ("Baroque As A Joke", "Deep Bounce", "Lo-Fi"). The DFAM-only
 designs inspired by those titles carry our own names, and their descriptions credit the original.
-The remaining presets are well-known community techniques. All 34 are in `presets.ts`. Each was
-rendered offline, and in the browser by the preset check, to confirm that it makes sound at a
-sensible level.
+The remaining presets are well-known community techniques. There are 38 presets in `presets.ts`,
+including the Init patch. Each one was rendered offline and played in the browser (a run of 2.5 s,
+measured at the master) to confirm that it makes sound. Master peaks sit between 0.35 and 0.6.

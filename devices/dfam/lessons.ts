@@ -95,7 +95,7 @@ const f1: Lesson = {
     {
       kind: 'do', control: 'vco2_level', targetValue: 60, concept: 'mixing',
       instruction: 'Turn VCO 2 LEVEL up to about 60%.',
-      principle: 'Two oscillators near the same pitch drift in and out of step, so the sound slowly wobbles.',
+      principle: 'A mixer adds waves together: two oscillators give a tone with the harmonics of both.',
       explanation: 'VCO 2 is still at noon, an octave below VCO 1. The mixer adds the two waves together before the filter.',
       manualReference: 'Manual: Mixer',
     },
@@ -843,8 +843,8 @@ const sd2: Lesson = {
     },
     {
       kind: 'match', instruction: 'Ear challenge: match this snare\'s balance and length.', concept: 'mixing',
-      match: { target: { noise_level: 40, vca_decay: 320 }, controls: ['noise_level', 'vca_decay'] },
-      hints: ['Is there more or less hiss than yours, and does it ring longer?', 'Less noise, longer tail: a fatter, rounder snare.', 'NOISE / EXT LEVEL around 40%, VCA DECAY around 320 ms.'],
+      match: { target: { noise_level: 40, vca_decay: 400 }, controls: ['noise_level', 'vca_decay'] },
+      hints: ['Is there more or less hiss than yours, and does it ring longer?', 'Less noise, longer tail: a fatter, rounder snare.', 'NOISE / EXT LEVEL around 40%, VCA DECAY around 400 ms.'],
     },
     {
       kind: 'patch', patchFrom: 'out_vca_eg', patchTo: 'in_noise_level', concept: 'signal-routing',
@@ -1042,15 +1042,16 @@ const sd4: Lesson = {
       principle: 'Sweeping a synced oscillator gives the classic "tearing" sync sound.',
     },
     {
-      kind: 'patch', patchFrom: 'out_vco_eg', patchTo: 'in_vco2_cv', concept: 'signal-routing',
-      instruction: 'Patch VCO EG into VCO 2 CV for a sync sweep on every hit.',
-      principle: 'An envelope on the synced oscillator sweeps its harmonics on every hit: the sync zap.',
-      explanation: 'VCO DECAY sets how long the sweep takes. Try it short for a "dzzt" and long for a siren.',
-    },
-    {
       kind: 'match', instruction: 'Ear challenge: is it FM, sync, or both?', concept: 'frequency-modulation',
       match: { target: { hard_sync: 1, fm_amount: 50 }, controls: ['hard_sync', 'fm_amount'] },
       hints: ['Does the target tear like sync, or ring like a bell?', 'The target is a clangy bell: no tearing.', 'HARD SYNC OFF and 1→2 FM AMOUNT about 50%.'],
+    },
+    {
+      kind: 'patch', patchFrom: 'out_vco_eg', patchTo: 'in_vco2_cv', concept: 'signal-routing',
+      setup: { hard_sync: 0, fm_amount: 0 },
+      instruction: 'Sync is back on. Patch VCO EG into VCO 2 CV for a sync sweep on every hit.',
+      principle: 'An envelope on the synced oscillator sweeps its harmonics on every hit: the sync zap.',
+      explanation: 'VCO DECAY sets how long the sweep takes. Try it short for a "dzzt" and long for a siren.',
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',
