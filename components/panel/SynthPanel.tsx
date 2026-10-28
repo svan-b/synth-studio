@@ -26,7 +26,18 @@ export interface SynthPanelProps {
   onUnpatch: (from: string, to: string) => void;
   teaching: boolean;
   step: LessonStep | null;
+  // v2: structured device data + ephemeral UI state for custom elements
+  instance?: string;
+  data?: unknown;
+  ui?: Record<string, unknown>;
+  updateData?: (fn: (draft: unknown) => unknown) => void;
+  setUi?: (patch: Record<string, unknown>) => void;
+  /** Spotlight: when set, elements not in the set are dimmed (focus mode in lessons) */
+  focus?: Set<string> | null;
 }
+
+const NOOP = () => undefined;
+const EMPTY_UI: Record<string, unknown> = {};
 
 const FONTS: Record<string, string> = {
   sans: '"Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -51,7 +62,10 @@ function SynthPanel(props: SynthPanelProps) {
   const k = layout.pxPerMm;
   const px = (mm: number) => mm * k;
   const theme = layout.theme;
-  const ctx: PanelContext = useMemo(() => ({ values, engine: engineState }), [values, engineState]);
+  const ctx: PanelContext = useMemo(
+    () => ({ values, engine: engineState, data: props.data, ui: props.ui ?? EMPTY_UI }),
+    [values, engineState, props.data, props.ui],
+  );
 
   const jacks = useMemo(() => {
     const all: Record<string, PatchPoint> = {};
@@ -467,7 +481,18 @@ function Faceplate(p: FaceplateProps) {
       case 'custom':
         return (
           <div key={i} className="absolute pointer-events-none [&>*]:pointer-events-auto" style={{ left: px(el.x), top: px(el.y), width: px(el.w), height: px(el.h) }}>
-            {el.render({ ...ctx, setValue: p.onChange, sendEvent: p.onEvent, teaching, step })}
+            {el.render({
+              ...ctx,
+              setValue: p.onChange,
+              sendEvent: p.onEvent,
+              teaching,
+              step,
+              data: p.data,
+              ui: p.ui ?? EMPTY_UI,
+              updateData: p.updateData ?? NOOP,
+              setUi: p.setUi ?? NOOP,
+              instance: p.instance ?? p.spec.id,
+            })}
           </div>
         );
     }

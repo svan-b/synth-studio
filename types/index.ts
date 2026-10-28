@@ -238,6 +238,68 @@ export interface LessonStep {
   // First principles teaching fields
   concept?: SynthConcept;  // What concept this step teaches
   principle?: string;      // One-liner fundamental truth about synthesis
+
+  // ---- v2: active-learning step kinds (see docs/PEDAGOGY.md) ---------------
+  /**
+   * do       - set a control (control + targetValue)            [default when control is set]
+   * patch    - connect two jacks (patchFrom + patchTo)            [default when patchFrom is set]
+   * info     - read/listen, then press Next
+   * predict  - answer `predict` first, then do the action and hear whether you were right
+   * listen   - A/B comparison of two settings, optional question
+   * match    - ear training: recreate `match.target` by ear, then Check
+   * quiz     - retrieval question
+   * reflect  - explain it in your own words, compare with a model answer, rate yourself
+   * challenge- open brief with a checklist; done when every check passes
+   */
+  kind?: 'do' | 'patch' | 'info' | 'predict' | 'listen' | 'match' | 'quiz' | 'reflect' | 'challenge';
+  predict?: MultipleChoice;
+  listen?: { a: Record<string, ControlValue>; b: Record<string, ControlValue>; labels?: [string, string]; question?: MultipleChoice };
+  match?: {
+    target: Record<string, ControlValue>;
+    /** The controls the learner must get right (others are set from `target` before the step) */
+    controls: string[];
+    patches?: PatchConnection[];
+    /** Allowed knob-travel error 0..1 (default 0.08) */
+    tolerance?: number;
+  };
+  quiz?: MultipleChoice;
+  reflect?: { prompt: string; model: string };
+  checklist?: { text: string; check?: (s: LessonCheckState) => boolean }[];
+  /** Custom completion test - sequencer tasks, multi-device tasks */
+  check?: (s: LessonCheckState) => boolean;
+  /** Values (and cables) applied when the step begins */
+  setup?: Record<string, ControlValue>;
+  setupPatches?: PatchConnection[];
+  /** Controls/jacks to spotlight when the step isn't about a single control */
+  focus?: string[];
+  /** Instance this step acts on (multi-device lessons); defaults to the lesson's device */
+  instance?: string;
+  /** Play the device's demo phrase when the step starts */
+  autoplay?: boolean;
+  /** Hint ladder - revealed one at a time on request (guidance that fades) */
+  hints?: string[];
+}
+
+export interface MultipleChoice {
+  question: string;
+  options: string[];
+  /** Index of the correct option */
+  answer: number;
+  /** Shown after answering - why the answer is right */
+  explain?: string;
+}
+
+/** What lesson checks can inspect */
+export interface LessonCheckState {
+  values: Record<string, ControlValue>;
+  patches: PatchConnection[];
+  data: unknown;
+  engine: Record<string, unknown>;
+  /** All studio instances (multi-device lessons) */
+  instances: Record<string, { device: string; values: Record<string, ControlValue>; patches: PatchConnection[]; data: unknown }>;
+  studioCables: { from: { instance: string; jack: string }; to: { instance: string; jack: string } }[];
+  routes: Record<string, string>;
+  transport: { playing: boolean; bpm: number };
 }
 
 export interface Lesson {
@@ -253,4 +315,17 @@ export interface Lesson {
   steps: LessonStep[];
   tags?: string[];  // e.g., ['kick', 'bass', 'percussion']
   concepts?: SynthConcept[];  // List of concepts taught in this lesson
+
+  // ---- v2 -------------------------------------------------------------------
+  /** Learning objective - "By the end you can ..." */
+  objective?: string;
+  /** Curriculum path and order within it */
+  path?: 'foundations' | 'sound-design' | 'sequencing' | 'performance' | 'studio' | 'ear-training';
+  order?: number;
+  /** State applied at lesson start; the learner's own patch is kept and can be restored */
+  start?: { values?: Record<string, ControlValue>; patches?: PatchConnection[]; reset?: boolean; data?: unknown };
+  /** Retrieval questions that join the spaced-review queue after the lesson */
+  review?: MultipleChoice[];
+  /** Studio lessons (device: 'studio'): instruments the lesson needs in the rack */
+  requires?: string[];
 }

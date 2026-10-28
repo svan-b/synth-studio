@@ -31,6 +31,10 @@ export interface EngineState {
 export interface PanelContext {
   values: Values;
   engine: EngineState;
+  /** Structured device data (patterns, songs...) - DeviceModule.data */
+  data?: unknown;
+  /** Ephemeral per-instance UI state (held trig, page, menu open...) */
+  ui?: Record<string, unknown>;
 }
 
 export type KnobVariant =
@@ -177,12 +181,21 @@ export interface CustomElement extends Positioned {
   w: number;
   h: number;
   /** `teaching`/`step` let custom widgets highlight themselves when a lesson step targets them */
-  render: (ctx: PanelContext & {
-    setValue: (id: string, v: ControlValue) => void;
-    sendEvent: (e: string, payload?: unknown) => void;
-    teaching: boolean;
-    step: LessonStep | null;
-  }) => ReactNode;
+  render: (ctx: CustomRenderContext) => ReactNode;
+}
+
+/** Everything a `custom` element can read and do */
+export interface CustomRenderContext extends PanelContext {
+  setValue: (id: string, v: ControlValue) => void;
+  sendEvent: (e: string, payload?: unknown) => void;
+  teaching: boolean;
+  step: LessonStep | null;
+  data: unknown;
+  ui: Record<string, unknown>;
+  updateData: (fn: (draft: unknown) => unknown) => void;
+  setUi: (patch: Record<string, unknown>) => void;
+  /** Instance id of the device (studio may hold several of the same device) */
+  instance: string;
 }
 
 export type PanelElement =

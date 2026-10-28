@@ -19,6 +19,7 @@
 
 import type { ControlValue, PatchConnection } from '@/types';
 import type { EngineState } from '@/types/panel';
+import type { Transport } from './transport';
 
 export type EventHandler = (time: number, value: number) => void;
 
@@ -52,7 +53,7 @@ export interface InputJack {
 }
 
 export interface SynthEngine {
-  start(ctx: AudioContext, destination: AudioNode): void;
+  start(ctx: AudioContext, destination: AudioNode | null): void;
   setParam(id: string, value: ControlValue): void;
   setPatches(connections: PatchConnection[]): void;
   /** Momentary UI events: buttons with `event`, pads, transport */
@@ -62,6 +63,20 @@ export interface SynthEngine {
   subscribe(listener: (state: EngineState) => void): () => void;
   getState(): EngineState;
   dispose(): void;
+
+  // ---- v2: studio integration ---------------------------------------------
+  /** A patch point other instruments can take a cable from */
+  getOutput(jackId: string): OutputJack | undefined;
+  /** Connect another instrument's output into one of our inputs. Returns a teardown, or null if incompatible. */
+  connectExternal(inputId: string, source: OutputJack): (() => void) | null;
+  /** The instrument's main audio output (what the studio routes to the mixer or master) */
+  getMainOutput(): AudioNode;
+  /** Re-route the main output (null = disconnected) */
+  setDestination(node: AudioNode | null): void;
+  /** Follow the studio transport like MIDI clock (null = run on the internal clock) */
+  followTransport(transport: Transport | null): void;
+  /** Structured device data (patterns, songs...) - see DeviceModule.data */
+  setData(data: unknown): void;
 }
 
 interface ActiveCable {
@@ -86,21 +101,82 @@ export abstract class BaseEngine implements SynthEngine {
   private state: EngineState = {};
   private disposers: (() => void)[] = [];
   private timers = new Set<ReturnType<typeof setTimeout>>();
+  private destination: AudioNode | null = null;
+  /** Studio transport when following it (MIDI-clock style), else null */
+  protected transport: Transport | null = null;
+  /** Latest structured device data (DeviceModule.data) */
+  protected data: unknown = undefined;
 
   /** Build the audio graph. this.ctx and this.out are ready. */
   protected abstract build(): void;
   /** React to a control change. Called for every param once after build(). */
   protected abstract onParam(id: string, value: ControlValue): void;
 
-  start(ctx: AudioContext, destination: AudioNode): void {
+  start(ctx: AudioContext, destination: AudioNode | null): void {
     if (this.started) return;
     this.ctx = ctx;
     this.out = ctx.createGain();
-    this.out.connect(destination);
+    this.destination = destination;
+    if (destination) this.out.connect(destination);
     this.build();
     this.started = true;
     Object.entries(this.params).forEach(([id, v]) => this.onParam(id, v));
     this.setPatches(this.pendingPatches);
+    if (this.data !== undefined) this.onData(this.data);
+    if (this.transport) this.onTransport(this.transport);
+  }
+
+  getMainOutput(): AudioNode {
+    return this.out;
+  }
+
+  setDestination(node: AudioNode | null): void {
+    if (node === this.destination) return;
+    if (this.out && this.destination) {
+      try { this.out.disconnect(this.destination); } catch { /* not connected */ }
+    }
+    this.destination = node;
+    if (this.out && node) this.out.connect(node);
+  }
+
+  followTransport(transport: Transport | null): void {
+    if (transport === this.transport) return;
+    this.transport = transport;
+    if (this.started) this.onTransport(transport);
+  }
+
+  /** Override to react to transport follow on/off (subscribe to transport.onTick / onEvent) */
+  protected onTransport(_transport: Transport | null): void {}
+
+  setData(data: unknown): void {
+    if (data === this.data) return;
+    this.data = data;
+    if (this.started) this.onData(data);
+  }
+
+  /** Override to react to new device data (patterns, songs...) */
+  protected onData(_data: unknown): void {}
+
+  getOutput(jackId: string): OutputJack | undefined {
+    return this.outputs[jackId];
+  }
+
+  connectExternal(inputId: string, source: OutputJack): (() => void) | null {
+    if (!this.started) return null;
+    const i = this.inputs[inputId];
+    if (!i) return null;
+    const teardown = this.link(source, i);
+    if (!teardown) return null;
+    this.inputCounts[inputId] = (this.inputCounts[inputId] || 0) + 1;
+    if (this.inputCounts[inputId] === 1) i.onConnect?.();
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      teardown();
+      this.inputCounts[inputId] = (this.inputCounts[inputId] || 1) - 1;
+      if (this.inputCounts[inputId] === 0) i.onDisconnect?.();
+    };
   }
 
   setParam(id: string, value: ControlValue): void {
@@ -174,8 +250,11 @@ export abstract class BaseEngine implements SynthEngine {
   }
 
   private connectCable(outId: string, inId: string): (() => void) | null {
-    const o = this.outputs[outId];
-    const i = this.inputs[inId];
+    return this.link(this.outputs[outId], this.inputs[inId]);
+  }
+
+  /** Wire an output to an input (audio-rate CV/audio and/or events) */
+  private link(o: OutputJack, i: InputJack): (() => void) | null {
     const teardowns: (() => void)[] = [];
 
     if (o.node && ((i.params && i.params.length) || i.node)) {
