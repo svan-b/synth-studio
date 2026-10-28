@@ -186,7 +186,7 @@ class DfamProcessor extends AudioWorkletProcessor {
     this.phase = 0;
     this.trigHigh = false; this.advHigh = false;
     this.lastTrigAudio = -1; this.lastTrigEvent = -1;
-    this.lastAdvAudio = -1; this.lastAdvEvent = -1;
+    this.lastAdvAudio = -1; this.lastAdvEvent = -1; this.lastAdvAt = -1;
     this.queue = [];
     this.trigOut = 0;              // samples left of the TRIGGER output pulse
     this.seqPitch = 0;             // volts on the internal pitch bus
@@ -262,6 +262,7 @@ class DfamProcessor extends AudioWorkletProcessor {
 
   /** One clock pulse: advance, then play the step through the TRIGGER normal */
   clockPulse() {
+    this.lastAdvAt = currentTime;
     this.advance();
     if (!this.patched[I_TRIG]) this.fire();
   }
@@ -270,9 +271,16 @@ class DfamProcessor extends AudioWorkletProcessor {
     switch (ev.ch) {
       case 'button-trig': this.fire(); break;
       case 'button-adv': this.advance(); break;
-      case 'aud-on':
-        if (!this.running && !this.audition) { this.audition = true; this.auditionStep = this.step; this.step = NSTEP - 1; }
+      case 'aud-on': {
+        // Audition from step 1 when stopped - or when armed for an external clock that is not
+        // sending pulses (studio stopped): then the internal clock plays the phrase
+        const idleClock = this.running && this.patched[I_ADV] && currentTime - this.lastAdvAt > 0.5;
+        if (!this.audition && (!this.running || idleClock)) {
+          this.audition = true; this.auditionStep = this.step; this.step = NSTEP - 1;
+          if (this.running) this.phase = 1;
+        }
         break;
+      }
       case 'aud-off':
         if (this.audition) {
           this.audition = false;
@@ -564,7 +572,9 @@ class DfamProcessor extends AudioWorkletProcessor {
     // UI: current step, running and trigger flash - at most every 25 ms
     const now = t0 + n / sr;
     if (this.uiDirty && now - this.uiLast >= 0.025) {
-      this.port.postMessage({ t: 's', step: this.step, run: this.running && !this.audition ? 1 : 0, trig: this.uiTrig ? 1 : 0, time: now });
+      // RUN LED: the button or the RUN/STOP gate - an audition does not light it
+      const lit = this.runButton || (patched[I_RUN] && (this.runGate || this.runEvent));
+      this.port.postMessage({ t: 's', step: this.step, run: lit ? 1 : 0, trig: this.uiTrig ? 1 : 0, time: now });
       this.uiDirty = false; this.uiTrig = false; this.uiLast = now;
     }
     return true;

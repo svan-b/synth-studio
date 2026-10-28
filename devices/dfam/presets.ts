@@ -32,7 +32,9 @@ const st = (semitones: number) => Math.round((semitones / 12) * 1000) / 1000;
 function steps(pitch: number[], vel: number[]): Values {
   const v: Values = {};
   for (let i = 0; i < 8; i++) {
-    v[`pitch_${i + 1}`] = pitch[i] ?? 0;
+    // PITCH knobs have semitone detents: keep preset steps on the same grid
+    const semis = Math.round((pitch[i] ?? 0) * 12);
+    v[`pitch_${i + 1}`] = semis === 0 ? 0 : Math.round((semis / 12) * 10000) / 10000;
     v[`velocity_${i + 1}`] = vel[i] ?? 100;
   }
   return v;

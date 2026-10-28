@@ -170,6 +170,7 @@ outputs. Output labels are printed white-on-black (inverted). Twin signal conven
 | Decay CV scaling | +1 V doubles the decay time |
 | Mixer taper | audio taper (≈ level³) |
 | ADV / CLOCK while stopped | pulses are ignored (forum reports differ) |
+| PITCH 1–8 knob feel | the twin snaps to semitones (1/12 V), so steps can be tuned on a touch screen. The hardware knobs are continuous. Presets and cables may still use any voltage |
 | Analog drift | ±3 cents per VCO, slow random |
 
 ## Presets

@@ -22,7 +22,7 @@ const SEQ_LED_Y = 86.2;
 const SEQ_VEL_Y = 93.4;
 const STEP_X = (i: number) => 105 + i * 15;
 
-const LEGEND = 7.6;   // px, two-line knob legends
+const LEGEND = 8.6;   // px, two-line knob legends
 
 type KnobOpts = Partial<Extract<PanelElement, { kind: 'knob' }>>;
 const knob = (control: string, x: number, y: number, diameter = LARGE, extra: KnobOpts = {}): PanelElement => ({
@@ -102,8 +102,8 @@ const elements: PanelElement[] = [
 
   // --- Sequencer ----------------------------------------------------------------
   ...Array.from({ length: 8 }, (_, i): PanelElement => ({ kind: 'label', text: String(i + 1), x: STEP_X(i), y: 69.6, size: 9 })),
-  { kind: 'label', text: 'PITCH', x: 98, y: SEQ_PITCH_Y, size: 7, align: 'right', color: '#9ca3af' },
-  { kind: 'label', text: 'VELOCITY', x: 98, y: SEQ_VEL_Y, size: 6.5, align: 'right', color: '#9ca3af' },
+  { kind: 'label', text: 'PITCH', x: 98, y: SEQ_PITCH_Y, size: 7.5, align: 'right', color: '#9ca3af' },
+  { kind: 'label', text: 'VELOCITY', x: 98, y: SEQ_VEL_Y, size: 7.5, align: 'right', color: '#9ca3af' },
   ...Array.from({ length: 8 }, (_, i) => knob(`pitch_${i + 1}`, STEP_X(i), SEQ_PITCH_Y, SEQ, { label: 'none', value: 'hover' })),
   ...Array.from({ length: 8 }, (_, i) => knob(`velocity_${i + 1}`, STEP_X(i), SEQ_VEL_Y, SEQ, { label: 'none' })),
   // Step LEDs: the current step is always shown (so ADVANCE can be seen); it flashes on each hit

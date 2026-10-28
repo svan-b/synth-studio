@@ -1474,8 +1474,8 @@ const sq2: Lesson = {
       manualReference: 'Moog support: "Can I change DFAM\'s note length?"',
     },
     {
-      kind: 'predict', control: 'pitch_2', targetValue: 0.4, concept: 'timing-tempo',
-      instruction: 'Turn PITCH 2 up to about +5 st (+0.4 V).',
+      kind: 'predict', control: 'pitch_2', targetValue: 0.417, concept: 'timing-tempo',
+      instruction: 'Turn PITCH 2 up to +5 st (about +0.4 V).',
       predict: {
         question: 'PITCH now sets the clock speed during each step. What happens to step 2?',
         options: ['It gets shorter - the next step comes sooner', 'It gets longer', 'It gets louder'], answer: 0,
@@ -1491,7 +1491,7 @@ const sq2: Lesson = {
         { text: 'Odd steps slower (PITCH 1, 3, 5, 7 below -0.2 V)', check: s => [1, 3, 5, 7].every(i => num(s, `pitch_${i}`) <= -0.2) },
         { text: 'Even steps faster (PITCH 2, 4, 6, 8 above +0.2 V)', check: s => [2, 4, 6, 8].every(i => num(s, `pitch_${i}`) >= 0.2) },
       ],
-      hints: ['Negative voltage slows the clock; positive speeds it up.', 'Mirror them: about -5 st on odd steps and +5 st on even steps.', 'Try -0.4 V and +0.4 V for a triplet-like shuffle.'],
+      hints: ['Negative voltage slows the clock; positive speeds it up.', 'Mirror them: about -5 st on odd steps and +5 st on even steps.', 'Try -5 st and +5 st (about ±0.4 V) for a triplet-like shuffle.'],
       solution: { values: seq([-5, 5, -5, 5, -5, 5, -5, 5]) },
     },
     {

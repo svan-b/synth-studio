@@ -19,8 +19,11 @@ const formatPitch = (v: number) => {
   return `${st > 0.04 ? '+' : ''}${shown === '-0' ? '0' : shown} st`;
 };
 
+// The hardware knob is continuous over ten octaves (a semitone is a hair of travel). The twin
+// adds semitone detents (1/12 V) so steps can be tuned on a touch screen; see REFERENCE.md.
 const pitchKnob = (n: number): KnobSpec => ({
   type: 'knob', label: `PITCH ${step(n)}`, min: -5, max: 5, default: 0, units: 'V', bipolar: true, size: 'small',
+  step: 1 / 12,
   format: formatPitch,
   description: `Step ${n} pitch: -5 V to +5 V (1 V = 1 octave, 12 semitones). Sent to the VCOs by SEQ PITCH MOD and always to the PITCH output.`,
   manualReference: 'Sequencer - PITCH 1-8',
