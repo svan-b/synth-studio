@@ -92,7 +92,7 @@ const analogFour: DeviceModule = {
   tips: [
     'Pick a track with T1-T4 (FX, CV), a page with OSC 1, OSC 2, FILTER, AMP, ENV or LFO, and turn knobs A-J: the screen shows what each one does. Press a lit page key again for its second page (NOISE, OSC 1&2, ENV 2, LFO 2).',
     'Trig keys: tap to add or remove a trig. Hold a trig and turn a knob to parameter-lock that step; hold a trig and press a keyboard key to give it a note. A long hold (or double tap) opens the trig editor: note, length, micro timing, conditions, slides.',
-    '[FUNC] reaches the grey legends under the keys: hold it, or tap it once for the next key (Shift on a computer keyboard works too). [BANK A-H] then a trig key picks a pattern; [PTN], [SONG], [FUNC]+[CHAIN] and [FUNC]+[PAGE] open the pattern, song, chain and scale menus.',
+    '[FUNC] reaches the grey legends under the keys: hold it, or tap it once for the next key (Shift on a computer keyboard works too). [FUNC] + a track key mutes that track. [BANK A-H] then a trig key picks a pattern; [PTN], [SONG], [FUNC]+[CHAIN] and [FUNC]+[PAGE] open the pattern, song, chain and scale menus.',
     'Space = PLAY/STOP; synced to the studio it is the studio transport. Keys A-K play the active track, Z/X shift the octave. [SND] or the TRACK LEVEL push opens the sound browser; [KIT] loads whole kits.',
     'Simplified: one kit per project, no POLY mode, no CV or audio-input jacks (the CV track is sequenced and shown), trig mutes and sound locks not modelled. Value-to-Hz and -seconds curves are fits to the documented ranges.',
   ],

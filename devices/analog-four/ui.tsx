@@ -624,8 +624,9 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
 
   const ledCol = lit ? lit[0] : null;
   const amt = lit ? lit[1] : 0;
-  const face = isFunc ? (funcOn ? '#3d4f43' : '#2b3a30') : down ? '#33363c' : COL.key;
-  const text = ledCol ? mix(COL.keyText, ledCol, 0.55 + 0.45 * amt) : isFunc ? '#dfe9e2' : COL.keyText;
+  // FUNC looks like every other key (it has no LED); the ring shows a held / latched FUNC
+  const face = funcOn ? '#3a3d44' : down ? '#33363c' : COL.key;
+  const text = ledCol ? mix(COL.keyText, ledCol, 0.55 + 0.45 * amt) : COL.keyText;
   const fs = name.startsWith('BANK') ? 12 : big ? 10 : 9.5;
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -647,7 +648,7 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
           boxShadow: [
             ledCol ? `0 0 ${3 + 7 * amt}px ${ledCol}${amt > 0.6 ? 'aa' : '55'}` : '0 2px 2px rgba(0,0,0,0.55)',
             'inset 0 1px 0 rgba(255,255,255,0.07)',
-            funcOn ? '0 0 0 2px #6fd18f' : '',
+            funcOn ? '0 0 0 2px #e8eaee' : '',
           ].filter(Boolean).join(', '),
           transform: down ? 'translateY(1px)' : undefined,
           opacity: dim ? 0.3 : 1, transition: 'opacity 200ms',

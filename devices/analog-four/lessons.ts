@@ -549,7 +549,7 @@ const sd1: Lesson = {
         'The squelch is the filter envelope: its decay time sets how fast the filter closes. RES sets how strongly it rings, not how long.'),
     },
     {
-      kind: 'predict', control: 'trig_mode', targetValue: 2, concept: 'glide',
+      kind: 'predict', control: 'trig_mode', targetValue: 2, concept: 'glide', focus: ['key:FUNC'],
       instruction: 'Hold FUNC and press BANK G (NOTE SLD). Tapping a trig key now adds or removes a slide.',
       predict: mc('A slide trig makes its note…', ['Glide in pitch from the previous note', 'Repeat quickly', 'Play louder'], 0,
         'A slide bends smoothly from the last note to this one instead of jumping. Louder is what an accent does (FUNC + BANK F).'),
@@ -1243,7 +1243,7 @@ const sq3: Lesson = {
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern',
-      instruction: 'Set trig key 16 to FILL. Then hold the FILL key while it plays: that hat only plays during fills.',
+      instruction: 'Set trig key 16 to FILL. Then hold the FILL key while it plays: that hat only plays during fills.', focus: ['key:FILL'],
       checklist: [{ text: 'A T2 trig with the FILL condition', check: s => conds(s).includes('FILL') }],
       hints: ['Hold trig key 16 and turn TRC (knob E) to FILL.', 'FILL is just after the percentages.'],
       solution: { data: SQ3_C2 },
@@ -1308,7 +1308,7 @@ const sq4: Lesson = {
     playStep('Press PLAY. Pattern A01, the intro of the Night Drive project, loops.', 'A pattern is one section of a track.'),
     {
       kind: 'info', concept: 'sequencer-pattern',
-      instruction: 'Press BANK A, then trig key 2: pattern A02 (the groove) is cued and starts when A01 ends.',
+      instruction: 'Press BANK A, then trig key 2: pattern A02 (the groove) is cued and starts when A01 ends.', focus: ['key:BANK_A'],
       explanation: 'The pattern keys of bank A are lit where patterns exist. A cued pattern blinks until it starts.',
       check: s => proj(s).active === 'A02',
       solution: { data: SQ4_A02 },
@@ -1320,7 +1320,7 @@ const sq4: Lesson = {
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern',
-      instruction: 'Press FUNC + CHAIN (NEW CHAIN) and add A01, A02, A02, A03 in the menu. Then press CHAIN to play the chain.',
+      instruction: 'Press FUNC + CHAIN (NEW CHAIN) and add A01, A02, A02, A03 in the menu. Then press CHAIN to play the chain.', focus: ['key:FUNC', 'key:CHAIN'],
       checklist: [
         { text: 'The chain starts with A01', check: s => proj(s).chain[0] === 'A01' },
         { text: 'At least four patterns in the chain', check: s => proj(s).chain.length >= 4 },
@@ -1332,7 +1332,7 @@ const sq4: Lesson = {
     },
     {
       kind: 'predict', concept: 'sequencer-pattern',
-      instruction: 'Press SONG to open the song editor and add a row.',
+      instruction: 'Press SONG to open the song editor and add a row.', focus: ['key:SONG'],
       predict: mc('A song row that says A02 x2 plays…', ['A02 twice, then the next row', 'A02 and A03 together', 'A02 at double speed'], 0,
         'Each song row is a pattern and a repeat count. The song plays the rows from top to bottom.'),
       principle: 'A song lists patterns with repeat counts, so a whole track plays by itself.',
@@ -1341,7 +1341,7 @@ const sq4: Lesson = {
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern',
-      instruction: 'Arrange a whole track: intro, groove, break, then the drop (A04) or the groove again. Then press SONG M and PLAY.',
+      instruction: 'Arrange a whole track: intro, groove, break, then the drop (A04) or the groove again. Then press SONG M and PLAY.', focus: ['key:SONG', 'key:SONGMODE', 'key:PLAY'],
       checklist: [
         { text: 'At least four rows', check: s => proj(s).song.rows.length >= 4 },
         { text: 'It starts with the intro (A01)', check: s => rowPatterns(s)[0] === 'A01' },
@@ -1386,14 +1386,14 @@ const p1: Lesson = {
   steps: [
     playStep('Press PLAY: the Night Drive groove with drums, bass, chord stabs and an arpeggio.', 'Live performance starts from a loop that already works.'),
     {
-      kind: 'predict', control: 't1_mute', targetValue: true, concept: 'sequencer-pattern',
+      kind: 'predict', control: 't1_mute', targetValue: true, concept: 'sequencer-pattern', focus: ['key:FUNC'],
       instruction: 'Hold FUNC and press T1.',
       predict: mc('Muting a track…', ['Silences its trigs; the pattern is untouched', 'Deletes its trigs', 'Stops the whole A4'], 0,
         'A mute only stops the track from playing. Its trigs stay, so unmuting brings it straight back.'),
       principle: 'Muting removes a part without losing it, so it can come back at any time.',
     },
     {
-      kind: 'do', control: 't1_mute', targetValue: false, concept: 'sequencer-pattern',
+      kind: 'do', control: 't1_mute', targetValue: false, concept: 'sequencer-pattern', focus: ['key:FUNC'],
       instruction: 'Count to the first beat of a bar, then press FUNC + T1 again: the drums are back.',
       principle: 'Bringing a part back on the first beat of a bar is the simplest live arrangement.',
     },
@@ -1487,7 +1487,7 @@ const st1: Lesson = {
       hints: ['SYNC is on by default for both.', 'Each instrument\'s card in the Studio tab has its own SYNC switch.'],
     },
     {
-      kind: 'do', control: 't1_mute', targetValue: true, concept: 'signal-routing',
+      kind: 'do', control: 't1_mute', targetValue: true, concept: 'signal-routing', focus: ['key:FUNC'],
       instruction: 'The Rytm will play the drums: hold FUNC and press T1 to mute the A4\'s own drum track.',
       principle: 'With two drum sources, give each part one home so they don\'t clash.',
     },

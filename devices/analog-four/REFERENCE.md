@@ -192,8 +192,9 @@ the encoder slot (NRPN LSB minus the page base) and the value range.
   EXT IN, CHORUS, DELAY and REVERB pages, the FX LFO pages and the CV A-D pages.
 - **Not one-to-one, by design:** midi.guide's `OSCn: Pitch` is a 14-bit NRPN that combines
   TUN and FIN; the twin shows them as the two encoders the screen has. Performance A-J,
-  TRACK LEVEL and track mute exist (`perf_a..j`, `tN_level`, live mutes) but are not paged
-  synth parameters. Mod wheel and breath are not modelled (no MIDI input).
+  TRACK LEVEL and track mute exist (`perf_a..j`, `tN_level`, `t1_mute..t6_mute`: global,
+  so they survive pattern changes, set with [FUNC] + [TRACK]) but are not paged synth
+  parameters. Mod wheel and breath are not modelled (no MIDI input).
 
 Where the twin differs from midi.guide, and why:
 
