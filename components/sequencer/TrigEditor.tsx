@@ -22,7 +22,8 @@ import {
   updateSteps, type Step, type StepPatch,
 } from '@/lib/sequencer/elektron';
 import {
-  C, FONT, MONO, Overlay, SeqButton, SeqStyles, Stepper, UI, clampN, editProject, lessonFocus, projectOf, type TrigEditorTarget,
+  C, FONT, MONO, Overlay, OverlayRoot, SeqButton, SeqStyles, Stepper, UI, clampN, editProject, lessonFocus, projectOf,
+  type TrigEditorTarget,
 } from './shared';
 
 export interface TrigEditorProps {
@@ -41,6 +42,8 @@ export interface TrigEditorProps {
   portal?: boolean;
   /** Portal size in px (default 620 x 460) */
   portalSize?: { w: number; h: number };
+  /** Portal at the 'top' (default) or 'bottom' of the viewport */
+  portalPlacement?: 'top' | 'bottom';
   /** Track names for the title */
   trackNames?: string[];
 }
@@ -94,11 +97,9 @@ export default function TrigEditor(props: TrigEditorProps) {
   const pctIndex = isProbability(code) ? Math.max(0, PROBABILITIES.findIndex(p => p >= probabilityOf(code))) : 10;
 
   const body = (
-    <div
-      onPointerDown={e => e.stopPropagation()}
-      onWheel={e => e.stopPropagation()}
+    <OverlayRoot
       style={{
-        width: '100%', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', background: 'rgba(14,15,17,0.97)',
+        boxSizing: 'border-box', display: 'flex', flexDirection: 'column', background: 'rgba(14,15,17,0.97)',
         color: C.text, fontFamily: FONT, border: `1px solid ${C.amber}`, borderRadius: 6, boxShadow: '0 10px 30px rgba(0,0,0,0.6)', overflow: 'hidden',
       }}
     >
@@ -128,19 +129,19 @@ export default function TrigEditor(props: TrigEditorProps) {
           <Cell label="NOTE" highlight={hi('note')}>
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               <SeqButton minWidth={36} onPress={() => patch({ note: clampN(note - 12, nLo, nHi) })} title="Octave down">−12</SeqButton>
-              <Stepper value={note} min={nLo} max={nHi} onChange={v => patch({ note: v })} format={fmtNote} muted={first?.note === undefined} width={58} />
+              <Stepper value={note} min={nLo} max={nHi} onChange={v => patch({ note: v })} format={fmtNote} muted={first?.note === undefined} width={58} name="note" />
               <SeqButton minWidth={36} onPress={() => patch({ note: clampN(note + 12, nLo, nHi) })} title="Octave up">+12</SeqButton>
             </div>
           </Cell>
           <Cell label="VEL" highlight={hi('vel')}>
-            <Stepper value={vel} min={1} max={127} onChange={v => patch({ vel: v })} muted={first?.vel === undefined} width={46} />
+            <Stepper value={vel} min={1} max={127} onChange={v => patch({ vel: v })} muted={first?.vel === undefined} width={46} name="velocity" />
           </Cell>
           <Cell label="LEN" highlight={hi('len')}>
-            <Stepper value={len} min={0} max={LEN_INF} onChange={v => patch({ len: v })} format={formatLength} muted={first?.len === undefined} width={58} dragPx={5} />
+            <Stepper value={len} min={0} max={LEN_INF} onChange={v => patch({ len: v })} format={formatLength} muted={first?.len === undefined} width={58} dragPx={5} name="length" />
           </Cell>
           <Cell label="MICRO TIMING" highlight={hi('micro')}>
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <Stepper value={micro} min={-23} max={23} onChange={v => patch({ micro: v })} format={formatMicro} width={70} dragPx={5} />
+              <Stepper value={micro} min={-23} max={23} onChange={v => patch({ micro: v })} format={formatMicro} width={70} dragPx={5} name="micro timing" />
               <SeqButton minWidth={30} onPress={() => patch({ micro: null })} dim={!micro} title="Back on the grid">0</SeqButton>
             </div>
           </Cell>
@@ -186,8 +187,8 @@ export default function TrigEditor(props: TrigEditorProps) {
                 {retrig && (
                   <>
                     <Stepper label="RATE" value={retrig.rate} min={0} max={RETRIG_RATES.length - 1} onChange={v => patch({ retrig: { ...retrig, rate: v } })} format={formatRetrigRate} width={46} />
-                    <Stepper label="LEN" value={retrig.len} min={0} max={LEN_INF} onChange={v => patch({ retrig: { ...retrig, len: v } })} format={formatLength} width={54} dragPx={5} />
-                    <Stepper label="VEL CURVE" value={retrig.vel} min={RETRIG_VEL_MIN} max={RETRIG_VEL_MAX} onChange={v => patch({ retrig: { ...retrig, vel: v } })} format={formatSigned} width={46} dragPx={3} />
+                    <Stepper label="LEN" name="retrig length" value={retrig.len} min={0} max={LEN_INF} onChange={v => patch({ retrig: { ...retrig, len: v } })} format={formatLength} width={54} dragPx={5} />
+                    <Stepper label="VEL CURVE" name="retrig velocity curve" value={retrig.vel} min={RETRIG_VEL_MIN} max={RETRIG_VEL_MAX} onChange={v => patch({ retrig: { ...retrig, vel: v } })} format={formatSigned} width={46} dragPx={3} />
                   </>
                 )}
               </div>
@@ -209,7 +210,7 @@ export default function TrigEditor(props: TrigEditorProps) {
                       type="button"
                       aria-label={`Clear ${k} lock`}
                       onClick={() => editProject(ctx, tracks, pr => setLock(pr, pattern, track, steps, k, null, { create: false }))}
-                      style={{ width: 28, height: 28, border: 'none', background: 'transparent', color: C.text, fontSize: 14, cursor: 'pointer', touchAction: 'manipulation' }}
+                      style={{ width: 28, height: 28, border: 'none', background: 'transparent', color: C.text, fontSize: 14, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                     >
                       ×
                     </button>
@@ -221,8 +222,8 @@ export default function TrigEditor(props: TrigEditorProps) {
           </Cell>
         </div>
       </div>
-    </div>
+    </OverlayRoot>
   );
 
-  return <Overlay portal={props.portal} portalSize={props.portalSize ?? { w: 620, h: 460 }}>{body}</Overlay>;
+  return <Overlay portal={props.portal} portalPlacement={props.portalPlacement} portalSize={props.portalSize ?? { w: 620, h: 460 }}>{body}</Overlay>;
 }

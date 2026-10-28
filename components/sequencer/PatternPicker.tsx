@@ -92,7 +92,7 @@ export default function PatternPicker(props: PatternPickerProps) {
     : `${active}${name ? ` ${name}` : ''}`;
 
   return (
-    <Overlay portal={props.portal} portalSize={props.portalSize ?? { w: 620, h: 420 }}>
+    <Overlay portal={props.portal} portalPlacement={props.portalPlacement} portalSize={props.portalSize ?? { w: 620, h: 420 }}>
       <Frame
         title="PATTERN"
         sub={status}

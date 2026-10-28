@@ -6,7 +6,7 @@
 // can be dragged or scrolled. Text >= 9 px, touch targets >= 28 px.
 // ============================================================================
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CustomRenderContext, EngineState } from '@/types/panel';
 import {
@@ -177,7 +177,7 @@ export function SeqButton({ children, onPress, active, color = C.red, blink, dim
         background: active ? color : C.key,
         color: active ? '#111' : dim ? C.faint : C.text,
         fontFamily: FONT, fontSize: 11, fontWeight: 700, letterSpacing: 0.4,
-        lineHeight: 1, whiteSpace: 'nowrap', touchAction: 'manipulation', userSelect: 'none',
+        lineHeight: 1, whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', userSelect: 'none',
         cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.4 : 1,
         boxShadow: active ? `0 0 8px ${color}88` : 'inset 0 -2px 0 rgba(0,0,0,0.35)',
         ...style,
@@ -203,6 +203,8 @@ export interface StepperProps {
   highlight?: boolean;
   /** Drag pixels per step on the value (default 7) */
   dragPx?: number;
+  /** Accessible name (default: the label) */
+  name?: string;
 }
 
 const REPEAT_DELAY = 380;
@@ -212,7 +214,8 @@ const REPEAT_EVERY = 70;
  * [−] value [+]. Hold a button to repeat, drag the value up/down (or left/right),
  * or use the mouse wheel over it.
  */
-export function Stepper({ value, min, max, step = 1, onChange, format, label, muted, width = 64, title, highlight, dragPx = 7 }: StepperProps) {
+export function Stepper({ value, min, max, step = 1, onChange, format, label, muted, width = 64, title, highlight, dragPx = 7, name }: StepperProps) {
+  const aname = name ?? label ?? title ?? 'value';
   const latest = useLatest({ value, onChange, min, max, step });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drag = useRef<{ y: number; x: number; applied: number; pointer: number } | null>(null);
@@ -254,7 +257,7 @@ export function Stepper({ value, min, max, step = 1, onChange, format, label, mu
   const btn = (dir: number, glyph: string) => (
     <button
       type="button"
-      aria-label={dir < 0 ? `decrease ${label ?? ''}` : `increase ${label ?? ''}`}
+      aria-label={`${dir < 0 ? 'decrease' : 'increase'} ${aname}`}
       onPointerDown={press(dir)}
       onPointerUp={stop}
       onPointerLeave={stop}
@@ -262,7 +265,7 @@ export function Stepper({ value, min, max, step = 1, onChange, format, label, mu
       onContextMenu={e => e.preventDefault()}
       style={{
         width: 30, height: 30, borderRadius: 4, border: `1px solid ${C.border}`, background: C.key, color: C.text,
-        fontSize: 15, fontWeight: 700, lineHeight: 1, touchAction: 'none', userSelect: 'none', cursor: 'pointer', flex: 'none',
+        fontSize: 15, fontWeight: 700, lineHeight: 1, touchAction: 'none', WebkitTapHighlightColor: 'transparent', userSelect: 'none', cursor: 'pointer', flex: 'none',
       }}
     >
       {glyph}
@@ -280,7 +283,7 @@ export function Stepper({ value, min, max, step = 1, onChange, format, label, mu
           aria-valuenow={value}
           aria-valuemin={min}
           aria-valuemax={max}
-          aria-label={label}
+          aria-label={aname}
           onPointerDown={e => {
             if (e.button !== 0 && e.pointerType === 'mouse') return;
             e.preventDefault();
@@ -305,7 +308,7 @@ export function Stepper({ value, min, max, step = 1, onChange, format, label, mu
           style={{
             width, height: 30, borderRadius: 4, background: '#0b0c0d', border: `1px solid ${C.border}`,
             color: muted ? C.dim : C.text, fontFamily: MONO, fontSize: 13, fontWeight: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', cursor: 'ns-resize',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', WebkitTapHighlightColor: 'transparent', cursor: 'ns-resize',
             userSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden',
           }}
         >
@@ -317,15 +320,34 @@ export function Stepper({ value, min, max, step = 1, onChange, format, label, mu
   );
 }
 
+/** Inside a portal overlays size to their content (up to the portal's max); inside a box they fill it */
+const OverlayMode = createContext<'box' | 'portal'>('box');
+
+/** Root sizing for an overlay's outer element */
+export function useOverlayFill(): CSSProperties {
+  return useContext(OverlayMode) === 'portal' ? { flex: '0 1 auto', minHeight: 0 } : { height: '100%' };
+}
+
+/** Outer element of an overlay that isn't a Frame (sizes itself like one; swallows pointer and wheel events) */
+export function OverlayRoot({ style, children }: { style?: CSSProperties; children: ReactNode }) {
+  const fill = useOverlayFill();
+  return (
+    <div onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} style={{ width: '100%', ...fill, ...style }}>
+      {children}
+    </div>
+  );
+}
+
 /** Section frame used by the overlay-style components */
 export function Frame({ title, right, children, style, onClose, sub }: {
   title: string; right?: ReactNode; children: ReactNode; style?: CSSProperties; onClose?: () => void; sub?: ReactNode;
 }) {
+  const fill = useOverlayFill();
   return (
     <div
       onPointerDown={e => e.stopPropagation()}
       style={{
-        width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: C.bg, color: C.text,
+        width: '100%', ...fill, display: 'flex', flexDirection: 'column', background: C.bg, color: C.text,
         border: `1px solid ${C.border}`, borderRadius: 6, fontFamily: FONT, overflow: 'hidden', boxSizing: 'border-box',
         boxShadow: '0 10px 30px rgba(0,0,0,0.55)', ...style,
       }}
@@ -371,6 +393,11 @@ export interface OverlayProps {
   portal?: boolean;
   /** Portal size in px (default 640 x 440, clamped to the viewport) */
   portalSize?: { w: number; h: number };
+  /**
+   * Where the portal floats: 'top' (default - the trig keys sit at the bottom of
+   * Elektron panels and stay reachable) or 'bottom'
+   */
+  portalPlacement?: 'top' | 'bottom';
 }
 
 /** Is this overlay open (prop wins, else ui.seqMenu)? */
@@ -383,16 +410,22 @@ export function closeMenu(ctx: CustomRenderContext): void {
 }
 
 /** Renders `children` inside the custom element's box, or floating over the page with `portal` */
-export function Overlay({ portal, portalSize, children }: { portal?: boolean; portalSize?: { w: number; h: number }; children: ReactNode }) {
+export function Overlay({ portal, portalSize, portalPlacement, children }: Pick<OverlayProps, 'portal' | 'portalSize' | 'portalPlacement'> & { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (portal) {
     if (!mounted || typeof document === 'undefined') return null;
     const w = portalSize?.w ?? 640;
     const h = portalSize?.h ?? 440;
+    const at = portalPlacement === 'bottom' ? { bottom: 12 } : { top: 12 };
     return createPortal(
-      <div style={{ position: 'fixed', left: '50%', top: 12, transform: 'translateX(-50%)', width: `min(${w}px, calc(100vw - 24px))`, height: `min(${h}px, calc(100vh - 24px))`, zIndex: 60 }}>
-        {children}
+      <div
+        style={{
+          position: 'fixed', left: '50%', ...at, transform: 'translateX(-50%)', zIndex: 60,
+          width: `min(${w}px, calc(100vw - 24px))`, maxHeight: `min(${h}px, calc(100vh - 24px))`, display: 'flex', flexDirection: 'column',
+        }}
+      >
+        <OverlayMode.Provider value="portal">{children}</OverlayMode.Provider>
       </div>,
       document.body,
     );
@@ -465,6 +498,8 @@ export function PatternGrid({ ctx, project, bank, onBank, onPattern, selected, b
         type="button"
         aria-label={`Pattern ${id}${name ? ` ${name}` : ''}${isPlaying ? ' playing' : ''}${isQueued ? ' queued' : ''}`}
         aria-pressed={isSel}
+        data-pattern={id}
+        data-state={isPlaying ? 'playing' : isQueued ? 'queued' : has ? 'content' : 'empty'}
         onClick={e => { e.stopPropagation(); onPattern(id); }}
         onPointerDown={e => e.stopPropagation()}
         className={`${isQueued ? 'seq-blink' : ''} ${focus?.has(`seq:pattern:${id}`) || focus?.has('seq:patterns') ? 'seq-target' : ''}`}
@@ -473,7 +508,7 @@ export function PatternGrid({ ctx, project, bank, onBank, onPattern, selected, b
           border: `2px solid ${isSel ? C.white : isQueued ? C.amber : C.border}`,
           background: isPlaying ? C.green : isQueued ? '#5a3d12' : has ? '#3a2422' : C.key,
           color: isPlaying ? '#0d1a10' : has ? C.text : C.dim,
-          fontFamily: MONO, fontSize: 11, fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', userSelect: 'none',
+          fontFamily: MONO, fontSize: 11, fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', userSelect: 'none',
           boxShadow: isPlaying ? `0 0 8px ${C.green}88` : undefined,
         }}
       >

@@ -82,7 +82,7 @@ export default function ChainBuilder(props: ChainBuilderProps) {
   };
 
   return (
-    <Overlay portal={props.portal} portalSize={props.portalSize ?? { w: 620, h: 440 }}>
+    <Overlay portal={props.portal} portalPlacement={props.portalPlacement} portalSize={props.portalSize ?? { w: 620, h: 440 }}>
       <Frame
         title="CHAIN"
         sub={`${chain.length} pattern${chain.length === 1 ? '' : 's'}${chainPlaying ? ` · playing ${playingIdx + 1}/${chain.length}` : ''}`}
@@ -122,7 +122,7 @@ export default function ChainBuilder(props: ChainBuilderProps) {
                   position: 'relative', minWidth: 48, height: 34, padding: '0 6px', borderRadius: 4, cursor: 'pointer',
                   border: `2px solid ${isSel ? C.white : i === cueIdx ? C.amber : C.border}`,
                   background: isPlaying ? C.green : C.key, color: isPlaying ? '#0d1a10' : C.text,
-                  fontFamily: MONO, fontSize: 11, fontWeight: 700, touchAction: 'manipulation', userSelect: 'none',
+                  fontFamily: MONO, fontSize: 11, fontWeight: 700, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', userSelect: 'none',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.05,
                 }}
               >

@@ -247,7 +247,7 @@ export default function TrigKeys(props: TrigKeysProps) {
     const s = steps[step] as Step | undefined;
     const inLen = step < len;
     const isHead = playStep === step;
-    const held = heldSet.has(step);
+    const held = mode !== 'mute' && heldSet.has(step);
     const target = !!focus && (focus.has(`seq:trig:${step + 1}`) || focus.has('seq:trigs'));
     let fill = C.key;
     let lit = 0;
@@ -277,6 +277,10 @@ export default function TrigKeys(props: TrigKeysProps) {
         key={i}
         type="button"
         aria-label={mode === 'mute' ? `Mute track ${i + 1}` : `Trig key ${step + 1}${s ? (s.trigless ? ' lock trig' : ' trig on') : ''}`}
+        data-step={step}
+        data-trig={s ? (s.trigless ? 'lock' : 'note') : 'none'}
+        data-playhead={isHead ? '1' : undefined}
+        data-held={held ? '1' : undefined}
         onPointerDown={e => down(i, e)}
         onPointerUp={e => up(e)}
         onPointerCancel={e => up(e, true)}
@@ -285,7 +289,7 @@ export default function TrigKeys(props: TrigKeysProps) {
         className={armed === step && mode === 'trig' ? 'seq-armed' : target ? 'seq-target' : undefined}
         style={{
           position: 'relative', flex: 1, minWidth: 0, minHeight: 28, borderRadius: 3, border: `1px solid ${held ? C.amber : C.border}`,
-          background: fill, opacity: dimmed ? 0.42 : 1, touchAction: 'none', userSelect: 'none', cursor: inLen || mode === 'mute' ? 'pointer' : 'default',
+          background: fill, opacity: dimmed ? 0.42 : 1, touchAction: 'none', WebkitTapHighlightColor: 'transparent', userSelect: 'none', cursor: inLen || mode === 'mute' ? 'pointer' : 'default',
           boxShadow: [
             lit ? `0 0 ${8 * lit}px ${fill}` : 'inset 0 2px 3px rgba(0,0,0,0.6)',
             isHead ? `inset 0 0 0 2px ${C.white}` : '',

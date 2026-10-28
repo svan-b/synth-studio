@@ -124,12 +124,13 @@ export default function SongEditor(props: SongEditorProps) {
             format={v => ALL_PATTERN_IDS[v]}
             muted={!patternHasContent(project.patterns[r.pattern])}
             width={46}
+            name={`row ${i + 1} pattern`}
             dragPx={10}
             title={pat.name ? `${r.pattern} ${pat.name}` : r.pattern}
           />
         </div>
         <div style={{ width: COL.repeat }}>
-          <Stepper value={r.repeats} min={1} max={99} onChange={v => patch(i, { repeats: v })} format={v => `×${v}`} width={38} />
+          <Stepper value={r.repeats} min={1} max={99} onChange={v => patch(i, { repeats: v })} format={v => `×${v}`} width={38} name={`row ${i + 1} repeats`} />
         </div>
         <div style={{ width: COL.length }}>
           <Stepper
@@ -140,6 +141,7 @@ export default function SongEditor(props: SongEditorProps) {
             format={v => (v ? String(v) : 'AUTO')}
             muted={r.length === undefined}
             width={46}
+            name={`row ${i + 1} length`}
             title={`Master steps per repeat (AUTO = ${autoLength(pat)})`}
           />
         </div>
@@ -153,6 +155,7 @@ export default function SongEditor(props: SongEditorProps) {
               format={v => (v ? String(Math.round(v)) : 'AUTO')}
               muted={r.tempo === undefined}
               width={46}
+              name={`row ${i + 1} tempo`}
               title="Tempo while this row plays (AUTO = unchanged)"
             />
           </div>
@@ -167,6 +170,7 @@ export default function SongEditor(props: SongEditorProps) {
               format={v => (v > 0 ? `+${v}` : String(v))}
               muted={!r.transpose}
               width={38}
+              name={`row ${i + 1} transpose`}
               title="Semitones added to every note of this row"
             />
           </div>
@@ -183,7 +187,7 @@ export default function SongEditor(props: SongEditorProps) {
                 onClick={e => { e.stopPropagation(); edit(p => songToggleMute(p, i, t)); }}
                 onPointerDown={e => e.stopPropagation()}
                 style={{
-                  width: 30, height: 30, padding: 0, borderRadius: 3, cursor: 'pointer', touchAction: 'manipulation', userSelect: 'none',
+                  width: 30, height: 30, padding: 0, borderRadius: 3, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', userSelect: 'none',
                   border: `1px solid ${muted ? C.border : '#2f5f3e'}`, background: muted ? '#26282b' : '#1f4a2c',
                   color: muted ? C.faint : '#bff5cf', fontFamily: FONT, fontSize: 9, fontWeight: 800, overflow: 'hidden', whiteSpace: 'nowrap',
                 }}
@@ -207,7 +211,7 @@ export default function SongEditor(props: SongEditorProps) {
   };
 
   return (
-    <Overlay portal={props.portal} portalSize={props.portalSize ?? { w: 1120, h: 520 }}>
+    <Overlay portal={props.portal} portalPlacement={props.portalPlacement} portalSize={props.portalSize ?? { w: 1120, h: 520 }}>
       <Frame
         title="SONG"
         sub={`${rows.length} row${rows.length === 1 ? '' : 's'}${songPlaying ? ` · row ${st!.songRow + 1}` : ''}`}

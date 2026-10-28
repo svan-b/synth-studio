@@ -65,7 +65,7 @@ export default function PagePicker(props: PagePickerProps) {
               background: shown ? C.white : inLen ? C.key : '#17181a',
               color: shown ? '#111' : inLen ? C.text : C.faint,
               fontSize: 10, fontWeight: 800, letterSpacing: 0.5, cursor: inLen ? 'pointer' : 'default',
-              touchAction: 'manipulation', userSelect: 'none',
+              touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', userSelect: 'none',
               boxShadow: shown ? `0 0 6px ${C.white}88` : 'inset 0 -2px 0 rgba(0,0,0,0.35)',
             }}
           >
