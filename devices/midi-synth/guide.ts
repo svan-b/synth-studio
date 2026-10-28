@@ -123,6 +123,7 @@ export const LABEL_MAX = 16;
 const ABBREVIATIONS: [RegExp, string][] = [
   [/\s*\([^)]*\)/g, ''],
   [/oscillator/gi, 'Osc'],
+  [/amplifier/gi, 'Amp'],
   [/envelope/gi, 'Env'],
   [/frequency/gi, 'Freq'],
   [/resonance/gi, 'Reso'],

@@ -167,7 +167,8 @@ export async function loadWam(rawUrl: string, ctx: BaseAudioContext, opts: LoadO
     vendor: d.vendor || instance.vendor || '',
     description: d.description || '',
     isInstrument: !!d.isInstrument,
-    hasAudioInput: d.hasAudioInput !== false,
+    // Trust the node over the descriptor: the SDK's default descriptor claims an audio input
+    hasAudioInput: d.hasAudioInput !== false && (node.numberOfInputs ?? 1) > 0,
     hasMidiInput: d.hasMidiInput !== false,
   };
 }

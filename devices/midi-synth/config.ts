@@ -138,9 +138,17 @@ export function migrateData(saved: unknown): MidiSynthData {
   return JSON.stringify(out) === JSON.stringify(saved) ? (saved as MidiSynthData) : out;
 }
 
-/** Narrow unknown device data (the store holds `unknown`) */
+let fallback: MidiSynthData | null = null;
+
+/**
+ * Narrow unknown device data (the store holds `unknown`). Checks the shape, not
+ * just the version: for one render after switching instruments the panel can be
+ * handed another device's data.
+ */
 export function asData(d: unknown): MidiSynthData {
-  return d && typeof d === 'object' && (d as MidiSynthData).v === 1 ? (d as MidiSynthData) : initialData();
+  const s = d as Partial<MidiSynthData> | null;
+  if (s && typeof s === 'object' && s.v === 1 && Array.isArray(s.knobs) && Array.isArray(s.steps)) return s as MidiSynthData;
+  return (fallback ??= initialData());
 }
 
 // ----------------------------------------------------------------------------

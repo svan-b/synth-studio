@@ -9,7 +9,7 @@ const H = 170;
 const COLS = 8;
 const COL_W = 278 / COLS;
 const colX = (c: number) => 6 + COL_W * (c + 0.5);
-const ROW_Y = [42, 70];
+const ROW_Y = [41, 72];
 const KNOB_D = 13;
 
 const knobs: PanelElement[] = KNOB_IDS.flatMap((id, i): PanelElement[] => {

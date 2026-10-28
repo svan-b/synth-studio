@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { CustomRenderContext } from '@/types/panel';
 import { hub } from '@/lib/studio/hub';
-import { KNOWN_PLUGINS, findKnownPlugin, type KnownPlugin } from '@/lib/wam/plugins';
+import { KNOWN_PLUGINS, WAM_COMMUNITY_INDEX, findKnownPlugin, type KnownPlugin } from '@/lib/wam/plugins';
 import { WamLoadError, normalizeWamUrl } from '@/lib/wam/host';
 import { isTrusted, originOf, trustOrigin } from '@/lib/wam/trust';
 import { asWamData } from './config';
@@ -22,7 +22,10 @@ const engineOf = (instance: string) => hub.getEngine(instance) as WamPluginEngin
 
 export function PluginHeader(ctx: CustomRenderContext) {
   const data = asWamData(ctx.data);
-  const status = (ctx.engine.status as PluginStatus | undefined) ?? (data.url ? 'loading' : 'empty');
+  // Engine state arrives a frame later: until it is about the current URL, we are loading
+  const engineUrl = ctx.engine.url as string | null | undefined;
+  const current = ctx.engine.status !== undefined && (engineUrl === undefined || engineUrl === data.url);
+  const status = current ? (ctx.engine.status as PluginStatus) : data.url ? 'loading' : 'empty';
   const plugin = ctx.engine.plugin as PluginInfo | null | undefined;
   const error = ctx.engine.error as string | null | undefined;
   const [chooser, setChooser] = useState(false);
@@ -133,7 +136,8 @@ function PluginChooser({ current, onChoose, onClose, onRemove }: {
   const [error, setError] = useState<string | null>(null);
 
   let origin = '';
-  try { origin = url.trim() ? originOf(normalizeWamUrl(url)) : ''; } catch { origin = ''; }
+  let urlError: string | null = null;
+  try { origin = url.trim() ? originOf(normalizeWamUrl(url)) : ''; } catch (e) { urlError = e instanceof Error ? e.message : String(e); }
   const alreadyTrusted = !!origin && isTrusted(origin);
 
   const pick = (k: KnownPlugin) => { setUrl(k.url); setName(k.name); setError(null); };
@@ -200,7 +204,8 @@ function PluginChooser({ current, onChoose, onClose, onRemove }: {
           ))}
           <p className="text-[10px] text-gray-500 mb-3">
             From the <a className="underline" href="https://github.com/boourns/wam-community" target="_blank" rel="noopener noreferrer">wam-community</a> collection
-            hosted at webaudiomodules.com. &quot;Unverified&quot;: this list was built where that site could not be reached, so a plugin may have moved.
+            hosted at webaudiomodules.com (<a className="underline" href={WAM_COMMUNITY_INDEX} target="_blank" rel="noopener noreferrer">full list</a>).
+            &quot;Unverified&quot;: this list was built where that site could not be reached, so a plugin may have moved.
           </p>
 
           <label className="block text-xs text-gray-300 mb-1" htmlFor="wam-url">Plugin URL</label>
@@ -221,6 +226,7 @@ function PluginChooser({ current, onChoose, onClose, onRemove }: {
             </label>
           )}
           {origin && alreadyTrusted && <p className="text-[11px] text-gray-400 mb-2">You trusted {origin.replace(/^https?:\/\//, '')} before.</p>}
+          {urlError && <p className="text-xs text-amber-300 mb-2">{urlError}</p>}
           {error && <p className="text-xs text-red-300 mb-2">{error}</p>}
 
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#3a3a3a]">
@@ -229,7 +235,7 @@ function PluginChooser({ current, onChoose, onClose, onRemove }: {
             <Dialog.Close asChild><button className="px-4 py-2 bg-[#3a3a3a] rounded text-sm">Cancel</button></Dialog.Close>
             <button
               onClick={load}
-              disabled={!url.trim() || (!alreadyTrusted && !agree)}
+              disabled={!url.trim() || !!urlError || (!alreadyTrusted && !agree)}
               className="px-4 py-2 rounded bg-violet-400 text-black font-bold text-sm disabled:opacity-40"
             >
               Load plugin

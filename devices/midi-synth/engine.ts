@@ -15,7 +15,7 @@ import type { ControlValue } from '@/types';
 import { BaseEngine, Clock } from '@/lib/audio/engine';
 import { transport as studioTransport, type Transport, type TransportTick } from '@/lib/audio/transport';
 import { midi, type MidiOutputLike } from '@/lib/midi/access';
-import { audioToMidiTime } from '@/lib/midi/time';
+import { audioClock } from '@/lib/midi/time';
 import { CC_ALL_NOTES_OFF, CC_ALL_SOUND_OFF, isChannelMessage, withChannel } from '@/lib/midi/bytes';
 import type { MidiReceiver } from '@/lib/midi/router';
 import { useMidiStore } from '@/store/midi';
@@ -81,7 +81,8 @@ export class MidiSynthEngine extends BaseEngine implements MidiReceiver {
   private sendAt(bytes: number[], audioTime: number, out = this.output()) {
     if (!out) return;
     const s = useMidiStore.getState().clockOut;
-    const ts = audioToMidiTime(this.ctx, audioTime, { compensate: s.compensate, offsetMs: s.offsetMs + this.cfg.offsetMs });
+    // Same steady mapping as MIDI clock out, so notes and clock agree exactly
+    const ts = audioClock.toMidiTime(this.ctx, audioTime, { compensate: s.compensate, offsetMs: s.offsetMs + this.cfg.offsetMs });
     if (midi.send(out, bytes, ts)) this.activity();
   }
 

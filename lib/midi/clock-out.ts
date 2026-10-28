@@ -5,8 +5,9 @@
 //
 // Every message is scheduled with output.send(bytes, timestamp): transport
 // ticks are generated ~100 ms ahead on the audio clock and mapped to
-// performance.now() time (see time.ts), so the clock is as steady as the audio
-// clock, not the main thread.
+// performance.now() time with performance.now() + (tickTime - currentTime) *
+// 1000 + outputLatency (time.ts, with the clock offset smoothed), so the clock
+// is as steady as the audio clock, not the main thread.
 //
 // Swing is *not* sent: the transport delays off-beat 16ths for the twins, but
 // MIDI clock stays even (hardware PLLs its tempo from the clock; uneven pulses
@@ -15,7 +16,7 @@
 
 import { PPQN, type Transport, type TransportTick, type TransportEvent } from '@/lib/audio/transport';
 import { CONTINUE, START, STOP, TIMING_CLOCK, songPosition } from './bytes';
-import { audioToMidiTime } from './time';
+import { audioClock, type AudioClockSync } from './time';
 import type { MidiOutputLike } from './access';
 import type { ClockOutSettings, PortRef } from '@/store/midi';
 
@@ -28,6 +29,8 @@ export interface ClockOutDeps {
   settings: () => ClockOutSettings;
   resolve: (ref: PortRef) => MidiOutputLike | null;
   now?: () => number;
+  /** Clock mapping (shared with the sequencers by default, so they line up exactly) */
+  clockSync?: AudioClockSync;
 }
 
 interface Target {
@@ -69,7 +72,7 @@ export class MidiClockOut {
     const ctx = this.deps.ctx();
     if (!ctx) return this.now();
     const s = this.deps.settings();
-    return audioToMidiTime(ctx, audioTime, { compensate: s.compensate, offsetMs: s.offsetMs }, this.now());
+    return (this.deps.clockSync ?? audioClock).toMidiTime(ctx, audioTime, { compensate: s.compensate, offsetMs: s.offsetMs }, this.now());
   }
 
   private send(t: Target, data: number[], ts: number) {

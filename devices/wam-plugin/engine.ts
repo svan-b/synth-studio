@@ -79,14 +79,14 @@ export class WamPluginEngine extends BaseEngine implements MidiReceiver {
     this.closeGui();
     this.unload();
     if (!url) {
-      this.emit({ status: 'empty' as PluginStatus, error: null, plugin: null });
+      this.emit({ status: 'empty' as PluginStatus, error: null, plugin: null, url: null });
       return;
     }
     if (!isTrusted(url)) {
-      this.emit({ status: 'untrusted' as PluginStatus, error: null, plugin: null, origin: originOf(url) });
+      this.emit({ status: 'untrusted' as PluginStatus, error: null, plugin: null, origin: originOf(url), url });
       return;
     }
-    this.emit({ status: 'loading' as PluginStatus, error: null, plugin: null });
+    this.emit({ status: 'loading' as PluginStatus, error: null, plugin: null, url });
     try {
       const w = await loadWam(url, this.ctx, { state: this.cfg.state });
       if (seq !== this.loadSeq || !this.started) {
@@ -97,13 +97,14 @@ export class WamPluginEngine extends BaseEngine implements MidiReceiver {
       this.wire();
       this.emit({
         status: 'ready' as PluginStatus,
+        url,
         error: null,
         plugin: { name: w.name, vendor: w.vendor, description: w.description, isInstrument: w.isInstrument, hasAudioInput: w.hasAudioInput, hasMidiInput: w.hasMidiInput },
       });
       if (this.transport) this.sendTransport(this.transport, this.ctx.currentTime);
     } catch (e) {
       if (seq !== this.loadSeq) return;
-      this.emit({ status: 'error' as PluginStatus, error: e instanceof Error ? e.message : String(e), plugin: null });
+      this.emit({ status: 'error' as PluginStatus, error: e instanceof Error ? e.message : String(e), plugin: null, url });
     }
   }
 
@@ -118,7 +119,9 @@ export class WamPluginEngine extends BaseEngine implements MidiReceiver {
       if (!w || w.hasAudioInput) this.input.connect(this.level);
       return;
     }
-    if (w.hasAudioInput) this.input.connect(w.node);
+    try {
+      if (w.hasAudioInput) this.input.connect(w.node);
+    } catch { /* the plugin's node takes no audio after all */ }
     w.node.connect(this.level);
   }
 

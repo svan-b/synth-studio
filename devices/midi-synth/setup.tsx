@@ -46,6 +46,8 @@ export default function SetupDialog({ data, onSave, onClose }: Props) {
         <Dialog.Content
           className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 sm:p-5 w-[calc(100%-1.5rem)] max-w-3xl shadow-2xl z-50 max-h-[92vh] overflow-y-auto text-white"
           aria-describedby="midi-synth-setup-desc"
+          // Don't jump into the Name field: on iPad that pops up the keyboard over the dialog
+          onOpenAutoFocus={e => { e.preventDefault(); (e.currentTarget as HTMLElement | null)?.focus?.(); }}
         >
           <Dialog.Title className="text-lg font-bold">Set up your synth</Dialog.Title>
           <p id="midi-synth-setup-desc" className="text-xs text-hardware-label mb-4">

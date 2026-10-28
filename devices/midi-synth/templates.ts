@@ -36,10 +36,23 @@ export function loadGuideDevice(id: string): Promise<GuideDevice> {
 
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim();
 
+/** Shown first before you type: synths people often bring (ids missing from the data are skipped) */
+const POPULAR = [
+  'moog-subsequent-37', 'moog-mother-32', 'moog-subharmonicon', 'moog-grandmother', 'korg-minilogue-xd', 'korg-monologue',
+  'korg-volca-keys', 'korg-volca-bass', 'korg-nts-1', 'arturia-microfreak', 'novation-bass-station-ii', 'novation-summit-and-peak',
+  'sequential-prophet-6', 'sequential-take-5', 'dave-smith-instruments-ob-6', 'roland-tr-8s', 'elektron-digitone', 'elektron-digitakt',
+  'elektron-analog-four-mkii', 'elektron-analog-rytm-mkii', 'dreadbox-nymphes', 'make-noise-0-coast', 'waldorf-blofeld',
+  'teenage-engineering-op-1-field', 'behringer-pro-800', 'behringer-deepmind-12',
+];
+
 /** Every word of the query must appear in "manufacturer device" (any order) */
 export function searchGuide(devices: GuideIndexEntry[], query: string, limit = 60): GuideIndexEntry[] {
   const words = norm(query).split(' ').filter(Boolean);
-  if (!words.length) return devices.slice(0, limit);
+  if (!words.length) {
+    const byId = new Map(devices.map(d => [d.id, d]));
+    const popular = POPULAR.map(id => byId.get(id)).filter((d): d is GuideIndexEntry => !!d);
+    return popular.length ? popular.slice(0, limit) : devices.slice(0, limit);
+  }
   const out: { e: GuideIndexEntry; score: number }[] = [];
   for (const e of devices) {
     const hay = norm(`${e.manufacturer} ${e.device}`);

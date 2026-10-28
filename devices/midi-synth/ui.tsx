@@ -31,8 +31,8 @@ export function KnobCaption({ index, ctx }: { index: number; ctx: CustomRenderCo
       className="flex flex-col items-center justify-between select-none"
       aria-hidden
     >
-      <div className="font-bold whitespace-nowrap overflow-hidden text-ellipsis max-w-full text-center leading-tight" style={{ fontSize: 11, color: k ? '#e6f2f0' : '#5d6b6a' }}>
-        {k ? k.label : 'not set'}
+      <div className="font-bold whitespace-nowrap overflow-hidden text-ellipsis max-w-full text-center leading-tight" style={{ fontSize: k ? 11 : 9, color: k ? '#e6f2f0' : '#4a5857' }}>
+        {k ? k.label : 'unused'}
       </div>
       {k ? (
         <div className="flex items-baseline gap-1 leading-none">

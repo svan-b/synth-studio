@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { MidiClockOut } from '../clock-out';
 import { CONTINUE, SONG_POSITION, START, STOP, TIMING_CLOCK } from '../bytes';
 import type { ClockOutSettings, PortRef } from '@/store/midi';
+import { AudioClockSync, audioToMidiTime } from '../time';
 import { FakeClock, done, manualTransport, near, test } from './harness';
 
 interface Sent { port: string; data: number[]; ts: number | undefined }
@@ -22,6 +23,7 @@ function setup(opts: Partial<ClockOutSettings> = {}, latency = { base: 0, out: 0
     settings: () => settings,
     resolve: (ref: PortRef) => ports.get(ref.id) ?? null,
     now: clock.now,
+    clockSync: new AudioClockSync(),
   });
   co.start();
   transport.setBpm(120);
@@ -143,6 +145,83 @@ test('no targets: nothing sent', () => {
   run(0.5);
   transport.stop();
   assert.equal(sent.length, 0);
+});
+
+test('steady mapping: currentTime moving in 10 ms bursts does not wobble the timestamps', () => {
+  // A real context: currentTime jumps once per audio callback while performance.now() runs on
+  const sync = new AudioClockSync();
+  const ctx = { currentTime: 0, outputLatency: 0.02 };
+  const raw: number[] = [];
+  const steady: number[] = [];
+  const tick = 60 / 120 / 24;
+  for (let ms = 0, k = 0; ms < 3000; ms += 1) {
+    ctx.currentTime = Math.floor(ms / 10) * 0.01; // 10 ms callbacks
+    const now = 5000 + ms;
+    // schedule tick k once it is within 100 ms
+    while (k * tick < ms / 1000 + 0.1) {
+      raw.push(audioToMidiTime(ctx, k * tick, {}, now));
+      steady.push(sync.toMidiTime(ctx, k * tick, {}, now));
+      k++;
+    }
+  }
+  const spread = (ts: number[]) => {
+    const d = ts.slice(1).map((t, i) => t - ts[i] - tick * 1000);
+    return Math.max(...d) - Math.min(...d);
+  };
+  assert.ok(spread(raw) > 5, `raw formula wobbles (spread ${spread(raw).toFixed(2)} ms)`);
+  // after the first callback has been seen, every interval is exact
+  const settled = steady.slice(10);
+  assert.ok(spread(settled) < 1e-6, `steady spread ${spread(settled)} ms`);
+  near(settled[0] - (5000 + 10 * tick * 1000 + 20), 0, 1e-6, 'offset + outputLatency');
+});
+
+test('steady mapping restarts when the timeline really jumps (context resumed)', () => {
+  const sync = new AudioClockSync();
+  const ctx = { currentTime: 1 };
+  near(sync.offset(ctx, 2000), 1000, 1e-9, 'first');
+  ctx.currentTime = 1.5;
+  near(sync.offset(ctx, 2500), 1000, 1e-9, 'steady');
+  // suspended for 3 s: currentTime frozen, then resumes
+  ctx.currentTime = 1.5;
+  near(sync.offset(ctx, 5600), 4100, 1e-9, 'jumped: new offset taken at once');
+});
+
+test('steady mapping: random sampling against 10 ms callbacks - settled, never steps', () => {
+  // The scheduler wakes at irregular moments (timer jitter); currentTime only moves per callback
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32);
+  const sync = new AudioClockSync();
+  const ctx = { currentTime: 0 };
+  const TRUE = 7000; // performance.now() at audio time 0
+  let prev: number | null = null;
+  let prevAt = 0;
+  let worst = 0;
+  let maxStepRate = 0;
+  for (let t = 0; t < 20000; t += 14 + rnd() * 12) {
+    ctx.currentTime = Math.floor(t / 10) * 0.01;
+    const now = TRUE + t;
+    const est = sync.offset(ctx, now);
+    if (t > 3000) {
+      worst = Math.max(worst, Math.abs(est - TRUE));
+      if (prev !== null) maxStepRate = Math.max(maxStepRate, Math.abs(est - prev) / (now - prevAt));
+    }
+    prev = est;
+    prevAt = now;
+  }
+  assert.ok(worst < 1.5, `within 1.5 ms of the true offset (worst ${worst.toFixed(3)})`);
+  assert.ok(maxStepRate <= 0.002 + 1e-9, `slew-limited (${maxStepRate})`);
+});
+
+test('steady mapping: huge callbacks (Bluetooth, 100 ms) do not cause restarts', () => {
+  const sync = new AudioClockSync();
+  const ctx = { currentTime: 0 };
+  const seen: number[] = [];
+  for (let t = 0; t < 10000; t += 20) {
+    ctx.currentTime = Math.floor(t / 100) * 0.1;
+    seen.push(sync.offset(ctx, 3000 + t));
+  }
+  const late = seen.slice(150);
+  assert.ok(Math.max(...late) - Math.min(...late) < 1, `stable (${(Math.max(...late) - Math.min(...late)).toFixed(2)} ms)`);
 });
 
 void done('MIDI clock out');

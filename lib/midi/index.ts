@@ -19,6 +19,7 @@ import { MidiRouter, isMidiReceiver, type FocusSink } from './router';
 import { MidiClockOut } from './clock-out';
 import { MidiClockIn } from './clock-in';
 import { ControlWriter, applyControlValues } from './apply';
+import { audioClock } from './time';
 
 export { midi } from './access';
 export type { MidiSnapshot, MidiPortInfo, IncomingMidi } from './access';
@@ -95,7 +96,11 @@ export function initMidi() {
       if (s.clockIn.enabled) midiClockIn.attach();
     }
   });
-  midi.onGranted(() => useMidiStore.getState().setAutoConnect(true));
+  midi.onGranted(() => {
+    useMidiStore.getState().setAutoConnect(true);
+    // Keep the audio -> MIDI clock mapping settled, so the first beat after Play is exact
+    audioClock.sampleEvery(() => getAudioContext());
+  });
   midi.onMessage(m => {
     midiActivity.set(m.port.id, performance.now());
     const msg = midiRouter.handle(m.port.name, m.data, m.timeStamp);
