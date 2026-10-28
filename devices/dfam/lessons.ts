@@ -64,7 +64,7 @@ const f1: Lesson = {
     run('An oscillator makes a repeating wave; repeated fast enough, the ear hears a pitch.'),
     {
       kind: 'predict', control: 'vco1_frequency', targetValue: 1, concept: 'oscillator-pitch',
-      instruction: 'Turn VCO 1 FREQUENCY up to +1 (one octave).',
+      instruction: 'Turn VCO 1 FREQUENCY up one octave, from 131 Hz to about 262 Hz.',
       predict: {
         question: 'What will turning VCO 1 FREQUENCY up do?',
         options: ['Raise the pitch', 'Make it louder', 'Make each hit longer'], answer: 0,
@@ -100,10 +100,10 @@ const f1: Lesson = {
       manualReference: 'Manual: Mixer',
     },
     {
-      kind: 'do', control: 'vco2_frequency', targetValue: 1.583, concept: 'oscillator-pitch',
-      instruction: 'Turn VCO 2 FREQUENCY to about +1.6, a fifth above VCO 1.',
+      kind: 'do', control: 'vco2_frequency', targetValue: 1.585, tolerance: 0.06, concept: 'oscillator-pitch',
+      instruction: 'Turn VCO 2 FREQUENCY slowly up to about 392 Hz, a fifth above VCO 1 (262 Hz).',
       principle: 'Pitches at a simple ratio (3:2, a fifth) blend into one rich tone; odd ratios sound metallic.',
-      explanation: 'A fifth is 7 semitones, and 7/12 of an octave is about 0.58. So +1.58 sits a fifth above VCO 1\'s +1. Move the knob slowly and listen for the point where the beating stops.',
+      explanation: 'A fifth is a 3:2 ratio: 262 Hz x 1.5 = 392 Hz. Close to it the two waves beat - a slow wobble. Watch the readout, and listen for the wobble to stop as they lock into one tone.',
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'oscillator-pitch',
@@ -123,9 +123,9 @@ const f1: Lesson = {
       instruction: 'Make a fuller tone: add VCO 2 exactly one octave above VCO 1, loud enough to hear.',
       checklist: [
         { text: 'VCO 2 LEVEL at least 40%', check: s => num(s, 'vco2_level') >= 40 },
-        { text: 'VCO 2 FREQUENCY one octave above VCO 1 (about +1 more)', check: s => Math.abs(num(s, 'vco2_frequency') - num(s, 'vco1_frequency') - 1) < 0.15 },
+        { text: 'VCO 2 FREQUENCY one octave above VCO 1 (twice its Hz)', check: s => Math.abs(num(s, 'vco2_frequency') - num(s, 'vco1_frequency') - 1) < 0.15 },
       ],
-      hints: ['An octave on these knobs is 1.0.', 'VCO 1 is at +1, so where should VCO 2 go?', 'VCO 2 FREQUENCY at about +2, VCO 2 LEVEL around 60%.'],
+      hints: ['An octave doubles the frequency.', 'VCO 1 reads 262 Hz, so where should VCO 2 go?', 'VCO 2 FREQUENCY at about 523 Hz, VCO 2 LEVEL around 60%.'],
       solution: { values: { vco1_frequency: 1, vco2_frequency: 2, vco2_level: 60 } },
     },
     {
@@ -576,8 +576,8 @@ const f6: Lesson = {
       instruction: 'Press RUN / STOP to stop the sequencer.',
       predict: {
         question: 'When you start it again, where will it carry on from?',
-        options: ['The step it stopped on', 'Always step 1', 'A random step'], answer: 0,
-        explain: 'The DFAM carries on from wherever it is. To start on step 1, park it on step 8 with ADVANCE: the first clock moves it to step 1 and then plays it.',
+        options: ['Where it stopped: the next step plays first', 'Always step 1', 'A random step'], answer: 0,
+        explain: 'The DFAM has no reset: it carries on from where it stopped, and the first clock moves it on one step before it plays. So to start on step 1, park it on step 8 with ADVANCE.',
       },
       principle: 'A step sequencer remembers its position; starting moves to the next step and plays it.',
     },
@@ -997,7 +997,7 @@ const sd4: Lesson = {
     },
     {
       kind: 'do', control: 'vco1_frequency', targetValue: 1, concept: 'frequency-modulation',
-      instruction: 'Sweep VCO 1 FREQUENCY slowly up to about +1 and listen to the overtones change.',
+      instruction: 'Sweep VCO 1 FREQUENCY slowly up to about 262 Hz and listen to the overtones change.',
       principle: 'FM timbre depends on the ratio between the two frequencies: simple ratios ring, odd ones clang.',
     },
     {
@@ -1038,7 +1038,7 @@ const sd4: Lesson = {
     },
     {
       kind: 'do', control: 'vco2_frequency', targetValue: 2.5, concept: 'oscillator-sync',
-      instruction: 'Sweep VCO 2 FREQUENCY up to about +2.5: the pitch stays, the tone tears.',
+      instruction: 'Sweep VCO 2 FREQUENCY up to about 740 Hz: the pitch stays, the tone tears.',
       principle: 'Sweeping a synced oscillator gives the classic "tearing" sync sound.',
     },
     {

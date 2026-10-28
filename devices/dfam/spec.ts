@@ -11,6 +11,18 @@ import { DFAM_PRESETS } from './presets';
 
 const step = (n: number) => String(n);
 
+/**
+ * VCO FREQUENCY knobs are stored in octaves from noon (the hardware's ten-octave range). The readout
+ * shows the knob's frequency in Hz, so "pitch is frequency" can be read off the panel: noon = 131 Hz
+ * (C3, the twin's reference - see REFERENCE.md), one octave = twice the Hz.
+ */
+const VCO_NOON_HZ = 130.8128;
+const formatVcoFreq = (oct: number) => {
+  const hz = VCO_NOON_HZ * Math.pow(2, oct);
+  if (hz >= 1000) return `${(hz / 1000).toFixed(2)} kHz`;
+  return `${hz >= 100 ? hz.toFixed(0) : hz.toFixed(1)} Hz`;
+};
+
 /** Sequencer PITCH knobs: volts (1 V = 1 octave), shown in semitones so steps can be tuned by eye */
 const formatPitch = (v: number) => {
   const st = v * 12;
@@ -90,7 +102,8 @@ export const DFAM: DeviceSpec = {
     // ---- VCOs -------------------------------------------------------------------
     vco1_frequency: {
       type: 'knob', label: 'VCO 1 FREQUENCY', min: -5, max: 5, default: 0, units: 'octaves', bipolar: true, size: 'large',
-      description: 'Starting pitch of VCO 1 over ten octaves (noon is about C3, 131 Hz). The VCO EG, sequencer and VCO 1 CV add to it.',
+      format: formatVcoFreq,
+      description: 'Starting pitch of VCO 1 over ten octaves, about 4 Hz to 4 kHz (noon is about C3, 131 Hz; one octave doubles the Hz). The VCO EG, sequencer and VCO 1 CV add to it.',
       manualReference: 'VCO section - VCO FREQUENCY',
     },
     vco1_wave: {
@@ -110,7 +123,8 @@ export const DFAM: DeviceSpec = {
     },
     vco2_frequency: {
       type: 'knob', label: 'VCO 2 FREQUENCY', min: -5, max: 5, default: 0, units: 'octaves', bipolar: true, size: 'large',
-      description: 'Starting pitch of VCO 2 over ten octaves. With HARD SYNC on it sets the timbre instead.',
+      format: formatVcoFreq,
+      description: 'Starting pitch of VCO 2 over ten octaves, about 4 Hz to 4 kHz. With HARD SYNC on it sets the timbre instead.',
       manualReference: 'VCO section - VCO FREQUENCY',
     },
     vco2_wave: {

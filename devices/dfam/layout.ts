@@ -3,17 +3,22 @@
 // All x/y in millimetres from the top-left of the black 60 HP panel (wooden
 // cheeks excluded). Control x/y = control centre. Positions follow the panel
 // diagram in the DFAM manual as read for the first build; sizes follow the
-// knob-cap evidence in REFERENCE.md (14 large caps, 3 small mixer caps,
-// 16 small sequencer caps). Long legends are printed on two lines, as on the
-// hardware, so neighbouring labels never collide on an iPad.
+// knob evidence in REFERENCE.md: 14 capped knobs, and 19 slim black
+// "stalks" with a painted line (the 3 mixer controls and the 16 sequencer
+// controls - Sound On Sound's "16 knobless stalks"). The stalks are drawn a
+// little wider than the hardware's 6 mm shafts so they stay touchable.
+// Long legends are printed on two lines, as on the hardware, so neighbouring
+// labels never collide on an iPad.
 // ============================================================================
 
 import type { PanelElement, PanelLayout } from '@/types/panel';
 
-// Knob cap diameters (mm)
+// Knob diameters (mm)
 const LARGE = 17.8;
 const MIXER = 8.9;
 const SEQ = 9.4;
+/** Black shaft with a white indicator line: the stock mixer and sequencer controls */
+const STALK = 'moog-black' as const;
 
 const ROW1_Y = 18;
 const ROW2_Y = 48;
@@ -71,9 +76,9 @@ const elements: PanelElement[] = [
   ...main('vco1_eg_amount', 'VCO 1\nEG AMOUNT', 52, ROW1_Y),
   ...main('vco1_frequency', 'VCO 1\nFREQUENCY', 84, ROW1_Y),
   sw('vco1_wave', 104, 27, 'VCO 1'),
-  knob('vco1_level', 124, 20, MIXER),
-  knob('noise_level', 124, 38, MIXER),
-  sw('vcf_mode', 140, 27, 'VCF'),
+  knob('vco1_level', 123, 20, MIXER, { variant: STALK }),
+  knob('noise_level', 123, 38, MIXER, { variant: STALK }),
+  sw('vcf_mode', 140.6, 27, 'VCF'),
   ...main('vcf_cutoff', 'CUTOFF', 154, ROW1_Y),
   ...main('vcf_resonance', 'RESONANCE', 177.3, ROW1_Y),
   sw('vca_attack_mode', 200.7, 22),
@@ -85,7 +90,7 @@ const elements: PanelElement[] = [
   ...main('vco2_eg_amount', 'VCO 2\nEG AMOUNT', 52, ROW2_Y),
   ...main('vco2_frequency', 'VCO 2\nFREQUENCY', 84, ROW2_Y),
   sw('vco2_wave', 104, 57, 'VCO 2'),
-  knob('vco2_level', 124, 56, MIXER),
+  knob('vco2_level', 123, 56, MIXER, { variant: STALK }),
   ...main('vcf_decay', 'VCF\nDECAY', 154, ROW2_Y),
   ...main('vcf_eg_amount', 'VCF EG\nAMOUNT', 177.3, ROW2_Y),
   ...main('noise_vcf_mod', 'NOISE /\nVCF MOD', 200.7, ROW2_Y),
@@ -104,8 +109,8 @@ const elements: PanelElement[] = [
   ...Array.from({ length: 8 }, (_, i): PanelElement => ({ kind: 'label', text: String(i + 1), x: STEP_X(i), y: 69.6, size: 9 })),
   { kind: 'label', text: 'PITCH', x: 98, y: SEQ_PITCH_Y, size: 7.5, align: 'right', color: '#9ca3af' },
   { kind: 'label', text: 'VELOCITY', x: 98, y: SEQ_VEL_Y, size: 7.5, align: 'right', color: '#9ca3af' },
-  ...Array.from({ length: 8 }, (_, i) => knob(`pitch_${i + 1}`, STEP_X(i), SEQ_PITCH_Y, SEQ, { label: 'none', value: 'hover' })),
-  ...Array.from({ length: 8 }, (_, i) => knob(`velocity_${i + 1}`, STEP_X(i), SEQ_VEL_Y, SEQ, { label: 'none' })),
+  ...Array.from({ length: 8 }, (_, i) => knob(`pitch_${i + 1}`, STEP_X(i), SEQ_PITCH_Y, SEQ, { label: 'none', value: 'hover', variant: STALK })),
+  ...Array.from({ length: 8 }, (_, i) => knob(`velocity_${i + 1}`, STEP_X(i), SEQ_VEL_Y, SEQ, { label: 'none', variant: STALK })),
   // Step LEDs: the current step is always shown (so ADVANCE can be seen); it flashes on each hit
   ...Array.from({ length: 8 }, (_, i): PanelElement => ({
     kind: 'led', x: STEP_X(i), y: SEQ_LED_Y, size: 3.6, color: '#ff3333',
