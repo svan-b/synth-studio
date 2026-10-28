@@ -216,7 +216,7 @@ const MD = (id: number, name: string, short: string, slots: (string | null)[], k
 
 export const MACHINES: Record<number, MachineDef> = {
   [M.BD_HARD]: MD(M.BD_HARD, 'BD HARD', 'BDHD', ['lev', 'tun', 'dec', 'hld', 'swt', 'snp', 'wav', 'tic'], ['tun', 'swt', 'snp', 'dec', 'wav', 'hld', 'tic', 'lev'],
-    'A hard, punchy kick: one oscillator with a fixed-depth pitch sweep, an extra snap and a hold-then-decay body.'),
+    'A hard, punchy kick: one oscillator with a fixed-depth pitch sweep, an extra snap and a hold-then-decay body.', { dec: 60, hld: 16 }),
   [M.BD_CLASSIC]: MD(M.BD_CLASSIC, 'BD CLASSIC', 'BDCL', ['lev', 'tun', 'dec', 'hld', 'swt', 'swd', 'wav', 'tra'], ['tun', 'swt', 'swd', 'dec', 'wav', 'hld', 'tra', 'lev'],
     'The classic analog kick: a swept oscillator with adjustable sweep depth and a choice of 56 transients.'),
   [M.BD_FM]: MD(M.BD_FM, 'BD FM', 'BDFM', ['lev', 'tun', 'dec', 'fma', 'swt', 'fms', 'fmd', 'fmt'], ['tun', 'swt', 'fms', 'dec', 'fma', 'fmd', 'fmt', 'lev'],

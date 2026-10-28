@@ -186,7 +186,7 @@ export const KIT_PRESETS: KitDef[] = [
       oh: { machine: 'OH METALLIC', dec: 52, amp_vol: 90 },
       cy: { machine: 'CY METALLIC', dec: 60, ton: 20 },
     },
-    { del_tim: 16, del_fdb: 110, del_hpf: 40, del_lpf: 80, dis_dov: 70, dis_amt: 46, dis_sym: 12, rev_dec: 60, cmp_thr: 78, cmp_rat: 0, cmp_atk: 3, cmp_rel: 1, cmp_mup: 64 },
+    { del_tim: 16, del_fdb: 110, del_hpf: 40, del_lpf: 80, dis_dov: 70, dis_amt: 46, dis_sym: 12, rev_dec: 60, cmp_thr: 78, cmp_rat: 0, cmp_atk: 3, cmp_rel: 1, cmp_mup: 54 },
     {
       name: 'GRIND',
       rows: {
@@ -603,7 +603,7 @@ export const KIT_PRESETS: KitDef[] = [
       bd: { machine: 'BD SILKY', tun: -1, dec: 46, hld: 6, swt: 40, swd: 30, lev: 70 },
       sd: { machine: 'SD NATURAL', tun: 0, bdy: 20, nbal: 104, dec: 70, lpf: 80, hpf: 50, nres: 10, amp_atk: 20 },
       ch: { dec: 18, col: -30, amp_vol: 70 },
-      cy: { machine: 'CY RIDE', typ: 0, dec: 96, hit: 40, c1: 90, c2: 60, c3: 50, amp_vol: 88 },
+      cy: { machine: 'CY RIDE', typ: 0, dec: 96, hit: 40, c1: 80, c2: 60, c3: 50, amp_vol: 74 },
     },
     { rev_dec: 58, rev_gai: 80, cmp_thr: 105 },
     {
@@ -826,8 +826,8 @@ const SONG_PATTERNS: [string, PatDef, string][] = [
 
 /** Kit ids: 01 the default kit (spec defaults), 02 the drop, 03.. the factory-style kits */
 export const kitIdOf = (i: number) => String(i + 3).padStart(2, '0');
-/** Pattern of a factory-style kit's demo (bank B) */
-export const kitPatternOf = (i: number) => `B${String(i + 1).padStart(2, '0')}`;
+/** Pattern of a factory-style kit's demo: bank B, then bank C */
+export const kitPatternOf = (i: number) => `${'BC'[Math.floor(i / 16)] ?? 'C'}${String((i % 16) + 1).padStart(2, '0')}`;
 
 export interface RytmKit {
   name: string;

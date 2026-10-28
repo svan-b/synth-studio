@@ -21,7 +21,7 @@ import { KIT_PRESETS } from './presets';
 import { RETRIG_RATES } from '@/lib/sequencer/elektron';
 
 const REF = {
-  trig: 'Manual 8.? TRIG page (Appendix A: drum track parameters)',
+  trig: 'Manual Appendix A: TRIG page',
   src: 'Manual Appendix D: machines (SYNTH page)',
   smpl: 'Manual Appendix A: SAMPLE page',
   fltr: 'Manual Appendix A: FILTER page',
@@ -73,7 +73,7 @@ function buildControls(): Record<string, ControlSpec> {
   add('fx_trig_prob', pageKnob('FX', TRIG_PAGE[3], REF.trig), false);
 
   // Globals (project settings, not part of a kit)
-  c.bpm = knob('TEMPO', 'Project tempo in BPM ([TEMPO]). Synced to the studio, the studio clock sets it.', 'Manual: TEMPO menu', 30, 300, 120, {
+  c.bpm = knob('TEMPO', 'Project tempo in BPM ([TEMPO]). Synced to the studio, the studio clock sets it.', 'Manual: TEMPO menu', 30, 300, 124, {
     units: 'BPM', step: 0.1, format: v => v.toFixed(1),
   });
   c.main_volume = knob('MAIN VOLUME', 'Main output and headphones volume', 'Manual 3.1 Front panel: MAIN VOLUME', 0, 127, 100, { endless: false });

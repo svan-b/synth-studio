@@ -13,13 +13,13 @@
 
 import React, { type ReactNode } from 'react';
 import type { CustomElement, CustomRenderContext, PanelContext, PanelElement, PanelLayout } from '@/types/panel';
-import { ChainBuilder, PagePicker, PatternPicker, ScaleMenu, SongEditor, TrigEditor, TrigKeys } from '@/components/sequencer';
+import { ChainBuilder, PatternPicker, ScaleMenu, SongEditor, TrigEditor, TrigKeys } from '@/components/sequencer';
 import {
   CHANGE_MODES, asProject, getPattern, setChangeMode, setPlayMode, trackLength, type ChangeMode,
 } from '@/lib/sequencer/elektron';
 import { FX_TRACK, PAGE, SEQ_TRACKS, TRACKS, pageControls, describe } from './model';
 import {
-  Key, Menus, Pads, RY, RytmStyles, Screen, flash, funcOn, nudgeHeld, openMenu, reloadKit, trackClear, trackCopy, trackPaste, useFunc,
+  Key, Menus, PageLeds, Pads, RY, RytmStyles, Screen, flash, funcOn, nudgeHeld, openMenu, reloadKit, trackClear, trackCopy, trackPaste, useFunc,
 } from './ui';
 import type { RytmProject } from './presets';
 
@@ -318,8 +318,8 @@ const sequencer: PanelElement[] = [
   },
   ...TRACKS.map((t, i): PanelElement => ({ kind: 'label', text: t.name, x: TRIG_X0 + i * TRIG_PITCH, y: TRIG_Y + TRIG_SIZE / 2 + 3.6, size: 9, color: '#d8d8d8', weight: 700 })),
   { kind: 'label', text: 'FX', x: TRIG_X0 + 12 * TRIG_PITCH, y: TRIG_Y + TRIG_SIZE / 2 + 3.6, size: 8, color: RY.sub, weight: 600 },
-  { kind: 'custom', x: 344.5, y: 160.5, w: 22, h: 6.5, render: ctx => <PagePicker ctx={ctx} tracks={SEQ_TRACKS} /> },
-  ...['1:4', '2:4', '3:4', '4:4'].map((t, i): PanelElement => ({ kind: 'label', text: t, x: 347.3 + i * 5.5, y: 158.2, size: 6.5, color: RY.sub, weight: 600 })),
+  { kind: 'custom', x: 344.0, y: 160.6, w: 21.0, h: 6.2, render: ctx => <PageLeds ctx={ctx} /> },
+  ...['1:4', '2:4', '3:4', '4:4'].map((t, i): PanelElement => ({ kind: 'label', text: t, x: 346.3 + i * 5.25, y: 158.0, size: 6.5, color: RY.sub, weight: 600 })),
   // Pattern-mode LEDs over BANK A-D (FUNC + BANK A-D sets them)
   ...MODE_LED_NAMES.map((n, i): PanelElement => ({
     kind: 'led', x: BANK_X[i], y: 117.0, size: 2.2, color: '#ff3b2a',

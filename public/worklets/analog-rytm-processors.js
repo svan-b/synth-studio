@@ -530,6 +530,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     const machine = this.mach[tr];
     const synth = P[IX_TRIG_SYN] > 0.5;
     if (synth || prevTrack !== tr || v.m !== machine) {
+      if (v.m !== machine) { v.s.fill(0); v.h.fill(0); v.e.fill(0); v.clapLeft = 0; v.step = 0; v.stepLeft = 0; }
       v.m = machine;
       this.startMachine(v, synth, prevTrack !== tr);
     }
@@ -916,7 +917,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     const trk = clamp(P[IX_TRK_LEV], 0, 127) / 100;
     let velG = P[IX_VEL_VOL] > 0.5 ? v.vel : 1;
     if (v.acc) velG *= 1 + clamp(P[IX_ACC_LEV], 0, 127) / 127;
-    v.gain = vol * vol * trk * trk * velG * 0.9;
+    v.gain = vol * vol * trk * trk * velG * 0.75;
     const pan = clamp(P[IX_AMP_PAN], -64, 63) / 64;
     v.gl = pan > 0 ? 1 - pan : 1;
     v.gr = pan < 0 ? 1 + pan : 1;
@@ -1202,7 +1203,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           let x;
           if (metal) {
             // ring-modulated pairs: harder, clangorous
-            x = (pulse(p[0], 0.5, dt0) * pulse(p[3], 0.5, dt3) + pulse(p[1], 0.5, dt1) * pulse(p[4], 0.5, dt4) + pulse(p[2], 0.5, dt2) * pulse(p[5], 0.5, dt5)) * 0.33;
+            x = (pulse(p[0], 0.5, dt0) * pulse(p[3], 0.5, dt3) + pulse(p[1], 0.5, dt1) * pulse(p[4], 0.5, dt4) + pulse(p[2], 0.5, dt2) * pulse(p[5], 0.5, dt5)) * 0.18;
           } else {
             x = (pulse(p[0], 0.5, dt0) + pulse(p[1], 0.5, dt1) + pulse(p[2], 0.5, dt2) + pulse(p[3], 0.5, dt3) + pulse(p[4], 0.5, dt4) + pulse(p[5], 0.5, dt5)) * 0.166;
           }
@@ -1221,9 +1222,9 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           if (closed) { env *= 0.45 + 0.55 * e[1]; e[1] *= k[1]; }
           if (m === HH_BASIC) { env *= 0.6 + 0.4 * e[2]; e[2] *= k[2]; e[3] *= k[3]; }
           e[0] *= k[0];
-          let y = hp * env * 1.9;
+          let y = hp * env * 4.6;
           if (m === HH_BASIC && t < 16) y += (1 - t / 16) * 0.35;
-          G[i] = y * lev;
+          G[i] = y * lev * (m === HH_LAB ? 1.6 : 1);
         }
         alive = e[0] * lev;
         break;
@@ -1253,7 +1254,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
             out += y * lvl;
           }
           e[0] *= k[0]; e[1] *= (m === CY_CLASSIC ? k[1] : m === CY_RIDE ? k[1] : k[2]); e[2] *= k[2];
-          let y = out * 1.7;
+          let y = out * 3.6;
           if ((m === CY_METALLIC || m === CY_RIDE) && t < 48) y += v.noise() * (1 - t / 48) * 0.5;
           G[i] = y * lev;
         }
@@ -1273,7 +1274,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           const y = v.m === CB_METALLIC ? (x - kq * v1 - v2) * 0.5 + v1 * 0.8 : v1 * 1.4 + v2 * 0.25;
           const env = 0.35 * e[0] + 0.65 * e[1];
           e[0] *= k[0]; e[1] *= k[1];
-          G[i] = y * env * lev * 1.3;
+          G[i] = y * env * lev * 0.95;
         }
         alive = Math.max(e[0], e[1]) * lev;
         break;
@@ -1481,8 +1482,9 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     const hpA = lpA(expT(E[FX_DEL_HPF], 15, 8000) * (E[FX_DEL_HPF] < 0.5 ? 0 : 1) + (E[FX_DEL_HPF] < 0.5 ? 5 : 0));
     const lpAc = lpA(E[FX_DEL_LPF] >= 126.5 ? 20000 : expT(E[FX_DEL_LPF], 300, 20000));
     const dov = clamp(E[FX_DIS_DOV], 0, 127) / 127;
-    const dg = 1 + dov * dov * 10, dn = 1 / (1 + dov * 2.2);
-    const vol = Math.pow(clamp(E[FX_DEL_VOL], 0, 127) / 127, 2) * 1.2;
+    // DOV: a saturator in the loop with unity small-signal gain (FDB alone sets the repeat level); harder = more distortion, the return gets the make-up
+    const dg = 0.6 + dov * 7, dInv = 1 / dg;
+    const vol = Math.pow(clamp(E[FX_DEL_VOL], 0, 127) / 127, 2) * 1.2 * (1 + dov * 1.5);
     const toRev = Math.pow(clamp(E[FX_DEL_REV], 0, 127) / 127, 2);
     const max = this.dMax, L = this.dL, R = this.dR;
     let w = this.dW, time = this.dTime;
@@ -1500,8 +1502,8 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       hpL += hpA * (lpL - hpL); hpR += hpA * (lpR - hpR);
       let fl = lpL - hpL, fr2 = lpR - hpR;
       // overdrive in the loop (DOV), always a soft limit so FDB > 127 builds up without exploding
-      fl = dov > 0 ? tanhF(fl * dg) * dn * (1 + dov) : tanhF(fl * 0.6) / 0.6;
-      fr2 = dov > 0 ? tanhF(fr2 * dg) * dn * (1 + dov) : tanhF(fr2 * 0.6) / 0.6;
+      fl = tanhF(fl * dg) * dInv;
+      fr2 = tanhF(fr2 * dg) * dInv;
       const inL = dL[i], inR = dR[i];
       if (pp) { L[w] = (inL + inR) * 0.5 + fr2 * fdb; R[w] = fl * fdb; }
       else { L[w] = inL + fl * fdb; R[w] = inR + fr2 * fdb; }

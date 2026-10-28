@@ -382,6 +382,45 @@ const recLive = (c: CustomRenderContext) => Math.round(num(c.values.rec)) === 2 
 const kitOf = (c: CustomRenderContext) => (c.engine.kit as string | undefined) || projectOf(c).kit || '01';
 
 // ----------------------------------------------------------------------------
+// PAGE LEDs (1:4 .. 4:4): bright = the page the trig keys show, dim = the
+// pattern's other pages, the green dot = the page that is playing. Tap to show a page.
+// ----------------------------------------------------------------------------
+
+export function PageLeds({ ctx }: { ctx: CustomRenderContext }) {
+  const p = projectOf(ctx);
+  const track = Math.round(num(ctx.values.track));
+  const st = ctx.engine.seq as { playing?: boolean; pattern?: string | null; steps?: number[] } | undefined;
+  const pid = (st?.playing && st.pattern) || p.active;
+  const pages = Math.max(1, Math.ceil(trackLength(getPattern(p, pid), track) / 16));
+  const shown = Math.min(pages - 1, Math.round(num(ctx.ui.stepPage)));
+  const playStep = st?.playing ? st.steps?.[track] ?? -1 : -1;
+  const playPage = playStep >= 0 ? Math.floor(playStep / 16) : -1;
+  const focusMode = useFocusMode();
+  const sp = spotlight(ctx, ['seq:pages', 'seq:page:1', 'seq:page:2', 'seq:page:3', 'seq:page:4'], focusMode);
+  return (
+    <div className={sp.hl ? 'rytm-target' : undefined} style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: sp.dim ? 0.3 : 1 }}>
+      {[0, 1, 2, 3].map(i => {
+        const exists = i < pages;
+        const on = i === shown;
+        return (
+          <button key={i} type="button" aria-label={`Show step page ${i + 1}`} data-page={i + 1}
+            onPointerDown={e => { e.stopPropagation(); if (exists) ctx.setUi({ stepPage: i }); }}
+            style={{ width: '22%', height: '100%', padding: 0, border: 'none', background: 'transparent', cursor: exists ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation' }}>
+            <span style={{
+              width: '62%', aspectRatio: '1 / 1', borderRadius: '50%', position: 'relative',
+              background: on ? '#ff3b2a' : exists ? '#6b1d16' : '#2a1414',
+              boxShadow: on ? '0 0 6px #ff3b2a' : 'inset 0 1px 2px #000',
+            }}>
+              {playPage === i && <span style={{ position: 'absolute', right: '-35%', top: '-35%', width: '45%', height: '45%', borderRadius: '50%', background: RY.green, boxShadow: `0 0 4px ${RY.green}` }} />}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
 // Screen
 // ----------------------------------------------------------------------------
 
@@ -474,9 +513,10 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
 
   const cells = ids.map(id => cellFor(id, ctx, { locked: !!id && heldSteps.length > 0 && isLocked(api, LOCKS, id) }));
   const oled: CSSProperties = { position: 'absolute', inset: 0, background: '#030403', color: '#e8f0ff', fontFamily: '"Menlo", "DejaVu Sans Mono", ui-monospace, monospace', textTransform: 'uppercase', display: 'flex', flexDirection: 'column', padding: '3% 3.5%', boxSizing: 'border-box', textShadow: '0 0 2px rgba(200,220,255,0.55)', letterSpacing: 0.3, fontSize: 'var(--rytm-oled-font, 10px)' };
+  // drawn inside the inverted (light) footer box, so it is dark
   const bar = (frac: number) => (
-    <span style={{ display: 'inline-block', width: '3.6em', height: '0.75em', border: '1px solid #e8f0ff', position: 'relative', verticalAlign: '-1px', marginLeft: 3 }}>
-      <span style={{ position: 'absolute', left: 1, top: 1, bottom: 1, width: `calc(${Math.round(frac * 100)}% - 2px)`, background: '#e8f0ff' }} />
+    <span style={{ display: 'inline-block', width: '3.6em', height: '0.75em', border: '1px solid #030403', position: 'relative', verticalAlign: '-1px', marginLeft: 3 }}>
+      <span style={{ position: 'absolute', left: 1, top: 1, bottom: 1, width: `calc(${Math.round(Math.max(0, Math.min(1, frac)) * 100)}% - 2px)`, background: '#030403' }} />
     </span>
   );
 
