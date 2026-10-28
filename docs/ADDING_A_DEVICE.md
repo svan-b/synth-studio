@@ -97,3 +97,66 @@ npm run build && npx next start -p 31xx    # then:
 node scripts/smoke.cjs http://localhost:31xx <id> /tmp/out   # screenshots + real audio levels
 ```
 Look at the screenshots: nothing overlapping, labels legible at iPad size (1180×820).
+
+---
+
+# v2: studio integration
+
+Instruments run in a **studio**: several instances in a rack, owned by the engine hub
+(`lib/studio/hub.ts`). Instances keep playing while you edit another, and the studio adds
+a master transport, cables between instruments, audio routing into a mixer and a song
+arranger. Read `lib/studio/hub.ts`, `lib/audio/transport.ts` and
+`devices/studio-clock/index.ts`, which is a small reference that follows the transport.
+
+## Transport sync (MIDI-clock style)
+- Set `studio: { midiSync: true }` if the hardware syncs to MIDI clock (Elektrons, Sub 37 arp,
+  Mother-32, Subharmonicon). The hub then calls `engine.followTransport(transport)` (or `null`).
+- Override `protected onTransport(t: Transport | null)` in your engine:
+  - When `t` is set, subscribe to `t.onTick(tick => ...)`. That gives 24 PPQN with audio
+    `time`; a 16th note is 6 ticks. Also subscribe to `t.onEvent(e => ...)` for
+    `start`/`stop`. Drive your sequencer from those instead of your own `Clock`.
+  - When it's `null`, go back to your internal clock.
+  - Always unsubscribe.
+- While synced, the hub turns your `transportControl` (RUN/PLAY button) into studio Play/Stop
+  and mirrors the studio state back into it. Don't start your internal clock from that param
+  while `this.transport` is set.
+- Clock-only gear (DFAM) is synced by patching Studio Clock CLOCK OUT into its clock input.
+  Make sure clock/trigger inputs accept both `onEvent` (EventBus) and edge-detected audio pulses.
+
+## Mixers
+- A mixer lists `studio.mixerInputs: [{ id, label }]`: input jack ids that other instruments'
+  main outputs can be routed into. Each must exist in `this.inputs` with a `node` (audio input),
+  and `onConnect`/`onDisconnect` should switch that channel's source to the routed instrument.
+- `engine.getMainOutput()` is your final output. The hub inserts a per-instrument gain after
+  it (arranger mutes) and connects that to the master or a mixer input. Never connect to
+  `ctx.destination` yourself.
+
+## Cables between instruments
+These need no extra work: the hub resolves `getOutput(jack)` on one engine and calls
+`connectExternal(input, output)` on the other, which uses your `inputs` (scale, normals)
+exactly like internal cables.
+
+## Structured data (patterns, songs, kits, configs)
+- `data: { initial: () => ({...}), migrate? }`. This is per-instance JSON, saved with the
+  project. The engine receives it via `setData` and overrides `protected onData(data)`.
+- Custom elements get `data`, `updateData(fn)`, `ui` and `setUi(patch)`. `ui` is ephemeral
+  hand state: held trigs, the open menu, the visible step page.
+- `interceptChange(id, value, api)` lets you capture knob moves. Return `true` when handled,
+  for example by writing a parameter lock while a trig is held.
+- `displayValues(api)` controls what the panel shows, for example the held step's locks.
+- Elektron-style sequencing: use `lib/sequencer/elektron` and `components/sequencer`
+  (see docs/ELEKTRON_SEQUENCER.md).
+
+## Song arranger
+- Pattern-based instruments provide `studio.patterns(data) => [{ id, label }]` and handle
+  `event('arranger:pattern', { id, time })` by switching pattern at audio `time` (a bar line).
+- Instruments without pattern memory get knob snapshots automatically.
+
+## Auditions (lessons)
+- `audition(api)` plays a short, characteristic phrase: a riff, one bar of the pattern, a few hits.
+  Lessons call it for "listen to the target" while values are temporarily overridden in the
+  engine. Return a stop function if you start something that must stop.
+
+## Lessons v2
+Follow docs/PEDAGOGY.md. `npm run validate <id>` checks every v2 field and warns about
+missing pedagogy parts.

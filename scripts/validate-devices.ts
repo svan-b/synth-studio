@@ -4,7 +4,7 @@
 // lessons or the panel at runtime. Exits non-zero on errors.
 // ============================================================================
 
-import type { ControlSpec, ControlValue, Lesson } from '../types';
+import type { ControlSpec, ControlValue, Lesson, LessonCheckState, MultipleChoice } from '../types';
 import type { PanelElement } from '../types/panel';
 import { DEVICES } from '../devices';
 import type { DeviceModule } from '../devices/types';
@@ -30,6 +30,11 @@ function checkValue(spec: ControlSpec, v: ControlValue, where: string, out: Issu
       if (typeof v !== 'string' || v.length !== spec.steps) err(`pattern must be a ${spec.steps}-char string`);
       break;
   }
+}
+
+/** Lessons written for the v2 coach (have an objective or any v2 step kind) */
+function lessonV2(l: Lesson): boolean {
+  return !!l.objective || l.steps.some(s => !!s.kind);
 }
 
 function radius(el: PanelElement): number | null {
@@ -175,14 +180,45 @@ function validate(id: string, mod: DeviceModule): Issue[] {
 
   // Lessons
   const ids = new Set<string>();
+  const defaults: Record<string, ControlValue> = {};
+  Object.entries(controls).forEach(([cid, c]) => { if ('default' in c && c.default !== undefined) defaults[cid] = c.default as ControlValue; });
+  const fakeState = (values: Record<string, ControlValue>): LessonCheckState => ({
+    values, patches: [], data: mod.data?.initial(), engine: {},
+    instances: { [id]: { device: id, values, patches: [], data: mod.data?.initial() } },
+    studioCables: [], routes: {}, transport: { playing: false, bpm: 120 },
+  });
+  const checkValues = (vals: Record<string, ControlValue> | undefined, where: string) => {
+    Object.entries(vals ?? {}).forEach(([cid, v]) => {
+      const c = controls[cid];
+      if (!c) err(`${where}: unknown control "${cid}"`);
+      else checkValue(c, v, `${where}.${cid}`, out);
+    });
+  };
+  const checkMC = (mc: MultipleChoice | undefined, where: string) => {
+    if (!mc) return;
+    if (!mc.question) err(`${where}: question missing`);
+    if (!Array.isArray(mc.options) || mc.options.length < 2) err(`${where}: needs at least 2 options`);
+    else if (!Number.isInteger(mc.answer) || mc.answer < 0 || mc.answer >= mc.options.length) err(`${where}: answer index ${mc.answer} out of range`);
+    if (!mc.explain) warn(`${where}: no explain (say why the answer is right)`);
+  };
   lessons.forEach((l: Lesson) => {
     const where = `lesson ${l.id}`;
     if (ids.has(l.id)) err(`${where}: duplicate id`);
     ids.add(l.id);
     if (l.device !== id) err(`${where}: device "${l.device}" should be "${id}"`);
     if (!l.steps.length) err(`${where}: no steps`);
+    checkValues(l.start?.values, `${where} start`);
+    (l.start?.patches ?? []).forEach(pc => {
+      if (!jacks.has(pc.from) || !jacks.has(pc.to)) err(`${where} start: unknown jack in ${pc.from} -> ${pc.to}`);
+    });
+    l.review?.forEach((mc, i) => checkMC(mc, `${where} review[${i}]`));
+    l.prerequisites?.forEach(pre => { if (!lessons.some(x => x.id === pre)) warn(`${where}: prerequisite "${pre}" is not a lesson on this device`); });
+
+    const kinds = new Set<string>();
     l.steps.forEach((s, si) => {
       const sw = `${where} step ${si + 1}`;
+      const kind = s.kind ?? (s.patchFrom && s.patchTo ? 'patch' : s.control ? 'do' : s.checklist?.length ? 'challenge' : 'info');
+      kinds.add(kind);
       if (s.control) {
         const c = controls[s.control];
         if (!c) err(`${sw}: unknown control "${s.control}"`);
@@ -195,8 +231,41 @@ function validate(id: string, mod: DeviceModule): Issue[] {
         if (s.patchTo && !jacks.has(s.patchTo)) err(`${sw}: unknown jack "${s.patchTo}"`);
         if (s.patchFrom && s.patchTo && jacks.get(s.patchFrom) === jacks.get(s.patchTo)) warn(`${sw}: patch connects two ${jacks.get(s.patchFrom)}s`);
       }
-      if (!s.principle) warn(`${sw}: no principle`);
+      checkValues(s.setup, `${sw} setup`);
+      if (kind === 'predict') { if (!s.predict) err(`${sw}: predict step without predict`); checkMC(s.predict, `${sw} predict`); if (!s.control && !s.patchFrom && !s.check) warn(`${sw}: predict step has no action to test the prediction`); }
+      if (kind === 'quiz') { if (!s.quiz) err(`${sw}: quiz step without quiz`); checkMC(s.quiz, `${sw} quiz`); }
+      if (kind === 'listen') {
+        if (!s.listen) err(`${sw}: listen step without listen`);
+        else { checkValues(s.listen.a, `${sw} listen.a`); checkValues(s.listen.b, `${sw} listen.b`); checkMC(s.listen.question, `${sw} listen.question`); }
+      }
+      if (kind === 'match') {
+        if (!s.match) err(`${sw}: match step without match`);
+        else {
+          checkValues(s.match.target, `${sw} match.target`);
+          if (!s.match.controls.length) err(`${sw}: match needs at least one control`);
+          s.match.controls.forEach(cid => {
+            if (!controls[cid]) err(`${sw}: match control "${cid}" unknown`);
+            if (s.match!.target[cid] === undefined) err(`${sw}: match control "${cid}" has no target value`);
+          });
+          if (s.match.controls.length > 3) warn(`${sw}: more than 3 controls in one ear challenge is very hard`);
+        }
+      }
+      if (kind === 'reflect' && (!s.reflect?.prompt || !s.reflect?.model)) err(`${sw}: reflect needs prompt and model answer`);
+      // Run custom checks against the default state to catch crashes
+      const st = fakeState({ ...defaults });
+      if (s.check) { try { s.check(st); } catch (e) { err(`${sw}: check() throws on the default state: ${e}`); } }
+      s.checklist?.forEach((c, ci) => { if (c.check) { try { c.check(st); } catch (e) { err(`${sw}: checklist[${ci}] throws: ${e}`); } } });
+      if (!s.principle && (kind === 'do' || kind === 'patch' || kind === 'predict')) warn(`${sw}: no principle`);
+      if (s.instruction && s.instruction.split(/\s+/).length > 32) warn(`${sw}: instruction is long (${s.instruction.split(/\s+/).length} words)`);
     });
+    // Pedagogy shape (docs/PEDAGOGY.md) - warnings only
+    if (lessonV2(l)) {
+      if (!l.objective) warn(`${where}: no objective`);
+      if (!kinds.has('predict') && !kinds.has('listen')) warn(`${where}: no predict or listen step`);
+      if (!kinds.has('quiz')) warn(`${where}: no quiz step`);
+      if (!kinds.has('match') && !kinds.has('challenge')) warn(`${where}: no match or challenge step`);
+      if ((l.review?.length ?? 0) < 3) warn(`${where}: fewer than 3 review questions`);
+    }
   });
   if (lessons.length === 0) warn('no lessons');
   return out;
