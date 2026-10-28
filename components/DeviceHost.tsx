@@ -94,7 +94,7 @@ function LoadedDevice({ device, mod }: { device: string; mod: DeviceModule }) {
   const values = useMemo(() => ({ ...defaults, ...(stored?.controlValues ?? {}) }), [defaults, stored?.controlValues]);
   const patches = stored?.patchConnections ?? EMPTY_PATCHES;
 
-  const { status, error, engineState, ensureAudio, sendEvent, noteOn, noteOff } = useSynthEngine(mod.createEngine, values, patches);
+  const { status, error, engineState, ensureAudio, sendEvent, noteOn, noteOff } = useSynthEngine(mod.createEngine, values, patches, mod.worklets);
 
   const onChange = useCallback((id: string, v: ControlValue) => setControlValue(device, id, v), [device, setControlValue]);
   const onPatch = useCallback((a: string, b: string) => addPatch(device, a, b), [device, addPatch]);

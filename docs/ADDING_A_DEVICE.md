@@ -1,0 +1,96 @@
+# Adding an instrument
+
+Every instrument is a folder `devices/<id>/` that default-exports a `DeviceModule`
+(`devices/types.ts`). The app renders, patches, plays and teaches it with no
+other code changes. **`devices/dfam/` is the reference implementation — read it first.**
+
+```
+devices/<id>/
+  spec.ts      controls, patch bay, presets      (types/index.ts)
+  layout.ts    panel drawing in millimetres      (types/panel.ts)
+  engine.ts    Web Audio engine                  (lib/audio/engine.ts, lib/audio/dsp.ts)
+  lessons.ts   guided lessons                    (types/index.ts → Lesson)
+  index.ts     export default { spec, layout, lessons, createEngine, ... }
+```
+
+Register it in `devices/index.ts` (code-split `load: () => import('./<id>')`).
+
+## spec.ts
+- `controls`: one entry per physical control. `knob` / `slider` (min, max, default,
+  units, `curve: 'logarithmic'` for Hz / time / tempo — min must be > 0, `step` for
+  detented controls, `format` for custom readouts), `switch` (options; value = index),
+  `button` (`momentary` true for triggers), `pattern` (hidden step data, a string with
+  one char per step, '0' = off).
+- Paged UIs (Elektron) model **every parameter as its own control**
+  (`bd_tune`, `bd_decay`…) plus UI-state switches (`track`, `page`) listed in
+  `DeviceModule.uiControls`. Encoders bind to them with a function (see layout).
+- `patchBay.inputs/outputs`: every jack, with `jackType` and `signalType`.
+- `presets`: `settings` (control → value) and, for semi-modulars, `patchConnections`.
+- Put `manualReference` ("p.12 – VCF") on controls and use the manual's names.
+
+## layout.ts
+- Units are **mm** from the faceplate's top-left; `pxPerMm` sets render size
+  (aim for a faceplate 950–1450 px wide; the app scales it to fit).
+- Control-like elements (knob, slider, switch, button, jack, led) use x/y as their
+  **centre**; boxes (section, display, keyboard, stepgrid, custom) use **top-left**.
+- Knob `control` can be a function `({ values, engine }) => controlId | null` — this is
+  how encoders follow the selected track/page. Lessons highlight whatever an encoder is
+  currently bound to.
+- Buttons: `control` (toggle/momentary per spec), `setValue` (radio button that writes
+  that value — page/track selectors), `event` (sent to `engine.event(name)` on press and
+  `name:up` on release — pads, transport). Both can be combined.
+- Touch: keep knobs ≥ 8 mm × pxPerMm ≈ 26 px, jacks are 6.2 mm, leave ≥ 3 mm between
+  controls. Labels sit above controls by default.
+- `theme`: faceplate background, legend colours, optional wooden `cheeks` or `frame`.
+
+## engine.ts
+Extend `BaseEngine`:
+
+```ts
+protected build() {           // build the graph; this.ctx / this.out are ready
+  this.vco = new Vco(this.ctx, 110);
+  ...
+  this.outputs = { out_vco: { node: this.vco.saw } };
+  this.inputs  = { in_cutoff: { params: [this.vcf.cutoffCv], scale: 5 } };
+}
+protected onParam(id, value) { ... }   // called for every control after build + on change
+event(name) { ... }                    // button events
+noteOn(note, vel) / noteOff(note)      // keyboards (DeviceModule.keyboard enables A–K keys)
+```
+
+- **Signal convention: 1.0 = 5 V.** A 1 V/oct input into a `pitch` param (octaves) uses `scale: 5`.
+- Cables are real audio connections (`output.node` → gain(`scale`) → `input.params` /
+  `input.node`). Trigger/clock cables use `EventBus` outputs and `onEvent` inputs.
+  Break internal normals in `onConnect`, restore them in `onDisconnect`.
+- DSP blocks (`lib/audio/dsp.ts`): `Vco` (tri/saw/pulse/sine, hard sync, FM, PWM,
+  `pitch` in octaves), `Ladder` (LP24/18/12/6, HP24/12, BP12; `cutoffCv` octaves,
+  resonance 0..1.2), `Env` (AD/ADSR/AR, `trigger(time, vel)` / `gate(time, on)`,
+  `timeCv`), `Lfo`, `createNoise`, `createConstant`, `Delay`, `Reverb`, `createDrive`,
+  `smooth()`, `setAt()`, `midiToHz()`.
+- Timing: use `Clock` (look-ahead on the audio clock) and schedule at the tick `time`;
+  update LEDs with `emitAt(time, { step })`. Never use `setInterval` for musical time.
+- UI state: `this.emit({ playing, step, leds: {...}, ... })` → available to layout
+  functions as `engine`.
+- iPad budget: keep worklet nodes per instrument modest (≈ ≤ 40) and free everything in
+  `onDispose`.
+- Device-specific worklets: put them in `public/worklets/<id>-processors.js` and list the
+  URL in `DeviceModule.worklets`.
+
+## lessons.ts
+- 8+ lessons from beginner to advanced; 5–10 steps each.
+- Every step: `instruction` (the move), `principle` (one sentence of first-principles
+  synthesis / acoustics / music theory that transfers to any instrument), `explanation`
+  (the why, 1–3 sentences), `manualReference`, and `concept` tags. Lessons list `concepts`.
+- Step kinds: control (`control` + `targetValue`), patch (`patchFrom` + `patchTo`),
+  informational (neither — waits for Next; end lessons with one that invites experimenting).
+- Targets must be reachable: in range, valid switch index, existing jack ids. Paged UIs:
+  first set `track`/`page` (radio buttons), then the parameter.
+
+## Verify
+```
+npm run validate <id>                      # data checks (errors must be 0)
+npx tsc --noEmit -p .                      # types
+npm run build && npx next start -p 31xx    # then:
+node scripts/smoke.cjs http://localhost:31xx <id> /tmp/out   # screenshots + real audio levels
+```
+Look at the screenshots: nothing overlapping, labels legible at iPad size (1180×820).

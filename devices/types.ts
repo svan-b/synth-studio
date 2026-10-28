@@ -21,6 +21,8 @@ export interface DeviceModule {
   uiControls?: string[];
   /** Short "how to play this thing" hints shown under the panel */
   tips?: string[];
+  /** Extra AudioWorklet modules (URLs under /worklets/) loaded before the engine starts */
+  worklets?: string[];
   /** Toggle control that the Space bar flips (e.g. RUN/STOP, PLAY) */
   transportControl?: string;
 }

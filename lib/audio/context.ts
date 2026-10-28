@@ -92,6 +92,22 @@ export function loadWorklets(): Promise<void> {
   return workletPromise;
 }
 
+const extraWorklets = new Map<string, Promise<void>>();
+
+/** Load a device-specific worklet module once */
+export function loadExtraWorklet(url: string): Promise<void> {
+  const c = getAudioContext();
+  let p = extraWorklets.get(url);
+  if (!p) {
+    p = c.audioWorklet.addModule(url).catch(err => {
+      extraWorklets.delete(url);
+      throw err;
+    });
+    extraWorklets.set(url, p);
+  }
+  return p;
+}
+
 /**
  * Resume audio. Must be called from (or synchronously within) a user gesture
  * on iOS - the unlock listeners below take care of that for every tap/click/key.

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ControlValue, PatchConnection } from '@/types';
 import type { EngineState } from '@/types/panel';
 import type { SynthEngine } from './engine';
-import { getAudioContext, getMasterBus, installAudioUnlock, loadWorklets, onAudioStateChange, resumeAudio } from './context';
+import { getAudioContext, getMasterBus, installAudioUnlock, loadWorklets, loadExtraWorklet, onAudioStateChange, resumeAudio } from './context';
 
 export type AudioStatus = 'off' | 'starting' | 'on' | 'error';
 
@@ -17,7 +17,10 @@ export function useSynthEngine(
   createEngine: (() => SynthEngine) | null,
   values: Record<string, ControlValue>,
   patches: PatchConnection[],
+  extraWorklets: string[] = [],
 ) {
+  const workletsRef = useRef(extraWorklets);
+  workletsRef.current = extraWorklets;
   const engineRef = useRef<SynthEngine | null>(null);
   const prevValues = useRef<Record<string, ControlValue>>({});
   const [status, setStatus] = useState<AudioStatus>('off');
@@ -86,6 +89,7 @@ export function useSynthEngine(
       try {
         await resumeAudio();
         await loadWorklets();
+        await Promise.all(workletsRef.current.map(loadExtraWorklet));
         if (engineRef.current !== engine) return;
         engine.start(getAudioContext(), getMasterBus());
         setStatus('on');
