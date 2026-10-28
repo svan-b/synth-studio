@@ -15,23 +15,25 @@ export function useAudioStatus(): { status: AudioStatus; error: string | null } 
   return { status, error: hub.error };
 }
 
-/** Load (or get the cached) device module */
+/**
+ * Load (or get the cached) device module. Always returns the module for the
+ * *current* `device` (or null while it loads) - never the previous device's
+ * module for one render after a switch, which would pair one instrument's
+ * layout with another instrument's data.
+ */
 export function useDeviceModule(device: string | undefined): { module: DeviceModule | null; error: string | null } {
-  const [module, setModule] = useState<DeviceModule | null>(() => (device ? hub.getModule(device) ?? null : null));
-  const [error, setError] = useState<string | null>(null);
+  const [, setVersion] = useState(0);
+  const [error, setError] = useState<{ device: string; message: string } | null>(null);
+  const mod = device ? hub.getModule(device) ?? null : null;
   useEffect(() => {
-    if (!device) return;
+    if (!device || hub.getModule(device)) return;
     let alive = true;
-    const cached = hub.getModule(device);
-    if (cached) {
-      setModule(cached);
-      return;
-    }
-    setModule(null);
-    hub.loadModule(device).then(m => alive && setModule(m)).catch(e => alive && setError(String(e)));
+    hub.loadModule(device)
+      .then(() => alive && setVersion(v => v + 1))
+      .catch(e => alive && setError({ device, message: String(e) }));
     return () => { alive = false; };
   }, [device]);
-  return { module, error };
+  return { module: mod, error: error && error.device === device ? error.message : null };
 }
 
 /** Live engine state (step, LEDs, meters) of an instance */
