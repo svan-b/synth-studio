@@ -5,8 +5,9 @@
 //   node scripts/bench.cjs <baseUrl> [out.json] [query]
 //   node scripts/bench.cjs http://localhost:3110 /tmp/bench.json "devices=dfam&reps=1"
 //
-// The query string is passed to the page (only=devices|processors,
-// devices=a,b, scenarios=x,y, reps=N). Exit code 1 on errors.
+// The query string is passed to the page (only=devices|processors|wrappers,
+// devices=a,b, scenarios=x,y, reps=N). Exit code 1 on errors or failed
+// wrapper checks.
 // ============================================================================
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -41,6 +42,12 @@ const fs = require('fs');
   const f = (v, d = 1) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(d) : '-');
   console.log(`\n${results.userAgent}\n${results.sampleRate} Hz, ${results.seconds} s renders`);
   console.log(`framework: empty render ${f(results.framework.emptyMs)} ms, with ${results.framework.suspends} suspends ${f(results.framework.suspendMs)} ms\n`);
+  const wrappers = results.wrappers || [];
+  if (wrappers.length) {
+    console.log('wrapper checks');
+    for (const w of wrappers) console.log(`  ${w.ok ? 'PASS' : 'FAIL'} ${w.name} - ${w.detail}`);
+    console.log('');
+  }
 
   const ids = [...new Set(results.devices.map(d => d.device))];
   if (ids.length) {
@@ -78,7 +85,7 @@ const fs = require('fs');
       for (const r of [b, a]) if (r && !r.ok) console.log(`   ${r.variant}: ${r.error}`);
     }
   }
-  const errs = [...results.errors, ...consoleErrors];
+  const errs = [...results.errors, ...consoleErrors, ...wrappers.filter(w => !w.ok).map(w => `wrapper check failed: ${w.name}`)];
   if (errs.length) console.log('\nerrors:\n  ' + errs.join('\n  '));
   if (out) { fs.writeFileSync(out, JSON.stringify({ ...results, consoleErrors }, null, 2)); console.log(`\nsaved ${out}`); }
   process.exitCode = errs.length || results.status !== 'done' ? 1 : 0;

@@ -24,12 +24,17 @@ import type { ControlValue } from '@/types';
 import type { DeviceEntry, DeviceModule } from '@/devices/types';
 import type { SynthEngine } from '@/lib/audio/engine';
 import { defaultOf } from '@/lib/controls/mapping';
+import { Chorus, Env, Ladder, Reverb, Reverb2, Svf, Vco, createNoise, type SvfMode } from '@/lib/audio/dsp';
 import { LEGACY_SYNTH_PROCESSORS } from './legacy-processors';
 
 export const SR = 48000;
 export const SECONDS = 10;
 const FRAMES = SR * SECONDS;
-/** Suspend every 24 render quanta (64 ms): engines schedule >= 100 ms ahead, so nothing is late */
+/**
+ * Suspend every 24 render quanta (64 ms). Main-thread timers run at each suspend, and offline
+ * rendering hands port messages to processors only while suspended (sometimes one suspend
+ * later). Engines schedule 100-120 ms ahead, so events land on time or a few ms late at worst.
+ */
 const SUSPEND_FRAMES = 128 * 24;
 
 export type Variant = 'before' | 'after';
@@ -171,6 +176,12 @@ export interface ProcRun {
   peak: number;
 }
 
+export interface WrapperCheck {
+  name: string;
+  ok: boolean;
+  detail: string;
+}
+
 export interface BenchResults {
   status: 'idle' | 'running' | 'done' | 'error';
   progress: string;
@@ -182,6 +193,7 @@ export interface BenchResults {
   framework: { emptyMs: number; suspendMs: number; suspends: number };
   devices: DeviceRun[];
   processors: ProcRun[];
+  wrappers: WrapperCheck[];
   errors: string[];
 }
 
@@ -280,8 +292,15 @@ async function renderDevice(mod: DeviceModule, variant: Variant) {
     if (mod.data) engine.setData(mod.data.initial());
     engine.start(ctx as unknown as AudioContext, ctx.destination);
     counter.restore();
-    const demo = startDemo(engine, mod);
-    timers.advance(0);
+    // Offline rendering only delivers port messages (envelope triggers...) while suspended,
+    // so the demo starts at the first quantum boundary and timers run at every suspend.
+    let demo = '';
+    const eng = engine;
+    ctx.suspend(128 / SR).then(() => {
+      demo = startDemo(eng, mod);
+      timers.advance((128 / SR) * 1000);
+      void ctx.resume();
+    });
     for (let f = SUSPEND_FRAMES; f < FRAMES; f += SUSPEND_FRAMES) {
       const t = f / SR;
       ctx.suspend(t).then(() => {
@@ -594,4 +613,223 @@ export async function runScenario(s: ProcScenario, variant: Variant, reps = 3): 
     run.error = e instanceof Error ? e.message : String(e);
   }
   return run;
+}
+
+// ----------------------------------------------------------------------------
+// Wrapper self-checks (lib/audio/dsp.ts on the current core, in a real browser)
+// ----------------------------------------------------------------------------
+
+async function offline(seconds: number, channels: number, build: (ctx: OfflineAudioContext) => void) {
+  const ctx = new OfflineAudioContext(channels, Math.round(SR * seconds), SR);
+  await ctx.audioWorklet.addModule(CORE_URL);
+  build(ctx);
+  flushMessages(ctx);
+  return ctx.startRendering();
+}
+
+/**
+ * Offline rendering only hands port messages to processors while it is suspended (and a
+ * message can wait for the next suspend). Messages posted before rendering - trigger(),
+ * set(), useOutputs()... - therefore need a few early suspends to arrive in time.
+ */
+function flushMessages(ctx: OfflineAudioContext, quanta = 3) {
+  for (let q = 1; q <= quanta; q++) ctx.suspend((q * 128) / SR).then(() => { void ctx.resume(); });
+}
+
+/** Route each node to its own output channel */
+function toChannels(ctx: OfflineAudioContext, nodes: AudioNode[]) {
+  const m = ctx.createChannelMerger(nodes.length);
+  nodes.forEach((n, i) => n.connect(m, 0, i));
+  m.connect(ctx.destination);
+}
+
+function rmsOf(d: Float32Array, from = 0, to = d.length) {
+  let s = 0;
+  for (let i = from; i < to; i++) s += d[i] * d[i];
+  return Math.sqrt(s / Math.max(1, to - from));
+}
+
+/** Rising zero crossings per second between two sample indices */
+function zcRate(d: Float32Array, from: number, to: number) {
+  let n = 0;
+  for (let i = from + 1; i < to; i++) if (d[i - 1] < 0 && d[i] >= 0) n++;
+  return (n * SR) / (to - from);
+}
+
+const db = (x: number) => 20 * Math.log10(Math.max(1e-12, x));
+
+export async function runWrapperChecks(): Promise<WrapperCheck[]> {
+  const out: WrapperCheck[] = [];
+  const check = async (name: string, fn: () => Promise<[boolean, string]>) => {
+    try {
+      const [ok, detail] = await fn();
+      out.push({ name, ok, detail });
+    } catch (e) {
+      out.push({ name, ok: false, detail: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
+  await check('Vco: default 4 outputs', async () => {
+    let hasSubs = true;
+    const b = await offline(1, 4, ctx => {
+      const v = new Vco(ctx, 220);
+      hasSubs = v.sub1 !== null || v.sub2 !== null;
+      toChannels(ctx, [v.tri, v.saw, v.pulse, v.sine]);
+    });
+    const r = [0, 1, 2, 3].map(c => rmsOf(b.getChannelData(c), 1000));
+    return [!hasSubs && r.every(x => x > 0.5 && x < 1.05), `rms tri/saw/pulse/sine ${r.map(x => x.toFixed(3)).join(' / ')}, sub taps ${hasSubs ? 'present' : 'null'}`];
+  });
+
+  await check('Vco: { subs: true } -> sub1 f/2, sub2 f/4', async () => {
+    const b = await offline(1, 2, ctx => {
+      const v = new Vco(ctx, 400, { subs: true });
+      toChannels(ctx, [v.sub1!, v.sub2!]);
+    });
+    const f1 = zcRate(b.getChannelData(0), 2000, SR), f2 = zcRate(b.getChannelData(1), 2000, SR);
+    return [Math.abs(f1 - 200) < 3 && Math.abs(f2 - 100) < 3, `sub1 ${f1.toFixed(1)} Hz, sub2 ${f2.toFixed(1)} Hz (VCO 400 Hz)`];
+  });
+
+  await check("Vco: useOutputs('pulse') silences the rest", async () => {
+    const b = await offline(0.5, 2, ctx => {
+      const v = new Vco(ctx, 220);
+      v.useOutputs('pulse');
+      toChannels(ctx, [v.tri, v.pulse]);
+    });
+    const t = rmsOf(b.getChannelData(0), 512), p = rmsOf(b.getChannelData(1), 512);
+    return [t === 0 && p > 0.9, `tri rms ${t.toFixed(4)}, pulse rms ${p.toFixed(3)}`];
+  });
+
+  await check('Vco: fmRatio through-zero (fm = -2 runs the saw backwards)', async () => {
+    const b = await offline(0.5, 1, ctx => {
+      const v = new Vco(ctx, 300, { fmRatio: true });
+      const c = ctx.createConstantSource();
+      c.offset.value = -2;
+      c.connect(v.fm);
+      c.start();
+      v.saw.connect(ctx.destination);
+    });
+    const d = b.getChannelData(0);
+    let up = 0, down = 0;
+    for (let i = 1000; i < d.length; i++) { if (d[i] > d[i - 1]) up++; else down++; }
+    return [down > up * 5, `falling ${down} / rising ${up} samples`];
+  });
+
+  await check('Vco: drift + tolerance (seeded)', async () => {
+    const b = await offline(4, 1, ctx => {
+      const v = new Vco(ctx, 500, { drift: 20, driftRate: 1, tolerance: 10, seed: 3 });
+      v.sine.connect(ctx.destination);
+    });
+    const d = b.getChannelData(0);
+    const f: number[] = [];
+    for (let s = 0; s + SR / 2 <= d.length; s += SR / 2) f.push(zcRate(d, s, s + SR / 2));
+    const lo = Math.min(...f), hi = Math.max(...f);
+    return [hi - lo > 1 && hi - lo < 40 && f.every(Number.isFinite), `frequency per 0.5 s: ${lo.toFixed(1)}..${hi.toFixed(1)} Hz`];
+  });
+
+  await check('Ladder: { quality: 1 } level matches quality 0', async () => {
+    const b = await offline(1, 2, ctx => {
+      const s = ctx.createOscillator();
+      s.type = 'sawtooth';
+      s.frequency.value = 110;
+      s.start();
+      const a = new Ladder(ctx, 2000), q = new Ladder(ctx, 2000, { quality: 1 });
+      a.resonance.value = 0.5;
+      q.resonance.value = 0.5;
+      s.connect(a.input);
+      s.connect(q.input);
+      toChannels(ctx, [a.output, q.output]);
+    });
+    const r0 = rmsOf(b.getChannelData(0), 4800), r1 = rmsOf(b.getChannelData(1), 4800);
+    return [Math.abs(db(r1 / r0)) < 1 && r0 > 0.05, `rms q0 ${r0.toFixed(3)}, q1 ${r1.toFixed(3)} (${db(r1 / r0).toFixed(2)} dB)`];
+  });
+
+  await check('Env: { delay, hold } options (DAHDSR)', async () => {
+    const b = await offline(0.6, 1, ctx => {
+      const e = new Env(ctx, 'ad', { delay: 0.1, hold: 0.05 });
+      e.attack.value = 0.001;
+      e.decay.value = 0.1;
+      e.trigger(0.05, 1);
+      e.output.connect(ctx.destination);
+    });
+    const d = b.getChannelData(0);
+    const start = d.findIndex(v => v > 0) / SR;
+    let hold = 0;
+    for (let i = 0; i < d.length; i++) if (d[i] >= 0.9999) hold++;
+    return [Math.abs(start - 0.15) < 0.003 && Math.abs(hold / SR - 0.05) < 0.003, `starts at ${(start * 1000).toFixed(1)} ms (expect 150), holds ${((hold / SR) * 1000).toFixed(1)} ms (expect 50)`];
+  });
+
+  await check('Env: set({ shape }, time) applies at that time', async () => {
+    const b = await offline(1, 1, ctx => {
+      const e = new Env(ctx, 'ad');
+      e.attack.value = 0.1;
+      e.decay.value = 0.05;
+      e.trigger(0.1, 1);
+      e.set({ shape: -1 }, 0.5);
+      e.trigger(0.6, 1);
+      e.output.connect(ctx.destination);
+    });
+    const d = b.getChannelData(0);
+    const a = d[Math.round(0.15 * SR)], c = d[Math.round(0.65 * SR)];
+    return [a > 0.45 && c < 0.2, `level half-way through the attack: before ${a.toFixed(3)} (linear), after ${c.toFixed(3)} (concave)`];
+  });
+
+  await check('Svf: all 7 modes', async () => {
+    const modes: SvfMode[] = ['lp2', 'lp1', 'bp', 'hp1', 'hp2', 'notch', 'peak'];
+    const b = await offline(0.5, 7, ctx => {
+      const n = createNoise(ctx);
+      const f = modes.map(m => {
+        const s = new Svf(ctx, 1000, m);
+        s.resonance.value = 0.5;
+        n.connect(s.input);
+        return s.output;
+      });
+      toChannels(ctx, f);
+    });
+    const r = modes.map((_, i) => rmsOf(b.getChannelData(i), 2000));
+    return [r.every(x => x > 0.02 && Number.isFinite(x)), modes.map((m, i) => `${m} ${r[i].toFixed(3)}`).join(', ')];
+  });
+
+  await check('Reverb2: level vs the old Reverb (same input)', async () => {
+    const b = await offline(4, 4, ctx => {
+      const n = createNoise(ctx);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.3, 0);
+      g.gain.setValueAtTime(0, 0.5);
+      n.connect(g);
+      const r1 = new Reverb(ctx, 2.5), r2 = new Reverb2(ctx, 2.5, { seed: 1 });
+      g.connect(r1.input);
+      g.connect(r2.input);
+      const s1 = ctx.createChannelSplitter(2), s2 = ctx.createChannelSplitter(2);
+      r1.output.connect(s1);
+      r2.output.connect(s2);
+      const m = ctx.createChannelMerger(4);
+      s1.connect(m, 0, 0); s1.connect(m, 1, 1); s2.connect(m, 0, 2); s2.connect(m, 1, 3);
+      m.connect(ctx.destination);
+    });
+    const o = rmsOf(b.getChannelData(0)) + rmsOf(b.getChannelData(1));
+    const n = rmsOf(b.getChannelData(2)) + rmsOf(b.getChannelData(3));
+    const diff = db(n / o);
+    return [Math.abs(diff) < 3, `Reverb2 is ${diff >= 0 ? '+' : ''}${diff.toFixed(1)} dB vs Reverb`];
+  });
+
+  await check('Chorus: stereo, wet/dry', async () => {
+    const b = await offline(1, 2, ctx => {
+      const s = ctx.createOscillator();
+      s.type = 'sawtooth';
+      s.frequency.value = 220;
+      s.start();
+      const c = new Chorus(ctx);
+      c.dry.value = 1;
+      c.wet.value = 0.7;
+      s.connect(c.input);
+      c.output.connect(ctx.destination);
+    });
+    const l = b.getChannelData(0), r = b.getChannelData(1);
+    let x = 0, ll = 0, rr = 0;
+    for (let i = 4800; i < l.length; i++) { x += l[i] * r[i]; ll += l[i] * l[i]; rr += r[i] * r[i]; }
+    const corr = x / Math.sqrt(ll * rr);
+    return [corr < 0.98 && rmsOf(l) > 0.2, `L/R correlation ${corr.toFixed(3)}, rms ${rmsOf(l).toFixed(3)}`];
+  });
+
+  return out;
 }

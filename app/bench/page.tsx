@@ -8,8 +8,9 @@
 // realtime factor (seconds of audio per second of CPU), the per-instance cost
 // and the output peak. Results are published on window.__benchResults.
 //
-// Query string: ?auto=1 runs on load; ?only=devices|processors;
+// Query string: ?auto=1 runs on load; ?only=devices|processors|wrappers;
 // ?devices=dfam,sub37 and ?scenarios=vco,ladder pick a subset; ?reps=3.
+// The wrapper self-checks (lib/audio/dsp.ts in a real browser) always run first.
 // Open it on the iPad to measure the target device itself.
 // ============================================================================
 
@@ -17,7 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEVICES } from '@/devices';
 import type { DeviceModule } from '@/devices/types';
 import {
-  SCENARIOS, SECONDS, SR, measureFramework, runDevice, runScenario,
+  SCENARIOS, SECONDS, SR, measureFramework, runDevice, runScenario, runWrapperChecks,
   type BenchResults, type DeviceRun, type ProcRun, type Variant,
 } from './runner';
 
@@ -32,11 +33,12 @@ function emptyResults(userAgent = ''): BenchResults {
   return {
     status: 'idle', progress: '', sampleRate: SR, seconds: SECONDS, userAgent,
     startedAt: '', framework: { emptyMs: 0, suspendMs: 0, suspends: 0 },
-    devices: [], processors: [], errors: [],
+    devices: [], processors: [], wrappers: [], errors: [],
   };
 }
 
-interface Options { only?: 'devices' | 'processors'; devices?: string[]; scenarios?: string[]; reps: number }
+type Only = 'devices' | 'processors' | 'wrappers';
+interface Options { only?: Only; devices?: string[]; scenarios?: string[]; reps: number }
 
 function readOptions(): { auto: boolean; opts: Options } {
   const q = new URLSearchParams(window.location.search);
@@ -45,7 +47,7 @@ function readOptions(): { auto: boolean; opts: Options } {
   return {
     auto: q.get('auto') === '1',
     opts: {
-      only: only === 'devices' || only === 'processors' ? only : undefined,
+      only: only === 'devices' || only === 'processors' || only === 'wrappers' ? only : undefined,
       devices: list('devices'),
       scenarios: list('scenarios'),
       reps: Math.max(1, Math.min(10, Number(q.get('reps')) || 3)),
@@ -61,7 +63,7 @@ export default function BenchPage() {
   const running = useRef(false);
 
   const publish = useCallback((r: BenchResults) => {
-    const copy = { ...r, devices: [...r.devices], processors: [...r.processors], errors: [...r.errors] };
+    const copy = { ...r, devices: [...r.devices], processors: [...r.processors], wrappers: [...r.wrappers], errors: [...r.errors] };
     window.__benchResults = copy;
     setRes(copy);
   }, []);
@@ -78,11 +80,16 @@ export default function BenchPage() {
     window.addEventListener('error', onError);
     window.addEventListener('unhandledrejection', onError);
     try {
-      r.progress = 'framework overhead';
+      r.progress = 'wrapper checks';
       publish(r);
-      r.framework = await measureFramework();
+      r.wrappers = await runWrapperChecks();
+      if (o.only !== 'wrappers') {
+        r.progress = 'framework overhead';
+        publish(r);
+        r.framework = await measureFramework();
+      }
 
-      if (o.only !== 'processors') {
+      if (!o.only || o.only === 'devices') {
         const entries = DEVICES.filter(d => !o.devices || o.devices.includes(d.id));
         for (const entry of entries) {
           let mod: DeviceModule;
@@ -100,7 +107,7 @@ export default function BenchPage() {
         }
       }
 
-      if (o.only !== 'devices') {
+      if (!o.only || o.only === 'processors') {
         const list = SCENARIOS.filter(s => !o.scenarios || o.scenarios.includes(s.id));
         for (const s of list) {
           for (const v of VARIANTS) {
@@ -237,6 +244,20 @@ export default function BenchPage() {
                 </tbody>
               </table>
             </div>
+          </section>
+        )}
+
+        {res.wrappers.length > 0 && (
+          <section className="mt-6">
+            <h2 className="text-lg font-semibold">Wrapper checks</h2>
+            <ul className="mt-2 text-sm space-y-1">
+              {res.wrappers.map(w => (
+                <li key={w.name}>
+                  <span className={w.ok ? 'text-emerald-400' : 'text-red-400'}>{w.ok ? 'PASS' : 'FAIL'}</span>{' '}
+                  {w.name} <span className="text-gray-400">— {w.detail}</span>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

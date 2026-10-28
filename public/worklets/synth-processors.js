@@ -7,28 +7,42 @@
 //                  (+ [4] sub -1 oct, [5] sub -2 oct squares with
 //                  processorOptions.subs = true and outputChannelCount [6]).
 //                  4-point polyBLEP / polyBLAMP on every discontinuity,
-//                  including sub-sample hard sync; through-zero linear FM,
-//                  analog drift, output mask. 3 samples latency.
+//                  including sub-sample hard sync and through-zero FM; analog
+//                  drift / tolerance; output mask. 3 samples latency.
 //   'ladder'     - zero-delay-feedback 4-pole transistor ladder with every
 //                  mode tap (LP24/18/12/6, HP24/12, BP12). quality 0 = 1x
-//                  (input saturation), quality 1 = 2x oversampled core with
-//                  per-stage tanh (halfband IIR up/down sampling).
+//                  (the original model), quality 1 = 2x oversampled core with
+//                  per-stage tanh (halfband IIR up/down sampling); bass-loss
+//                  compensation.
 //   'env'        - D/A/H/D/S/R envelope (AD / ADSR / AR modes), sample-accurate
 //                  scheduled triggers, audio-rate gate input, time CV,
 //                  optional analog RC curves, curvature and looping.
 //   'svf'        - Simper/Cytomic trapezoidal state-variable filter:
 //                  LP2, LP1, BP, HP1, HP2, BS (notch), PK (peak) - the Elektron
 //                  multimode set. Stable under audio-rate modulation.
-//   'fdn-reverb' - 8-line feedback-delay-network reverb: predelay, 8-channel
+//   'fdn-reverb' - 8-line feedback-delay-network reverb: predelay, 3-stage
 //                  Hadamard diffuser, Householder feedback, modulated lines,
-//                  two-band decay, stereo width. Stereo in/out.
+//                  Jot absorption filters (RT60 halves at the damping
+//                  frequency at any size), stereo width. Stereo in/out.
 //   'chorus'     - BBD-style 1-2 voice stereo chorus with feedback, bucket-
 //                  brigade band limiting and soft saturation.
+//
+// Backward compatibility: 'vco', 'ladder' and 'env' keep exactly their
+// original AudioParams, ranges and output layouts; with default settings the
+// ladder and envelope reproduce the original output (to float precision).
+//
+// Settings vs AudioParams: an AudioParam costs ~3.4 ns per sample per node in
+// Chrome on every render quantum, even when idle and unconnected. So only
+// modulation inputs are AudioParams; settings (VCO mask / drift / tolerance /
+// thruZero / fmRatio, ladder quality / comp, envelope delay / hold / loop /
+// analog / shape, chorus and reverb tone) come from processorOptions and
+// { type: 'set', ... } port messages (the envelope's are timed).
 //
 // Signal convention used across the app: 1.0 = 5 volts.
 // Performance: coefficients are computed once per render quantum whenever the
 // relevant a-rate params are constant (array length 1); per-sample paths use
-// the fast approximations below instead of Math.pow / tan / tanh / exp / sin.
+// the fast approximations below instead of Math.pow / tan / tanh / exp / sin;
+// states are flushed against denormals and reset on NaN / Infinity.
 // ============================================================================
 
 const TWO_PI = Math.PI * 2;
@@ -403,9 +417,15 @@ class VcoProcessor extends AudioWorkletProcessor {
       if (sinOn) Wn[k] = sin2pi(p);
       pwPrev = pw;
     }
+    if (!(p === p) || !(last === last)) {
+      // NaN / Infinity on a modulation input: recover instead of staying silent forever
+      p = 0; last = 0;
+      for (let c = 0; c < 6; c++) this.W[c].fill(0);
+      this.ne = 0;
+    }
     this.phase = p;
     this.lastSync = last;
-    this.lastPw = pwPrev;
+    this.lastPw = pwPrev === pwPrev ? pwPrev : 0.5;
     if (triOn) { Wt[L] += ct; Wt[n + L] = 0; }
     if (sawOn) { Ws[L] += cs; Ws[n + L] = 0; }
     if (pulOn) { Wp[L] += cp; Wp[n + L] = 0; }
@@ -622,7 +642,7 @@ class LadderProcessor extends AudioWorkletProcessor {
     if (constC && constR) iK = 1 / (1 + k * G4);
 
     if (!quality) {
-      // ---- 1x: today's model (linear ZDF estimate, tanh at the input) ----
+      // ---- 1x: the original model (linear ZDF estimate, tanh at the input) ----
       for (let i = 0; i < n; i++) {
         if (!constC) {
           let fc = cArr.length > 1 ? cArr[i] : cArr[0];
@@ -998,6 +1018,7 @@ class EnvProcessor extends AudioWorkletProcessor {
       }
       out[i] = value;
     }
+    if (!(value === value) || value === Infinity || value === -Infinity) { value = 0; this.stage = ST_IDLE; } // NaN guard
     this.value = value;
     return true;
   }
@@ -1100,8 +1121,9 @@ const DIF_MS = [
 //   stage 1: + - + + - + - -   stage 2: - + + - + - - +   stage 3: + + - + - - + -
 // Each stage is delay -> polarity -> orthonormal 8-point Hadamard.
 const FDN_MOD_RATE = [1, 1.31, 1.73, 2.19]; // for lines 0, 2, 4, 6
-// Wet level calibrated so Reverb2 sits at roughly the old convolver Reverb's level
-const FDN_OUT_GAIN = 0.6;
+// Wet level calibrated so Reverb2 matches the old convolver Reverb within ~1 dB for
+// decays of 1-5 s (0.5 s noise burst in, RMS of the stereo output, Chrome)
+const FDN_OUT_GAIN = 0.25;
 
 function pow2Ceil(x) { let p = 1; while (p < x) p <<= 1; return p; }
 
@@ -1187,14 +1209,16 @@ class FdnReverbProcessor extends AudioWorkletProcessor {
     const oL = out[0], oR = out.length > 1 ? out[1] : null;
     const n = oL.length;
     const inp = inputs[0];
-    const iL = inp && inp.length ? inp[0] : null;
-    const iR = inp && inp.length > 1 ? inp[1] : iL;
+    let iL = inp && inp.length ? inp[0] : null;
+    let iR = inp && inp.length > 1 ? inp[1] : iL;
     const sr = sampleRate;
 
     // Idle: silent input and a tail below -140 dB -> skip all work
     let inPeak = 0;
     if (iL) {
       for (let i = 0; i < n; i++) { const a = iL[i], b = iR[i]; inPeak += a * a + b * b; }
+      // NaN / Infinity in the input: treat the quantum as silence so it never enters the delay lines
+      if (!(inPeak < Infinity)) { iL = null; iR = null; inPeak = 0; }
     }
     const silentIn = inPeak < 1e-18;
     if (silentIn && this.quiet >= this.quietNeed) {
@@ -1375,8 +1399,10 @@ class FdnReverbProcessor extends AudioWorkletProcessor {
     // blow-up guard (NaN/Infinity anywhere in the loop): clear the network
     if (!(tail < Infinity)) {
       lp.fill(0);
+      pd.fill(0);
       for (let c = 0; c < 8; c++) ln[c].fill(0);
       for (let j = 0; j < 24; j++) db[j].fill(0);
+      this.hxL = this.hyL = this.hxR = this.hyR = this.lpL = this.lpR = 0;
       tail = 0;
     }
     this.quiet = silentIn && tail < 1e-14 * n ? this.quiet + 1 : 0;
