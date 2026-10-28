@@ -111,6 +111,8 @@ interface StudioStore extends StudioStoreState {
   setCurrentDevice: (instanceOrDevice: string) => void;
   registerDevice: (spec: DeviceSpec) => void;
   addToRack: (device: string, opts?: { duplicate?: boolean; label?: string; focus?: boolean }) => string;
+  /** Swap one instrument for another (single-instrument use, like the original app). Returns the new instance id. */
+  replaceInRack: (instance: string, device: string) => string;
   removeFromRack: (instance: string) => void;
   moveInRack: (instance: string, delta: number) => void;
   renameInstance: (instance: string, label: string) => void;
@@ -465,6 +467,32 @@ export const useStudioStore = create<StudioStore>()(
             studio: { ...state.studio, rack: [...state.studio.rack, slot] },
             ...(opts.focus ? { currentDevice: id } : {}),
           }));
+          return id;
+        },
+
+        replaceInRack: (instance, device) => {
+          const s = get();
+          const existing = s.studio.rack.find(r => r.device === device);
+          if (existing) {
+            set({ currentDevice: existing.id });
+            return existing.id;
+          }
+          const id = s.studio.rack.some(r => r.id === device) ? `${device}#2` : device;
+          const rack = s.studio.rack.some(r => r.id === instance)
+            ? s.studio.rack.map(r => (r.id === instance ? { id, device } : r))
+            : [...s.studio.rack, { id, device }];
+          const routes = { ...s.studio.routes };
+          delete routes[instance];
+          set({
+            studio: {
+              ...s.studio,
+              rack,
+              routes,
+              cables: s.studio.cables.filter(c => c.from.instance !== instance && c.to.instance !== instance),
+            },
+            currentDevice: id,
+          });
+          if (s.currentLesson && s.lessonInstance === instance) get().resetLesson();
           return id;
         },
 

@@ -165,6 +165,17 @@ class EngineHub {
       const migrated = module.data.migrate(saved);
       if (migrated !== saved) store.setDeviceData(instance, migrated);
     }
+    // Transport and momentary buttons are performance actions, not settings: an
+    // instrument never comes back from a reload (or a switch back) already running.
+    const stored = useStudioStore.getState().devices[instance]?.controlValues ?? {};
+    const transient: Record<string, boolean> = {};
+    Object.entries(module.spec.controls).forEach(([id, c]) => {
+      if (c.type !== 'button') return;
+      const isTransport = id === module.transportControl;
+      if ((c.momentary || isTransport) && stored[id] !== undefined && stored[id] !== c.default) transient[id] = c.default;
+    });
+    if (Object.keys(transient).length) useStudioStore.getState().setControlValues(instance, transient);
+
     const engine = module.createEngine();
     const slot: Slot = {
       instance,
@@ -446,6 +457,45 @@ class EngineHub {
       return;
     }
     store.setControlValue(instance, id, value);
+  }
+
+  /**
+   * The big ▶: start the studio clock, and every instrument's own sequencer that
+   * isn't already following the clock (MIDI-style sync, or a clock cable from the
+   * Studio Clock). "Play" should mean "everything plays".
+   */
+  startAll() {
+    this.ensureAudio();
+    const st = useStudioStore.getState();
+    if (!transport.playing) {
+      transport.setBpm(st.studio.bpm);
+      transport.setSwing(st.studio.swing);
+      transport.start();
+    }
+    this.slots.forEach(slot => {
+      const tc = slot.module.transportControl;
+      if (!tc || this.isSynced(slot) || this.isClockedByCable(slot.instance)) return;
+      if (!st.devices[slot.instance]?.controlValues[tc]) st.setControlValue(slot.instance, tc, true);
+    });
+  }
+
+  /** The big ■: stop the clock and every instrument's own sequencer */
+  stopAll() {
+    transport.stop();
+    const st = useStudioStore.getState();
+    this.slots.forEach(slot => {
+      const tc = slot.module.transportControl;
+      if (!tc) return;
+      if (st.devices[slot.instance]?.controlValues[tc]) st.setControlValue(slot.instance, tc, false);
+    });
+  }
+
+  /** Is this instrument driven by a clock cable from the Studio Clock? */
+  isClockedByCable(instance: string): boolean {
+    const st = useStudioStore.getState();
+    return st.studio.cables.some(c =>
+      (c.to.instance === instance && st.deviceOf(c.from.instance) === 'studio-clock') ||
+      (c.from.instance === instance && st.deviceOf(c.to.instance) === 'studio-clock'));
   }
 
   getState(instance: string): EngineState {

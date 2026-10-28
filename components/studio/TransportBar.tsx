@@ -44,13 +44,8 @@ export default function TransportBar() {
   }, [recording]);
 
   const togglePlay = () => {
-    hub.ensureAudio();
-    if (transport.playing) transport.stop();
-    else {
-      transport.setBpm(bpm);
-      transport.setSwing(swing);
-      transport.start();
-    }
+    if (transport.playing) hub.stopAll();
+    else hub.startAll();
   };
 
   const tap = () => {
@@ -96,7 +91,7 @@ export default function TransportBar() {
         onClick={togglePlay}
         className={`w-11 h-9 rounded-lg font-bold text-lg flex items-center justify-center ${playing ? 'bg-green-500 text-black' : 'bg-[#2a2a2a] text-white hover:bg-[#333]'}`}
         aria-label={playing ? 'Stop studio' : 'Play studio'}
-        title="Play / stop everything synced to the studio clock"
+        title="Play / stop everything in the studio"
       >
         {playing ? '■' : '▶'}
       </button>
@@ -120,10 +115,16 @@ export default function TransportBar() {
         <button className="px-2 h-8 rounded bg-[#242424] text-gray-300 text-[11px]" onClick={tap} title="Tap at least three times">TAP</button>
       </div>
 
-      <label className="flex items-center gap-1.5 text-[11px] text-gray-400" title="Delays every second 16th note - the shuffle in house and hip-hop">
+      <label className="flex items-center gap-1 text-[11px] text-gray-400" title="Swing delays every second 16th note - the shuffle in house and hip-hop">
         Swing
-        <input type="range" min={0} max={0.5} step={0.01} value={swing} onChange={e => setSwing(Number(e.target.value))} className="w-16 accent-green-500" aria-label="Swing" />
-        <span className="w-8 tabular-nums text-gray-300">{Math.round(50 + swing * 50)}%</span>
+        <select
+          value={String(Math.round(50 + swing * 50))}
+          onChange={e => setSwing((Number(e.target.value) - 50) / 50)}
+          className="bg-black/60 text-white rounded px-1 py-1 text-[11px]"
+          aria-label="Swing"
+        >
+          {[50, 54, 58, 62, 66, 70, 75].map(v => <option key={v} value={v}>{v}%</option>)}
+        </select>
       </label>
 
       <button

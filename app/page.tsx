@@ -63,7 +63,7 @@ function App() {
   const onWelcome = (c: WelcomeChoice) => {
     closeWelcome();
     hub.ensureAudio();
-    if (c === 'learn') { setCurrentDevice('sub37'); setView('instrument'); setTimeout(() => setLessonsOpen(true), 300); }
+    if (c === 'learn') { openInstrument('sub37'); setTimeout(() => setLessonsOpen(true), 300); }
     if (c === 'explore') setDevicesOpen(true);
     if (c === 'track' || c === 'moog-studio') setView('studio');
   };
@@ -72,7 +72,7 @@ function App() {
   const focusDevice = focusInstance ? deviceOf(focusInstance) : 'dfam';
   const entry = DEVICES.find(d => d.id === focusDevice);
   const onModuleLoaded = useCallback((m: DeviceModule) => setModule(m), []);
-  const lessons = useMemo(() => [...(module?.spec.id === focusDevice ? module.lessons : []), ...STUDIO_LESSONS], [module, focusDevice]);
+  const lessons = useMemo(() => (module?.spec.id === focusDevice ? module.lessons : []), [module, focusDevice]);
   const dueCount = dueReviewItems(review).length;
 
   const nextLesson = useMemo(() => {
@@ -87,6 +87,32 @@ function App() {
     setCurrentDevice(instance);
     setView('instrument');
   };
+
+  /**
+   * Open an instrument from the picker. With a single instrument (the normal
+   * case) it is swapped, like changing instruments in the original app: the old
+   * one stops. Once you have built a studio (2+ instruments) it opens as a tab
+   * and plays along with the rest.
+   */
+  const openInstrument = (deviceId: string) => {
+    const st = useStudioStore.getState();
+    const existing = st.studio.rack.find(r => r.device === deviceId);
+    if (existing) { focus(existing.id); return; }
+    if (st.studio.rack.length <= 1) {
+      const id = st.replaceInRack(focusInstance ?? st.studio.rack[0]?.id, deviceId);
+      focus(id);
+    } else {
+      const id = addToRack(deviceId);
+      focus(id);
+    }
+  };
+  const addInstrumentToStudio = (deviceId: string) => {
+    const st = useStudioStore.getState();
+    const dup = st.studio.rack.some(r => r.device === deviceId);
+    const id = addToRack(deviceId, { duplicate: dup });
+    focus(id);
+  };
+  const singleInstrument = rack.length <= 1;
 
   const begin = (lesson: Lesson) => {
     hub.ensureAudio();
@@ -107,25 +133,44 @@ function App() {
 
   return (
     <div className="min-h-screen bg-hardware-bg px-3 py-3 sm:px-5">
-      <header className="max-w-[1800px] mx-auto mb-3 flex flex-wrap items-center gap-3">
+      <header className="max-w-[1800px] mx-auto mb-3 flex flex-wrap items-center gap-2">
         <div className="mr-2">
           <h1 className="text-xl font-bold text-white leading-none">SYNTH STUDIO</h1>
-          <p className="text-[11px] text-hardware-label mt-0.5">Play it. Patch it. Understand it.</p>
+          <p className="text-[11px] text-hardware-label mt-0.5 hidden xl:block">Play it. Patch it. Understand it.</p>
         </div>
         <TransportBar />
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
+      </header>
+
+      {projectMsg && <p className="max-w-[1800px] mx-auto text-xs text-sky-300 mb-2">{projectMsg}</p>}
+
+      {/* Rack tabs: Studio overview + one tab per instrument */}
+      <div className="max-w-[1800px] mx-auto mb-3 flex items-center gap-2">
+        <nav className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto pb-1" aria-label="Instruments">
+          <TabButton active={view === 'studio'} onClick={() => setView('studio')}>
+            ◫ Studio <span className="text-[10px] text-gray-400 ml-1">{rack.length}</span>
+          </TabButton>
+          {rack.map(r => (
+            <TabButton key={r.id} active={view === 'instrument' && r.id === focusInstance} onClick={() => focus(r.id)}>
+              {labelFor(r.id)}
+            </TabButton>
+          ))}
+          <button onClick={() => setDevicesOpen(true)} className="px-3 py-2 rounded-lg text-sm text-gray-300 border border-dashed border-[#444] hover:border-[#666] whitespace-nowrap">
+            {singleInstrument ? 'Instruments…' : '+ Instrument'}
+          </button>
+        </nav>
+        <div className="shrink-0 flex items-center gap-2">
           <button
             onClick={() => setReviewOpen(true)}
             className={`px-3 py-2 rounded-lg text-sm border ${dueCount ? 'border-sky-500 text-sky-200 bg-sky-950/40' : 'border-[#3a3a3a] text-gray-300'}`}
             title="Spaced review of what you've learned"
           >
-            Daily review{dueCount ? ` (${dueCount})` : ''}
+            Review{dueCount ? ` (${dueCount})` : ''}
           </button>
           <button
             onClick={() => setLessonsOpen(true)}
             className="px-4 py-2 bg-teaching-current text-black font-bold rounded-lg text-sm hover:brightness-110"
           >
-            {isTeaching ? 'Lessons' : 'Start a lesson'}
+            Lessons
             {lessons.length > 0 && <span className="ml-2 text-[11px] font-normal">{lessons.filter(l => completed.includes(l.id)).length}/{lessons.length}</span>}
           </button>
           <button onClick={() => setWelcomeOpen(true)} className="px-3 py-2 rounded-lg text-sm border border-[#3a3a3a] text-gray-300" title="Getting started">
@@ -150,24 +195,7 @@ function App() {
             }}
           />
         </div>
-      </header>
-
-      {projectMsg && <p className="max-w-[1800px] mx-auto text-xs text-sky-300 mb-2">{projectMsg}</p>}
-
-      {/* Rack tabs: Studio overview + one tab per instrument */}
-      <nav className="max-w-[1800px] mx-auto mb-3 flex items-center gap-1.5 overflow-x-auto pb-1" aria-label="Instruments">
-        <TabButton active={view === 'studio'} onClick={() => setView('studio')}>
-          ◫ Studio <span className="text-[10px] text-gray-400 ml-1">{rack.length}</span>
-        </TabButton>
-        {rack.map(r => (
-          <TabButton key={r.id} active={view === 'instrument' && r.id === focusInstance} onClick={() => focus(r.id)}>
-            {labelFor(r.id)}
-          </TabButton>
-        ))}
-        <button onClick={() => setDevicesOpen(true)} className="px-3 py-2 rounded-lg text-sm text-gray-300 border border-dashed border-[#444] hover:border-[#666] whitespace-nowrap">
-          + Instrument
-        </button>
-      </nav>
+      </div>
 
       <main className="max-w-[1800px] mx-auto flex flex-col lg:flex-row gap-4 items-start">
         <div className="flex-1 min-w-0 w-full">
@@ -202,7 +230,9 @@ function App() {
           <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-3xl shadow-2xl z-50 max-h-[88vh] overflow-y-auto">
             <Dialog.Title className="text-lg font-bold text-white mb-1">Instruments</Dialog.Title>
             <Dialog.Description className="text-xs text-hardware-label mb-4">
-              Open an instrument, or add another one to the studio. Everything in the studio plays together.
+              {singleInstrument
+                ? 'Switch to another instrument, or add it to your studio to play several together.'
+                : 'Open an instrument, or add another one. Everything in your studio plays together.'}
             </Dialog.Description>
             {(['Percussion', 'Synthesizer', 'Groovebox', 'DJ Mixer', 'Studio', 'External'] as const).map(cat => {
               const items = DEVICES.filter(d => d.category === cat);
@@ -222,14 +252,16 @@ function App() {
                           <div className="font-bold text-white mt-0.5">{d.name}</div>
                           <div className="text-[11px] text-gray-400 mt-0.5 leading-snug">{d.tagline}</div>
                           <div className="flex gap-2 mt-2">
-                            <button onClick={() => { focus(d.id); setDevicesOpen(false); }} className="px-3 py-1.5 rounded bg-teaching-current text-black text-xs font-bold">
-                              {inRack ? 'Open' : 'Open'}
+                            <button onClick={() => { openInstrument(d.id); setDevicesOpen(false); }} className="px-3 py-1.5 rounded bg-teaching-current text-black text-xs font-bold">
+                              {inRack ? 'Open' : singleInstrument ? 'Switch to this' : 'Open'}
                             </button>
-                            {inRack && (
-                              <button onClick={() => { const id = addToRack(d.id, { duplicate: true }); focus(id); setDevicesOpen(false); }} className="px-3 py-1.5 rounded bg-[#2a2a2a] text-white text-xs">
-                                Add another
-                              </button>
-                            )}
+                            <button
+                              onClick={() => { addInstrumentToStudio(d.id); setDevicesOpen(false); }}
+                              className="px-3 py-1.5 rounded bg-[#2a2a2a] text-white text-xs"
+                              title="Keep what you have and add this one - everything in the studio plays together"
+                            >
+                              {inRack ? 'Add another' : 'Add to studio'}
+                            </button>
                           </div>
                         </div>
                       );
@@ -255,7 +287,7 @@ function App() {
               Short, hands-on lessons. You will predict, listen, match sounds by ear and explain ideas in your own words - the
               things that make learning stick.
             </Dialog.Description>
-            <LessonBrowser lessons={lessons} completed={completed} onStart={begin} />
+            <LessonBrowser lessons={lessons} studioLessons={STUDIO_LESSONS} deviceName={entry?.name ?? 'Instrument'} completed={completed} onStart={begin} />
             <div className="mt-3 flex justify-end">
               <Dialog.Close asChild><button className="px-4 py-2 bg-[#3a3a3a] text-white rounded text-sm">Close</button></Dialog.Close>
             </div>

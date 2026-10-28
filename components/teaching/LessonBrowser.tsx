@@ -15,26 +15,38 @@ const PATHS: { id: NonNullable<Lesson['path']> | 'other'; title: string; blurb: 
 ];
 
 interface Props {
+  /** This instrument's lessons - always listed first */
   lessons: Lesson[];
+  /** Cross-instrument studio lessons - listed after */
+  studioLessons?: Lesson[];
+  deviceName: string;
   completed: string[];
   onStart: (lesson: Lesson) => void;
 }
 
-export default function LessonBrowser({ lessons, completed, onStart }: Props) {
+export default function LessonBrowser({ lessons, studioLessons = [], deviceName, completed, onStart }: Props) {
   const [difficulty, setDifficulty] = useState<'all' | Lesson['difficulty']>('all');
 
-  const sorted = useMemo(() => [...lessons].sort((a, b) => (a.order ?? 999) - (b.order ?? 999)), [lessons]);
-  // First lesson not done whose prerequisites are done
-  const recommended = useMemo(
-    () => sorted.find(l => !completed.includes(l.id) && (l.prerequisites ?? []).every(p => completed.includes(p))),
-    [sorted, completed],
-  );
-  const shown = difficulty === 'all' ? sorted : sorted.filter(l => l.difficulty === difficulty);
+  const byOrder = (a: Lesson, b: Lesson) => (a.order ?? 999) - (b.order ?? 999);
+  const sorted = useMemo(() => [...lessons].sort(byOrder), [lessons]);
+  const studioSorted = useMemo(() => [...studioLessons].sort(byOrder), [studioLessons]);
+  // First lesson on this instrument not done whose prerequisites are done; studio lessons only after
+  const recommended = useMemo(() => {
+    const ready = (l: Lesson) => !completed.includes(l.id) && (l.prerequisites ?? []).every(p => completed.includes(p));
+    return sorted.find(ready) ?? studioSorted.find(ready);
+  }, [sorted, studioSorted, completed]);
+  const filter = (ls: Lesson[]) => (difficulty === 'all' ? ls : ls.filter(l => l.difficulty === difficulty));
+  const shown = filter(sorted);
 
-  const byPath = PATHS.map(p => ({
-    ...p,
-    lessons: shown.filter(l => (l.path ?? 'other') === p.id),
-  })).filter(p => p.lessons.length);
+  // The instrument's own lessons first: grouped by path if they have one,
+  // otherwise one "<instrument> lessons" section. Studio lessons come last.
+  const byPath = [
+    ...PATHS.filter(p => p.id !== 'other').map(p => ({ ...p, lessons: shown.filter(l => l.path === p.id) })),
+    { id: 'device' as const, title: `${deviceName} lessons`, blurb: '', lessons: shown.filter(l => !l.path) },
+    { id: 'studio-all' as const, title: 'Studio & full tracks', blurb: 'Wire instruments together, sync them, mix and arrange a whole track.', lessons: filter(studioSorted) },
+  ].filter(p => p.lessons.length);
+  // Untagged lessons belong at the top, before any path sections
+  byPath.sort((a, b) => (a.id === 'device' ? -1 : b.id === 'device' ? 1 : a.id === 'studio-all' ? 1 : b.id === 'studio-all' ? -1 : 0));
 
   return (
     <div className="flex flex-col min-h-0">
