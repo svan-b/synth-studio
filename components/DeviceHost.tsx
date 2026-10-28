@@ -18,6 +18,8 @@ const KEYMAP: Record<string, number> = {
 };
 
 const EMPTY_PATCHES: PatchConnection[] = [];
+/** Shortest note a tap can play (ms) */
+const MIN_GATE_MS = 60;
 
 interface DeviceHostProps {
   instance: string;
@@ -104,13 +106,27 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
 
   const heldRef = useRef(held);
   heldRef.current = held;
+  // A very quick tap can release a key inside the same audio block it was pressed
+  // in, so the envelope never opens. Give every note a minimum gate, like a real key.
+  const noteStarted = useRef(new Map<number, number>());
   const handleNoteOn = useCallback((n: number, velocity = 1) => {
     setHeld(prev => new Set(prev).add(n));
+    noteStarted.current.set(n, performance.now());
     hub.noteOn(instance, n, velocity);
   }, [instance]);
   const handleNoteOff = useCallback((n: number) => {
     setHeld(prev => { const s = new Set(prev); s.delete(n); return s; });
-    hub.noteOff(instance, n);
+    const startedAt = noteStarted.current.get(n);
+    const release = () => {
+      // Skip if the same key was pressed again in the meantime
+      if (noteStarted.current.get(n) !== startedAt) return;
+      noteStarted.current.delete(n);
+      hub.noteOff(instance, n);
+    };
+    // No recorded note-on (e.g. a stray release): release at once, never drop it
+    const wait = startedAt === undefined ? 0 : MIN_GATE_MS - (performance.now() - startedAt);
+    if (wait > 0) setTimeout(release, wait);
+    else release();
   }, [instance]);
 
   // MIDI input plays the focused instrument through the handlers above (keys light up)
