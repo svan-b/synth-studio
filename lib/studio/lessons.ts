@@ -122,9 +122,9 @@ export const STUDIO_LESSONS: Lesson[] = [
       },
       {
         kind: 'do',
-        instruction: 'Press ▶ in the top bar. The DFAM steps in time with the studio even though its own RUN is off.',
+        instruction: 'Press ▶ in the top bar. It presses the DFAM\'s RUN / STOP for you, and the DFAM now steps in time with the studio instead of its own TEMPO knob.',
         check: s => s.transport.playing,
-        principle: 'An external clock replaces the instrument\'s own tempo knob.',
+        principle: 'An external clock replaces the instrument\'s own tempo knob. RUN still starts and stops it: on the hardware you press RUN first, then it waits for pulses.',
       },
       {
         kind: 'challenge',

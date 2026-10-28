@@ -4,10 +4,11 @@
 // ============================================================================
 
 import { useStudioStore, type InstanceState, type StudioDoc } from '@/store/studio';
+import { PROJECT_VERSION, upgradeDevices } from './upgrades';
 
 export interface ProjectFile {
   format: 'synth-studio-project';
-  version: 1;
+  version: number;
   name: string;
   savedAt: string;
   currentDevice: string;
@@ -19,7 +20,7 @@ export function exportProject(name = 'My track'): ProjectFile {
   const s = useStudioStore.getState();
   return {
     format: 'synth-studio-project',
-    version: 1,
+    version: PROJECT_VERSION,
     name,
     savedAt: new Date().toISOString(),
     currentDevice: s.currentDevice,
@@ -44,6 +45,8 @@ export async function importProject(file: File): Promise<string> {
   if (parsed.format !== 'synth-studio-project' || !parsed.studio || !parsed.devices) {
     throw new Error('That file is not a Synth Studio project');
   }
-  useStudioStore.getState().loadProject({ devices: parsed.devices, studio: parsed.studio, currentDevice: parsed.currentDevice });
+  // Projects saved by an older version: controls whose meaning changed keep sounding the same
+  const devices = upgradeDevices(parsed.devices, parsed.studio.rack ?? [], 'project', parsed.version ?? 1);
+  useStudioStore.getState().loadProject({ devices, studio: parsed.studio, currentDevice: parsed.currentDevice });
   return parsed.name ?? 'Project';
 }

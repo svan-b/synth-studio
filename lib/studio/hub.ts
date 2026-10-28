@@ -461,22 +461,25 @@ class EngineHub {
 
   /**
    * The big ▶: start the studio clock, and every instrument's own sequencer that
-   * isn't already following the clock (MIDI-style sync, or a clock cable from the
-   * Studio Clock). "Play" should mean "everything plays".
+   * isn't already following the clock by MIDI-style sync. "Play" should mean
+   * "everything plays".
    */
   startAll() {
     this.ensureAudio();
     const st = useStudioStore.getState();
+    // Press RUN on everything that isn't synced - including instruments clocked
+    // by a cable: like the hardware, their sequencers only play clock pulses while
+    // running. Before the clock starts, so the very first pulse finds them running.
+    this.slots.forEach(slot => {
+      const tc = slot.module.transportControl;
+      if (!tc || this.isSynced(slot)) return;
+      if (!st.devices[slot.instance]?.controlValues[tc]) st.setControlValue(slot.instance, tc, true);
+    });
     if (!transport.playing) {
       transport.setBpm(st.studio.bpm);
       transport.setSwing(st.studio.swing);
       transport.start();
     }
-    this.slots.forEach(slot => {
-      const tc = slot.module.transportControl;
-      if (!tc || this.isSynced(slot) || this.isClockedByCable(slot.instance)) return;
-      if (!st.devices[slot.instance]?.controlValues[tc]) st.setControlValue(slot.instance, tc, true);
-    });
   }
 
   /** The big ■: stop the clock and every instrument's own sequencer */
@@ -488,14 +491,6 @@ class EngineHub {
       if (!tc) return;
       if (st.devices[slot.instance]?.controlValues[tc]) st.setControlValue(slot.instance, tc, false);
     });
-  }
-
-  /** Is this instrument driven by a clock cable from the Studio Clock? */
-  isClockedByCable(instance: string): boolean {
-    const st = useStudioStore.getState();
-    return st.studio.cables.some(c =>
-      (c.to.instance === instance && st.deviceOf(c.from.instance) === 'studio-clock') ||
-      (c.from.instance === instance && st.deviceOf(c.to.instance) === 'studio-clock'));
   }
 
   getState(instance: string): EngineState {

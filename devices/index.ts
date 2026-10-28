@@ -71,6 +71,31 @@ export const DEVICES: DeviceEntry[] = [
     tagline: 'The studio tempo as patchable clock, reset and run voltages',
     load: () => import('./studio-clock'),
   },
+  // ---- External: bring your own gear (docs/EXTERNAL_GEAR.md) ----
+  {
+    id: 'midi-synth',
+    name: 'Your synth (MIDI)',
+    manufacturer: 'Bring your own',
+    category: 'External',
+    tagline: 'Play, sequence and tweak a hardware synth over MIDI, with templates from midi.guide',
+    load: () => import('./midi-synth'),
+  },
+  {
+    id: 'audio-in',
+    name: 'Audio input',
+    manufacturer: 'Bring your own',
+    category: 'External',
+    tagline: 'Hear and record your gear through an audio interface input',
+    load: () => import('./audio-in'),
+  },
+  {
+    id: 'wam-plugin',
+    name: 'Web Audio plugin',
+    manufacturer: 'Bring your own',
+    category: 'External',
+    tagline: 'Host a WAM 2 browser synth or effect',
+    load: () => import('./wam-plugin'),
+  },
 ];
 
 export const getDeviceEntry = (id: string) => DEVICES.find(d => d.id === id);

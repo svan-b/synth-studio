@@ -1,0 +1,1 @@
+{"id":"polyend-step","manufacturer":"Polyend","device":"Step","source":"https://github.com/pencilresearch/midi/blob/main/Polyend/Step.csv","params":[{"name":"Change pattern","section":"Pattern control","cc":1,"usage":"0-66: Switch to the previous pattern; 67-127: Switch to the next pattern"}],"suggested":[]}

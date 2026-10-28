@@ -1,0 +1,1 @@
+{"id":"behringer-td-3-mo","manufacturer":"Behringer","device":"TD-3-MO","source":"https://github.com/pencilresearch/midi/blob/main/Behringer/TD-3-MO.csv","params":[{"name":"Cutoff","section":"VCF","cc":74,"usage":"0~127: Filter cutoff"},{"name":"Accent","section":"General","cc":120,"usage":"0-127: Trigger accent"}],"suggested":[0,1]}
