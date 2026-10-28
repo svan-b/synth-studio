@@ -221,7 +221,7 @@ export const FX_DESTS: { name: string; key: string; range: number }[] = [
   { name: 'DEL LPF', key: 'del_lpf', range: 127 }, { name: 'DEL OVR', key: 'del_ovr', range: 127 },
   { name: 'DEL VOL', key: 'del_vol', range: 127 },
   { name: 'REV PRE', key: 'rev_pre', range: 127 }, { name: 'REV DEC', key: 'rev_dec', range: 127 },
-  { name: 'REV FRQ', key: 'rev_frq', range: 127 }, { name: 'REV GAI', key: 'rev_gai', range: 128 },
+  { name: 'REV FRQ', key: 'rev_frq', range: 127 }, { name: 'REV GAI', key: 'rev_gai', range: 127 },
   { name: 'REV HPF', key: 'rev_hpf', range: 127 }, { name: 'REV LPF', key: 'rev_lpf', range: 127 },
   { name: 'REV VOL', key: 'rev_vol', range: 127 },
 ];
@@ -271,7 +271,7 @@ function oscPage(n: 1 | 2): ParamDef[] {
   const M = `${APX}, OSC ${n} page`;
   const waves = n === 1 ? WAVES1 : WAVES2;
   return [
-    { key: `${o}tun`, page, slot: 0, short: 'TUN', name: `Osc ${n} coarse tune`, min: -60, max: 60, def: 0, bipolar: true, fmt: signed, manual: M, desc: 'Pitch in semitones: +12 is one octave up.' },
+    { key: `${o}tun`, page, slot: 0, short: 'TUN', name: `Osc ${n} coarse tune`, min: -63, max: 63, def: 0, bipolar: true, fmt: signed, manual: M, desc: 'Pitch in semitones: +12 is one octave up.' },
     { key: `${o}fin`, page, slot: 1, short: 'FIN', name: `Osc ${n} fine tune`, min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: M, desc: 'Fine pitch in 1/128 of a semitone: the full range is half a semitone either way.' },
     { key: `${o}det`, page, slot: 2, short: 'DET', name: `Osc ${n} linear detune`, min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: M, desc: 'Detunes by a fixed number of hertz (not cents), so low notes beat as fast as high ones and bass gets relatively more detune.' },
     { key: `${o}trk`, page, slot: 3, short: 'TRK', name: `Osc ${n} keytrack`, min: 0, max: 1, def: 1, options: ONOFF, fmt: opt(ONOFF), manual: M, desc: 'ON: the oscillator follows the note. OFF: constant pitch, for drums and effects.' },
@@ -470,7 +470,7 @@ export const FX_PARAMS: ParamDef[] = [
   { key: 'rev_pre', page: 'reverb', slot: 0, short: 'PRE', name: 'Reverb pre-delay', min: 0, max: 127, def: 8, fmt: int, manual: `${APB}, REVERB page`, desc: 'Gap before the reverb starts: keeps the dry attack clear.' },
   { key: 'rev_dec', page: 'reverb', slot: 1, short: 'DEC', name: 'Reverb decay time', min: 0, max: 127, def: 64, fmt: v => (v >= 127 ? 'INF' : int(v)), manual: `${APB}, REVERB page`, desc: 'Length of the reverb tail (127 = endless).' },
   { key: 'rev_frq', page: 'reverb', slot: 2, short: 'FRQ', name: 'Shelving frequency', min: 0, max: 127, def: 80, fmt: int, manual: `${APB}, REVERB page`, desc: 'Frequency above which the shelving filter (GAI) works on the tail.' },
-  { key: 'rev_gai', page: 'reverb', slot: 3, short: 'GAI', name: 'Shelving gain', min: -64, max: 63, def: -16, bipolar: true, fmt: signed, manual: `${APB}, REVERB page`, desc: 'Negative damps the highs as the tail decays (a softer, more natural room).' },
+  { key: 'rev_gai', page: 'reverb', slot: 3, short: 'GAI', name: 'Shelving gain', min: 0, max: 127, def: 96, fmt: int, manual: `${APB}, REVERB page`, desc: 'Gain of the shelving filter on the tail above FRQ: 127 leaves it bright, lower values damp the highs as the tail decays (a softer room).' },
   { key: 'rev_hpf', page: 'reverb', slot: 5, short: 'HPF', name: 'Reverb high-pass', min: 0, max: 127, def: 16, fmt: int, manual: `${APB}, REVERB page`, desc: 'High-pass on the reverb input: less mud.' },
   { key: 'rev_lpf', page: 'reverb', slot: 6, short: 'LPF', name: 'Reverb low-pass', min: 0, max: 127, def: 110, fmt: int, manual: `${APB}, REVERB page`, desc: 'Low-pass on the reverb input.' },
   { key: 'rev_vol', page: 'reverb', slot: 9, short: 'VOL', name: 'Reverb volume', min: 0, max: 127, def: 100, fmt: int, manual: `${APB}, REVERB page`, desc: 'Level of the reverb return.' },
@@ -515,9 +515,10 @@ export const CV_PARAMS: ParamDef[] = [
     const page = `cv${c}` as PageId;
     const M = `${APC}, CV ${c.toUpperCase()} page`;
     return [
-      { key: `cv${c}_tun`, page, slot: 0, short: 'TUN', name: `CV ${c.toUpperCase()} coarse tune`, min: -60, max: 60, def: 0, bipolar: true, fmt: signed, manual: M, desc: 'Transposes the CV output in semitones (1 V per octave).' },
+      { key: `cv${c}_tun`, page, slot: 0, short: 'TUN', name: `CV ${c.toUpperCase()} coarse tune`, min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: M, desc: 'Transposes the CV output in semitones (1 V per octave).' },
       { key: `cv${c}_fin`, page, slot: 1, short: 'FIN', name: `CV ${c.toUpperCase()} fine tune`, min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: M, desc: 'Fine tune of the CV output.' },
       { key: `cv${c}_val`, page, slot: 2, short: 'VAL', name: `CV ${c.toUpperCase()} value`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'A fixed voltage (for CV outputs configured as values).' },
+      { key: `cv${c}_clk`, page, slot: 3, short: 'CLK', name: `CV ${c.toUpperCase()} clock`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Clock rate for a CV output set up as a clock (CV CONFIG).' },
       { key: `cv${c}_src`, page, slot: 4, short: 'SRC', name: `CV ${c.toUpperCase()} source track`, min: 0, max: 5, def: 5, options: CV_SOURCES, fmt: opt(CV_SOURCES), manual: M, desc: 'Track whose notes this output follows.' },
       { key: `cv${c}_bnd`, page, slot: 5, short: 'BND', name: `CV ${c.toUpperCase()} bend depth`, min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: M, desc: 'Pitch bend range of the output.' },
       { key: `cv${c}_sli`, page, slot: 6, short: 'SLI', name: `CV ${c.toUpperCase()} slide time`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Glide time of the output on slide trigs.' },

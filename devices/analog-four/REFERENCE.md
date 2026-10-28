@@ -16,7 +16,7 @@ environment, so every claim below is tagged with its source and a confidence lev
 | **ELK** | Elektronauts thread "Analog mk2 grey and black comparison" | MKII Black edition: "midnight" finish, the coloured highlight replaced by grey, FUNC shortcuts underlined, smaller Elektron logo. |
 | **SPEC** | Elektron product page and retailer spec sheets | 385 x 225 x 82 mm (W x D x H, including knobs, jacks and feet), 2.4 kg, 128 x 64 OLED. |
 | **SYSEX** | `kimasendorf/elektron-analog-four-sound-sysex` (OS 1.40A sound dump tables) | Every sound parameter with its screen abbreviation, display range and init value; waveform, sub, filter type, envelope shape, LFO and routing enumerations. |
-| **MIDI** | `pencilresearch/midi` (midi.guide), `Elektron/Analog Four MKII.csv` | The MKII NRPN map: every parameter by page in encoder order (NRPN LSB = page base + knob slot), the 12 envelope shape names, the full modulation destination list. |
+| **MIDI** | midi.guide (CC BY-SA 4.0), in the repo as `public/midi-guide/devices/elektron-analog-four-mkii.json` (230 parameters; the same data as `pencilresearch/midi` `Elektron/Analog Four MKII.csv`) | **Verified source.** The MKII NRPN map: every parameter by page in encoder order (NRPN LSB = page base + knob slot), ranges, centred / 0-based, the 12 envelope shape names, the full modulation destination list. |
 
 Confidence: **verified** = two independent sources agree, or a measurement of the real OS;
 **high** = one authoritative source (manual text, OS tables); **medium** = the community
@@ -181,3 +181,40 @@ but has no jacks: they are on the rear panel), the audio inputs (INL/INR wavefor
 EXT IN page are present but silent), and FDB / NEI routings approximated as described in
 `engine.ts`. Value-to-Hz and value-to-seconds curves are our fits to the documented
 ranges, not measurements.
+
+## Cross-check of params.ts against midi.guide
+
+A script maps each of the 230 midi.guide entries to a control in `params.ts` and compares
+the encoder slot (NRPN LSB minus the page base) and the value range.
+
+- **139 parameters match exactly** in page, slot and range: every OSC 1 / OSC 2 / NOISE /
+  OSC 1&2 / FILTERS / AMP / ENV F / ENV 2 / LFO page entry not listed below, the FX track's
+  EXT IN, CHORUS, DELAY and REVERB pages, the FX LFO pages and the CV A-D pages.
+- **Not one-to-one, by design:** midi.guide's `OSCn: Pitch` is a 14-bit NRPN that combines
+  TUN and FIN; the twin shows them as the two encoders the screen has. Performance A-J,
+  TRACK LEVEL and track mute exist (`perf_a..j`, `tN_level`, live mutes) but are not paged
+  synth parameters. Mod wheel and breath are not modelled (no MIDI input).
+
+Where the twin differs from midi.guide, and why:
+
+| Parameter | midi.guide | Twin | Reason |
+|---|---|---|---|
+| OSC 2 DET, NOISE FAD, LFO SPD, DELAY WID, EXT IN L PAN | 0..127, 0-based | -64..+63 | The screen shows these signed (SYSEX ranges; the manual: FAD "0 gives a constant noise, positive fades out, negative fades in"; LFO SPD "negative values run the cycle backwards"). midi.guide lists the raw NRPN value. OSC 1 DET is centred in midi.guide, OSC 2 DET is not: an inconsistency there. |
+| EXT IN L LEV | centred | 0..127 | Looks swapped with L PAN in midi.guide (R PAN is centred, R LEV is not). |
+| ENV / LFO DEP A/B, FX LFO DEP | 7-bit MSB, centred | -128..+127 | The hardware has a finer (14-bit, decimals) depth; SYSEX gives -128..+127. |
+| ENV / LFO DST, VELOCITY MOD DST | 0..127 code list (about 70 targets) | 55 targets | Continuous targets only; discrete ones (waveform, sub, sync mode, shapes, multiplier) are left out. FX LFO DST: 22 of the 73 codes (the EXT IN targets are left out with the inputs). |
+| LFO MUL | 36 values (x1..x2K, .1...2K, f1..f2K) | 24 values | The third group (`µ` in SYSEX) is undocumented; left out. The FX LFO has 24 values in both. |
+| DELAY X (ping-pong) | 0..127 | OFF / ON | Kept as the on/off switch the screen shows (unverified). |
+| REVERB GAI | 0..127 | 0..127 | Matches (an earlier draft had it signed; fixed). |
+
+## DSP implementation notes
+
+- Voices: one `a4-voice` worklet per track (`public/worklets/analog-four-processors.js`):
+  oscillators with the shared core's 4-point polyBLEP/polyBLAMP residuals, A4 sub
+  dividers, transistor pulse, sync modes and AM, noise, ladder, overdrive, multimode,
+  envelopes and LFOs in one node, so the A4's full modulation matrix (envelope times, LFO
+  speed, sends, levels...) works without native glue. Four worklet nodes instead of the
+  previous version's 36 shared nodes plus native gains.
+- FX track: the shared `Chorus` (BBD) and `Reverb2` (FDN) processors, and an `a4-fx`
+  worklet for the delay, the effect-to-effect sends and the master mix (see engine.ts).
+
