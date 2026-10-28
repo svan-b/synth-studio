@@ -1,33 +1,48 @@
 // ============================================================================
 // DFAM panel layout
-// All x/y in millimetres from the top-left of the black panel (wooden cheeks
-// excluded), matching the Moog DFAM manual panel diagram (p.5) and the patch
-// bay chart (p.15-16). Control x/y = control centre.
-// Reference: https://api.moogmusic.com/sites/default/files/2018-04/DFAM_Manual.pdf
+// All x/y in millimetres from the top-left of the black 60 HP panel (wooden
+// cheeks excluded). Control x/y = control centre. Positions follow the panel
+// diagram in the DFAM manual as read for the first build; sizes follow the
+// knob-cap evidence in REFERENCE.md (14 large caps, 3 small mixer caps,
+// 16 small sequencer caps). Long legends are printed on two lines, as on the
+// hardware, so neighbouring labels never collide on an iPad.
 // ============================================================================
 
 import type { PanelElement, PanelLayout } from '@/types/panel';
 
-// Knob cap diameters (mm) - the hardware uses three sizes
+// Knob cap diameters (mm)
 const LARGE = 17.8;
-const MEDIUM = 13.3;
-const SMALL = 8.9;
+const MIXER = 8.9;
+const SEQ = 9.4;
 
 const ROW1_Y = 18;
 const ROW2_Y = 48;
-const SWITCH_Y1 = 35;
-const SWITCH_Y2 = 63;
 const SEQ_PITCH_Y = 79;
-const SEQ_LED_Y = 86;
-const SEQ_VEL_Y = 93;
+const SEQ_LED_Y = 86.2;
+const SEQ_VEL_Y = 93.4;
 const STEP_X = (i: number) => 105 + i * 15;
 
-const knob = (control: string, x: number, y: number, diameter = LARGE, extra: Partial<Extract<PanelElement, { kind: 'knob' }>> = {}): PanelElement => ({
+const LEGEND = 7.6;   // px, two-line knob legends
+
+type KnobOpts = Partial<Extract<PanelElement, { kind: 'knob' }>>;
+const knob = (control: string, x: number, y: number, diameter = LARGE, extra: KnobOpts = {}): PanelElement => ({
   kind: 'knob', control, x, y, diameter, variant: 'moog-silver', ...extra,
 });
-const sw = (control: string, x: number, y: number): PanelElement => ({ kind: 'switch', control, x, y });
 
-// Patch bay: 3 columns x 8 rows, IN | IN | OUT on rows 1-6
+/** A large knob with its printed legend above it (one or two lines) */
+const main = (control: string, legend: string, x: number, y: number): PanelElement[] => {
+  const lines = legend.split('\n').length;
+  return [
+    knob(control, x, y, LARGE, { label: 'none' }),
+    { kind: 'label', text: legend, x, y: y - LARGE / 2 - (lines === 2 ? 3.3 : 2.1), size: LEGEND, letterSpacing: 0.3 },
+  ];
+};
+
+const sw = (control: string, x: number, y: number, labelText?: string): PanelElement => ({
+  kind: 'switch', control, x, y, scale: 1.3, ...(labelText ? { labelText } : {}),
+});
+
+// Patch bay: 3 columns x 8 rows - IN | IN | OUT on rows 1-6, three inputs on row 7, three outputs on row 8
 const PB_X = (col: number) => 253 + col * 18;
 const PB_Y = (row: number) => 21.5 + row * 11;
 const PATCH_GRID: [string, number, number][] = [
@@ -50,49 +65,51 @@ const elements: PanelElement[] = [
   { kind: 'label', text: 'OUT', x: 276, y: 11, size: 8, invert: true },
   ...PATCH_GRID.map(([jack, col, row]): PanelElement => ({ kind: 'jack', jack, x: PB_X(col), y: PB_Y(row) })),
 
-  // --- Row 1 -------------------------------------------------------------------
-  knob('vco_decay', 20, ROW1_Y),
-  sw('seq_pitch_mod', 36, SWITCH_Y1),
-  knob('vco1_eg_amount', 52, ROW1_Y),
-  knob('vco1_frequency', 84, ROW1_Y),
-  sw('vco1_wave', 104, 28),
-  knob('vco1_level', 124, 20, SMALL),
-  knob('noise_level', 124, 38, SMALL),
-  sw('vcf_mode', 140, 28),
-  knob('vcf_cutoff', 154, ROW1_Y),
-  knob('vcf_resonance', 180, ROW1_Y),
-  sw('vca_attack_mode', 202, 22),
-  knob('volume', 224, ROW1_Y),
+  // --- Row 1: VCO EG, VCO 1, mixer, VCF, VCA --------------------------------------
+  ...main('vco_decay', 'VCO\nDECAY', 20, ROW1_Y),
+  sw('seq_pitch_mod', 36, 35.5),
+  ...main('vco1_eg_amount', 'VCO 1\nEG AMOUNT', 52, ROW1_Y),
+  ...main('vco1_frequency', 'VCO 1\nFREQUENCY', 84, ROW1_Y),
+  sw('vco1_wave', 104, 27, 'VCO 1'),
+  knob('vco1_level', 124, 20, MIXER),
+  knob('noise_level', 124, 38, MIXER),
+  sw('vcf_mode', 140, 27, 'VCF'),
+  ...main('vcf_cutoff', 'CUTOFF', 154, ROW1_Y),
+  ...main('vcf_resonance', 'RESONANCE', 177.3, ROW1_Y),
+  sw('vca_attack_mode', 200.7, 22),
+  ...main('volume', 'VOLUME', 224, ROW1_Y),
 
-  // --- Row 2 -------------------------------------------------------------------
-  knob('fm_amount', 20, ROW2_Y),
-  sw('hard_sync', 36, SWITCH_Y2),
-  knob('vco2_eg_amount', 52, ROW2_Y),
-  knob('vco2_frequency', 84, ROW2_Y),
-  sw('vco2_wave', 104, 58),
-  knob('vco2_level', 124, 56, SMALL),
-  knob('vcf_decay', 154, ROW2_Y),
-  knob('vcf_eg_amount', 180, ROW2_Y),
-  knob('noise_vcf_mod', 200, ROW2_Y, MEDIUM),
-  knob('vca_decay', 224, ROW2_Y),
+  // --- Row 2: FM, VCO 2, mixer, VCF EG, VCA EG ------------------------------------
+  ...main('fm_amount', '1→2 FM\nAMOUNT', 20, ROW2_Y),
+  sw('hard_sync', 36, 64),
+  ...main('vco2_eg_amount', 'VCO 2\nEG AMOUNT', 52, ROW2_Y),
+  ...main('vco2_frequency', 'VCO 2\nFREQUENCY', 84, ROW2_Y),
+  sw('vco2_wave', 104, 57, 'VCO 2'),
+  knob('vco2_level', 124, 56, MIXER),
+  ...main('vcf_decay', 'VCF\nDECAY', 154, ROW2_Y),
+  ...main('vcf_eg_amount', 'VCF EG\nAMOUNT', 177.3, ROW2_Y),
+  ...main('noise_vcf_mod', 'NOISE /\nVCF MOD', 200.7, ROW2_Y),
+  ...main('vca_decay', 'VCA\nDECAY', 224, ROW2_Y),
 
   // --- Transport ----------------------------------------------------------------
-  { kind: 'button', control: 'trigger', event: 'trigger', x: 15, y: 76, w: 7.6, color: '#0f2a12', ledColor: '#22c55e', label: 'right' },
-  knob('tempo', 50, 76),
-  { kind: 'button', control: 'run_stop', x: 35, y: 94, w: 12.7, color: '#3a0909', ledColor: '#ef4444', label: 'none' },
-  { kind: 'button', control: 'advance', event: 'advance', x: 65, y: 94, w: 10.2, color: '#0f2a12', ledColor: '#22c55e', label: 'above' },
-  { kind: 'led', x: 27, y: 87, size: 2.6, color: '#ff3333', on: ({ values }) => !!values.run_stop },
-  { kind: 'label', text: 'RUN / STOP', x: 35, y: 88, size: 6, color: '#9ca3af' },
+  { kind: 'button', control: 'trigger', event: 'trigger', x: 15, y: 76, w: 8.6, color: '#0f2a12', ledColor: '#22c55e', label: 'right' },
+  ...main('tempo', 'TEMPO', 50, 78),
+  { kind: 'button', control: 'run_stop', x: 35, y: 96, w: 12.7, color: '#3a0909', ledColor: '#ef4444', label: 'none',
+    lit: ({ engine }) => !!engine.playing },
+  { kind: 'button', control: 'advance', event: 'advance', x: 65, y: 96, w: 10.2, color: '#0f2a12', ledColor: '#22c55e', label: 'above' },
+  { kind: 'led', x: 26.5, y: 88.6, size: 2.6, color: '#ff3333', on: ({ engine }) => !!engine.playing },
+  { kind: 'label', text: 'RUN / STOP', x: 35, y: 88.6, size: 6.5, color: '#9ca3af' },
 
   // --- Sequencer ----------------------------------------------------------------
   ...Array.from({ length: 8 }, (_, i): PanelElement => ({ kind: 'label', text: String(i + 1), x: STEP_X(i), y: 69.6, size: 9 })),
-  { kind: 'label', text: 'PITCH', x: 98, y: 78.2, size: 7, align: 'right', color: '#9ca3af' },
-  { kind: 'label', text: 'VELOCITY', x: 98, y: 92, size: 6, align: 'right', color: '#9ca3af' },
-  ...Array.from({ length: 8 }, (_, i) => knob(`pitch_${i + 1}`, STEP_X(i), SEQ_PITCH_Y, SMALL, { label: 'none', value: 'hover' })),
-  ...Array.from({ length: 8 }, (_, i) => knob(`velocity_${i + 1}`, STEP_X(i), SEQ_VEL_Y, SMALL, { label: 'none' })),
+  { kind: 'label', text: 'PITCH', x: 98, y: SEQ_PITCH_Y, size: 7, align: 'right', color: '#9ca3af' },
+  { kind: 'label', text: 'VELOCITY', x: 98, y: SEQ_VEL_Y, size: 6.5, align: 'right', color: '#9ca3af' },
+  ...Array.from({ length: 8 }, (_, i) => knob(`pitch_${i + 1}`, STEP_X(i), SEQ_PITCH_Y, SEQ, { label: 'none', value: 'hover' })),
+  ...Array.from({ length: 8 }, (_, i) => knob(`velocity_${i + 1}`, STEP_X(i), SEQ_VEL_Y, SEQ, { label: 'none' })),
+  // Step LEDs: the current step is always shown (so ADVANCE can be seen); it flashes on each hit
   ...Array.from({ length: 8 }, (_, i): PanelElement => ({
-    kind: 'led', x: STEP_X(i), y: SEQ_LED_Y, size: 3.8, color: '#ff3333',
-    on: ({ engine }) => (engine.step === i && (engine.playing || (engine.flash as number) > 0) ? 1 : 0),
+    kind: 'led', x: STEP_X(i), y: SEQ_LED_Y, size: 3.6, color: '#ff3333',
+    on: ({ engine }) => (engine.step === i ? ((engine.flash as number) > 0 ? 1 : engine.playing ? 0.7 : 0.35) : 0),
   })),
 
   // --- Branding -------------------------------------------------------------------
