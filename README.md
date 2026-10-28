@@ -1,152 +1,69 @@
 # Synth Studio
 
-**Digital Twin Learning System for Hardware Synthesizers**
+**Playable digital twins of hardware synthesizers that teach synthesis from first principles.**
 
-Pixel-perfect digital replicas of hardware synthesizers with real-time teaching indicators and step-by-step lessons.
+Every instrument is drawn from its real panel layout, makes sound with a real-time
+Web Audio engine, can be patched with cables, and comes with guided lessons. Each
+lesson step tells you which control to move and gives a one-line principle behind
+it, so you learn why the sound changes, not just where the knobs go.
 
-## 🎯 Features
+## Instruments
 
-### Exact Hardware Replicas
-- Every knob, slider, and button positioned exactly as on real hardware
-- Real hardware units: Hz, ms, octaves, semitones, cents, dB, steps
-- LED-style value displays showing current settings
-- 3D knobs with realistic shadows and indicators
-- All specifications verified from official manufacturer manuals
+| Instrument | Type |
+|---|---|
+| Moog DFAM | Semi-modular analog percussion, 24-point patch bay, 8-step sequencer |
+| Moog Mother-32 | Semi-modular mono synth, 32-point patch bay, 32-step sequencer |
+| Moog Subharmonicon | Subharmonic oscillators, polyrhythmic sequencers |
+| Moog Sub 37 | Paraphonic analog keyboard synth |
+| Elektron Analog Four MKII | Four-voice analog synth and sequencer with parameter pages |
+| Elektron Analog Rytm MKII | Analog drum machine with 12 pads |
+| Allen & Heath Xone:96 | Analog DJ mixer with dual VCF filters, with built-in sources |
 
-### Teaching System
-- **Green outline with pulse** = Adjust this control now
-- **Target indicators** = Shows where to turn the knob
-- **Auto-step advance** = Automatically moves to next step when correct
-- **Progress tracking** = Visual progress bar and step completion
-- **Manual references** = Direct links to official documentation
+## Using it
 
-### Currently Implemented
-- **Moog DFAM** (fully implemented)
-  - 20+ controls with exact specifications
-  - 3 complete lessons: Classic 909 Kick, 808 Sub Kick, Snappy Snare
-  - All specs from [official DFAM manual](https://api.moogmusic.com/sites/default/files/2018-04/DFAM_Manual.pdf)
+- **Sound** starts on your first tap or click (a browser rule). The badge in the toolbar shows the status and an output meter.
+- **Knobs**: drag up/down. Hold Shift for fine control, double-tap to reset, or use the arrow keys when focused.
+- **Patch cables**: tap an output jack, then an input (or drag between them). Tap a cable to unplug it.
+- **Keyboards**: A–K on the computer keyboard play notes, Z/X shift the octave, multi-touch chords work on iPad. **Space** toggles the transport.
+- **Presets** load from the toolbar, including their patch cables.
+- **Lessons**: pick one from *Start a lesson*. The control to change pulses orange and turns green when it's set right, then the lesson moves on. Use Back/Skip or tap any step to jump to it.
+- Works with mouse and touch. On iPad, use landscape. *Fit* scales the panel to the screen, and +/− zooms with sideways scrolling.
 
-### Coming Soon
-- Moog Mother-32
-- Moog Subharmonicon
-- Elektron Analog Four MKII
-- Elektron Analog Rytm MKII
-- Moog Sub 37
-- Allen & Heath Xone:96
+## Architecture
 
-## 🚀 Tech Stack
+```
+devices/<id>/          one folder per instrument (see docs/ADDING_A_DEVICE.md)
+  spec.ts              controls, patch bay, presets
+  layout.ts            panel drawing in millimetres
+  engine.ts            Web Audio engine (extends BaseEngine)
+  lessons.ts           guided lessons
+devices/index.ts       registry (instruments are code-split)
+components/panel/      generic panel renderer, cables, keyboard, step grid
+components/controls/   knob, slider, switch, button
+lib/audio/             shared AudioContext, engine base + patch router, DSP blocks
+public/worklets/       AudioWorklet DSP: PolyBLEP VCO (sync/FM/PWM), ladder filter, envelopes
+lib/controls/mapping.ts  value curves, formatting and lesson target matching
+store/studio.ts        Zustand store: control values, cables, lesson progress (persisted)
+```
 
-- **Framework:** Next.js 14 with App Router
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS
-- **State Management:** Zustand with persistence
-- **UI Components:** Radix UI for accessibility
-- **Deployment:** Vercel
+Patch cables are real audio-rate connections in the Web Audio graph, with
+hardware-style normals that break when you plug in. Musical timing runs on a
+look-ahead scheduler that uses the audio clock.
 
-## 📦 Installation
+## Development
 
 ```bash
 npm install
-```
-
-## 🛠️ Development
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## 🏗️ Build
-
-```bash
+npm run dev                 # http://localhost:3000
+npm run validate            # check every device's spec, layout, presets and lessons
+npx tsc --noEmit -p .       # type-check
 npm run build
-npm run start
+node scripts/smoke.cjs http://localhost:3000 <deviceId> ./out   # browser smoke test + audio levels
 ```
 
-## 📖 Usage
+## Deployment
 
-1. **Select a device** from the dropdown (currently only DFAM available)
-2. **Click "Start Lesson"** to choose from available lessons
-3. **Follow the instructions** in the sidebar
-4. **Adjust controls** to match target values (green indicators show which control)
-5. **System auto-advances** when you get close enough (5% tolerance)
-6. **Complete all steps** to finish the lesson
+The GitHub repo is connected to Vercel. Every push to a branch gets a preview URL
+(shown on the commit and pull request), and merging to `main` deploys production.
 
-### Laptop-Beside-Hardware Workflow
-- Open the app on your laptop next to your physical hardware
-- Match the digital twin controls to your hardware settings
-- Learn exact values instead of guessing knob positions
-- Build muscle memory for classic sounds
-
-## 🎛️ Component Architecture
-
-```
-/components
-  /controls
-    - Knob.tsx         # Rotary controls with teaching indicators
-    - Button.tsx       # Buttons with LED indicators
-    - Switch.tsx       # Multi-position switches
-  /devices
-    - DFAM.tsx         # Complete DFAM digital twin
-  /teaching
-    - Indicator.tsx    # Visual teaching hints
-    - Instructions.tsx # Step-by-step sidebar
-```
-
-## 📊 Data Structure
-
-All device specifications stored in `/data`:
-- Hardware-accurate control ranges
-- Real units (Hz, ms, octaves, etc.)
-- Preset patches from official manuals
-- Lesson steps with target values
-
-## 🎨 Design Principles
-
-### Hardware Accuracy
-- Exact control positions from panel layouts
-- Real value ranges from official specifications
-- Authentic LED colors and panel aesthetics
-- 3D knobs with realistic shadows
-
-### Teaching Clarity
-- Subtle indicators (outlines, not animations)
-- Clear target values shown
-- Progress tracking
-- Source attribution for all lessons
-
-### Pixel-Perfect Layout
-- CSS Grid and absolute positioning for exact placement
-- Responsive scaling maintains aspect ratio
-- Touch-friendly on tablets
-- Minimum 1024px width for usability
-
-## 🔗 References
-
-### Moog DFAM
-- [Official Manual PDF](https://api.moogmusic.com/sites/default/files/2018-04/DFAM_Manual.pdf)
-- Tempo Range: 10-300 BPM (0.7Hz - 700Hz capable)
-- VCO Range: ±5 octaves (10 octave range total)
-- Filter: 4-pole Moog Ladder (LP/HP switchable)
-
-### Specifications Sources
-- [Moog Music Official Site](https://www.moogmusic.com)
-- [Elektron Official Site](https://www.elektron.se)
-- [ManualsLib](https://www.manualslib.com)
-
-## 📝 License
-
-For educational and learning purposes.
-
-## 🤝 Contributing
-
-Contributions welcome! Areas for improvement:
-- Additional device implementations
-- More lessons for existing devices
-- Audio synthesis capabilities
-- Mobile responsive optimizations
-
----
-
-**Built with precision • Verified from official manuals • Optimized for learning**
+*Synth Studio is an educational project and is not affiliated with Moog Music, Elektron or Allen & Heath.*
