@@ -70,6 +70,8 @@ class EngineHub {
   init() {
     if (this.initialised || typeof window === 'undefined') return;
     this.initialised = true;
+    // Test/automation hook (lesson runner, smoke tests)
+    (window as unknown as { __synthStudio?: unknown }).__synthStudio = { store: useStudioStore, hub: this, transport };
     installAudioUnlock();
     const st = useStudioStore.getState();
     transport.attach(getAudioContext());

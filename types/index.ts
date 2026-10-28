@@ -278,6 +278,8 @@ export interface LessonStep {
   autoplay?: boolean;
   /** Hint ladder - revealed one at a time on request (guidance that fades) */
   hints?: string[];
+  /** One way to satisfy an open challenge - used by "show me" and the automated lesson runner */
+  solution?: { values?: Record<string, ControlValue>; patches?: PatchConnection[]; data?: unknown };
 }
 
 export interface MultipleChoice {
