@@ -61,6 +61,18 @@ function tanhf(x) {
   return x * (27 + x2) / (27 + 9 * x2);
 }
 
+/**
+ * Output buffer rail: unity gain up to RAIL_KNEE, then a tanh knee toward
+ * RAIL_MAX. However hot the patch (every source up, full RESONANCE, VCA CV
+ * on top), the instrument output never reaches 0 dBFS (1.0 = 5 V).
+ */
+const RAIL_KNEE = 0.7, RAIL_MAX = 0.98, RAIL_W = RAIL_MAX - RAIL_KNEE;
+function rail(x) {
+  if (x > RAIL_KNEE) return RAIL_KNEE + RAIL_W * tanhf((x - RAIL_KNEE) / RAIL_W);
+  if (x < -RAIL_KNEE) return -RAIL_KNEE - RAIL_W * tanhf((-x - RAIL_KNEE) / RAIL_W);
+  return x;
+}
+
 // ----------------------------------------------------------------------------
 // Band-limited oscillator edges (2-point polyBLEP / polyBLAMP).
 // The oscillator output runs one sample late, so a discontinuity found while
@@ -202,8 +214,8 @@ class DfamProcessor extends AudioWorkletProcessor {
     // Ladder state and coefficient cache
     this.z0 = 0; this.z1 = 0; this.z2 = 0; this.z3 = 0;
     this.cutLast = NaN; this.gCut = 0;
-    // DC blocker (8 Hz) on the main output
-    this.dcX = 0; this.dcY = 0; this.dcR = 1 - (2 * Math.PI * 8) / sr;
+    // DC blocker (5 Hz) on the main output, ahead of the output rail
+    this.dcX = 0; this.dcY = 0; this.dcR = 1 - (2 * Math.PI * 5) / sr;
 
     // UI reporting
     this.uiDirty = true; this.uiTrig = false; this.uiLast = -1;
@@ -538,9 +550,11 @@ class DfamProcessor extends AudioWorkletProcessor {
         const vol = s[K_VOLUME];
         main = amp * vol * vol;
       }
+      // AC-coupled output, then the rail: a sub-audio square stepping through the
+      // DC blocker can overshoot, so the rail comes last
       const dc = main - this.dcX + this.dcR * this.dcY;
       this.dcX = main; this.dcY = dc;
-      main = dc;
+      main = rail(dc);
 
       // ---- outputs ----
       const trig = this.trigOut > 0 ? 1 : 0;
