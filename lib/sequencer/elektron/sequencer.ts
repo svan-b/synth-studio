@@ -285,6 +285,7 @@ export class ElektronSequencer {
   private runMute: Uint8Array;
   /** Note of a held preview per track (-1 = none) */
   private previewNote: Int16Array;
+  private auditionStop: (() => void) | null = null;
   private rowMute: Uint8Array;
   private rowMuteOn = false;
   private nb: Int32Array;
@@ -586,6 +587,27 @@ export class ElektronSequencer {
     return ev;
   }
 
+  /**
+   * Lesson audition ("listen to the target"): play the selected pattern now on
+   * the internal clock, even while following a stopped studio transport.
+   * Returns the stop function (it restores the transport follow). Already
+   * playing: nothing to do.
+   */
+  audition(): () => void {
+    if (this.playing) return () => undefined;
+    const t = this.transport;
+    if (t) this.follow(null);
+    this.start();
+    this.auditionStop = () => {
+      this.auditionStop = null;
+      if (this.transport === null) {
+        this.stop();
+        if (t) this.follow(t);
+      }
+    };
+    return this.auditionStop;
+  }
+
   /** End a held preview on the track (note-off now) */
   previewOff(track: number, time = this.ctx.currentTime): void {
     const note = this.previewNote[track];
@@ -624,6 +646,8 @@ export class ElektronSequencer {
       case 'seq:preview:up':
         if (typeof p.track === 'number') this.previewOff(p.track);
         return true;
+      case 'seq:audition': this.audition(); return true;
+      case 'seq:audition:stop': this.auditionStop?.(); return true;
     }
     return false;
   }

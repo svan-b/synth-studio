@@ -1119,6 +1119,24 @@ test('song mode on the transport: rows advance on ticks, row tempo is left to th
   eq(r.tempos.length, 0);
 });
 
+test('audition: plays on the internal clock while following a stopped transport, then follows again', () => {
+  const tr = new FakeTransport();
+  const r = rig(proj(1, { 0: { 0: {}, 4: {} } }));
+  r.seq.follow(tr);
+  ok(r.seq.handleEvent('seq:audition'), 'handled');
+  r.clock.advance(0.7);
+  eq(r.trigs.map(e => e.step), [0, 4], 'played on the internal clock');
+  eq(r.seq.following, false);
+  r.seq.handleEvent('seq:audition:stop');
+  eq([r.seq.playing, r.seq.following], [false, true]);
+  tr.start(5);
+  tr.run(3);
+  eq(r.trigs.length, 3, 'the transport drives it again');
+  const noop = r.seq.audition();
+  noop();
+  eq(r.seq.playing, true, 'already playing: the audition leaves it alone');
+});
+
 /** Song-arranger stand-in: on bar ticks it picks each section's pattern, like lib/studio/arranger.ts */
 function arrangerOn(tr: FakeTransport, seq: ElektronSequencer, sections: PatternId[], viaEvent = false) {
   return tr.onTick(t => {
