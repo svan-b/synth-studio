@@ -19,6 +19,17 @@ import {
 import { Transport, type TransportEvent, type TransportTick } from '../lib/audio/transport';
 import type { DeviceUiApi } from '../devices/types';
 import type { ControlValue } from '../types';
+import type { CustomRenderContext } from '../types/panel';
+import * as ReactNS from 'react';
+import { createElement, type ComponentType } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import {
+  ChainBuilder, MenuKey, PagePicker, PatternPicker, ScaleMenu, SongEditor, TrigEditor, TrigKeys,
+} from '../components/sequencer';
+
+// The UI kit's .tsx files use Next's automatic JSX runtime; tsx compiles them with
+// the classic one here (tsconfig has jsx: preserve), which needs a global React.
+(globalThis as unknown as { React: typeof ReactNS }).React = ReactNS;
 
 // ----------------------------------------------------------------------------
 // Tiny harness
@@ -866,6 +877,22 @@ test('entering PER TRACK keeps playback: master length and change start at the p
   eq([p.patterns.A01.master, p.patterns.A01.change], [0, 32]);
 });
 
+test('preview (REC off trig keys): plays a step now with its locks; empty steps play the track default', () => {
+  const r = rig(proj(2, { 0: { 3: { note: 67, vel: 50, len: 30, cond: '1:8', locks: { cutoff: 7 } } } }));
+  r.clock.advance(1);
+  ok(r.seq.handleEvent('seq:preview', { track: 0, step: 3 }), 'handled');
+  const e = r.trigs[0];
+  eq([e.note, e.velocity, e.locks.cutoff, e.time, e.trigless], [67, 50, 7, 1, false]);
+  near(e.duration, 2 * STEP120);
+  r.seq.handleEvent('seq:preview:up', { track: 0 });
+  eq(r.offs, [{ track: 0, note: 67, time: 1 }]);
+  r.seq.handleEvent('seq:preview', { track: 1, step: 9 });
+  eq(r.trigs[1].note, 60, 'track default note');
+  r.seq.handleEvent('seq:preview:up', { track: 1 });
+  r.seq.handleEvent('seq:preview:up', { track: 1 });
+  eq(r.offs.length, 2, 'one note-off per preview');
+});
+
 test('a lock trig with a condition only applies its locks when the condition passes', () => {
   const p = updatePatternSettings(proj(1, { 0: { 0: { trigless: true, cond: '1:2', locks: { x: 1 } } } }), 'A01', { length: 1 });
   const r = rig(p);
@@ -1363,6 +1390,87 @@ test('setLock / updateSteps helpers: create rules', () => {
   eq(p.patterns.A01.tracks[0].vel, 127);
   p = chainAdd(p, 'H16');
   eq(p.chain, ['H16']);
+});
+
+// ============================================================================
+section('UI kit (server render)');
+
+function uiCtx(data: unknown, ui: Record<string, unknown> = {}, engine: Record<string, unknown> = {}, values: Record<string, ControlValue> = { track: 0 }): CustomRenderContext {
+  return {
+    values, engine, data, ui, teaching: false, step: null, instance: 'test',
+    setValue: () => undefined, sendEvent: () => undefined, updateData: () => undefined, setUi: () => undefined,
+  };
+}
+const html = <P,>(c: ComponentType<P>, props: P) => renderToStaticMarkup(createElement(c as ComponentType<object>, props as object));
+
+/** A project with every kind of content, and a playing snapshot of it */
+function busyProject(): { p: Project; seqState: unknown } {
+  let p = proj(4, {
+    0: { 0: { cond: '1:4', micro: -3 }, 2: { trigless: true, locks: { cutoff: 3 } }, 5: { retrig: { rate: 12, len: 30, vel: -20 }, accent: true, slide: true } },
+    1: { 1: { note: 70, len: 127, locks: { decay: 9 } } },
+  }, { length: 32, name: 'BUSY' });
+  p = setChain(p, ['A01', 'A02']);
+  p = songAddRow(p, { pattern: 'A01', repeats: 2, mutes: [1], tempo: 99, transpose: 3 });
+  p = songAddRow(p, { pattern: 'B02', repeats: 1, length: 8 });
+  const r = rig(p);
+  r.seq.start();
+  r.clock.advance(T0 + 3 * STEP120 + 0.01);
+  return { p, seqState: r.seq.getState() };
+}
+
+test('every component renders empty, busy and playing projects (open, in its box)', () => {
+  const { p, seqState } = busyProject();
+  const cases: [string, CustomRenderContext][] = [
+    ['missing data', uiCtx(undefined)],
+    ['busy', uiCtx(p)],
+    ['playing', uiCtx(p, {}, { seq: seqState, playing: true })],
+  ];
+  for (const [name, ctx] of cases) {
+    const parts = [
+      html(TrigKeys, { ctx }), html(TrigKeys, { ctx, mode: 'mute' as const, rows: 2 as const }), html(PagePicker, { ctx }),
+      html(PatternPicker, { ctx, open: true }), html(ChainBuilder, { ctx, open: true }), html(SongEditor, { ctx, open: true, transpose: true }),
+      html(ScaleMenu, { ctx, open: true }), html(MenuKey, { ctx, menu: 'pattern' as const }),
+      html(TrigEditor, { ctx: { ...ctx, ui: { trigEditor: { track: 0, pattern: 'A01', steps: [5] } } } }),
+    ];
+    parts.forEach((h, i) => ok(h.length > 20, `${name}: component ${i} rendered`));
+  }
+});
+
+test('TrigKeys: LED states for trigs, lock trigs, playhead, held keys, conditions and pages', () => {
+  const { p, seqState } = busyProject();
+  const h = html(TrigKeys, { ctx: uiCtx(p, { heldSteps: [5], heldTrack: 0, heldPattern: 'A01' }, { seq: seqState }) });
+  ok(h.includes('data-step="0" data-trig="note"'), 'note trig');
+  ok(h.includes('data-step="2" data-trig="lock"'), 'lock trig');
+  ok(/data-step="3" data-trig="none" data-playhead="1"/.test(h), 'playhead on step 4');
+  ok(/data-step="5" data-trig="note" data-held="1"/.test(h), 'held step');
+  ok(h.includes('>1:4<'), 'condition label');
+  const page2 = html(TrigKeys, { ctx: uiCtx(p, { stepPage: 1 }) });
+  ok(page2.includes('data-step="16"') && !page2.includes('data-step="15"'), 'page 2 shows steps 17-32');
+  ok(html(TrigKeys, { ctx: uiCtx(p, { stepPage: 3 }) }).includes('data-step="16"'), 'a page beyond the length clamps to the last page');
+});
+
+test('overlays render only when open (prop or ui.seqMenu); TrigEditor only with a target', () => {
+  const ctx = uiCtx(createProject({ tracks: 4 }));
+  eq(html(PatternPicker, { ctx }), '');
+  eq(html(SongEditor, { ctx }), '');
+  eq(html(TrigEditor, { ctx }), '');
+  ok(html(ChainBuilder, { ctx: uiCtx(ctx.data, { seqMenu: 'chain' }) }).includes('CHAIN'), 'ui.seqMenu opens it');
+  eq(html(ScaleMenu, { ctx: uiCtx(ctx.data, { seqMenu: 'scale' }), portal: true }), '', 'a portal waits for the client');
+});
+
+test('PatternPicker / SongEditor reflect playing, cued and song state', () => {
+  const { p } = busyProject();
+  const r = rig(p);
+  r.seq.start();
+  r.clock.advance(T0 + 2 * STEP120);
+  r.seq.queuePattern('A02');
+  r.clock.advance(0.01);
+  const picker = html(PatternPicker, { ctx: uiCtx(p, {}, { seq: r.seq.getState() }), open: true });
+  ok(picker.includes('data-pattern="A01" data-state="playing"'), 'playing pattern');
+  ok(picker.includes('data-pattern="A02" data-state="queued"') && picker.includes('seq-blink'), 'cued pattern blinks');
+  const song = html(SongEditor, { ctx: uiCtx(p), open: true, transpose: true });
+  ok(song.includes('×2') && song.includes('>99<') && song.includes('+3') && song.includes('>8<'), 'row values');
+  ok(song.includes('aria-label="Unmute T2 in row 1"'), 'row mutes');
 });
 
 // ============================================================================

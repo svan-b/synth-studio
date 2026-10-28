@@ -283,6 +283,8 @@ export class ElektronSequencer {
   private rtIdx: Int32Array;
   private rtBase: (TrigEvent | null)[];
   private runMute: Uint8Array;
+  /** Note of a held preview per track (-1 = none) */
+  private previewNote: Int16Array;
   private rowMute: Uint8Array;
   private rowMuteOn = false;
   private nb: Int32Array;
@@ -337,6 +339,7 @@ export class ElektronSequencer {
     this.rtIdx = new Int32Array(n);
     this.rtBase = new Array(n).fill(null);
     this.runMute = new Uint8Array(n);
+    this.previewNote = new Int16Array(n).fill(-1);
     this.rowMute = new Uint8Array(n);
     this.aSteps = new Int32Array(n).fill(-1);
     this.nb = new Int32Array(n);
@@ -558,6 +561,40 @@ export class ElektronSequencer {
   }
 
   /**
+   * Audition one step now (REC off: trig keys play their step; the hardware's
+   * trig preview). Emits onTrig with the step's note, velocity, length and
+   * locks - the track's defaults on an empty step - outside the sequence:
+   * conditions, mutes and retrigs are ignored. previewOff() ends a held preview.
+   */
+  preview(track: number, step: number, pattern?: PatternId, time = this.ctx.currentTime): TrigEvent | null {
+    if (!(track >= 0 && track < this.n)) return null;
+    const id = pattern && isPatternId(pattern) ? pattern : this.cur ? this.curId : this.startId ?? this.project.active;
+    const pat = getPattern(this.project, id);
+    const t = pat.tracks[track] ?? createTrack(this.project.defaults[track]);
+    const s: Step = t.steps[clamp(Math.round(step), 0, MAX_STEPS - 1)] ?? {};
+    const speed = pat.scaleMode === 'track' && t.speed ? t.speed : pat.speed;
+    const stepSec = ((SPEED_TICKS[speed] ?? TICKS_PER_16TH) * 60) / (this.tempo * SEQ_PPQN);
+    const note = clamp((s.note ?? t.note) + this.transpose, 0, 127);
+    const ev: TrigEvent = {
+      track, step, pattern: id, time, duration: NOTE_LENGTHS[clamp(s.len ?? t.len, 0, NOTE_LENGTHS.length - 1)] * stepSec,
+      note, velocity: clamp(s.vel ?? t.vel, 1, 127), locks: s.locks ?? EMPTY_LOCKS, trigless: false, slide: false,
+      paramSlide: false, slideTo: null, accent: s.accent === true, retrig: false, retrigIndex: 0, fill: false,
+      conditionPassed: true, condition: '', loop: 0, stepDuration: stepSec,
+    };
+    this.previewNote[track] = note;
+    this.o.onTrig?.(ev);
+    return ev;
+  }
+
+  /** End a held preview on the track (note-off now) */
+  previewOff(track: number, time = this.ctx.currentTime): void {
+    const note = this.previewNote[track];
+    if (note === undefined || note < 0) return;
+    this.previewNote[track] = -1;
+    this.o.onNoteOff?.(track, note, time);
+  }
+
+  /**
    * Route the UI kit's sequencer events (components call ctx.sendEvent with
    * these names). Returns true when handled - call it first in engine.event().
    */
@@ -580,6 +617,12 @@ export class ElektronSequencer {
       case 'seq:stop': this.stop(); return true;
       case 'arranger:pattern':
         if (typeof p.id === 'string') this.selectPattern(p.id, typeof p.time === 'number' ? p.time : undefined);
+        return true;
+      case 'seq:preview':
+        if (typeof p.track === 'number' && typeof p.step === 'number') this.preview(p.track, p.step, typeof p.pattern === 'string' ? p.pattern : undefined);
+        return true;
+      case 'seq:preview:up':
+        if (typeof p.track === 'number') this.previewOff(p.track);
         return true;
     }
     return false;
