@@ -163,7 +163,7 @@ data, so don't mutate it.
 |---|---|
 | `track`, `step`, `pattern`, `loop` | where it came from; `loop` is the track's loop counter |
 | `time` | start, with swing, micro timing and retrig offsets |
-| `duration` | gate length in seconds (`Infinity` for LEN INF). A matching `onNoteOff(track, note, time)` follows; the next note on the track, a stop or a pattern change cut it earlier |
+| `duration` | gate length in seconds (`Infinity` for LEN INF). A matching `onNoteOff(track, note, time)` follows; the next note on the track (in any pattern) or a stop cuts it earlier |
 | `note`, `velocity` | step value or track default; song-row transpose included; velocity 1–127 after the retrig curve |
 | `locks` | the trig's parameter locks (apply for this trig only, see `LockTracker`) |
 | `trigless` | lock trig: apply `locks` to the sounding voice, start no note (no note-off follows) |
@@ -273,6 +273,17 @@ const module: DeviceModule = {
   LEN, micro timing, condition), the track defaults with `trackDefaults`, and
   the track probability. Use `isLocked(api, LOCKS, id)` for a locked-encoder
   highlight and `clearLock(api, LOCKS, id)` to remove one (e.g. on a double tap).
+- **TRIG page controls** that `lockKey` maps to the special keys must use these
+  value ranges (spec `knob` with `step: 1` and a `format`):
+
+  | key | control value | readout |
+  |---|---|---|
+  | `note` | MIDI note 0–127 | `formatNote` |
+  | `vel` | 1–127 | |
+  | `len` | `NOTE_LENGTHS` index 0–127 (14 = 1/16, 127 = INF) | `formatLength` |
+  | `micro` | −23…23 | `formatMicro` |
+  | `cond` | `TRIG_CONDITIONS` index (0 = none) | `TRIG_CONDITIONS[v] \|\| 'NONE'` |
+  | `prob` | 0–100 (track probability, not a lock) | `${v}%` |
 - **`studio.patterns`** lists the patterns that hold trigs for the arranger;
   the arranger's `event('arranger:pattern', { id, time })` goes straight to
   `seq.handleEvent`. While it drives the patterns, `SeqState.arranged` is true.
@@ -357,8 +368,12 @@ check: s => { const p = asProject(s.data, 12); return trigSteps(p, p.active, 0).
 
 ## 5. Fidelity
 
-Researched against the A4 MKII / AR MKII manuals' sequencer chapters (and the
-Digitakt / Cycles manuals where those are clearer – the conditions are shared).
+Researched from excerpts of the Analog Four / Analog Rytm manuals' sequencer
+chapters, the Digitakt / Cycles manuals (the trig conditions are shared), the
+A4 OS 1.50 / AR OS 1.60 release notes and Elektronauts reports. Two behaviours
+are inferred rather than quoted: swing at speeds other than 1x follows the step
+positions (as the Machinedrum / Monomachine manuals describe), and A:B / 1ST
+count each track's own loops.
 
 **Modelled**: 8 banks × 16 patterns; length 1–64 in pages of 16; scale 2x…1/8x
 per pattern or PER TRACK with master length (INF) and master change (OFF);

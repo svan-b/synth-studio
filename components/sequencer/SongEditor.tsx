@@ -187,7 +187,7 @@ export default function SongEditor(props: SongEditorProps) {
                 onClick={e => { e.stopPropagation(); edit(p => songToggleMute(p, i, t)); }}
                 onPointerDown={e => e.stopPropagation()}
                 style={{
-                  width: 30, height: 30, padding: 0, borderRadius: 3, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', userSelect: 'none',
+                  width: 30, height: 30, padding: 0, borderRadius: 3, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none',
                   border: `1px solid ${muted ? C.border : '#2f5f3e'}`, background: muted ? '#26282b' : '#1f4a2c',
                   color: muted ? C.faint : '#bff5cf', fontFamily: FONT, fontSize: 9, fontWeight: 800, overflow: 'hidden', whiteSpace: 'nowrap',
                 }}

@@ -210,7 +210,7 @@ export default function TrigEditor(props: TrigEditorProps) {
                       type="button"
                       aria-label={`Clear ${k} lock`}
                       onClick={() => editProject(ctx, tracks, pr => setLock(pr, pattern, track, steps, k, null, { create: false }))}
-                      style={{ width: 28, height: 28, border: 'none', background: 'transparent', color: C.text, fontSize: 14, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                      style={{ width: 28, height: 28, border: 'none', background: 'transparent', color: C.text, fontSize: 14, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none' }}
                     >
                       ×
                     </button>
