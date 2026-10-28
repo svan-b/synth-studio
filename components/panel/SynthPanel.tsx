@@ -547,12 +547,14 @@ function PanelButton({ el, spec, layout, values, ctx, teaching, step, px, onChan
     if (el.event) onEvent(`${el.event}:up`);
   };
 
+  // Radio keys on a switch control are named after the option they select
+  const radioLabel = isRadio && controlSpec?.type === 'switch' ? (controlSpec as SwitchSpec).options[el.setValue as number] : undefined;
   const w = px(el.w ?? 7);
   return (
     <Anchor x={px(el.x)} y={px(el.y)}>
       <Button
         id={el.control ?? el.event ?? 'button'}
-        label={el.labelText ?? (controlSpec ? controlSpec.label : undefined)}
+        label={el.labelText ?? radioLabel ?? (controlSpec ? controlSpec.label : undefined)}
         description={controlSpec?.description}
         lit={lit}
         onPress={press}
