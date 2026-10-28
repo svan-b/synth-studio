@@ -117,8 +117,9 @@ function LoadedDevice({ device, mod }: { device: string; mod: DeviceModule }) {
       const t = e.target as HTMLElement;
       if (e.metaKey || e.ctrlKey || e.altKey || t.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (e.key === ' ' && mod.transportControl) {
-        if (t.closest('button, [role="slider"]')) return;
+        // Space is always transport (even when a panel button has focus)
         e.preventDefault();
+        if (e.repeat) return;
         ensureAudio();
         const cur = useStudioStore.getState().devices[device]?.controlValues[mod.transportControl] ?? defaults[mod.transportControl];
         setControlValue(device, mod.transportControl, !cur);

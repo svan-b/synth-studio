@@ -86,8 +86,8 @@ export default function Button({
         onPointerUp={up}
         onPointerCancel={up}
         onContextMenu={e => e.preventDefault()}
-        onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onPress(); } }}
-        onKeyUp={e => { if (e.key === ' ' || e.key === 'Enter') onRelease?.(); }}
+        onKeyDown={e => { if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); onPress(); } }}
+        onKeyUp={e => { if (e.key === 'Enter') onRelease?.(); }}
         className="absolute inset-0 border-2 border-[#3a3a3a] active:scale-95 transition-transform"
         style={{
           borderRadius: radius,
