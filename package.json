@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "validate": "tsx scripts/validate-devices.ts"
+    "validate": "tsx scripts/validate-devices.ts",
+    "test:seq": "tsx scripts/test-sequencer.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
