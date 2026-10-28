@@ -1,0 +1,1 @@
+{"id":"behringer-neutron","manufacturer":"Behringer","device":"Neutron","source":"https://github.com/pencilresearch/midi/blob/main/Behringer/Neutron.csv","params":[{"name":"Modulation wheel","section":"General","cc":1,"lsb":21},{"name":"Damper pedal on/off","section":"General","cc":40}],"suggested":[0]}
