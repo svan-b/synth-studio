@@ -13,8 +13,7 @@
 // at full size instead (good on a scaled-down panel).
 // ============================================================================
 
-import { useEffect, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import type { ReactNode } from 'react';
 import type { CustomRenderContext } from '@/types/panel';
 import {
   LEN_INF, PROBABILITIES, RETRIG_DEFAULT, RETRIG_RATES, RETRIG_VEL_MAX, RETRIG_VEL_MIN,
@@ -22,7 +21,9 @@ import {
   formatNote, formatRetrigRate, formatSigned, getPattern, isAB, isProbability, probabilityOf, setLock, setStep,
   updateSteps, type Step, type StepPatch,
 } from '@/lib/sequencer/elektron';
-import { C, FONT, MONO, SeqButton, SeqStyles, Stepper, UI, clampN, editProject, lessonFocus, projectOf, type TrigEditorTarget } from './shared';
+import {
+  C, FONT, MONO, Overlay, SeqButton, SeqStyles, Stepper, UI, clampN, editProject, lessonFocus, projectOf, type TrigEditorTarget,
+} from './shared';
 
 export interface TrigEditorProps {
   ctx: CustomRenderContext;
@@ -38,6 +39,8 @@ export interface TrigEditorProps {
   noteRange?: [number, number];
   /** Float over the page (document.body) instead of filling the custom element */
   portal?: boolean;
+  /** Portal size in px (default 620 x 460) */
+  portalSize?: { w: number; h: number };
   /** Track names for the title */
   trackNames?: string[];
 }
@@ -57,8 +60,6 @@ export default function TrigEditor(props: TrigEditorProps) {
   const { ctx } = props;
   const tracks = props.tracks ?? 4;
   const target = ctx.ui[UI.trigEditor] as TrigEditorTarget | null | undefined;
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
   if (!target || !Array.isArray(target.steps) || !target.steps.length) return null;
 
   const project = projectOf(ctx, tracks);
@@ -223,13 +224,5 @@ export default function TrigEditor(props: TrigEditorProps) {
     </div>
   );
 
-  if (props.portal && mounted && typeof document !== 'undefined') {
-    return createPortal(
-      <div style={{ position: 'fixed', left: '50%', top: 12, transform: 'translateX(-50%)', width: 'min(620px, calc(100vw - 24px))', height: 'min(460px, calc(100vh - 24px))', zIndex: 60 }}>
-        {body}
-      </div>,
-      document.body,
-    );
-  }
-  return <div style={{ position: 'absolute', inset: 0, zIndex: 30 }}>{body}</div>;
+  return <Overlay portal={props.portal} portalSize={props.portalSize ?? { w: 620, h: 460 }}>{body}</Overlay>;
 }

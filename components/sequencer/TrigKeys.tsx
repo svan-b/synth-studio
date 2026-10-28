@@ -7,10 +7,14 @@
 //                       encoder parameter-locks it (an empty step becomes a lock
 //                       trig); release leaves the trig as it is
 //   hold one + tap more selects the range of steps between them (multi-touch)
-//   long hold / double tap   opens the TrigEditor; while it is open the steps
-//                       stay held, so mouse users can lock with the encoders
+//   long hold, then release without turning anything / double tap
+//                       opens the TrigEditor (it never pops up mid-gesture);
+//                       while it is open the steps stay held, so mouse users
+//                       can lock with the encoders too
+//   editor open         keys pick the step(s) it edits (shift-click: a range)
 //   mode 'accent' | 'slide' | 'pslide'   taps toggle that trig flag
-//   mode 'mute'         keys 1..N mute / unmute tracks
+//   mode 'mute'         keys 1..N mute / unmute tracks (the pattern's mutes, or
+//                       the sequencer's live mutes with muteTarget 'live')
 //   editable false      (REC off) keys audition steps: 'seq:preview' / 'seq:preview:up'
 //
 // LEDs: red note trig, amber lock trig, white ring = playhead, dim when the
@@ -18,7 +22,7 @@
 // accent. Lesson steps light keys with focus ids 'seq:trig:<n>' or 'seq:trigs'.
 // ============================================================================
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CustomRenderContext } from '@/types/panel';
 import {
   getPattern, setStep, setTrackMute, stepHasLocks, trackLength, updateSteps,
@@ -56,6 +60,8 @@ export interface TrigKeysProps {
   /** Open the TrigEditor on long hold / double tap (default true) */
   editor?: boolean;
   numbered?: boolean;
+  /** Mute mode writes the pattern's track mutes (saved) or the sequencer's live mutes ('seq:mute') */
+  muteTarget?: 'pattern' | 'live';
 }
 
 interface Hold {
@@ -65,7 +71,8 @@ interface Hold {
   before: Step | undefined;
   stepsRef: unknown;
   range: boolean;
-  opened: boolean;
+  /** Held past longPressMs: releasing without an edit opens the editor */
+  long: boolean;
   timer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -101,6 +108,9 @@ export default function TrigKeys(props: TrigKeysProps) {
   const extra = useRef(new Map<number, number>()); // other pointers in a range gesture -> step
   const lastTap = useRef<{ step: number; time: number; before: Step | undefined; wasOn: boolean } | null>(null);
   const preview = useRef(-1);
+  /** Step whose long hold is armed (release opens the editor) - drawn with a pulsing ring */
+  const [armed, setArmed] = useState(-1);
+  const muteLive = props.muteTarget === 'live';
 
   // Unmount / page or track change: drop a pending hold
   useEffect(() => () => { if (hold.current?.timer) clearTimeout(hold.current.timer); }, []);
@@ -126,8 +136,12 @@ export default function TrigKeys(props: TrigKeysProps) {
 
     if (l.mode === 'mute') {
       if (i < l.project.tracks) {
-        const muted = !!getPattern(l.project, l.pattern).tracks[i]?.mute;
-        editProject(l.ctx, l.tracks, p => setTrackMute(p, l.pattern, i, !muted));
+        if (muteLive) {
+          l.ctx.sendEvent('seq:mute', { track: i });
+        } else {
+          const muted = !!getPattern(l.project, l.pattern).tracks[i]?.mute;
+          editProject(l.ctx, l.tracks, p => setTrackMute(p, l.pattern, i, !muted));
+        }
       }
       return;
     }
@@ -167,17 +181,16 @@ export default function TrigKeys(props: TrigKeysProps) {
 
     const before = l.steps[step] as Step | undefined;
     const nh: Hold = {
-      step, pointer: e.pointerId, wasOn: !!before, before, stepsRef: l.steps, range: false, opened: false, timer: null,
+      step, pointer: e.pointerId, wasOn: !!before, before, stepsRef: l.steps, range: false, long: false, timer: null,
     };
     if (editor) {
       nh.timer = setTimeout(() => {
         const cur = hold.current;
         if (!cur || cur !== nh) return;
         const lv = live.current;
-        if (lv.ctx.ui[UI.heldEdited] === true || lv.steps !== cur.stepsRef) return; // it was a p-lock gesture
-        cur.opened = true;
-        const held = Array.isArray(lv.ctx.ui[UI.heldSteps]) ? (lv.ctx.ui[UI.heldSteps] as number[]) : [cur.step];
-        openEditor({ track: lv.track, pattern: lv.pattern, steps: held.length ? held : [cur.step] });
+        if (lv.ctx.ui[UI.heldEdited] === true || lv.steps !== cur.stepsRef) return; // it is a p-lock gesture
+        cur.long = true;
+        setArmed(cur.step);
       }, longPressMs);
     }
     hold.current = nh;
@@ -196,8 +209,14 @@ export default function TrigKeys(props: TrigKeysProps) {
     if (!h || h.pointer !== e.pointerId) return;
     hold.current = null;
     if (h.timer) clearTimeout(h.timer);
-    if (h.opened) return; // the editor keeps the steps held
+    setArmed(-1);
     const edited = l.ctx.ui[UI.heldEdited] === true || l.steps !== h.stepsRef;
+    if (h.long && !edited && !cancelled) {
+      // Long hold released without a lock: edit the held step (or range)
+      const held = Array.isArray(l.ctx.ui[UI.heldSteps]) ? (l.ctx.ui[UI.heldSteps] as number[]) : [];
+      openEditor({ track: l.track, pattern: l.pattern, steps: held.length ? held.slice() : [h.step] });
+      return;
+    }
     if (h.range || edited || cancelled) {
       release();
       return;
@@ -237,7 +256,7 @@ export default function TrigKeys(props: TrigKeysProps) {
 
     if (mode === 'mute') {
       const exists = i < project.tracks;
-      const muted = exists && !!pat.tracks[i]?.mute;
+      const muted = exists && (muteLive ? !!st?.mutes?.[i] : !!pat.tracks[i]?.mute);
       fill = !exists ? '#17181a' : muted ? '#26282b' : C.green;
       lit = exists && !muted ? 1 : 0;
       text = lit ? '#0d1a10' : C.dim;
@@ -263,7 +282,7 @@ export default function TrigKeys(props: TrigKeysProps) {
         onPointerCancel={e => up(e, true)}
         onLostPointerCapture={e => up(e, true)}
         onContextMenu={e => e.preventDefault()}
-        className={target ? 'seq-target' : undefined}
+        className={armed === step && mode === 'trig' ? 'seq-armed' : target ? 'seq-target' : undefined}
         style={{
           position: 'relative', flex: 1, minWidth: 0, minHeight: 28, borderRadius: 3, border: `1px solid ${held ? C.amber : C.border}`,
           background: fill, opacity: dimmed ? 0.42 : 1, touchAction: 'none', userSelect: 'none', cursor: inLen || mode === 'mute' ? 'pointer' : 'default',

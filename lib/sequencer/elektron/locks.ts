@@ -16,10 +16,15 @@
 // ui.heldSteps (and the track / pattern they show in ui.heldTrack /
 // ui.heldPattern, which win over currentTrack / currentPattern).
 //
-// lockKey may return the step fields 'note' | 'vel' | 'len' | 'micro' for the
-// TRIG page encoders: those write the trig's own NOTE / VEL / LEN / micro timing.
-// With `trackDefaults: true`, turning them with nothing held edits the track's
-// trig defaults in the pattern (the TRIG page), like the hardware.
+// lockKey may also return these keys for the TRIG page encoders:
+//   'note' | 'vel' | 'len' | 'micro'   the held trig's own NOTE / VEL / LEN /
+//                                      micro timing (control value = the number)
+//   'cond'                             the held trig's condition (control value =
+//                                      index into TRIG_CONDITIONS, 0 = none)
+//   'prob'                             the track's trig probability 0..100 (held
+//                                      or not - it's a track setting)
+// With `trackDefaults: true`, turning NOTE / VEL / LEN with nothing held edits
+// the track's trig defaults in the pattern (the TRIG page), like the hardware.
 // ============================================================================
 
 import type { ControlValue } from '@/types';
@@ -27,7 +32,9 @@ import type { Values } from '@/types/panel';
 import type { DeviceUiApi } from '@/devices/types';
 import type { PatternId, Project, Step, TrackDefaults } from './types';
 import { asProject, getPattern, isPatternId } from './project';
-import { clearLocks, isStepField, setLock, setTrackDefault, type StepField } from './edit';
+import {
+  TRACK_PROB_KEY, clearLocks, isStepField, setLock, setTrackDefault, setTrackProb, stepFieldValue, type StepField,
+} from './edit';
 
 /** ui keys shared by the sequencer UI kit and these helpers */
 export const UI_HELD_STEPS = 'heldSteps';
@@ -110,20 +117,21 @@ export function interceptForLocks(id: string, value: ControlValue, api: DeviceUi
   const key = lockKeyOf(opts, id);
   if (!key) return false;
   const held = heldSteps(api.ui);
-  if (!held.length) {
-    const field = isStepField(key) ? FIELD_TO_DEFAULT[key] : undefined;
-    if (!opts.trackDefaults || !field) return false;
-    const v = toLockValue(opts, id, value);
-    if (v === null) return false;
-    const { track, pattern } = heldTarget(api, opts);
-    if (!sameTrack(opts, id, track)) return false;
-    api.updateData(d => setTrackDefault(asProject(d, opts.tracks), pattern, track, field, v));
-    return true;
-  }
+  const field = isStepField(key) ? FIELD_TO_DEFAULT[key] : undefined;
+  // Nothing held: only the TRIG page's track settings are intercepted
+  if (!held.length && key !== TRACK_PROB_KEY && !(opts.trackDefaults && field)) return false;
   const v = toLockValue(opts, id, value);
   if (v === null) return false;
   const { track, pattern } = heldTarget(api, opts);
   if (!sameTrack(opts, id, track)) return false;
+  if (key === TRACK_PROB_KEY) {
+    api.updateData(d => setTrackProb(asProject(d, opts.tracks), pattern, track, v));
+    return true;
+  }
+  if (!held.length) {
+    api.updateData(d => setTrackDefault(asProject(d, opts.tracks), pattern, track, field!, v));
+    return true;
+  }
   const steps = held.slice();
   api.updateData(d => setLock(asProject(d, opts.tracks), pattern, track, steps, key, v));
   if (api.ui[UI_HELD_EDITED] !== true) api.setUi({ [UI_HELD_EDITED]: true });
@@ -132,7 +140,7 @@ export function interceptForLocks(id: string, value: ControlValue, api: DeviceUi
 
 function lockedValue(step: Step | undefined, key: string): number | undefined {
   if (!step) return undefined;
-  if (isStepField(key)) return step[key];
+  if (isStepField(key)) return stepFieldValue(step, key);
   return step.locks?.[key];
 }
 
@@ -140,12 +148,13 @@ const displayCache = new WeakMap<LockOptions, { values: Values; data: unknown; u
 
 /**
  * DeviceModule.displayValues: the stored values with the first held step's
- * locks overlaid (and the track's trig defaults for the step fields when
- * `trackDefaults`). Returns `api.values` itself when there is nothing to show.
+ * locks overlaid - its NOTE / VEL / LEN (the track defaults when it has none),
+ * micro timing and condition - plus the track's trig defaults when nothing is
+ * held and `trackDefaults`, and the track probability. Returns `api.values`
+ * itself when nothing differs.
  */
 export function displayWithLocks(api: Pick<DeviceUiApi, 'values' | 'data' | 'ui'>, opts: LockOptions): Values {
   const held = heldSteps(api.ui);
-  if (!held.length && !opts.trackDefaults) return api.values;
   const c = displayCache.get(opts);
   if (c && c.values === api.values && c.data === api.data && c.ui === api.ui) return c.out;
   const project = asProject(api.data, opts.tracks);
@@ -157,10 +166,16 @@ export function displayWithLocks(api: Pick<DeviceUiApi, 'values' | 'data' | 'ui'
   for (const id in api.values) {
     const key = lockKeyOf(opts, id);
     if (!key || !sameTrack(opts, id, track)) continue;
-    let v = lockedValue(step, key);
-    if (v === undefined && t && isStepField(key)) {
-      const f = FIELD_TO_DEFAULT[key];
-      if (f && (held.length || opts.trackDefaults)) v = t[f];
+    let v: number | undefined;
+    if (key === TRACK_PROB_KEY) {
+      v = t ? t.prob ?? 100 : undefined;
+    } else {
+      v = lockedValue(step, key);
+      if (v === undefined && t && isStepField(key)) {
+        const f = FIELD_TO_DEFAULT[key];
+        if (f && (held.length || opts.trackDefaults)) v = t[f];
+        else if (!f && held.length) v = 0; // held trig without micro timing / condition
+      }
     }
     if (v === undefined) continue;
     const curV = api.values[id];

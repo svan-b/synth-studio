@@ -1319,6 +1319,27 @@ test('trackDefaults: TRIG page encoders edit the track defaults when nothing is 
   eq(displayWithLocks(api, opts).t3_trig_note, 48);
 });
 
+test('TRIG page COND and PROB encoders: condition of the held trig, probability of the track', () => {
+  const api = fakeApi(proj(4, { 0: { 0: {} } }), { track: 0, t1_cond: 0, t1_prob: 100, t1_micro: 0 }, { heldSteps: [0] });
+  const fiftyPct = TRIG_CONDITIONS.indexOf('50%');
+  eq(interceptForLocks('t1_cond', fiftyPct, api, LOCKS), true);
+  eq(getStep(api.project(), 'A01', 0, 0), { cond: '50%' });
+  eq(displayWithLocks(api, LOCKS).t1_cond, fiftyPct);
+  eq(displayWithLocks(api, LOCKS).t1_micro, 0, 'held trig without micro timing shows 0');
+  interceptForLocks('t1_cond', 0, api, LOCKS);
+  eq(getStep(api.project(), 'A01', 0, 0), {}, 'index 0 removes the condition');
+  // A condition alone doesn't make a lock trig on an empty step
+  api.setUi({ heldSteps: [5] });
+  interceptForLocks('t1_cond', fiftyPct, api, LOCKS);
+  eq(getStep(api.project(), 'A01', 0, 5), undefined);
+  // PROB is a track setting, held or not
+  api.setUi({ heldSteps: [] });
+  eq(interceptForLocks('t1_prob', 40, api, LOCKS), true);
+  eq(api.project().patterns.A01.tracks[0].prob, 40);
+  eq(displayWithLocks(api, LOCKS).t1_prob, 40);
+  eq(interceptForLocks('t1_micro', 5, api, LOCKS), false, 'micro with nothing held passes through');
+});
+
 test('the scheduler plays the lock for that step only (LockTracker reverts on the next trig)', () => {
   const api = fakeApi(proj(1, { 0: { 0: {}, 1: {}, 2: {} } }), { track: 0, t1_cutoff: 64 }, { heldSteps: [1] });
   interceptForLocks('t1_cutoff', 5, api, LOCKS);

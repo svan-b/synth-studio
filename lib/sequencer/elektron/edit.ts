@@ -12,7 +12,7 @@
 
 import {
   LEN_DEFAULT, MASTER_MAX, MAX_STEPS, NOTE_LENGTHS, RETRIG_RATES, RETRIG_VEL_MAX, RETRIG_VEL_MIN, SPEEDS,
-  SWING_MAX, SWING_MIN, TEMPO_MAX, TEMPO_MIN,
+  SWING_MAX, SWING_MIN, TEMPO_MAX, TEMPO_MIN, TRIG_CONDITIONS,
   type ChangeMode, type Pattern, type PatternId, type PlayMode, type Project, type Retrig, type SongRow,
   type Speed, type Step, type Track, type TrackDefaults,
 } from './types';
@@ -21,10 +21,22 @@ import { normalizeCondition } from './conditions';
 
 const clampInt = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(v)));
 
-/** Step fields an encoder can lock by returning these keys from LockOptions.lockKey */
-export const STEP_FIELDS = ['note', 'vel', 'len', 'micro'] as const;
+/**
+ * Step fields an encoder can write by returning these keys from LockOptions.lockKey
+ * (numbers: 'cond' is an index into TRIG_CONDITIONS, 0 = none)
+ */
+export const STEP_FIELDS = ['note', 'vel', 'len', 'micro', 'cond'] as const;
 export type StepField = (typeof STEP_FIELDS)[number];
 export const isStepField = (k: string): k is StepField => (STEP_FIELDS as readonly string[]).includes(k);
+/** lockKey value for the track's trig probability (a track setting, never a lock) */
+export const TRACK_PROB_KEY = 'prob';
+
+/** A step field as the number an encoder shows (cond -> TRIG_CONDITIONS index) */
+export function stepFieldValue(s: Step | undefined, f: StepField): number | undefined {
+  if (!s) return undefined;
+  if (f === 'cond') return s.cond ? Math.max(0, TRIG_CONDITIONS.indexOf(s.cond)) : undefined;
+  return s[f];
+}
 
 /** Field updates: a value sets it, null (or false / 0 micro / '' cond) removes it */
 export type StepPatch = { [K in keyof Step]?: Step[K] | null | false };
@@ -167,7 +179,11 @@ export function setLock(
       s = { trigless: true };
     }
     let next: Step;
-    if (isStepField(key)) {
+    if (key === 'cond') {
+      const c = value === null ? '' : TRIG_CONDITIONS[clampInt(value, 0, TRIG_CONDITIONS.length - 1)];
+      if ((s.cond ?? '') === c) return s;
+      next = patchStep(s, { cond: c || null });
+    } else if (isStepField(key)) {
       next = patchStep(s, { [key]: value } as StepPatch);
     } else {
       const has = !!s.locks && key in s.locks;
