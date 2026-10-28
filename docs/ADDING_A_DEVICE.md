@@ -73,6 +73,9 @@ noteOn(note, vel) / noteOff(note)      // keyboards (DeviceModule.keyboard enabl
   functions as `engine`.
 - iPad budget: keep worklet nodes per instrument modest (≈ ≤ 40) and free everything in
   `onDispose`.
+- Web Audio gotcha: `BiquadFilterNode.Q` is in **dB** for lowpass/highpass (it is a plain ratio
+  only for bandpass/peaking/notch/allpass). A Butterworth stage (ratio 0.707) is `Q = -3.01`;
+  a Linkwitz-Riley crossover is two of those cascaded - check that the bands sum flat.
 - Device-specific worklets: put them in `public/worklets/<id>-processors.js` and list the
   URL in `DeviceModule.worklets`.
 

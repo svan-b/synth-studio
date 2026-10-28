@@ -1,6 +1,6 @@
 // ============================================================================
 // Xone:96 behaviour check (Playwright):
-//   node devices/xone96/check.cjs http://localhost:3106 <outDir>
+//   node scripts/checks/xone96.cjs http://localhost:3106 <outDir>
 // Plays the decks, then verifies with the real output level that
 //   1. pulling channel 1's fader down drops the level,
 //   2. the crossfader cuts a channel assigned to X when moved to Y (and back),

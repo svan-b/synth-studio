@@ -576,7 +576,8 @@ function PanelButton({ el, spec, layout, values, ctx, teaching, step, px, onChan
 
 function Anchor({ x, y, children }: { x: number; y: number; children: React.ReactNode }) {
   return (
-    <div className="absolute" style={{ left: x, top: y, transform: 'translate(-50%, -50%)' }}>
+    // max-content stops elements near the panel's right edge from being squeezed (and their text wrapping)
+    <div className="absolute" style={{ left: x, top: y, width: 'max-content', transform: 'translate(-50%, -50%)' }}>
       {children}
     </div>
   );
