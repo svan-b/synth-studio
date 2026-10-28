@@ -1,6 +1,7 @@
 'use client';
 
 import type { SwitchSpec } from '@/types';
+import type { LabelPosition } from '@/types/panel';
 
 export interface SwitchProps {
   id: string;
@@ -9,8 +10,20 @@ export interface SwitchProps {
   onChange: (value: number) => void;
   highlighted?: boolean;
   targetValue?: number;
+  orientation?: 'vertical' | 'horizontal';
+  style?: 'toggle' | 'buttons' | 'rotary';
+  label?: LabelPosition;
+  labelText?: string;
+  labelColor?: string;
+  scale?: number;
 }
 
+/**
+ * Multi-position switch.
+ *  toggle  - bat lever (2 or 3 positions), tap cycles, or tap a position legend
+ *  buttons - row/column of small radio buttons (Elektron/Xone style selectors)
+ *  rotary  - stepped selector knob with position legends
+ */
 export default function Switch({
   id,
   spec,
@@ -18,115 +31,166 @@ export default function Switch({
   onChange,
   highlighted = false,
   targetValue,
+  orientation = 'vertical',
+  style = 'toggle',
+  label = 'above',
+  labelText,
+  labelColor = '#9ca3af',
+  scale = 1,
 }: SwitchProps) {
-  const { options, label } = spec;
-  const currentIndex = value;
+  const { options } = spec;
+  const current = Math.max(0, Math.min(options.length - 1, Math.round(value)));
+  const isCorrect = targetValue !== undefined && current === targetValue;
+  const ring = highlighted ? (isCorrect ? 'ring-2 ring-green-500' : 'ring-2 ring-orange-500 animate-pulse') : '';
+  const shownLabel = labelText ?? spec.label;
+  const title = `${spec.label}: ${options[current]}${spec.description ? `\n${spec.description}` : ''}`;
+  const labelFont = Math.round(6 * scale);
+  const legendFont = Math.max(5, Math.round(5 * scale));
 
-  const handleClick = () => {
-    const nextIndex = (currentIndex + 1) % options.length;
-    onChange(nextIndex);
-  };
+  const header = label !== 'none' && shownLabel && (
+    <div className="font-bold whitespace-nowrap leading-none mb-0.5" style={{ fontSize: labelFont, color: labelColor }}>
+      {shownLabel}
+    </div>
+  );
 
-  const isCorrect = targetValue !== undefined && value === targetValue;
+  const hint = highlighted && targetValue !== undefined && !isCorrect && (
+    <div className="font-mono text-orange-400 font-bold mt-0.5 whitespace-nowrap bg-black/80 px-1 rounded" style={{ fontSize: Math.max(7, legendFont + 2) }}>
+      → {options[targetValue]}
+    </div>
+  );
 
-  // 3-position toggle switch (like SEQ PITCH MOD: VCO1&2 / OFF / VCO2)
-  if (options.length === 3) {
+  if (style === 'buttons') {
+    const vertical = orientation === 'vertical';
     return (
-      <div
-        className="flex flex-col items-center"
-        title={`${spec.label}: ${options[currentIndex]}\n${spec.description}`}
-      >
-        {/* Label above - compact */}
-        <div className="text-[5px] text-gray-500 font-bold mb-0.5 whitespace-nowrap">
-          {label}
-        </div>
-
-        {/* Switch with position labels on right */}
-        <div className="flex items-center gap-0.5">
-          {/* Toggle track - vertical 3-position */}
-          <button
-            onClick={handleClick}
-            className={`
-              relative w-3 h-5 rounded-sm
-              bg-gradient-to-b from-[#2a2a2a] to-[#1a1a1a]
-              border border-[#3a3a3a]
-              ${highlighted ? (isCorrect ? 'ring-2 ring-green-500' : 'ring-2 ring-orange-500 animate-pulse') : ''}
-            `}
-            style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.6)' }}
-          >
-            {/* Metal toggle lever */}
-            <div
-              className="absolute left-0.5 w-2 h-1.5 rounded-sm transition-all duration-150"
+      <div className="flex flex-col items-center select-none" title={title} data-control={id}>
+        {header}
+        <div className={`flex ${vertical ? 'flex-col' : 'flex-row'} gap-0.5 rounded p-0.5 ${ring}`}>
+          {options.map((opt, i) => (
+            <button
+              key={opt + i}
+              onClick={() => onChange(i)}
+              className="rounded-sm font-bold leading-none transition-colors"
               style={{
-                top: currentIndex === 0 ? '1px' : currentIndex === 1 ? 'calc(50% - 3px)' : 'calc(100% - 7px)',
-                background: 'linear-gradient(180deg, #888 0%, #555 50%, #888 100%)',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                fontSize: legendFont + 1,
+                padding: `${2 * scale}px ${4 * scale}px`,
+                minWidth: 16 * scale,
+                background: i === current ? '#e5e5e5' : '#222',
+                color: i === current ? '#111' : '#aaa',
+                border: '1px solid #444',
+                boxShadow: i === current ? '0 0 6px rgba(255,255,255,0.35)' : 'inset 0 1px 2px #000',
               }}
-            />
-          </button>
-
-          {/* Position labels - right side, compact */}
-          <div className="flex flex-col justify-between text-[4px] text-gray-500 font-bold leading-none" style={{ height: '20px' }}>
-            <span className={currentIndex === 0 ? 'text-white' : ''}>{options[0]}</span>
-            <span className={currentIndex === 1 ? 'text-white' : ''}>{options[1]}</span>
-            <span className={currentIndex === 2 ? 'text-white' : ''}>{options[2]}</span>
-          </div>
+            >
+              {opt}
+            </button>
+          ))}
         </div>
-
-        {/* Target hint - only show when teaching */}
-        {highlighted && targetValue !== undefined && !isCorrect && (
-          <div className="text-[5px] text-orange-400 font-mono mt-0.5">→ {options[targetValue]}</div>
-        )}
+        {hint}
       </div>
     );
   }
 
-  // 2-position toggle switch (like HARD SYNC: ON/OFF, VCO WAVE: TRI/SQR)
-  return (
-    <div
-      className="flex flex-col items-center"
-      title={`${spec.label}: ${options[currentIndex]}\n${spec.description}`}
-    >
-      {/* Label above - compact */}
-      <div className="text-[5px] text-gray-500 font-bold mb-0.5 whitespace-nowrap">
-        {label}
-      </div>
-
-      {/* Switch with position labels on right */}
-      <div className="flex items-center gap-0.5">
-        {/* Toggle track - vertical 2-position */}
-        <button
-          onClick={handleClick}
-          className={`
-            relative w-3 h-4 rounded-sm
-            bg-gradient-to-b from-[#2a2a2a] to-[#1a1a1a]
-            border border-[#3a3a3a]
-            ${highlighted ? (isCorrect ? 'ring-2 ring-green-500' : 'ring-2 ring-orange-500 animate-pulse') : ''}
-          `}
-          style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.6)' }}
-        >
-          {/* Metal toggle lever */}
-          <div
-            className="absolute left-0.5 w-2 h-2 rounded-sm transition-all duration-150"
+  if (style === 'rotary') {
+    const d = 22 * scale;
+    const sweep = options.length > 1 ? 270 / (options.length - 1) : 0;
+    const angle = -135 + current * sweep;
+    return (
+      <div className="flex flex-col items-center select-none" title={title} data-control={id}>
+        {header}
+        <div className="relative" style={{ width: d * 2.2, height: d * 2.0 }}>
+          {options.map((opt, i) => {
+            const a = ((-135 + i * sweep) * Math.PI) / 180;
+            const r = d * 0.95;
+            return (
+              <button
+                key={opt + i}
+                onClick={() => onChange(i)}
+                className="absolute font-bold leading-none whitespace-nowrap"
+                style={{
+                  left: d * 1.1 + Math.sin(a) * r,
+                  top: d * 1.05 - Math.cos(a) * r,
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: legendFont,
+                  color: i === current ? '#fff' : '#888',
+                }}
+              >
+                {opt}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => onChange((current + 1) % options.length)}
+            className={`absolute rounded-full ${ring}`}
             style={{
-              top: currentIndex === 0 ? '1px' : 'calc(100% - 9px)',
-              background: 'linear-gradient(180deg, #888 0%, #555 50%, #888 100%)',
+              width: d,
+              height: d,
+              left: d * 0.6,
+              top: d * 0.55,
+              background: 'radial-gradient(circle at 45% 35%, #3a3a3a 0%, #0e0e0e 80%)',
+              border: '1px solid #444',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.6)',
+              transform: `rotate(${angle}deg)`,
+            }}
+            aria-label={shownLabel}
+          >
+            <span className="absolute left-1/2 -translate-x-1/2 bg-white rounded-full" style={{ top: 2, width: 2, height: d * 0.35 }} />
+          </button>
+        </div>
+        {hint}
+      </div>
+    );
+  }
+
+  // Bat-lever toggle
+  const positions = options.length;
+  const vertical = orientation === 'vertical';
+  const trackLong = (positions === 3 ? 20 : 16) * scale;
+  const trackShort = 12 * scale;
+  const lever = 8 * scale;
+  const frac = positions > 1 ? current / (positions - 1) : 0;
+  const leverPos = 1 + frac * (trackLong - lever - 2);
+
+  return (
+    <div className="flex flex-col items-center select-none" title={title} data-control={id}>
+      {header}
+      <div className={`flex ${vertical ? 'flex-row' : 'flex-col'} items-center gap-0.5`}>
+        <button
+          onClick={() => onChange((current + 1) % positions)}
+          className={`relative rounded-sm bg-gradient-to-b from-[#2a2a2a] to-[#1a1a1a] border border-[#3a3a3a] ${ring}`}
+          style={{
+            width: vertical ? trackShort : trackLong,
+            height: vertical ? trackLong : trackShort,
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.6)',
+          }}
+          aria-label={`${shownLabel}: ${options[current]}`}
+        >
+          <span
+            className="absolute rounded-sm transition-all duration-150"
+            style={{
+              ...(vertical
+                ? { left: (trackShort - lever) / 2 - 1, top: leverPos, width: lever, height: lever }
+                : { top: (trackShort - lever) / 2 - 1, left: leverPos, width: lever, height: lever }),
+              background: 'linear-gradient(180deg, #999 0%, #555 50%, #999 100%)',
               boxShadow: '0 1px 2px rgba(0,0,0,0.5)',
             }}
           />
         </button>
-
-        {/* Position labels - right side, compact */}
-        <div className="flex flex-col justify-between text-[4px] text-gray-500 font-bold leading-none" style={{ height: '16px' }}>
-          <span className={currentIndex === 0 ? 'text-white' : ''}>{options[0]}</span>
-          <span className={currentIndex === 1 ? 'text-white' : ''}>{options[1]}</span>
+        <div
+          className={`flex ${vertical ? 'flex-col' : 'flex-row gap-1'} justify-between font-bold leading-none`}
+          style={vertical ? { height: trackLong, fontSize: legendFont } : { fontSize: legendFont }}
+        >
+          {options.map((opt, i) => (
+            <span
+              key={opt + i}
+              onClick={() => onChange(i)}
+              className="cursor-pointer whitespace-nowrap"
+              style={{ color: i === current ? '#fff' : '#777' }}
+            >
+              {opt}
+            </span>
+          ))}
         </div>
       </div>
-
-      {/* Target hint - only show when teaching */}
-      {highlighted && targetValue !== undefined && !isCorrect && (
-        <div className="text-[5px] text-orange-400 font-mono mt-0.5">→ {options[targetValue]}</div>
-      )}
+      {hint}
     </div>
   );
 }

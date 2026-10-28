@@ -7,8 +7,10 @@
 // Control Types
 // ----------------------------------------------------------------------------
 
-export type ControlType = 'knob' | 'button' | 'switch' | 'jack';
-export type Units = 'Hz' | 'ms' | 'octaves' | '%' | 'dB' | 'semitones' | 'cents' | 'BPM' | 'V';
+export type ControlType = 'knob' | 'slider' | 'button' | 'switch' | 'jack' | 'pattern';
+export type Units =
+  | 'Hz' | 'ms' | 's' | 'octaves' | '%' | 'dB' | 'semitones' | 'cents' | 'BPM' | 'V'
+  | 'ratio' | 'steps' | 'none';
 export type KnobSize = 'small' | 'medium' | 'large';
 export type JackType = 'input' | 'output';
 export type SignalType = 'audio' | 'cv' | 'gate' | 'trigger' | 'clock';
@@ -38,7 +40,29 @@ export interface KnobSpec extends BaseControlSpec {
   bipolar?: boolean;
   size?: KnobSize;
   step?: number;  // For stepped controls
-  curve?: 'linear' | 'logarithmic' | 'exponential';  // For audio params
+  curve?: 'linear' | 'logarithmic' | 'exponential';  // Knob travel → value mapping
+  endless?: boolean;  // Endless encoder (Elektron style) - drawn without end stops
+  format?: (value: number) => string;  // Custom display formatting
+}
+
+export interface SliderSpec extends BaseControlSpec {
+  type: 'slider';
+  min: number;
+  max: number;
+  default: number;
+  units: Units;
+  bipolar?: boolean;
+  step?: number;
+  curve?: 'linear' | 'logarithmic' | 'exponential';
+  format?: (value: number) => string;
+}
+
+// Hidden data control - stores a step pattern as a string, one character per step.
+// '0' = step off, any other character = step on (devices may use '1'-'9' for accents/ratchets).
+export interface PatternSpec extends BaseControlSpec {
+  type: 'pattern';
+  steps: number;
+  default: string;
 }
 
 export interface SwitchSpec extends BaseControlSpec {
@@ -61,7 +85,9 @@ export interface JackSpec extends BaseControlSpec {
   normalled?: string;  // ID of internally connected jack
 }
 
-export type ControlSpec = KnobSpec | SwitchSpec | ButtonSpec | JackSpec;
+export type ControlSpec = KnobSpec | SliderSpec | SwitchSpec | ButtonSpec | JackSpec | PatternSpec;
+
+export type ControlValue = number | string | boolean;
 
 // ----------------------------------------------------------------------------
 // Signal Flow Section (Organizes controls by function)
@@ -165,22 +191,39 @@ export interface PresetSpec {
 export type SynthConcept =
   | 'oscillator-pitch'
   | 'oscillator-waveform'
+  | 'oscillator-sync'
+  | 'frequency-modulation'
+  | 'subharmonics'
+  | 'noise'
+  | 'mixing'
   | 'envelope-attack'
   | 'envelope-decay'
+  | 'envelope-sustain'
+  | 'envelope-release'
   | 'envelope-shape'
   | 'filter-cutoff'
   | 'filter-resonance'
+  | 'filter-type'
+  | 'lfo'
   | 'modulation-source'
   | 'modulation-depth'
   | 'signal-routing'
   | 'velocity-dynamics'
+  | 'glide'
   | 'timing-tempo'
-  | 'sequencer-pattern';
+  | 'sequencer-pattern'
+  | 'polyrhythm'
+  | 'parameter-locks'
+  | 'effects'
+  | 'equalization'
+  | 'dj-mixing'
+  | 'gain-staging';
 
 export interface LessonStep {
   // For control adjustments
   control?: string;  // Control ID (optional if this is a patch step)
   targetValue?: number | string | boolean;
+  tolerance?: number;  // Optional absolute tolerance override for numeric targets
 
   // For patch connection steps
   patchFrom?: string;  // Output jack ID
@@ -210,71 +253,4 @@ export interface Lesson {
   steps: LessonStep[];
   tags?: string[];  // e.g., ['kick', 'bass', 'percussion']
   concepts?: SynthConcept[];  // List of concepts taught in this lesson
-}
-
-// ----------------------------------------------------------------------------
-// Application State
-// ----------------------------------------------------------------------------
-
-export interface DeviceState {
-  controlValues: Record<string, number | string | boolean>;
-  patchConnections: PatchConnection[];
-}
-
-export interface StudioState {
-  currentDevice: string;
-  devices: Record<string, DeviceState>;
-  currentLesson?: Lesson;
-  currentStep: number;
-  completedLessons: string[];
-  isTeachingMode: boolean;
-}
-
-// ----------------------------------------------------------------------------
-// Component Props (for UI components)
-// ----------------------------------------------------------------------------
-
-export interface KnobProps {
-  id: string;
-  spec: KnobSpec;
-  value: number;
-  onChange: (value: number) => void;
-  highlighted?: boolean;
-  targetValue?: number;
-  showTarget?: boolean;
-}
-
-export interface SwitchProps {
-  id: string;
-  spec: SwitchSpec;
-  value: number;  // Index into options
-  onChange: (value: number) => void;
-  highlighted?: boolean;
-  targetValue?: number;
-}
-
-export interface ButtonProps {
-  id: string;
-  spec: ButtonSpec;
-  value: boolean;
-  onChange: (value: boolean) => void;
-  highlighted?: boolean;
-}
-
-export interface JackProps {
-  id: string;
-  spec: JackSpec;
-  isConnected: boolean;
-  onConnect?: () => void;
-  highlighted?: boolean;
-}
-
-// ----------------------------------------------------------------------------
-// Device Registry (for multi-device support)
-// ----------------------------------------------------------------------------
-
-export interface DeviceRegistry {
-  devices: Record<string, DeviceSpec>;
-  getDevice: (id: string) => DeviceSpec | undefined;
-  listDevices: () => { id: string; name: string; manufacturer: string }[];
 }

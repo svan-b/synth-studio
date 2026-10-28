@@ -1,391 +1,276 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Lesson, PatchConnection } from '@/types';
+import type { ControlValue, DeviceSpec, Lesson, PatchConnection } from '@/types';
+import { isStepSatisfied } from '@/lib/controls/mapping';
 
 interface DeviceState {
-  controlValues: Record<string, number | string | boolean>;
+  controlValues: Record<string, ControlValue>;
   patchConnections: PatchConnection[];
 }
 
 interface StudioState {
   currentDevice: string;
   devices: Record<string, DeviceState>;
+  completedLessons: string[];
+
+  // Teaching session (not persisted)
   currentLesson?: Lesson;
   currentStep: number;
-  completedLessons: string[];
   isTeachingMode: boolean;
-  _pendingStepAdvance: boolean; // Prevents multiple auto-advances
-  clearCablesTrigger: number; // Increment to trigger PatchBay cable clear
+  /** True once the final step is satisfied */
+  lessonFinished: boolean;
+  /** Current step is satisfied and about to auto-advance */
+  stepSatisfied: boolean;
 }
 
 interface StudioStore extends StudioState {
-  // Device management
   setCurrentDevice: (device: string) => void;
+  /** Make a device spec known to the store (tolerances, jack directions) */
+  registerDevice: (spec: DeviceSpec) => void;
 
-  // Control values
-  setControlValue: (device: string, control: string, value: number | string | boolean) => void;
-  getControlValue: (device: string, control: string) => number | string | boolean | undefined;
-  resetDeviceToDefaults: (device: string) => void;
-  resetControlsToSpec: (device: string, defaults: Record<string, number | string | boolean>) => void;
+  setControlValue: (device: string, control: string, value: ControlValue) => void;
+  setControlValues: (device: string, values: Record<string, ControlValue>) => void;
+  getControlValue: (device: string, control: string) => ControlValue | undefined;
+  resetControlsToSpec: (device: string, defaults: Record<string, ControlValue>) => void;
+  loadPreset: (device: string, values: Record<string, ControlValue>, patches?: PatchConnection[]) => void;
 
-  // Patch connections
   addPatchConnection: (device: string, from: string, to: string, color?: string) => void;
   removePatchConnection: (device: string, from: string, to: string) => void;
   clearPatchConnections: (device: string) => void;
 
-  // Teaching / Lessons
-  startLesson: (lesson: Lesson, resetControls?: boolean, defaults?: Record<string, number | string | boolean>) => void;
-  completeStep: () => void;
+  startLesson: (lesson: Lesson) => void;
+  goToStep: (index: number) => void;
+  nextStep: () => void;
+  prevStep: () => void;
   resetLesson: () => void;
-  toggleTeachingMode: () => void;
   completeLesson: () => void;
   isStepComplete: () => boolean;
-
-  // Internal - timeout tracking for cleanup
-  _pendingTimeoutId: ReturnType<typeof setTimeout> | null;
 }
 
-// Helper to initialize device state
-const initDeviceState = (): DeviceState => ({
-  controlValues: {},
-  patchConnections: [],
-});
+// Device specs registered at runtime (module scope - not persisted)
+const specs: Record<string, DeviceSpec> = {};
+let advanceTimer: ReturnType<typeof setTimeout> | null = null;
+
+const ADVANCE_DELAY_MS = 750;
+
+const initDeviceState = (): DeviceState => ({ controlValues: {}, patchConnections: [] });
+
+const sameCable = (c: PatchConnection, a: string, b: string) =>
+  (c.from === a && c.to === b) || (c.from === b && c.to === a);
+
+/** Put the output first so engines and the UI see a consistent direction */
+function orient(device: string, a: string, b: string): [string, string] {
+  const pb = specs[device]?.patchBay;
+  if (!pb) return [a, b];
+  const isOut = (id: string) => pb.outputs.some(j => j.id === id);
+  if (!isOut(a) && isOut(b)) return [b, a];
+  return [a, b];
+}
+
+function clearAdvance() {
+  if (advanceTimer) clearTimeout(advanceTimer);
+  advanceTimer = null;
+}
 
 export const useStudioStore = create<StudioStore>()(
   persist(
-    (set, get) => ({
-      // Initial state
-      currentDevice: 'dfam',
-      devices: {},
-      currentLesson: undefined,
-      currentStep: 0,
-      completedLessons: [],
-      isTeachingMode: false,
-      _pendingStepAdvance: false,
-      _pendingTimeoutId: null,
-      clearCablesTrigger: 0,
+    (set, get) => {
+      /** Check the current lesson step against current state and advance when satisfied */
+      const evaluate = () => {
+        const s = get();
+        if (!s.isTeachingMode || !s.currentLesson || s.lessonFinished) return;
+        const lesson = s.currentLesson;
+        const step = lesson.steps[s.currentStep];
+        if (!step) return;
+        const dev = s.devices[lesson.device] ?? initDeviceState();
+        const spec = step.control ? specs[lesson.device]?.controls[step.control] : undefined;
+        const ok = isStepSatisfied(step, spec, dev.controlValues, dev.patchConnections);
 
-      // Device management
-      setCurrentDevice: (device) => set({ currentDevice: device }),
-
-      // Control values
-      setControlValue: (device, control, value) => {
-        set((state) => {
-          const deviceState = state.devices[device] || initDeviceState();
-          return {
-            devices: {
-              ...state.devices,
-              [device]: {
-                ...deviceState,
-                controlValues: {
-                  ...deviceState.controlValues,
-                  [control]: value,
-                },
-              },
-            },
-          };
-        });
-
-        // Auto-advance lesson step if value matches target
-        // Use a flag to prevent multiple rapid advances (debounce)
-        const state = get();
-        if (state.isTeachingMode && state.currentLesson && !state._pendingStepAdvance) {
-          const step = state.currentLesson.steps[state.currentStep];
-          if (step && step.control === control) {
-            // Check if value matches target (with tolerance for numbers)
-            const target = step.targetValue;
-            let isMatch = false;
-
-            if (typeof target === 'number' && typeof value === 'number') {
-              // Use 5% of target with a sensible minimum (0.1) for zero/small targets
-              // This is more consistent with range-based checks while being safe
-              const tolerance = Math.max(Math.abs(target) * 0.05, 0.1);
-              isMatch = Math.abs(value - target) <= tolerance;
-            } else {
-              isMatch = value === target;
-            }
-
-            if (isMatch && state.currentStep < state.currentLesson.steps.length - 1) {
-              // Set flag to prevent duplicate advances
-              set({ _pendingStepAdvance: true });
-
-              // Store timeout ID so it can be cancelled if lesson is reset
-              const timeoutId = setTimeout(() => {
-                const currentState = get();
-                // Only advance if we're still in teaching mode with the same lesson
-                if (currentState._pendingStepAdvance &&
-                    currentState.isTeachingMode &&
-                    currentState.currentLesson?.id === state.currentLesson?.id) {
-                  set({
-                    currentStep: currentState.currentStep + 1,
-                    _pendingStepAdvance: false,
-                    _pendingTimeoutId: null
-                  });
-                }
-              }, 800);
-
-              set({ _pendingTimeoutId: timeoutId });
-            }
-          }
+        if (!ok) {
+          if (s.stepSatisfied) set({ stepSatisfied: false });
+          clearAdvance();
+          return;
         }
-      },
+        if (s.stepSatisfied && advanceTimer) return;
+        set({ stepSatisfied: true });
+        // Informational steps (nothing to set) wait for the learner to press Next
+        if (!step.control && !(step.patchFrom && step.patchTo)) return;
+        clearAdvance();
+        const lessonId = lesson.id;
+        const stepIndex = s.currentStep;
+        advanceTimer = setTimeout(() => {
+          advanceTimer = null;
+          const now = get();
+          if (!now.isTeachingMode || now.currentLesson?.id !== lessonId || now.currentStep !== stepIndex) return;
+          if (stepIndex >= lesson.steps.length - 1) {
+            set({ lessonFinished: true, stepSatisfied: true });
+          } else {
+            set({ currentStep: stepIndex + 1, stepSatisfied: false });
+            evaluate();
+          }
+        }, ADVANCE_DELAY_MS);
+      };
 
-      getControlValue: (device, control) => {
-        const state = get();
-        return state.devices[device]?.controlValues[control];
-      },
-
-      resetDeviceToDefaults: (device) => {
-        set((state) => ({
-          devices: {
-            ...state.devices,
-            [device]: initDeviceState(),
-          },
+      const updateDevice = (device: string, fn: (d: DeviceState) => DeviceState) => {
+        set(state => ({
+          devices: { ...state.devices, [device]: fn(state.devices[device] ?? initDeviceState()) },
         }));
-      },
+        evaluate();
+      };
 
-      resetControlsToSpec: (device, defaults) => {
-        set((state) => {
-          const deviceState = state.devices[device] || initDeviceState();
-          return {
-            devices: {
-              ...state.devices,
-              [device]: {
-                ...deviceState,
-                controlValues: { ...defaults },
-              },
-            },
-          };
-        });
-      },
+      return {
+        currentDevice: 'dfam',
+        devices: {},
+        completedLessons: [],
+        currentLesson: undefined,
+        currentStep: 0,
+        isTeachingMode: false,
+        lessonFinished: false,
+        stepSatisfied: false,
 
-      // Patch connections
-      addPatchConnection: (device, from, to, color) => {
-        set((state) => {
-          const deviceState = state.devices[device] || initDeviceState();
-          // Check if connection already exists (in either direction)
-          const exists = deviceState.patchConnections.some(
-            c => (c.from === from && c.to === to) || (c.from === to && c.to === from)
-          );
-          if (exists) return state;
+        setCurrentDevice: device => {
+          const s = get();
+          if (s.currentLesson && s.currentLesson.device !== device) get().resetLesson();
+          set({ currentDevice: device });
+        },
 
-          return {
-            devices: {
-              ...state.devices,
-              [device]: {
-                ...deviceState,
-                patchConnections: [
-                  ...deviceState.patchConnections,
-                  { from, to, color },
-                ],
-              },
-            },
-          };
-        });
+        registerDevice: spec => {
+          specs[spec.id] = spec;
+        },
 
-        // Auto-advance lesson step if patch matches target
-        const state = get();
-        if (state.isTeachingMode && state.currentLesson && !state._pendingStepAdvance) {
-          const step = state.currentLesson.steps[state.currentStep];
-          // Check if this is a patch step
-          if (step && step.patchFrom && step.patchTo) {
-            // Check if the connection matches (either direction)
-            const isMatch =
-              (from === step.patchFrom && to === step.patchTo) ||
-              (from === step.patchTo && to === step.patchFrom);
+        setControlValue: (device, control, value) =>
+          updateDevice(device, d => (d.controlValues[control] === value ? d : { ...d, controlValues: { ...d.controlValues, [control]: value } })),
 
-            if (isMatch && state.currentStep < state.currentLesson.steps.length - 1) {
-              // Set flag to prevent duplicate advances
-              set({ _pendingStepAdvance: true });
+        setControlValues: (device, values) =>
+          updateDevice(device, d => ({ ...d, controlValues: { ...d.controlValues, ...values } })),
 
-              // Store timeout ID so it can be cancelled if lesson is reset
-              const timeoutId = setTimeout(() => {
-                const currentState = get();
-                // Only advance if we're still in teaching mode with the same lesson
-                if (currentState._pendingStepAdvance &&
-                    currentState.isTeachingMode &&
-                    currentState.currentLesson?.id === state.currentLesson?.id) {
-                  set({
-                    currentStep: currentState.currentStep + 1,
-                    _pendingStepAdvance: false,
-                    _pendingTimeoutId: null
-                  });
-                }
-              }, 800);
+        getControlValue: (device, control) => get().devices[device]?.controlValues[control],
 
-              set({ _pendingTimeoutId: timeoutId });
-            }
-          }
-        }
-      },
+        resetControlsToSpec: (device, defaults) =>
+          updateDevice(device, d => ({ ...d, controlValues: { ...d.controlValues, ...defaults } })),
 
-      removePatchConnection: (device, from, to) => {
-        set((state) => {
-          const deviceState = state.devices[device];
-          if (!deviceState) return state;
+        loadPreset: (device, values, patches) =>
+          updateDevice(device, d => ({
+            controlValues: { ...d.controlValues, ...values },
+            patchConnections: patches
+              ? patches.map((p, i) => {
+                  const [from, to] = orient(device, p.from, p.to);
+                  return { from, to, color: p.color ?? PRESET_COLORS[i % PRESET_COLORS.length] };
+                })
+              : d.patchConnections,
+          })),
 
-          return {
-            devices: {
-              ...state.devices,
-              [device]: {
-                ...deviceState,
-                patchConnections: deviceState.patchConnections.filter(
-                  c => !(c.from === from && c.to === to)
-                ),
-              },
-            },
-          };
-        });
-      },
-
-      clearPatchConnections: (device) => {
-        set((state) => {
-          const deviceState = state.devices[device];
-          if (!deviceState) return state;
-
-          return {
-            devices: {
-              ...state.devices,
-              [device]: {
-                ...deviceState,
-                patchConnections: [],
-              },
-            },
-            // Increment trigger to notify PatchBay to clear its internal cables
-            clearCablesTrigger: state.clearCablesTrigger + 1,
-          };
-        });
-      },
-
-      // Teaching / Lessons
-      startLesson: (lesson, resetControls = false, defaults) => {
-        const state = get();
-        // Clear any pending timeout from previous lesson
-        if (state._pendingTimeoutId) {
-          clearTimeout(state._pendingTimeoutId);
-        }
-
-        // Optionally reset controls to defaults when starting a new lesson
-        if (resetControls && defaults) {
-          const deviceState = state.devices[state.currentDevice] || initDeviceState();
-          set({
-            devices: {
-              ...state.devices,
-              [state.currentDevice]: {
-                ...deviceState,
-                controlValues: { ...defaults },
-              },
-            },
+        addPatchConnection: (device, a, b, color) => {
+          if (a === b) return;
+          const [from, to] = orient(device, a, b);
+          updateDevice(device, d => {
+            if (d.patchConnections.some(c => sameCable(c, from, to))) return d;
+            return {
+              ...d,
+              patchConnections: [
+                ...d.patchConnections,
+                { from, to, color: color ?? PRESET_COLORS[d.patchConnections.length % PRESET_COLORS.length] },
+              ],
+            };
           });
-        }
+        },
 
-        set({
-          currentLesson: lesson,
-          currentStep: 0,
-          isTeachingMode: true,
-          _pendingStepAdvance: false,
-          _pendingTimeoutId: null,
-        });
-      },
+        removePatchConnection: (device, from, to) =>
+          updateDevice(device, d => ({ ...d, patchConnections: d.patchConnections.filter(c => !sameCable(c, from, to)) })),
 
-      completeStep: () => {
-        const state = get();
-        if (state.currentLesson && state.currentStep < state.currentLesson.steps.length - 1) {
-          set({ currentStep: state.currentStep + 1, _pendingStepAdvance: false });
-        }
-      },
+        clearPatchConnections: device => updateDevice(device, d => ({ ...d, patchConnections: [] })),
 
-      resetLesson: () => {
-        const state = get();
-        // Clear any pending timeout to prevent stale advances
-        if (state._pendingTimeoutId) {
-          clearTimeout(state._pendingTimeoutId);
-        }
-        set({
-          currentLesson: undefined,
-          currentStep: 0,
-          isTeachingMode: false,
-          _pendingStepAdvance: false,
-          _pendingTimeoutId: null,
-        });
-      },
+        startLesson: lesson => {
+          clearAdvance();
+          set({
+            currentLesson: lesson,
+            currentStep: 0,
+            isTeachingMode: true,
+            lessonFinished: false,
+            stepSatisfied: false,
+            currentDevice: lesson.device,
+          });
+          evaluate();
+        },
 
-      toggleTeachingMode: () => {
-        set((state) => ({ isTeachingMode: !state.isTeachingMode }));
-      },
+        goToStep: index => {
+          const s = get();
+          if (!s.currentLesson) return;
+          clearAdvance();
+          const i = Math.max(0, Math.min(s.currentLesson.steps.length - 1, index));
+          set({ currentStep: i, stepSatisfied: false, lessonFinished: false });
+          evaluate();
+        },
 
-      completeLesson: () => {
-        const state = get();
-        if (state.currentLesson) {
-          const lessonId = state.currentLesson.id;
-          set((state) => ({
-            completedLessons: state.completedLessons.includes(lessonId)
-              ? state.completedLessons
-              : [...state.completedLessons, lessonId],
+        nextStep: () => {
+          const s = get();
+          if (!s.currentLesson) return;
+          if (s.currentStep >= s.currentLesson.steps.length - 1) {
+            clearAdvance();
+            set({ lessonFinished: true });
+          } else {
+            get().goToStep(s.currentStep + 1);
+          }
+        },
+
+        prevStep: () => get().goToStep(get().currentStep - 1),
+
+        resetLesson: () => {
+          clearAdvance();
+          set({ currentLesson: undefined, currentStep: 0, isTeachingMode: false, lessonFinished: false, stepSatisfied: false });
+        },
+
+        completeLesson: () => {
+          const s = get();
+          clearAdvance();
+          if (!s.currentLesson) return;
+          const id = s.currentLesson.id;
+          set({
+            completedLessons: s.completedLessons.includes(id) ? s.completedLessons : [...s.completedLessons, id],
             currentLesson: undefined,
             currentStep: 0,
             isTeachingMode: false,
-          }));
-        }
-      },
+            lessonFinished: false,
+            stepSatisfied: false,
+          });
+        },
 
-      isStepComplete: () => {
-        const state = get();
-        if (!state.currentLesson) return false;
-
-        const step = state.currentLesson.steps[state.currentStep];
-        if (!step) return false;
-
-        // Check if this is a patch step
-        if (step.patchFrom && step.patchTo) {
-          const connections = state.devices[state.currentDevice]?.patchConnections || [];
-          // Check if connection exists (in either direction)
-          return connections.some(
-            c => (c.from === step.patchFrom && c.to === step.patchTo) ||
-                 (c.from === step.patchTo && c.to === step.patchFrom)
-          );
-        }
-
-        // Otherwise, check control value
-        if (!step.control) return false;
-
-        const value = state.devices[state.currentDevice]?.controlValues[step.control];
-        if (value === undefined) return false;
-
-        const target = step.targetValue;
-        if (typeof target === 'number' && typeof value === 'number') {
-          // Consistent with auto-advance: 5% of target with min 0.1
-          const tolerance = Math.max(Math.abs(target) * 0.05, 0.1);
-          return Math.abs(value - target) <= tolerance;
-        }
-
-        return value === target;
-      },
-    }),
+        isStepComplete: () => {
+          const s = get();
+          const lesson = s.currentLesson;
+          if (!lesson) return false;
+          const step = lesson.steps[s.currentStep];
+          if (!step) return false;
+          const dev = s.devices[lesson.device] ?? initDeviceState();
+          const spec = step.control ? specs[lesson.device]?.controls[step.control] : undefined;
+          return isStepSatisfied(step, spec, dev.controlValues, dev.patchConnections);
+        },
+      };
+    },
     {
       name: 'synth-studio-storage',
-      version: 2, // Bump version to handle migration from old format
+      version: 3,
+      partialize: s => ({ currentDevice: s.currentDevice, devices: s.devices, completedLessons: s.completedLessons }),
       migrate: (persisted, version) => {
-        // Handle migration from v1 (old deviceSettings format)
-        if (version === 1 || version === 0) {
-          const old = persisted as Record<string, unknown> & { deviceSettings?: Record<string, Record<string, number | string>> };
-          if (old && old.deviceSettings) {
-            const devices: Record<string, DeviceState> = {};
-            Object.entries(old.deviceSettings).forEach(([device, settings]) => {
-              devices[device.toLowerCase()] = {
-                controlValues: settings as Record<string, number | string | boolean>,
-                patchConnections: [],
-              };
-            });
-            return {
-              ...old,
-              devices,
-              deviceSettings: undefined,
-            };
-          }
+        const old = (persisted ?? {}) as Record<string, unknown> & {
+          deviceSettings?: Record<string, Record<string, ControlValue>>;
+          devices?: Record<string, DeviceState>;
+        };
+        let devices = old.devices ?? {};
+        if ((version === 0 || version === 1) && old.deviceSettings) {
+          devices = {};
+          Object.entries(old.deviceSettings).forEach(([device, settings]) => {
+            devices[device.toLowerCase()] = { controlValues: settings, patchConnections: [] };
+          });
         }
-        return persisted;
+        return {
+          currentDevice: (old.currentDevice as string) ?? 'dfam',
+          devices,
+          completedLessons: (old.completedLessons as string[]) ?? [],
+        } as unknown as StudioStore;
       },
-    }
-  )
+    },
+  ),
 );
+
+const PRESET_COLORS = ['#22c55e', '#f97316', '#ef4444', '#06b6d4', '#a855f7', '#eab308', '#ec4899', '#3b82f6', '#14b8a6', '#f43f5e'];
