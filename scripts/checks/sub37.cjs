@@ -1,4 +1,4 @@
-// Run: node devices/sub37/check.cjs http://localhost:3103 <outDir>   (after npm run build && npx next start -p 3103)
+// Run: node scripts/checks/sub37.cjs http://localhost:3103 <outDir>   (after npm run build && npx next start -p 3103)
 // Sub 37 interaction check:
 //  1. play an on-screen key with the mouse pointer and confirm audio
 //  2. drag the CUTOFF knob down / up and confirm the output spectrum changes

@@ -1,6 +1,6 @@
 // ============================================================================
 // Subharmonicon behaviour check (Playwright):
-//   node devices/subharmonicon/playwright-check.cjs http://localhost:3102 <outDir>
+//   node scripts/checks/subharmonicon.cjs http://localhost:3102 <outDir>
 // 1. Changing a RHYTHM divider (by dragging the knob) changes how often the
 //    sequencer advances and therefore the step pattern (engine state).
 // 2. Patching a cable (VCO 2 SUB 2 → CUTOFF, tapping the two jacks) changes
