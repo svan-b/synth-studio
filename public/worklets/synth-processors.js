@@ -1044,37 +1044,24 @@ const DIF_MS = [
   [3.1, 0.7, 5.3, 2.2, 6.1, 4.4, 1.5, 7.2],
   [9.7, 2.9, 6.3, 12.1, 4.7, 0.8, 10.9, 7.9],
 ];
-const DIF_SIGN = [
-  [1, -1, 1, 1, -1, 1, -1, -1],
-  [-1, 1, 1, -1, 1, -1, -1, 1],
-  [1, 1, -1, 1, -1, -1, 1, -1],
-];
+// Diffuser polarity flips (baked into the unrolled stages below):
+//   stage 1: + - + + - + - -   stage 2: - + + - + - - +   stage 3: + + - + - - + -
+// Each stage is delay -> polarity -> orthonormal 8-point Hadamard.
 const FDN_MOD_RATE = [1, 1.31, 1.73, 2.19]; // for lines 0, 2, 4, 6
 // Wet level calibrated so Reverb2 sits at roughly the old convolver Reverb's level
 const FDN_OUT_GAIN = 0.6;
 
 function pow2Ceil(x) { let p = 1; while (p < x) p <<= 1; return p; }
 
-/** In-place 8-point fast Walsh-Hadamard transform, orthonormal */
-function fwht8(v) {
-  let a0 = v[0] + v[1], a1 = v[0] - v[1], a2 = v[2] + v[3], a3 = v[2] - v[3];
-  let a4 = v[4] + v[5], a5 = v[4] - v[5], a6 = v[6] + v[7], a7 = v[6] - v[7];
-  const b0 = a0 + a2, b2 = a0 - a2, b1 = a1 + a3, b3 = a1 - a3;
-  const b4 = a4 + a6, b6 = a4 - a6, b5 = a5 + a7, b7 = a5 - a7;
-  const s = 0.35355339059327373;
-  v[0] = (b0 + b4) * s; v[4] = (b0 - b4) * s; v[1] = (b1 + b5) * s; v[5] = (b1 - b5) * s;
-  v[2] = (b2 + b6) * s; v[6] = (b2 - b6) * s; v[3] = (b3 + b7) * s; v[7] = (b3 - b7) * s;
-}
-
 class FdnReverbProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
       { name: 'predelay', defaultValue: 0.02, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      // RT60 at mid frequencies (seconds)
+      // RT60 at low and mid frequencies (seconds)
       { name: 'decay', defaultValue: 2.5, minValue: 0.1, maxValue: 30, automationRate: 'k-rate' },
       // Room size 0..1 (delay-line lengths x 0.25 .. 1)
       { name: 'size', defaultValue: 0.6, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      // High-frequency damping corner (Hz): highs decay faster above it
+      // High-frequency damping (Hz): the RT60 is half of `decay` at this frequency and falls further above it
       { name: 'damping', defaultValue: 7000, minValue: 200, maxValue: 20000, automationRate: 'k-rate' },
       { name: 'width', defaultValue: 1, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
       // Delay modulation depth 0..1 (up to +-0.5 ms) and base rate
@@ -1093,98 +1080,148 @@ class FdnReverbProcessor extends AudioWorkletProcessor {
     const sr = sampleRate;
     const o = (options && options.processorOptions) || {};
     this.rng = makeRng(o.seed);
-    // predelay (stereo)
-    this.pdSize = pow2Ceil(sr * 1.05 + 4);
-    this.pdL = new Float32Array(this.pdSize);
-    this.pdR = new Float32Array(this.pdSize);
+    // predelay: interleaved stereo ring buffer (up to 1 s)
+    this.pdSize = pow2Ceil(sr * 1.0 + 8);
+    this.pd = new Float32Array(this.pdSize * 2);
     this.pdW = 0;
     this.pdLen = -1;
-    // diffuser
-    this.dif = [];
+    // diffuser: 3 stages x 8 channel delays, one ring buffer each (shared write index)
+    this.difMax = new Int32Array(24);
+    this.difLen = new Int32Array(24);
+    let maxD = 1;
     for (let s = 0; s < 3; s++) {
-      const st = [];
       for (let c = 0; c < 8; c++) {
-        const len = Math.max(1, Math.round((DIF_MS[s][c] * sr) / 1000));
-        const size = pow2Ceil(len + 2);
-        st.push({ buf: new Float32Array(size), mask: size - 1, len, maxLen: len });
+        const d = Math.round((DIF_MS[s][c] * sr) / 1000);
+        this.difMax[s * 8 + c] = d;
+        if (d > maxD) maxD = d;
       }
-      this.dif.push(st);
     }
+    this.difSize = pow2Ceil(maxD + 2);
+    this.db = [];
+    for (let j = 0; j < 24; j++) this.db.push(new Float32Array(this.difSize));
     this.difW = 0;
     // feedback lines
-    this.lines = [];
-    for (let c = 0; c < 8; c++) {
-      const maxLen = (FDN_MS[c] * sr) / 1000 + 0.0006 * sr + 8;
-      const size = pow2Ceil(maxLen + 4);
-      this.lines.push({ buf: new Float32Array(size), mask: size - 1, len: -1, len0: 0, g: 0, m0: 0, m1: 0, lp: 0, phase: this.rng() });
-    }
-    this.lineW = 0;
-    this.v = new Float64Array(8);
-    this.fb = new Float64Array(8);
+    this.lnSize = pow2Ceil((FDN_MS[7] * sr) / 1000 + 0.0006 * sr + 16);
+    this.ln = [];
+    for (let c = 0; c < 8; c++) this.ln.push(new Float32Array(this.lnSize));
+    this.lnW = 0;
+    this.len = new Float64Array(8).fill(-1);  // gliding base length (samples, integer when settled)
+    this.dA = new Float64Array(8);             // delay at the start / end of the quantum (incl. modulation)
+    this.dB = new Float64Array(8);
+    this.intD = new Int32Array(8);             // >= 0: integer delay (no interpolation), -1: interpolate
+    this.gain = new Float64Array(8);
+    this.cut = new Float64Array(8);            // 1 - pole of the per-line absorption filter
+    this.lp = new Float64Array(8);
+    this.mph = new Float64Array(4);
+    this.mval = new Float64Array(4);
+    for (let k = 0; k < 4; k++) this.mph[k] = this.rng();
     // input tone filter states (one-pole high-pass x1/y1, one-pole low-pass)
     this.hxL = 0; this.hyL = 0; this.hxR = 0; this.hyR = 0; this.lpL = 0; this.lpR = 0;
     this.lastSize = -1;
+    this.quiet = 0;                            // quanta with silent input and a decayed tail
+    this.quietNeed = Math.ceil(this.lnSize / 128) + 2;
   }
 
   process(inputs, outputs, params) {
     const out = outputs[0];
-    const oL = out[0], oR = out[1] || out[0];
+    const oL = out[0], oR = out.length > 1 ? out[1] : null;
     const n = oL.length;
     const inp = inputs[0];
-    const iL = inp && inp[0], iR = inp && (inp[1] || inp[0]);
+    const iL = inp && inp.length ? inp[0] : null;
+    const iR = inp && inp.length > 1 ? inp[1] : iL;
     const sr = sampleRate;
+
+    // Idle: silent input and a tail below -140 dB -> skip all work
+    let inPeak = 0;
+    if (iL) {
+      for (let i = 0; i < n; i++) { const a = iL[i], b = iR[i]; inPeak += a * a + b * b; }
+    }
+    const silentIn = inPeak < 1e-18;
+    if (silentIn && this.quiet >= this.quietNeed) {
+      oL.fill(0);
+      if (oR) oR.fill(0);
+      return true;
+    }
+
     const decay = params.decay[0], size = params.size[0], width = params.width[0];
     const wet = params.wet[0], dry = params.dry[0];
     const modD = params.mod[0] * 0.0005 * sr;
     const scale = 0.25 + 0.75 * size;
 
     // --- per-quantum coefficients
-    const lpA = 1 - Math.exp((-TWO_PI * params.damping[0]) / sr);
-    const hcA = 1 - Math.exp((-TWO_PI * params.highCut[0]) / sr);
+    const hcA = 1 - Math.exp((-TWO_PI * Math.min(params.highCut[0], 0.45 * sr)) / sr);
     const lcA = Math.exp((-TWO_PI * params.lowCut[0]) / sr);
-    const lines = this.lines;
+    const cw = Math.cos((TWO_PI * Math.min(params.damping[0], 0.49 * sr)) / sr);
     const sm = 1 - Math.exp(-n / (0.08 * sr)); // length glide (~80 ms) when size changes
+    const rate = (params.modRate[0] * n) / sr;
+    const len = this.len, dA = this.dA, dB = this.dB, intD = this.intD, gain = this.gain, cut = this.cut;
     for (let c = 0; c < 8; c++) {
-      const L = lines[c];
-      const target = (FDN_MS[c] * sr * scale) / 1000;
-      if (L.len < 0) L.len = target;
-      L.len0 = L.len;
-      L.len += (target - L.len) * sm;
-      if (Math.abs(target - L.len) < 1e-3) L.len = target;
-      // RT60: gain per pass = 10^(-3 * len / (decay * sr))
-      L.g = Math.pow(10, (-3 * L.len) / (decay * sr));
-      if (c % 2 === 0 && modD > 0) {
-        const rate = params.modRate[0] * FDN_MOD_RATE[c >> 1];
-        L.m0 = sin2pi(L.phase) * modD;
-        L.phase += (rate * n) / sr;
-        L.phase -= Math.floor(L.phase);
-        L.m1 = sin2pi(L.phase) * modD;
-      } else { L.m0 = 0; L.m1 = 0; }
+      const target = Math.round((FDN_MS[c] * sr * scale) / 1000);
+      let l0 = len[c];
+      if (l0 < 0) l0 = target;
+      let l1 = l0 + (target - l0) * sm;
+      if (Math.abs(target - l1) < 0.01) l1 = target;
+      len[c] = l1;
+      let m0 = 0, m1 = 0;
+      if ((c & 1) === 0) {
+        const k = c >> 1;
+        m0 = this.mval[k];
+        let ph = this.mph[k] + rate * FDN_MOD_RATE[k];
+        ph -= Math.floor(ph);
+        this.mph[k] = ph;
+        m1 = modD > 0 ? sin2pi(ph) * modD : 0;
+        this.mval[k] = m1;
+      }
+      dA[c] = l0 + m0;
+      dB[c] = l1 + m1;
+      intD[c] = dA[c] === dB[c] && dA[c] === Math.floor(dA[c]) ? dA[c] : -1;
+      // RT60: gain per pass = 10^(-3 len / (decay sr)). Jot absorption filter: a one-pole
+      // low-pass whose loss at the damping frequency equals that gain again, so the RT60
+      // halves there whatever the line length (size-independent tone).
+      const g = Math.pow(10, (-3 * l1) / (decay * sr));
+      const g2 = g * g, A = 1 - g2 * cw, B = 1 - g2;
+      const pole = B / (A + Math.sqrt(A * A > B * B ? A * A - B * B : 0));
+      gain[c] = g;
+      cut[c] = 1 - pole;
     }
     // diffuser lengths follow the size
     if (size !== this.lastSize) {
-      for (let s = 0; s < 3; s++) for (let c = 0; c < 8; c++) {
-        const d = this.dif[s][c];
-        d.len = Math.max(0, Math.min(d.maxLen, Math.round(d.maxLen * (0.35 + 0.65 * size))));
-      }
+      const f = 0.35 + 0.65 * size;
+      for (let j = 0; j < 24; j++) this.difLen[j] = Math.round(this.difMax[j] * f);
       this.lastSize = size;
     }
-    const pdTarget = Math.min(this.pdSize - 4, params.predelay[0] * sr);
+    const pdTarget = Math.round(Math.min(this.pdSize - 4, params.predelay[0] * sr));
     if (this.pdLen < 0) this.pdLen = pdTarget;
     const pd0 = this.pdLen;
-    this.pdLen += (pdTarget - this.pdLen) * sm;
-    if (Math.abs(pdTarget - this.pdLen) < 1e-3) this.pdLen = pdTarget;
-    const pd1 = this.pdLen;
+    let pd1 = pd0 + (pdTarget - pd0) * sm;
+    if (Math.abs(pdTarget - pd1) < 0.01) pd1 = pdTarget;
+    this.pdLen = pd1;
+    const pdInt = pd0 === pd1 && pd0 === Math.floor(pd0);
 
-    const v = this.v, fb = this.fb;
-    const pdL = this.pdL, pdR = this.pdR, pdMask = this.pdSize - 1;
-    let pdW = this.pdW, difW = this.difW, lineW = this.lineW;
+    const pd = this.pd, pdMask = this.pdSize - 1;
+    const dm = this.difSize - 1, lm = this.lnSize - 1;
+    const db = this.db, dl = this.difLen;
+    const b00 = db[0], b01 = db[1], b02 = db[2], b03 = db[3], b04 = db[4], b05 = db[5], b06 = db[6], b07 = db[7];
+    const L00 = dl[0], L01 = dl[1], L02 = dl[2], L03 = dl[3], L04 = dl[4], L05 = dl[5], L06 = dl[6], L07 = dl[7];
+    const b10 = db[8], b11 = db[9], b12 = db[10], b13 = db[11], b14 = db[12], b15 = db[13], b16 = db[14], b17 = db[15];
+    const L10 = dl[8], L11 = dl[9], L12 = dl[10], L13 = dl[11], L14 = dl[12], L15 = dl[13], L16 = dl[14], L17 = dl[15];
+    const b20 = db[16], b21 = db[17], b22 = db[18], b23 = db[19], b24 = db[20], b25 = db[21], b26 = db[22], b27 = db[23];
+    const L20 = dl[16], L21 = dl[17], L22 = dl[18], L23 = dl[19], L24 = dl[20], L25 = dl[21], L26 = dl[22], L27 = dl[23];
+    const ln = this.ln;
+    const n0 = ln[0], n1 = ln[1], n2 = ln[2], n3 = ln[3], n4 = ln[4], n5 = ln[5], n6 = ln[6], n7 = ln[7];
+    const I0 = intD[0], I1 = intD[1], I2 = intD[2], I3 = intD[3], I4 = intD[4], I5 = intD[5], I6 = intD[6], I7 = intD[7];
+    const A0 = dA[0], S0 = dB[0] - dA[0], A1 = dA[1], S1 = dB[1] - dA[1], A2 = dA[2], S2 = dB[2] - dA[2], A3 = dA[3], S3 = dB[3] - dA[3], A4 = dA[4], S4 = dB[4] - dA[4], A5 = dA[5], S5 = dB[5] - dA[5], A6 = dA[6], S6 = dB[6] - dA[6], A7 = dA[7], S7 = dB[7] - dA[7];
+    const k0 = cut[0], g0 = gain[0], k1 = cut[1], g1 = gain[1], k2 = cut[2], g2 = gain[2], k3 = cut[3], g3 = gain[3], k4 = cut[4], g4 = gain[4], k5 = cut[5], g5 = gain[5], k6 = cut[6], g6 = gain[6], k7 = cut[7], g7 = gain[7];
+    const lp = this.lp;
+    let p0 = lp[0], p1 = lp[1], p2 = lp[2], p3 = lp[3], p4 = lp[4], p5 = lp[5], p6 = lp[6], p7 = lp[7];
+    let pdW = this.pdW, w = this.difW, lw = this.lnW;
     let hxL = this.hxL, hyL = this.hyL, hxR = this.hxR, hyR = this.hyR, lpL = this.lpL, lpR = this.lpR;
-    const dif = this.dif;
     const invN = 1 / n;
+    const SQ8 = 0.35355339059327373;
     // Output taps: two orthogonal Hadamard rows -> decorrelated L / R
     const ws = 0.5 * width, wm = 0.5;
     const outG = FDN_OUT_GAIN * wet;
+    let tail = 0;
 
     for (let i = 0; i < n; i++) {
       const fr = (i + 1) * invN;
@@ -1193,76 +1230,108 @@ class FdnReverbProcessor extends AudioWorkletProcessor {
       hyL = xl - hxL + lcA * hyL; hxL = xl;
       hyR = xr - hxR + lcA * hyR; hxR = xr;
       lpL += hcA * (hyL - lpL); lpR += hcA * (hyR - lpR);
-      // predelay (linear interpolation, gliding length)
-      pdL[pdW] = lpL; pdR[pdW] = lpR;
-      const pdD = pd0 + (pd1 - pd0) * fr;
-      const pdI = pdD | 0, pdF = pdD - pdI;
-      const r0 = (pdW - pdI) & pdMask, r1 = (r0 - 1) & pdMask;
-      const pl = pdL[r0] + (pdL[r1] - pdL[r0]) * pdF;
-      const pr = pdR[r0] + (pdR[r1] - pdR[r0]) * pdF;
+      // predelay (integer read unless the time is gliding)
+      pd[pdW << 1] = lpL; pd[(pdW << 1) | 1] = lpR;
+      let pl, pr;
+      if (pdInt) {
+        const r = ((pdW - pd0) & pdMask) << 1;
+        pl = pd[r]; pr = pd[r | 1];
+      } else {
+        const pdD = pd0 + (pd1 - pd0) * fr;
+        const pdI = pdD | 0, pdF = pdD - pdI;
+        const r0 = ((pdW - pdI) & pdMask) << 1, r1 = ((pdW - pdI - 1) & pdMask) << 1;
+        pl = pd[r0] + (pd[r1] - pd[r0]) * pdF;
+        pr = pd[r0 | 1] + (pd[r1 | 1] - pd[r0 | 1]) * pdF;
+      }
       pdW = (pdW + 1) & pdMask;
-      // upmix to 8 channels
-      v[0] = pl; v[1] = pr; v[2] = pl; v[3] = -pr; v[4] = -pl; v[5] = pr; v[6] = pl; v[7] = pr;
-      // diffuser: delay, polarity, Hadamard
-      for (let s = 0; s < 3; s++) {
-        const st = dif[s], sg = DIF_SIGN[s];
-        for (let c = 0; c < 8; c++) {
-          const d = st[c];
-          d.buf[difW & d.mask] = v[c];
-          v[c] = d.buf[(difW - d.len) & d.mask] * sg[c];
-        }
-        fwht8(v);
+      // upmix to 8 channels, then 3 diffusion stages: delay, polarity flip, Hadamard
+      let v0 = pl, v1 = pr, v2 = pl, v3 = -pr, v4 = -pl, v5 = pr, v6 = pl, v7 = pr;
+      const wi = w & dm;
+      // stage 1
+      b00[wi] = v0; b01[wi] = v1; b02[wi] = v2; b03[wi] = v3; b04[wi] = v4; b05[wi] = v5; b06[wi] = v6; b07[wi] = v7;
+      v0 = b00[(w - L00) & dm]; v1 = -b01[(w - L01) & dm];
+      v2 = b02[(w - L02) & dm]; v3 = b03[(w - L03) & dm];
+      v4 = -b04[(w - L04) & dm]; v5 = b05[(w - L05) & dm];
+      v6 = -b06[(w - L06) & dm]; v7 = -b07[(w - L07) & dm];
+      {
+        const a0 = v0 + v1, a1 = v0 - v1, a2 = v2 + v3, a3 = v2 - v3, a4 = v4 + v5, a5 = v4 - v5, a6 = v6 + v7, a7 = v6 - v7;
+        const c0 = a0 + a2, c2 = a0 - a2, c1 = a1 + a3, c3 = a1 - a3, c4 = a4 + a6, c6 = a4 - a6, c5 = a5 + a7, c7 = a5 - a7;
+        v0 = (c0 + c4) * SQ8; v4 = (c0 - c4) * SQ8; v1 = (c1 + c5) * SQ8; v5 = (c1 - c5) * SQ8;
+        v2 = (c2 + c6) * SQ8; v6 = (c2 - c6) * SQ8; v3 = (c3 + c7) * SQ8; v7 = (c3 - c7) * SQ8;
       }
-      difW = (difW + 1) | 0;
-      if (difW > 1073741823) difW = 0;
-      // feedback network: read lines (modulated lines use cubic Hermite)
-      let sum = 0;
-      for (let c = 0; c < 8; c++) {
-        const L = lines[c];
-        let d = L.len0 + (L.len - L.len0) * fr;
-        if (L.m0 !== 0 || L.m1 !== 0) d += L.m0 + (L.m1 - L.m0) * fr;
-        const di = d | 0, f = d - di;
-        const b = L.buf, mk = L.mask;
-        const i0 = (lineW - di) & mk;
-        let y;
-        if (f === 0) y = b[i0];
-        else {
-          const xm1 = b[(i0 + 1) & mk], x0 = b[i0], x1 = b[(i0 - 1) & mk], x2 = b[(i0 - 2) & mk];
-          const c1 = 0.5 * (x1 - xm1), c2 = xm1 - 2.5 * x0 + 2 * x1 - 0.5 * x2, c3 = 0.5 * (x2 - xm1) + 1.5 * (x0 - x1);
-          y = ((c3 * f + c2) * f + c1) * f + x0;
-        }
-        // damping (one-pole low-pass) and decay gain
-        L.lp += lpA * (y - L.lp);
-        const z = L.lp * L.g;
-        fb[c] = z;
-        sum += z;
+      // stage 2
+      b10[wi] = v0; b11[wi] = v1; b12[wi] = v2; b13[wi] = v3; b14[wi] = v4; b15[wi] = v5; b16[wi] = v6; b17[wi] = v7;
+      v0 = -b10[(w - L10) & dm]; v1 = b11[(w - L11) & dm];
+      v2 = b12[(w - L12) & dm]; v3 = -b13[(w - L13) & dm];
+      v4 = b14[(w - L14) & dm]; v5 = -b15[(w - L15) & dm];
+      v6 = -b16[(w - L16) & dm]; v7 = b17[(w - L17) & dm];
+      {
+        const a0 = v0 + v1, a1 = v0 - v1, a2 = v2 + v3, a3 = v2 - v3, a4 = v4 + v5, a5 = v4 - v5, a6 = v6 + v7, a7 = v6 - v7;
+        const c0 = a0 + a2, c2 = a0 - a2, c1 = a1 + a3, c3 = a1 - a3, c4 = a4 + a6, c6 = a4 - a6, c5 = a5 + a7, c7 = a5 - a7;
+        v0 = (c0 + c4) * SQ8; v4 = (c0 - c4) * SQ8; v1 = (c1 + c5) * SQ8; v5 = (c1 - c5) * SQ8;
+        v2 = (c2 + c6) * SQ8; v6 = (c2 - c6) * SQ8; v3 = (c3 + c7) * SQ8; v7 = (c3 - c7) * SQ8;
       }
-      // Householder feedback: x - 2/N * sum
+      // stage 3
+      b20[wi] = v0; b21[wi] = v1; b22[wi] = v2; b23[wi] = v3; b24[wi] = v4; b25[wi] = v5; b26[wi] = v6; b27[wi] = v7;
+      v0 = b20[(w - L20) & dm]; v1 = b21[(w - L21) & dm];
+      v2 = -b22[(w - L22) & dm]; v3 = b23[(w - L23) & dm];
+      v4 = -b24[(w - L24) & dm]; v5 = -b25[(w - L25) & dm];
+      v6 = b26[(w - L26) & dm]; v7 = -b27[(w - L27) & dm];
+      {
+        const a0 = v0 + v1, a1 = v0 - v1, a2 = v2 + v3, a3 = v2 - v3, a4 = v4 + v5, a5 = v4 - v5, a6 = v6 + v7, a7 = v6 - v7;
+        const c0 = a0 + a2, c2 = a0 - a2, c1 = a1 + a3, c3 = a1 - a3, c4 = a4 + a6, c6 = a4 - a6, c5 = a5 + a7, c7 = a5 - a7;
+        v0 = (c0 + c4) * SQ8; v4 = (c0 - c4) * SQ8; v1 = (c1 + c5) * SQ8; v5 = (c1 - c5) * SQ8;
+        v2 = (c2 + c6) * SQ8; v6 = (c2 - c6) * SQ8; v3 = (c3 + c7) * SQ8; v7 = (c3 - c7) * SQ8;
+      }
+      w = (w + 1) & dm;
+      // feedback network: read the lines (Catmull-Rom while modulated or gliding),
+      // absorption low-pass and decay gain
+      p0 += k0 * ((I0 >= 0 ? n0[(lw - I0) & lm] : readFrac(n0, lw, lm, A0 + S0 * fr)) - p0);
+      p1 += k1 * ((I1 >= 0 ? n1[(lw - I1) & lm] : readFrac(n1, lw, lm, A1 + S1 * fr)) - p1);
+      p2 += k2 * ((I2 >= 0 ? n2[(lw - I2) & lm] : readFrac(n2, lw, lm, A2 + S2 * fr)) - p2);
+      p3 += k3 * ((I3 >= 0 ? n3[(lw - I3) & lm] : readFrac(n3, lw, lm, A3 + S3 * fr)) - p3);
+      p4 += k4 * ((I4 >= 0 ? n4[(lw - I4) & lm] : readFrac(n4, lw, lm, A4 + S4 * fr)) - p4);
+      p5 += k5 * ((I5 >= 0 ? n5[(lw - I5) & lm] : readFrac(n5, lw, lm, A5 + S5 * fr)) - p5);
+      p6 += k6 * ((I6 >= 0 ? n6[(lw - I6) & lm] : readFrac(n6, lw, lm, A6 + S6 * fr)) - p6);
+      p7 += k7 * ((I7 >= 0 ? n7[(lw - I7) & lm] : readFrac(n7, lw, lm, A7 + S7 * fr)) - p7);
+      const y0 = p0 * g0, y1 = p1 * g1, y2 = p2 * g2, y3 = p3 * g3, y4 = p4 * g4, y5 = p5 * g5, y6 = p6 * g6, y7 = p7 * g7;
+      // Householder feedback (I - 2/N 11^T) plus the diffused input
+      const sum = y0 + y1 + y2 + y3 + y4 + y5 + y6 + y7;
       const hh = sum * 0.25;
-      for (let c = 0; c < 8; c++) {
-        const L = lines[c];
-        L.buf[lineW & L.mask] = fb[c] - hh + v[c];
-      }
-      lineW = (lineW + 1) | 0;
-      if (lineW > 1073741823) lineW = 0;
+      const li = lw & lm;
+      n0[li] = y0 - hh + v0; n1[li] = y1 - hh + v1; n2[li] = y2 - hh + v2; n3[li] = y3 - hh + v3; n4[li] = y4 - hh + v4; n5[li] = y5 - hh + v5; n6[li] = y6 - hh + v6; n7[li] = y7 - hh + v7;
+      lw = (lw + 1) & lm;
       // stereo out from the line outputs
-      const yl = (fb[0] - fb[1] + fb[2] - fb[3] + fb[4] - fb[5] + fb[6] - fb[7]) * 0.35355339059327373;
-      const yr = (fb[0] + fb[1] - fb[2] - fb[3] + fb[4] + fb[5] - fb[6] - fb[7]) * 0.35355339059327373;
+      const yl = (y0 - y1 + y2 - y3 + y4 - y5 + y6 - y7) * SQ8;
+      const yr = (y0 + y1 - y2 - y3 + y4 + y5 - y6 - y7) * SQ8;
+      tail += sum * sum + yl * yl + yr * yr;
       const mid = (yl + yr) * wm, side = (yl - yr) * ws;
       oL[i] = (mid + side) * outG + xl * dry;
-      if (oR !== oL) oR[i] = (mid - side) * outG + xr * dry;
+      if (oR) oR[i] = (mid - side) * outG + xr * dry;
     }
-    this.pdW = pdW; this.difW = difW; this.lineW = lineW;
+    this.pdW = pdW; this.difW = w; this.lnW = lw;
     this.hxL = hxL; this.hyL = flush(hyL); this.hxR = hxR; this.hyR = flush(hyR);
     this.lpL = flush(lpL); this.lpR = flush(lpR);
-    // denormal / blow-up guard on the loop filters
-    for (let c = 0; c < 8; c++) {
-      const L = lines[c];
-      if (!Number.isFinite(L.lp)) { L.lp = 0; L.buf.fill(0); }
-      else L.lp = flush(L.lp);
+    lp[0] = flush(p0); lp[1] = flush(p1); lp[2] = flush(p2); lp[3] = flush(p3); lp[4] = flush(p4); lp[5] = flush(p5); lp[6] = flush(p6); lp[7] = flush(p7);
+    // blow-up guard (NaN/Infinity anywhere in the loop): clear the network
+    if (!(tail < Infinity)) {
+      lp.fill(0);
+      for (let c = 0; c < 8; c++) ln[c].fill(0);
+      for (let j = 0; j < 24; j++) db[j].fill(0);
+      tail = 0;
     }
+    this.quiet = silentIn && tail < 1e-14 * n ? this.quiet + 1 : 0;
     return true;
   }
+}
+
+/** Catmull-Rom read at fractional delay d (samples) behind write index w */
+function readFrac(buf, w, mask, d) {
+  const di = d | 0, f = d - di;
+  const i0 = w - di;
+  const xm1 = buf[(i0 + 1) & mask], x0 = buf[i0 & mask], x1 = buf[(i0 - 1) & mask], x2 = buf[(i0 - 2) & mask];
+  const c1 = 0.5 * (x1 - xm1), c2 = xm1 - 2.5 * x0 + 2 * x1 - 0.5 * x2, c3 = 0.5 * (x2 - xm1) + 1.5 * (x0 - x1);
+  return ((c3 * f + c2) * f + c1) * f + x0;
 }
 
 // ============================================================================
