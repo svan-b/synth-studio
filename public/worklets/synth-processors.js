@@ -312,9 +312,10 @@ class VcoProcessor extends AudioWorkletProcessor {
     }
     const driftMul = octOff !== 0 ? Math.pow(2, octOff) : 1;
 
-    if (!any && !subOn) {
-      // Nothing audible: keep the phase running so a later enable stays coherent
-      const f = params.frequency[0] * Math.pow(2, params.pitch[0]) * driftMul * (1 + params.linFm[0]) + params.fm[0];
+    if (!any) {
+      // Nothing audible (every output masked): keep the phase running so a later enable stays coherent
+      let f = params.frequency[0] * Math.pow(2, params.pitch[0]) * driftMul * (1 + params.linFm[0]) + params.fm[0];
+      if (f < 0 && params.thruZero[0] < 0.5) f = 0;
       this.phase += (clamp(f, -0.45 * sr, 0.45 * sr) / sr) * n;
       this.phase -= Math.floor(this.phase);
       return true;
