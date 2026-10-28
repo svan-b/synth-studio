@@ -9,6 +9,7 @@
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let analyser: AnalyserNode | null = null;
+let recordTap: AudioNode | null = null;
 let levelBuf: Float32Array<ArrayBuffer> | null = null;
 let workletPromise: Promise<void> | null = null;
 let unlockInstalled = false;
@@ -39,6 +40,7 @@ function createContext(): AudioContext {
   analyser.fftSize = 2048;
   levelBuf = new Float32Array(analyser.fftSize);
   limiter.connect(analyser);
+  recordTap = limiter;
   (window as unknown as { __synthLevel?: () => number }).__synthLevel = getOutputLevel;
 
   c.addEventListener('statechange', () => notify(c.state === 'running'));
@@ -57,6 +59,17 @@ export function getAudioContext(): AudioContext {
 export function getMasterBus(): AudioNode {
   getAudioContext();
   return master!;
+}
+
+/** Post-limiter master signal (what you hear) - for recording */
+export function getRecordTap(): AudioNode {
+  getAudioContext();
+  return recordTap!;
+}
+
+/** The master analyser - for scopes and meters */
+export function getMasterAnalyser(): AnalyserNode | null {
+  return analyser;
 }
 
 /** Peak output level (0..1) over the last ~40ms */

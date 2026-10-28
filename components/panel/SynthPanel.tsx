@@ -34,6 +34,14 @@ export interface SynthPanelProps {
   setUi?: (patch: Record<string, unknown>) => void;
   /** Spotlight: when set, elements not in the set are dimmed (focus mode in lessons) */
   focus?: Set<string> | null;
+  /** Studio patching: when set, jack taps go to the studio (cables between instruments) */
+  patchController?: PatchController;
+}
+
+/** Studio-wide patching: tap a jack on one instrument, then a jack on another */
+export interface PatchController {
+  active: { instance: string; jack: string } | null;
+  tap: (instance: string, jack: string) => void;
 }
 
 const NOOP = () => undefined;
@@ -143,6 +151,8 @@ function Faceplate(p: FaceplateProps) {
   const target = (id: string | null): ControlValue | undefined =>
     teaching && step && id && step.control === id ? step.targetValue : undefined;
   const isTarget = (id: string | null) => !!(teaching && step && id && step.control === id);
+  /** Spotlight: dim controls the current lesson step isn't about */
+  const dimmed = (id: string | null | undefined) => !!(p.focus && (!id || !p.focus.has(id)));
 
   const toLocal = useCallback((clientX: number, clientY: number) => {
     const el = faceRef.current;
@@ -262,7 +272,7 @@ function Faceplate(p: FaceplateProps) {
         const id = typeof el.control === 'function' ? el.control(ctx) : el.control;
         const s = id ? (spec.controls[id] as KnobSpec | undefined) : undefined;
         return (
-          <Anchor key={i} x={px(el.x)} y={px(el.y)}>
+          <Anchor key={i} x={px(el.x)} y={px(el.y)} dim={dimmed(id)}>
             {s && s.type === 'knob' ? (
               <Knob
                 id={id!}
@@ -292,7 +302,7 @@ function Faceplate(p: FaceplateProps) {
         const s = spec.controls[el.control] as SliderSpec | undefined;
         if (!s || s.type !== 'slider') return null;
         return (
-          <Anchor key={i} x={px(el.x)} y={px(el.y)}>
+          <Anchor key={i} x={px(el.x)} y={px(el.y)} dim={dimmed(el.control)}>
             <Slider
               id={el.control}
               spec={s}
@@ -316,7 +326,7 @@ function Faceplate(p: FaceplateProps) {
         const s = spec.controls[el.control] as SwitchSpec | undefined;
         if (!s || s.type !== 'switch') return null;
         return (
-          <Anchor key={i} x={px(el.x)} y={px(el.y)}>
+          <Anchor key={i} x={px(el.x)} y={px(el.y)} dim={dimmed(el.control)}>
             <Switch
               id={el.control}
               spec={s}
@@ -345,11 +355,13 @@ function Faceplate(p: FaceplateProps) {
         const connected = p.patches.filter(c => c.from === el.jack || c.to === el.jack);
         const isHl = highlightedJacks.includes(el.jack);
         const d = px(6.2);
-        const isActive = active?.from === el.jack;
+        const isActive = p.patchController
+          ? p.patchController.active?.instance === (p.instance ?? p.spec.id) && p.patchController.active?.jack === el.jack
+          : active?.from === el.jack;
         const lp = el.label ?? 'above';
         const ring = isActive ? '#fff' : isHl ? (targetPatchDone ? '#22c55e' : '#f97316') : theme.jack?.ring ?? '#555';
         return (
-          <Anchor key={i} x={px(el.x)} y={px(el.y)}>
+          <Anchor key={i} x={px(el.x)} y={px(el.y)} dim={dimmed(el.jack)}>
             <div className="relative" style={{ width: d, height: d }}>
               {lp !== 'none' && (
                 <div
@@ -532,9 +544,17 @@ function Faceplate(p: FaceplateProps) {
           <div
             key={`hit-${i}`}
             data-jack={el.jack}
-            onPointerDown={e => startOrFinish(el.jack, e)}
-            onPointerMove={onJackMove}
-            onPointerUp={onJackUp}
+            onPointerDown={e => {
+              if (p.patchController) {
+                e.stopPropagation();
+                e.preventDefault();
+                p.patchController.tap(p.instance ?? p.spec.id, el.jack);
+                return;
+              }
+              startOrFinish(el.jack, e);
+            }}
+            onPointerMove={p.patchController ? undefined : onJackMove}
+            onPointerUp={p.patchController ? undefined : onJackUp}
             title={`${j.label} (${j.jackType}, ${j.signalType})`}
             className="absolute rounded-full cursor-pointer"
             style={{ left: px(el.x) - d / 2, top: px(el.y) - d / 2, width: d, height: d, zIndex: 40, touchAction: 'none' }}
@@ -545,7 +565,7 @@ function Faceplate(p: FaceplateProps) {
   );
 }
 
-function PanelButton({ el, spec, layout, values, ctx, teaching, step, px, onChange, onEvent }: FaceplateProps & { el: ButtonElement }) {
+function PanelButton({ el, spec, layout, values, ctx, teaching, step, px, onChange, onEvent, focus }: FaceplateProps & { el: ButtonElement }) {
   const controlSpec = el.control ? spec.controls[el.control] : undefined;
   const isRadio = el.setValue !== undefined;
   const current = el.control ? values[el.control] : undefined;
@@ -576,7 +596,7 @@ function PanelButton({ el, spec, layout, values, ctx, teaching, step, px, onChan
   const radioLabel = isRadio && controlSpec?.type === 'switch' ? (controlSpec as SwitchSpec).options[el.setValue as number] : undefined;
   const w = px(el.w ?? 7);
   return (
-    <Anchor x={px(el.x)} y={px(el.y)}>
+    <Anchor x={px(el.x)} y={px(el.y)} dim={!!(focus && !(el.control && focus.has(el.control)) && !(el.event && focus.has(el.event)))}>
       <Button
         id={el.control ?? el.event ?? 'button'}
         label={el.labelText ?? radioLabel ?? (controlSpec ? controlSpec.label : undefined)}
@@ -599,10 +619,16 @@ function PanelButton({ el, spec, layout, values, ctx, teaching, step, px, onChan
   );
 }
 
-function Anchor({ x, y, children }: { x: number; y: number; children: React.ReactNode }) {
+function Anchor({ x, y, children, dim }: { x: number; y: number; children: React.ReactNode; dim?: boolean }) {
   return (
     // max-content stops elements near the panel's right edge from being squeezed (and their text wrapping)
-    <div className="absolute" style={{ left: x, top: y, width: 'max-content', transform: 'translate(-50%, -50%)' }}>
+    <div
+      className="absolute"
+      style={{
+        left: x, top: y, width: 'max-content', transform: 'translate(-50%, -50%)',
+        opacity: dim ? 0.28 : 1, filter: dim ? 'saturate(0.3)' : undefined, transition: 'opacity 200ms',
+      }}
+    >
       {children}
     </div>
   );

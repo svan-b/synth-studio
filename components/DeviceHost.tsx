@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ControlValue, PatchConnection } from '@/types';
-import type { DeviceEntry, DeviceModule } from '@/devices/types';
-import { useStudioStore } from '@/store/studio';
-import { useSynthEngine } from '@/lib/audio/useSynthEngine';
-import { getOutputLevel } from '@/lib/audio/context';
-import SynthPanel from '@/components/panel/SynthPanel';
+import type { ControlValue, PatchConnection, PresetSpec } from '@/types';
+import type { DeviceModule, DeviceUiApi } from '@/devices/types';
+import { useStudioStore, specDefaults, stepKind } from '@/store/studio';
+import { useUiStore, selectUi } from '@/store/ui';
+import { hub } from '@/lib/studio/hub';
+import { useDeviceModule, useEngineState } from '@/lib/studio/useHub';
+import SynthPanel, { type PatchController } from '@/components/panel/SynthPanel';
 import ResponsiveDeviceContainer from '@/components/ui/ResponsiveDeviceContainer';
 
 // Computer keyboard → semitone offset (two rows like a DAW)
@@ -18,112 +19,110 @@ const KEYMAP: Record<string, number> = {
 const EMPTY_PATCHES: PatchConnection[] = [];
 
 interface DeviceHostProps {
-  entry: DeviceEntry;
+  instance: string;
+  /** Studio rack view: slimmer toolbar, no tips */
+  compact?: boolean;
+  /** Only the focused instrument listens to the computer keyboard */
+  keyboardActive?: boolean;
+  /** Studio-level patching (cables between instruments) */
+  patchController?: PatchController;
+  /** Fixed zoom for the rack view; focus view uses the Fit / +/- controls */
+  zoomOverride?: 'fit' | number;
   onModuleLoaded?: (module: DeviceModule) => void;
 }
 
-export default function DeviceHost({ entry, onModuleLoaded }: DeviceHostProps) {
-  const [mod, setMod] = useState<DeviceModule | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const device = entry.id;
+export default function DeviceHost(props: DeviceHostProps) {
+  const device = useStudioStore(s => s.deviceOf(props.instance));
+  const { module, error } = useDeviceModule(device);
+  const onLoaded = props.onModuleLoaded;
+  useEffect(() => { if (module) onLoaded?.(module); }, [module, onLoaded]);
 
-  useEffect(() => {
-    let alive = true;
-    setMod(null);
-    setLoadError(null);
-    entry.load()
-      .then(m => {
-        if (!alive) return;
-        useStudioStore.getState().registerDevice(m.default.spec);
-        setMod(m.default);
-        onModuleLoaded?.(m.default);
-      })
-      .catch(e => alive && setLoadError(String(e)));
-    return () => { alive = false; };
-  }, [entry, onModuleLoaded]);
-
-  if (loadError) return <div className="text-red-400 p-8 text-center">Failed to load {entry.name}: {loadError}</div>;
-  if (!mod) {
-    return (
-      <div className="flex items-center justify-center h-64 text-hardware-label animate-pulse">
-        Loading {entry.manufacturer} {entry.name}…
-      </div>
-    );
+  if (error) return <div className="text-red-400 p-8 text-center">Failed to load {device}: {error}</div>;
+  if (!module) {
+    return <div className="flex items-center justify-center h-64 text-hardware-label animate-pulse">Loading {device}…</div>;
   }
-  return <LoadedDevice key={device} device={device} mod={mod} />;
+  return <LoadedDevice key={props.instance} {...props} device={device} mod={module} />;
 }
 
-function LoadedDevice({ device, mod }: { device: string; mod: DeviceModule }) {
+function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, patchController, zoomOverride }: DeviceHostProps & { device: string; mod: DeviceModule }) {
   const { spec, layout } = mod;
-  const stored = useStudioStore(s => s.devices[device]);
-  const setControlValue = useStudioStore(s => s.setControlValue);
-  const setControlValues = useStudioStore(s => s.setControlValues);
+  const stored = useStudioStore(s => s.devices[instance]);
   const addPatch = useStudioStore(s => s.addPatchConnection);
   const removePatch = useStudioStore(s => s.removePatchConnection);
   const clearPatches = useStudioStore(s => s.clearPatchConnections);
   const resetControls = useStudioStore(s => s.resetControlsToSpec);
   const loadPreset = useStudioStore(s => s.loadPreset);
+  const updateDeviceData = useStudioStore(s => s.updateDeviceData);
   const isTeaching = useStudioStore(s => s.isTeachingMode);
   const lesson = useStudioStore(s => s.currentLesson);
+  const lessonInstance = useStudioStore(s => s.lessonInstance);
   const stepIndex = useStudioStore(s => s.currentStep);
+  const focusMode = useStudioStore(s => s.focusMode);
+  const ui = useUiStore(selectUi(instance));
+  const setUiStore = useUiStore(s => s.setUi);
+  const engineState = useEngineState(instance);
   const [zoom, setZoom] = useState<'fit' | number>('fit');
   const [scaleInfo, setScaleInfo] = useState({ scale: 1, fit: 1 });
   const [held, setHeld] = useState<Set<number>>(new Set());
   const [octave, setOctave] = useState(0);
   const [preset, setPreset] = useState('');
 
-  const defaults = useMemo(() => {
-    const d: Record<string, ControlValue> = {};
-    Object.entries(spec.controls).forEach(([id, c]) => {
-      if ('default' in c && c.default !== undefined) d[id] = c.default as ControlValue;
-    });
-    return d;
-  }, [spec]);
-
-  // Momentary and transport buttons are performance actions, not saved settings:
-  // never come back from a reload already "running". Latching toggles (sync, latch...) persist.
-  useEffect(() => {
-    const reset: Record<string, ControlValue> = {};
-    Object.entries(spec.controls).forEach(([id, c]) => {
-      const transient = c.type === 'button' && (c.momentary || id === mod.transportControl);
-      if (transient && stored?.controlValues[id] !== undefined && stored.controlValues[id] !== c.default) reset[id] = c.default;
-    });
-    if (Object.keys(reset).length) setControlValues(device, reset);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [device]);
-
+  const defaults = useMemo(() => specDefaults(device), [device]);
   const values = useMemo(() => ({ ...defaults, ...(stored?.controlValues ?? {}) }), [defaults, stored?.controlValues]);
   const patches = stored?.patchConnections ?? EMPTY_PATCHES;
+  const data = stored?.data;
 
-  const { status, error, engineState, ensureAudio, sendEvent, noteOn, noteOff } = useSynthEngine(mod.createEngine, values, patches, mod.worklets);
+  const setUi = useCallback((patch: Record<string, unknown>) => setUiStore(instance, patch), [instance, setUiStore]);
+  const updateData = useCallback((fn: (d: unknown) => unknown) => updateDeviceData(instance, fn), [instance, updateDeviceData]);
 
-  const onChange = useCallback((id: string, v: ControlValue) => setControlValue(device, id, v), [device, setControlValue]);
-  const onPatch = useCallback((a: string, b: string) => addPatch(device, a, b), [device, addPatch]);
-  const onUnpatch = useCallback((a: string, b: string) => removePatch(device, a, b), [device, removePatch]);
+  // The API device hooks see (parameter locks etc.)
+  const apiRef = useRef<DeviceUiApi | null>(null);
+  apiRef.current = {
+    values,
+    data,
+    ui,
+    setValue: (id, v) => hub.setControl(instance, id, v),
+    updateData,
+    setUi,
+  };
+
+  const displayValues = useMemo(
+    () => (mod.displayValues && apiRef.current ? mod.displayValues(apiRef.current) : values),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mod, values, data, ui],
+  );
+
+  const onChange = useCallback((id: string, v: ControlValue) => {
+    if (mod.interceptChange && apiRef.current && mod.interceptChange(id, v, apiRef.current)) return;
+    hub.setControl(instance, id, v);
+  }, [mod, instance]);
+  const onEvent = useCallback((name: string, payload?: unknown) => hub.event(instance, name, payload), [instance]);
+  const onPatch = useCallback((a: string, b: string) => addPatch(instance, a, b), [instance, addPatch]);
+  const onUnpatch = useCallback((a: string, b: string) => removePatch(instance, a, b), [instance, removePatch]);
 
   const heldRef = useRef(held);
   heldRef.current = held;
   const handleNoteOn = useCallback((n: number, velocity = 1) => {
     setHeld(prev => new Set(prev).add(n));
-    noteOn(n, velocity);
-  }, [noteOn]);
+    hub.noteOn(instance, n, velocity);
+  }, [instance]);
   const handleNoteOff = useCallback((n: number) => {
     setHeld(prev => { const s = new Set(prev); s.delete(n); return s; });
-    noteOff(n);
-  }, [noteOff]);
+    hub.noteOff(instance, n);
+  }, [instance]);
 
-  // Computer keyboard: notes (playable instruments), Z/X octave, Space = transport
+  // Computer keyboard: notes, Z/X octave, Space = transport (focused instrument only)
   useEffect(() => {
+    if (!keyboardActive) return;
     const down = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (e.metaKey || e.ctrlKey || e.altKey || t.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (e.key === ' ' && mod.transportControl) {
-        // Space is always transport (even when a panel button has focus)
         e.preventDefault();
         if (e.repeat) return;
-        ensureAudio();
-        const cur = useStudioStore.getState().devices[device]?.controlValues[mod.transportControl] ?? defaults[mod.transportControl];
-        setControlValue(device, mod.transportControl, !cur);
+        hub.ensureAudio();
+        const cur = useStudioStore.getState().devices[instance]?.controlValues[mod.transportControl] ?? defaults[mod.transportControl];
+        hub.setControl(instance, mod.transportControl, !cur);
         return;
       }
       if (!mod.keyboard || e.repeat) return;
@@ -132,7 +131,7 @@ function LoadedDevice({ device, mod }: { device: string; mod: DeviceModule }) {
       if (key === 'x') { setOctave(o => Math.min(3, o + 1)); return; }
       const off = KEYMAP[key];
       if (off === undefined) return;
-      ensureAudio();
+      hub.ensureAudio();
       handleNoteOn(mod.keyboard.lowNote + octave * 12 + off);
     };
     const up = (e: KeyboardEvent) => {
@@ -148,79 +147,105 @@ function LoadedDevice({ device, mod }: { device: string; mod: DeviceModule }) {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-  }, [mod, device, octave, defaults, ensureAudio, handleNoteOn, handleNoteOff, setControlValue]);
+  }, [keyboardActive, mod, instance, octave, defaults, handleNoteOn, handleNoteOff]);
 
-  const step = isTeaching && lesson && lesson.device === device ? lesson.steps[stepIndex] ?? null : null;
+  // Lesson step that targets this instance
+  const step = useMemo(() => {
+    if (!isTeaching || !lesson) return null;
+    const st = lesson.steps[stepIndex];
+    if (!st) return null;
+    const target = st.instance ?? lessonInstance ?? lesson.device;
+    return target === instance ? st : null;
+  }, [isTeaching, lesson, stepIndex, lessonInstance, instance]);
+
+  // Spotlight (focus mode): dim everything the step isn't about
+  const focus = useMemo(() => {
+    if (!step || !focusMode) return null;
+    const ids = new Set<string>(step.focus ?? []);
+    if (step.control) ids.add(step.control);
+    if (step.patchFrom) ids.add(step.patchFrom);
+    if (step.patchTo) ids.add(step.patchTo);
+    if (stepKind(step) === 'match' && step.match) step.match.controls.forEach(c => ids.add(c));
+    return ids.size ? ids : null;
+  }, [step, focusMode]);
+
   const presets = spec.presets ? Object.entries(spec.presets) : [];
+  const transientIds = useMemo(() => {
+    const s = new Set<string>(mod.uiControls ?? []);
+    Object.entries(spec.controls).forEach(([id, c]) => {
+      if (c.type === 'button' && (c.momentary || id === mod.transportControl)) s.add(id);
+    });
+    return s;
+  }, [mod, spec]);
 
   const applyPreset = (key: string) => {
     setPreset(key);
     const p = spec.presets?.[key];
     if (!p) return;
-    const ui = new Set(mod.uiControls ?? []);
     const base: Record<string, ControlValue> = {};
-    Object.entries(defaults).forEach(([id, v]) => {
-      const c = spec.controls[id];
-      const transient = c.type === 'button' && (c.momentary || id === mod.transportControl);
-      if (!ui.has(id) && !transient) base[id] = v;
-    });
-    loadPreset(device, { ...base, ...p.settings }, p.patchConnections ?? []);
+    Object.entries(defaults).forEach(([id, v]) => { if (!transientIds.has(id)) base[id] = v; });
+    loadPreset(instance, { ...base, ...p.settings }, p.patchConnections ?? []);
   };
 
   const doReset = () => {
-    const ui = new Set(mod.uiControls ?? []);
     const d: Record<string, ControlValue> = {};
-    Object.entries(defaults).forEach(([id, v]) => { if (!ui.has(id)) d[id] = v; });
-    resetControls(device, d);
+    Object.entries(defaults).forEach(([id, v]) => { if (!transientIds.has(id)) d[id] = v; });
+    resetControls(instance, d);
     setPreset('');
   };
 
   const onScaleChange = useCallback((scale: number, fit: number) => setScaleInfo({ scale, fit }), []);
 
   return (
-    <div onPointerDownCapture={ensureAudio} onKeyDownCapture={ensureAudio}>
-      {/* Utility toolbar - outside the scaled panel so it stays finger-sized on iPad */}
-      <div className="flex flex-wrap items-center justify-center gap-2 mb-3 text-sm">
-        <AudioBadge status={status} error={error} onClick={ensureAudio} />
+    <div onPointerDownCapture={() => hub.ensureAudio()} data-instance={instance}>
+      <div className={`flex flex-wrap items-center justify-center gap-2 ${compact ? 'mb-1.5' : 'mb-3'} text-sm`}>
         {presets.length > 0 && (
           <select
             value={preset}
             onChange={e => applyPreset(e.target.value)}
-            className="bg-[#232323] border border-[#3a3a3a] text-white rounded-full px-3 py-1.5 text-xs max-w-[220px]"
+            className="bg-[#232323] border border-[#3a3a3a] text-white rounded-full px-3 py-1.5 text-xs max-w-[240px]"
             aria-label="Load preset"
           >
-            <option value="">Load preset…</option>
-            {presets.map(([key, p]) => (
-              <option key={key} value={key}>{p.name}{p.patchConnections?.length ? ` (${p.patchConnections.length} cable${p.patchConnections.length > 1 ? 's' : ''})` : ''}</option>
+            <option value="">Presets ({presets.length})…</option>
+            {groupPresets(presets).map(([group, items]) => (
+              <optgroup key={group} label={group}>
+                {items.map(([k, p]) => (
+                  <option key={k} value={k}>
+                    {p.name}{p.patchConnections?.length ? ` · ${p.patchConnections.length} cable${p.patchConnections.length > 1 ? 's' : ''}` : ''}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         )}
         <ToolButton onClick={doReset} title="Reset every knob and switch to its default">Reset</ToolButton>
         {spec.patchBay && (
-          <ToolButton onClick={() => clearPatches(device)} title="Remove all patch cables" disabled={!patches.length}>
+          <ToolButton onClick={() => clearPatches(instance)} title="Remove this instrument's patch cables" disabled={!patches.length}>
             Clear cables{patches.length ? ` (${patches.length})` : ''}
           </ToolButton>
         )}
-        <div className="flex items-center rounded-full border border-[#3a3a3a] overflow-hidden">
-          <button className={`px-2.5 py-1.5 text-xs ${zoom === 'fit' ? 'bg-[#3a3a3a] text-white' : 'text-gray-400'}`} onClick={() => setZoom('fit')}>Fit</button>
-          <button className="px-2.5 py-1.5 text-xs text-gray-300 border-l border-[#3a3a3a]" onClick={() => setZoom(Math.max(0.35, +(scaleInfo.scale - 0.15).toFixed(2)))} aria-label="Zoom out">−</button>
-          <span className="px-1.5 text-[11px] text-gray-400 tabular-nums w-10 text-center">{Math.round(scaleInfo.scale * 100)}%</span>
-          <button className="px-2.5 py-1.5 text-xs text-gray-300 border-l border-[#3a3a3a]" onClick={() => setZoom(Math.min(1.5, +(scaleInfo.scale + 0.15).toFixed(2)))} aria-label="Zoom in">+</button>
-        </div>
-        {mod.keyboard && (
+        {!zoomOverride && (
+          <div className="flex items-center rounded-full border border-[#3a3a3a] overflow-hidden">
+            <button className={`px-2.5 py-1.5 text-xs ${zoom === 'fit' ? 'bg-[#3a3a3a] text-white' : 'text-gray-400'}`} onClick={() => setZoom('fit')}>Fit</button>
+            <button className="px-2.5 py-1.5 text-xs text-gray-300 border-l border-[#3a3a3a]" onClick={() => setZoom(Math.max(0.35, +(scaleInfo.scale - 0.15).toFixed(2)))} aria-label="Zoom out">−</button>
+            <span className="px-1.5 text-[11px] text-gray-400 tabular-nums w-10 text-center">{Math.round(scaleInfo.scale * 100)}%</span>
+            <button className="px-2.5 py-1.5 text-xs text-gray-300 border-l border-[#3a3a3a]" onClick={() => setZoom(Math.min(1.5, +(scaleInfo.scale + 0.15).toFixed(2)))} aria-label="Zoom in">+</button>
+          </div>
+        )}
+        {!compact && mod.keyboard && keyboardActive && (
           <span className="text-[11px] text-gray-500 hidden md:inline">Keys A–K play · Z/X octave ({octave >= 0 ? '+' : ''}{octave})</span>
         )}
-        {mod.transportControl && <span className="text-[11px] text-gray-500 hidden md:inline">Space = play/stop</span>}
+        {!compact && mod.transportControl && keyboardActive && <span className="text-[11px] text-gray-500 hidden md:inline">Space = play/stop</span>}
       </div>
 
-      <ResponsiveDeviceContainer zoom={zoom} onScaleChange={onScaleChange}>
+      <ResponsiveDeviceContainer zoom={zoomOverride ?? zoom} onScaleChange={onScaleChange}>
         <SynthPanel
           spec={spec}
           layout={layout}
-          values={values}
+          values={displayValues}
           engineState={engineState}
           onChange={onChange}
-          onEvent={sendEvent}
+          onEvent={onEvent}
           onNoteOn={handleNoteOn}
           onNoteOff={handleNoteOff}
           heldNotes={held}
@@ -229,16 +254,40 @@ function LoadedDevice({ device, mod }: { device: string; mod: DeviceModule }) {
           onUnpatch={onUnpatch}
           teaching={isTeaching}
           step={step}
+          instance={instance}
+          data={data}
+          ui={ui}
+          updateData={updateData}
+          setUi={setUi}
+          focus={focus}
+          patchController={patchController}
         />
       </ResponsiveDeviceContainer>
 
-      {mod.tips && mod.tips.length > 0 && (
-        <ul className="mt-2 max-w-3xl mx-auto text-[12px] text-gray-500 list-disc pl-6 space-y-0.5">
-          {mod.tips.map(t => <li key={t}>{t}</li>)}
-        </ul>
+      {!compact && mod.tips && mod.tips.length > 0 && (
+        <details className="mt-2 max-w-3xl mx-auto text-[12px] text-gray-500">
+          <summary className="cursor-pointer text-gray-400 hover:text-white select-none">How to play this {spec.name}</summary>
+          <ul className="list-disc pl-6 space-y-0.5 mt-1">
+            {mod.tips.map(t => <li key={t}>{t}</li>)}
+          </ul>
+        </details>
       )}
     </div>
   );
+}
+
+type PresetEntry = [string, PresetSpec];
+
+/** Group presets by the prefix before " / " or by their source */
+function groupPresets(presets: PresetEntry[]): [string, PresetEntry[]][] {
+  const groups = new Map<string, PresetEntry[]>();
+  presets.forEach(entry => {
+    const p = entry[1];
+    const group = p.name.includes(' / ') ? p.name.split(' / ')[0] : p.source === 'factory' ? 'Factory' : p.source === 'manual' ? 'From the manual' : 'Patches';
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group)!.push(entry);
+  });
+  return [...groups.entries()];
 }
 
 function ToolButton({ children, onClick, title, disabled }: { children: React.ReactNode; onClick: () => void; title?: string; disabled?: boolean }) {
@@ -251,45 +300,5 @@ function ToolButton({ children, onClick, title, disabled }: { children: React.Re
     >
       {children}
     </button>
-  );
-}
-
-function AudioBadge({ status, error, onClick }: { status: string; error: string | null; onClick: () => void }) {
-  const on = status === 'on';
-  const label = on ? 'Audio on' : status === 'starting' ? 'Starting…' : status === 'error' ? 'Audio error' : 'Tap to enable audio';
-  return (
-    <button
-      onClick={onClick}
-      title={error ?? (on ? 'Audio engine running' : 'Browsers only allow sound after you touch the page')}
-      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition-colors ${on ? 'border-green-900 text-green-400 bg-green-950/40' : status === 'error' ? 'border-red-900 text-red-400' : 'border-orange-700 text-orange-300 bg-orange-950/40 animate-pulse'}`}
-    >
-      <span className="w-2 h-2 rounded-full" style={{ background: on ? '#22c55e' : status === 'error' ? '#ef4444' : '#f97316', boxShadow: on ? '0 0 6px #22c55e' : undefined }} />
-      {label}
-      {on && <LevelMeter />}
-    </button>
-  );
-}
-
-function LevelMeter() {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    let raf = 0;
-    let held = 0;
-    const tick = () => {
-      const lvl = getOutputLevel();
-      held = Math.max(lvl, held * 0.9);
-      if (ref.current) {
-        ref.current.style.width = `${Math.min(100, held * 100)}%`;
-        ref.current.style.background = held > 0.95 ? '#ef4444' : held > 0.7 ? '#eab308' : '#22c55e';
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-  return (
-    <span className="relative w-12 h-1.5 rounded-full bg-black/60 overflow-hidden" aria-hidden>
-      <span ref={ref} className="absolute inset-y-0 left-0 rounded-full" style={{ width: 0 }} />
-    </span>
   );
 }
