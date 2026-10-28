@@ -624,7 +624,8 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
 
   const ledCol = lit ? lit[0] : null;
   const amt = lit ? lit[1] : 0;
-  // FUNC looks like every other key (it has no LED); the ring shows a held / latched FUNC
+  // FUNC has no LED. On the black (2020) finish it is a plain dark key like the others (the grey
+  // 2017 MKII had a green-grey cap); the ring shows a held / latched FUNC
   const face = funcOn ? '#3a3d44' : down ? '#33363c' : COL.key;
   const text = ledCol ? mix(COL.keyText, ledCol, 0.55 + 0.45 * amt) : COL.keyText;
   const fs = name.startsWith('BANK') ? 12 : big ? 10 : 9.5;

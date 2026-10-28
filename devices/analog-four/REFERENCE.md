@@ -49,7 +49,7 @@ item number.
 | 2 | GLOBAL (GLOBAL SETTINGS) | SAVE PROJECT (long press: LOAD PROJECT) | 25.0, 51.2 | key 18.5 x 13.7, LED | GLOBAL SETTINGS menu | MAN, EMU, CORE | verified |
 | 4 | QPER | MUTE | 60.6, 51.2 | key, no LED | With [TRIG 1-10]: pick the macro QUICK PERF controls; FUNC mutes the macros | MAN, EMU | verified |
 | 6 | TEMPO | TAP TEMPO | 96.2, 51.2 | key, no LED | TEMPO menu; FUNC+TEMPO taps the tempo | MAN, EMU | verified |
-| 15 or 37 (unconfirmed) | FUNC | - | 25.4, 87.3 | large key 19.1 x 17.2 | Shift for every secondary function | MAN, EMU | verified |
+| 15 or 37 (unconfirmed) | FUNC | - | 25.4, 87.3 | large key 19.1 x 17.2, no LED; on the black finish drawn as a plain dark key (assumed; the grey 2017 MKII had a dark green-grey cap, EMU 0x3B4A3D) | Shift for every secondary function | MAN, EMU | verified (function), guessed (black-finish colour) |
 | 31 | KIT | SAVE KIT | 58.3, 85.2 | key, LED | KIT menu | MAN, EMU | verified |
 | 32 | SND | SETTINGS | 78.1, 85.2 | key, LED | SOUND menu; FUNC: SOUND SETTINGS | MAN, EMU | verified |
 | 33 | MIX | POLY CONFIG | 97.9, 85.2 | key, LED | PERFORMANCE MIXER; FUNC: POLY CONFIG | MAN, EMU | verified |
