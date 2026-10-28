@@ -319,27 +319,41 @@ async function renderDevice(mod: DeviceModule, variant: Variant) {
   }
 }
 
-export async function runDevice(entry: DeviceEntry, mod: DeviceModule, variant: Variant, reps = 3): Promise<DeviceRun> {
-  const base: DeviceRun = {
+/**
+ * One instrument with the original core ('before') and the upgraded one ('after').
+ * Repetitions alternate the order (before/after, after/before, ...) so load changes on
+ * the machine hit both alike; each variant keeps its best render.
+ */
+export async function runDevicePair(entry: DeviceEntry, mod: DeviceModule, reps = 3): Promise<DeviceRun[]> {
+  const variants: Variant[] = ['before', 'after'];
+  const runs: DeviceRun[] = variants.map(variant => ({
     device: entry.id, name: `${entry.manufacturer} ${entry.name}`, variant, ok: false, demo: '',
     renderMs: 0, realtime: 0, peak: 0, rms: 0, worklets: {}, timerErrors: [],
-  };
-  try {
-    let best = Infinity;
-    for (let r = 0; r < reps; r++) {
-      const res = await renderDevice(mod, variant);
-      best = Math.min(best, res.ms);
-      const s = stats(res.buf);
-      Object.assign(base, { demo: res.demo, peak: s.peak, rms: s.rms, worklets: res.worklets, timerErrors: res.timerErrors });
+  }));
+  const best = [Infinity, Infinity];
+  for (let r = 0; r < reps; r++) {
+    for (const k of r % 2 === 0 ? [0, 1] : [1, 0]) {
+      const run = runs[k];
+      if (run.error) continue;
+      try {
+        const res = await renderDevice(mod, run.variant);
+        best[k] = Math.min(best[k], res.ms);
+        const s = stats(res.buf);
+        // levels: the loudest repetition (oscillators start at random phases, like hardware)
+        Object.assign(run, { demo: res.demo, peak: Math.max(run.peak, s.peak), rms: Math.max(run.rms, s.rms), worklets: res.worklets, timerErrors: res.timerErrors });
+      } catch (e) {
+        run.error = e instanceof Error ? e.message : String(e);
+      }
       await pause();
     }
-    base.ok = true;
-    base.renderMs = best;
-    base.realtime = (SECONDS * 1000) / best;
-  } catch (e) {
-    base.error = e instanceof Error ? e.message : String(e);
   }
-  return base;
+  runs.forEach((run, k) => {
+    if (run.error) return;
+    run.ok = true;
+    run.renderMs = best[k];
+    run.realtime = (SECONDS * 1000) / best[k];
+  });
+  return runs;
 }
 
 // ----------------------------------------------------------------------------
@@ -587,32 +601,45 @@ async function renderScenario(s: ProcScenario, variant: Variant, real: boolean) 
   return { ms: performance.now() - t0, buf };
 }
 
-export async function runScenario(s: ProcScenario, variant: Variant, reps = 3): Promise<ProcRun> {
-  const run: ProcRun = {
+/**
+ * One scenario, before and after (or after only). Repetitions alternate the order
+ * (before/after, after/before, ...) so load changes on the machine hit both alike.
+ */
+export async function runScenarioPair(s: ProcScenario, reps = 3): Promise<ProcRun[]> {
+  const variants: Variant[] = s.afterOnly ? ['after'] : ['before', 'after'];
+  const runs: ProcRun[] = variants.map(variant => ({
     id: s.id, label: s.label, processor: variant === 'before' && s.beforeIs ? s.beforeIs : s.processor, variant,
     instances: s.instances, ok: false, renderMs: 0, baselineMs: 0, nsPerSample: 0, corePct: 0, peak: 0,
-  };
-  try {
-    let best = Infinity, base = Infinity;
-    for (let r = 0; r < reps; r++) {
-      const a = await renderScenario(s, variant, true);
-      best = Math.min(best, a.ms);
-      run.peak = stats(a.buf).peak;
-      await pause();
-      const b = await renderScenario(s, variant, false);
-      base = Math.min(base, b.ms);
-      await pause();
+  }));
+  const best = runs.map(() => Infinity), base = runs.map(() => Infinity);
+  for (let r = 0; r < reps; r++) {
+    const order = r % 2 === 0 ? runs.map((_, k) => k) : runs.map((_, k) => runs.length - 1 - k);
+    for (const k of order) {
+      const run = runs[k];
+      if (run.error) continue;
+      try {
+        const a = await renderScenario(s, run.variant, true);
+        best[k] = Math.min(best[k], a.ms);
+        run.peak = stats(a.buf).peak;
+        await pause();
+        const b = await renderScenario(s, run.variant, false);
+        base[k] = Math.min(base[k], b.ms);
+        await pause();
+      } catch (e) {
+        run.error = e instanceof Error ? e.message : String(e);
+      }
     }
-    const own = Math.max(0, best - base);
+  }
+  runs.forEach((run, k) => {
+    if (run.error) return;
+    const own = Math.max(0, best[k] - base[k]);
     run.ok = true;
-    run.renderMs = best;
-    run.baselineMs = base;
+    run.renderMs = best[k];
+    run.baselineMs = base[k];
     run.nsPerSample = (own * 1e6) / (s.instances * FRAMES);
     run.corePct = (own / s.instances / (SECONDS * 1000)) * 100;
-  } catch (e) {
-    run.error = e instanceof Error ? e.message : String(e);
-  }
-  return run;
+  });
+  return runs;
 }
 
 // ----------------------------------------------------------------------------

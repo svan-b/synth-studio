@@ -18,15 +18,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEVICES } from '@/devices';
 import type { DeviceModule } from '@/devices/types';
 import {
-  SCENARIOS, SECONDS, SR, measureFramework, runDevice, runScenario, runWrapperChecks,
+  SCENARIOS, SECONDS, SR, measureFramework, runDevicePair, runScenarioPair, runWrapperChecks,
   type BenchResults, type DeviceRun, type ProcRun, type Variant,
 } from './runner';
 
 declare global {
   interface Window { __benchResults?: BenchResults }
 }
-
-const VARIANTS: Variant[] = ['before', 'after'];
 
 /** Initial / reset state. Pass the user agent only on the client (the page is prerendered). */
 function emptyResults(userAgent = ''): BenchResults {
@@ -99,23 +97,18 @@ export default function BenchPage() {
             r.errors.push(`${entry.id}: failed to load (${String(e)})`);
             continue;
           }
-          for (const v of VARIANTS) {
-            r.progress = `device ${entry.id} (${v})`;
-            publish(r);
-            r.devices.push(await runDevice(entry, mod, v, o.reps));
-          }
+          r.progress = `device ${entry.id}`;
+          publish(r);
+          r.devices.push(...(await runDevicePair(entry, mod, o.reps)));
         }
       }
 
       if (!o.only || o.only === 'processors') {
         const list = SCENARIOS.filter(s => !o.scenarios || o.scenarios.includes(s.id));
         for (const s of list) {
-          for (const v of VARIANTS) {
-            if (v === 'before' && s.afterOnly) continue;
-            r.progress = `processor ${s.id} (${v})`;
-            publish(r);
-            r.processors.push(await runScenario(s, v, o.reps));
-          }
+          r.progress = `processor ${s.id}`;
+          publish(r);
+          r.processors.push(...(await runScenarioPair(s, o.reps)));
         }
       }
       r.status = 'done';

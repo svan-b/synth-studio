@@ -108,7 +108,7 @@ new Reverb2(ctx, seconds = 2.5, options?: { seed?: number; lowCut?: number; high
   .set({ lowCut, highCut })  // input tone
 ```
 - **Drop-in for `Reverb`.** It has the same `input`, `output`, `damping`, `preDelay` and `setSize`, and its level matches within about 1 dB for 1-5 s decays.
-- **Cheaper and live.** It costs 1.6x less CPU than the 2.5 s convolver, and decay, size and damping change live and smoothly. The old Reverb rebuilds its impulse response, so engines debounce it.
+- **Cheaper and live.** It costs about 1.5x less CPU than the 2.5 s convolver, and decay, size and damping change live and smoothly. The old Reverb rebuilds its impulse response, so engines debounce it.
 - **Damping semantics.** `damping` is the frequency where the decay time halves. The old Reverb's `damping` was an input low-pass, so the same number sounds a little brighter here.
 
 ### Chorus
@@ -200,52 +200,54 @@ Open `/bench` on the iPad to measure the target itself.
 
 - **Instruments.** Each one starts on an OfflineAudioContext with spec defaults and runs its transport control (or a keyboard riff) for 10 s. Main-thread timers are virtualised onto the audio clock at suspends. It runs once with the original core (`before`, embedded in `app/bench/legacy-processors.ts`) and once with the new one.
 - **Processors.** N instances render with typical inputs, minus a baseline graph with the same sources. The result is ns of CPU per audio sample per instance (`% of a core` = that × 48 kHz).
-- **Results below.** Chrome 141 headless, Linux x86-64, 4 vCPUs, best of 5. Other agents shared the machine, so single numbers move by about ±10%.
+- **Results below.** Chrome 141 headless, Linux x86-64, 4 vCPUs, best of 6. Before and after repetitions are interleaved in alternating order, so load changes from other agents on the machine hit both alike. The Rytm and Xone:96 use none of the shared processors, so their ±6% shows the noise floor.
 
 **Instruments** (×RT = seconds of audio rendered per second of CPU; higher is better):
 
 | Instrument | Before ×RT | After ×RT | Change | Worklet nodes |
 |---|---|---|---|---|
-| DFAM | 33.0 | 35.9 | +9% | vco 2, ladder 1, env 3 |
-| Mother-32 | 32.8 | 36.9 | +12% | vco 1, ladder 1, env 1 (+1 device) |
-| Subharmonicon | 28.4 | 36.5 | +28% | ladder 1, env 2 (+3 device) |
-| Sub 37 | 25.7 | 27.8 | +8% | ladder 1 (+6 device) |
-| Analog Four MKII | 4.7 | 4.9 | +3% | vco 16, ladder 4, env 8 (+8 device) |
-| Analog Rytm MKII | 15.5 | 16.4 | (no shared processors) | 0 |
-| Xone:96 | 5.1 | 5.1 | (no shared processors) | 0 |
-| Studio Clock | 800 | 870 | (silent) | 0 |
+| DFAM | 36.6 | 42.1 | +15% | vco 2, ladder 1, env 3 |
+| Mother-32 | 39.5 | 42.4 | +7% | vco 1, ladder 1, env 1 (+1 device) |
+| Subharmonicon | 34.3 | 38.9 | +13% | ladder 1, env 2 (+3 device) |
+| Sub 37 | 25.2 | 30.3 | +20% | ladder 1 (+6 device) |
+| Analog Four MKII | 5.2 | 5.2 | +1% | vco 16, ladder 4, env 8 (+8 device) |
+| Analog Rytm MKII | 19.4 | 20.5 | (noise: no shared processors) | 0 |
+| Xone:96 | 6.1 | 6.1 | (noise: no shared processors) | 0 |
+| Studio Clock | 1010 | 1031 | (silent) | 0 |
 
-The Analog Four and the Xone:96 (about 20% of a core each) are the expensive instruments. Most of their cost is native nodes: the convolver reverbs, filters and delays, and 4 voices of oscillators. See the notes below.
+The Analog Four and the Xone:96 (about 16-19% of a core each) are the expensive instruments. Most of their cost is native nodes: the convolver reverbs, filters and delays, and per-voice gains and panners. See the notes below.
 
 **Processors** (ns of CPU per sample per instance; ×1.0 = same as before):
 
 | Scenario | N | Before | After | Speed-up | After, % of a core |
 |---|---|---|---|---|---|
-| VCO, 4 outputs, steady pitch | 16 | 72.0 | 62.1 | 1.16× | 0.30% |
-| VCO, pitch CV (a-rate) | 16 | 79.5 | 79.2 | 1.00× | 0.38% |
-| VCO, audio-rate FM through zero | 16 | 66.8 | 66.4 | 1.01× | 0.32% |
-| VCO, hard sync | 16 | 82.1 | 85.2 | 0.96× | 0.41% |
-| VCO, `useOutputs('pulse')` | 16 | (new) | 43.2 | | 0.21% |
-| VCO + 2 subs | 16 | (new) | 72.8 | | 0.35% |
-| Ladder 1x, steady | 16 | 96.1 | 58.7 | 1.64× | 0.28% |
-| Ladder 1x, cutoff CV | 16 | 133.5 | 73.0 | 1.83× | 0.35% |
-| Ladder 2x (`quality: 1`) | 16 | (new) | 180.1 | | 0.87% |
-| Ladder 2x, cutoff CV | 16 | (new) | 185.7 | | 0.89% |
-| Env ADSR, retriggered 8 Hz | 32 | 57.8 | 38.9 | 1.49× | 0.19% |
-| Env + time CV | 32 | 66.3 | 61.3 | 1.08× | 0.29% |
-| Env idle | 32 | 39.9 | 30.4 | 1.31× | 0.15% |
-| SVF steady (before: `a4-svf`) | 16 | 51.5 | 37.0 | 1.39× | 0.18% |
-| SVF cutoff CV (before: `a4-svf`) | 16 | 75.8 | 45.5 | 1.67× | 0.22% |
-| Reverb (before: convolver `Reverb`) | 4 | 448.8 | 281.1 | 1.60× | 1.35% |
-| Chorus (before: native-node chorus) | 8 | 72.7 | 80.3 | 0.91× | 0.39% |
+| VCO, 4 outputs, steady pitch | 16 | 58.5 | 57.3 | 1.02× | 0.28% |
+| VCO, pitch CV (a-rate) | 16 | 73.2 | 77.1 | 0.95× | 0.37% |
+| VCO, audio-rate FM through zero | 16 | 63.9 | 66.9 | 0.95× | 0.32% |
+| VCO, hard sync | 16 | 70.4 | 66.9 | 1.05× | 0.32% |
+| VCO, `useOutputs('pulse')` | 16 | (new) | 41.8 | | 0.20% |
+| VCO + 2 subs | 16 | (new) | 68.7 | | 0.33% |
+| Ladder 1x, steady | 16 | 99.1 | 55.8 | 1.77× | 0.27% |
+| Ladder 1x, cutoff CV | 16 | 115.8 | 76.4 | 1.52× | 0.37% |
+| Ladder 2x (`quality: 1`) | 16 | (new) | 170.7 | | 0.82% |
+| Ladder 2x, cutoff CV | 16 | (new) | 178.6 | | 0.86% |
+| Env ADSR, retriggered 8 Hz | 32 | 49.2 | 37.6 | 1.31× | 0.18% |
+| Env + time CV | 32 | 61.2 | 48.4 | 1.26× | 0.23% |
+| Env idle | 32 | 33.3 | 28.3 | 1.18× | 0.14% |
+| SVF steady (before: `a4-svf`) | 16 | 50.1 | 27.2 | 1.84× | 0.13% |
+| SVF cutoff CV (before: `a4-svf`) | 16 | 69.0 | 44.0 | 1.57× | 0.21% |
+| Reverb (before: convolver `Reverb`) | 4 | 411.4 | 276.4 | 1.49× | 1.33% |
+| Chorus (before: native-node chorus) | 8 | 74.2 | 70.7 | 1.05× | 0.34% |
 
-The VCO now does far more work per sample: 4-point kernels and BLAMP corners. It still costs the same as before because the per-quantum coefficients and fast math pay for it. Dropping unused outputs with `useOutputs()` saves a further 30% or so.
+Across three full runs the speed-ups stayed within about ±0.15× of these. VCO cases ran 0.94-1.21×, ladder 1.5-1.9×, SVF 1.35-1.85×, reverb 1.5-1.6×, env 1.1-1.5×.
+
+Roughly 26 ns of every VCO figure is Chrome's fixed per-node cost: 5 AudioParams, 4 output channels and the call. That is why adding just 6 AudioParams would have made it 35% slower. The VCO now does far more work per sample (4-point kernels, BLAMP corners) and still costs the same as before, because the per-quantum coefficients and fast math pay for it. Dropping unused outputs with `useOutputs()` saves another 30% or so.
 
 ## Notes for device engines
 
 - **VCO masks.** Call `vco.useOutputs(...)` with only the taps you connect. For example, Analog Four sub oscillators need `useOutputs('pulse')`, and the DFAM VCOs need tri + pulse. That saves about 30% per VCO, and on a waveform switch the change fades in one quantum.
 - **Ladder quality.** `new Ladder(ctx, f, { quality: 1 })` gives a richer, alias-free, drive-friendly ladder. It costs about +0.6% of a core per instance, so it fits mono synths easily; on 4-voice devices, measure first. Add `comp` for a "non-Moog" passband.
-- **Reverb2.** Swapping `new Reverb(...)` for `new Reverb2(...)` frees about 0.8% of a core per reverb (all of its cost while idle) and removes the impulse-regeneration debounce, because `setSize()` glides. Then retune `damping` by ear: it is now the decay-halving frequency.
+- **Reverb2.** Swapping `new Reverb(...)` for `new Reverb2(...)` frees about 0.7% of a core per reverb (all of its cost while idle) and removes the impulse-regeneration debounce, because `setSize()` glides. Then retune `damping` by ear: it is now the decay-halving frequency.
 - **Svf.** It can replace `a4-svf` directly (same modes and params, plus `drive`).
 - **Chorus.** It replaces hand-built DelayNode choruses with a BBD-style sound. It's about the same cost.
 - **Analog feel.** For per-voice instability, use `new Vco(ctx, f, { drift: 3, tolerance: 5 })` and `new Env(ctx, 'adsr', { analog: true })`. Keep drift small (2-5 cents) for tuned instruments.
@@ -255,8 +257,8 @@ The VCO now does far more work per sample: 4-point kernels and BLAMP corners. It
   | Node | Cost per instance |
   |---|---|
   | VCO | 0.3% of a core |
-  | Ladder 1x / 2x | 0.3% / 0.9% |
-  | Env | 0.15-0.3% |
-  | Reverb2 | 1.4% (0 when idle) |
+  | Ladder 1x / 2x | 0.3% / 0.85% |
+  | Env | 0.14-0.23% |
+  | Reverb2 | 1.3% (0 when idle) |
 
   Measure on the iPad with `/bench` before relying on these. As a rule of thumb, keep each instrument under about 10% of a core so a studio of 4-6 instruments plays without dropouts.
