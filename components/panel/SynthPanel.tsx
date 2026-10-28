@@ -18,7 +18,7 @@ export interface SynthPanelProps {
   engineState: EngineState;
   onChange: (id: string, value: ControlValue) => void;
   onEvent: (name: string, payload?: unknown) => void;
-  onNoteOn: (note: number) => void;
+  onNoteOn: (note: number, velocity?: number) => void;
   onNoteOff: (note: number) => void;
   heldNotes: Set<number>;
   patches: PatchConnection[];
@@ -145,40 +145,52 @@ function Faceplate(p: FaceplateProps) {
     return j?.dataset.jack ?? null;
   };
 
+  // Drag state lives in a ref: pointer events can arrive faster than React re-renders
+  const drag = useRef<{ from: string; moved: boolean } | null>(null);
+
   const startOrFinish = (jackId: string, e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (active && active.from !== jackId) {
       p.onPatch(active.from, jackId);
       setActive(null);
+      drag.current = null;
       return;
     }
     if (active && active.from === jackId) {
       setActive(null);
+      drag.current = null;
       return;
     }
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    drag.current = { from: jackId, moved: false };
     setActive({ from: jackId, pointer: toLocal(e.clientX, e.clientY), color: cableColor(p.patches.length), moved: false });
   };
 
   const onJackMove = (e: React.PointerEvent) => {
-    if (!active) return;
+    const d = drag.current;
+    if (!d) return;
     const pt = toLocal(e.clientX, e.clientY);
-    const origin = p.jackPos[active.from];
-    const moved = active.moved || (origin ? Math.hypot(pt.x - origin.x, pt.y - origin.y) > 12 : false);
-    setActive({ ...active, pointer: pt, moved });
+    const origin = p.jackPos[d.from];
+    if (!d.moved && origin && Math.hypot(pt.x - origin.x, pt.y - origin.y) > 12) d.moved = true;
+    setActive(a => (a ? { ...a, pointer: pt, moved: d.moved } : a));
   };
 
   const onJackUp = (e: React.PointerEvent) => {
-    if (!active) return;
-    if (!active.moved) return; // tap: keep the cable "in hand" until the next tap
+    const d = drag.current;
+    if (!d) return;
+    if (!d.moved) return; // tap: keep the cable "in hand" until the next tap
+    drag.current = null;
     const over = jackUnder(e.clientX, e.clientY);
-    if (over && over !== active.from) p.onPatch(active.from, over);
+    if (over && over !== d.from) p.onPatch(d.from, over);
     setActive(null);
   };
 
   const onFaceMove = (e: React.PointerEvent) => {
-    if (active && !active.moved) setActive({ ...active, pointer: toLocal(e.clientX, e.clientY) });
+    if (active && !drag.current?.moved) {
+      const pt = toLocal(e.clientX, e.clientY);
+      setActive(a => (a ? { ...a, pointer: pt } : a));
+    }
   };
 
   const highlightedJacks = teaching && step?.patchFrom && step?.patchTo ? [step.patchFrom, step.patchTo] : [];
@@ -348,14 +360,9 @@ function Faceplate(p: FaceplateProps) {
                 </div>
               )}
               <div
-                data-jack={el.jack}
-                onPointerDown={e => startOrFinish(el.jack, e)}
-                onPointerMove={onJackMove}
-                onPointerUp={onJackUp}
-                className={`absolute inset-0 rounded-full cursor-pointer ${isHl && !targetPatchDone ? 'animate-pulse' : ''}`}
+                className={`absolute inset-0 rounded-full pointer-events-none ${isHl && !targetPatchDone ? 'animate-pulse' : ''}`}
                 title={`${j.label} (${isOut ? 'output' : 'input'}, ${j.signalType})`}
                 style={{
-                  touchAction: 'none',
                   background: 'radial-gradient(circle at 30% 30%, #3a3a3a 0%, #111 100%)',
                   border: `2px solid ${ring}`,
                   boxShadow: isHl ? `0 0 10px ${targetPatchDone ? '#22c55e' : '#f97316'}, inset 0 2px 4px rgba(0,0,0,0.7)` : 'inset 0 2px 4px rgba(0,0,0,0.7)',
@@ -459,8 +466,8 @@ function Faceplate(p: FaceplateProps) {
 
       case 'custom':
         return (
-          <div key={i} className="absolute" style={{ left: px(el.x), top: px(el.y), width: px(el.w), height: px(el.h) }}>
-            {el.render({ ...ctx, setValue: p.onChange, sendEvent: p.onEvent })}
+          <div key={i} className="absolute pointer-events-none [&>*]:pointer-events-auto" style={{ left: px(el.x), top: px(el.y), width: px(el.w), height: px(el.h) }}>
+            {el.render({ ...ctx, setValue: p.onChange, sendEvent: p.onEvent, teaching, step })}
           </div>
         );
     }
@@ -479,7 +486,7 @@ function Faceplate(p: FaceplateProps) {
       className="absolute"
       style={{ left: p.left, top: p.top, width, height, background: theme.background, borderRadius: 4, overflow: 'visible', color: theme.text }}
       onPointerMove={onFaceMove}
-      onPointerDown={() => { if (active) setActive(null); }}
+      onPointerDown={() => { if (active) { setActive(null); drag.current = null; } }}
     >
       {ordered.map(renderElement)}
       <Cables
@@ -491,6 +498,24 @@ function Faceplate(p: FaceplateProps) {
         height={height}
         jackRadius={px(3.1)}
       />
+      {/* Jack hit targets sit above the cables, so a patched jack can still start another cable */}
+      {layout.elements.map((el, i) => {
+        if (el.kind !== 'jack' || !p.jacks[el.jack]) return null;
+        const j = p.jacks[el.jack];
+        const d = px(7.5);
+        return (
+          <div
+            key={`hit-${i}`}
+            data-jack={el.jack}
+            onPointerDown={e => startOrFinish(el.jack, e)}
+            onPointerMove={onJackMove}
+            onPointerUp={onJackUp}
+            title={`${j.label} (${j.jackType}, ${j.signalType})`}
+            className="absolute rounded-full cursor-pointer"
+            style={{ left: px(el.x) - d / 2, top: px(el.y) - d / 2, width: d, height: d, zIndex: 40, touchAction: 'none' }}
+          />
+        );
+      })}
     </div>
   );
 }

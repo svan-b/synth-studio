@@ -11,7 +11,7 @@
 // ============================================================================
 
 import type { ReactNode } from 'react';
-import type { ControlValue } from './index';
+import type { ControlValue, LessonStep } from './index';
 
 export type Values = Record<string, ControlValue>;
 
@@ -176,7 +176,13 @@ export interface CustomElement extends Positioned {
   kind: 'custom';
   w: number;
   h: number;
-  render: (ctx: PanelContext & { setValue: (id: string, v: ControlValue) => void; sendEvent: (e: string, payload?: unknown) => void }) => ReactNode;
+  /** `teaching`/`step` let custom widgets highlight themselves when a lesson step targets them */
+  render: (ctx: PanelContext & {
+    setValue: (id: string, v: ControlValue) => void;
+    sendEvent: (e: string, payload?: unknown) => void;
+    teaching: boolean;
+    step: LessonStep | null;
+  }) => ReactNode;
 }
 
 export type PanelElement =

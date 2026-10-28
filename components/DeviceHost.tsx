@@ -80,12 +80,13 @@ function LoadedDevice({ device, mod }: { device: string; mod: DeviceModule }) {
     return d;
   }, [spec]);
 
-  // Momentary / transport buttons are performance actions, not saved settings:
-  // never come back from a reload already "running".
+  // Momentary and transport buttons are performance actions, not saved settings:
+  // never come back from a reload already "running". Latching toggles (sync, latch...) persist.
   useEffect(() => {
     const reset: Record<string, ControlValue> = {};
     Object.entries(spec.controls).forEach(([id, c]) => {
-      if (c.type === 'button' && stored?.controlValues[id] !== undefined && stored.controlValues[id] !== c.default) reset[id] = c.default;
+      const transient = c.type === 'button' && (c.momentary || id === mod.transportControl);
+      if (transient && stored?.controlValues[id] !== undefined && stored.controlValues[id] !== c.default) reset[id] = c.default;
     });
     if (Object.keys(reset).length) setControlValues(device, reset);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,9 +103,9 @@ function LoadedDevice({ device, mod }: { device: string; mod: DeviceModule }) {
 
   const heldRef = useRef(held);
   heldRef.current = held;
-  const handleNoteOn = useCallback((n: number) => {
+  const handleNoteOn = useCallback((n: number, velocity = 1) => {
     setHeld(prev => new Set(prev).add(n));
-    noteOn(n, 1);
+    noteOn(n, velocity);
   }, [noteOn]);
   const handleNoteOff = useCallback((n: number) => {
     setHeld(prev => { const s = new Set(prev); s.delete(n); return s; });
@@ -158,7 +159,11 @@ function LoadedDevice({ device, mod }: { device: string; mod: DeviceModule }) {
     if (!p) return;
     const ui = new Set(mod.uiControls ?? []);
     const base: Record<string, ControlValue> = {};
-    Object.entries(defaults).forEach(([id, v]) => { if (!ui.has(id) && spec.controls[id].type !== 'button') base[id] = v; });
+    Object.entries(defaults).forEach(([id, v]) => {
+      const c = spec.controls[id];
+      const transient = c.type === 'button' && (c.momentary || id === mod.transportControl);
+      if (!ui.has(id) && !transient) base[id] = v;
+    });
     loadPreset(device, { ...base, ...p.settings }, p.patchConnections ?? []);
   };
 

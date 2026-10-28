@@ -7,7 +7,8 @@ interface KeyboardProps {
   numKeys: number;
   style?: 'piano' | 'membrane';
   held: Set<number>;
-  onNoteOn: (note: number) => void;
+  /** velocity 0..1 - pressing lower on a key plays louder, like striking it harder */
+  onNoteOn: (note: number, velocity: number) => void;
   onNoteOff: (note: number) => void;
 }
 
@@ -28,6 +29,12 @@ export default function Keyboard({ lowNote, numKeys, style = 'piano', held, onNo
     const k = el?.closest('[data-note]') as HTMLElement | null;
     return k ? Number(k.dataset.note) : null;
   };
+  const velocityAt = (x: number, y: number): number => {
+    const el = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest('[data-note]') as HTMLElement | null;
+    if (!el) return 0.8;
+    const r = el.getBoundingClientRect();
+    return Math.max(0.25, Math.min(1, 0.3 + 0.7 * ((y - r.top) / r.height)));
+  };
 
   const down = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -35,7 +42,7 @@ export default function Keyboard({ lowNote, numKeys, style = 'piano', held, onNo
     if (n === null) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     fingers.current.set(e.pointerId, n);
-    onNoteOn(n);
+    onNoteOn(n, velocityAt(e.clientX, e.clientY));
   };
   const move = (e: React.PointerEvent) => {
     const cur = fingers.current.get(e.pointerId);
@@ -44,7 +51,7 @@ export default function Keyboard({ lowNote, numKeys, style = 'piano', held, onNo
     if (n !== null && n !== cur) {
       fingers.current.set(e.pointerId, n);
       onNoteOff(cur);
-      onNoteOn(n);
+      onNoteOn(n, velocityAt(e.clientX, e.clientY));
     }
   };
   const up = (e: React.PointerEvent) => {
