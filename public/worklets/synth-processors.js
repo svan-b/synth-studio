@@ -746,10 +746,13 @@ class EnvProcessor extends AudioWorkletProcessor {
     this.queue = [];
     this.gateHigh = false;
     this.lastIn = 0;
+    this.dstep = -1;
+    this.curDelay = 0;
     this.port.onmessage = (e) => {
       const m = e.data;
       if (!m) return;
       if (m.type === 'reset' || m.type === 'clear') { this.queue = []; this.value = 0; this.stage = ST_IDLE; this.gateHigh = false; return; }
+      if (typeof m.time !== 'number' || !(m.time === m.time)) m.time = 0; // no time = as soon as possible
       this.queue.push(m);
       this.queue.sort((a, b) => a.time - b.time);
     };
@@ -759,6 +762,13 @@ class EnvProcessor extends AudioWorkletProcessor {
     this.peak = velocity === undefined ? 1 : velocity;
     this.stage = this.curDelay > 0 ? ST_DELAY : ST_ATTACK;
     this.count = 0;
+    this.dstep = -1;
+  }
+
+  /** Gate off: release from the current level (AD mode ignores it) */
+  off(mode) {
+    this.gateHigh = false;
+    if (mode !== 0 && this.stage !== ST_IDLE) this.stage = ST_RELEASE;
   }
 
   process(inputs, outputs, params) {
@@ -772,43 +782,70 @@ class EnvProcessor extends AudioWorkletProcessor {
     const loop = params.loop[0] > 0.5;
     const analog = params.analog[0] > 0.5;
     const shape = params.shape[0];
+    const cvArr = params.timeCv;
+    const cvConst = cvArr.length === 1;
+    const sr = sampleRate;
+    const t0 = currentTime;
+    this.curDelay = delayT;
+    let nextT = this.queue.length ? this.queue[0].time : Infinity;
+
+    // Steady stages (idle, sustain) with no event, gate edge or loop in this quantum: constant output
+    if (!gateIn && nextT > t0 + (n - 1) / sr) {
+      const st = this.stage;
+      if (st === ST_IDLE || (st === ST_SUSTAIN && mode !== 0 && !(loop && this.gateHigh))) {
+        if (st === ST_SUSTAIN && mode === 1) this.value = sustain * this.peak;
+        out.fill(this.value);
+        return true;
+      }
+    }
+
+    // Curve constants. Legacy curves (analog 0, shape 0) are exactly the original envelope.
     const legacyA = !analog && shape === 0;
     const legacyDR = shape === 0;
     const kA = (analog ? LN3 : 0) + 6 * shape;
     const expDecay = analog || !linear;
     const kD = (expDecay ? 6.9 : 0) + 6 * shape;
     const kR = 6.9 + 6 * shape;
-    const cvArr = params.timeCv;
-    const cvConst = cvArr.length === 1;
-    const sr = sampleRate;
-    const t0 = currentTime;
-    this.curDelay = delayT;
+    const linA = legacyA || (kA < 1e-6 && kA > -1e-6);
+    const linD = !legacyDR && kD < 1e-6 && kD > -1e-6;
+    const linR = !legacyDR && kR < 1e-6 && kR > -1e-6;
+    const eA = linA ? 0 : 1 / (1 - exp2(-kA * LOG2E));          // attack target = peak * eA
+    const eD = legacyDR || linD ? 0 : 1 / (1 - exp2(-kD * LOG2E));
+    const eR = legacyDR || linR ? 0 : 1 / (1 - exp2(-kR * LOG2E));
 
-    // Per-quantum time scaling (and per-sample only when timeCv is modulated)
+    // Per-quantum stage lengths and coefficients (recomputed per sample only while timeCv is modulated)
     let tScale = cvConst ? Math.pow(2, -cvArr[0] * 5) : 1;
-    let nextT = this.queue.length ? this.queue[0].time : Infinity;
+    let aN = 0, dN = 0, rN = 0, cA = 0, cD = 0, cR = 0, delN = 0, holdN = 0;
+    if (cvConst) {
+      aN = Math.max(1, attack * tScale * sr);
+      dN = Math.max(1, decay * tScale * sr);
+      rN = Math.max(1, release * tScale * sr);
+      cA = linA ? 0 : exp2((-kA / aN) * LOG2E);
+      cD = legacyDR ? Math.exp(-6.9 / dN) : linD ? 0 : exp2((-kD / dN) * LOG2E);
+      cR = legacyDR ? Math.exp(-6.9 / rN) : linR ? 0 : exp2((-kR / rN) * LOG2E);
+      delN = delayT * tScale * sr;
+      holdN = holdT * tScale * sr;
+    }
     let value = this.value;
 
     for (let i = 0; i < n; i++) {
       const now = t0 + i / sr;
       if (now >= nextT) {
-        this.value = value;
         while (this.queue.length && this.queue[0].time <= now) {
           const msg = this.queue.shift();
           if (msg.type === 'trig') this.fire(msg.velocity);
           else if (msg.type === 'gate') {
             if (msg.on) { this.gateHigh = true; this.fire(msg.velocity); }
-            else { this.gateHigh = false; if (mode !== 0 && this.stage !== ST_IDLE) this.stage = ST_RELEASE; }
+            else this.off(mode);
           }
         }
         nextT = this.queue.length ? this.queue[0].time : Infinity;
-        value = this.value;
       }
 
       if (gateIn) {
         const g = gateIn[i];
         if (this.lastIn < 0.2 && g >= 0.2) { this.gateHigh = true; this.fire(1); }
-        else if (this.lastIn >= 0.2 && g < 0.2) { this.gateHigh = false; if (mode !== 0 && this.stage !== ST_IDLE) this.stage = ST_RELEASE; }
+        else if (this.lastIn >= 0.2 && g < 0.2) this.off(mode);
         this.lastIn = g;
       }
 
@@ -816,21 +853,29 @@ class EnvProcessor extends AudioWorkletProcessor {
 
       switch (this.stage) {
         case ST_DELAY:
-          if (++this.count >= delayT * tScale * sr) { this.stage = ST_ATTACK; this.count = 0; }
+          if (++this.count >= (cvConst ? delN : delayT * tScale * sr)) { this.stage = ST_ATTACK; this.count = 0; }
           else break;
         // falls through into the attack on the sample the delay ends
         case ST_ATTACK: {
+          // Retrigger continues from the current level. Above a (lower-velocity) peak the
+          // attack ramps down to it at the attack rate instead of jumping (no click).
           const peak = this.peak;
-          const N = Math.max(1, attack * tScale * sr);
-          if (legacyA || (kA < 1e-6 && kA > -1e-6)) {
-            value += peak / N;
+          const N = cvConst ? aN : Math.max(1, attack * tScale * sr);
+          let reached;
+          if (value > peak) {
+            if (this.dstep < 0) this.dstep = (value - peak) / N;
+            value -= this.dstep;
+            reached = value <= peak;
           } else {
-            // RC / curved attack toward an overshoot target, clipped at the peak
-            const e = exp2(-kA * LOG2E);
-            const T = peak / (1 - e);
-            value = T + (value - T) * exp2((-kA / N) * LOG2E);
+            if (linA) value += peak / N;
+            else {
+              // RC / curved attack toward an overshoot target, clipped at the peak
+              const T = peak * eA;
+              value = T + (value - T) * (cvConst ? cA : exp2((-kA / N) * LOG2E));
+            }
+            reached = value >= peak;
           }
-          if (value >= peak) {
+          if (reached) {
             value = peak;
             if (holdT > 0) { this.stage = ST_HOLD; this.count = 0; }
             else this.stage = mode === 2 ? (loop && this.gateHigh ? ST_RELEASE : ST_SUSTAIN) : ST_DECAY;
@@ -838,12 +883,12 @@ class EnvProcessor extends AudioWorkletProcessor {
           break;
         }
         case ST_HOLD:
-          if (++this.count >= holdT * tScale * sr) this.stage = mode === 2 ? (loop && this.gateHigh ? ST_RELEASE : ST_SUSTAIN) : ST_DECAY;
+          if (++this.count >= (cvConst ? holdN : holdT * tScale * sr)) this.stage = mode === 2 ? (loop && this.gateHigh ? ST_RELEASE : ST_SUSTAIN) : ST_DECAY;
           break;
         case ST_DECAY: {
           const peak = this.peak;
           const target = mode === 1 ? sustain * peak : 0;
-          const tSamples = Math.max(1, decay * tScale * sr);
+          const tSamples = cvConst ? dN : Math.max(1, decay * tScale * sr);
           let done = false;
           if (legacyDR) {
             if (!expDecay) {
@@ -851,17 +896,15 @@ class EnvProcessor extends AudioWorkletProcessor {
               if (value <= target) { value = target; done = true; }
             } else {
               // ~ -60dB over the decay time
-              const coef = cvConst ? Math.exp(-6.9 / tSamples) : exp2((-6.9 / tSamples) * LOG2E);
-              value = target + (value - target) * coef;
+              value = target + (value - target) * (cvConst ? cD : exp2((-6.9 / tSamples) * LOG2E));
               if (Math.abs(value - target) < 1e-4) { value = target; done = true; }
             }
-          } else if (kD < 1e-6 && kD > -1e-6) {
+          } else if (linD) {
             value -= peak / tSamples;
             if (value <= target) { value = target; done = true; }
           } else {
-            const e = exp2(-kD * LOG2E);
-            const T = peak + (target - peak) / (1 - e);
-            value = T + (value - T) * exp2((-kD / tSamples) * LOG2E);
+            const T = peak + (target - peak) * eD;
+            value = T + (value - T) * (cvConst ? cD : exp2((-kD / tSamples) * LOG2E));
             if (value <= target) { value = target; done = true; }
           }
           if (done) {
@@ -877,19 +920,17 @@ class EnvProcessor extends AudioWorkletProcessor {
           else if (loop && this.gateHigh) this.stage = ST_RELEASE;
           break;
         case ST_RELEASE: {
-          const tSamples = Math.max(1, release * tScale * sr);
+          const tSamples = cvConst ? rN : Math.max(1, release * tScale * sr);
           let done = false;
           if (legacyDR) {
-            const coef = cvConst ? Math.exp(-6.9 / tSamples) : exp2((-6.9 / tSamples) * LOG2E);
-            value *= coef;
+            value *= cvConst ? cR : exp2((-6.9 / tSamples) * LOG2E);
             if (value < 1e-4) done = true;
           } else {
             const peak = this.peak > 1e-6 ? this.peak : 1e-6;
-            if (kR < 1e-6 && kR > -1e-6) value -= peak / tSamples;
+            if (linR) value -= peak / tSamples;
             else {
-              const e = exp2(-kR * LOG2E);
-              const T = peak - peak / (1 - e);
-              value = T + (value - T) * exp2((-kR / tSamples) * LOG2E);
+              const T = peak - peak * eR;
+              value = T + (value - T) * (cvConst ? cR : exp2((-kR / tSamples) * LOG2E));
             }
             if (value <= 1e-4) done = true;
           }
