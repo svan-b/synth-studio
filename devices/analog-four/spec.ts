@@ -58,6 +58,14 @@ for (const p of CV_PARAMS) {
 }
 
 const MAN = 'Manual - Front panel';
+// Track mutes ([FUNC] + [TRACK]): global, so they stay put when patterns change
+TRACK_NAMES.forEach((name, t) => {
+  controls[tid(t, 'mute')] = {
+    type: 'button', label: `${name} MUTE`, default: false,
+    description: `Mutes ${name}: its trigs stop playing until you unmute it. [FUNC] + [${name}]; the track key goes dark.`,
+    manualReference: `${MAN}, [FUNC] + [TRACK]`,
+  };
+});
 Object.assign(controls, {
   tempo: {
     type: 'knob', label: 'TEMPO', min: 30, max: 300, default: 120, step: 1, units: 'BPM', endless: true,
@@ -122,7 +130,7 @@ KITS.forEach((kit, i) => {
     description: `${kit.desc} Loads the four sounds, the FX track and the project's patterns and song.`,
     source: 'community',
     author: 'Synth Studio',
-    settings: { ...kitValues(kit), kit_project: i + 2, track: 0, page: V.OSC1, play: false },
+    settings: { ...kitValues(kit), kit_project: i + 2, track: 0, page: V.OSC1 },
   };
 });
 presets.init = {
@@ -130,7 +138,7 @@ presets.init = {
   description: 'Init sound on every track and an empty pattern memory: start a track from scratch.',
   source: 'community',
   author: 'Synth Studio',
-  settings: { kit_project: 1, track: 0, page: V.NOTE, play: false },
+  settings: { kit_project: 1, track: 0, page: V.NOTE },
 };
 SOUNDS.forEach(s => {
   presets[`sound-${s.id}`] = {

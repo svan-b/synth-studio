@@ -572,6 +572,30 @@ export const PERF_MACROS: { name: string; synth: [string, number][]; fx?: [strin
   { name: 'SPACE', synth: [], fx: [['rev_dec', 60], ['del_fb', 60], ['rev_vol', 20]] },
 ];
 
+/**
+ * Where a control lives: the track to select (null = any) and the view whose
+ * encoders show it (-1 = no page, e.g. TRACK LEVEL). Lessons use it to light
+ * the way: track key first, then the page key, then the encoder.
+ */
+export function routeOf(id: string): { track: number | null; view: number } | null {
+  if (id === 'tempo' || id === 'swing') return { track: null, view: V.TEMPO };
+  if (/^perf_[a-j]$/.test(id)) return { track: null, view: V.PERF };
+  let track: number;
+  let key: string;
+  let m = /^t([1-6])_(.+)$/.exec(id);
+  if (m) { track = Number(m[1]) - 1; key = m[2]; }
+  else if ((m = /^fx_(.+)$/.exec(id))) { track = FX_TRACK; key = m[1]; }
+  else if ((m = /^cv_(.+)$/.exec(id))) { track = CV_TRACK; key = m[1]; }
+  else return null;
+  if (key === 'mute') return null;
+  if (key === 'level') return { track, view: -1 };
+  const kind = trackKind(track);
+  const p = (kind === 'synth' ? SYNTH_BY_KEY : kind === 'fx' ? FX_BY_KEY : CV_BY_KEY)[key];
+  if (!p) return null;
+  for (let v = 0; v < VIEWS.length; v++) if (pageFor(track, v) === p.page) return { track, view: v };
+  return { track, view: -1 };
+}
+
 /** Encoder slot -> control for the active track and view */
 export function encoderControl(track: number, view: number, slot: number, perfMuted = false): string | null {
   const page = pageFor(track, view);

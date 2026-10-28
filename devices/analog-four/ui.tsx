@@ -34,7 +34,7 @@ import {
 } from '@/lib/sequencer/elektron';
 import {
   FX_TRACK, PAGE_TITLE, PERF_MACROS, SEQ_TRACKS, SYNTH_TRACKS, TRACK_NAMES, V, VIEWS, keyOfView, levelControl, pageFor,
-  pageSlots, controlFor, trackKind, viewAfterPress, type ParamDef,
+  pageSlots, controlFor, routeOf, trackKind, viewAfterPress, type ParamDef,
 } from './params';
 import { KEYS, PX_PER_MM, TRIGS, KEYBOARD, BLACK_KEYS, WHITE_OFFSETS, MODE_LEDS, OCT_LEDS, PAGE_LEDS } from './geometry';
 import { SOUNDS, SOUND_CATEGORIES, type SoundDef } from './sounds';
@@ -192,18 +192,24 @@ const trackKey = (t: number): KeyDef => ({
   sub: 'MUTE',
   aria: `Track ${TRACK_NAMES[t]}`,
   led: e => {
-    const st = seqStateOf(e.ctx.engine);
     const pat = getPattern(project(e.ctx), viewPattern(e.ctx, project(e.ctx)));
-    const muted = !!st?.mutes?.[t] || !!pat.tracks[t]?.mute;
-    if (e.track === t) return [COL.red, 1];
+    const muted = !!e.ctx.values[`t${t + 1}_mute`] || !!pat.tracks[t]?.mute;
+    if (e.track === t) return muted ? [COL.red, 0.35] : [COL.red, 1];
     return muted ? null : [COL.green, 0.55];
   },
   press: e => {
-    if (e.func) { e.ctx.sendEvent('seq:mute', { track: t }); useFunc(e.ctx); return; }
+    if (e.func) {
+      const id = `t${t + 1}_mute`;
+      const m = !e.ctx.values[id];
+      e.ctx.setValue(id, m);
+      useFunc(e.ctx);
+      say(e.ctx, `${TRACK_NAMES[t]} ${m ? 'MUTED' : 'UNMUTED'}`, 1000);
+      return;
+    }
     e.ctx.setUi({ [UI.heldSteps]: [], [UI.trigEditor]: null });
     e.ctx.setValue('track', t);
   },
-  target: (c, v) => c === 'track' && v === t,
+  target: (c, v) => (c === 'track' && v === t) || c === `t${t + 1}_mute`,
 });
 
 function bankKey(b: number): KeyDef {
@@ -511,12 +517,36 @@ function useFocusMode(): boolean {
   return useStudioStore(s => s.focusMode);
 }
 
+/**
+ * The keys that lead to the step's controls: the track key while another
+ * track is selected, then the page key while another page is shown (the
+ * encoder itself lights once it shows the control).
+ */
+function guideKeys(ctx: CustomRenderContext): Set<string> {
+  const out = new Set<string>();
+  const st = ctx.step;
+  if (!st) return out;
+  const track = Math.round(num(ctx.values.track));
+  const view = Math.round(num(ctx.values.page, V.OSC1));
+  const ids = [st.control, ...(st.match?.controls ?? []), ...(st.focus ?? [])].filter((x): x is string => typeof x === 'string');
+  for (const id of ids) {
+    const r = routeOf(id);
+    if (!r) continue;
+    if (r.track !== null && r.track !== track) { out.add(TRACK_NAMES[r.track]); continue; }
+    if (r.view >= 0 && r.view !== view) {
+      const k = keyOfView(r.view)?.key;
+      if (k) out.add(k === 'SOUND' ? 'SND' : k);
+    }
+  }
+  return out;
+}
+
 /** Lesson highlight / dim for a key */
 function keyFocus(ctx: CustomRenderContext, name: string, def: KeyDef, focusMode: boolean): { highlight: boolean; dim: boolean } {
   if (!ctx.teaching || !ctx.step) return { highlight: false, dim: false };
   const st = ctx.step;
   const f = lessonFocus(ctx);
-  const hit = !!(f?.has(`key:${name}`) || (def.target && def.target(st.control, st.targetValue)) || (def.target && st.focus?.some(x => def.target!(x, undefined))));
+  const hit = !!(f?.has(`key:${name}`) || guideKeys(ctx).has(name) || (def.target && def.target(st.control, st.targetValue)) || (def.target && st.focus?.some(x => def.target!(x, undefined))));
   const anyFocus = !!(st.control || st.focus?.length || st.match);
   return { highlight: hit, dim: focusMode && anyFocus && !hit };
 }
@@ -894,7 +924,7 @@ export function Screen(props: PanelContext) {
     body = (
       <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: 78, paddingTop: 6 }}>
         {lv.map((v, i) => {
-          const muted = !!st?.mutes?.[i] || !!getPattern(pr, shownPattern).tracks[i]?.mute;
+          const muted = !!values[`t${i + 1}_mute`] || !!getPattern(pr, shownPattern).tracks[i]?.mute;
           return (
             <div key={i} style={{ textAlign: 'center', width: 34 }}>
               <div style={{ height: 52, width: 10, margin: '0 auto', border: `1px solid ${OLED_DIM}`, position: 'relative' }}>
@@ -975,15 +1005,27 @@ export function Screen(props: PanelContext) {
 
 const TRIG_MODES = ['trig', 'accent', 'slide', 'pslide'] as const;
 
+/** Lessons: the trig keys step back (dimmed) while a step is about the sound, not the sequencer */
+function trigAreaDimmed(ctx: CustomRenderContext, focusMode: boolean): boolean {
+  const st = ctx.step;
+  if (!focusMode || !ctx.teaching || !st || st.check) return false;
+  const ids = [st.control, ...(st.focus ?? []), ...(st.match?.controls ?? [])].filter((x): x is string => typeof x === 'string');
+  if (!ids.length) return false;
+  return !ids.some(id => /_trig_|^trig_mode$|_mute$|^seq:/.test(id));
+}
+
 export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
+  const focusMode = useFocusMode();
+  const dim = trigAreaDimmed(ctx, focusMode);
   const bank = ctx.ui[UIK.bank];
   const qper = !!ctx.ui[UIK.qper];
   const pr = project(ctx);
   const st = seqStateOf(ctx.engine);
   const keyW = TRIGS.keyW * k;
   const pitch = TRIGS.pitch * k;
+  const dimStyle = { opacity: dim ? 0.35 : 1, transition: 'opacity 0.2s' } as const;
   const strip = (render: (i: number) => ReactNode) => (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', ...dimStyle }}>
       <A4Styles />
       {Array.from({ length: 16 }, (_, i) => <div key={i} style={{ position: 'absolute', left: i * pitch, top: 0, width: keyW, height: '100%' }}>{render(i)}</div>)}
     </div>
@@ -1041,7 +1083,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
   }
   const mode = TRIG_MODES[Math.round(num(ctx.values.trig_mode))] ?? 'trig';
   return (
-    <div style={{ width: '100%', height: '100%' }}>
+    <div style={{ width: '100%', height: '100%', ...dimStyle }}>
       <TrigKeys ctx={ctx} tracks={TRACKS} mode={mode} editable={ctx.values.rec !== false} trackNames={[...TRACK_NAMES]} color={COL.red} />
     </div>
   );

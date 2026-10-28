@@ -238,6 +238,7 @@ export class AnalogFourEngine extends BaseEngine {
     if (m) {
       const t = Number(m[1]) - 1;
       const key = m[2];
+      if (key === 'mute') { this.seq.setMute(t, !!value); return; }
       if (t >= SYNTH_TRACKS || key.startsWith('trig_')) return;
       if ((ARP_KEYS as readonly string[]).includes(key)) { this.arpBase[t][key as ArpKey] = v; return; }
       const i = VI[key];

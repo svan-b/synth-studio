@@ -24,7 +24,7 @@ import { SOUND_BY_ID, type SoundDef, type SoundParams } from './sounds';
 // Note-length indices (NOTE_LENGTHS): steps -> index
 export const LEN = { s1: LEN_1_STEP, s1_5: 22, s2: 30, s3: 38, s4: 46, s6: 54, s8: 62, s12: 70, s16: 78, s32: 94 } as const;
 
-interface TrackSpec {
+export interface TrackSpec {
   s: string;
   note?: number;
   vel?: number;
@@ -40,7 +40,7 @@ interface TrackSpec {
   mute?: boolean;
 }
 
-const rep = (s: string, times: number) => s.repeat(times);
+export const rep = (s: string, times: number) => s.repeat(times);
 
 function buildTrack(spec: TrackSpec): Pattern['tracks'][number]['steps'] {
   const steps: Record<number, Step> = {};
@@ -67,7 +67,7 @@ function buildTrack(spec: TrackSpec): Pattern['tracks'][number]['steps'] {
 /** Strip readability characters so string positions are step numbers */
 const clean = (s: string) => s.replace(/[ |]/g, '');
 
-function pat(name: string, length: number, tracks: (TrackSpec | null)[], opts: { swing?: number } = {}): Pattern {
+export function pat(name: string, length: number, tracks: (TrackSpec | null)[], opts: { swing?: number } = {}): Pattern {
   const p = createPattern(SEQ_TRACKS, { name, length, swing: opts.swing ?? 50 });
   tracks.forEach((t, i) => {
     if (!t) return;
@@ -81,7 +81,7 @@ function pat(name: string, length: number, tracks: (TrackSpec | null)[], opts: {
   return p;
 }
 
-function project(patterns: Record<string, Pattern>, opts: { song?: SongRow[]; loopRow?: number; mode?: Project['mode']; active?: string; chain?: string[]; songName?: string } = {}): Project {
+export function project(patterns: Record<string, Pattern>, opts: { song?: SongRow[]; loopRow?: number; mode?: Project['mode']; active?: string; chain?: string[]; songName?: string } = {}): Project {
   const pr = createProject({ tracks: SEQ_TRACKS, defaults: { note: 60, vel: 100, len: LEN_1_STEP } });
   pr.patterns = patterns;
   pr.active = opts.active ?? Object.keys(patterns)[0] ?? 'A01';
