@@ -1,241 +1,285 @@
 // ============================================================================
-// MOOG MOTHER-32 - Semi-modular analog synthesizer with 32-step sequencer
-// 60 HP Eurorack, 3U. Single VCO (saw / pulse), white noise, 4-pole ladder
-// VCF (LP / HP), AD(S) envelope, VCA, triangle / square LFO, glide,
-// VC MIX and MULT utilities, assignable output, 13-key button keyboard and
-// a 32-step sequencer. 32-point patch bay: 18 inputs, 14 outputs.
-//
-// Sources: Moog Mother-32 User's Manual (page numbers below follow the
-// 60-page User's Manual: p.7 Setup & Connections, p.17 VC MIX / Patchbay
-// overview, p.19 Creating a pattern in KB mode, p.31 Step mode, p.34 KB mode
-// panel functions, p.36 Step mode panel functions, pp.39-42 Patchbay inputs
-// and outputs, p.48 MIDI, p.49 Setup mode). Front-panel synthesis controls are
-// described in the panel section (pp.8-17). Published specs: VCO 8 Hz-8 kHz,
-// LFO 0.1-350 Hz, EG attack 1.25 ms-3 s, decay 1.25 ms-7 s, VCF 20 Hz-20 kHz.
+// MOOG MOTHER-32 (2015) - semi-modular analog synthesizer, 60 HP Eurorack.
+// One VCO (saw / pulse), white noise, MIX, 4-pole ladder VCF (LP / HP), EG with
+// a SUSTAIN switch, VCA (EG / ON), LFO (square / triangle), GLIDE, VC MIX, MULT,
+// ASSIGN, a 13-key keyboard, a 32-step sequencer with 64 pattern memories and a
+// 32-point patch bay (18 inputs, 14 outputs).
+// Every control, range and normal is documented with sources and confidence in
+// devices/mother32/REFERENCE.md. Presets live in ./presets.ts.
 // ============================================================================
 
-import type { DeviceSpec, PatchPoint } from '@/types';
-import { EMPTY_PATTERN, NO_ACCENTS, STEPS, makeAccents, makePattern } from './sequence';
+import type { DeviceSpec, KnobSpec, PatchPoint } from '@/types';
+import { MOTHER32_PRESETS, DEFAULT_SEQUENCE } from './presets';
+import { ASSIGN_SOURCES, DIVISIONS, DIV_DEFAULT, TEMPO_MODES } from './model';
+import { STEPS } from './sequence';
 
-const PANEL = 'pp.8–17 – Panel controls';
-const PB = 'pp.39–42 – Patchbay';
+const M = 'Manual v2';
+const fmtGate = (v: number) => { const g = Math.round(v); return g >= 8 ? 'TIE' : `${g}/8`; };
 
-// Default pattern: a 16-step bass line around C2 (null = rest)
-const DEFAULT_NOTES = makePattern([36, 36, 48, 36, null, 39, 36, 43, 36, 36, 46, 36, 41, null, 43, 39]);
-const DEFAULT_ACCENTS = makeAccents([1, 9]);
+const lane = (label: string, def: string, ref: string) => ({ type: 'pattern' as const, label, steps: STEPS, default: def, manualReference: ref });
 
-// The patch bay, in its 4 x 8 grid (column, row), reading left to right / top to bottom.
-//   EXT AUDIO   MIX CV      VCA CV       [VCA]
-//   [NOISE]     VCF CUTOFF  VCF RES      [VCF]
-//   VCO 1V/OCT  VCO LIN FM  [VCO SAW]    [VCO PULSE]
-//   VCO MOD     LFO RATE    [LFO TRI]    [LFO SQ]
-//   MIX 1       MIX 2       VC MIX CTRL  [VC MIX]
-//   MULT        [MULT 1]    [MULT 2]     [ASSIGN]
-//   GATE        [EG]        [KB]         [GATE]
-//   TEMPO       RUN/STOP    RESET        HOLD
-// [boxed] = output. This order matches the manual's jack-by-jack listing of
-// inputs (EXT AUDIO, MIX CV, VCA CV, VCF CUTOFF, VCF RES, VCO 1V/OCT ...) and
-// outputs (VCA, NOISE, VCF, VCO SAW, VCO PULSE, LFO TRI, LFO SQ ...).
 const inp = (id: string, label: string, signalType: PatchPoint['signalType'], column: number, row: number, normalled?: string): PatchPoint =>
   ({ id, label, jackType: 'input', signalType, column, row, ...(normalled ? { normalled } : {}) });
 const outp = (id: string, label: string, signalType: PatchPoint['signalType'], column: number, row: number): PatchPoint =>
   ({ id, label, jackType: 'output', signalType, column, row });
+
+const knob = (k: Omit<KnobSpec, 'type'>): KnobSpec => ({ type: 'knob', ...k });
 
 export const MOTHER32: DeviceSpec = {
   id: 'mother32',
   name: 'Mother-32',
   manufacturer: 'Moog',
   year: 2015,
-  description: 'Semi-modular analog synthesizer with a 32-step sequencer and 32-point patch bay',
-  manualUrl: 'https://cdn.inmusicbrands.com/Moog/Mother32/Mother_32_Users_Manual.pdf',
+  description: 'Semi-modular analog synthesizer with a 32-step sequencer and a 32-point patch bay',
+  manualUrl: 'https://www.moogmusic.com/synthesizers/mother-32/',
 
-  dimensions: { width: 304.8, height: 128.5, eurorackHP: 60 },
+  // 60 HP Eurorack panel (304.8 x 128.5 mm) in wooden end cheeks; the unit is 319.3 mm wide
+  dimensions: { width: 319.3, height: 128.5, depth: 106.9, eurorackHP: 60 },
   display: { width: 1250, height: 527, scale: 4.1 },
 
   signalFlow: [
-    { id: 'sequencer', name: 'Sequencer / Keyboard', order: 1, description: 'TEMPO, RUN/STOP, the 13-key keyboard and 32-step sequencer generate KB pitch CV and GATE',
-      controls: ['tempo', 'gate_length', 'run_stop', 'shift', 'rec', 'seq_notes', 'seq_accent'] },
-    { id: 'vco', name: 'VCO', order: 2, description: 'One VCO: sawtooth and variable-width pulse, with a modulation source/destination/amount section',
-      controls: ['frequency', 'pulse_width', 'vco_wave', 'vco_mod_source', 'vco_mod_dest', 'vco_mod_amount', 'glide'] },
-    { id: 'mixer', name: 'Mixer', order: 3, description: 'MIX crossfades between the selected VCO wave and NOISE (or EXT AUDIO)', controls: ['mix'] },
-    { id: 'vcf', name: 'VCF', order: 4, description: '4-pole ladder filter, low-pass or high-pass', controls: ['cutoff', 'resonance', 'vcf_mode', 'vcf_mod_source', 'vcf_mod_amount'] },
-    { id: 'vca', name: 'VCA / Output', order: 5, controls: ['vca_mode', 'volume'] },
-    { id: 'eg', name: 'Envelope Generator', order: 6, controls: ['attack', 'decay', 'sustain'] },
-    { id: 'lfo', name: 'LFO', order: 7, controls: ['lfo_rate', 'lfo_wave'] },
-    { id: 'utilities', name: 'Utilities', order: 8, description: 'VC MIX (crossfader / attenuator / VCA), MULT, assignable output', controls: ['vc_mix', 'assign_source'] },
+    { id: 'vco', name: 'VCO', order: 1, description: 'One oscillator: sawtooth and variable-width pulse, tuned by FREQUENCY and the keyboard CV (1 V/oct)',
+      controls: ['frequency', 'vco_wave', 'pulse_width', 'glide'] },
+    { id: 'vco_mod', name: 'VCO MOD', order: 2, description: 'The EG (or the VCO MOD jack) or the LFO, by an AMOUNT, to the pitch or the pulse width',
+      controls: ['vco_mod_source', 'vco_mod_amount', 'vco_mod_dest'] },
+    { id: 'mixer', name: 'Mixer', order: 3, description: 'MIX crossfades the VCO wave against NOISE (or EXT. AUDIO when patched)', controls: ['mix'] },
+    { id: 'vcf', name: 'VCF', order: 4, description: '4-pole Moog ladder: resonant low-pass or (non-resonant) high-pass, 20 Hz - 20 kHz',
+      controls: ['cutoff', 'resonance', 'vcf_mode', 'vcf_mod_source', 'vcf_mod_amount', 'vcf_mod_polarity'] },
+    { id: 'eg', name: 'EG', order: 5, description: 'Attack and decay, with a SUSTAIN switch that holds the peak while the gate is high', controls: ['attack', 'decay', 'sustain'] },
+    { id: 'vca', name: 'VCA', order: 6, description: 'Opened by the EG, or held ON for drones', controls: ['vca_mode', 'volume'] },
+    { id: 'lfo', name: 'LFO', order: 7, description: 'Square and triangle, 0.1 Hz to 350 Hz', controls: ['lfo_rate', 'lfo_wave'] },
+    { id: 'sequencer', name: 'Sequencer', order: 8, description: '32 steps with gate length, glide, ratchet, accent and rest per step; 64 patterns',
+      controls: ['tempo', 'swing', 'run_stop', 'seq_mode', 'kb_octave'] },
+    { id: 'utilities', name: 'Utilities', order: 9, description: 'VC MIX (crossfader, attenuator, VCA, offset), MULT and the ASSIGN output', controls: ['vc_mix', 'assign_source'] },
   ],
 
   controls: {
-    // --- Sequencer / keyboard ----------------------------------------------
-    tempo: {
-      type: 'knob', label: 'TEMPO', min: 30, max: 300, default: 120, units: 'BPM', curve: 'logarithmic',
-      description: 'Sequencer tempo (each step is a 16th note). Hold SHIFT to turn this knob into GATE LENGTH.',
-      manualReference: 'p.34 – KB mode panel functions: TEMPO / GATE LENGTH',
-    },
-    gate_length: {
-      type: 'knob', label: 'GATE LENGTH', min: 5, max: 100, default: 50, units: '%',
-      description: 'SHIFT + TEMPO: how long each sequencer gate stays high, as a percentage of a step. 100% = legato.',
-      manualReference: 'p.34 – KB mode panel functions: SHIFT + TEMPO',
-    },
-    run_stop: {
-      type: 'button', label: 'RUN/STOP', default: false, ledColor: '#ff3b30',
-      description: 'Starts and stops the sequencer (Space bar). SHIFT + RUN/STOP = REC (record a pattern from the keyboard).',
-      manualReference: 'p.34 – KB mode panel functions: RUN/STOP',
-    },
-    shift: {
-      type: 'button', label: 'SHIFT', default: false, ledColor: '#ffffff',
-      description: 'Second functions: SHIFT + TEMPO = GATE LENGTH, SHIFT + RUN/STOP = REC. Latching here so it works with a mouse.',
-      manualReference: 'p.34 – KB mode panel functions: SHIFT',
-    },
-    rec: {
-      type: 'button', label: 'REC', default: false, ledColor: '#ff3b30',
-      description: 'Pattern record (SHIFT + RUN/STOP): each key press stores a note and moves to the next step; HOLD/REST stores a rest.',
-      manualReference: 'p.19 – Creating a pattern in KB mode',
-    },
-    seq_notes: { type: 'pattern', label: 'Pattern notes', steps: STEPS, default: DEFAULT_NOTES, manualReference: 'p.19 – Creating a pattern in KB mode' },
-    seq_accent: { type: 'pattern', label: 'Pattern accents', steps: STEPS, default: DEFAULT_ACCENTS, manualReference: 'p.36 – Step mode panel functions: ACCENT' },
-
-    // --- VCO ------------------------------------------------------------------
-    frequency: {
-      type: 'knob', label: 'FREQUENCY', min: -3, max: 3, default: 0, units: 'octaves', bipolar: true, size: 'large',
-      description: 'VCO base pitch. The keyboard / sequencer CV (KB) is added to it at 1 V/octave.',
-      manualReference: `${PANEL}: VCO FREQUENCY`,
-    },
-    pulse_width: {
-      type: 'knob', label: 'PULSE WIDTH', min: 0, max: 100, default: 50, units: '%',
-      description: 'Duty cycle of the pulse wave. 50% = square (odd harmonics only); narrow = thin and nasal.',
-      manualReference: `${PANEL}: VCO PULSE WIDTH`,
-    },
+    // ---- Row 1 ----------------------------------------------------------------
+    frequency: knob({
+      label: 'FREQUENCY', min: -1, max: 1, default: 0, units: 'octaves', bipolar: true,
+      description: 'Tunes the VCO up or down one octave from the centre. The keyboard, sequencer and 1V/OCT jack add their 1 V per octave on top: at the centre, 0 V is middle C (C4).',
+      manualReference: `${M} p.11 - VCO FREQUENCY`,
+    }),
     vco_wave: {
-      type: 'switch', label: 'VCO WAVE', options: ['SAW', 'PULSE'], default: 0,
-      description: 'Which VCO waveform goes to the mixer. Both are always available at VCO SAW and VCO PULSE.',
-      manualReference: `${PANEL}: VCO WAVE`,
+      type: 'switch', label: 'VCO WAVE', options: ['PULSE', 'SAW'], default: 1,
+      description: 'Which wave goes to the mixer: PULSE (up) or SAW (down). Both are always at the VCO PULSE and VCO SAW jacks.',
+      manualReference: `${M} p.11 - VCO WAVE`,
     },
+    pulse_width: knob({
+      label: 'PULSE WIDTH', min: 2, max: 98, default: 50, units: '%',
+      description: 'Duty cycle of the pulse wave, about 2 % to 98 %. At the centre it is a square (odd harmonics only, hollow); thinner pulses are nasal and bright.',
+      manualReference: `${M} p.11 - PULSE WIDTH`,
+    }),
+    mix: knob({
+      label: 'MIX', min: 0, max: 100, default: 0, units: '%',
+      description: 'Crossfades the VCO wave (fully left) against NOISE (fully right). A cable in EXT. AUDIO replaces the noise; MIX CV moves the crossfade.',
+      manualReference: `${M} pp.47-48 - MIX`,
+    }),
+    cutoff: knob({
+      label: 'CUTOFF', min: 20, max: 20000, default: 1200, units: 'Hz', curve: 'logarithmic',
+      description: 'Filter cutoff, 20 Hz to 20 kHz. VCF MOD, accents and the VCF CUTOFF jack (1 V per octave) add to it.',
+      manualReference: `${M} p.14 - CUTOFF`,
+    }),
+    resonance: knob({
+      label: 'RESONANCE', min: 0, max: 100, default: 15, units: '%',
+      description: 'Feedback around the ladder: a ringing peak at the cutoff. Past about 3 o\'clock the low-pass self-oscillates into a sine. In HI PASS mode there is no peak - turning it up brings the bass back instead.',
+      manualReference: `${M} p.14 - RESONANCE`,
+    }),
+    vca_mode: {
+      type: 'switch', label: 'VCA MODE', options: ['ON', 'EG'], default: 1,
+      description: 'EG (down): the envelope opens the VCA for each note. ON (up): the VCA is held open - a drone that needs no gate.',
+      manualReference: `${M} p.16 - VCA MODE`,
+    },
+    volume: knob({
+      label: 'VOLUME', min: 0, max: 100, default: 70, units: '%',
+      description: 'Output level, for the main output and the VCA jack.',
+      manualReference: `${M} p.47 - VOLUME`,
+    }),
+
+    // ---- Row 2 ----------------------------------------------------------------
+    glide: knob({
+      label: 'GLIDE', min: 0, max: 2000, default: 0, units: 'ms', curve: 'exponential',
+      description: 'Portamento: how long the pitch slides to a new note. Keyboard and MIDI notes always slide; sequencer steps slide only where glide is switched on for the step.',
+      manualReference: `${M} p.26 - GLIDE`,
+    }),
     vco_mod_source: {
       type: 'switch', label: 'VCO MOD SOURCE', options: ['EG', 'LFO'], default: 1,
-      description: 'EG position: the envelope, or whatever is patched into VCO MOD. LFO position: the LFO wave selected by LFO WAVE.',
-      manualReference: `${PANEL}: VCO MOD source; p.41 – VCO MOD input`,
+      description: 'EG (up): the envelope - or whatever is patched into VCO MOD, which replaces it. LFO (down): the wave picked by LFO WAVE.',
+      manualReference: `${M} p.12, p.49 - VCO MOD`,
     },
+    vco_mod_amount: knob({
+      label: 'VCO MOD AMOUNT', min: 0, max: 100, default: 0, units: '%',
+      description: 'How much the selected source moves the pitch or the pulse width. Small amounts of LFO are vibrato; the EG at full is a big pitch sweep.',
+      manualReference: `${M} p.12 - VCO MOD AMOUNT`,
+    }),
     vco_mod_dest: {
-      type: 'switch', label: 'VCO MOD DEST', options: ['FREQ', 'PW'], default: 0,
-      description: 'Where VCO modulation goes: pitch (FREQ) or pulse width (PW).',
-      manualReference: `${PANEL}: VCO MOD destination`,
-    },
-    vco_mod_amount: {
-      type: 'knob', label: 'VCO MOD AMOUNT', min: 0, max: 100, default: 0, units: '%',
-      description: 'Depth of VCO modulation from the selected source.',
-      manualReference: `${PANEL}: VCO MOD AMOUNT`,
-    },
-    glide: {
-      type: 'knob', label: 'GLIDE', min: 0, max: 2000, default: 0, units: 'ms', curve: 'exponential',
-      description: 'Portamento: how long the pitch takes to slide from one note to the next.',
-      manualReference: `${PANEL}: GLIDE`,
-    },
-
-    // --- Mixer ----------------------------------------------------------------
-    mix: {
-      type: 'knob', label: 'MIX', min: 0, max: 100, default: 0, units: '%',
-      description: 'Crossfade: fully left = VCO only, fully right = NOISE only (or EXT AUDIO when patched).',
-      manualReference: `${PANEL}: MIX; p.39 – MIX CV input`,
-    },
-
-    // --- VCF ------------------------------------------------------------------
-    cutoff: {
-      type: 'knob', label: 'CUTOFF', min: 20, max: 20000, default: 1200, units: 'Hz', curve: 'logarithmic', size: 'large',
-      description: 'Filter cutoff frequency (20 Hz – 20 kHz).',
-      manualReference: `${PANEL}: VCF CUTOFF`,
-    },
-    resonance: {
-      type: 'knob', label: 'RESONANCE', min: 0, max: 100, default: 15, units: '%',
-      description: 'Feedback around the ladder: boosts frequencies at the cutoff. Near the top the filter self-oscillates.',
-      manualReference: `${PANEL}: VCF RESONANCE`,
+      type: 'switch', label: 'VCO MOD DEST', options: ['PW', 'FREQ'], default: 1,
+      description: 'Where VCO modulation goes: PULSE WIDTH (up) or FREQUENCY (down).',
+      manualReference: `${M} p.12 - VCO MOD DEST`,
     },
     vcf_mode: {
       type: 'switch', label: 'VCF MODE', options: ['HP', 'LP'], default: 1,
-      description: 'Low-pass (removes highs) or high-pass (removes lows).',
-      manualReference: `${PANEL}: VCF MODE`,
+      description: 'LOW PASS (down) removes highs and resonates; HI PASS (up) removes lows and does not resonate.',
+      manualReference: `${M} p.14 - VCF MODE`,
     },
     vcf_mod_source: {
       type: 'switch', label: 'VCF MOD SOURCE', options: ['EG', 'LFO'], default: 0,
-      description: 'Modulation source for the cutoff: the envelope or the LFO.',
-      manualReference: `${PANEL}: VCF MOD source`,
+      description: 'Modulation for the cutoff: the envelope (up) or the LFO wave picked by LFO WAVE (down).',
+      manualReference: `${M} p.15 - VCF MOD SOURCE`,
     },
-    vcf_mod_amount: {
-      type: 'knob', label: 'VCF MOD AMOUNT', min: -100, max: 100, default: 40, units: '%', bipolar: true,
-      description: 'Bipolar depth of cutoff modulation. Negative values sweep the cutoff down instead of up.',
-      manualReference: `${PANEL}: VCF MOD AMOUNT`,
-    },
-
-    // --- VCA / output -----------------------------------------------------------
-    vca_mode: {
-      type: 'switch', label: 'VCA MODE', options: ['ON', 'EG'], default: 1,
-      description: 'EG: the envelope opens the VCA for each note. ON: the VCA is fully open (drone).',
-      manualReference: `${PANEL}: VCA MODE`,
-    },
-    volume: {
-      type: 'knob', label: 'VOLUME', min: 0, max: 100, default: 70, units: '%',
-      description: 'Output level.',
-      manualReference: `${PANEL}: VOLUME`,
+    vcf_mod_amount: knob({
+      label: 'VCF MOD AMOUNT', min: 0, max: 100, default: 40, units: '%',
+      description: 'How far the source moves the cutoff. POLARITY sets the direction.',
+      manualReference: `${M} p.15 - VCF MOD AMOUNT`,
+    }),
+    vcf_mod_polarity: {
+      type: 'switch', label: 'VCF MOD POLARITY', options: ['+', '−'], default: 0,
+      description: '+ (up): the modulation opens the filter. − (down): it closes it - the envelope then sweeps downward.',
+      manualReference: `${M} p.15 - VCF MOD POLARITY`,
     },
 
-    // --- EG -----------------------------------------------------------------------
-    attack: {
-      type: 'knob', label: 'ATTACK', min: 1.25, max: 3000, default: 2, units: 'ms', curve: 'logarithmic',
-      description: 'Time for the envelope to rise to full level after a gate starts (1.25 ms – 3 s).',
-      manualReference: `${PANEL}: EG ATTACK`,
+    // ---- Row 3 ----------------------------------------------------------------
+    tempo: knob({
+      label: 'TEMPO', min: 20, max: 300, default: 120, units: 'BPM', curve: 'logarithmic',
+      description: 'Sequencer tempo, 20-300 BPM (16th-note steps by default). While a step is edited it sets that step\'s GATE LENGTH; with SHIFT, SWING; when the studio clock drives the sequencer, the step division.',
+      manualReference: `${M} p.54 - TEMPO / GATE LENGTH`,
+    }),
+    lfo_rate: knob({
+      label: 'LFO RATE', min: 0.1, max: 350, default: 4, units: 'Hz', curve: 'logarithmic',
+      description: 'LFO speed, about 0.1 Hz to 350 Hz - the top end is audio rate. The LFO RATE jack adds 1 V per octave, up to 600 Hz.',
+      manualReference: `${M} p.13 - LFO RATE`,
+    }),
+    lfo_wave: {
+      type: 'switch', label: 'LFO WAVE', options: ['SQ', 'TRI'], default: 1,
+      description: 'Which LFO wave feeds both MOD SOURCE switches: square (up) or triangle (down). Both are always at the LFO SQ and LFO TRI jacks.',
+      manualReference: `${M} p.13 - LFO WAVE`,
     },
-    decay: {
-      type: 'knob', label: 'DECAY', min: 1.25, max: 7000, default: 400, units: 'ms', curve: 'logarithmic',
-      description: 'With SUSTAIN OFF: time to fall back to zero. With SUSTAIN ON: the release time after the gate ends (1.25 ms – 7 s).',
-      manualReference: `${PANEL}: EG DECAY`,
-    },
+    attack: knob({
+      label: 'ATTACK', min: 1.25, max: 3000, default: 2, units: 'ms', curve: 'logarithmic',
+      description: 'How long the envelope takes to rise to its peak after a gate starts.',
+      manualReference: `${M} p.15 - ATTACK`,
+    }),
     sustain: {
       type: 'switch', label: 'SUSTAIN', options: ['ON', 'OFF'], default: 0,
-      description: 'ON: the envelope holds at full level while the gate is high, then decays when released. OFF: it decays even while held (AD).',
-      manualReference: `${PANEL}: EG SUSTAIN`,
+      description: 'ON (up): the envelope holds its peak while the gate is high, then DECAY releases it; legato notes do not retrigger. OFF (down): attack then decay at once (AD); every note retriggers.',
+      manualReference: `${M} p.16 - SUSTAIN`,
     },
+    decay: knob({
+      label: 'DECAY', min: 1.25, max: 7000, default: 400, units: 'ms', curve: 'logarithmic',
+      description: 'How long the envelope takes to fall: after the attack (SUSTAIN OFF) or after the gate ends (SUSTAIN ON).',
+      manualReference: `${M} p.16 - DECAY`,
+    }),
+    vc_mix: knob({
+      label: 'VC MIX', min: 0, max: 100, default: 50, units: '%',
+      description: 'Crossfades MIX 1 (left) and MIX 2 (right). With nothing patched, MIX 1 is 0 V and MIX 2 is +5 V, so VC MIX is a 0-5 V knob; patch one input and it is an attenuator.',
+      manualReference: `${M} pp.50-51 - VC MIX`,
+    }),
 
-    // --- LFO ------------------------------------------------------------------------
-    lfo_rate: {
-      type: 'knob', label: 'LFO RATE', min: 0.1, max: 350, default: 4, units: 'Hz', curve: 'logarithmic',
-      description: 'LFO speed, 0.1 Hz – 350 Hz (the top of the range reaches audio rate).',
-      manualReference: `${PANEL}: LFO RATE`,
+    // ---- Sequencer --------------------------------------------------------------
+    run_stop: {
+      type: 'button', label: 'RUN / STOP', default: false, ledColor: '#ff3b30',
+      description: 'Starts and stops the sequencer (Space bar). Synced to the studio, it starts and stops the studio. SHIFT + RUN / STOP = REC; SHIFT held on it for a second = save the pattern.',
+      manualReference: `${M} p.19 - RUN / STOP (REC)`,
     },
-    lfo_wave: {
-      type: 'switch', label: 'LFO WAVE', options: ['TRI', 'SQ'], default: 0,
-      description: 'Which LFO wave the VCO MOD and VCF MOD sections use. Both are always at LFO TRI / LFO SQ.',
-      manualReference: `${PANEL}: LFO WAVE`,
+    shift: {
+      type: 'button', label: 'SHIFT', default: false, ledColor: '#ffffff',
+      description: 'Second functions (printed in brackets). Tap to latch it here; it lets go after the next button.',
+      manualReference: `${M} p.34 - (SHIFT)`,
     },
+    rec: {
+      type: 'button', label: 'REC', default: false, ledColor: '#ff3b30',
+      description: 'KB-mode recording (SHIFT + RUN / STOP): each key stores a note and moves on; HOLD / REST stores a rest.',
+      manualReference: `${M} p.19 - Creating a pattern in KB mode`,
+    },
+    seq_mode: {
+      type: 'switch', label: 'MODE', options: ['KB', 'STEP'], default: 0,
+      description: 'KB mode (SHIFT + KB): the keys play, record and transpose. STEP mode (SHIFT + STEP): the pads switch steps on and off; SHIFT + a pad edits that step.',
+      manualReference: `${M} p.31 - Step mode`,
+    },
+    kb_octave: {
+      type: 'switch', label: 'OCTAVE', options: ['1', '2', '3', '4', '5', '6', '7', '8'], default: 3,
+      description: 'Keyboard octave, shown by the OCTAVE / LOCATION LEDs. Change it with the KB and STEP arrows.',
+      manualReference: `${M} p.34 - (KB) / (STEP)`,
+    },
+    swing: knob({
+      label: 'SWING', min: 25, max: 75, default: 50, units: '%',
+      description: 'SHIFT + TEMPO: delays every second step. 50 % is straight; about 66 % is a triplet shuffle.',
+      manualReference: `${M} p.19 - (SWING)`,
+    }),
+    step_div: knob({
+      label: 'CLOCK DIV', min: 0, max: 23, default: DIV_DEFAULT, units: 'none',
+      format: v => DIVISIONS[Math.max(0, Math.min(23, Math.round(v)))].name,
+      description: 'How long each step is: 1/16 by default. When the studio clock drives the sequencer, the TEMPO knob selects it (24 straight, dotted and triplet values).',
+      manualReference: 'Firmware 2.0 addendum - clock divisions',
+    }),
+    seq_length: knob({
+      label: 'LENGTH', min: 1, max: STEPS, default: DEFAULT_SEQUENCE.seq_length, units: 'steps',
+      format: v => `${Math.round(v)} steps`,
+      description: 'Pattern length (STEP mode: SET END + a step).',
+      manualReference: `${M} p.31 - SET END`,
+    }),
+    step_gate: knob({
+      label: 'GATE LENGTH', min: 1, max: 8, default: 4, units: 'none', format: fmtGate,
+      description: 'The edited step\'s gate length, in eighths of a step; 8/8 ties into the next step. Needs SUSTAIN ON to be heard.',
+      manualReference: `${M} p.25 - Gate Length`,
+    }),
+    step_glide: knob({
+      label: 'GLIDE ON/OFF', min: 0, max: 100, default: 0, units: '%', format: v => (v > 0.5 ? 'GLIDE ON' : 'OFF'),
+      description: 'While a step is edited, any clockwise GLIDE setting turns glide on for it; fully counter-clockwise turns it off.',
+      manualReference: `${M} p.26 - Glide`,
+    }),
+    step_ratchet: knob({
+      label: 'RATCHET', min: 1, max: 4, default: 1, units: 'none', format: v => `${Math.round(v)}x`,
+      description: 'SHIFT + GLIDE while a step is edited: how many notes the step plays (1-4).',
+      manualReference: `${M} p.26 - Ratchet`,
+    }),
 
-    // --- Utilities -------------------------------------------------------------------
-    vc_mix: {
-      type: 'knob', label: 'VC MIX', min: 0, max: 100, default: 50, units: '%',
-      description: 'Crossfades MIX 1 (left) to MIX 2 (right). With nothing patched MIX 1 = 0 V and MIX 2 = +5 V, so VC MIX outputs a 0–5 V offset.',
-      manualReference: 'p.17 – VC MIX (voltage controlled mixer / attenuator)',
-    },
+    // ---- Setup mode (SHIFT + RESET + SET END + STEP 8 on the hardware) ------------
     assign_source: {
-      type: 'switch', label: 'ASSIGN', options: ['ACCENT', 'CLOCK'], default: 0,
-      description: 'Stand-in for Setup mode: what the ASSIGN output sends. The hardware offers 16 sources; two sequencer sources are modelled.',
-      manualReference: 'p.49 – Setup mode: Assignable output',
+      type: 'switch', label: 'ASSIGN', options: ASSIGN_SOURCES, default: 1,
+      description: 'Setup page 1: what the ASSIGN jack sends. Factory default: the sequencer CLOCK, one pulse per step.',
+      manualReference: `${M} p.52, p.59 - Assignable output`,
     },
+    tempo_mode: {
+      type: 'switch', label: 'TEMPO IN', options: TEMPO_MODES, default: 1,
+      description: 'Setup page 3: what the TEMPO jack does. CLOCK ADVANCE (default): one step per rising edge.',
+      manualReference: `${M} p.55, p.59 - TEMPO input modes`,
+    },
+
+    // ---- The pattern (hidden lanes, one character per step; see sequence.ts) ------
+    seq_notes: lane('Pattern notes', DEFAULT_SEQUENCE.seq_notes, `${M} p.19`),
+    seq_accent: lane('Pattern accents', DEFAULT_SEQUENCE.seq_accent, `${M} p.24`),
+    seq_gate: lane('Pattern gate lengths', DEFAULT_SEQUENCE.seq_gate, `${M} p.25`),
+    seq_glide: lane('Pattern glides', DEFAULT_SEQUENCE.seq_glide, `${M} p.26`),
+    seq_ratchet: lane('Pattern ratchets', DEFAULT_SEQUENCE.seq_ratchet, `${M} p.26`),
+    seq_rest: lane('Pattern rests', DEFAULT_SEQUENCE.seq_rest, `${M} p.24`),
   },
 
+  // The patch bay: 4 columns x 8 rows, in Moog's reading order ([boxed] = output).
+  //   EXT. AUDIO   MIX CV      VCA CV       [VCA]
+  //   [NOISE]      VCF CUTOFF  VCF RES.     [VCF]
+  //   VCO 1V/OCT   VCO LIN FM  [VCO SAW]    [VCO PULSE]
+  //   VCO MOD      LFO RATE    [LFO TRI]    [LFO SQ]
+  //   MIX 1        MIX 2       VC MIX CTRL  [VC MIX]
+  //   MULT         [MULT 1]    [MULT 2]     [ASSIGN]
+  //   GATE         [EG]        [KB]         [GATE]
+  //   TEMPO        RUN/STOP    RESET        HOLD
   patchBay: {
     inputs: [
-      inp('in_ext_audio', 'EXT AUDIO', 'audio', 0, 0, 'out_noise'),
+      inp('in_ext_audio', 'EXT. AUDIO', 'audio', 0, 0, 'out_noise'),
       inp('in_mix_cv', 'MIX CV', 'cv', 1, 0),
-      inp('in_vca_cv', 'VCA CV', 'cv', 2, 0, 'out_eg'),
+      inp('in_vca_cv', 'VCA CV', 'cv', 2, 0),
       inp('in_vcf_cutoff', 'VCF CUTOFF', 'cv', 1, 1),
-      inp('in_vcf_res', 'VCF RES', 'cv', 2, 1),
-      inp('in_vco_1voct', 'VCO 1V/OCT', 'cv', 0, 2, 'out_kb'),
-      inp('in_vco_lin_fm', 'VCO LIN FM', 'audio', 1, 2),
+      inp('in_vcf_res', 'VCF RES.', 'cv', 2, 1),
+      inp('in_vco_1voct', 'VCO 1V/OCT', 'cv', 0, 2),
+      inp('in_vco_lin_fm', 'VCO LIN FM', 'cv', 1, 2),
       inp('in_vco_mod', 'VCO MOD', 'cv', 0, 3, 'out_eg'),
       inp('in_lfo_rate', 'LFO RATE', 'cv', 1, 3),
       inp('in_mix1', 'MIX 1', 'cv', 0, 4),
       inp('in_mix2', 'MIX 2', 'cv', 1, 4),
       inp('in_vc_mix_ctrl', 'VC MIX CTRL', 'cv', 2, 4),
       inp('in_mult', 'MULT', 'cv', 0, 5),
-      inp('in_gate', 'GATE', 'gate', 0, 6, 'out_gate'),
+      inp('in_gate', 'GATE', 'gate', 0, 6),
       inp('in_tempo', 'TEMPO', 'clock', 0, 7),
       inp('in_run_stop', 'RUN/STOP', 'gate', 1, 7),
       inp('in_reset', 'RESET', 'trigger', 2, 7),
@@ -259,107 +303,5 @@ export const MOTHER32: DeviceSpec = {
     ],
   },
 
-  presets: {
-    init: {
-      name: 'Basic Patch (normalled)',
-      description: 'The default patch: keyboard → VCO saw → ladder low-pass → VCA opened by the EG. No cables needed.',
-      source: 'manual',
-      settings: {},
-    },
-    pwm_lead: {
-      name: 'PWM Lead',
-      description: 'LFO sweeps the pulse width for a chorus-like, moving lead. Internal routing: VCO MOD = LFO → PW.',
-      source: 'community',
-      settings: {
-        vco_wave: 1, pulse_width: 50, vco_mod_source: 1, vco_mod_dest: 1, vco_mod_amount: 55,
-        lfo_rate: 0.9, lfo_wave: 0, cutoff: 2400, resonance: 20, vcf_mod_amount: 30, glide: 60,
-        attack: 6, decay: 600, sustain: 0,
-      },
-    },
-    acid_seq: {
-      name: 'Acid Sequence',
-      description: 'Resonant saw bass on the sequencer: short AD envelope on the filter, accents patched to the cutoff via ASSIGN.',
-      source: 'community',
-      settings: {
-        vco_wave: 0, frequency: 0, cutoff: 260, resonance: 72, vcf_mod_amount: 55, vcf_mod_source: 0,
-        sustain: 1, attack: 1.25, decay: 260, glide: 40, tempo: 124, gate_length: 55, assign_source: 0,
-        seq_notes: makePattern([36, 36, 48, 36, 39, 36, 51, 36, 43, 36, 46, 48, 36, null, 41, 39]),
-        seq_accent: makeAccents([3, 7, 11, 15]),
-      },
-      patchConnections: [{ from: 'out_assign', to: 'in_vcf_cutoff' }],
-    },
-    lfo_wobble: {
-      name: 'LFO → Cutoff Wobble',
-      description: 'LFO TRI patched to VCF CUTOFF adds a wobble on top of the envelope sweep (both modulate the filter at once).',
-      source: 'community',
-      settings: {
-        vco_wave: 0, frequency: -1, cutoff: 500, resonance: 55, vcf_mod_source: 0, vcf_mod_amount: 20,
-        lfo_rate: 3, sustain: 0, decay: 900,
-      },
-      patchConnections: [{ from: 'out_lfo_tri', to: 'in_vcf_cutoff' }],
-    },
-    eg_zap: {
-      name: 'EG → Pitch Zaps',
-      description: 'Envelope into the VCO 1V/OCT input replaces the keyboard CV: every note is a falling laser zap. Sequencer drives the gate.',
-      source: 'community',
-      settings: {
-        vco_wave: 1, pulse_width: 30, frequency: 1, cutoff: 6000, resonance: 30, vcf_mod_amount: 20,
-        sustain: 1, attack: 1.25, decay: 180, tempo: 100,
-      },
-      patchConnections: [{ from: 'out_eg', to: 'in_vco_1voct' }],
-    },
-    whistle_filter: {
-      name: 'Self-Oscillating Filter (KB → MULT)',
-      description: 'KB pitch CV is multed to both the VCO and the VCF CUTOFF, so the resonant filter tracks the keyboard and sings as a second oscillator.',
-      source: 'community',
-      settings: {
-        vco_wave: 0, mix: 100, cutoff: 260, resonance: 98, vcf_mod_amount: 10, sustain: 0,
-        attack: 30, decay: 1500, volume: 55,
-      },
-      patchConnections: [
-        { from: 'out_kb', to: 'in_mult' },
-        { from: 'out_mult1', to: 'in_vco_1voct' },
-        { from: 'out_mult2', to: 'in_vcf_cutoff' },
-      ],
-    },
-    delayed_vibrato: {
-      name: 'Delayed Vibrato (VC MIX as VCA)',
-      description: 'LFO into MIX 2 and the EG into VC MIX CTRL: the VC MIX output is LFO × EG, so vibrato fades in with the envelope. Patched into VCO MOD (source EG, dest FREQ).',
-      source: 'community',
-      settings: {
-        vco_wave: 1, pulse_width: 40, vco_mod_source: 0, vco_mod_dest: 0, vco_mod_amount: 18,
-        lfo_rate: 5.5, vc_mix: 0, attack: 1400, decay: 500, sustain: 0, cutoff: 3000, vcf_mod_amount: 10, glide: 80,
-      },
-      patchConnections: [
-        { from: 'out_lfo_tri', to: 'in_mix2' },
-        { from: 'out_eg', to: 'in_vc_mix_ctrl' },
-        { from: 'out_vc_mix', to: 'in_vco_mod' },
-      ],
-    },
-    audio_fm: {
-      name: 'Audio-Rate LFO FM Bell',
-      description: 'The LFO at audio rate into VCO LIN FM makes clangorous sidebands; the EG on the filter shapes it into a bell.',
-      source: 'community',
-      settings: {
-        vco_wave: 0, lfo_rate: 262, lfo_wave: 0, cutoff: 900, resonance: 10, vcf_mod_amount: 65,
-        sustain: 1, attack: 1.25, decay: 1800,
-      },
-      patchConnections: [{ from: 'out_lfo_tri', to: 'in_vco_lin_fm' }],
-    },
-    noise_drone: {
-      name: 'Wind Drone (VCA ON)',
-      description: 'VCA MODE ON makes a drone. Noise through a resonant filter, with the slow LFO sweeping it via VCF MOD.',
-      source: 'community',
-      settings: {
-        mix: 100, cutoff: 700, resonance: 80, vcf_mod_source: 1, vcf_mod_amount: 45, lfo_rate: 0.15,
-        vca_mode: 0, volume: 55,
-      },
-    },
-    empty_pattern: {
-      name: 'Blank Pattern (ready to record)',
-      description: 'Clears the sequence so you can record your own with SHIFT + RUN/STOP.',
-      source: 'manual',
-      settings: { seq_notes: EMPTY_PATTERN, seq_accent: NO_ACCENTS },
-    },
-  },
+  presets: MOTHER32_PRESETS,
 };
