@@ -5,8 +5,8 @@ Moog DFAM Owner's Manual with Patch Sheets (primary source, cited as "M p.N"), t
 review, VoltPages and forum reports. Measurements come from an offline Node harness that runs the
 worklet exactly as the engine drives it, plus Playwright runs of the real app.
 
-Status: **complete** (finished on `finish/dfam-review`, merged with the integrated framework at
-5878311). The merge gate passes; see "Gate" at the end. The items under "Open" need a hardware unit.
+Status: **complete** (finished on `finish/dfam-review`, merged with the integration branch at
+262e3ce). The merge gate passes; see "Gate" at the end. The items under "Open" need a hardware unit.
 
 ## Findings and changes
 
@@ -121,19 +121,19 @@ Status: **complete** (finished on `finish/dfam-review`, merged with the integrat
   knob positions from; those presets follow the sheet notes.
 - The clap's 0.4 LU app/offline difference (see "Preset loudness").
 - Finding #24 can make the audio-QA gate flake about once in 20 full DFAM runs (it did once in
-  six full runs after the preset changes). If the gate must never flake, either the integrator sets
+  eight full runs after the preset changes). If the gate must never flake, either the integrator sets
   `thresholds.clicksMin: 2` for `dfam` in the audio-QA config, or Lo-fi crunch and Techno
   percussion drop NOISE / VCF MOD (and lose their crackle).
 - The model choices in REFERENCE.md need a hardware unit to confirm.
 
-## Gate (final build: finish/dfam-review, integration branch ee54efe merged)
+## Gate (final build: finish/dfam-review, integration branch 262e3ce merged)
 
 | Check | Result |
 |---|---|
 | tsc, `next lint`, `npm run validate dfam` | clean; 0 errors, 0 warnings |
 | build | passes |
-| `scripts/smoke.cjs` | no console errors; transport peak 0.31, button peak 0.30; no horizontal scroll on desktop or iPad |
-| `scripts/e2e/run.cjs` | 23/23 |
+| `scripts/smoke.cjs` | no console errors; transport peak 0.31, button peak 0.31; no horizontal scroll on desktop or iPad |
+| `scripts/e2e/run.cjs` | 33/33 (with the new touch tests) |
 | `scripts/lesson-runner.cjs dfam` | 20 lessons, 0 failed, 0 manual steps |
-| `scripts/audio-qa.cjs dfam --target -18 --suggest` | last run: exit 0, `[dfam] median -19.2 LUFS, spread 5.2 LU, 0 of 40 flagged (none)`, max true peak -2.1 dBTP; with `--excite dfam=transport`: exit 0, `[dfam] median -19.0 LUFS, spread 4.9 LU, 0 of 40 flagged (none)`. Of the six full runs after the preset changes (four on the final preset set), five had 0 flags; one audition run flagged a single -32.7 dBFS crackle in Lo-fi crunch (finding #24) |
+| `scripts/audio-qa.cjs dfam --target -18 --suggest` | exit 0: `[dfam] median -19.1 LUFS, spread 5.3 LU, 0 of 40 flagged (none)`, max true peak -2.1 dBTP; with `--excite dfam=transport`: exit 0, `[dfam] median -19.1 LUFS, spread 4.8 LU, 0 of 40 flagged (none)`. Of the eight full runs after the preset changes (six on the final preset set), seven had 0 flags; one audition run flagged a single -32.7 dBFS crackle in Lo-fi crunch (finding #24) |
 | screenshots (desktop 1440 x 900, iPad 1180 x 820) | read against M p.7: layout, legends and patch bay match; no truncated text |
