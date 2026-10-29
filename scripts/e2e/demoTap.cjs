@@ -200,8 +200,9 @@ async function startPolling(page) {
       if (e.type === 'start') log.starts.push(e.time);
       if (e.type === 'stop') log.stops.push({ at: ctx.currentTime, time: e.time });
     });
-    // bar ticks: [0-based bar, audio time]
-    const offTick = S.transport.onTick(t => { if (t.tick % 96 === 0) log.bars.push([t.bar, t.time]); });
+    // bar ticks: [0-based bar, audio time, how late the transport handed the tick out (s; normally
+    // about -0.1, its look-ahead). A tick handed out after its time - the page stalled - plays late.
+    const offTick = S.transport.onTick(t => { if (t.tick % 96 === 0) log.bars.push([t.bar, t.time, ctx.currentTime - t.time]); });
     let lastFrame = null;
     const poll = setInterval(() => {
       const el = document.querySelector('[data-demo-caption]');

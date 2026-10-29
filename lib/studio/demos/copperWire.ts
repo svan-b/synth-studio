@@ -167,7 +167,7 @@ function sub37Preset(which: 1 | 2, over: { cutoff?: number; egAmt?: number; driv
     mod2_source: 0, mod2_sync: true, mod2_div: DIV_EIGHTH, mod2_filter_amt: p1 ? 0 : 45, mod2_pitch_amt: 0, mod2_mod_amt: 0,
     // PRESET VOL levels each preset as the factory ones are: the bass 1 dB under the kick, and the
     // sustained wobble (AMP SUSTAIN 100 %) at the same short-term level as the bassline
-    preset_volume: p1 ? 30 : 19,
+    preset_volume: p1 ? 46 : 29,
   };
 }
 

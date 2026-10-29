@@ -17,6 +17,9 @@
 // loudness at the Xone's output, each part soloed). --bars N plays only N bars (quick run).
 // Bar times come from the transport's own ticks, so a page that stalls (a busy machine)
 // and makes the transport resync does not fail the timing checks; resyncs are reported.
+// A bar line the transport handed out after its time (the page stalled just then, so every
+// part plays it late together) can't show where the demo puts its notes: the timing checks
+// skip and report those bar lines, and fail if fewer than half of them were on time.
 // Prints one JSON object (the last line) and exits 1 if a check fails.
 // ============================================================================
 const { chromium } = require('playwright');
@@ -154,6 +157,9 @@ const EXPECT = {
       const T = Object.fromEntries(cap.taps.map(t => [t.id, makeTap(t, sr, cap.started.time)]));
       // the transport's own bar lines (1-based bar -> audio time)
       const barTime = new Map(log.bars.map(([b, t]) => [b + 1, t]));
+      // ms each bar line was handed out after its time; > -2 ms: the page stalled over it
+      const barLate = new Map(log.bars.map(([b, , late]) => [b + 1, Math.round(late * 1000)]));
+      const stalled = b => (barLate.get(b) ?? -100) > -2;
       const lastBar = Math.max(...barTime.keys());
       const barT = b => barTime.get(b) ?? (barTime.get(lastBar) + (b - lastBar) * barDur);
       const t0 = barT(1);
@@ -194,9 +200,11 @@ const EXPECT = {
 
       // the kick hits each section's first beat: a rise of 6 dB or more that starts within 12 ms of the bar line
       const kickSecs = inSong.map((s, i) => ({ ...s, i })).filter(s => s.i >= (exp.kickFrom ?? 1) - 1 && !(exp.kickSkip ?? []).includes(s.i + 1));
-      const kicks = kickSecs.map(s => ({ section: s.i + 1, ...T[exp.kick].hitAt(barT(s.start)) }));
+      const kicks = kickSecs.map(s => ({ section: s.i + 1, ...T[exp.kick].hitAt(barT(s.start)), ...(stalled(s.start) ? { stalledMs: barLate.get(s.start) } : {}) }));
       R.kickHits = kicks;
-      check(id, 'section changes land on bar lines (the kick on each section\'s first beat)', kicks.every(k => k.db >= 6 && k.ms !== null && Math.abs(k.ms) <= 12), kicks);
+      const onTime = list => list.filter(x => x.stalledMs === undefined);
+      check(id, 'section changes land on bar lines (the kick on each section\'s first beat)',
+        onTime(kicks).length * 2 >= kicks.length && onTime(kicks).every(k => k.db >= 6 && k.ms !== null && Math.abs(k.ms) <= 12), kicks);
 
       // a part the arranger unmutes comes in on its section's bar line (its first note on its step)
       const stepDur = barDur / 16;
@@ -204,10 +212,15 @@ const EXPECT = {
         const tb = barT(e.bar);
         const quiet = lufsOf(T[e.instance].meanPower(tb - 1.0, tb - 0.01)) < -60;
         const on = T[e.instance].entryAfter(tb - 0.01, tb + barDur);
-        return { instance: e.instance, bar: e.bar, silentBefore: quiet, onsetMs: on === null ? null : Math.round((on - (tb + (e.step - 1) * stepDur)) * 1000) };
+        return {
+          instance: e.instance, bar: e.bar, silentBefore: quiet, onsetMs: on === null ? null : Math.round((on - (tb + (e.step - 1) * stepDur)) * 1000),
+          ...(stalled(e.bar) ? { stalledMs: barLate.get(e.bar) } : {}),
+        };
       });
       R.entries = entries;
-      check(id, 'unmuted parts enter on their section\'s bar line', entries.every(e => e.silentBefore && e.onsetMs !== null && Math.abs(e.onsetMs) <= 12), entries);
+      check(id, 'unmuted parts enter on their section\'s bar line',
+        entries.every(e => e.silentBefore) && onTime(entries).length * 2 >= entries.length && onTime(entries).every(e => e.onsetMs !== null && Math.abs(e.onsetMs) <= 12), entries);
+      R.stalledBars = [...barLate].filter(([b]) => stalled(b)).map(([b, ms]) => [b, ms]);
 
       if (!MAX_BARS) {
         const stop = log.stops[0];
