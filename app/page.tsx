@@ -9,13 +9,15 @@ import { useStudioStore, dueReviewItems } from '@/store/studio';
 import { hub } from '@/lib/studio/hub';
 import { arranger } from '@/lib/studio/arranger';
 import { STUDIO_LESSONS } from '@/lib/studio/lessons';
-import { downloadProject, importProject } from '@/lib/studio/project';
+import { downloadProject, importProject, newProject } from '@/lib/studio/project';
+import { history } from '@/lib/studio/history';
 import DeviceHost from '@/components/DeviceHost';
 import Instructions from '@/components/teaching/Instructions';
 import LessonBrowser from '@/components/teaching/LessonBrowser';
 import ReviewSession from '@/components/teaching/ReviewSession';
 import TransportBar from '@/components/studio/TransportBar';
 import StudioView from '@/components/studio/StudioView';
+import UndoRedo from '@/components/studio/UndoRedo';
 import Welcome, { type WelcomeChoice } from '@/components/onboarding/Welcome';
 import MidiButton from '@/components/midi/MidiButton'; // external gear: MIDI settings
 
@@ -26,6 +28,8 @@ export default function Home() {
   useEffect(() => {
     hub.init();
     arranger.init();
+    // after the hub: undo history never sits between a knob and its engine
+    history.init();
     setHydrated(true);
   }, []);
   if (!hydrated) return <div className="min-h-screen bg-hardware-bg" />;
@@ -160,6 +164,7 @@ function App() {
           </button>
         </nav>
         <div className="shrink-0 flex items-center gap-2">
+          <UndoRedo />
           <button
             onClick={() => setReviewOpen(true)}
             className={`px-3 py-2 rounded-lg text-sm border ${dueCount ? 'border-sky-500 text-sky-200 bg-sky-950/40' : 'border-[#3a3a3a] text-gray-300'}`}
@@ -181,7 +186,7 @@ function App() {
           <ProjectMenu
             onSave={() => downloadProject(entry ? `${entry.name} session` : 'My track')}
             onOpen={() => fileRef.current?.click()}
-            onNew={() => { if (confirm('Start a new empty project? Save first if you want to keep this one.')) useStudioStore.getState().newProject(); }}
+            onNew={() => { if (confirm('Start a new empty project? Save first if you want to keep this one.')) newProject(); }}
           />
           <input
             ref={fileRef}
@@ -335,7 +340,7 @@ function ProjectMenu({ onSave, onOpen, onNew }: { onSave: () => void; onOpen: ()
           <MenuItem onClick={() => { onSave(); setOpen(false); }}>Save project to a file</MenuItem>
           <MenuItem onClick={() => { onOpen(); setOpen(false); }}>Open project file…</MenuItem>
           <MenuItem onClick={() => { onNew(); setOpen(false); }}>New empty project</MenuItem>
-          <p className="text-[10px] text-gray-500 px-2 py-1.5">Your work also saves automatically in this browser. Use REC in the top bar to bounce a WAV.</p>
+          <p className="text-[10px] text-gray-500 px-2 py-1.5">Your work also saves automatically in this browser. Use REC or Bounce… in the top bar to export WAV files and stems.</p>
         </div>
       )}
     </div>

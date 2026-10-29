@@ -1,10 +1,11 @@
 // ============================================================================
 // Projects: the whole studio (every instrument's knobs, cables, patterns,
-// routing, tempo and song arrangement) as one JSON file.
+// routing, tempo, the mix and the song arrangement) as one JSON file.
 // ============================================================================
 
 import { useStudioStore, type InstanceState, type StudioDoc } from '@/store/studio';
 import { PROJECT_VERSION, upgradeDevices } from './upgrades';
+import { history } from './history';
 
 export interface ProjectFile {
   format: 'synth-studio-project';
@@ -29,6 +30,12 @@ export function exportProject(name = 'My track'): ProjectFile {
   };
 }
 
+/** Start an empty project (keeps the focused instrument) and forget the undo history */
+export function newProject() {
+  useStudioStore.getState().newProject();
+  history.clear();
+}
+
 export function downloadProject(name = 'My track') {
   const file = exportProject(name);
   const blob = new Blob([JSON.stringify(file)], { type: 'application/json' });
@@ -48,5 +55,7 @@ export async function importProject(file: File): Promise<string> {
   // Projects saved by an older version: controls whose meaning changed keep sounding the same
   const devices = upgradeDevices(parsed.devices, parsed.studio.rack ?? [], 'project', parsed.version ?? 1);
   useStudioStore.getState().loadProject({ devices, studio: parsed.studio, currentDevice: parsed.currentDevice });
+  // A different project: nothing to undo into
+  history.clear();
   return parsed.name ?? 'Project';
 }

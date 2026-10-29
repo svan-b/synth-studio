@@ -111,7 +111,11 @@ class StudioHistory {
     return () => this.listeners.delete(l);
   }
 
+  /** Bumped on every change of the stacks (for useSyncExternalStore) */
+  version = 0;
+
   private emit() {
+    this.version++;
     this.listeners.forEach(l => l());
   }
 

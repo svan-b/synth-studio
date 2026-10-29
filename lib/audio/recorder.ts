@@ -172,6 +172,8 @@ export interface TakeTap {
   /** Record this many frames later (the master: the limiter's look-ahead) */
   offsetFrames?: number;
   keepFloats?: boolean;
+  /** Called with every recorded chunk (a streaming loudness meter, say) */
+  onChunk?: (l: Float32Array, r: Float32Array) => void;
 }
 
 export interface TakeTrack {
@@ -216,7 +218,7 @@ export class Take {
       this.done.push(new Promise<void>(resolve => {
         node.port.onmessage = e => {
           const d = e.data as { type: string; l: Float32Array; r: Float32Array };
-          if (d.type === 'chunk') track.wav.push(d.l, d.r);
+          if (d.type === 'chunk') { track.wav.push(d.l, d.r); tap.onChunk?.(d.l, d.r); }
           else if (d.type === 'done') resolve();
         };
       }));
@@ -251,8 +253,8 @@ export class Take {
 }
 
 /** The master, recorded after the limiter and shifted to line up with stems */
-export function masterTap(keepFloats = false): TakeTap {
-  return { id: 'master', name: 'Master', node: getRecordTap(), offsetFrames: getMasterLatencyFrames(), keepFloats };
+export function masterTap(keepFloats = false, onChunk?: TakeTap['onChunk']): TakeTap {
+  return { id: 'master', name: 'Master', node: getRecordTap(), offsetFrames: getMasterLatencyFrames(), keepFloats, onChunk };
 }
 
 /** REC in the top bar: what you hear, to a WAV file */
