@@ -167,7 +167,7 @@ export const exampleElements: CustomElement[] = [
         <TrigEditor ctx={ctx} tracks={TRACKS} portal features={{ retrig: true, accent: true, slide: false, pslide: true }} lockLimit={LOCK_LIMIT_RYTM} />
         {/* SAVE / RELOAD, UNDO for PASTE and CLEAR, TEMP JUMP arming */}
         <PatternPicker ctx={ctx} tracks={TRACKS} portal />
-        <ChainBuilder ctx={ctx} tracks={TRACKS} portal maxLength={256} />
+        <ChainBuilder ctx={ctx} tracks={TRACKS} portal />
         {/* Rows with chains of patterns, song mutes per pattern; hardware-style: no row tempo, length or loop */}
         <SongEditor ctx={ctx} tracks={TRACKS} portal tempo={false} length={false} loop={false} />
         {/* A longer length copies the existing pages (copyPages, on by default) */}
