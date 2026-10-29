@@ -69,6 +69,14 @@ function tanF(x) {
 
 function clamp(x, lo, hi) { return x < lo ? lo : x > hi ? hi : x; }
 
+/** A soft limit: unity up to `knee`, then a tanh knee toward `max` - an output stage near its rails */
+function rail(x, knee, max) {
+  const w = max - knee;
+  if (x > knee) return knee + w * tanhF((x - knee) / w);
+  if (x < -knee) return -knee - w * tanhF((-x - knee) / w);
+  return x;
+}
+
 // 4-point polyBLEP (integrated cubic B-spline): corrects W[k-2 .. k+1]; d = samples since the step
 function addBlep(W, k, d, h) {
   if (d < 0) d = 0; else if (d > 1) d = 1;
@@ -121,6 +129,7 @@ const FMOD_OCT_PER_V = 0.9;   // VCF MOD at full AMOUNT: EG 6.75 oct, LFO +/-4.5
 const ACCENT_OCT = 1.0;       // accent: cutoff up one octave...
 const ACCENT_GAIN = 0.333;    // ...and +2.5 dB at the VCA, a fixed level (manual p.18)
 const RES_K = 5.4;            // ladder feedback at RESONANCE 100 % (self-oscillates from ~3 o'clock)
+const HP_K = 2.5;             // HI PASS feedback at RESONANCE 100 %: well below oscillation (non-resonant HP)
 const LADDER_HEADROOM = 3;    // ladder input scaling (see the VCF)
 const MAIN_GAIN = 1.5;        // VCA jack (1.0 = 5 V) to the studio's main bus (presets sit near -18 LUFS)
 const TRIG_ON = 3.2, TRIG_OFF = 2.4;   // TEMPO / RUN / RESET / HOLD thresholds, about +3.2 V (manual p.56)
@@ -152,7 +161,7 @@ class Mother32Processor extends AudioWorkletProcessor {
     // The manual's default panel (p.9) until the engine sends the real values
     k[K_WAVE] = 1; k[K_PW] = 0.5; k[K_CUTOFF] = 350; k[K_RES] = 0.05; k[K_VCA_MODE] = 1; k[K_VOLUME] = 0.5;
     k[K_VMOD_SRC] = 1; k[K_VMOD_DEST] = 1; k[K_VCF_MODE] = 1; k[K_FMOD_AMT] = 0.5; k[K_TEMPO] = 120;
-    k[K_LFO_RATE] = 5.9; k[K_LFO_WAVE] = 1; k[K_ATTACK] = 0.00125; k[K_DECAY] = 0.06; k[K_VCMIX] = 0;
+    k[K_LFO_RATE] = 5.9; k[K_LFO_WAVE] = 1; k[K_ATTACK] = 0.00125; k[K_DECAY] = 0.18; k[K_VCMIX] = 0;
     k[K_SWING] = 0.5; k[K_DIV] = DIV_DEFAULT; k[K_SWDIV] = DIV_DEFAULT; k[K_ASSIGN] = 1; k[K_TEMPO_MODE] = 1;
     k[K_QUALITY] = 1; k[K_PPQN] = 4;
     this.k = k;
@@ -272,6 +281,7 @@ class Mother32Processor extends AudioWorkletProcessor {
 
     // Main-bus DC blocker (the jacks are DC coupled like the hardware)
     this.dcX = 0; this.dcY = 0; this.dcR = 1 - (2 * Math.PI * 6) / sr;
+    this.dc2X = 0; this.dc2Y = 0; this.dc2R = 1 - (2 * Math.PI * 3) / sr;   // after the output rail
 
     // UI reporting
     this.uiDirty = true; this.uiLast = -1; this.beat = 0; this.beatOffAt = 0;
@@ -1042,11 +1052,12 @@ class Mother32Processor extends AudioWorkletProcessor {
         if (res < 0) res = 0; else if (res > 1) res = 1;
       } else this.resCv = 0;
       // LOW PASS: the resonant 4-pole ladder (a little make-up gain for the Moog bass loss).
-      // HI PASS: the input minus the ladder low-pass. It does not self-oscillate: RESONANCE lets the
-      // low band back in, as the manual warns (p.14), and leaves a gentle bump at the cutoff - the
-      // "peaking filter" reviewers describe - with the ladder's feedback kept below oscillation.
-      const kf = lp ? res * RES_K : res * RES_K * 0.7;
-      const hpKeep = lp ? 0 : 1 - 0.85 * res;
+      // HI PASS: the filter's input minus the ladder low-pass. It is non-resonant (manual p.14): the
+      // feedback stays far below oscillation, so RESONANCE leaves only a gentle bump at the cutoff
+      // (+4 dB at full) - the "peaking filter" reviewers describe. What RESONANCE does here is let
+      // the bass back in, as the manual warns: the fed-back low-pass no longer cancels the low band
+      // (gain k / (1 + k) at DC, -3 dB at full).
+      const kf = lp ? res * RES_K : res * HP_K;
       const inGain = lp ? (1 + 0.5 * res) : 1, outGain = lp ? (1 + 0.3 * res) : 1;
       // The ladder runs in units of LADDER_HEADROOM volts/5, so the input pair compresses a full VCO
       // only gently and self-oscillation can reach VCO level. A whisper of noise (-100 dB), as in any
@@ -1063,7 +1074,7 @@ class Mother32Processor extends AudioWorkletProcessor {
         v = (y1 - z1) * G; const y2 = v + z1; z1 = y2 + v;
         v = (y2 - z2) * G; const y3 = v + z2; z2 = y3 + v;
         v = (y3 - z3) * G; const y4 = v + z3; z3 = y4 + v;
-        filt = lp ? y4 : u - hpKeep * y4;
+        filt = lp ? y4 : xin - y4;
       } else {
         // 2x oversampled transistor core with per-stage tanh ('ladder' quality 1 in synth-processors.js)
         let t1 = A0 * (xin - hb[3]) + hb[0]; hb[0] = xin; hb[3] = t1;
@@ -1089,7 +1100,7 @@ class Mother32Processor extends AudioWorkletProcessor {
           const u = tanhF(xsub - kf * y4e);
           const y1 = a1 * u + b1, y2 = a2 * y1 + b2, y3 = a3 * y2 + b3, y4 = a4 * y3 + b4;
           z0 = 2 * y1 - z0; z1 = 2 * y2 - z1; z2 = 2 * y3 - z2; z3 = 2 * y4 - z3;
-          const y = lp ? y4 : u - hpKeep * y4;
+          const y = lp ? y4 : xsub - y4;
           if (sub === 0) za = y; else zb = y;
         }
         t1 = A0 * (zb - hb[15]) + hb[12]; hb[12] = zb; hb[15] = t1;
@@ -1100,7 +1111,9 @@ class Mother32Processor extends AudioWorkletProcessor {
         const yb = B2 * (t2 - hb[23]) + hb[20]; hb[20] = t2; hb[23] = yb;
         filt = 0.5 * (ya + yb);
       }
-      const vcf = filt * LADDER_HEADROOM * outGain; // the VCF jack, 1.0 = 5 V (self-oscillation ~ +/-4.5 V)
+      // The VCF jack, 1.0 = 5 V: self-oscillation about +/-4.5 V; the output stage limits near
+      // +/-5.5 V, so feedback patches (VCF -> EXT. AUDIO) stay at the manual's "about +/-5 V" (p.48)
+      const vcf = rail(filt * LADDER_HEADROOM * outGain, 0.95, 1.15);
 
       // ---- VCA (manual p.47): EG mode 0..+8 V of control (the EG reaches 7.5 V), ON mode +/-5 V
       //      about full level; the VCA CV sums with the switch. Accent adds a little; soft clip. ----
@@ -1117,7 +1130,13 @@ class Mother32Processor extends AudioWorkletProcessor {
       const vca = amp * vol * vol;                  // VOLUME sets both the VCA jack and the audio out
       let main = vca * MAIN_GAIN;
       const dc = main - this.dcX + this.dcR * this.dcY;
-      this.dcX = main; this.dcY = dc; main = dc;
+      // The output rail comes last (a sub-audio square stepping through the DC blocker overshoots):
+      // however hot the patch - VOLUME up, full RESONANCE, VCA CV on top - the output stays below 0 dBFS
+      this.dcX = main; this.dcY = dc; main = rail(dc, 0.7, 0.98);
+      // The rail clips a lopsided wave (a saw's edge overshoot) off-centre, which leaves a little DC
+      // at VOLUME fully up; a slow second blocker takes it away, and a last ceiling keeps 0 dBFS
+      const d2 = main - this.dc2X + this.dc2R * this.dc2Y;
+      this.dc2X = main; this.dc2Y = d2; main = d2 > 0.995 ? 0.995 : d2 < -0.995 ? -0.995 : d2;
 
       // ---- VC MIX (DC coupled): MIX 1 (0 V normal) <-> MIX 2 (+5 V normal) ----
       let p = s[K_VCMIX];
@@ -1185,6 +1204,7 @@ class Mother32Processor extends AudioWorkletProcessor {
     this.z2 = (z2 > 1e-20 || z2 < -1e-20) ? z2 : 0; this.z3 = (z3 > 1e-20 || z3 < -1e-20) ? z3 : 0;
     for (let j = 0; j < 24; j++) { const v = hb[j]; if (!(v > 1e-20 || v < -1e-20)) hb[j] = 0; }
     if (!(this.dcY > 1e-20 || this.dcY < -1e-20)) this.dcY = 0;
+    if (!(this.dc2Y > 1e-20 || this.dc2Y < -1e-20)) this.dc2Y = 0;
     if (!(this.acY > 1e-20 || this.acY < -1e-20)) this.acY = 0;
     if (!Number.isFinite(this.sqA + this.trA + this.sqY + this.trY)) { this.sqA = this.sqB = this.trA = this.trB = 0; this.sqY = 1; this.trY = -1; }
 
