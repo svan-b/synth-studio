@@ -39,7 +39,7 @@ front-on photo of a black unit.
 | 2 | [SAMPLING] | Opens SAMPLING; FUNC starts direct sampling | Shows that sampling is not modelled | (Rytm MKII manual, p.10) |
 | 3 | [QPER] | With the pads, picks the performance macros the QUICK PERF AMOUNT knob drives; FUNC mutes the macros | The same. A tap latches the selection | (Rytm MKII manual, pp.10, 30-31) |
 | 4 | QUICK PERF AMOUNT | Amount of the picked macros; an absolute knob | The same | (Rytm MKII manual, pp.10, 22) |
-| 5 | [FIX] | Fixed pad velocity on or off; FUNC opens FIXED VELOCITY (AUTO uses the track's TRIG VEL) | The same | (Rytm MKII manual, pp.10, 45) |
+| 5 | [FIX] | Fixed pad velocity on or off; FUNC opens FIXED VELOCITY (AUTO uses the track's TRIG VEL) | The same | (Rytm MKII manual, pp.10, 43, 45) |
 | 6 | TRACK LEVEL | Level of the active track (with the FX track selected, the master return of delay and reverb); also scrolls menus; FUNC opens the SOUND BROWSER | Level and menu values; sets the accent amount in the ACCENT menu. No sound browser | (Rytm MKII manual, pp.10, 36, 50) |
 | 7 | [TEMPO] | TEMPO menu; FUNC taps the tempo | The same | (Rytm MKII manual, pp.10, 38) |
 | 8 | [NO] | Exits and steps back. With keys 32-36 it reloads the kit, Sound, track, pattern or song | [NO] + [PLAY MODE] / [MUTE] / [SCNE] reload the kit / the active track's sound / the pattern. Tracks and songs are saved automatically, so there is nothing to reload. [FX] + [NO] reloads the FX track. **Twin**: FUNC + [NO] also reloads the kit, for mouse use | (Rytm MKII manual, pp.10, 51-52, 81) |
@@ -108,7 +108,7 @@ The twin follows all three.
 | SRC | per machine | See above | (Rytm MKII manual, pp.96-109) |
 | SMPL | TUN FIN BR SMP / STA END LOP LEV | END below STA plays backwards. LOP loops for the trig's length. The twin ships synthesized one-shots in place of samples, and the second SMPL page (a waveform view) is not drawn | (Rytm MKII manual, pp.77-78) |
 | FLTR | ATK DEC SUS REL / FRQ RES TYP ENV | Seven types (LP2 LP1 BP HP1 HP2 BS PK). The twin builds them all from one resonant 2-pole filter; the 1-pole types have a gentler slope | (Rytm MKII manual, p.78) |
-| AMP | ATK HLD DEC OVR / DEL REV PAN VOL | OVR drives the sound before the filter. **Twin**: HLD 0 holds while the pad is held, or for the trig's length; DEC 127 never decays | (Rytm MKII manual, p.79) |
+| AMP | ATK HLD DEC OVR / DEL REV PAN VOL | HLD AUTO (0) holds while the pad is pressed; 1-127 are fixed holds. OVR drives the sound before the filter. **Twin**: on the sequencer HLD AUTO holds for the trig's length, and DEC 127 never decays | (Rytm MKII manual, p.79) |
 | LFO | SPD MUL FAD DST / WAV SPH MOD DEP | Seven waves (TRI SIN SQR SAW EXP RMP RND) and five trig modes (FREE TRG HLD ONE HLF). MUL "x" values follow the tempo; "." values run at 120 BPM whatever the tempo. **Twin**: SPH adds slew on RND | (Rytm MKII manual, pp.79-80) |
 
 Each control has its own id:
@@ -195,9 +195,9 @@ section is the FX defaults (`KIT01_MASTER` in `model.ts`).
 
 - **DIST AMT** drives the mix into the master clipper. The clipper is an
   order-12 soft clipper at about 0.68 / 0.72 of full scale, and it is there even
-  at AMT 0. It holds the peaks. Drive stays at or below 18 where hats ride on a
-  big kick: deeper clipping notches the hats on the kick's flattened crest and
-  crackles.
+  at AMT 0. It holds the peaks. Dub Chords, Deep Garage and Jungle Roller keep
+  their drive at 18: there, bright hats ride on a big kick, and deeper clipping
+  notches them on the kick's flattened crest, which crackles.
 - **COMP** keeps each kit's character (threshold, attack, release, ratio, SEQ).
   MIX is parallel compression, with MUP matched to the wet path's fixed loss
   plus the average gain reduction.
@@ -219,30 +219,30 @@ its master section is calibrated instead.
 
 ### Measured loudness (audio QA, `--target -18`)
 
-Two runs at 44.1 kHz on the instrument output: `audition` plays each kit's demo pattern through the module's own audition, and `transport` plays it from the studio transport (`--excite analog-rytm=transport`). Audition: median -18.2 LUFS, spread 3.0 LU, worst true peak -1.6 dBTP, 0 of 20 flagged. Transport: median -18.4 LUFS, spread 3.2 LU, worst true peak -1.3 dBTP, 0 of 20 flagged.
+Two runs at 44.1 kHz on the instrument output: `audition` plays each kit's demo pattern through the module's own audition, and `transport` plays it from the studio transport (`--excite analog-rytm=transport`). Neither run has a click, DC or tail flag. Audition: median -18.1 LUFS, spread 3.1 LU, worst true peak -1.6 dBTP, 0 of 20 flagged. Transport: median -18.4 LUFS, spread 3.0 LU, worst true peak -1.3 dBTP, 0 of 20 flagged.
 
 | Kit | Audition LUFS | Audition dBTP | Transport LUFS | Transport dBTP |
 |---|---:|---:|---:|---:|
-| Techno / Warehouse | -19.1 | -1.6 | -19.3 | -1.7 |
-| Techno / Industrial Grind | -18.1 | -4.3 | -18.2 | -3.9 |
-| Techno / Dub Chords | -19.6 | -1.6 | -19.7 | -1.3 |
-| House / Deep Garage | -20.0 | -1.9 | -20.3 | -1.9 |
-| House / Nine-O-Nine Box | -18.8 | -2.6 | -18.9 | -2.6 |
-| Electro / Miami Bass | -18.1 | -4.3 | -18.2 | -4.3 |
-| Electro / Robot Funk | -18.1 | -2.0 | -18.3 | -2.5 |
-| Drum Machine / Straight Boom | -18.1 | -3.0 | -18.4 | -3.0 |
-| Hip-Hop / Dusty Boom Bap | -18.2 | -2.3 | -18.4 | -2.6 |
-| Hip-Hop / Trap Sub | -18.1 | -4.1 | -18.2 | -3.9 |
-| Breaks / Jungle Roller | -19.6 | -2.8 | -20.1 | -2.6 |
-| Breaks / Big Beat | -18.4 | -1.8 | -18.3 | -2.9 |
-| Minimal / Micro Clicks | -20.9 | -2.1 | -21.4 | -3.2 |
-| IDM / Glitch Lab | -18.6 | -2.1 | -19.2 | -2.2 |
-| Dub / Echo Chamber | -18.0 | -1.7 | -18.3 | -1.4 |
-| Acoustic / Studio Kit | -18.2 | -4.0 | -18.3 | -3.5 |
-| Acoustic / Brush Jazz | -18.1 | -2.6 | -18.3 | -2.6 |
-| Lo-Fi / Bitcrushed Tape | -17.9 | -2.1 | -18.2 | -2.1 |
-| Percussion / Afro-Latin | -18.2 | -3.7 | -18.4 | -3.7 |
-| Synth / Analog Toys | -18.5 | -3.0 | -18.5 | -2.3 |
+| Techno / Warehouse | -19.1 | -1.9 | -19.3 | -1.8 |
+| Techno / Industrial Grind | -18.1 | -4.2 | -18.3 | -3.9 |
+| Techno / Dub Chords | -19.6 | -1.7 | -19.7 | -1.3 |
+| House / Deep Garage | -20.2 | -1.8 | -20.4 | -1.4 |
+| House / Nine-O-Nine Box | -17.8 | -2.3 | -18.7 | -2.3 |
+| Electro / Miami Bass | -18.0 | -4.4 | -18.2 | -4.2 |
+| Electro / Robot Funk | -18.0 | -3.0 | -18.3 | -2.7 |
+| Drum Machine / Straight Boom | -18.1 | -3.1 | -18.4 | -2.8 |
+| Hip-Hop / Dusty Boom Bap | -17.7 | -2.3 | -18.3 | -2.3 |
+| Hip-Hop / Trap Sub | -18.1 | -4.2 | -18.2 | -3.7 |
+| Breaks / Jungle Roller | -19.8 | -2.5 | -19.9 | -2.3 |
+| Breaks / Big Beat | -18.4 | -2.2 | -18.4 | -2.9 |
+| Minimal / Micro Clicks | -20.8 | -2.4 | -21.2 | -2.4 |
+| IDM / Glitch Lab | -19.3 | -2.3 | -19.1 | -2.4 |
+| Dub / Echo Chamber | -18.0 | -1.6 | -18.3 | -1.6 |
+| Acoustic / Studio Kit | -18.2 | -3.8 | -18.2 | -4.1 |
+| Acoustic / Brush Jazz | -18.1 | -2.5 | -18.3 | -3.1 |
+| Lo-Fi / Bitcrushed Tape | -17.9 | -2.1 | -18.3 | -2.1 |
+| Percussion / Afro-Latin | -18.3 | -4.2 | -18.4 | -4.3 |
+| Synth / Analog Toys | -18.3 | -2.5 | -18.5 | -3.1 |
 
 ## Model choices (not in the manual)
 
@@ -251,15 +251,15 @@ Two runs at 44.1 kHz on the instrument output: `audition` plays each kit's demo 
 | Machine DSP | Each machine is modelled on the firmware's machine functions (rytm-mods): the two-oscillator circuit on BD, SD, RS and CP; the tuned resonator on the toms; the six-square hat bank (TR-808 ratios); and the cymbal and cowbell bank. Where no source gives absolute curves (Hz, ms), they are tuned by ear |
 | Hat metal | The six squares feed a ringing band-pass (Q about 3.3) and a high-pass, so their edges blend into a sizzle rather than single-sample spikes |
 | Digital clicks | TIC, TRA and the snare and rim ticks use one smooth 0.5 ms tick (CLICK) and a 0.35 ms push (BUMP). Both are defined in time, so they sound the same at 44.1 and 48 kHz |
-| Attack | AMP ATK 0 is a 0.4 ms ramp, as fast as the circuit allows |
-| Retrigger | A trig on a sounding voice crossfades: the old sound's offset fades out over 1.3 ms and the new sound fades in over 0.3 ms (raised cosines). The amp carries on from its level, as on the hardware |
+| Attack | AMP ATK 0 is a 0.4 ms linear ramp |
+| Retrigger | A trig on a sounding voice crossfades: the old sound's offset fades out over 1.3 ms and the new sound fades in over 0.3 ms (raised cosines). The amp carries on from its current level |
 | STOP | Every voice fades out over about 5 ms; the delay and reverb ring on |
 | Output | AC coupled: a 5 Hz high-pass after the returns, so asymmetric kicks leave no DC |
 | Filter | A Simper state-variable filter. FRQ moves one semitone per step, with 440 Hz at 60. A moving cutoff glides sample by sample |
 | Compressor | The rytm-mods calibrated model: a SEQ-filtered peak detector, a softplus curve per RAT, and ballistics from ATK and REL. Makeup is about 0.6 dB per step up to 48, and VOL follows a measured table. The output gain is smoothed by two one-pole stages |
 | Reverb | The studio's Reverb2 (FDN), not the Rytm's algorithm |
 | Samples | 32 synthesized one-shots (kick, snare, hats, percussion, noise) stand in for the +Drive sample library |
-| Trig LEN with AMP HLD 0 | The amp holds for the trig's length. The manual describes this hold only for pads |
+| Trig LEN with AMP HLD AUTO | The amp holds for the trig's length. The manual describes AUTO only for pads |
 
 ## Simplified or not modelled
 
