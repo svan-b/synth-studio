@@ -341,3 +341,18 @@ foundations 6, sound design 3, ear training 5, sequencing 3, performance 1, stud
 that grades a divisor uses tolerance 0.03. RESET, NEXT and TRIGGER steps count presses (lesson API v3).
 Synced to the studio, PLAY runs on the studio's 16th notes, so the TEMPO comparisons are Listen steps
 (auditions run on the internal clock).
+
+## Measured in the app
+
+A Playwright check against a production build (headless Chromium, 44.1 kHz) measures the running
+instrument, not the code. Step times are read from the panel's step events on the main thread, so
+they carry a few milliseconds of jitter.
+
+| What | Result |
+|---|---|
+| Subharmonic ratios (AnalyserNode FFT peak, each sub alone against its VCO alone) | ÷2, ÷3, ÷5, ÷7, ÷12, ÷16 on both VCOs: every ratio within 0.12 % of the divisor (the FFT's resolution at the 25-45 Hz subs) |
+| QUANTIZE on the VCO FREQ knob | a 500 Hz knob setting sounds at 494.1 Hz in 12-ET (B4 = 493.9 Hz, plus the ±1.5 cent drift), 500.1 Hz with QUANTIZE off |
+| Polyrhythm (÷3 on Sequencer 1 against ÷4 on Sequencer 2) | 16 steps against 12 in 6 s: 4 : 3 |
+| Studio ▶ at the studio tempo (16th-note master pulse) | step intervals 371 / 500 ms at 120 BPM (375 / 500 expected), 500 / 667 ms at 90 BPM (500 / 667) |
+| Studio Clock CLOCK → CLOCK IN (CLOCK DIV 1/8) | ÷1 steps every 129 ms synced (125 expected), every 249 ms on the cable (250): the cable takes over |
+| Every preset makes sound | all 36, under the studio transport and under the audition |
