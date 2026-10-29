@@ -329,8 +329,8 @@ every recording a lesson uses (both sides of an A/B) and fails a step whose reco
 missing, silent or doesn't stop.
 
 In the Producer path the hooks of L1 (the demo's drums), L3 (its kick and bass), L4 (Three
-Clocks), L5, L6, L8, L12 and L15 (all three demos in turn) are `info.play`, and L2 (straight
-against swung, with ghost notes), L7 (as made against muddy: every high-pass off, the low mids
-up), L9 (dry against as
-made), L11 (everything against the drums alone), L13 (as made against the drums 6 dB down) and
-L14 (its master against the same mix pushed 9 dB into the limiter) are `listen.demo`.
+Clocks), L5, L6, L8, L12 and L15 (all three demos in turn) are `info.play`. Those of L2
+(straight against swung, with ghost notes), L7 (as made against muddy: every high-pass off, the
+low mids up), L9 (dry against as made), L11 (everything against the drums alone), L13 (as made
+against the drums 6 dB down) and L14 (its master against the same mix pushed 9 dB into the
+limiter) are `listen.demo`.
