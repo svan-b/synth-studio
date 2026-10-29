@@ -25,7 +25,7 @@ export interface SoundDef {
   recreates?: string;
   /** Changes from the init sound (keys of params.ts SYNTH_PARAMS) */
   p: SoundParams;
-  /** Keyboard octave that suits it (-3..+3, default +1 = C4 on the C key) */
+  /** Keyboard register that suits it: the C key plays MIDI 48 + 12 x oct (default +1: C4) */
   oct?: number;
   /** A short phrase for auditions: [step, note, len index] */
   demo?: [number, number, number][];

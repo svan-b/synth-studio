@@ -38,7 +38,7 @@ import {
 } from './params';
 import { KEYS, PX_PER_MM, TRIGS, TRIG_LEGENDS, KEYBOARD, KB_KEY, KB_KEYS, MODE_LEDS, OCT_LEDS, PAGE_LEDS, LOGO } from './geometry';
 import { SOUNDS, SOUND_CATEGORIES, type SoundDef } from './sounds';
-import { KITS, KIT_PROJECT_IDS, kitValues, projectFor, soundTrackValues } from './kits';
+import { KITS, KIT_PROJECT_IDS, SOUND_DEMO_BASE, kitValues, projectFor, soundTrackValues } from './kits';
 
 const TRACKS = SEQ_TRACKS;
 const k = PX_PER_MM;
@@ -210,6 +210,8 @@ const viewKey = (name: 'ARP' | 'NOTE' | 'PERF' | 'MIX' | 'TEMPO', label: string,
 });
 
 const lastTrackPress = { t: -1, at: 0 };
+/** The last [STOP] press: a quick second press while stopped fades the send effects (manual p.38) */
+const lastStopPress = { at: 0 };
 
 /** The held trig(s) of the active track, if any */
 function heldTrig(ctx: CustomRenderContext): { track: number; pattern: string; steps: number[]; first: Step | undefined } | null {
@@ -457,6 +459,11 @@ const KEYDEFS: Record<string, KeyDef> = {
     led: e => (!e.playing ? [COL.white, 0.5] : null),
     press: e => {
       if (e.func) { useFunc(e.ctx); copyPaste(e, 'paste'); return; }
+      const now = performance.now();
+      const quick = now - lastStopPress.at < 500;
+      lastStopPress.at = now;
+      // [STOP] cuts the sound, the send effects ring on; [STOP][STOP] fades them too (manual p.38)
+      if (!e.playing && quick) { e.ctx.sendEvent('a4:fxfade'); say(e.ctx, 'SEND FX FADED', 900); }
       e.ctx.setValue('play', false);
       if (e.ctx.values.live_rec) e.ctx.setValue('live_rec', false);
     },
@@ -1605,7 +1612,7 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
     useStudioStore.getState().setControlValues(ctx.instance, { kit_project_loaded: kp });
     const kit = KITS[kp - 2];
     if (kit) followKitTempo(ctx, kit.tempo);
-    if (proj) say(ctx, `PROJECT ${KIT_PROJECT_IDS[kp].toUpperCase()} LOADED`);
+    if (proj) say(ctx, kp >= SOUND_DEMO_BASE ? 'DEMO IN A01: PRESS PLAY' : `PROJECT ${KIT_PROJECT_IDS[kp].toUpperCase()} LOADED`);
   }, [kp, kpl, pending, ctx]);
 
   // LIVE RECORDING ends with playback (the studio transport may stop it)

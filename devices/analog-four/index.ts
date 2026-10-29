@@ -106,9 +106,11 @@ const analogFour: DeviceModule = {
     stereo: true,
     patterns: data => arrangerPatterns(data, SEQ_TRACKS),
   },
+  // A preview plays the selected pattern (a riff on the keyboard's track when it is empty) and ends
+  // like [STOP][STOP]: the sound is cut and the send effects fade (engine.ts startAudition)
   audition: api => {
-    api.event('seq:audition');
-    return () => api.event('seq:audition:stop');
+    api.event('a4:audition');
+    return () => api.event('a4:audition:stop');
   },
   tips: [
     'Pick a track with T1-T4 (FX, CV), a page with OSC 1, OSC 2, FILTER, AMP, ENV or LFO, and turn knobs A-J: the screen shows what each one does. Press a lit page key again for its second page (NOISE, OSC 1&2, ENV 2, LFO 2).',

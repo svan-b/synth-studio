@@ -144,7 +144,7 @@ presets.init = {
 SOUNDS.forEach(s => {
   presets[`sound-${s.id}`] = {
     name: s.name,
-    description: `${s.desc}${s.recreates ? ` Recreation of ${s.recreates}.` : ''} Loads on track 1 (the other tracks get the init sound; patterns are kept). Use [SND] to load a sound into any track without touching the others.`,
+    description: `${s.desc}${s.recreates ? ` Recreation of ${s.recreates}.` : ''} Loads on track 1 with a one-bar demo in pattern A01 (the other tracks get the init sound, and the demo replaces the pattern memory, as a kit does). Use [SND] to load a sound into any track without touching the rest.`,
     source: 'community',
     author: 'Synth Studio',
     settings: soundPresetValues(s),

@@ -42,7 +42,14 @@ const KB_C1 = 72;
 
 /** a4-fxmod output channels driving the shared processors (must match the worklet) */
 const FXC = { CHO_RATE: 0, CHO_DEPTH: 1, CHO_DELAY: 2, CHO_FB: 3, CHO_WIDTH: 4, REV_PRE: 5, REV_DECAY: 6, REV_SIZE: 7, REV_DAMP: 8, REV_WIDTH: 9, REV_VOL: 23 };
-const FX_CHANNELS = 24;
+const FX_CHANNELS = 25;
+/** [STOP][STOP]: how long the send effects take to fade out */
+const FX_FADE_SEC = 0.3;
+/** A riff for an empty pattern's audition: [step, semitones from the keyboard's C, length in steps] */
+const AUDITION_RIFF: [number, number, number][] = [
+  [0, 0, 2], [2, 7, 1], [4, 12, 2], [6, 10, 1], [8, 7, 2], [10, 3, 1], [12, 5, 1], [14, 7, 2],
+  [16, 0, 2], [18, 7, 1], [20, 12, 2], [22, 15, 1], [24, 14, 3], [28, 12, 4],
+];
 
 function voiceOptions() {
   const mins: number[] = [], maxs: number[] = [], defs: number[] = [];
@@ -107,6 +114,9 @@ export class AnalogFourEngine extends BaseEngine {
   private lastStep: { step: number; time: number }[] = [];
   private transportUnsub: (() => void) | null = null;
   private recSerial = 0;
+  /** The audition in progress (a preview): its stop */
+  private auditionEnd: (() => void) | null = null;
+  private fxFaded = false;
 
   // --------------------------------------------------------------------------
 
@@ -184,10 +194,15 @@ export class AnalogFourEngine extends BaseEngine {
       onNoteOff: (track, _note, time) => this.gateOff(track, time),
       onStep: (track, step, time) => { const s = this.lastStep[track]; s.step = step; s.time = time; },
       onPlay: playing => {
-        if (!playing) {
-          this.locks.releaseAll((track, key) => this.revert(track, key, this.ctx.currentTime));
-          for (let t = 0; t < SYNTH_TRACKS; t++) this.stopArp(t, this.ctx.currentTime);
+        if (playing) { this.unfadeFx(); return; }
+        // [STOP] cuts the sound off; the send effects ring on (manual p.38). Keys still held keep playing.
+        const now = this.ctx.currentTime;
+        for (let t = 0; t < SYNTH_TRACKS; t++) {
+          if (this.liveNote[t] !== null || this.arps[t]?.live) continue;
+          this.arps[t] = null;
+          this.voices[t].port.postMessage({ t: 'cut' });
         }
+        this.locks.releaseAll((track, key) => this.revert(track, key, now));
       },
     });
     this.seq.subscribe(s => this.emit({ seq: s, playing: s.playing }));
@@ -546,6 +561,7 @@ export class AnalogFourEngine extends BaseEngine {
   private liveOn(note: number) {
     const t = this.activeTrack();
     if (t >= SYNTH_TRACKS) return;
+    this.unfadeFx();
     const time = this.ctx.currentTime + 0.004;
     const n = Math.max(0, Math.min(127, note));
     const held = this.held[t];
@@ -615,6 +631,57 @@ export class AnalogFourEngine extends BaseEngine {
       case 'panic':
         for (let t = 0; t < SYNTH_TRACKS; t++) { this.held[t] = []; this.liveNote[t] = null; this.stopArp(t, this.ctx.currentTime); this.voices[t].port.postMessage({ t: 'reset' }); }
         break;
+      // [STOP][STOP] while stopped: the send effects fade out (manual p.38)
+      case 'a4:fxfade': this.fadeFx(); break;
+      case 'a4:audition': this.startAudition(); break;
+      case 'a4:audition:stop': this.auditionEnd?.(); break;
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // Send-FX fade, auditions
+  // --------------------------------------------------------------------------
+
+  private fadeFx() {
+    this.fxFaded = true;
+    this.fxmod.port.postMessage({ t: 'fade', dur: FX_FADE_SEC });
+  }
+
+  private unfadeFx() {
+    if (!this.fxFaded) return;
+    this.fxFaded = false;
+    this.fxmod.port.postMessage({ t: 'unfade' });
+  }
+
+  /**
+   * A preview (lessons, the preset browser, audio QA): the pattern from its
+   * start, as [PLAY] would play it; an empty pattern plays a riff on the
+   * keyboard's track instead. The preview ends like [STOP][STOP]: the sound is
+   * cut and the send effects fade.
+   */
+  private startAudition() {
+    this.auditionEnd?.();
+    if (this.seq.getState().playing) return; // already playing: nothing to preview
+    this.unfadeFx();
+    const p = asProject(this.data, SEQ_TRACKS);
+    const pat = getPattern(p, p.active);
+    const hasTrigs = pat.tracks.slice(0, SYNTH_TRACKS).some((tr, t) => !this.seq.isMuted(t) && !tr.mute && Object.values(tr.steps).some(s => s && !s.trigless));
+    if (hasTrigs) {
+      const stop = this.seq.audition();
+      this.auditionEnd = () => { this.auditionEnd = null; stop(); this.fadeFx(); };
+      return;
+    }
+    const t = this.activeTrack();
+    const v = this.voices[t];
+    const stepSec = 60 / this.bpm() / 4;
+    const t0 = this.ctx.currentTime + 0.03;
+    const root = KB_C1 + 12 * this.octave();
+    const vel = this.trackVel(t);
+    for (const [step, semis, len] of AUDITION_RIFF) {
+      const note = Math.max(0, Math.min(127, root + semis));
+      v.port.postMessage({ t: 'on', time: t0 + step * stepSec, note, vel, acc: 0, slide: false });
+      v.port.postMessage({ t: 'off', time: t0 + (step + len) * stepSec - 0.002 });
+    }
+    this.auditionEnd = () => { this.auditionEnd = null; v.port.postMessage({ t: 'cut' }); this.fadeFx(); };
   }
 }

@@ -272,6 +272,7 @@ class A4Voice extends AudioWorkletProcessor {
     this.g1 = 0.5; this.g2 = 0.5; this.dt1 = 0.005; this.dt2 = 0.005;
     this.idle = true;
     this.velMod = this.vel;
+    this.cutLeft = 0; this.cutN = 1;   // STOP: control blocks left of the cut-off fade
     this.nb = 8; // control blocks per quantum
     this.alloc(128);
     this.port.onmessage = e => this.msg(e.data);
@@ -305,8 +306,21 @@ class A4Voice extends AudioWorkletProcessor {
         this.q.length = 0; this.ramps.length = 0;
         if (this.gate) this.noteOff();
         break;
+      case 'cut':
+        // [STOP]: the sound is cut off (manual p.38); nothing queued ahead may sound after it
+        this.q.length = 0; this.ramps.length = 0;
+        this.gate = false;
+        if (!this.idle || this.envA.stage !== 0) { this.cutN = Math.max(1, Math.round((0.006 * sampleRate) / BLOCK)); this.cutLeft = this.cutN; }
+        break;
       default: enqueue(this.q, m);
     }
+  }
+
+  /** The end of a cut: every envelope at rest, no gate */
+  silence() {
+    for (const e of [this.envA, this.envF, this.env2]) { e.v = 0; e.stage = 0; e.gate = false; e.pending = false; e.gateEnd = Infinity; }
+    this.gate = false;
+    this.glideTime = 0;
   }
 
   E(i) {
@@ -316,6 +330,7 @@ class A4Voice extends AudioWorkletProcessor {
 
   noteOn(ev, now) {
     const I = this.I, P = this.P;
+    if (this.cutLeft > 0) { this.cutLeft = 0; this.silence(); }
     const wasGate = this.gate;
     this.note = ev.note;
     this.vel = Math.max(1, ev.vel) / 127;
@@ -707,6 +722,11 @@ class A4Voice extends AudioWorkletProcessor {
       this.bOn[b] = 1;
       any = true;
       const ea = this.control(now, dtBlock, b);
+      if (this.cutLeft > 0) {
+        this.cutLeft--;
+        this.bGain[b + 1] *= this.cutLeft / this.cutN;
+        if (this.cutLeft === 0) this.silence();
+      }
       if (this.envA.stage === 0 && ea <= 1e-5 && !this.gate) this.idle = true;
     }
     // carry the last targets into the next quantum
@@ -829,9 +849,9 @@ const FXC = {
   CHO_RATE: 0, CHO_DEPTH: 1, CHO_DELAY: 2, CHO_FB: 3, CHO_WIDTH: 4,
   REV_PRE: 5, REV_DECAY: 6, REV_SIZE: 7, REV_DAMP: 8, REV_WIDTH: 9,
   DEL_TIME: 10, DEL_X: 11, DEL_WID: 12, DEL_FB: 13, DEL_HP: 14, DEL_LP: 15, DEL_DRIVE: 16, DEL_TOREV: 17, DEL_VOL: 18,
-  CHO_TODEL: 19, CHO_TOREV: 20, CHO_VOL: 21, RET: 22, REV_VOL: 23,
+  CHO_TODEL: 19, CHO_TOREV: 20, CHO_VOL: 21, RET: 22, REV_VOL: 23, FADE: 24,
 };
-const FX_CHANNELS = 24;
+const FX_CHANNELS = 25;
 // AudioParam minimums the outputs are offset against (the params' intrinsic value is set to these)
 const FX_MIN = { 0: 0.01, 1: 0, 2: 0.0005, 3: -0.95, 4: 0, 5: 0, 6: 0.1, 7: 0, 8: 200, 9: 0 };
 
@@ -860,9 +880,12 @@ class A4FxMod extends AudioWorkletProcessor {
         dst: [I[pre + 'dsta'], I[pre + 'dstb']], dep: [I[pre + 'depa'], I[pre + 'depb']] };
     });
     this.val = new Float64Array(FX_CHANNELS);
+    this.fade = 1; this.fadeTo = 1; this.fadeSec = 0.3;
     this.port.onmessage = e => {
       const m = e.data;
-      if (m.t === 'p') { const l = m.list; for (let k = 0; k < l.length; k += 2) this.P[l[k]] = l[k + 1]; }
+      if (m.t === 'fade') { this.fadeTo = 0; this.fadeSec = m.dur || 0.3; }
+      else if (m.t === 'unfade') { this.fadeTo = 1; this.fadeSec = m.dur || 0.02; }
+      else if (m.t === 'p') { const l = m.list; for (let k = 0; k < l.length; k += 2) this.P[l[k]] = l[k + 1]; }
       else if (m.t === 'off2') { this.O.fill(0); const l = m.list; for (let k = 0; k < l.length; k += 2) this.O[l[k]] = l[k + 1]; }
       else if (m.t === 'bpm') this.bpm = m.v;
       else enqueue(this.q, m);
@@ -934,7 +957,12 @@ class A4FxMod extends AudioWorkletProcessor {
     val[FXC.CHO_VOL] = sq(E('cho_vol'));
     const lvl = E('level') / 127;
     val[FXC.RET] = lvl * lvl * 1.6;
-    val[FXC.REV_VOL] = sq(E('rev_vol')) * val[FXC.RET];
+    // the send-FX fade: the reverb return follows it, and a faded reverb empties fast
+    const fs = dt / Math.max(0.005, this.fadeSec);
+    this.fade = this.fadeTo > this.fade ? Math.min(this.fadeTo, this.fade + fs) : Math.max(this.fadeTo, this.fade - fs);
+    val[FXC.FADE] = this.fade;
+    val[FXC.REV_VOL] = sq(E('rev_vol')) * val[FXC.RET] * this.fade;
+    if (this.fade <= 0) val[FXC.REV_DECAY] = FX_MIN[6];
     for (let c = 0; c < FX_CHANNELS && c < out.length; c++) {
       const x = val[c] - (FX_MIN[c] || 0);
       out[c].fill(x);
@@ -956,6 +984,7 @@ class A4Fx extends AudioWorkletProcessor {
     this.len = Math.ceil(sr * 4);
     this.dL = new Float32Array(this.len); this.dR = new Float32Array(this.len);
     this.w = 0; this.time = 0.375 * sr; this.lpL = 0; this.lpR = 0; this.hpL = 0; this.hpR = 0;
+    this.fd = 1; this.empty = false;
   }
   read(buf, w, d) {
     let pos = w - d;
@@ -974,6 +1003,12 @@ class A4Fx extends AudioWorkletProcessor {
     const X = pv(FXC.DEL_X) > 0.5, wid = pv(FXC.DEL_WID), fbk = pv(FXC.DEL_FB), hp = pv(FXC.DEL_HP), lp = pv(FXC.DEL_LP) || 1;
     const drive = pv(FXC.DEL_DRIVE) || 1, dNorm = 1 / Math.sqrt(drive);
     const toRev = pv(FXC.DEL_TOREV), dVol = pv(FXC.DEL_VOL), cToD = pv(FXC.CHO_TODEL), cToR = pv(FXC.CHO_TOREV), cVol = pv(FXC.CHO_VOL), ret = pv(FXC.RET);
+    const fdTo = par && par[FXC.FADE] ? par[FXC.FADE][0] : 1;
+    if (fdTo <= 0 && this.fd <= 0) {
+      if (!this.empty) { this.dL.fill(0); this.dR.fill(0); this.lpL = this.lpR = this.hpL = this.hpR = 0; this.empty = true; }
+    } else this.empty = false;
+    let fd = this.fd;
+    const fdStep = (fdTo - fd) / OL.length;
     const sD = sends && sends[1], sR = sends && sends[2];
     const cL = cho && cho[0], cR = cho && (cho[1] || cho[0]);
     const dLi = dry && dry[0], dRi = dry && (dry[1] || dry[0]);
@@ -994,12 +1029,14 @@ class A4Fx extends AudioWorkletProcessor {
       dl[w] = din + fl;
       dr[w] = (X ? 0 : din) + fr;
       w = w + 1 >= len ? 0 : w + 1;
+      fd += fdStep;
       const rs = (sR ? sR[i] : 0);
-      RL[i] = rs + chl * cToR + eL * toRev;
-      RR[i] = rs + chr * cToR + eR * toRev;
-      OL[i] = (dLi ? dLi[i] : 0) + (chl * cVol + eL * dVol) * ret;
-      OR[i] = (dRi ? dRi[i] : 0) + (chr * cVol + eR * dVol) * ret;
+      RL[i] = (rs + chl * cToR + eL * toRev) * fd;
+      RR[i] = (rs + chr * cToR + eR * toRev) * fd;
+      OL[i] = (dLi ? dLi[i] : 0) + (chl * cVol + eL * dVol) * ret * fd;
+      OR[i] = (dRi ? dRi[i] : 0) + (chr * cVol + eR * dVol) * ret * fd;
     }
+    this.fd = fdTo;
     lpL = flush(lpL); lpR = flush(lpR); hpL = flush(hpL); hpR = flush(hpR);
     if (!Number.isFinite(lpL + lpR + hpL + hpR + time)) { dl.fill(0); dr.fill(0); lpL = lpR = hpL = hpR = 0; time = tgt; }
     this.w = w; this.time = time; this.lpL = lpL; this.lpR = lpR; this.hpL = hpL; this.hpR = hpR;

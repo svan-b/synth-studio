@@ -19,7 +19,7 @@ import {
   createPattern, createProject, LEN_1_STEP, type Locks, type Pattern, type Project, type SongRow, type Step,
 } from '@/lib/sequencer/elektron';
 import { SEQ_TRACKS, SYNTH_BY_KEY, FX_BY_KEY, V, dest, tid, fxid } from './params';
-import { SOUND_BY_ID, type SoundDef, type SoundParams } from './sounds';
+import { SOUNDS, SOUND_BY_ID, type SoundDef, type SoundParams } from './sounds';
 import { withPatternArp } from './arp';
 
 // Note-length indices (NOTE_LENGTHS): steps -> index
@@ -443,22 +443,40 @@ export const KITS: KitDef[] = [
 ];
 
 export const KIT_BY_ID: Record<string, KitDef> = Object.fromEntries(KITS.map(k => [k.id, k]));
-/** Option list of the hidden `kit_project` switch: 0 = none, 1 = an empty project, then the kits */
-export const KIT_PROJECT_IDS = ['---', 'init', ...KITS.map(k => k.id)];
+/** Option list of the hidden `kit_project` switch: 0 = none, 1 = an empty project, the kits, then one demo per sound */
+export const KIT_PROJECT_IDS = ['---', 'init', ...KITS.map(k => k.id), ...SOUNDS.map(s => `sound-${s.id}`)];
+/** First `kit_project` index of the sound demos */
+export const SOUND_DEMO_BASE = 2 + KITS.length;
+
+/** A sound's demo: pattern A01, one bar, the sound's phrase on track 1 */
+export function soundDemoProject(s: SoundDef): Project {
+  const p = createPattern(SEQ_TRACKS, { name: 'DEMO', length: 16, swing: 50 });
+  const steps: Record<number, Step> = {};
+  for (const [step, note, len] of s.demo ?? [[0, 60, LEN_1_STEP]]) steps[step] = { note, len };
+  p.tracks[0].steps = steps;
+  return project({ A01: p });
+}
 
 /** The project a `kit_project` index loads (null for 0) */
 export function projectFor(index: number): Project | null {
   if (index <= 0) return null;
   if (index === 1) return project({});
+  if (index >= SOUND_DEMO_BASE) {
+    const s = SOUNDS[index - SOUND_DEMO_BASE];
+    return s ? soundDemoProject(s) : null;
+  }
   const kit = KITS[index - 2];
   return kit ? kit.project() : null;
 }
 
-/** Preset settings of a single sound: it goes to track 1 (the rest of the kit takes its defaults) */
+/**
+ * Preset settings of a single sound: it goes to track 1 (the rest of the kit takes its defaults) with a
+ * one-bar demo in A01, and the keyboard moves to the sound's register (the C key plays MIDI 48 + 12 x oct).
+ */
 export function soundPresetValues(s: SoundDef): Record<string, number> {
-  const out: Record<string, number> = { track: 0, page: V.OSC1 };
+  const out: Record<string, number> = { track: 0, page: V.OSC1, kit_project: SOUND_DEMO_BASE + SOUNDS.indexOf(s) };
   for (const [k, v] of Object.entries(s.p)) out[tid(0, k)] = v;
-  if (s.oct !== undefined) out.kb_oct = s.oct + 3;
+  out.kb_oct = (s.oct ?? 1) + 3;
   return out;
 }
 
