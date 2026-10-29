@@ -2059,6 +2059,307 @@ test('song row edits: add, update, mute and remove pattern positions (the row ke
 });
 
 // ============================================================================
+section('Manual: mutes, solo, MIDI clock and transport (A4 MKII p.16, p.27, p.37-39, p.56, p.58; Rytm MKII p.23, p.37, p.55, p.61)');
+
+test('track mutes are global: kept when the pattern changes, saved with the project (A4 p.16, p.37; Rytm p.23)', () => {
+  let p = setStep(threePatterns(), 'A02', 1, 0, { note: 8 });
+  p = setStep(p, 'A01', 1, 4, { note: 7 });
+  p = setPlayMode(setChain(setMasterMute(p, 1, true), ['A01', 'A02']), 'chain');
+  eq(p.mutes, [1]);
+  const r = rig(p);
+  r.seq.start();
+  r.clock.advance(T0 + 3 * 24 * STEP120);
+  eq(r.trigs.filter(e => e.track === 1).length, 0, 'track 2 silent in A01 and A02');
+  ok(r.trigs.filter(e => e.track === 0).length >= 4, 'track 1 plays');
+  ok(r.seq.isMuted(1) && !r.seq.isMuted(0), 'isMuted');
+  eq(migrateProject(JSON.parse(JSON.stringify(p)), 2).mutes, [1], 'saved');
+  eq(setMasterMute(p, 1, false).mutes, undefined, 'unmuted');
+  eq(setMasterMutes(p, [3, 0, 0, 9]).mutes, [0], 'all at once, clamped to the tracks');
+});
+
+const MUTE_LAYERS: { master: boolean; song: boolean; trig: boolean }[] = [
+  { master: false, song: false, trig: false },
+  { master: true, song: false, trig: false },
+  { master: false, song: true, trig: false },
+  { master: false, song: false, trig: true },
+  { master: true, song: true, trig: true },
+];
+for (const c of MUTE_LAYERS) {
+  const plays = !c.master && !c.song && !c.trig;
+  test(`mute layers: master ${c.master ? 'on' : 'off'}, song ${c.song ? 'on' : 'off'}, trig ${c.trig ? 'on' : 'off'} -> ${plays ? 'plays' : 'silent'} (master mutes override trig and song mutes, Rytm p.23)`, () => {
+    let p = proj(1, { 0: { 0: c.trig ? { mute: true } : {} } }, { length: 4 });
+    p = songAddRow(p, { pattern: 'A01', repeats: 1, mutes: c.song ? [0] : [] });
+    p = setPlayMode(c.master ? setMasterMute(p, 0, true) : p, 'song');
+    const r = rig(p);
+    r.seq.start();
+    r.clock.advance(T0 + 2 * STEP120);
+    eq(r.trigs.length, plays ? 1 : 0);
+  });
+}
+
+const SOLOS: { solo: number[]; master?: number[]; plays: number[] }[] = [
+  { solo: [], plays: [0, 1, 2] },
+  { solo: [1], plays: [1] },
+  { solo: [0, 2], plays: [0, 2] },
+  { solo: [2], master: [2], plays: [] },
+];
+for (const c of SOLOS) {
+  test(`solo [${c.solo.map(t => t + 1).join(', ')}]${c.master ? ' + master mute' : ''}: tracks [${c.plays.map(t => t + 1).join(', ')}] play (Rytm p.23: several tracks can be soloed)`, () => {
+    let p = proj(3, { 0: { 0: {} }, 1: { 0: {} }, 2: { 0: {} } }, { length: 4 });
+    if (c.master) p = setMasterMutes(p, c.master);
+    const r = rig(p);
+    c.solo.forEach(t => r.seq.handleEvent('seq:solo', { track: t }));
+    eq(r.seq.getState().solos, [0, 1, 2].map(t => c.solo.includes(t)));
+    r.seq.start();
+    r.clock.advance(T0 + 2 * STEP120);
+    eq(r.trigs.map(e => e.track), c.plays);
+  });
+}
+
+test('a mute preselection ([FUNC] held) takes effect all at once (Rytm p.23, A4 p.27)', () => {
+  const r = rig(proj(4, {}));
+  r.seq.handleEvent('seq:mutes', { mutes: [0, 2] });
+  eq(r.seq.getState().mutes, [true, false, true, false]);
+  r.seq.handleEvent('seq:mutes', { mutes: [false, true, false, false] });
+  eq(r.seq.getState().mutes, [false, true, false, false]);
+});
+
+/** Trigs as "track:pattern:step:note:loop@tick" of a run on a fake transport started at tick `from` */
+function transportFrom(p: Project, from: number, until: number): string[] {
+  const tr = new FakeTransport();
+  const r = rig(p);
+  r.seq.follow(tr);
+  tr.start(0, from);
+  tr.run(until - from);
+  return r.trigs.map(e => `${e.track}:${e.pattern}:${e.step}:${e.note}:${e.loop}@${(from + e.time / tr.dur).toFixed(3)}`);
+}
+const tickOf = (s: string) => Number(s.slice(s.indexOf('@') + 1));
+
+const CONTINUE_CASES: { name: string; project: () => Project; from: number[] }[] = [
+  {
+    name: 'PATTERN mode: lined up, and A:B / 1ST count the loops since tick 0',
+    project: () => proj(2, { 0: { 0: { cond: '1:2' }, 4: { cond: '2:3' }, 8: { cond: '!1ST' }, 12: {} }, 1: { 2: { cond: '1:4' }, 10: {} } }, { swing: 58 }),
+    from: [30, 96 * 3, 96 * 5 + 39],
+  },
+  {
+    name: 'PER TRACK: 5- and 7-step tracks under a 12-step master length',
+    project: () => {
+      let p = proj(2, { 0: { 0: { cond: '1:2' }, 2: {}, 4: { cond: '1:3' } }, 1: { 0: { cond: '2:3' }, 3: {}, 6: {} } }, { scaleMode: 'track', master: 12, change: 0 });
+      p = setTrackScale(setTrackScale(p, 'A01', 0, { length: 5 }), 'A01', 1, { length: 7 });
+      return p;
+    },
+    from: [72 + 10, 72 * 4 + 30, 72 * 7 + 66],
+  },
+  {
+    name: 'CHAIN mode: the right chain entry and step, in later passes too',
+    project: () => setPlayMode(setChain(setStep(threePatterns(), 'B03', 1, 6, { cond: '!1ST' }), ['A01', 'A02', 'B03']), 'chain'),
+    from: [100, 96 + 48 + 50, 240 * 2 + 10, 240 * 3 + 96 + 3],
+  },
+  {
+    name: 'SONG mode: the right row, repeat and pattern position, after the song looped too',
+    project: () => setSongLoop(chainSong(), true, 1),
+    from: [100, 300, 500, 528 + 20, 528 + 48 * 3 + 7],
+  },
+];
+for (const c of CONTINUE_CASES) {
+  test(`continue / song position: ${c.name} - as if it had played from tick 0 (A4 p.58, Rytm p.61)`, () => {
+    const until = Math.max(...c.from) + 300;
+    const all = transportFrom(c.project(), 0, until);
+    for (const from of c.from) eq(transportFrom(c.project(), from, until), all.filter(s => tickOf(s) >= from), `from tick ${from}`);
+  });
+}
+
+test('continue past the end of a song without loop: it stays silent (A4 p.55, Rytm p.53)', () => {
+  eq(transportFrom(chainSong(), 600, 900), []);
+  eq(transportFrom(chainSong(), 470, 900).map(tickOf), [480, 480], 'before the end: the last row still plays');
+});
+
+test('song position while playing (locate): the song re-lines up at once (A4 p.58, Rytm p.61)', () => {
+  const p = setSongLoop(chainSong(), true);
+  const tr = new FakeTransport();
+  const tickAt = new Map<string, number>();
+  tr.onTick(t => { tickAt.set(t.time.toFixed(9), t.tick); });
+  const r = rig(p);
+  r.seq.follow(tr);
+  tr.start(0);
+  tr.run(200);
+  const n = r.trigs.length;
+  tr.locate(336 + 12);
+  tr.run(400);
+  const after = r.trigs.slice(n).map(e => `${e.track}:${e.pattern}:${e.step}:${e.note}@${tickAt.get(e.time.toFixed(9))}`);
+  const ref = transportFrom(p, 0, 748).filter(s => tickOf(s) >= 348).map(s => s.replace(/:\d+@/, '@').replace(/\.000$/, ''));
+  eq(after, ref);
+});
+
+test('[PLAY] while playing pauses, [PLAY] again resumes from the same position; [STOP] then [PLAY] starts over (A4 p.38-39, Rytm p.37)', () => {
+  const r = rig(proj(1, { 0: Object.fromEntries([0, 2, 4, 6, 8, 10, 12, 14].map(s => [s, { len: 46 }])) }));
+  r.seq.start();
+  r.clock.advance(T0 + 5 * STEP120);
+  ok(r.seq.pause(), 'paused');
+  const n = r.trigs.length;
+  eq([r.seq.playing, r.seq.getState().paused, r.seq.isPaused], [false, true, true]);
+  eq(r.offs.length, n, 'sounding notes released');
+  r.clock.advance(3);
+  eq(r.trigs.length, n, 'silent while paused');
+  ok(r.seq.handleEvent('seq:resume') && r.seq.playing, 'resumed');
+  r.clock.advance(1);
+  eq(r.trigs.map(e => e.step), [0, 2, 4, 6, 8, 10, 12, 14].slice(0, r.trigs.length), 'carries on with the next steps');
+  const resumedAt = r.trigs[n].time;
+  ok(resumedAt > T0 + 3, 'after the pause');
+  near(r.trigs[n + 1].time - resumedAt, 2 * STEP120, 1e-9, 'same grid');
+  eq(r.plays.map(x => x.playing), [true, false, true]);
+  r.seq.pause();
+  const m = r.trigs.length;
+  r.seq.start();
+  r.clock.advance(0.2);
+  eq([r.trigs[m].step, r.trigs[m].loop], [0, 0], 'start after a pause plays from the top');
+  eq(r.plays.map(x => x.playing), [true, false, true, false, true]);
+});
+
+// ============================================================================
+section('Manual: copy, paste and clear - patterns, tracks, track pages, trigs (A4 MKII p.38, p.40, p.54, p.84; Rytm MKII p.37, p.39, p.51, p.75)');
+
+test('pattern: copy, paste to another slot (a deep copy), paste back what was there = undo, clear (A4 p.54, Rytm p.51)', () => {
+  const p = proj(2, { 0: { 0: { locks: { cut: 3 } }, 4: {} } });
+  const clip = copyPattern(p, 'A01');
+  const before = copyPattern(p, 'C05');
+  const q = pastePattern(p, 'C05', clip);
+  eq(trigSteps(q, 'C05', 0), [0, 4]);
+  ok(q.patterns.C05.tracks[0].steps[0] !== p.patterns.A01.tracks[0].steps[0], 'deep copy');
+  eq(pastePattern(q, 'C05', before).patterns.C05, undefined, 'undo: the slot was empty');
+  eq(clearPattern(q, 'A01').patterns.A01, undefined);
+});
+
+test('track: copy, paste over another track (trigs, locks and track settings), clear (A4 p.54, Rytm p.51)', () => {
+  let p = proj(3, { 0: { 1: { note: 50, locks: { cut: 1 } }, 9: {} } });
+  p = setTrackProb(p, 'A01', 0, 40);
+  const clip = copyTrack(p, 'A01', 0)!;
+  const q = pasteTrack(p, 'B02', 2, clip);
+  eq([trigSteps(q, 'B02', 2), getStep(q, 'B02', 2, 1)?.locks?.cut, q.patterns.B02.tracks[2].prob], [[1, 9], 1, 40]);
+  eq(trigSteps(clearTrack(q, 'B02', 2), 'B02', 2), []);
+  eq(copyTrack(p, 'H16', 0), null, 'an empty slot copies nothing');
+});
+
+test('track page: copy page 1, paste it on page 3, clear page 3 (A4 p.54, Rytm p.51)', () => {
+  let p = proj(1, { 0: { 0: {}, 5: { note: 40 }, 15: {}, 16: {}, 40: { note: 9 } } }, { length: 64 });
+  const clip = copyPage(p, 'A01', 0, 0);
+  eq(Object.keys(clip), ['0', '5', '15']);
+  p = pastePage(p, 'A01', 0, 2, clip);
+  eq(trigSteps(p, 'A01', 0), [0, 5, 15, 16, 32, 37, 47], 'page 3 replaced (its trig on step 41 is gone)');
+  eq(trigSteps(clearPage(p, 'A01', 0, 2), 'A01', 0), [0, 5, 15, 16]);
+});
+
+test('trigs with all their locks: pasted in the same relation to each other, the destination trig is the start (A4 p.54, Rytm p.51)', () => {
+  let p = proj(1, { 0: { 2: { locks: { cut: 1 } }, 3: {}, 6: { note: 70 }, 12: {} } });
+  const clip = copyTrigs(p, 'A01', 0, [1, 2, 3, 4, 5, 6]); // held keys 2-7: the first trig is on key 3
+  eq(Object.keys(clip), ['0', '1', '4']);
+  p = pasteTrigs(p, 'A01', 0, 9, clip);
+  eq(trigSteps(p, 'A01', 0), [2, 3, 6, 9, 10, 12, 13], 'steps between the pasted trigs are left alone (13 stays)');
+  eq([getStep(p, 'A01', 0, 9)?.locks?.cut, getStep(p, 'A01', 0, 13)?.note], [1, 70]);
+  eq(trigSteps(pasteTrigs(p, 'A01', 0, 62, clip), 'A01', 0).filter(s => s >= 62), [62, 63], 'clipped at step 64');
+});
+
+test('clear trig locks: the held trigs lose their parameter locks and keep their trigs (A4 p.54, Rytm p.51)', () => {
+  const p = proj(1, { 0: { 0: { locks: { a: 1 }, note: 50 }, 1: { trigless: true, locks: { b: 2 } } } });
+  const q = clearLocks(p, 'A01', 0, [0, 1]);
+  eq([getStep(q, 'A01', 0, 0), getStep(q, 'A01', 0, 1)], [{ note: 50 }, undefined], 'a lock trig without locks is removed');
+});
+
+const SHIFTS: { by: number; steps: number[] }[] = [
+  { by: 1, steps: [1, 5, 0] },
+  { by: -1, steps: [15, 3, 14] },
+  { by: 16, steps: [0, 4, 15] },
+];
+for (const c of SHIFTS) {
+  test(`trig shift ${c.by > 0 ? '+' : ''}${c.by}: every trig of the track moves, wrapping round the track length (A4 p.40, p.84; Rytm p.39, p.75)`, () => {
+    const p = proj(1, { 0: { 0: { note: 1 }, 4: { note: 2 }, 15: { note: 3 } } });
+    const q = shiftTrigs(p, 'A01', 0, c.by);
+    eq([1, 2, 3].map(n => Object.entries(q.patterns.A01.tracks[0].steps).find(([, s]) => s.note === n)![0]).map(Number), c.steps);
+  });
+}
+
+// ============================================================================
+section('Manual: lock budget, program changes, trig defaults, quantize, pattern tempo (A4 MKII p.39, p.45, p.47, p.50, p.59; Rytm MKII p.22, p.38, p.43, p.45, p.47)');
+
+const BUDGETS: { machine: string; limit: number }[] = [
+  { machine: 'Analog Four (A4 p.50)', limit: LOCK_LIMIT_A4 },
+  { machine: 'Analog Rytm (Rytm p.47)', limit: LOCK_LIMIT_RYTM },
+];
+for (const c of BUDGETS) {
+  test(`lock budget, ${c.machine}: ${c.limit} different parameters per pattern, each counted once however many trigs lock it`, () => {
+    let p = proj(2, {});
+    for (let i = 0; i < c.limit; i++) p = setLock(p, 'A01', 0, [i % 16], `k${i}`, 1);
+    p = setLock(p, 'A01', 0, [0, 1, 2, 3], 'k0', 5);
+    eq(lockedParamCount(p.patterns.A01), c.limit);
+    eq(setLock(p, 'A01', 0, [5], 'new', 1, { limit: c.limit }), p, 'one more parameter is refused');
+    eq(setLock(p, 'A01', 1, [5], 'k0', 1, { limit: c.limit }), p, 'the same parameter on another track counts again');
+    ok(setLock(p, 'A01', 0, [9], 'k3', 7, { limit: c.limit }) !== p, 'a parameter already locked can be locked on more trigs');
+    const api = fakeApi(p, { track: 0, t1_extra: 1 }, { heldSteps: [2] });
+    eq(interceptForLocks('t1_extra', 5, api, { ...LOCKS, lockLimit: c.limit }), true, 'the turn is swallowed');
+    eq(api.project(), p, 'and nothing is locked');
+  });
+}
+
+test('program change 0-127 selects A01-H16, PRG CH SEND sends the pattern number (Rytm p.22, A4 p.59)', () => {
+  for (const [pc, id] of [[0, 'A01'], [15, 'A16'], [16, 'B01'], [100, 'G05'], [127, 'H16']] as const) {
+    eq([patternFromProgram(pc), programOfPattern(id)], [id, pc]);
+  }
+  eq([patternFromProgram(128), patternFromProgram(-1), programOfPattern('Z01')], [null, null, -1]);
+  const r = rig(twoPatterns());
+  r.seq.handleEvent('seq:program', { program: 1 });
+  eq(r.seq.getState().queued, 'A02', 'a program change cues the pattern');
+});
+
+test('trig defaults: the A4 copies its NOTE menu values into each new trig, the Rytm TRIG page is a live default (A4 p.45, Rytm p.43)', () => {
+  let p = setTrackDefault(proj(1, {}), 'A01', 0, 'len', 30); // LEN 1/8
+  p = setStep(p, 'A01', 0, 0, trackTrigDefaults(p, 'A01', 0)); // A4 trig placed now
+  p = setTrackDefault(p, 'A01', 0, 'len', 46); // LEN 1/4 from now on
+  p = setStep(p, 'A01', 0, 4, trackTrigDefaults(p, 'A01', 0));
+  p = setStep(p, 'A01', 0, 8, {}); // Rytm-style trig: follows the TRIG page
+  const run = rig(p);
+  run.seq.start();
+  run.clock.advance(T0 + 16 * STEP120 - STEP120);
+  eq(run.trigs.map(e => e.duration / STEP120), [2, 4, 4]);
+  eq(trackTrigDefaults(p, 'A01', 0), { note: 60, vel: 100, len: 46 });
+});
+
+const QUANTIZE_CASES: { global: number; track: number; micro: number; heard: number }[] = [
+  { global: 0, track: 0, micro: 12, heard: 12 },
+  { global: 127, track: 0, micro: 12, heard: 0 },
+  { global: 0, track: 127, micro: -12, heard: 0 },
+  { global: 64, track: 0, micro: 12, heard: 6 },
+  { global: 64, track: 0, micro: -12, heard: -6 },
+  { global: 32, track: 96, micro: 12, heard: 3 },
+];
+for (const c of QUANTIZE_CASES) {
+  test(`quantize: GLOBAL ${c.global}, TRACK ${c.track}: micro ${c.micro} plays as ${c.heard}/24 step (A4 p.47, Rytm p.45: 0-127)`, () => {
+    let p = proj(1, { 0: { 4: { micro: c.micro } } }, { quantize: c.global });
+    p = setTrackQuantize(p, 'A01', 0, c.track);
+    const r = rig(p);
+    r.seq.start();
+    r.clock.advance(T0 + 8 * STEP120);
+    near(r.trigs[0].time, T0 + (4 + c.heard / 24) * STEP120, 1e-9);
+    eq(getStep(p, 'A01', 0, 4)?.micro, c.micro, 'non-destructive: the trig keeps its micro timing');
+  });
+}
+
+test('PATTERN tempo mode: each pattern brings its own tempo, PROJECT mode keeps one tempo (A4 p.39, Rytm p.38)', () => {
+  let p = updatePatternSettings(updatePatternSettings(threePatterns(), 'A01', { tempo: 100 }), 'A02', { tempo: 140 });
+  p = setPlayMode(setChain(p, ['A01', 'A02']), 'chain');
+  const project = rig(p);
+  project.seq.start();
+  project.clock.advance(5);
+  eq(project.tempos.length, 0, 'PROJECT tempo mode');
+  const pattern = rig(setTempoMode(p, 'pattern'));
+  pattern.seq.start();
+  pattern.clock.advance(6);
+  eq(pattern.tempos.slice(0, 3).map(x => x.bpm), [100, 140, 100]);
+  near(pattern.patterns[1].time - pattern.patterns[0].time, 16 * 60 / 100 / 4, 1e-6, 'A01 at 100 BPM');
+  near(pattern.patterns[2].time - pattern.patterns[1].time, 8 * 60 / 140 / 4, 1e-6, 'A02 (8 steps) at 140 BPM');
+  eq(updatePatternSettings(p, 'A01', { tempo: 0 }).patterns.A01.tempo, undefined, 'tempo 0 removes it');
+});
+
+// ============================================================================
 section('Hidden page (adaptive look-ahead)');
 
 /** A busy project: swing, micro timing both ways, retrigs, conditions (seeded), a 3-pattern chain */
