@@ -15,9 +15,12 @@ import React, { useEffect, useRef, useState, type CSSProperties, type ReactNode 
 import type { ControlValue } from '@/types';
 import type { CustomRenderContext } from '@/types/panel';
 import {
-  CHANGE_MODES, asProject, clearTrack, getPattern, setActive, setChangeMode, setMasterMute, setMasterMutes, setPlayMode, setStep,
-  setTrigMute, trackLength, updatePatternSettings, updateSteps, withTrack, type Project, type Step, type Track,
+  CHANGE_MODES, LOCK_LIMIT_RYTM, asProject, clearTrack, getPattern, setActive, setChangeMode, setMasterMute, setMasterMutes, setPlayMode,
+  setTrigMute, trackLength, updatePatternSettings, updateSteps, withTrack, type Project, type SeqState, type Track,
 } from '@/lib/sequencer/elektron';
+import { eraseLocks, eraseTrigs, recordHit, recordHitLength, recordLock } from './live';
+import { POOL_SIZE, captureSound, freeSlot, setSoundLock, slotLabel, soundChoices, soundControls, soundFits, withSound } from './pool';
+import { euclidOn, euclidRefused, euclidSettings, euclidSteps, euclidView, euclidWriteBack, pulseSteps } from './euclid';
 import { isLocked } from '@/lib/sequencer/elektron/locks';
 import { C, Frame, FONT, Group, MONO, Overlay, SeqButton, Stepper } from '@/components/sequencer/shared';
 import { useStudioStore } from '@/store/studio';
@@ -60,6 +63,32 @@ export const RY = {
   navy: '#3a55e0',
   pad: '#e7e8e9',
 };
+
+/**
+ * The context the shared trig keys and trig editor get: Euclidean tracks show their
+ * generated trigs, and edits made there are written back (euclid.ts). Adding or removing
+ * a trig on a Euclidean track is refused, as on the hardware (manual p.44). The same
+ * context when no track is in Euclidean mode.
+ */
+export function euclidCtx(ctx: CustomRenderContext): CustomRenderContext {
+  const real = projectOf(ctx);
+  const view = euclidView(real);
+  if (view === real) return ctx;
+  return {
+    ...ctx,
+    data: view,
+    updateData: fn => {
+      let refused = false;
+      ctx.updateData(d => {
+        const r = asProject(d, T);
+        const next = asProject(fn(euclidView(r)), T);
+        refused = euclidRefused(r, next);
+        return euclidWriteBack(r, next);
+      });
+      if (refused) flash(ctx, 'EUCLIDEAN MODE: THE PULSE GENERATORS PLACE THE TRIGS (HOLD ONE TO LOCK IT)');
+    },
+  };
+}
 
 // ----------------------------------------------------------------------------
 // UI state helpers (ctx.ui is per instance and not saved)
@@ -218,7 +247,7 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
   const kit = project.kits?.[kitOf(ctx)];
   const focusMode = useFocusMode();
   const faces = useRef<(HTMLDivElement | null)[]>([]);
-  const held = useRef(new Map<number, { pad: number; track: number; note?: number; perf?: boolean; y0: number; h: number }>());
+  const held = useRef(new Map<number, { pad: number; track: number; note?: number; perf?: boolean; erase?: boolean; y0: number; h: number }>());
   const live = useRef(ctx);
   live.current = ctx;
 
@@ -264,7 +293,16 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
     const c = live.current;
     const m = Math.round(num(c.values.pad_mode));
     const r = e.currentTarget.getBoundingClientRect();
-    const h: { pad: number; track: number; note?: number; perf?: boolean; y0: number; h: number } = { pad, track: pad, y0: e.clientY, h: r.height };
+    const h: { pad: number; track: number; note?: number; perf?: boolean; erase?: boolean; y0: number; h: number } = { pad, track: pad, y0: e.clientY, h: r.height };
+    // LIVE RECORDING: [NO] + pads erase those tracks' trigs on every step reached while held (manual p.40)
+    if (c.ui.noHeld && liveRecording(c)) {
+      h.erase = true;
+      held.current.set(e.pointerId, h);
+      const list = ((c.ui.liveEraseTracks as number[] | undefined) ?? []).filter(t => t !== pad);
+      c.setUi({ liveEraseTracks: [...list, pad], yesNoUsed: true });
+      flash(c, `ERASING ${TRACKS[pad].name} TRIGS WHILE HELD`);
+      return;
+    }
     // [QPER] held (or latched): pads choose the macros of the QUICK PERF AMOUNT knob
     if (c.ui.qperHeld || c.ui.qperLatch) {
       const list = ((c.ui.qperList as number[] | undefined) ?? []).slice();
@@ -340,6 +378,10 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
     if (!h) return;
     held.current.delete(e.pointerId);
     const c = live.current;
+    if (h.erase) {
+      c.setUi({ liveEraseTracks: ((c.ui.liveEraseTracks as number[] | undefined) ?? []).filter(t => t !== h.pad) });
+      return;
+    }
     if (h.perf) { c.sendEvent('perf:up', { index: h.pad }); return; }
     c.sendEvent('pad:up', { track: h.track });
   };
@@ -468,7 +510,7 @@ export function applyMutePreselect(c: CustomRenderContext) {
  * the LEDs follow the sequencer over the active track's trigs. With [QPER] held they choose macros.
  */
 export function PlayTrigs({ ctx }: { ctx: CustomRenderContext }) {
-  const p = projectOf(ctx);
+  const p = euclidView(projectOf(ctx));
   const track = Math.round(num(ctx.values.track));
   const st = ctx.engine.seq as { playing?: boolean; pattern?: string | null; steps?: number[] } | undefined;
   const pid = (st?.playing && st.pattern) || p.active;
@@ -549,6 +591,8 @@ export function nudgeSwing(ctx: CustomRenderContext, dir: number) {
 
 const rtrgOn = (c: CustomRenderContext) => !!(c.ui.rtrgHeld || c.ui.rtrgLatch);
 const recLive = (c: CustomRenderContext) => Math.round(num(c.values.rec)) === 2 && !!(c.engine.seq as { playing?: boolean } | undefined)?.playing;
+/** LIVE RECORDING is on and the sequencer plays */
+export const liveRecording = recLive;
 const kitOf = (c: CustomRenderContext) => (c.engine.kit as string | undefined) || projectOf(c).kit || '01';
 
 // ----------------------------------------------------------------------------
@@ -622,7 +666,7 @@ function cellFor(id: string | null, ctx: CustomRenderContext, flags: { locked: b
   if (!meta || !d) return null;
   const p = meta.p as { min: number; max: number; bipolar?: boolean; options?: readonly string[] };
   const frac = (v - p.min) / Math.max(1e-9, p.max - p.min);
-  const textual = !!p.options || (meta.kind === 'page' && /trig_note|trig_len|trig_prob|flt_frq/.test(meta.p.key));
+  const textual = !!p.options || (meta.kind === 'page' && /trig_note|trig_len|trig_prob|flt_frq|euc_pl|euc_len/.test(meta.p.key));
   return { label: d.abbr, name: d.name, text: d.text, frac, bipolar: !!p.bipolar, textual, locked: flags.locked };
 }
 
@@ -678,8 +722,13 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
   }, [message]);
   const showMsg = message && Date.now() - message.at < 2200;
 
-  const title = isFx ? FX_PAGE_TITLES[page] : page === PAGE.SRC ? MACHINES[machine].name : PAGE_TITLES[page];
-  const header = touched ? touched.name : title;
+  const page2 = ids[0] === 'euc_pl1';
+  const title = isFx ? FX_PAGE_TITLES[page] : page === PAGE.SRC ? MACHINES[machine].name : page2 ? `EUCLIDEAN${euclidOn(getPattern(project, project.active).tracks[track]) ? ' ON' : ''}` : PAGE_TITLES[page];
+  // a held sound-locked trig shows its Sound (manual p.48)
+  const heldTrack = typeof ctx.ui.heldTrack === 'number' ? ctx.ui.heldTrack : track;
+  const heldPat = typeof ctx.ui.heldPattern === 'string' ? ctx.ui.heldPattern : project.active;
+  const heldSnd = heldSteps.length && heldTrack < 12 ? Math.round(getPattern(euclidView(project), heldPat).tracks[heldTrack]?.steps[heldSteps[0]]?.locks?.sound ?? 0) : 0;
+  const header = touched ? touched.name : heldSnd > 0 ? `SOUND ${slotLabel(heldSnd - 1, project.pool?.[heldSnd - 1])}` : title;
   const trackLev = isFx ? num(ctx.values.fx_trk_lev, 100) : num(ctx.values[`${TRACKS[track].id}_trk_lev`], 100);
   const trackName = isFx ? 'FX' : TRACKS[track].name;
 
@@ -707,6 +756,40 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
           return <div key={t.id} style={{ textAlign: 'center', border: '1px solid #e8f0ff', padding: '6% 0', background: m ? 'transparent' : '#e8f0ff', color: m ? '#e8f0ff' : '#030403', fontWeight: 700 }}>{t.name}</div>;
         })}
         <div style={{ gridColumn: '1 / -1', textAlign: 'center', fontSize: '0.85em', opacity: 0.8 }}>MUTE MODE: TAP PADS</div>
+      </div>
+    );
+  } else if (page2) {
+    // TRIG page 2: the eight Euclidean parameters and a map of what the generators place
+    const pat = getPattern(project, project.active);
+    const e = euclidSettings(project, project.active, track);
+    const len = trackLength(pat, track);
+    const g1 = pulseSteps(e.pl1, len, e.ro1), g2 = pulseSteps(e.pl2, len, e.ro2);
+    const res = new Set(euclidSteps(e, len));
+    const shown = Math.min(len, 32);
+    const mark = (on: boolean, h: string) => <span style={{ flex: 1, height: h, background: on ? '#e8f0ff' : 'transparent', border: '1px solid #e8f0ff55', boxSizing: 'border-box' }} />;
+    const rot = (s: number) => ((s - Math.round(e.tro)) % len + len) % len;
+    body = (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: '1fr 1fr', columnGap: '3%', rowGap: '2%', padding: '1% 0 1%' }}>
+          {cells.map((c, i) => (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', minWidth: 0 }}>
+              {c ? (
+                <>
+                  {c.textual ? <div style={{ fontSize: '1.05em', fontWeight: 700, height: '1.6em', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{c.text}</div> : <Dial frac={c.frac} bipolar={c.bipolar} />}
+                  <div style={{ fontWeight: 700 }}>{c.label}</div>
+                </>
+              ) : <div style={{ opacity: 0.25 }}>-</div>}
+            </div>
+          ))}
+        </div>
+        <div aria-label="Euclidean map: generator 1, generator 2 and the trigs they place" style={{ display: 'flex', flexDirection: 'column', gap: 1, padding: '0 0 2%' }}>
+          {[['1', (s: number) => g1.has(rot(s)), '0.35em'], ['2', (s: number) => g2.has(rot(s)), '0.35em'], ['=', (s: number) => res.has(s), '0.6em']].map(([lab, on, h]) => (
+            <div key={lab as string} style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <span style={{ width: '1.1em', fontSize: '0.8em', opacity: 0.8 }}>{lab as string}</span>
+              {Array.from({ length: shown }, (_, s) => <React.Fragment key={s}>{mark((on as (s: number) => boolean)(s), h as string)}</React.Fragment>)}
+            </div>
+          ))}
+        </div>
       </div>
     );
   } else {
@@ -754,6 +837,7 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
         </div>
       </div>
       <DataSync ctx={ctx} />
+      <LiveRec ctx={ctx} />
       <PresetLoader ctx={ctx} />
     </div>
   );
@@ -795,7 +879,8 @@ function DataSync({ ctx }: { ctx: CustomRenderContext }) {
     let kitChanged = false;
     let kits = { ...(p0.kits ?? {}) };
     let currentKit = p0.kit;
-    let p: RytmProject = p0;
+    // recorded trigs and locks land on what plays: a Euclidean track's generated trigs (euclid.ts)
+    let p: RytmProject = euclidView(p0);
     for (const op of todo) {
       if (op.type === 'kit') {
         if (op.from) kits[op.from] = { ...(kits[op.from] ?? { name: `KIT ${op.from}` }), values: sparseKit(working) };
@@ -803,17 +888,19 @@ function DataSync({ ctx }: { ctx: CustomRenderContext }) {
         currentKit = op.to;
         kitChanged = true;
       } else if (op.type === 'rec') {
-        const cur = getPattern(p, op.pattern).tracks[op.track]?.steps[op.step];
-        const step: Step = { ...(cur ?? {}), vel: op.vel };
-        if (op.micro) step.micro = op.micro; else delete step.micro;
-        delete step.trigless;
-        p = setStep(p, op.pattern, op.track, op.step, step) as RytmProject;
+        p = recordHit(p, op) as RytmProject;
+      } else if (op.type === 'reclen') {
+        p = recordHitLength(p, op) as RytmProject;
+      } else if (op.type === 'lock') {
+        p = recordLock(p, op, LOCK_LIMIT_RYTM) as RytmProject;
       }
     }
     const last = todo[todo.length - 1].n;
+    const edited = p !== euclidView(p0);
+    if (edited) p = euclidWriteBack(p0, p);
     ctx.updateData(d => {
       const base = { ...(asProject(d, T) as RytmProject) };
-      const merged: RytmProject = { ...base, patterns: p === p0 ? base.patterns : p.patterns, opsApplied: { sid: ops.sid, n: last } };
+      const merged: RytmProject = { ...base, patterns: edited ? p.patterns : base.patterns, opsApplied: { sid: ops.sid, n: last } };
       if (kitChanged) { merged.kits = kits; merged.kit = currentKit; }
       return merged;
     });
@@ -824,6 +911,69 @@ function DataSync({ ctx }: { ctx: CustomRenderContext }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ops?.sid, ops?.n]);
+  return null;
+}
+
+/**
+ * LIVE RECORDING of encoder turns and the erase keys (manual pp.40, 47).
+ * - interceptChange (index.ts) marks each turn of a PARAMETER page encoder in
+ *   `ui.liveTurn`; this forwards it to the engine, which knows where the
+ *   sequencer is and records the lock (engine.liveTurn -> a 'lock' op).
+ * - While [FUNC] + [NO] are held (ui.liveEraseAll), [NO] + an encoder was turned
+ *   (ui.liveEraseKey) or [NO] + pads are held (ui.liveEraseTracks), every step
+ *   the sequencer reaches loses its parameter locks / that parameter's locks /
+ *   its trigs. Sound locks stay.
+ * - It also tells interceptChange whether the sequencer plays (ui.livePlaying).
+ */
+function LiveRec({ ctx }: { ctx: CustomRenderContext }) {
+  const st = ctx.engine.seq as SeqState | undefined;
+  const playing = !!st?.playing;
+  const live = Math.round(num(ctx.values.rec)) === 2 && playing;
+  const turn = ctx.ui.liveTurn as { n: number } | undefined;
+  useEffect(() => {
+    if (!!ctx.ui.livePlaying !== playing) ctx.setUi({ livePlaying: playing });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing]);
+  useEffect(() => {
+    if (turn && live) ctx.sendEvent('rytm:live-lock', turn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turn?.n]);
+
+  const eraseAll = !!ctx.ui.liveEraseAll;
+  const eraseKey = ctx.ui.liveEraseKey as { track: number; key: string } | null | undefined;
+  const eraseTracks = (ctx.ui.liveEraseTracks as number[] | undefined) ?? [];
+  const active = Math.round(num(ctx.values.track));
+  /** Last step erased per gesture ("kind:track") */
+  const done = useRef(new Map<string, number>());
+  const steps = st?.steps;
+  const pattern = st?.pattern;
+  useEffect(() => {
+    const jobs: { kind: 'all' | 'key' | 'trigs'; track: number; step: number; key?: string }[] = [];
+    const want = new Set<string>();
+    if (live && steps && pattern) {
+      const add = (kind: 'all' | 'key' | 'trigs', track: number, key?: string) => {
+        const id = `${kind}:${track}:${key ?? ''}`;
+        want.add(id);
+        const s = steps[track] ?? -1;
+        if (s < 0 || done.current.get(id) === s) return;
+        done.current.set(id, s);
+        jobs.push({ kind, track, step: s, key });
+      };
+      if (eraseAll) add('all', active);
+      if (eraseKey) add('key', eraseKey.track, eraseKey.key);
+      for (const t of eraseTracks) add('trigs', t);
+    }
+    for (const id of [...done.current.keys()]) if (!want.has(id)) done.current.delete(id);
+    if (!jobs.length || !pattern) return;
+    ctx.updateData(d => {
+      let p: Project = asProject(d, T);
+      for (const j of jobs) {
+        p = j.kind === 'trigs' ? eraseTrigs(p, pattern, j.track, [j.step]) : eraseLocks(p, pattern, j.track, [j.step], j.kind === 'key' ? j.key! : null);
+      }
+      return p;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [steps, pattern, live, eraseAll, eraseKey, eraseTracks.join(), active]);
   return null;
 }
 
@@ -883,7 +1033,55 @@ export function Menus({ ctx }: { ctx: CustomRenderContext }) {
       {typeof sceneEdit === 'number' && <MacroEdit ctx={ctx} kind="scene" index={sceneEdit} />}
       {typeof perfEdit === 'number' && <MacroEdit ctx={ctx} kind="perf" index={perfEdit} />}
       {(ctx.ui.trkHeld || ctx.ui.trkLatch) ? <TrackSelect ctx={ctx} /> : null}
+      <SoundLockPicker ctx={ctx} />
     </>
+  );
+}
+
+/**
+ * SOUND LOCKS (manual p.48): hold a note trig and turn TRACK LEVEL (index.ts) and this
+ * list of the pool appears; it follows the knob, and a tap on an entry picks it too.
+ * The choice is written to the held trigs at once; letting go of the trig closes it.
+ */
+function SoundLockPicker({ ctx }: { ctx: CustomRenderContext }) {
+  const held = Array.isArray(ctx.ui.heldSteps) ? (ctx.ui.heldSteps as number[]) : [];
+  const sl = ctx.ui.soundLock as { track: number; pattern: string } | null | undefined;
+  const open = !!sl && held.length > 0;
+  useEffect(() => {
+    if (sl && !held.length) ctx.setUi({ soundLock: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!sl, held.length]);
+  if (!open || !sl) return null;
+  const vctx = euclidCtx(ctx);
+  const p = projectOf(vctx);
+  const step = getPattern(p, sl.pattern).tracks[sl.track]?.steps[held[0]];
+  const cur = Math.round(step?.locks?.sound ?? 0);
+  const choices = soundChoices(p.pool, sl.track);
+  const pick = (slot: number) => {
+    vctx.updateData(d => {
+      const q = asProject(d, T) as RytmProject;
+      return setSoundLock(q, sl.pattern, sl.track, held, slot, q.pool);
+    });
+    ctx.setUi({ heldEdited: true });
+  };
+  return (
+    <Overlay portal portalSize={{ w: 560, h: 300 }}>
+      <Frame title={`SOUND LOCK · ${TRACKS[sl.track]?.name ?? ''} TRIG ${held.map(s => s + 1).join(' ')}`} sub="TRACK LEVEL or a tap picks; let go of the trig to finish">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, fontFamily: FONT }}>
+          {choices.map(c => {
+            const s = c.slot > 0 ? p.pool?.[c.slot - 1] : null;
+            const label = c.slot === 0 ? 'TRACK SOUND' : `${slotLabel(c.slot - 1, s)}${c.fits ? '' : ' (!)'}`;
+            return (
+              <SeqButton key={c.slot} active={c.slot === cur} color={C.white} dim={!c.fits} disabled={!c.fits} minWidth={110}
+                onPress={() => { if (c.fits) pick(c.slot); }} title={c.fits ? undefined : 'This track cannot run the Sound\'s machine'}>
+                {label}
+              </SeqButton>
+            );
+          })}
+          {choices.length === 1 && <span style={{ fontSize: 12, color: C.faint }}>The Sound pool is empty: store Sounds with [YES] + [MUTE] or the SOUND menu first.</span>}
+        </div>
+      </Frame>
+    </Overlay>
   );
 }
 
@@ -1023,6 +1221,64 @@ export function reloadKit(ctx: CustomRenderContext) {
   flash(ctx, `RELOADED K${kitOf(ctx)}`);
 }
 
+/** [YES] + [MUTE] (STORE TRACK SOUND): the active track's Sound into the first free pool slot (manual pp.33, 35) */
+export function storeTrackSound(ctx: CustomRenderContext): number {
+  const track = Math.min(11, Math.round(num(ctx.values.track)));
+  const pool = projectOf(ctx).pool;
+  const slot = freeSlot(pool);
+  if (slot < 0) { flash(ctx, 'THE SOUND POOL IS FULL (128 SOUNDS)'); return -1; }
+  const snd = captureSound(hub.valuesFor(ctx.instance), track);
+  ctx.updateData(d => {
+    const q = asProject(d, T) as RytmProject;
+    return { ...q, pool: withSound(q.pool, slot, snd) };
+  });
+  flash(ctx, `SOUND STORED: POOL ${slotLabel(slot, snd)}`);
+  return slot;
+}
+
+/** The SOUND pool part of the SOUND menu: store, preview, load, rename, delete (manual pp.31-33) */
+function SoundPoolPanel({ ctx, track }: { ctx: CustomRenderContext; track: number }) {
+  const pool = projectOf(ctx).pool ?? [];
+  const sel = typeof ctx.ui.poolSel === 'number' ? (ctx.ui.poolSel as number) : -1;
+  const snd = sel >= 0 ? pool[sel] : null;
+  const fits = soundFits(snd, track);
+  const used = pool.map((s, i) => (s ? i : -1)).filter(i => i >= 0);
+  const edit = (fn: (q: RytmProject) => RytmProject) => ctx.updateData(d => fn(asProject(d, T) as RytmProject));
+  return (
+    <Group label={`SOUND POOL (${used.length}/${POOL_SIZE}) · tap to preview on the active track · (!) = not for this track`}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          <SeqButton color={C.green} onPress={() => { const s = storeTrackSound(ctx); if (s >= 0) ctx.setUi({ poolSel: s }); }} title="[YES] + [MUTE]">STORE TRACK SOUND</SeqButton>
+          <SeqButton disabled={!fits} onPress={() => {
+            if (!fits) return;
+            useStudioStore.getState().setControlValues(ctx.instance, soundControls(snd, track));
+            flash(ctx, `LOADED ${snd.name} TO ${TRACKS[track].name}`);
+          }}>LOAD TO TRACK</SeqButton>
+          <SeqButton disabled={!snd} onPress={() => {
+            if (!snd || typeof window === 'undefined') return;
+            const name = window.prompt('Sound name', snd.name);
+            if (name && name.trim()) edit(q => ({ ...q, pool: withSound(q.pool, sel, { ...snd, name: name.trim().toUpperCase().slice(0, 15) }) }));
+          }}>RENAME</SeqButton>
+          <SeqButton disabled={!snd} onPress={() => { if (snd) { edit(q => ({ ...q, pool: withSound(q.pool, sel, null) })); ctx.setUi({ poolSel: -1 }); } }}>DELETE</SeqButton>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {used.length === 0 && <span style={{ fontSize: 12, color: C.faint }}>The pool is empty. STORE TRACK SOUND copies the active track&apos;s Sound into it; trigs can then sound lock it.</span>}
+          {used.map(i => {
+            const s = pool[i]!;
+            const ok = soundFits(s, track);
+            return (
+              <SeqButton key={i} active={i === sel} color={C.white} dim={!ok} minWidth={110} title={`${MACHINES[s.machine].name}${ok ? '' : ` - ${TRACKS[track].name} cannot run this machine`}`}
+                onPress={() => { ctx.setUi({ poolSel: i }); if (ok) ctx.sendEvent('rytm:preview-sound', { track, slot: i + 1 }); }}>
+                {`${slotLabel(i, s)}${ok ? '' : ' (!)'}`}
+              </SeqButton>
+            );
+          })}
+        </div>
+      </div>
+    </Group>
+  );
+}
+
 function SoundMenu({ ctx }: { ctx: CustomRenderContext }) {
   const track = Math.min(11, Math.round(num(ctx.values.track)));
   const t = TRACKS[track];
@@ -1043,6 +1299,7 @@ function SoundMenu({ ctx }: { ctx: CustomRenderContext }) {
           ))}
         </Group>
         <div style={{ fontSize: 12, color: C.dim, minHeight: 32 }}>{MACHINES[cur].desc}</div>
+        <SoundPoolPanel ctx={ctx} track={track} />
         <Group label="SOUND SETTINGS">
           <SeqButton active={num(ctx.values[`${t.id}_vel_vol`], 1) > 0} color={C.green} onPress={() => ctx.setValue(`${t.id}_vel_vol`, num(ctx.values[`${t.id}_vel_vol`], 1) > 0 ? 0 : 1)}>VELOCITY TO VOL</SeqButton>
           <Stepper label="ACCENT LEVEL" value={num(ctx.values[`${t.id}_acc_lev`], 32)} min={0} max={127} onChange={v => ctx.setValue(`${t.id}_acc_lev`, v)} />

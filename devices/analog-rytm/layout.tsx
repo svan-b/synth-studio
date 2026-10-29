@@ -22,9 +22,11 @@ import {
 } from '@/lib/sequencer/elektron';
 import { FX_TRACK, PAGE, SEQ_TRACKS, TRACKS, pageControls, describe } from './model';
 import {
-  Key, Menus, PageLeds, Pads, PlayTrigs, RY, RytmStyles, Screen, applyMutePreselect, flash, funcOn, nudgeHeld, nudgeSwing, openMenu,
-  pageReloadOrRandom, reloadKit, reloadSound, saveKit, shiftTrack, toggleHeldFlag, toggleHeldMute, trackClear, trackCopy, trackPaste, consumeFunc,
+  Key, Menus, PageLeds, Pads, PlayTrigs, RY, RytmStyles, Screen, applyMutePreselect, euclidCtx, flash, funcOn, liveRecording, nudgeHeld, nudgeSwing, openMenu,
+  pageReloadOrRandom, reloadKit, reloadSound, saveKit, shiftTrack, storeTrackSound, toggleHeldFlag, toggleHeldMute, trackClear, trackCopy, trackPaste, consumeFunc,
 } from './ui';
+import { slotLabel } from './pool';
+import { euclidOn } from './euclid';
 import type { RytmProject } from './presets';
 
 const W = 385;
@@ -109,7 +111,8 @@ function quickSaveReload(ctx: CustomRenderContext, mode: number): boolean {
   if (!yes && !no) return false;
   ctx.setUi({ yesNoUsed: true });
   if (mode === 0) { if (yes) saveKit(ctx); else reloadKit(ctx); return true; }
-  if (mode === 1) { if (yes) flash(ctx, 'THE SOUND IS KEPT IN THE KIT ([YES] + [PLAY] SAVES IT)'); else reloadSound(ctx); return true; }
+  // [YES] + [MUTE]: STORE TRACK SOUND, into the project's Sound pool (manual pp.33, 35)
+  if (mode === 1) { if (yes) storeTrackSound(ctx); else reloadSound(ctx); return true; }
   if (mode === 3) {
     // [YES] + [SCNE]: SAVE PATTERN (the restore point); [NO] + [SCNE]: RELOAD PATTERN (manual p.43)
     ctx.updateData(d => (yes ? savePattern : reloadPattern)(asProject(d, SEQ_TRACKS)));
@@ -312,8 +315,22 @@ function keys(): PanelElement[] {
     onDown={() => press(ctx, () => ctx.setUi({ yesHeld: true, yesNoUsed: false }), () => openMenu(ctx, 'kit'))}
     onUp={() => { if (!ctx.ui.yesHeld) return; const used = !!ctx.ui.yesNoUsed; ctx.setUi({ yesHeld: false }); if (!used) closeAll(ctx); }} />));
   out.push(key(197.2, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:no" label="NO" sub="Reload" lit={!!ctx.ui.noHeld}
-    onDown={() => press(ctx, () => ctx.setUi({ noHeld: true, yesNoUsed: false }), () => reloadKit(ctx))}
-    onUp={() => { if (!ctx.ui.noHeld) return; const used = !!ctx.ui.yesNoUsed; ctx.setUi({ noHeld: false }); if (!used) closeAll(ctx); }} />));
+    onDown={() => {
+      // LIVE RECORDING: [FUNC] + [NO] held erases the active track's parameter locks on every step reached (manual p.47)
+      if (liveRecording(ctx) && funcOn(ctx)) {
+        consumeFunc(ctx);
+        ctx.setUi({ noHeld: true, yesNoUsed: true, liveEraseAll: true });
+        flash(ctx, 'ERASING PARAMETER LOCKS WHILE HELD');
+        return;
+      }
+      press(ctx, () => ctx.setUi({ noHeld: true, yesNoUsed: false }), () => reloadKit(ctx));
+    }}
+    onUp={() => {
+      if (!ctx.ui.noHeld) return;
+      const used = !!ctx.ui.yesNoUsed;
+      ctx.setUi({ noHeld: false, liveEraseAll: false, liveEraseKey: null, liveEraseTracks: [] });
+      if (!used) closeAll(ctx);
+    }} />));
   out.push(key(228.8, 79.6, SMALL, ctx => <Key ctx={ctx} id="key:up" label={I.up} sub="Retrig +" onDown={() => arrow(ctx, 'up')} />));
   out.push(key(213.1, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:left" label={I.left} sub="µTime -" onDown={() => arrow(ctx, 'left')} onUp={() => arrowUp(ctx)} />));
   out.push(key(228.8, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:down" label={I.down} sub="Retrig -" onDown={() => arrow(ctx, 'down')} />));
@@ -326,6 +343,11 @@ function keys(): PanelElement[] {
         press(ctx, () => {
           // a quick double press on [SRC] opens the MACHINE menu
           if (i === 1 && Math.round(num(ctx.values.track)) !== FX_TRACK && doublePress(ctx, 'srcTap')) { openMenu(ctx, 'sound'); return; }
+          // [TRIG] on the TRIG page: its page 2, the Euclidean sequencer of a drum track (manual pp.43-44)
+          const again = i === 0 && Math.round(num(ctx.values.page, 1)) === 0 && Math.round(num(ctx.values.track)) !== FX_TRACK;
+          const two = again && ctx.ui.trigPage2 !== true;
+          if (!!ctx.ui.trigPage2 !== two) ctx.setUi({ trigPage2: two });
+          if (again) flash(ctx, two ? 'TRIG PAGE 2: EUCLIDEAN SEQUENCER' : 'TRIG PAGE 1');
           ctx.setValue('page', i);
         }, func ? () => {
           if (i === 0) { const q = num(ctx.values.quantize, 1) > 0 ? 0 : 1; ctx.setValue('quantize', q); flash(ctx, q ? 'TRIGS SETUP: LIVE RECORDING QUANTIZED' : 'TRIGS SETUP: LIVE RECORDING KEEPS MICRO TIMING'); }
@@ -374,7 +396,11 @@ function keys(): PanelElement[] {
   // --- Transport -----------------------------------------------------------------------
   out.push(key(282.7, 141.7, BIG, ctx => {
     const rec = Math.round(num(ctx.values.rec, 1));
-    return <Key ctx={ctx} id="key:rec" big label={I.rec} sub="Copy" funcSub lit={rec > 0} blink={rec === 2} control="rec"
+    // the active track in Euclidean mode lights [REC] purple (manual p.44)
+    const p = projectOf(ctx);
+    const t = Math.round(num(ctx.values.track));
+    const euc = t < 12 && euclidOn(getPattern(p, p.active).tracks[t]);
+    return <Key ctx={ctx} id="key:rec" big label={I.rec} sub="Copy" funcSub lit={rec > 0 ? 1 : euc ? 0.6 : 0} blink={rec === 2} control="rec" ledColor={euc ? RY.purple : undefined}
       onDown={() => press(ctx, () => { ctx.setUi({ recHeld: true }); ctx.setValue('rec', rec === 1 ? 0 : 1); }, () => trackCopy(ctx))}
       onUp={() => ctx.setUi({ recHeld: false })} />;
   }, true));
@@ -385,7 +411,19 @@ function keys(): PanelElement[] {
     return <Key ctx={ctx} id="key:play" big label={I.play} sub="Clear" funcSub lit={playing || paused} blink={paused} ledColor={RY.green} control="play" focusIds={['seq:play']}
       onDown={() => press(ctx, () => {
         // [RECORD] + [PLAY]: LIVE RECORDING (and play); [PLAY] during it leaves it and keeps playing (manual p.40)
-        if (ctx.ui.recHeld) { ctx.setValue('rec', 2); flash(ctx, 'LIVE RECORDING: PLAY THE PADS'); if (!playing) pressPlay(ctx); return; }
+        if (ctx.ui.recHeld) {
+          // [RECORD] + [PLAY] twice: quantize the live recording on or off (manual p.40)
+          if (doublePress(ctx, 'recPlayTap') && Math.round(num(ctx.values.rec)) === 2) {
+            const q = num(ctx.values.quantize, 1) > 0 ? 0 : 1;
+            ctx.setValue('quantize', q);
+            flash(ctx, q ? 'LIVE RECORDING: QUANTIZED' : 'LIVE RECORDING: KEEPS MICRO TIMING');
+            return;
+          }
+          ctx.setValue('rec', 2);
+          flash(ctx, 'LIVE RECORDING: PLAY THE PADS, TURN THE ENCODERS');
+          if (!playing) pressPlay(ctx);
+          return;
+        }
         if (playing && Math.round(num(ctx.values.rec)) === 2) { ctx.setValue('rec', 0); flash(ctx, 'LIVE RECORDING OFF'); return; }
         // stopped: play; playing: pause; paused: resume (manual p.37). Synced, it plays / stops the studio.
         if (playing && !seqStateOf(ctx.engine)?.following) flash(ctx, 'PAUSED: [PLAY] RESUMES, [STOP] STOPS');
@@ -480,7 +518,7 @@ const sequencer: PanelElement[] = [
       return (
         <div className="rytm-trigs" style={{ position: 'absolute', inset: 0, ...gap }}>
           {editing
-            ? <TrigKeys ctx={ctx} tracks={SEQ_TRACKS} trackNames={TRACK_NAMES} editable color="#ff3b2a" longPressMs={550} />
+            ? <TrigKeys ctx={euclidCtx(ctx)} tracks={SEQ_TRACKS} trackNames={TRACK_NAMES} editable color="#ff3b2a" longPressMs={550} />
             : <PlayTrigs ctx={ctx} />}
         </div>
       );
@@ -500,8 +538,9 @@ const sequencer: PanelElement[] = [
     render: ctx => (
       <>
         <RytmStyles />
-        <TrigEditor ctx={ctx} tracks={SEQ_TRACKS} portal portalPlacement="top" trackNames={TRACK_NAMES} features={{ retrig: true, accent: true, slide: false, pslide: true, trigMute: true }} lockLimit={LOCK_LIMIT_RYTM}
+        <TrigEditor ctx={euclidCtx(ctx)} tracks={SEQ_TRACKS} portal portalPlacement="top" trackNames={TRACK_NAMES} features={{ retrig: true, accent: true, slide: false, pslide: true, trigMute: true }} lockLimit={LOCK_LIMIT_RYTM}
           lockLabel={k => describe(`bd_${k}`, 0)?.abbr ?? describe(`fx_${k}`, 0)?.abbr ?? k.toUpperCase()}
+          lockFormat={(k, v) => (k === 'sound' ? slotLabel(v - 1, projectOf(ctx).pool?.[v - 1]) : String(Math.round(v * 100) / 100))}
           noteFormat={n => `${n - 60 >= 0 ? '+' : ''}${n - 60}`} noteRange={[36, 84]} />
         {/* [BANK] + [TRIG]: the bank window closes once a pattern is chosen (manual p.37) */}
         <PatternPicker ctx={ctx} tracks={SEQ_TRACKS} portal closeOnPick />

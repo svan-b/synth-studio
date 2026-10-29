@@ -28,7 +28,7 @@
 //   { t:'kit', at, tracks:[{m, p}], fx }   whole kit at once
 //   { t:'ovr', tr, i, v }          scene value (NaN clears), tr 12 = FX
 //   { t:'perf', tr, i, target, amt }   performance morph
-//   { t:'trig', at, tr, vel, note, acc, len, locks:{i:v}, rt }   note trig
+//   { t:'trig', at, tr, vel, note, acc, len, locks:{i:v}, rt, mach? }   note trig (mach: a sound lock's machine)
 //   { t:'locks', at, tr, locks }   lock trig (no note)
 //   { t:'off', at, tr }            note-off (gate end)
 //   { t:'fxlocks', at, locks }     FX track lock trig
@@ -598,7 +598,8 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     v.gate = true;
     v.gateLen = m.len;
     v.choke = 0;
-    const machine = this.mach[tr];
+    // a sound lock (manual p.48) plays a pool Sound: its machine for this trig, its parameters as locks
+    const machine = m.mach === undefined ? this.mach[tr] : m.mach;
     const synth = P[IX_TRIG_SYN] > 0.5;
     if (synth || prevTrack !== tr || v.m !== machine) {
       if (v.m !== machine) { v.s.fill(0); v.h.fill(0); v.e.fill(0); v.clapLeft = 0; v.step = 0; v.stepLeft = 0; }

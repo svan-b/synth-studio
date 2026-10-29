@@ -30,6 +30,9 @@ import {
 } from './model';
 import { ANALOG_RYTM, KIT_CONTROL_IDS } from './spec';
 import type { RytmProject } from './presets';
+import { SOUND_LOCK, lenIndexOf, stepsBetween, type LiveHit, type LiveLock } from './live';
+import { lockIndex, soundFits, soundLockMap, type RytmSound } from './pool';
+import { euclidView } from './euclid';
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const expT = (v: number, lo: number, hi: number) => lo * Math.pow(hi / lo, clamp(v, 0, 127) / 127);
@@ -50,8 +53,17 @@ for (const [id, c] of Object.entries(ANALOG_RYTM.controls)) if ('default' in c &
 
 type RytmOpInput =
   | { type: 'kit'; from: string; to: string }
-  | { type: 'rec'; pattern: string; track: number; step: number; micro: number; vel: number };
+  // LIVE RECORDING (manual pp.40, 47): a hit, how long it was held, an encoder turn
+  | ({ type: 'rec' } & LiveHit)
+  | { type: 'reclen'; pattern: string; track: number; step: number; len: number; retrig?: boolean }
+  | ({ type: 'lock' } & LiveLock);
 export type RytmOp = RytmOpInput & { n: number };
+
+/** An encoder turn during LIVE RECORDING, as the panel reports it (index.ts / ui.tsx LiveRec) */
+export interface LiveTurn { n: number; track: number; key: string; value: number; at: number }
+
+/** Encoder turns of one parameter less than this many steps apart record the steps in between too */
+const FILL_STEPS = 3;
 
 const num = (v: ControlValue | undefined, d = 0) => (typeof v === 'number' ? v : typeof v === 'boolean' ? (v ? 1 : 0) : d);
 
@@ -89,6 +101,12 @@ export class AnalogRytmEngine extends BaseEngine {
   private auditionTimer: ReturnType<typeof setTimeout>[] = [];
   private lastBpm = 0;
   private fxOffTimer: ReturnType<typeof setTimeout> | null = null;
+  /** LIVE RECORDING: the hit recorded for each track's held pad (its length is written on release) */
+  private liveHits = new Map<number, { pattern: string; step: number; t0: number; stepDur: number; retrig: boolean }>();
+  /** LIVE RECORDING: the last recorded turn of each track's parameter ("track:key") */
+  private lastTurn = new Map<string, { pattern: string; step: number; value: number; t: number }>();
+  /** The pool Sound each track's last note trig played (a sound lock), for the lock trigs after it */
+  private soundOn: (RytmSound | null)[] = TRACKS.map(() => null);
 
   protected build(): void {
     const ctx = this.ctx;
@@ -298,7 +316,8 @@ export class AnalogRytmEngine extends BaseEngine {
   protected onData(data: unknown): void {
     const p = asProject(data, SEQ_TRACKS) as RytmProject;
     this.project = p;
-    this.seq.setProject(p);
+    // Euclidean tracks play their generated trigs (euclid.ts; the same project when there are none)
+    this.seq.setProject(euclidView(p));
     if (p.kit !== this.lastDataKit) {
       this.lastDataKit = p.kit;
       if (p.kit) { this.kitId = p.kit; this.emit({ kit: p.kit }); }
@@ -390,6 +409,24 @@ export class AnalogRytmEngine extends BaseEngine {
     return out;
   }
 
+  /** The pool Sound a trig's sound lock plays on `track`, if the track can run it (manual p.48) */
+  private lockedSound(track: number, locks: Readonly<Record<string, number>>): RytmSound | null {
+    const slot = locks[SOUND_LOCK];
+    if (slot === undefined || track >= 12) return null;
+    const snd = this.project?.pool?.[Math.round(slot) - 1];
+    return soundFits(snd, track) ? snd : null;
+  }
+
+  /** A sound-locked trig: the whole pool Sound as locks, with the trig's own locks on top (keys mapped to its machine) */
+  private soundLocks(snd: RytmSound, locks: Readonly<Record<string, number>>): Record<number, number> {
+    const out: Record<number, number> = { ...soundLockMap(snd) };
+    for (const key in locks) {
+      const i = lockIndex(snd.machine, key);
+      if (i >= 0) out[i] = locks[key];
+    }
+    return out;
+  }
+
   private onTrig(e: TrigEvent) {
     if (e.track === FX_TRACK) {
       // FX track: lock trigs only. The worklet holds them until the next FX trig;
@@ -400,8 +437,22 @@ export class AnalogRytmEngine extends BaseEngine {
       if (Object.keys(rl).length || Object.keys(this.revLock).length) { this.revLock = rl; this.applyReverb(e.time); }
       return;
     }
+    if (e.trigless) {
+      // a lock trig that only keeps a sound lock (LIVE RECORDING erased its note trig) does nothing
+      if (e.locks[SOUND_LOCK] !== undefined && Object.keys(e.locks).length === 1) return;
+      // after a sound-locked trig the voice plays the pool Sound: the lock trig's locks apply to it
+      const playing = this.soundOn[e.track];
+      const locks = playing ? this.soundLocks(playing, e.locks) : this.convertLocks(e.track, e.locks);
+      this.post({ t: 'locks', at: e.time, tr: e.track, locks });
+      return;
+    }
+    const snd = this.lockedSound(e.track, e.locks);
+    this.soundOn[e.track] = snd;
+    if (snd) {
+      this.post({ t: 'trig', at: e.time, tr: e.track, vel: e.velocity, note: e.note, acc: e.accent, len: e.duration, locks: this.soundLocks(snd, e.locks), mach: snd.machine });
+      return;
+    }
     const locks = this.convertLocks(e.track, e.locks);
-    if (e.trigless) { this.post({ t: 'locks', at: e.time, tr: e.track, locks }); return; }
     this.post({ t: 'trig', at: e.time, tr: e.track, vel: e.velocity, note: e.note, acc: e.accent, len: e.duration, locks });
   }
 
@@ -421,11 +472,12 @@ export class AnalogRytmEngine extends BaseEngine {
   // --------------------------------------------------------------------------
 
   private padTrig(track: number, vel: number, note: number, at = 0) {
+    this.soundOn[track] = null;
     this.post({ t: 'trig', at, tr: track, vel, note, acc: false, len: Infinity, locks: {} });
   }
 
   /** Where a hit at audio time `t` falls on the playing pattern: step and micro timing */
-  private livePosition(track: number, t: number): { pattern: string; step: number; micro: number } | null {
+  private livePosition(track: number, t: number): { pattern: string; step: number; micro: number; dur: number; len: number } | null {
     const st = this.seq.getState();
     if (!st.playing || !st.pattern || !this.project) return null;
     const c = this.stepClock[track];
@@ -438,7 +490,66 @@ export class AnalogRytmEngine extends BaseEngine {
     let micro = Math.round((frac - Math.floor(frac + 0.5)) * 24);
     step = ((step % len) + len) % len;
     micro = clamp(micro, -23, 23);
-    return { pattern: st.pattern, step, micro };
+    return { pattern: st.pattern, step, micro, dur, len };
+  }
+
+  /** LIVE RECORDING is on and the sequencer plays */
+  private recording(): boolean {
+    return Math.round(this.num('rec')) === 2 && this.seq.getState().playing;
+  }
+
+  /**
+   * LIVE RECORDING: a pad (or key) hit on `track` at audio time `at` becomes a note trig
+   * with its velocity, micro timing (none when quantized), CHROMATIC pitch and, with
+   * [RTRG], the roll (manual pp.40-41, 43). Its length follows on release (liveRelease).
+   */
+  private liveHit(track: number, at: number, vel: number, note: number | undefined, roll: boolean) {
+    if (!this.recording()) return;
+    const pos = this.livePosition(track, at);
+    if (!pos) return;
+    const id = TRACKS[track].id;
+    const quantize = this.num('quantize', 1) > 0;
+    const retrig = roll ? {
+      rate: clamp(Math.round(this.num(`${id}_rtrg_rate`, 9)), 0, RETRIG_RATES.length - 1),
+      len: clamp(Math.round(this.num(`${id}_rtrg_len`, 14)), 0, NOTE_LENGTHS.length - 1),
+      vel: clamp(Math.round(this.num(`${id}_rtrg_vcr`)), -128, 127),
+    } : undefined;
+    this.pushOp({ type: 'rec', pattern: pos.pattern, track, step: pos.step, micro: quantize ? 0 : pos.micro, vel, note, retrig });
+    this.liveHits.set(track, { pattern: pos.pattern, step: pos.step, t0: at, stepDur: pos.dur, retrig: roll });
+  }
+
+  /** The pad of a recorded hit was released: its LEN, or the roll's length (manual p.40) */
+  private liveRelease(track: number) {
+    const h = this.liveHits.get(track);
+    if (!h) return;
+    this.liveHits.delete(track);
+    if (!this.recording()) return;
+    const held = Math.max(0, this.ctx.currentTime - h.t0) / Math.max(1e-3, h.stepDur);
+    this.pushOp({ type: 'reclen', pattern: h.pattern, track, step: h.step, len: lenIndexOf(held), retrig: h.retrig || undefined });
+  }
+
+  /**
+   * LIVE RECORDING: an encoder turn on the active track becomes a parameter lock on the
+   * step the sequencer is at, the nearest one as for a hit (manual p.47). Turns of the
+   * same parameter less than FILL_STEPS steps apart also lock the steps in between to the
+   * value that played there (**design**: a slow turn records a continuous sweep).
+   */
+  private liveTurn(turn: LiveTurn) {
+    if (!this.recording()) return;
+    const tr = clamp(Math.round(turn.track), 0, FX_TRACK);
+    const lag = Math.max(0, Math.min(0.5, (performance.now() - turn.at) / 1000));
+    const t = this.ctx.currentTime - lag;
+    const pos = this.livePosition(tr, t);
+    if (!pos) return;
+    const k = `${tr}:${turn.key}`;
+    const last = this.lastTurn.get(k);
+    let fill: LiveLock['fill'];
+    if (last && last.pattern === pos.pattern && last.step !== pos.step && t - last.t <= FILL_STEPS * pos.dur) {
+      const steps = stepsBetween(last.step, pos.step, pos.len);
+      if (steps.length && steps.length < FILL_STEPS) fill = { steps, value: last.value };
+    }
+    this.lastTurn.set(k, { pattern: pos.pattern, step: pos.step, value: turn.value, t });
+    this.pushOp({ type: 'lock', pattern: pos.pattern, track: tr, step: pos.step, key: turn.key, value: turn.value, fill });
   }
 
   event(name: string, payload?: unknown): void {
@@ -452,12 +563,11 @@ export class AnalogRytmEngine extends BaseEngine {
         const note = p.note ?? 60;
         const now = this.ctx.currentTime;
         this.padTrig(track, vel, note);
-        if (p.rec) {
-          const pos = this.livePosition(track, now + 0.01);
-          if (pos) this.pushOp({ type: 'rec', pattern: pos.pattern, track, step: pos.step, micro: p.quantize ? 0 : pos.micro, vel });
-        }
         // [RTRG] held, or the track's retrig set to ALWAYS ON: roll for as long as the pad is held
-        if (p.rtrg || this.num(`${TRACKS[track].id}_rtrg_on`) > 0) this.startRetrig(track, vel, note, now);
+        const roll = !!p.rtrg || this.num(`${TRACKS[track].id}_rtrg_on`) > 0;
+        // LIVE RECORDING: CHROMATIC pads (they send a note) record their pitch too
+        if (p.rec) this.liveHit(track, now + 0.01, vel, p.note, roll);
+        if (roll) this.startRetrig(track, vel, note, now);
         return;
       }
       case 'pad:pressure': {
@@ -473,6 +583,20 @@ export class AnalogRytmEngine extends BaseEngine {
         this.stopRetrig(track);
         this.post({ t: 'at', tr: track, v: 0 });
         this.post({ t: 'off', at: 0, tr: track });
+        this.liveRelease(track);
+        return;
+      }
+      case 'rytm:live-lock': this.liveTurn(payload as LiveTurn); return;
+      case 'rytm:preview-sound': {
+        // the SOUND menu: a pool Sound played on the active track, as its pad would (manual p.32)
+        const track = clamp(Math.round(p.track ?? 0), 0, 11);
+        const slot = Math.round((payload as { slot?: number } | undefined)?.slot ?? 0);
+        const snd = this.project?.pool?.[slot - 1];
+        if (!soundFits(snd, track)) return;
+        const at = this.ctx.currentTime + 0.01;
+        this.soundOn[track] = snd;
+        this.post({ t: 'trig', at, tr: track, vel: 100, note: 60, acc: false, len: 0.35, locks: soundLockMap(snd), mach: snd.machine });
+        this.post({ t: 'off', at: at + 0.35, tr: track });
         return;
       }
       case 'scene':
@@ -549,7 +673,7 @@ export class AnalogRytmEngine extends BaseEngine {
   private audition() {
     this.stopAudition();
     if (this.seq.playing) return;
-    const p = this.project;
+    const p = this.project ? euclidView(this.project) : null;
     const pat = p ? getPattern(p, p.active) : null;
     const busy = pat ? pat.tracks.filter(t => Object.keys(t.steps).length > 0).length : 0;
     if (busy >= 3) {
