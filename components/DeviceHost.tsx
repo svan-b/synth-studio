@@ -11,6 +11,7 @@ import { useDeviceModule } from '@/lib/studio/useHub';
 import { describeValue } from '@/lib/controls/mapping';
 import SynthPanel, { type EngineSource, type PatchController } from '@/components/panel/SynthPanel';
 import ResponsiveDeviceContainer from '@/components/ui/ResponsiveDeviceContainer';
+import { prefetchTeaching } from '@/components/teaching/onDemand';
 import { midiLearnTouch, useMidiFocus } from '@/lib/midi'; // external gear: MIDI learn + MIDI input
 
 const NO_ENGINE: EngineState = {};
@@ -122,6 +123,8 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
   // learns this instrument's lessons so it can tell rebuilt questions from current ones
   useEffect(() => { setLessonEngineReader(id => hub.getState(id) as Record<string, unknown>); }, []);
   useEffect(() => { registerLessons(device, mod.lessons); }, [device, mod]);
+  // The instrument is up: fetch the lesson UI (loaded on demand) while the page idles
+  useEffect(() => { prefetchTeaching(); }, []);
 
   const heldRef = useRef(held);
   heldRef.current = held;
@@ -370,7 +373,8 @@ function ControlStatus({ spec, values, touched }: { spec: DeviceSpec; values: Va
     if (c) {
       name = c.label;
       const v = values[id] ?? ('default' in c ? (c.default as ControlValue) : undefined);
-      value = c.type === 'jack' || c.type === 'pattern' ? '' : describeValue(c, v);
+      // A momentary button (TRIGGER, TAP) has no lasting state worth showing
+      value = c.type === 'jack' || c.type === 'pattern' || (c.type === 'button' && c.momentary) ? '' : describeValue(c, v);
       about = firstSentence(c.description);
     }
   } else if (touched?.kind === 'jack') {

@@ -302,8 +302,11 @@ export class StudioMixer {
       const on = audible.has(id);
       const g = on ? dbToGain(ch.gain) * Math.pow(10, s.trimDb / 20) : 0;
       s.set(g, ch.pan);
-      if (this.setSend(s, 'A', on ? ch.sendA : MIN_DB)) sendsA = true;
-      if (this.setSend(s, 'B', on ? ch.sendB : MIN_DB)) sendsB = true;
+      // Routed into a mixer (e.g. a Xone:96 channel), the instrument uses that mixer's
+      // own FX sends, as with hardware. Studio sends here would bypass its faders and mutes.
+      const sendsOn = on && (routes[id] ?? 'master') === 'master';
+      if (this.setSend(s, 'A', sendsOn ? ch.sendA : MIN_DB)) sendsA = true;
+      if (this.setSend(s, 'B', sendsOn ? ch.sendB : MIN_DB)) sendsB = true;
     });
     const d = delayOf(doc);
     const r = reverbOf(doc);

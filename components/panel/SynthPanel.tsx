@@ -73,6 +73,8 @@ export interface PatchController {
 const NOOP = () => undefined;
 const NO_SUBSCRIBE = () => NOOP;
 const EMPTY_UI: Record<string, unknown> = {};
+/** For elements that don't read the panel's values: a stable stand-in, so a value change elsewhere doesn't re-render them */
+const NO_BASE: Base = { values: {}, data: undefined, ui: EMPTY_UI };
 /** Touch target the panel aims for, in rendered CSS px */
 const TOUCH_PX = 44;
 /** A tap may move this far (CSS px) and still count as a tap */
@@ -407,7 +409,7 @@ function Faceplate(p: FaceplateProps) {
             current={current}
             staticLit={staticLit}
             src={src}
-            base={base}
+            base={el.lit ? base : NO_BASE}
             onChange={p.onChange}
             onEvent={p.onEvent}
             onPress={onPress}

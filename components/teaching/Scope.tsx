@@ -202,14 +202,14 @@ export default function Scope({ height = 120, mode: initial = 'both', stepMode }
           g.stroke();
         }
 
-        // Axis labels (level labels only where there is room for them)
+        // Axis labels (level labels only where there is room for them). The unit rides on
+        // the last frequency label, kept inside the plot, so the two never collide.
         g.fillStyle = 'rgba(226,232,240,0.62)';
-        FREQ_GRID.forEach(f => {
-          if (!FREQ_LABELS.has(f) && w < 420) return;
-          const x = xOfFreq(f, w);
-          g.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, x + 2, h - 3);
+        const freqs = FREQ_GRID.filter(f => FREQ_LABELS.has(f) || w >= 420);
+        freqs.forEach((f, i) => {
+          const text = `${f >= 1000 ? `${f / 1000}k` : f}${i === freqs.length - 1 ? 'Hz' : ''}`;
+          g.fillText(text, Math.min(xOfFreq(f, w) + 2, w - 2 - g.measureText(text).width), h - 3);
         });
-        g.fillText('Hz', w - 16, h - 3);
         const tall = plotH >= 70;
         let lastY = -Infinity;
         DB_GRID.forEach(db => {
