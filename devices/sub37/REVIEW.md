@@ -254,7 +254,7 @@ falls back to its own audition and is a second pass of the same captures):
 
 | Run | Before | After |
 |---|---|---|
-| audition | median −18.1 LUFS, spread 4.5 LU, 0 of 64 flagged (exit 0) | AFTER_AUD |
+| audition | median −18.1 LUFS, spread 4.5 LU, 0 of 64 flagged (exit 0) | median −18.0 LUFS, spread 5.0 LU, 0 of 64 flagged (exit 0) |
 | `--excite sub37=transport` | median −18.0 LUFS, spread 5.7 LU, 1 of 64 flagged: Boom-Bah Arp, 1 click (exit 1) | AFTER_TR |
 
 GATE_LINE
