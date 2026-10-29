@@ -159,11 +159,21 @@ exactly like internal cables.
 ## Changing what a control means
 Saved studios and project files must keep sounding the same after a rebuild. Renaming or
 removing a control is safe: unknown ids are ignored and missing ones take their default.
-Changing an existing control's range, unit or taper is not, because the old saved number
-would mean something else. In that case, add an entry to `lib/studio/upgrades.ts` that
-converts the old value, and bump `STORE_VERSION` and `PROJECT_VERSION`. Each upgrade runs
-once on older browser saves and project files. For example, the DFAM rebuild changed
-TEMPO from steps per minute to 16th-note BPM, so old values are divided by 4.
+These changes are not safe, and each needs an entry in `lib/studio/upgrades.ts`:
+- **A new range, unit or taper.** The old saved number would mean something else. The
+  entry's `apply` converts the old value. For example, the DFAM rebuild changed TEMPO from
+  steps per minute to 16th-note BPM, so old values are divided by 4.
+- **A new default.** Saves keep only the controls someone touched, so an untouched control
+  would silently pick up the new default. List the old default in `oldDefaults`: it is
+  filled in before `apply` runs.
+- **A rebuild with no faithful conversion** (the Analog Four and Rytm redefined hundreds of
+  ids). Set `reset: true` with `apply: () => ({})`. The instrument starts fresh, and the
+  dropped values are kept in the browser and offered to the learner as a file (`lib/studio/legacy.ts`).
+
+Bump `STORE_VERSION` and `PROJECT_VERSION` with each new entry. Each upgrade runs once on
+older browser saves and project files, and on studios kept while a lesson ran. A renamed
+lesson id goes in `LESSON_RENAMES`, so completions carry over. To find changed defaults and
+removed ids between two commits, compare `specDefaults(<device>)` at both.
 
 ## Song arranger
 - Pattern-based instruments provide `studio.patterns(data) => [{ id, label }]` and handle

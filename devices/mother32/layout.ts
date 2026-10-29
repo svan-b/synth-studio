@@ -18,7 +18,7 @@ import type { ReactNode } from 'react';
 import type { CustomRenderContext, PanelElement, PanelLayout } from '@/types/panel';
 import { MOTHER32 } from './spec';
 import {
-  BLACK, WHITE, editTarget, renderDin, renderFn, renderKey, renderMidiLed, renderOctLeds, renderReadout, renderSetup, renderStepLeds,
+  BLACK, WHITE, editTarget, renderDin, renderFn, renderKey, renderMidiLed, renderOctLeds, renderReadout, renderRing, renderSetup, renderStepLeds,
   renderTempoLed, ui,
 } from './panelUi';
 
@@ -47,10 +47,14 @@ const toggle = (control: string, title: string, x: number, y: number, legendW = 
 const ringLegend = (text: string, x: number, y: number, size = LEGEND): PanelElement =>
   ({ kind: 'label', text, x, y: y - 12.6, size, letterSpacing: 0.3 });
 
-/** The printed scale ring of FREQUENCY, PULSE WIDTH, TEMPO and LFO RATE (manual p.9, p.11, p.13) */
+/**
+ * The printed scale ring of FREQUENCY, PULSE WIDTH, TEMPO and LFO RATE (manual p.9, p.11, p.13):
+ * outer circle about 10.9 mm in radius on the drawing. Drawn as art, so the value under the knob
+ * can still grow to the legibility floor.
+ */
+const RING_R = 10.9;
 const scaleRing = (x: number, y: number): PanelElement[] => [
-  { kind: 'section', x: x - 10.4, y: y - 10.4, w: 20.8, h: 20.8, radius: 10.4, border: '1px solid #d9d9d9' },
-  { kind: 'section', x: x - 9.0, y: y - 9.0, w: 18.0, h: 18.0, radius: 9.0, border: '1px solid #8a8a8a' },
+  { kind: 'custom', x: x - RING_R, y: y - RING_R, w: 2 * RING_R, h: 2 * RING_R, render: renderRing(RING_R, 9.0, K) },
 ];
 
 /** The small holes beside some knobs (the panel drawing, manual p.9; four reach the VCO trimmers, p.61) */
@@ -132,7 +136,7 @@ const sequencer: PanelElement[] = [
 
   // teaching readout (not on the hardware), in the blank band above the keys, and the Setup page
   { kind: 'custom', x: 120.2, y: 88.0, w: 124, h: 4, render: renderReadout(124, K) },
-  { kind: 'custom', x: 262, y: 121.1, w: 22, h: 5, render: renderSetup(K) },
+  { kind: 'custom', x: 261, y: 120.2, w: 24, h: 6.6, render: renderSetup(K) },
 ];
 
 const editing = (values: CustomRenderContext['values'], u: Record<string, unknown> | undefined) =>
@@ -150,13 +154,13 @@ const elements: PanelElement[] = [
   ...toggle('vco_wave', 'VCO WAVE', 51.3, ROW1, 7.5),
   ringLegend('PULSE WIDTH', 80.8, ROW1), knob('pulse_width', 80.8, ROW1),
   legend('MIX', 110.3, ROW1), knob('mix', 110.3, ROW1),
-  { kind: 'label', text: 'VCO', x: 102.8, y: ROW1 + 8.4, size: 5.6, color: '#bdbdbd' },
-  { kind: 'label', text: 'NOISE / EXT', x: 119.6, y: ROW1 + 8.4, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: 'VCO', x: 102.4, y: ROW1 + 12.4, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: 'NOISE / EXT', x: 118.4, y: ROW1 + 12.4, size: 5.6, color: '#bdbdbd' },
   legend('CUTOFF', 146.1, ROW1), knob('cutoff', 146.1, ROW1),
-  { kind: 'label', text: '20Hz', x: 137.8, y: ROW1 + 8.0, size: 5.6, color: '#bdbdbd' },
-  { kind: 'label', text: '200Hz', x: 137.4, y: ROW1 - 7.2, size: 5.6, color: '#bdbdbd' },
-  { kind: 'label', text: '2KHz', x: 154.8, y: ROW1 - 7.2, size: 5.6, color: '#bdbdbd' },
-  { kind: 'label', text: '20KHz', x: 154.6, y: ROW1 + 8.0, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: '20Hz', x: 137.5, y: ROW1 + 12.4, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: '200Hz', x: 131.7, y: ROW1 - 7.2, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: '2KHz', x: 159.9, y: ROW1 - 7.2, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: '20KHz', x: 154.5, y: ROW1 + 12.4, size: 5.6, color: '#bdbdbd' },
   legend('RESONANCE', 181.8, ROW1), knob('resonance', 181.8, ROW1),
   ...toggle('vca_mode', 'VCA MODE', 206.3, ROW1, 4.5),
   legend('VOLUME', 228.7, ROW1), knob('volume', 228.7, ROW1),
@@ -213,8 +217,8 @@ const elements: PanelElement[] = [
   ...toggle('sustain', 'SUSTAIN', 169.5, ROW3, 5),
   legend('DECAY', 199.2, ROW3), knob('decay', 199.2, ROW3),
   legend('VC MIX', 228.7, ROW3), knob('vc_mix', 228.7, ROW3),
-  { kind: 'label', text: 'LO / MIX 1', x: 219.6, y: ROW3 + 8.4, size: 5.6, color: '#bdbdbd' },
-  { kind: 'label', text: 'HI / MIX 2', x: 237.8, y: ROW3 + 8.4, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: 'LO / MIX 1', x: 216.6, y: ROW3 + 8.4, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: 'HI / MIX 2', x: 240.8, y: ROW3 + 8.4, size: 5.6, color: '#bdbdbd' },
 
   // --- MIDI IN: its LED left of TEMPO, the legend above the socket (manual p.9) ---------
   { kind: 'custom', x: 14.3 - 1.4, y: 77.4 - 1.4, w: 2.8, h: 2.8, render: renderMidiLed(2.8, K) },
@@ -235,6 +239,8 @@ export const MOTHER32_LAYOUT: PanelLayout = {
   width: 304.8,
   height: 128.5,
   pxPerMm: K,
+  // The manual's clock positions and the preset readings use Moog's 300° sweep (7 to 5 o'clock)
+  knobTravel: 300,
   theme: {
     background: 'linear-gradient(180deg, #161616 0%, #0e0e0e 100%)',
     text: '#f2f2f2',

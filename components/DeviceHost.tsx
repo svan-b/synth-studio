@@ -68,6 +68,11 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
   const focusMode = useStudioStore(s => s.focusMode);
   const stepSatisfied = useStudioStore(s => s.stepSatisfied);
   const lessonDemo = useStudioStore(s => s.lessonDemo);
+  // Clock source, as on hardware with MIDI clock plugged in or not
+  const canSync = !!mod.studio?.midiSync && !!mod.transportControl && device !== 'studio-clock';
+  const synced = useStudioStore(s => s.studio.sync[instance] !== false);
+  const studioBpm = useStudioStore(s => s.studio.bpm);
+  const setSync = useStudioStore(s => s.setSync);
   const ui = useUiStore(selectUi(instance));
   const setUiStore = useUiStore(s => s.setUi);
   // Engine state goes straight to the elements that show it (LEDs, screens, playheads):
@@ -265,7 +270,7 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
       onFocusCapture={e => noteTouched(e.target)}
       data-instance={instance}
     >
-      <div className={`flex flex-wrap items-center justify-center gap-2 ${compact ? 'mb-1.5' : 'mb-3'} text-sm`}>
+      <div className={`flex flex-wrap items-center justify-center gap-2 ${compact ? 'mb-1.5' : 'mb-3 coarse-lg:mb-2'} text-sm`}>
         {presets.length > 0 && (
           <select
             value={preset}
@@ -291,6 +296,17 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
             Clear cables{patches.length ? ` (${patches.length})` : ''}
           </ToolButton>
         )}
+        {!compact && canSync && (
+          <ToolButton
+            onClick={() => setSync(instance, !synced)}
+            title={synced
+              ? `Follows the studio clock (${studioBpm} BPM), like MIDI clock: Play keeps it in time with everything else. Tap to run it on its own tempo instead.`
+              : 'Runs on its own tempo, like hardware with no clock plugged in. Tap to follow the studio clock again.'}
+            pressed={!synced}
+          >
+            Clock: {synced ? `studio ${studioBpm}` : 'own tempo'}
+          </ToolButton>
+        )}
         {!zoomOverride && (
           <div className="flex items-center rounded-full border border-[#3a3a3a] overflow-hidden">
             <button className={`px-2.5 py-1.5 text-xs coarse:min-h-[44px] coarse:min-w-[44px] ${zoom === 'fit' ? 'bg-[#3a3a3a] text-white' : 'text-gray-400'}`} onClick={() => setZoom('fit')}>Fit</button>
@@ -300,14 +316,16 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
           </div>
         )}
         {!compact && mod.keyboard && keyboardActive && (
-          <span className="text-[11px] text-gray-500 hidden md:inline">Keys A–K play · Z/X octave ({octave >= 0 ? '+' : ''}{octave})</span>
+          <span className="text-[11px] text-gray-500 hidden md:inline coarse-lg:hidden">Keys A–K play · Z/X octave ({octave >= 0 ? '+' : ''}{octave})</span>
         )}
-        {!compact && mod.transportControl && keyboardActive && <span className="text-[11px] text-gray-500 hidden md:inline">Space = play/stop</span>}
+        {!compact && mod.transportControl && keyboardActive && <span className="text-[11px] text-gray-500 hidden md:inline coarse-lg:hidden">Space = play/stop</span>}
+        {/* On an iPad the status shares the toolbar row, so the panel gets its line */}
+        {!compact && <ControlStatus spec={spec} values={displayValues} touched={touched} inline />}
       </div>
 
       {!compact && <ControlStatus spec={spec} values={displayValues} touched={touched} />}
 
-      <ResponsiveDeviceContainer zoom={zoomOverride ?? zoom} onScaleChange={onScaleChange}>
+      <ResponsiveDeviceContainer zoom={zoomOverride ?? zoom} fitHeight={!compact} onScaleChange={onScaleChange}>
         <SynthPanel
           spec={spec}
           layout={layout}
@@ -362,7 +380,7 @@ function firstSentence(text: string | undefined): string {
  * does. Touch screens have no hover tooltips, and naming the thing you just moved
  * (with its unit) is half of learning a new instrument.
  */
-function ControlStatus({ spec, values, touched }: { spec: DeviceSpec; values: Values; touched: { kind: 'control' | 'jack'; id: string } | null }) {
+function ControlStatus({ spec, values, touched, inline = false }: { spec: DeviceSpec; values: Values; touched: { kind: 'control' | 'jack'; id: string } | null; inline?: boolean }) {
   let name = '';
   let value = '';
   let about = '';
@@ -388,7 +406,12 @@ function ControlStatus({ spec, values, touched }: { spec: DeviceSpec; values: Va
     }
   }
   return (
-    <div className="h-6 mb-1.5 px-2 flex items-center justify-center gap-2 text-[12px] leading-none min-w-0 max-w-full select-none" data-control-status="">
+    <div
+      className={`h-6 px-2 items-center gap-2 text-[12px] leading-none min-w-0 max-w-full select-none ${
+        inline ? 'hidden coarse-lg:flex basis-0 grow min-w-[240px] max-w-[520px] justify-start' : 'flex mb-1.5 justify-center coarse-lg:hidden'
+      }`}
+      data-control-status={inline ? 'inline' : ''}
+    >
       {name ? (
         <>
           <span className="font-bold text-white shrink-0">{name}</span>
@@ -416,13 +439,14 @@ function groupPresets(presets: PresetEntry[]): [string, PresetEntry[]][] {
   return [...groups.entries()];
 }
 
-function ToolButton({ children, onClick, title, disabled }: { children: React.ReactNode; onClick: () => void; title?: string; disabled?: boolean }) {
+function ToolButton({ children, onClick, title, disabled, pressed }: { children: React.ReactNode; onClick: () => void; title?: string; disabled?: boolean; pressed?: boolean }) {
   return (
     <button
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="px-3 py-1.5 text-xs bg-[#2d2d2d] hover:bg-[#3a3a3a] text-white rounded-full border border-[#3a3a3a] disabled:opacity-40 transition-colors coarse:min-h-[44px] coarse:min-w-[44px]"
+      aria-pressed={pressed}
+      className="px-3 py-1.5 text-xs bg-[#2d2d2d] hover:bg-[#3a3a3a] text-white rounded-full border border-[#3a3a3a] aria-pressed:border-amber-500/70 aria-pressed:text-amber-200 disabled:opacity-40 transition-colors coarse:min-h-[44px] coarse:min-w-[44px]"
     >
       {children}
     </button>

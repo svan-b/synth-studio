@@ -48,12 +48,12 @@ const knobName = (x: number, y: number, a: string, b: string): CustomElement => 
 
 const elements: PanelElement[] = [
   // --- Rear connectors' names along the top edge -------------------------------------
-  ...REAR_LEGENDS.map(r => label(r.text, r.x, REAR_Y + (r.text.includes('\n') ? 1.4 : 0), { size: 7, color: COL.legendDim, weight: 500 })),
+  ...REAR_LEGENDS.map(r => label(r.text, r.x, REAR_Y + (r.text.includes('\n') ? 1.4 : 0), { size: 7.5, color: COL.legendDim, weight: 500 })),
   { kind: 'custom', x: HEADPHONE_X - 2, y: REAR_Y - 2, w: 4, h: 4, render: () => createElement(RearIcons) },
 
   // --- Screen window: black glass, the tag line, the OLED, the name ---------------------
   { kind: 'section', x: SCREEN_WINDOW.x, y: SCREEN_WINDOW.y, w: SCREEN_WINDOW.w, h: SCREEN_WINDOW.h, background: 'linear-gradient(160deg, #0b0c0e 0%, #040405 55%, #08090b 100%)', border: '1px solid #2a2c31', radius: 2.6 },
-  label('4 Voice Analog Tabletop Synthesizer', OLED.x, SCREEN_WINDOW.y + 4.4, { size: 7, color: '#c4c7cc', align: 'left', weight: 500 }),
+  label('4 Voice Analog Tabletop Synthesizer', OLED.x, SCREEN_WINDOW.y + 4.4, { size: 8, color: '#c4c7cc', align: 'left', weight: 500 }),
   { kind: 'display', x: OLED.x, y: OLED.y, w: OLED.w, h: OLED.h, style: 'oled', render: ctx => createElement(Screen, ctx) },
   {
     kind: 'custom', x: OLED.x, y: OLED.y + OLED.h + 2.2, w: 60, h: 6.6,
@@ -85,7 +85,7 @@ const elements: PanelElement[] = [
         kind: 'knob', x: p.x, y: p.y, diameter: ENC_D, variant: 'elektron', capColor: 'transparent', label: 'none', value: 'hover',
         control: ({ values, ui }) => encoderControl(Math.round(num(values.track)), Math.round(num(values.page, V.OSC1)), slot, false, Array.isArray(ui?.heldSteps) && (ui?.heldSteps as unknown[]).length > 0),
       },
-      label('ABCDEFGHIJ'[slot], p.x, p.y + ENC_D / 2 + 4.6, { size: 8.5, weight: 600, color: COL.legend }),
+      label('ABCDEFGHIJ'[slot], p.x, p.y + ENC_D / 2 + 4.6, { size: 10, weight: 600, color: COL.legend }),
     ];
   }).flat(),
 

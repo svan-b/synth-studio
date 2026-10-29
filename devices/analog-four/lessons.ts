@@ -208,7 +208,7 @@ const f2: Lesson = {
       kind: 'do', control: 't1_osc1_sub', targetValue: 1, concept: 'subharmonics',
       instruction: 'Turn knob G (SUB) to 1OCT: a square wave one octave below OSC 1.',
       principle: 'A sub-oscillator adds weight an octave down without changing the note.',
-      explanation: 'The other choices are 2OCT (two octaves down), 2PUL (a pulse two octaves down) and 5TH (a fifth below the octave).',
+      explanation: 'The other choices are 2OCT (two octaves down), 2PUL (a narrow pulse two octaves down) and 5TH (a fifth below OSC 1 itself).',
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'subharmonics',
@@ -554,7 +554,7 @@ const sd1: Lesson = {
     },
     {
       kind: 'predict', control: 'trig_mode', targetValue: 2, concept: 'glide', focus: ['key:FUNC'],
-      instruction: 'Hold FUNC and press BANK G (NOTE SLD). Tapping a trig key now adds or removes a slide.',
+      instruction: 'Hold FUNC and press BANK G (Note Slide). Tapping a trig key now adds or removes a slide.',
       predict: mc('A slide trig makes its note…', ['Glide in pitch from the previous note', 'Repeat quickly', 'Play louder'], 0,
         'A slide bends smoothly from the last note to this one instead of jumping. Louder is what an accent does (FUNC + BANK F).'),
       principle: 'A slide glides from one note\'s pitch to the next instead of jumping.',
@@ -570,7 +570,7 @@ const sd1: Lesson = {
         { text: 'ENV F SUS 20 or less', check: s => num(s, 't1_envf_sus') <= 20 },
         { text: 'At least three slide trigs on T1', check: s => slides(s) >= 3 },
       ],
-      hints: ['With NOTE SLD on, tap any trig key that has a trig.', 'Two slides are already there: add one more.', 'Press FUNC + BANK G again to leave slide mode.'],
+      hints: ['With NOTE SLIDE on, tap any trig key that has a trig.', 'Two slides are already there: add one more.', 'Press FUNC + BANK G again to leave slide mode.'],
       solution: {
         values: { t1_flt1_res: 105, t1_flt1_dep: 45, t1_envf_sus: 0 },
         data: edited(ACID, p => { p.patterns.A01.tracks[0].steps[7] = { ...p.patterns.A01.tracks[0].steps[7], slide: true }; }),
@@ -788,7 +788,7 @@ const sd4: Lesson = {
     },
     {
       kind: 'do', control: 'fx_del_fb', targetValue: 90, tolerance: 8, concept: 'effects',
-      instruction: 'Press AMP (on the FX track it is the DELAY page) and turn knob E (FB) up to about 90.',
+      instruction: 'Press AMP (on the FX track it is the DELAY page) and turn knob E (FDB) up to about 90.',
       principle: 'Feedback sends the echo back into the delay, so it repeats more times.',
     },
     {
@@ -798,8 +798,8 @@ const sd4: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'effects',
-      quiz: mc('Where do you set how many times the echoes repeat?', ['FB on the FX track\'s DELAY page', 'DEL on T1\'s AMP page', 'RES on the FILTER page'], 0,
-        'DEL on T1 decides how much of T1 goes into the delay. FB on the FX track decides how long the echoes keep going, for every track.'),
+      quiz: mc('Where do you set how many times the echoes repeat?', ['FDB on the FX track\'s DELAY page', 'DEL on T1\'s AMP page', 'RES on the FILTER page'], 0,
+        'DEL on T1 decides how much of T1 goes into the delay. FDB (feedback) on the FX track decides how long the echoes keep going, for every track.'),
     },
     {
       kind: 'challenge', concept: 'effects',
@@ -809,7 +809,7 @@ const sd4: Lesson = {
         { text: 'T1 AMP SUS 30 or less (short stabs)', check: s => num(s, 't1_amp_sus') <= 30 },
         { text: 'T1 delay send (DEL) 60 or more', check: s => num(s, 't1_amp_del') >= 60 },
         { text: 'T1 reverb send (REV) 30 or more', check: s => num(s, 't1_amp_rev') >= 30 },
-        { text: 'FX delay FB between 60 and 115 (long, not endless)', check: s => num(s, 'fx_del_fb') >= 60 && num(s, 'fx_del_fb') <= 115 },
+        { text: 'FX delay FDB between 60 and 115 (long, not endless)', check: s => num(s, 'fx_del_fb') >= 60 && num(s, 'fx_del_fb') <= 115 },
       ],
       hints: ['The sends (DEL, REV) are on T1\'s AMP page.', 'The reverb send is knob H, next to DEL.', 'Try REV about 50.'],
       solution: { values: { t1_osc2_lev: 100, t1_osc2_tun: 7, t1_amp_sus: 0, t1_amp_del: 80, t1_amp_rev: 50, fx_del_fb: 90 } },
@@ -825,7 +825,7 @@ const sd4: Lesson = {
   review: [
     mc('OSC 2 tuned +7 semitones above OSC 1 plays…', ['A fifth', 'An octave', 'The same note'], 0, 'Seven semitones is a fifth.'),
     mc('On the A4, a track gets into the delay through…', ['Its DEL send on the AMP page', 'The FILTER page', 'The NOTE page'], 0, 'Sends are on the AMP page.'),
-    mc('Delay FB controls…', ['How many times the echoes repeat', 'The delay send of T1', 'The pitch'], 0, 'Feedback.'),
+    mc('Delay FDB controls…', ['How many times the echoes repeat', 'The delay send of T1', 'The pitch'], 0, 'Feedback.'),
     mc('The FX track\'s effects are…', ['Shared by all tracks', 'Only for T1', 'Only for the CV track'], 0, 'Send effects.'),
   ],
 };
@@ -1340,7 +1340,7 @@ const sq4: Lesson = {
     },
     {
       kind: 'predict', concept: 'sequencer-pattern',
-      instruction: 'Press SONG to open the song editor and add a row.', focus: ['key:SONG'],
+      instruction: 'Hold FUNC and press SONG M (Edit Song) to open the song editor, then add a row.', focus: ['key:FUNC', 'key:SONGMODE'],
       predict: mc('A song row that says A02 x2 plays…', ['A02 twice, then the next row', 'A02 and A03 together', 'A02 at double speed'], 0,
         'Each song row is a pattern and a repeat count. The song plays the rows from top to bottom.'),
       principle: 'A song lists patterns with repeat counts, so a whole track plays by itself.',

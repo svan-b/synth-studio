@@ -597,7 +597,7 @@ export class Xone96Engine extends BaseEngine {
     const put = (k: string, lin: number | undefined, pk: number | undefined) => {
       const m = meters[k] ?? (meters[k] = { db: -120, pk: false });
       m.db = linToDbu(lin);
-      m.pk = !!pk; // PK!: post-GAIN, pre-EQ on the channels (block diagram); +15 dBu
+      m.pk = !!pk; // sample-peak flags: channel PK! post-GAIN, pre-EQ at +15 dBu (block diagram); LR MIX PK! LED at +10 dBu
     };
     (['1', '2', '3', '4'] as const).forEach((id, i) => put(id, a?.[2 * i], a?.[2 * i + 1]));
     (['a', 'b', 'c', 'd'] as const).forEach((id, i) => put(id, b?.[2 * i], b?.[2 * i + 1]));

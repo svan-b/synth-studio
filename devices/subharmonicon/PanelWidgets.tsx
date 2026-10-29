@@ -18,12 +18,28 @@
 import { useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { ControlValue, LessonStep } from '@/types';
+import { FONTS, MIN_CONDENSE, measureLine } from '@/lib/controls/textFit';
 
 type SetValue = (id: string, v: ControlValue) => void;
 
 const CAP = '#2b2b2b';
 const LIT = '#ff3b30';
 const LONG_PRESS_MS = 600;
+/** Cap legends aim at the panel's 9 px legibility floor (a little over, for an iPad's ~0.98 fit) */
+const CAP_FLOOR_PX = 9.3;
+
+/**
+ * A legend printed on a button cap: at the floor, condensed to fit (never narrower than the
+ * panel's own 80 % limit) and only then smaller - as the panel fits its own legends.
+ */
+export function capLegend(text: string, capW: number): CSSProperties {
+  const room = Math.max(8, capW - 6);
+  const width = measureLine(text, CAP_FLOOR_PX, 700, FONTS.sans, 0.2) || 1;
+  let size = CAP_FLOOR_PX;
+  let sx = Math.min(1, room / width);
+  if (sx < MIN_CONDENSE) { size = Math.max(6, (CAP_FLOOR_PX * sx) / MIN_CONDENSE); sx = MIN_CONDENSE; }
+  return { fontSize: +size.toFixed(2), transform: sx < 0.999 ? `scaleX(${sx.toFixed(3)})` : undefined, letterSpacing: '0.2px' };
+}
 
 /** No selection, magnifier or callout on long presses (iOS Safari) */
 const NO_SELECT: CSSProperties = { WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none', touchAction: 'none' };
@@ -93,8 +109,8 @@ export function CycleButton({ control, label, value, next, heldControl, held, se
       style={{ ...NO_SELECT, width: w, height: h, background: CAP, boxShadow: [hl, 'inset 0 2px 4px rgba(0,0,0,0.6)'].filter(Boolean).join(', ') }}
       aria-label={`${label}${held ? ' (held: SEQ jacks free)' : ''}`}
     >
-      <span className="absolute inset-0 flex items-center justify-center font-bold leading-none whitespace-nowrap pointer-events-none" style={{ fontSize: Math.min(9, (w / label.length) * 1.45), color: '#d8d8d8', letterSpacing: '0.2px' }}>
-        {label}
+      <span className="absolute inset-0 flex items-center justify-center font-bold leading-none whitespace-nowrap pointer-events-none" style={{ color: '#d8d8d8' }}>
+        <span style={{ display: 'inline-block', ...capLegend(label, w) }}>{label}</span>
       </span>
     </button>
   );
@@ -126,7 +142,9 @@ export function EgButton({ value, setValue, w, h, teaching, step }: { value: num
       aria-label={`EG ${['OFF', 'ON', 'HELD'][value] ?? ''}`}
       aria-pressed={lit}
     >
-      <span className="absolute inset-0 flex items-center justify-center font-bold leading-none pointer-events-none" style={{ fontSize: Math.min(9, w * 0.3), color: lit ? '#1a0000' : '#d8d8d8' }}>EG</span>
+      <span className="absolute inset-0 flex items-center justify-center font-bold leading-none pointer-events-none" style={{ color: lit ? '#1a0000' : '#d8d8d8' }}>
+        <span style={{ display: 'inline-block', ...capLegend('EG', w) }}>EG</span>
+      </span>
       <style>{'@keyframes subh-blink{0%,49%{opacity:1}50%,100%{opacity:.35}}.subh-blink{animation:subh-blink .5s linear infinite}'}</style>
     </button>
   );

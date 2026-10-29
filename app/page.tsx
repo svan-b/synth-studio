@@ -70,6 +70,7 @@ function App() {
   const currentLesson = useStudioStore(s => s.currentLesson);
   const lessonInstance = useStudioStore(s => s.lessonInstance);
   const completed = useStudioStore(s => s.completedLessons);
+  const [startFirstOn, setStartFirstOn] = useState<string | null>(null);
   const review = useStudioStore(s => s.review);
   const deviceOf = useStudioStore(s => s.deviceOf);
   const [view, setView] = useState<View>('instrument');
@@ -136,7 +137,8 @@ function App() {
   const onWelcome = (c: WelcomeChoice) => {
     closeWelcome();
     hub.ensureAudio();
-    if (c === 'learn') { openInstrument('sub37'); setTimeout(() => setLessonsOpen(true), 300); }
+    // The card promises the first lesson: it starts once the Sub 37's lessons have loaded
+    if (c === 'learn') { openInstrument('sub37'); setStartFirstOn('sub37'); }
     if (c === 'explore') setDevicesOpen(true);
     if (c === 'track' || c === 'moog-studio') setView('studio');
   };
@@ -194,6 +196,19 @@ function App() {
     setView(lesson.device === 'studio' ? 'studio' : 'instrument');
   };
 
+  // Welcome → "Start the first lesson": the recommended one (as the lesson browser picks it)
+  const beginRef = useRef(begin);
+  beginRef.current = begin;
+  useEffect(() => {
+    if (!startFirstOn || focusDevice !== startFirstOn || !lessons.length) return;
+    setStartFirstOn(null);
+    const ready = [...lessons]
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+      .find(l => !completed.includes(l.id) && (l.prerequisites ?? []).every(p => completed.includes(p)));
+    if (ready) beginRef.current(ready);
+    else setLessonsOpen(true);
+  }, [startFirstOn, focusDevice, lessons, completed]);
+
   const labelFor = (id: string) => {
     const r = rack.find(x => x.id === id);
     const e = DEVICES.find(d => d.id === r?.device);
@@ -228,9 +243,12 @@ function App() {
               {labelFor(r.id)}
             </TabButton>
           ))}
-          <button onClick={() => setDevicesOpen(true)} className="px-3 py-2 rounded-lg text-sm text-gray-300 border border-dashed border-[#444] hover:border-[#666] whitespace-nowrap">
-            {singleInstrument ? 'Instruments…' : '+ Instrument'}
-          </button>
+          {/* Pinned to the end of the row, so a full studio's tabs scroll under it instead of cutting it off */}
+          <div className="sticky right-0 z-10 pl-1.5 bg-hardware-bg">
+            <button onClick={() => setDevicesOpen(true)} className="px-3 py-2 rounded-lg text-sm text-gray-300 border border-dashed border-[#444] hover:border-[#666] whitespace-nowrap bg-hardware-bg">
+              {singleInstrument ? 'Instruments…' : '+ Instrument'}
+            </button>
+          </div>
         </nav>
         <div className="shrink-0 flex items-center gap-2">
           <UndoRedo />

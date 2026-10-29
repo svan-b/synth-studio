@@ -5,9 +5,15 @@ import type { RackSlot, StudioCable } from '@/devices/types';
 import { isStepSatisfied, isValueOnTarget, valueToNorm, defaultOf } from '@/lib/controls/mapping';
 import { transport } from '@/lib/audio/transport';
 import { STORE_VERSION, upgradeCompletedLessons, upgradeDevices } from '@/lib/studio/upgrades';
+import { keepOldSettings, type OldSettings } from '@/lib/studio/legacy';
 import type { ChannelDoc, DelayDoc, MasterDoc, MixerDoc, ReverbDoc } from '@/lib/studio/mixerDoc';
+import { channelOf, delayOf, reverbOf, masterOf } from '@/lib/studio/mixerDoc';
 import { throttledLocalStorage } from '@/lib/studio/persistStorage';
 import { STUDIO_LESSONS } from '@/lib/studio/lessons';
+import { getLessonLive, lessonStudioHooks } from '@/lib/studio/lessonLive';
+import { isProducerLessonId, producerLessonsNow, setProducerRegister } from '@/lib/studio/producerIndex';
+import { buildLessonStudio, newBackupId, pushBackup, sameStudio, type LessonBackup } from '@/lib/studio/lessonStudio';
+import { LIMITER_CEILING_DB } from '@/lib/audio/context';
 
 // ============================================================================
 // Synth Studio store
@@ -124,7 +130,14 @@ interface LessonSessionState {
   focusMode: boolean;
   /** "Show me" demonstration in progress (auto-advance waits until it ends) */
   lessonDemo: LessonDemo | null;
+  /**
+   * A studio lesson that started from its own studio (Lesson.start.studio): the backup of
+   * the learner's studio taken at the start, and whether they chose to use their own studio
+   */
+  lessonStudio?: { lesson: string; backupId?: string; own: boolean };
 }
+
+export type { LessonBackup };
 
 interface StudioStoreState extends LessonSessionState {
   /** Focused instance (the big panel) */
@@ -133,6 +146,8 @@ interface StudioStoreState extends LessonSessionState {
   studio: StudioDoc;
   completedLessons: string[];
   review: Record<string, ReviewItem>;
+  /** The learner's studios saved before studio lessons replaced them (newest first; saved in the browser) */
+  lessonBackups: LessonBackup[];
 }
 
 interface StudioStore extends StudioStoreState {
@@ -205,6 +220,14 @@ interface StudioStore extends StudioStoreState {
   markStepShown: () => void;
   /** Check state of the current step's instrument (coach, lesson runner) */
   lessonCheckState: () => LessonCheckState | null;
+  /**
+   * Bring back a studio saved before a lesson. The studio you have now is saved in its
+   * place first (`keepCurrent`, default true), so restoring never loses work.
+   */
+  restoreStudioBackup: (id: string, opts?: { keepCurrent?: boolean }) => void;
+  deleteStudioBackup: (id: string) => void;
+  /** During a lesson that allows it: go back to your own studio and do the lesson there */
+  useOwnStudio: () => void;
 
   // ---- spaced review --------------------------------------------------------
   recordReview: (itemId: string, correct: boolean, lesson: string, meta?: { fp?: string; device?: string }) => void;
@@ -284,6 +307,8 @@ export function resolveReviewItem(id: string, item?: Pick<ReviewItem, 'device'>,
   if (!REVIEWABLE.has(ref[0])) return null;
   const lesson = lessonIndex.get(lessonId);
   if (!lesson) {
+    // Producer path lessons load on demand: until they have, their questions are pending, not gone
+    if (isProducerLessonId(lessonId) && !producerLessonsNow()) return undefined;
     if (complete || (item?.device && lessonDevices.has(item.device))) return null;
     return undefined;
   }
@@ -303,6 +328,9 @@ export function registerLessons(device: string, lessons: Lesson[]) {
   // Deferred: callers are often in the middle of a render or module load
   setTimeout(() => useStudioStore.getState().reconcileReview(), 0);
 }
+
+// The Producer path's lessons register themselves here once they have loaded
+setProducerRegister(registerLessons);
 
 const ADVANCE_DELAY_MS = 750;
 const PREDICT_REVEAL_MS = 2200;
@@ -345,6 +373,30 @@ const stripInstance = (instance: string) => instance.split('#')[0];
 function clearAdvance() {
   if (advanceTimer) clearTimeout(advanceTimer);
   advanceTimer = null;
+}
+
+/** The studio mixer with every default filled in (lesson checks read it) */
+function mixerView(studio: StudioDoc): NonNullable<LessonCheckState['mixer']> {
+  const channels: NonNullable<LessonCheckState['mixer']>['channels'] = {};
+  studio.rack.forEach(r => { channels[r.id] = channelOf(studio.mixer, r.id); });
+  return { channels, delay: delayOf(studio.mixer), reverb: reverbOf(studio.mixer), master: masterOf(studio.mixer) };
+}
+
+/**
+ * The v3 studio-state fields of a lesson check state: swing, the mix, the master section
+ * and what the lesson runtime measures live (meters, REC and Bounce, history, song position)
+ */
+function studioCheckExtras(studio: StudioDoc): Pick<LessonCheckState, 'mixer' | 'master' | 'meters' | 'bounce' | 'history' | 'arranger'> {
+  const live = getLessonLive();
+  const mixer = mixerView(studio);
+  return {
+    mixer,
+    master: { gainDb: mixer.master.gain, limiterOn: true, ceilingDbTP: LIMITER_CEILING_DB, glueOn: mixer.master.glue.on, eqOn: mixer.master.eq.on },
+    meters: live.meters,
+    bounce: live.bounce,
+    history: live.history,
+    arranger: live.arranger,
+  };
 }
 
 /** Defaults for a device from its registered spec */
@@ -418,12 +470,36 @@ export const useStudioStore = create<StudioStore>()(
           studioCables: s.studio.cables,
           routes: s.studio.routes,
           sync: s.studio.sync,
-          transport: { playing: transport.playing, bpm: s.studio.bpm },
+          transport: { playing: transport.playing, bpm: s.studio.bpm, swing: s.studio.swing ?? 0 },
           arrangement: s.studio.arrangement,
           events: sess?.events?.[instance] ?? {},
           notesPlayed: sess?.notes?.[instance] ?? [],
           eventsByInstance: sess?.events ?? {},
+          ...studioCheckExtras(s.studio),
         };
+      };
+
+      /** Replace the studio and instruments (lesson start states, restoring a backup) */
+      const replaceStudio = (next: { devices: Record<string, InstanceState>; studio: StudioDoc; currentDevice: string }) => {
+        const hooks = lessonStudioHooks();
+        if (hooks) hooks.stopAll();
+        else if (transport.playing) transport.stop();
+        set({ devices: next.devices, studio: next.studio, currentDevice: next.currentDevice });
+        transport.setBpm(next.studio.bpm);
+        transport.setSwing(next.studio.swing ?? 0);
+        hooks?.studioReplaced();
+      };
+
+      /** Save the studio you have now as a backup (unless an identical one is the newest) */
+      const backupCurrent = (label: string): string => {
+        const s = get();
+        const newest = s.lessonBackups[0];
+        if (newest && sameStudio(newest, s.devices, s.studio)) return newest.id;
+        const id = newBackupId();
+        const pinned = !s.lessonBackups.some(b => b.pinned);
+        const backup: LessonBackup = { id, at: Date.now(), label, pinned, devices: s.devices, studio: s.studio, currentDevice: s.currentDevice };
+        set({ lessonBackups: pushBackup(s.lessonBackups, backup) });
+        return id;
       };
 
       /** Is the current step's *action* done (ignores answer requirements) */
@@ -601,6 +677,8 @@ export const useStudioStore = create<StudioStore>()(
         lessonSnapshot: undefined,
         focusMode: true,
         lessonDemo: null,
+        lessonStudio: undefined,
+        lessonBackups: [],
 
         // ---- focus / rack -------------------------------------------------------
         setCurrentDevice: id => {
@@ -845,7 +923,19 @@ export const useStudioStore = create<StudioStore>()(
         // ---- lessons --------------------------------------------------------------
         startLesson: (lesson, instanceArg) => {
           clearAdvance();
-          const s = get();
+          let s = get();
+          // A whole studio to start from (v3): save the learner's studio, then load the lesson's
+          const studioStart = lesson.device === 'studio' ? lesson.start?.studio : undefined;
+          let lessonStudio: LessonSessionState['lessonStudio'];
+          if (studioStart) {
+            const backupId = backupCurrent(`Before “${lesson.name}”`);
+            replaceStudio(buildLessonStudio(studioStart, get()));
+            lessonStudio = { lesson: lesson.id, backupId, own: false };
+            s = get();
+          }
+          // Studio lessons measure the studio live (meters, takes, history): that is the lesson
+          // runtime, loaded on demand because it imports the hub
+          if (lesson.device === 'studio' && typeof window !== 'undefined') void import('@/lib/studio/lessonRuntime').catch(() => undefined);
           let instance = instanceArg;
           if (!instance) {
             if (lesson.device === 'studio') instance = s.currentDevice;
@@ -888,6 +978,7 @@ export const useStudioStore = create<StudioStore>()(
             session: {},
             lessonSnapshot: snapshot,
             lessonDemo: null,
+            lessonStudio,
             currentDevice: lesson.device === 'studio' ? s.currentDevice : instance,
           });
           enterStep(0);
@@ -910,7 +1001,7 @@ export const useStudioStore = create<StudioStore>()(
 
         resetLesson: () => {
           clearAdvance();
-          set({ currentLesson: undefined, currentStep: 0, isTeachingMode: false, lessonFinished: false, stepSatisfied: false, session: {}, lessonDemo: null });
+          set({ currentLesson: undefined, currentStep: 0, isTeachingMode: false, lessonFinished: false, stepSatisfied: false, session: {}, lessonDemo: null, lessonStudio: undefined });
         },
 
         completeLesson: () => {
@@ -949,13 +1040,50 @@ export const useStudioStore = create<StudioStore>()(
             stepSatisfied: false,
             session: {},
             lessonDemo: null,
+            lessonStudio: undefined,
           });
         },
 
         restoreLessonSnapshot: () => {
+          // A studio lesson replaced the whole studio: bring back the one saved at its start
+          const ls = get().lessonStudio;
+          if (ls?.backupId && !ls.own && get().lessonBackups.some(b => b.id === ls.backupId)) {
+            get().restoreStudioBackup(ls.backupId);
+            set({ lessonSnapshot: undefined, lessonStudio: { ...ls, backupId: undefined } });
+            return;
+          }
           const snap = get().lessonSnapshot;
           if (!snap) return;
           set(state => ({ devices: { ...state.devices, [snap.instance]: snap.state }, lessonSnapshot: undefined }));
+        },
+
+        restoreStudioBackup: (id, opts = {}) => {
+          const s = get();
+          const b = s.lessonBackups.find(x => x.id === id);
+          if (!b) return;
+          let list = s.lessonBackups.filter(x => x.id !== id);
+          // Swap: the studio you have now takes its place, so nothing is lost
+          if (opts.keepCurrent !== false && !sameStudio(b, s.devices, s.studio)) {
+            const lessonName = s.currentLesson?.name ?? lessonIndex.get(s.lessonStudio?.lesson ?? '')?.name;
+            list = pushBackup(list, {
+              id: newBackupId(), at: Date.now(), label: lessonName ? `Your work in “${lessonName}”` : 'Your studio before restoring',
+              pinned: false, devices: s.devices, studio: s.studio, currentDevice: s.currentDevice,
+            });
+          }
+          set({ lessonBackups: list });
+          replaceStudio({ devices: b.devices, studio: b.studio, currentDevice: b.currentDevice });
+        },
+
+        deleteStudioBackup: id => set(state => ({ lessonBackups: state.lessonBackups.filter(b => b.id !== id) })),
+
+        useOwnStudio: () => {
+          const s = get();
+          const ls = s.lessonStudio;
+          if (!ls || ls.own || !s.currentLesson?.start?.studio?.ownStudio) return;
+          // The lesson's studio is only its start state: nothing to keep
+          if (ls.backupId && s.lessonBackups.some(b => b.id === ls.backupId)) get().restoreStudioBackup(ls.backupId, { keepCurrent: false });
+          set({ lessonStudio: { ...ls, backupId: undefined, own: true } });
+          enterStep(get().currentStep);
         },
 
         isStepComplete: () => get().stepSatisfied,
@@ -1125,6 +1253,8 @@ export const useStudioStore = create<StudioStore>()(
         completedLessons: s.completedLessons,
         review: s.review,
         focusMode: s.focusMode,
+        // A lesson that replaced the studio must never cost the learner their track, even after a reload
+        lessonBackups: s.lessonBackups,
       }),
       migrate: (persisted, version) => {
         const old = (persisted ?? {}) as Record<string, unknown> & {
@@ -1141,8 +1271,15 @@ export const useStudioStore = create<StudioStore>()(
         }
         const currentDevice = (old.currentDevice as string) ?? 'dfam';
         const studio = old.studio ?? defaultStudio(currentDevice);
-        // Controls whose meaning changed since this was saved keep sounding the same
-        devices = upgradeDevices(devices, studio.rack ?? [], 'store', version);
+        // Controls whose meaning changed since this was saved keep sounding the same;
+        // settings no conversion can carry over are kept as a copy for the learner
+        const dropped: OldSettings[] = [];
+        const keep = (from: OldSettings['from']) => (instance: string, device: string, values: OldSettings['values']) => dropped.push({ instance, device, from, values });
+        devices = upgradeDevices(devices, studio.rack ?? [], 'store', version, keep('studio'));
+        const lessonBackups = Array.isArray(old.lessonBackups)
+          ? (old.lessonBackups as LessonBackup[]).map(b => ({ ...b, devices: upgradeDevices(b.devices ?? {}, b.studio?.rack ?? [], 'store', version, keep('lesson backup')) }))
+          : [];
+        keepOldSettings(dropped, version);
         return {
           currentDevice,
           devices,
@@ -1150,6 +1287,8 @@ export const useStudioStore = create<StudioStore>()(
           completedLessons: upgradeCompletedLessons((old.completedLessons as string[]) ?? [], version),
           review: (old.review as Record<string, ReviewItem>) ?? {},
           focusMode: (old.focusMode as boolean) ?? true,
+          // Studios saved before lessons get the same upgrades, so bringing one back sounds as it did
+          lessonBackups,
         } as unknown as StudioStore;
       },
     },
@@ -1178,11 +1317,12 @@ export function buildCheckState(instance: string, engine?: Record<string, unknow
     studioCables: s.studio.cables,
     routes: s.studio.routes,
     sync: s.studio.sync,
-    transport: { playing: transport.playing, bpm: s.studio.bpm },
+    transport: { playing: transport.playing, bpm: s.studio.bpm, swing: s.studio.swing ?? 0 },
     arrangement: s.studio.arrangement,
     events: sess?.events?.[instance] ?? {},
     notesPlayed: sess?.notes?.[instance] ?? [],
     eventsByInstance: sess?.events ?? {},
+    ...studioCheckExtras(s.studio),
   };
 }
 

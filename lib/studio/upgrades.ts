@@ -26,6 +26,8 @@ interface Upgrade {
   device: string;
   /** Defaults of the version being replaced, for controls whose default changed or that were removed */
   oldDefaults?: Values;
+  /** No faithful conversion exists: the old values are dropped, and offered to the user as a backup */
+  reset?: boolean;
   apply: (values: Values) => Values;
 }
 
@@ -146,6 +148,7 @@ const UPGRADES: Upgrade[] = [
     store: 7,
     project: 4,
     device: 'analog-four',
+    reset: true,
     apply: () => ({}),
   },
   {
@@ -209,6 +212,27 @@ const UPGRADES: Upgrade[] = [
       return o;
     },
   },
+  {
+    // Analog Rytm MKII rebuild to the OS 1.72 manual: the voices, machines and
+    // sequencer were redefined (391 of 421 ids replaced; old patterns lived in
+    // control strings). No faithful conversion exists, so old Rytm settings start
+    // fresh: the new defaults and the demo song.
+    store: 11,
+    project: 8,
+    device: 'analog-rytm',
+    reset: true,
+    apply: () => ({}),
+  },
+  {
+    // Mother-32 review: DECAY spans 10 ms - 7 s (was 1.25 ms - 7 s) so the
+    // manual's patch sheets play as drawn, and its default moved from 60 to 180 ms.
+    // Stored times keep their meaning; saves that never touched DECAY keep 60 ms.
+    store: 12,
+    project: 9,
+    device: 'mother32',
+    oldDefaults: { decay: 60 },
+    apply: v => (typeof v.decay === 'number' && v.decay < 10 ? { ...v, decay: 10 } : v),
+  },
 ];
 
 /** Lessons replaced by a rebuild: completing the old one counts for its successor */
@@ -258,6 +282,21 @@ const LESSON_RENAMES: { store: number; map: Record<string, string> }[] = [
       'subh-clock-patching': 'subharmonicon-st1-studio-clock',
     },
   },
+  {
+    store: 11,
+    map: {
+      'rytm-kick-anatomy': 'analog-rytm-s1-kick',
+      'rytm-snare': 'analog-rytm-s2-snare-clap',
+      'rytm-hats-choke': 'analog-rytm-s3-hats-cymbals-choke',
+      'rytm-filter-amp-env': 'analog-rytm-s4-toms-envelopes',
+      'rytm-sends': 'analog-rytm-s5-sends',
+      'rytm-compressor-glue': 'analog-rytm-s6-dist-comp',
+      'rytm-four-on-the-floor': 'analog-rytm-q1-rhythm-basics',
+      'rytm-backbeat-syncopation': 'analog-rytm-q1-rhythm-basics',
+      'rytm-ghosts-accents': 'analog-rytm-q2-groove',
+      'rytm-swing-groove': 'analog-rytm-q2-groove',
+    },
+  },
 ];
 
 /** Carry lesson completions over to the lessons that replaced them */
@@ -269,19 +308,22 @@ export function upgradeCompletedLessons(done: string[], from: number): string[] 
   return [...out];
 }
 
-export const STORE_VERSION = 10;
-export const PROJECT_VERSION = 7;
+export const STORE_VERSION = 12;
+export const PROJECT_VERSION = 9;
 
 /**
  * Upgrade the control values of every instance saved before version `from`
  * ('store' for browser saves, 'project' for project files). `rack` maps
  * instance ids to devices; ids not in it are "<device>" or "<device>#n".
+ * `onReset` gets the values an upgrade without a conversion drops, so the
+ * caller can keep a copy for the user.
  */
 export function upgradeDevices<S extends { controlValues?: Values }>(
   devices: Record<string, S>,
   rack: RackSlot[],
   key: 'store' | 'project',
   from: number,
+  onReset?: (instance: string, device: string, values: Values) => void,
 ): Record<string, S> {
   const pending = UPGRADES.filter(u => u[key] > from);
   if (!pending.length) return devices;
@@ -290,7 +332,9 @@ export function upgradeDevices<S extends { controlValues?: Values }>(
     const device = rack.find(r => r.id === instance)?.device ?? instance.split('#')[0];
     let values = state.controlValues;
     pending.forEach(u => {
-      if (values && u.device === device) values = u.apply(u.oldDefaults ? { ...u.oldDefaults, ...values } : values);
+      if (!values || u.device !== device) return;
+      if (u.reset && Object.keys(values).length) onReset?.(instance, device, values);
+      values = u.apply(u.oldDefaults ? { ...u.oldDefaults, ...values } : values);
     });
     out[instance] = values === state.controlValues ? state : { ...state, controlValues: values };
   });

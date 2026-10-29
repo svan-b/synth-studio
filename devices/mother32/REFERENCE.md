@@ -25,6 +25,7 @@ Facts are written in our own words; the few short quotations are marked and cite
 | MAN | Moog, *Mother-32 User Manual Version 2* (©2020): every chapter, the default-panel drawing (p.9), the patch-bay drawing (p.46), the nine patch sheets (pp.64-66) and the blank sheets (pp.67-69) | everything marked verified |
 | DFAM | Moog, *DFAM Owner's Manual with Patch Sheets*, "Syncing DFAM with a Mother-32" (DFAM manual, p.31) | the ASSIGN-clock recipe in lesson st2 |
 | SOS | Sound On Sound review of the Mother-32 (search excerpts), quoting Moog's figures | EG time ranges (attack 1.25 ms - 3 s, decay 1.25 ms - 7 s, nominal) |
+| ELEC | Moog, *House of Electronicus* patch book (DFAM + Mother-32 patches), "Sine Up For Noise" (ELEC p.10) | with the patch sheets, evidence for the DECAY law (a melody at DECAY 11 o'clock) |
 | MS | Moog support articles: VCA CV distortion above +5 V; MIDI sync at half or double time | VCA CV clipping; why TEMPO selects the division under sync |
 | PS | The patchscore project's 200 dpi measurement of a blank patch-sheet drawing (Mother-32 manual, p.68), moved into faceplate coordinates (x - 7.25 mm cheek, y - 2.25 mm) | knob, switch, button and jack centres |
 | PD9 | Our own measurement of a 200 dpi render of the default-panel drawing (Mother-32 manual, p.9): faceplate 169.5-1470 px wide (4.27 px/mm) | screws, button legends, bottom band |
@@ -105,7 +106,7 @@ Positions are faceplate millimetres (x, y) of the control centre (PS, PD9): **li
 | LFO WAVE | (110.4, 75.9) | UP square, DOWN triangle (default); the chosen wave feeds both MOD SOURCE switches; both waves always have jacks | SQ / TRI | (Mother-32 manual, p.13, p.9) | **verified** |
 | ATTACK | (139.9, 75.9) | time to rise from zero to the peak | 1.25 ms - 3 s, log | (Mother-32 manual, p.15); range SOS | function **verified**; range **likely** |
 | SUSTAIN | (169.5, 75.9) | UP ON (default): holds the peak while a note is held, and overlapping notes do not retrigger; DOWN OFF: the attack moves on to the decay when complete or at note-off, whichever comes first, and every note retriggers | ON / OFF | (Mother-32 manual, p.16, p.9) | **verified** |
-| DECAY | (199.2, 75.9) | time to fall from the current or peak level to zero | 1.25 ms - 7 s, log | (Mother-32 manual, p.16); range SOS | function **verified**; range **likely** |
+| DECAY | (199.2, 75.9) | time to fall from the current or peak level to zero | 10 ms - 7 s to -40 dB, log | (Mother-32 manual, p.16); top SOS; bottom fitted to the patch sheets (see "Model choices") | function **verified**; range **guess** |
 | VC MIX | (228.7, 75.9) | crossfades MIX 1 (CCW) and MIX 2 (CW); DC coupled; not wired to the synth inside | 0-100 % | (Mother-32 manual, p.21, p.50, p.51) | **verified** |
 
 ### Sequencer buttons
@@ -288,22 +289,23 @@ and page 8 options 4-7 (see "Simplified").
 ## Presets from the manual
 
 The nine patch sheets (Mother-32 manual, pp.64-66) and the default panel (p.9) are recreated as
-presets under our own names; each sheet's knob angles were read from the drawing and converted
-through this twin's knob laws. The sheets show no pattern, so every demo pattern is ours. VOLUME
-is set on every preset so it plays at about -18 LUFS (scripts/audio-qa.cjs), not as drawn.
+presets under our own names; each sheet's knob angles were read from the drawing (a 300° sweep,
+7 o'clock to 5 o'clock, as drawn) and converted through this twin's knob laws. The sheets show no
+pattern, so every demo pattern is ours. VOLUME is set on every preset so it plays at about
+-18 LUFS (scripts/audio-qa.cjs), not as drawn.
 
 | Sheet (page) | Preset | Changes from the drawing |
 |---|---|---|
 | default panel (p.9) | Init / Basic patch | - |
-| Octave Bounce Back (p.64) | Lead / Gate pitch jump | - |
-| Noise Transient (p.64) | Drums / Noise-attack pluck | DECAY a little longer (the drawn 43 ms is very short in this twin's decay law) |
-| Metal Snare (p.64) | Drums / Noise snare | CUTOFF two octaves higher and the pattern and octave two lower (the same sound, noise only, playable from the keys); DECAY longer |
+| Octave Bounce Back (p.64) | Lead / Gate pitch jump | VC MIX fully up instead of about 2 o'clock: in this twin that is exactly an octave (2 o'clock gives 9.2 semitones), and the sheet says to set the interval with VC MIX |
+| Noise Transient (p.64) | Lead / Noise-attack pluck | - |
+| Metal Snare (p.64) | Drums / Noise snare | TEMPO 100 BPM for the demo pattern (drawn fully down, 20 BPM) |
 | Sequencer Bass (p.65) | Bass / Pulse sequencer bass | - |
 | Resonant High Pass Filter (p.65) | FX / High-pass feedback | - |
-| 8-Bit Percussion (p.65) | Drone / Bit-crunch bed | VCF MOD AMOUNT a little lower so the hits sit on the bed |
+| 8-Bit Percussion (p.65) | Drone / 8-bit percussion | - (filed as a drone: VCA MODE ON keeps a quiet bed sounding between the hits) |
 | '80s Toms (p.66) | Drums / Electronic toms | - |
-| Short Brass (p.66) | Brass / Saw and pulse stabs | DECAY longer, CUTOFF brighter and a smaller pulse-width sweep: the drawn settings give a 50 ms blip whose pulse-width step through the AC-coupled mixer peaks 10 dB above the note |
-| Filter Kick (p.66) | Drums / Feedback filter kick | - |
+| Short Brass (p.66) | Brass / Saw and pulse stabs | VCO MOD AMOUNT 62 % instead of 80 % and CUTOFF 800 Hz instead of about 325 Hz: the full EG sweep of the pulse width moves the pulse's DC level so far that, through the AC-coupled mixer, its low thump comes out 9 dB above the note |
+| Filter Kick (p.66) | Drums / Feedback filter kick | - (the demo pattern plays the G key at octave 3: a 30-100 Hz kick) |
 
 The remaining presets are our own designs or follow Moog's first-edition patch examples and the
 Sweetwater / Moog patch-sheet series; their descriptions say which.
@@ -313,7 +315,7 @@ Sweetwater / Moog patch-sheet series; their descriptions say which.
 | Quantity | Twin value |
 |---|---|
 | Pitch | FREQUENCY centre + KB 0 V = C4 (261.6 Hz), which matches the calibration procedure (Mother-32 manual, p.62); keyboard octave n (LED n) starts at C(n-1): octave 4 low C = C3 = -1 V, octave 5 low C = 0 V |
-| EG | attack 1.25 ms - 3 s and decay 1.25 ms - 7 s on log knobs (SOS); RC attack toward 1.5 x the peak; exponential fall reaching -40 dB at the DECAY time; peak +7.5 V; retriggers from the current level |
+| EG | attack 1.25 ms - 3 s on a log knob (SOS), RC toward 1.5 x the peak, reaching it at the ATTACK time; exponential fall reaching -40 dB at the DECAY time, 10 ms - 7 s on a log knob; peak +7.5 V; retriggers from the current level. The DECAY top is Moog's nominal 7 s (SOS). Its bottom is raised from the nominal 1.25 ms to 10 ms (the DFAM's documented minimum) because, with 1.25 ms, the manual's own patches came out far too short at their drawn angles: Filter Kick and Noise Transient (11 o'clock) gave 40 ms, a click and a blip; Short Brass (noon) 93 ms; the Electronicus "Sine Up For Noise" melody (11 o'clock) 40 ms notes. On 10 ms - 7 s they give 136, 144, 265 and 135 ms, and the 1 o'clock sheets (snare, toms) about 530 ms |
 | GLIDE | 0 - 2 s on an exponential knob; RC slide reaching 95 % at the knob's time |
 | VCO MOD AMOUNT | audio taper; full scale 0.5 oct per volt of source (EG 3.75 octaves, LFO +/-2.5 octaves), or 9.6 % pulse width per volt (LFO +/-48 %) |
 | VCF MOD AMOUNT | audio taper; full scale 0.9 oct per volt (EG 6.75 octaves, LFO +/-4.5 octaves) |
@@ -321,10 +323,11 @@ Sweetwater / Moog patch-sheet series; their descriptions say which.
 | Accent | +1 octave of cutoff and +2.5 dB at the VCA, eased in over about 5 ms |
 | Ladder | 2x-oversampled transistor core with per-stage tanh; feedback 5.4 x RESONANCE, so self-oscillation starts near 75 % (3 o'clock) and reaches about 4.5 V; a little make-up gain for the Moog bass loss |
 | VCF RES. jack | reaches the feedback through a 1.5 ms slew, as through the VCA of a real feedback path, so stepped CVs cannot click the level |
-| HI PASS | the input minus the ladder low-pass, with RESONANCE fading the subtraction (the bass returns) and the feedback held below oscillation (a gentle peak). This makes the manual's VCF -> EXT. AUDIO trick self-oscillate near MIX 80 %, as described (Mother-32 manual, p.14) |
+| HI PASS | the filter's input minus the ladder low-pass, with the ladder's feedback at most 2.5 (far below oscillation, so non-resonant): RESONANCE lets the bass back in (the fed-back low-pass no longer cancels it; measured at CUTOFF 600 Hz, 65 Hz goes from -7.5 dB at RESONANCE 0 to -3.5 dB at 80 % and -2.9 dB at 100 %) and leaves only a gentle bump at the cutoff (+3.5 dB at 80 %, +4.4 dB at 100 %). Below the corner the slope is about 6 dB/oct, the "lot of mid-range" reviewers describe. The manual's VCF -> EXT. AUDIO trick (RESONANCE at 0) self-oscillates from MIX about 75-80 %, as described (Mother-32 manual, p.14) |
 | Mixer | linear crossfade; AC coupled at 4 Hz; EXT. AUDIO soft-limits above about 4.5 V |
 | VCA | EG mode: EG / 7.5 V plus VCA CV / 7.5 V (+8 V is just past full); ON mode: 1 + VCA CV / 5 V; soft clipping above full gain (Moog support: distortion above +5 V) |
-| Main output | the VCA jack (1.0 = 5 V) x 1.5 to the studio, DC blocked at 6 Hz; the jacks stay DC coupled |
+| Main output | the VCA jack (1.0 = 5 V) x 1.5 to the studio, DC blocked at 6 Hz, then an output rail (unity to 0.7, a soft knee to 0.98), so even VOLUME fully up with everything hot stays below 0 dBFS (it reached +6.8 dBFS without it); a slow second blocker (3 Hz) after the rail removes the DC that clipping a lopsided wave leaves (0.015 at VOLUME 100, now under 0.001); the jacks stay DC coupled |
+| VCF jack | the ladder output limited near the rails (a soft knee from about 4.75 V to 5.75 V), the manual's "about +/-5 V" maximum (p.48); self-oscillation (4.5 V) is untouched, but feedback patches (VCF -> EXT. AUDIO) no longer reach 14 V |
 | ASSIGN clock | one pulse per step, high for the first half of the step (swung with the steps) |
 | Swing | the on-beat takes SWING AMOUNT of every two swing intervals, as a time warp of the clock |
 | Pendulum | the end steps are not repeated at the turn |
@@ -337,7 +340,15 @@ Sweetwater / Moog patch-sheet series; their descriptions say which.
 
 - **Toggle legends**: the panel prints each switch's two positions above and below the lever; the
   twin's switch element shows them beside it, so each lever sits 2-4 mm right of its printed
-  position (the positions above are the printed ones).
+  position (the positions above are the printed ones). The legends are the tap targets and the
+  lit one shows the position, so nothing is lost in use; matching the print needs a legend
+  option in the shared switch component.
+- **Knob travel**: the twin's knobs turn through the drawn Moog knobs' 300°, 7 o'clock to 5 o'clock
+  (`knobTravel` in layout.ts). The presets were read on the same 300° sweep, so a sheet's
+  pointer angles show as drawn.
+- **Scale legends**: 200Hz, 2KHz, 20Hz, 20KHz, VCO and NOISE / EXT sit where the default-panel
+  drawing prints them (the lower four 1.3 mm higher, clear of the value boxes); LO / MIX 1 and
+  HI / MIX 2 sit beside the VC MIX value box instead of under it, where the teaching readout is.
 - **Type and logo**: Helvetica and Roboto Condensed stand in for the panel's typefaces; the maker's
   logo is set as text, not drawn.
 - **Setup mode** is the SETUP panel (with the clock division, swing interval and direction) instead
@@ -352,8 +363,9 @@ Sweetwater / Moog patch-sheet series; their descriptions say which.
   tapped again; held (on a touch screen) they end on release, as on the hardware.
 - **Circuits** are DSP models (band-limited VCO, ladder, RC envelopes) with a slow 2-cent drift; no
   component tolerance, temperature drift or calibration trimmers.
-- **HI PASS** is gentler than the 24 dB/oct the manual prints (Mother-32 manual, p.14); see "Model
-  choices".
+- **HI PASS** is gentler than the 24 dB/oct the manual prints (Mother-32 manual, p.14): about
+  6 dB/oct below a corner about two octaves under the knob, as the reviewers' "a lot of mid-range"
+  and "a triangle comes out almost square" suggest; see "Model choices".
 - **Memory**: the 64 patterns and the Setup values are saved with the studio project per instrument
   instance, not in the instrument.
 - **Rear panel**: not drawn; the output feeds the studio mixer at studio level.

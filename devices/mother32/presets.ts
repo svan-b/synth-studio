@@ -58,11 +58,11 @@ const C3 = 48, D3 = 50, Eb3 = 51, F3 = 53, G3 = 55, Ab3 = 56, Bb3 = 58, C4 = 60,
 const C5 = 72, C6 = 84, A3 = 57, C7 = 96, G7 = 103;
 
 // The manual's default panel (p.9): basic sawtooth, MIX on VCO, CUTOFF about 11 o'clock, VCF MOD
-// at noon from the EG, SUSTAIN ON, DECAY just before noon, LFO RATE at noon, VOLUME at noon
+// at noon from the EG, SUSTAIN ON, DECAY just before noon (11:25), LFO RATE at noon, VOLUME at noon
 const MANUAL_DEFAULTS: Values = {
   frequency: 0, vco_wave: 1, pulse_width: 50, mix: 0, cutoff: 340, resonance: 5, vca_mode: 1, volume: 50,
   glide: 0, vco_mod_source: 1, vco_mod_amount: 0, vco_mod_dest: 1, vcf_mode: 1, vcf_mod_source: 0, vcf_mod_amount: 50,
-  vcf_mod_polarity: 0, lfo_rate: 5.9, lfo_wave: 1, attack: 1.25, sustain: 0, decay: 60, vc_mix: 0, kb_octave: 3,
+  vcf_mod_polarity: 0, lfo_rate: 5.9, lfo_wave: 1, attack: 1.25, sustain: 0, decay: 180, vc_mix: 0, kb_octave: 3,
 };
 
 export const MOTHER32_PRESETS: Record<string, PresetSpec> = {
@@ -72,10 +72,10 @@ export const MOTHER32_PRESETS: Record<string, PresetSpec> = {
 
   // ---------------------------------------------------------------- Bass
   bass_sequencer: preset('Bass / Pulse sequencer bass',
-    'Based on the manual\'s "Sequencer Bass" patch sheet (p.65): a 32 % pulse whose width the EG sweeps, the low-pass at noon tracking the keyboard (KB into VCF CUTOFF), short AD envelope, glide, octave 2. Demo pattern ours.',
+    'Based on the manual\'s "Sequencer Bass" patch sheet (p.65): a 32 % pulse whose width the EG sweeps, the low-pass at noon tracking the keyboard (KB into VCF CUTOFF), an attack-decay envelope (SUSTAIN OFF), glide, octave 2. Demo pattern ours.',
     'manual', {
       ...MANUAL_DEFAULTS, vco_wave: 0, pulse_width: 32.4, cutoff: 632, resonance: 20, glide: 180, vco_mod_source: 0, vco_mod_amount: 40,
-      vco_mod_dest: 0, vcf_mod_amount: 30, tempo: 175, lfo_rate: 2.1, sustain: 1, decay: 93.5, kb_octave: 1, volume: 72.2,
+      vco_mod_dest: 0, vcf_mod_amount: 30, tempo: 175, lfo_rate: 2.1, sustain: 1, decay: 270, kb_octave: 1, volume: 57.4,
     }, {
       cables: [c('out_kb', 'in_vcf_cutoff')],
       seq: [{ note: C1, accent: true }, C1, C2, C1, Eb2 - 12, C1, { note: G2 - 12, glide: true }, Bb2 - 12, { note: C1, accent: true }, C1, C2, { note: F2 - 12, glide: true }, Eb2 - 12, null, G2 - 12, Bb2 - 12],
@@ -126,10 +126,10 @@ export const MOTHER32_PRESETS: Record<string, PresetSpec> = {
 
   // ---------------------------------------------------------------- Leads and brass
   lead_gate_jump: preset('Lead / Gate pitch jump',
-    'Based on the manual\'s "Octave Bounce Back" patch sheet (p.64): GATE into MIX 2 and VC MIX into VCO LIN FM, so every held note jumps up and falls back on release - VC MIX sets the interval. Slow LFO on pulse width and cutoff. Demo pattern ours.',
+    'Based on the manual\'s "Octave Bounce Back" patch sheet (p.64): GATE into MIX 2 and VC MIX into VCO LIN FM, so a held note sits an octave up and falls back as the gate ends, in the ringing tail. The sheet says to set the interval with VC MIX: here it is fully up, which is exactly one octave (drawn at about 2 o\'clock). Slow LFO on pulse width and cutoff. Demo pattern ours.',
     'manual', {
       ...MANUAL_DEFAULTS, vco_wave: 0, cutoff: 1288, resonance: 30, vco_mod_amount: 50, vco_mod_dest: 0, vcf_mod_source: 1, vcf_mod_amount: 11,
-      tempo: 54.5, lfo_rate: 0.74, attack: 5.93, sustain: 1, decay: 558, vc_mix: 70, volume: 52,
+      tempo: 54.5, lfo_rate: 0.74, attack: 5.93, sustain: 1, decay: 1010, vc_mix: 100, volume: 46,
     }, {
       cables: [c('out_vc_mix', 'in_vco_lin_fm'), c('out_gate', 'in_mix2')],
       seq: [{ note: C3, gate: 3 }, { note: G3, gate: 2 }, { note: Eb3, gate: 4 }, { note: C4, gate: 2 }],
@@ -167,10 +167,10 @@ export const MOTHER32_PRESETS: Record<string, PresetSpec> = {
       seq: [{ note: C3, gate: 6 }, { note: G3, gate: 6 }, { note: Eb3, gate: 6 }, { note: Bb3, gate: 6 }, { note: C4, gate: 8 }, { note: G3, gate: 6, glide: true }, { note: F3, gate: 6 }, { note: Eb3, gate: 6 }],
     }),
   brass_short: preset('Brass / Saw and pulse stabs',
-    'Based on the manual\'s "Short Brass" patch sheet (p.66): VCO SAW into EXT. AUDIO so MIX blends saw and a 26 % pulse whose width the EG sweeps, KB into VCF CUTOFF, a short AD envelope and a touch of glide. Opened up a little from the drawing (longer DECAY, brighter CUTOFF, a gentler width sweep) so the stab carries in a mix. Demo riff ours.',
+    'Based on the manual\'s "Short Brass" patch sheet (p.66): VCO SAW into EXT. AUDIO so MIX blends saw and a 26 % pulse whose width the EG sweeps, KB into VCF CUTOFF, a short attack-decay envelope and a touch of glide. Two changes from the drawing: a gentler width sweep (VCO MOD AMOUNT 62 % instead of 80 %) and a brighter CUTOFF, because the full sweep moves the pulse\'s DC level so far that its low thump comes out louder than the note. Demo riff ours.',
     'manual', {
-      ...MANUAL_DEFAULTS, vco_wave: 0, pulse_width: 25.8, mix: 66, cutoff: 800, resonance: 0, glide: 80, vco_mod_source: 0, vco_mod_amount: 62,
-      vco_mod_dest: 0, vcf_mod_amount: 50, tempo: 152, lfo_rate: 1.26, attack: 2.72, sustain: 1, decay: 480, volume: 100,
+      ...MANUAL_DEFAULTS, vco_wave: 0, pulse_width: 25.8, mix: 60, cutoff: 800, resonance: 0, glide: 80, vco_mod_source: 0, vco_mod_amount: 62,
+      vco_mod_dest: 0, vcf_mod_amount: 50, tempo: 152, lfo_rate: 1.26, attack: 2.72, sustain: 1, decay: 265, volume: 100,
     }, {
       cables: [c('out_vco_saw', 'in_ext_audio'), c('out_kb', 'in_vcf_cutoff')],
       seq: [{ note: C3, gate: 3 }, null, { note: C3, gate: 2 }, null, { note: Eb3, gate: 3 }, { note: C3, gate: 2 }, null, { note: F3, gate: 3 },
@@ -199,10 +199,10 @@ export const MOTHER32_PRESETS: Record<string, PresetSpec> = {
 
   // ---------------------------------------------------------------- Drums
   drum_kick_snare: preset('Drums / Kick and snare',
-    'Based on Moog\'s SIMPLEST KICK & SNARE patch example: KB into MULT, MULT 1 into MIX CV and MULT 2 into VCF CUTOFF. Low notes are dark and mostly VCO with a pitch drop (kick); high notes are bright and noisier (snare).',
+    'Based on Moog\'s SIMPLEST KICK & SNARE patch example: KB into MULT, MULT 1 into MIX CV and MULT 2 into VCF CUTOFF. Low notes are dark and mostly VCO with a pitch drop (kick); high notes are bright and noisier (snare). ATTACK at 3 ms: the key jump moves MIX and CUTOFF at the same instant, and a faster attack ticks on it.',
     'community', {
       vco_wave: 1, mix: 35, cutoff: 900, resonance: 20, vcf_mod_amount: 45, vco_mod_source: 0, vco_mod_dest: 1, vco_mod_amount: 42,
-      attack: 1.25, decay: 260, sustain: 1, frequency: 0, tempo: 104, volume: 89,
+      attack: 3, decay: 260, sustain: 1, frequency: 0, tempo: 104, volume: 89,
     }, {
       cables: [c('out_kb', 'in_mult'), c('out_mult1', 'in_mix_cv'), c('out_mult2', 'in_vcf_cutoff')],
       seq: [C1, null, null, C1, C6, null, null, C1, null, C1, null, null, C6, null, C1, C6],
@@ -222,46 +222,46 @@ export const MOTHER32_PRESETS: Record<string, PresetSpec> = {
       mix: 100, lfo_rate: 38, lfo_wave: 1, cutoff: 2200, resonance: 0, vcf_mod_amount: 0, attack: 1.25, decay: 320, sustain: 1, tempo: 120, volume: 68,
     }, { cables: [c('out_lfo_tri', 'in_ext_audio'), c('out_eg', 'in_lfo_rate')], seq: [C2, null, null, null, C2, null, null, null, C2, null, null, null, C2, null, null, { note: C2, accent: true }] }),
   drum_filter_kick: preset('Drums / Feedback filter kick',
-    'Based on the manual\'s "Filter Kick" patch sheet (p.66): HI PASS with RESONANCE up and VCF fed back into EXT. AUDIO with MIX fully clockwise - the filter loop rings, KB into VCF CUTOFF tunes it and the EG drops it on every hit. Octave 3. Demo pattern ours.',
+    'Based on the manual\'s "Filter Kick" patch sheet (p.66): HI PASS with RESONANCE up (which lets the bass back in) and VCF fed back into EXT. AUDIO with MIX fully clockwise - the filter loop rings, KB into VCF CUTOFF tunes it and the EG drops its pitch on every hit. Octave 3; the demo pattern (ours) plays the G key, a deep 30-100 Hz kick.',
     'manual', {
       ...MANUAL_DEFAULTS, vco_wave: 0, pulse_width: 2, mix: 100, cutoff: 79.6, resonance: 100, vcf_mode: 0, tempo: 152, lfo_rate: 0.1,
-      sustain: 1, decay: 48, kb_octave: 2, volume: 62,
+      sustain: 1, decay: 136, kb_octave: 2, volume: 62,
     }, {
       cables: [c('out_vcf', 'in_ext_audio'), c('out_kb', 'in_vcf_cutoff')],
-      seq: [C2, null, null, null, C2, null, null, C2, C2, null, null, null, C2, null, null, null],
+      seq: [G2, null, null, null, G2, null, null, G2, G2, null, null, null, G2, null, null, null],
     }),
   drum_noise_snare: preset('Drums / Noise snare',
-    'Based on the manual\'s "Metal Snare" patch sheet (p.64): MIX fully on noise into a dark low-pass that the EG opens and the keyboard tunes (KB into VCF CUTOFF), and the EG patched into VCA CV as well for a harder hit. The sheet plays it at octave 6; here CUTOFF sits two octaves higher and the keys two lower, which is the same sound (noise has no pitch) but in the keyboard\'s middle. A longer ring than drawn. Demo pattern ours.',
+    'Based on the manual\'s "Metal Snare" patch sheet (p.64): MIX fully on noise into a dark low-pass that the EG opens and the keyboard tunes (KB into VCF CUTOFF, octave 6 as drawn), and the EG patched into VCA CV as well, which drives the VCA into a gritty, metallic hit. The drawn TEMPO is fully down (20 BPM); the demo pattern (ours) plays at 100 BPM.',
     'manual', {
-      ...MANUAL_DEFAULTS, vco_wave: 0, pulse_width: 55.6, mix: 100, cutoff: 636, resonance: 0, vcf_mod_amount: 70, tempo: 20, lfo_rate: 350,
-      lfo_wave: 0, sustain: 1, decay: 560, kb_octave: 3, volume: 71,
+      ...MANUAL_DEFAULTS, vco_wave: 0, pulse_width: 55.6, mix: 100, cutoff: 153, resonance: 0, vco_mod_dest: 0, vcf_mod_amount: 70, tempo: 100, lfo_rate: 350,
+      lfo_wave: 0, sustain: 1, decay: 533, kb_octave: 5, volume: 73,
     }, {
       cables: [c('out_eg', 'in_vca_cv'), c('out_kb', 'in_vcf_cutoff')],
-      seq: [null, null, null, null, C3, null, null, { note: C3, ratchet: 2 }, null, null, null, null, C3, null, null, { note: C4, gate: 2 }],
+      seq: [null, null, null, null, C5, null, null, { note: C5, ratchet: 2 }, null, null, null, null, C5, null, null, { note: C6, gate: 2 }],
     }),
   drum_80s_toms: preset('Drums / Electronic toms',
     'Based on the manual\'s "\'80s Toms" patch sheet (p.66): a pulse half mixed with noise, the EG sweeping the pitch down hard (VCO MOD: EG to FREQUENCY at 2 o\'clock) and the low-pass fully, KB into VCF CUTOFF, glide between notes. Octave 2. Demo fill ours.',
     'manual', {
       ...MANUAL_DEFAULTS, vco_wave: 0, mix: 50, cutoff: 1236, resonance: 0, glide: 180, vco_mod_source: 0, vco_mod_amount: 80,
-      vcf_mod_amount: 100, tempo: 152, lfo_rate: 1.26, sustain: 1, decay: 222, kb_octave: 1, volume: 66,
+      vcf_mod_amount: 100, tempo: 152, lfo_rate: 1.26, sustain: 1, decay: 510, kb_octave: 1, volume: 48,
     }, {
       cables: [c('out_kb', 'in_vcf_cutoff')],
       seq: [C2, null, A2 - 12, null, F2 - 12, F2 - 12, D2 - 12, null, C2, A2 - 12, F2 - 12, D2 - 12, C1, null, null, null],
     }),
-  drum_noise_transient: preset('Drums / Noise-attack pluck',
-    'Based on the manual\'s "Noise Transient" patch sheet (p.64): the EG into MIX 2 and VC MIX into MIX CV push the mixer to noise at the start of every note, so each short pluck begins with a burst of noise. Slow PWM. DECAY a little longer than drawn. Octave 5. Demo pattern ours.',
+  drum_noise_transient: preset('Lead / Noise-attack pluck',
+    'Based on the manual\'s "Noise Transient" patch sheet (p.64): the EG into MIX 2 and VC MIX into MIX CV push the mixer to noise at the start of every note, so each short pluck begins with a burst of noise, like a pick or a breath. Slow PWM. Octave 5. Demo pattern ours.',
     'manual', {
       ...MANUAL_DEFAULTS, vco_wave: 0, pulse_width: 38.2, cutoff: 340, resonance: 0, vco_mod_amount: 40, vco_mod_dest: 0,
-      vcf_mod_amount: 70, tempo: 77.5, lfo_rate: 0.77, sustain: 1, decay: 125, vc_mix: 70, kb_octave: 4, volume: 73,
+      vcf_mod_amount: 70, tempo: 77.5, lfo_rate: 0.77, sustain: 1, decay: 144, vc_mix: 70, kb_octave: 4, volume: 73,
     }, {
       cables: [c('out_vc_mix', 'in_mix_cv'), c('out_eg', 'in_mix2')],
       seq: [C4, null, G4, null, Eb4, null, C4, Bb3, null, G3, null, C4, null, Eb4, F4, null],
     }),
-  drum_bit_crunch: preset('Drone / Bit-crunch bed',
-    'Based on the manual\'s "8-Bit Percussion" patch sheet (p.65): noise into a closed, resonant low-pass whose cutoff the VCO saw modulates at audio rate (VCO SAW into VCF CUTOFF). VCA MODE is ON, so a gritty bed keeps sounding; the EG (also into VCA CV) opens the filter for each crunchy hit - VCF MOD AMOUNT a little below the drawing, so the hits sit on the bed. Octave 8. Demo pattern ours.',
+  drum_bit_crunch: preset('Drone / 8-bit percussion',
+    'Based on the manual\'s "8-Bit Percussion" patch sheet (p.65): noise into a closed, resonant low-pass whose cutoff the VCO saw modulates at audio rate (VCO SAW into VCF CUTOFF). The EG (also into VCA CV) throws the filter open for each crunchy, bit-crushed hit. VCA MODE is ON, so a quiet gritty bed keeps sounding between the hits - hence a drone. Octave 8. Demo pattern ours.',
     'manual', {
       ...MANUAL_DEFAULTS, vco_wave: 1, pulse_width: 62.6, mix: 100, cutoff: 20, resonance: 30, vca_mode: 0, vco_mod_dest: 1,
-      vcf_mod_amount: 78, tempo: 155, lfo_rate: 0.76, sustain: 1, decay: 558, kb_octave: 7, volume: 68,
+      vcf_mod_amount: 95, tempo: 155, lfo_rate: 0.76, sustain: 1, decay: 1000, kb_octave: 7, volume: 38,
     }, {
       cables: [c('out_eg', 'in_vca_cv'), c('out_vco_saw', 'in_vcf_cutoff')],
       seq: [C7, null, C6, null, C7, null, null, { note: G7, ratchet: 2 }, C7, null, C6, null, C7, null, null, G7],
@@ -350,12 +350,12 @@ export const MOTHER32_PRESETS: Record<string, PresetSpec> = {
   seq_step_scanner: preset('Sequence / Step scanner',
     'The TEMPO jack set to STEP ADDRESS CV (manual p.55), with the slow LFO triangle patched in, picks the step by voltage - the pattern is scanned up and down instead of clocked. Based on VoltPages\' "step-address scanner".',
     'community', {
-      vco_wave: 1, lfo_rate: 0.35, lfo_wave: 1, cutoff: 1000, resonance: 40, vcf_mod_amount: 35, decay: 350, sustain: 1, tempo: 120, volume: 81, tempo_mode: T.address,
+      vco_wave: 1, lfo_rate: 0.35, lfo_wave: 1, cutoff: 1000, resonance: 40, vcf_mod_amount: 35, decay: 350, sustain: 1, tempo: 120, volume: 62.5, tempo_mode: T.address,
     }, { cables: [c('out_lfo_tri', 'in_tempo')], seq: [C3, D3, Eb3, F3, G3, Ab3, Bb3, C4] }),
   seq_pendulum: preset('Sequence / Pendulum arpeggio',
     'An arpeggio played in PENDULUM order (KB + STEP + step 3, manual p.40): up the chord and back down, with a gentle swing on the 16ths, a longer ring and an echo-like glide.',
     'community', {
-      vco_wave: 1, cutoff: 900, resonance: 45, vcf_mod_amount: 45, attack: 1.25, decay: 450, sustain: 1, glide: 30, tempo: 118, volume: 75,
+      vco_wave: 1, cutoff: 900, resonance: 45, vcf_mod_amount: 45, attack: 1.25, decay: 450, sustain: 1, glide: 30, tempo: 118, volume: 67,
       seq_direction: 2, swing: 58,
     }, { seq: [C3, Eb3, G3, Bb3, C4, { note: Eb4, glide: true }, G4, Bb3] }),
   seq_swing_house: preset('Sequence / Swing house',
@@ -394,7 +394,7 @@ export const MOTHER32_PRESETS: Record<string, PresetSpec> = {
     'Based on the manual\'s "Resonant High Pass Filter" patch sheet (p.65), the manual\'s own trick (p.14): in HI PASS the filter does not resonate, so VCF goes back into EXT. AUDIO and MIX becomes the resonance (RESONANCE fully counter-clockwise); the slow LFO sweeps it. Octave 3. Demo pattern ours.',
     'manual', {
       ...MANUAL_DEFAULTS, vco_wave: 0, mix: 50, cutoff: 356, resonance: 0, vco_mod_dest: 1, vcf_mode: 0, vcf_mod_source: 1, vcf_mod_amount: 50,
-      tempo: 118, lfo_rate: 0.76, sustain: 0, decay: 240, kb_octave: 2, volume: 29.5,
+      tempo: 118, lfo_rate: 0.76, sustain: 0, decay: 530, kb_octave: 2, volume: 29.5,
     }, { cables: [c('out_vcf', 'in_ext_audio')], seq: [{ note: C2, gate: 6 }, null, { note: C2, gate: 3 }, { note: Eb2, gate: 6 }, null, { note: G2, gate: 6 }, null, { note: Bb2 - 12, gate: 3 }] }),
   fx_laser: preset('FX / Laser zap',
     'VCO MOD: EG to FREQUENCY near the top, with a medium decay: every note dives from very high - pew. Pure arcade.',

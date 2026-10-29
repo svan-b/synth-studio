@@ -79,6 +79,9 @@ check('upgrade: no errors', !u.__error && (u.errs ?? []).length === 0, u.__error
 check('upgrade: old DFAM TEMPO keeps its speed (120 -> 30)', u.first?.dfamTempo === 30 && u.first?.version >= 5, u.first);
 check('upgrade: other values and instruments untouched', u.first?.vco1 === 220 && u.first?.m32Tempo === 120, u.first);
 check('upgrade: runs only once', u.afterReload?.dfamTempo === 30, u.afterReload);
+check('upgrade: an untouched Mother-32 DECAY keeps the time it had (400 ms)', u.first?.m32Decay === 400, u.first?.m32Decay);
+check('upgrade: settings a rebuild cannot convert start fresh, are kept once, and the learner is told', u.first?.a4Values === 0 && u.first?.a4Kept === 1 && u.first?.notice && u.first?.saveButton && u.afterReload?.a4Kept === 1,
+  { values: u.first?.a4Values, kept: [u.first?.a4Kept, u.afterReload?.a4Kept], notice: u.first?.notice, button: u.first?.saveButton });
 check('upgrade: completed lessons carry over to their rebuilt successors', u.first?.lessonCarried === true, u.first?.lessonCarried);
 
 // ---- Touch gestures (iPad) -----------------------------------------------------
@@ -105,6 +108,11 @@ check('touch: a momentary-button do-step counts taps and completes', tm.before?.
   { presses: [tm.before?.presses, tm.afterOne?.presses, tm.afterTwo?.presses], counter: tm.afterOne?.counter, ring: tm.afterTwo?.ring, advanced: tm.advanced });
 check('touch: spectrum scope draws the output while it plays', sp.playing?.mode === 'spectrum' && sp.flippedTo === 'wave' && sp.playing?.sized && sp.quiet?.lit < 40 && sp.playing?.cols > 0.3 * (sp.playing?.W ?? 1e9),
   { quiet: sp.quiet?.lit, playingCols: sp.playing?.cols, width: sp.playing?.W, mode: sp.playing?.mode, flip: sp.flippedTo });
+
+// ---- Producer path on iPad ---------------------------------------------------
+const pp = run(path.join(__dirname, 'producer.cjs'), [base, path.join(outDir, 'producer')], 600_000);
+check('producer path: iPad walkthrough of a whole-studio lesson', !pp.__error && pp.total > 0 && (pp.failed ?? []).length === 0 && (pp.errs ?? []).length === 0,
+  pp.__error ?? { passed: pp.passed, total: pp.total, failed: pp.failed });
 
 // ---- Every instrument (--full) -----------------------------------------------
 if (full) {

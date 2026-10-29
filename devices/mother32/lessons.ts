@@ -383,7 +383,7 @@ const f4: Lesson = {
     },
     {
       kind: 'do', control: 'decay', targetValue: 80, concept: 'envelope-decay',
-      instruction: 'Now turn DECAY right down to about 80 ms.',
+      instruction: 'Now turn DECAY down to about 80 ms.',
       principle: 'With a fast release each note stops almost as soon as its gate ends.',
       explanation: 'Listen to the long and short steps: with SUSTAIN ON the gate length now decides how long each note lasts.',
     },
@@ -488,7 +488,7 @@ const f5: Lesson = {
       kind: 'predict', control: 'vco_mod_amount', targetValue: 12, concept: 'modulation-depth',
       instruction: 'Turn VCO MOD AMOUNT up to about 12 %.',
       predict: {
-        question: 'VCO MOD SOURCE is on LFO and VCO MOD DEST on FREQ. What will a little AMOUNT do?',
+        question: 'VCO MOD SOURCE is on LFO and VCO MOD DEST on FREQUENCY. What will a little AMOUNT do?',
         options: ['A wobble in pitch - vibrato', 'A "wah" in the tone', 'A tremolo in volume'], answer: 0,
         explain: 'The LFO\'s slow wave now moves the VCO\'s pitch up and down a little, six times a second: vibrato. The filter and the VCA are not involved.',
       },
@@ -497,7 +497,7 @@ const f5: Lesson = {
     },
     {
       kind: 'do', control: 'vco_mod_dest', targetValue: 0, concept: 'modulation-source',
-      instruction: 'Flip VCO MOD DEST up to PW (pulse width).',
+      instruction: 'Flip VCO MOD DEST up to PULSE WIDTH.',
       principle: 'The same modulator on a different destination is a different effect.',
       explanation: 'Now the LFO moves the pulse width instead of the pitch: the harmonics shift while the pitch stays still.',
     },
@@ -521,7 +521,7 @@ const f5: Lesson = {
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'modulation-source',
       quiz: {
-        question: 'VCO MOD SOURCE on EG with VCO MOD DEST on FREQ gives…',
+        question: 'VCO MOD SOURCE on EG with VCO MOD DEST on FREQUENCY gives…',
         options: ['A pitch sweep on every note', 'A steady vibrato', 'Pulse-width movement'], answer: 0,
         explain: 'The envelope rises and falls once per note, so the pitch jumps up and falls back each time: a drum thump or a zap. Vibrato needs the LFO.',
       },
@@ -710,7 +710,7 @@ const f7: Lesson = {
     {
       kind: 'predict', patchFrom: 'out_lfo_sq', patchTo: 'in_vco_mod', concept: 'signal-routing',
       setup: { vco_mod_source: 0, vco_mod_dest: 1, vco_mod_amount: 30, lfo_rate: 4 },
-      instruction: 'VCO MOD is on EG and FREQ with some AMOUNT. Patch LFO SQ into VCO MOD.',
+      instruction: 'VCO MOD is on EG and FREQUENCY with some AMOUNT. Patch LFO SQ into VCO MOD.',
       predict: {
         question: 'A cable in VCO MOD replaces the normalled EG. What will the square LFO do to the pitch?',
         options: ['Jump it between two notes - a trill', 'Add a pitch sweep to every note', 'Nothing - VCO MOD is only for the EG'], answer: 0,
@@ -859,12 +859,12 @@ const sd2: Lesson = {
   source: 'Synth Studio · after Moog\'s first-edition Mother-32 patch examples; MULT, MIX CV and VCF CUTOFF from the manual v2 pp.47-51', estimatedMinutes: 8,
   prerequisites: ['mother32-f7-patching'],
   concepts: ['modulation-depth', 'noise', 'signal-routing', 'mixing'],
-  start: { reset: true, values: { vco_wave: 1, mix: 35, cutoff: 900, resonance: 20, vcf_mod_amount: 45, attack: 1.25, decay: 230, sustain: 1, vco_mod_source: 0, vco_mod_dest: 1, vco_mod_amount: 0, ...KIT } },
+  start: { reset: true, values: { vco_wave: 1, mix: 35, cutoff: 900, resonance: 20, vcf_mod_amount: 45, attack: 3, decay: 230, sustain: 1, vco_mod_source: 0, vco_mod_dest: 1, vco_mod_amount: 0, ...KIT } },
   steps: [
     run('A drum is a short sound with a fast pitch drop or a burst of noise.'),
     {
       kind: 'predict', control: 'vco_mod_amount', targetValue: 42, concept: 'modulation-depth',
-      instruction: 'Turn VCO MOD AMOUNT up to about 40 % (source EG, dest FREQ).',
+      instruction: 'Turn VCO MOD AMOUNT up to about 40 % (SOURCE on EG, DEST on FREQUENCY).',
       predict: {
         question: 'The EG now pushes the pitch up at the start of each note and lets it fall. What does that sound like on the low notes?',
         options: ['A drum thump', 'A slow siren', 'Nothing - the EG only controls volume'], answer: 0,
@@ -1429,11 +1429,11 @@ const sq2: Lesson = {
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern',
-      instruction: 'Save it to pattern 1-2: hold (SHIFT) on RUN / STOP for a second, pick slot 2 (SHIFT + pad 2, or the STEP arrow), then SHIFT + RUN / STOP.',
+      instruction: 'Save it to pattern 1-2: tap (SHIFT) and hold RUN / STOP for a second, pick slot 2 (pad 2 or the STEP arrow), then SHIFT + RUN / STOP.',
       checklist: [
         { text: 'Pattern 1-2 holds this pattern', check: s => { const d = s.data as { bank?: unknown[] } | undefined; const p = d?.bank?.[1] as Record<string, unknown> | null | undefined; return !!p && p.seq_ratchet === patternOf(s.values).seq_ratchet && p.seq_glide === patternOf(s.values).seq_glide; } },
       ],
-      hints: ['Save mode starts with SHIFT held on RUN / STOP for a second.', 'A blinking OCTAVE / LOCATION LED shows the slot; the pads pick it.', 'Pad 2, then SHIFT + RUN / STOP saves.'],
+      hints: ['Save mode starts with (SHIFT), then RUN / STOP held for a second.', 'A blinking OCTAVE / LOCATION LED shows the slot; the pads pick it.', 'Pad 2, then SHIFT + RUN / STOP saves.'],
       solution: { data: { v: 1, loc: 1, bank: [null, { ...patternOf({ ...SQ2, seq_ratchet: '113'.padEnd(32, '1'), seq_glide: '00001'.padEnd(32, '0') }) }, ...new Array(62).fill(null)] } },
     },
     {
@@ -1456,7 +1456,7 @@ const sq2: Lesson = {
     { question: 'A ratchet…', options: ['Repeats a note inside one step', 'Lengthens a step', 'Transposes a step'], answer: 0, explain: '1-4 notes per step.' },
     { question: 'Swing at 50 % is…', options: ['Straight', 'A full triplet shuffle', 'Silent'], answer: 0, explain: 'No delay.' },
     { question: 'The Mother-32 stores…', options: ['64 patterns: 8 banks x 8', '8 patterns', 'One pattern'], answer: 0, explain: 'Plus the one you are editing.' },
-    { question: 'To save on the Mother-32 you start with…', options: ['SHIFT held on RUN / STOP for a second', 'PATTERN + RESET', 'SHIFT + STEP'], answer: 0, explain: 'Then pick the slot and confirm with SHIFT + RUN / STOP.' },
+    { question: 'To save on the Mother-32 you start with…', options: ['SHIFT + RUN / STOP, held for a second', 'PATTERN + RESET', 'SHIFT + STEP'], answer: 0, explain: 'Then pick the slot and confirm with SHIFT + RUN / STOP.' },
   ],
 };
 

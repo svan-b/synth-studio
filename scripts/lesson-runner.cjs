@@ -1,7 +1,7 @@
 // ============================================================================
 // Lesson runner - plays every lesson of a device like a perfect student and
 // reports any step that cannot be completed.
-//   node scripts/lesson-runner.cjs <baseUrl> <deviceId>
+//   node scripts/lesson-runner.cjs <baseUrl> <deviceId> [lesson id filter]
 // For each step it performs the intended action through the real store:
 //   do/predict  -> answer the prediction correctly, then set the target value -
 //                  or, for a momentary button / `event` step, PRESS it through the
@@ -17,11 +17,17 @@
 // (studio transport, a cable between instruments, an internal cable, a switch or
 // button, a press) are tried one at a time and kept when they help. A step solved
 // that way is reported as "auto" with the moves; one that cannot be solved fails.
+//
+// `studio` runs the cross-instrument lessons, the Producer path included (Lesson
+// API v3): each lesson loads its own studio, and solutions may set other
+// instruments, the mixer, the master, the song and its snapshots, and play,
+// bounce or record for real - the runner waits for the meters, like a learner.
 // ============================================================================
 const { chromium } = require('playwright');
 
 (async () => {
-  const [, , base = 'http://localhost:3000', device = 'dfam'] = process.argv;
+  // An optional third argument runs only the lessons whose id contains it
+  const [, , base = 'http://localhost:3000', device = 'dfam', only = ''] = process.argv;
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   const errors = [];
@@ -34,23 +40,45 @@ const { chromium } = require('playwright');
       sessionStorage.setItem('seeded', '1');
       localStorage.setItem('synth-studio-welcomed', '1');
     }
-  }, device);
+  }, device === 'studio' ? 'dfam' : device);
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.waitForFunction(() => window.__synthStudio, null, { timeout: 15000 });
   await page.waitForTimeout(800);
 
-  const report = await page.evaluate(async device => {
+  const report = await page.evaluate(async ([device, only]) => {
     const { store, hub } = window.__synthStudio;
-    const mod = await hub.loadModule(device);
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const S = () => store.getState();
     const results = [];
+    const studio = device === 'studio';
+    // Studio lessons are not a device module: the app lists them (the Producer path loads on demand)
+    const mod = studio ? { lessons: await window.__synthStudioLessons() } : await hub.loadModule(device);
+    hub.ensureAudio();
+    /** The lesson runtime (meters, A/B, studio solutions) */
+    const runtime = async () => {
+      for (let i = 0; i < 100 && !window.__synthLesson; i++) await wait(100);
+      return window.__synthLesson;
+    };
+    /** A lesson that loaded its own studio: wait until every instrument's engine runs */
+    const waitForStudio = async () => {
+      for (let i = 0; i < 150 && hub.status !== 'on'; i++) await wait(100);
+      const rack = () => S().studio.rack.map(r => r.id).filter(id => !(S().studio.off || {})[id]);
+      for (let i = 0; i < 150 && !rack().every(id => hub.instances().includes(id)); i++) await wait(100);
+      await wait(600);
+    };
 
     const kindOf = step => step.kind || (step.patchFrom && step.patchTo ? 'patch'
       : (step.control || step.event || step.play) ? 'do'
       : (step.checklist && step.checklist.length) ? 'challenge' : 'info');
     const lessonInstanceOf = () => S().lessonInstance || device;
-    const instanceOfStep = step => step.instance || lessonInstanceOf();
+    /** A step's instance: an instance id, or a device's first instance in the rack */
+    const resolveRef = ref => {
+      const rack = S().studio.rack;
+      if (rack.some(r => r.id === ref)) return ref;
+      const r = rack.find(x => x.device === ref);
+      return r ? r.id : ref;
+    };
+    const instanceOfStep = step => (step.instance ? resolveRef(step.instance) : lessonInstanceOf());
     const deviceOfInstance = inst => S().deviceOf(inst);
     const specOf = inst => { const m = hub.getModule(deviceOfInstance(inst)); return m ? m.spec : null; };
     const layoutOf = inst => { const m = hub.getModule(deviceOfInstance(inst)); return m ? m.layout : null; };
@@ -168,9 +196,14 @@ const { chromium } = require('playwright');
       return satisfied() ? applied : null;
     };
 
-    for (const lesson of mod.lessons) {
-      S().startLesson(lesson, device);
+    for (const lesson of mod.lessons.filter(l => !only || l.id.includes(only))) {
+      const t0 = performance.now();
+      // A studio lesson starts in the current studio (or loads its own); a device lesson on its instrument
+      S().startLesson(lesson, studio ? undefined : device);
       await wait(60);
+      const ownStudio = !!(lesson.start && lesson.start.studio);
+      const rt = studio ? await runtime() : undefined;
+      if (ownStudio) await waitForStudio();
       const stepResults = [];
       for (let i = 0; i < lesson.steps.length; i++) {
         if (S().currentStep !== i) S().goToStep(i);
@@ -199,42 +232,72 @@ const { chromium } = require('playwright');
             S().checkMatch();
           }
           if (kind === 'reflect') { S().revealStep(); S().rateReflection('got-it'); }
-          const sol = step.solution;
+          // A studio step already done (an earlier bounce or play-through counts): don't redo it
+          const already = studio && step.solution && kind !== 'reflect' && satisfied();
+          const sol = already ? null : step.solution;
+          if (already) how = 'already satisfied';
           if (sol) {
-            const si = sol.instance || inst;
+            const si = sol.instance ? resolveRef(sol.instance) : inst;
             if (sol.values) S().setControlValues(si, sol.values);
             if (sol.patches) sol.patches.forEach(p => S().addPatchConnection(si, p.from, p.to));
             if (sol.data !== undefined) S().setDeviceData(si, sol.data);
             if (sol.studioCables) sol.studioCables.forEach(c => S().addStudioCable({ from: { instance: resolveEnd(c.from), jack: c.from.jack }, to: { instance: resolveEnd(c.to), jack: c.to.jack } }));
+            // v3: other instruments, the mixer, the master, tempo and routing, the song and its snapshots
+            if (rt && (sol.parts || sol.channels || sol.master || sol.studio || sol.arrangement || sol.capture)) rt.applyStudioSolution(sol);
             if (sol.transport === 'play') hub.startAll();
             if (sol.transport === 'stop') hub.stopAll();
             if (sol.presses) for (const p of sol.presses) await press(si, p);
             if (sol.notes) await playNotes(si, sol.notes);
             await wait(20);
+            // Press until done (park a sequencer on its last step...)
+            if (sol.pressUntilDone) {
+              // Through the engine, like the panel button (which may be off screen)
+              const id = sol.pressUntilDone;
+              for (let k = 0; k < 16 && !satisfied(); k++) { hub.event(si, id); S().lessonPress(si, [id]); await wait(150); }
+            }
+            // Play, bounce or record for real, until the step is satisfied (meters need time)
+            if (rt && rt.isTimedSolution(sol)) {
+              how = `timed: ${['play', 'bounce', 'record'].filter(k => sol[k]).join(', ')}`;
+              await rt.runTimedSolution(sol, { until: () => !sol.bounce && !sol.record && satisfied() });
+            }
           }
         } catch (e) {
           stepResults.push({ i: i + 1, kind, ok: false, why: 'threw: ' + e });
           continue;
         }
         await wait(30);
+        // Live checks (meters, takes) settle a moment later: give them a second
+        if (rt) { rt.publish(); for (let k = 0; k < 8 && !satisfied(); k++) { await wait(150); rt.publish(); } }
         let ok = satisfied();
+        // What a failing studio check saw, before any search moves change it
+        let seen;
+        if (!ok && studio) {
+          const cs = S().lessonCheckState();
+          const fails = [];
+          (step.checklist || []).forEach(c => { try { if (c.check && !c.check(cs)) fails.push(c.text); } catch (e) { fails.push(`${c.text} (threw)`); } });
+          const m = cs && cs.meters && cs.meters.master;
+          const ch = cs && cs.meters ? Object.fromEntries(Object.entries(cs.meters.channels).filter(([k]) => /:[1-4ab]$/.test(k)).map(([k, v]) => [k, `${Math.round(v.peak * 10) / 10}${v.pk ? ' PK' : ''}`])) : undefined;
+          seen = { failing: fails, meters: m ? { I: m.lufsI, S: m.lufsS, peak: m.peakDb, tp: m.maxTruePeakDb, gr: m.grDb, maxGr: m.maxGrDb, sec: m.measuredSec, fromStart: m.fromStart, steady: m.steady } : undefined, channels: ch, bounce: cs && cs.bounce && cs.bounce.last, arranger: cs && cs.arranger };
+        }
         let auto = null;
-        if (!ok) {
+        // Single learner moves can't fix a measurement: timed steps stand on their own solution
+        if (!ok && !(rt && rt.isTimedSolution(step.solution))) {
           auto = await search(step);
           ok = !!auto;
         }
         // An open challenge with no `solution` that no single move solves needs a human
         const manual = !ok && kind === 'challenge' && !step.solution;
         stepResults.push({
-          i: i + 1, kind, ok: ok || manual, manual, how, auto: auto && auto.length ? auto : undefined,
+          i: i + 1, kind, ok: ok || manual, manual, how, auto: auto && auto.length ? auto : undefined, seen,
           why: ok ? '' : manual ? 'challenge needs a manual/solution check' : 'not satisfied after performing the action (and no single learner move solved it)',
         });
       }
       S().resetLesson();
       hub.stopAll();
-      S().clearStudioCables();
+      if (!studio) S().clearStudioCables();
+      await wait(studio ? 400 : 0);
       results.push({
-        id: lesson.id, steps: lesson.steps.length,
+        id: lesson.id, steps: lesson.steps.length, seconds: Math.round((performance.now() - t0) / 100) / 10,
         failed: stepResults.filter(r => !r.ok),
         manual: stepResults.filter(r => r.manual).length,
         auto: stepResults.filter(r => r.auto).map(r => ({ step: r.i, kind: r.kind, moves: r.auto })),
@@ -242,7 +305,7 @@ const { chromium } = require('playwright');
       });
     }
     return results;
-  }, device);
+  }, [device, only]);
 
   const failedLessons = report.filter(r => r.failed.length);
   const autoSteps = report.reduce((n, r) => n + r.auto.length, 0);

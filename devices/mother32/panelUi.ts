@@ -882,7 +882,7 @@ function Readout({ c, w }: { c: C; w: number }) {
   const dv = divName(v.step_div, v.div_type);
   const dir = Math.round(num(v.seq_direction, 0));
   if (fresh) text = u.msg!;
-  else if (held.kb && held.step && t < 0) text = `KB + STEP held · TEMPO = straight clock division (${divName(v.step_div, 0)}) · GLIDE = swing interval · steps 1-4 = ${DIRECTIONS.join(' / ')}`;
+  else if (held.kb && held.step && t < 0) text = `KB + STEP · TEMPO = clock division (${divName(v.step_div, 0)}) · GLIDE = swing interval · steps 1-4 = ${DIRECTIONS.join(' / ')}`;
   else if (held.kb && t < 0) text = `KB held · TEMPO = dotted division (${divName(v.step_div, 1)}) · GLIDE = dotted swing interval · release = octave down`;
   else if (held.step && t < 0) text = `STEP held · TEMPO = triplet division (${divName(v.step_div, 2)}) · GLIDE = triplet swing interval · release = octave up`;
   else if (u.latch === 'save') text = `SAVE to ${locName(u.saveLoc ?? d.loc)}${u.saveBank ? ' · pick a BANK with a step button or the arrows' : ' · step buttons / arrows pick the slot, PATTERN the bank'} · SHIFT + RUN/STOP saves · RUN/STOP cancels`;
@@ -914,9 +914,14 @@ function Readout({ c, w }: { c: C; w: number }) {
         ? `▶ ${loc} · ${String(pos + 1).padStart(2, '0')}/${len} · ${clock}${extras}${tr}${pend} · keys transpose`
         : `KB · ${loc} · ${len} steps · ${clock}${extras} · octave ${Math.round(num(v.kb_octave, 3)) + 1}`;
   }
+  // 10.5 px: at the iPad's fitted zoom (about 0.86) this still renders at the 9 px legibility floor
   return h('div', {
-    className: 'font-mono whitespace-nowrap overflow-hidden text-ellipsis pointer-events-none select-none',
-    style: { width: w, fontSize: 8, lineHeight: '10px', color: v.rec || u.latch === 'save' ? '#ff7a6b' : '#8f8f8f', letterSpacing: 0.2, WebkitUserSelect: 'none' },
+    className: 'whitespace-nowrap overflow-hidden text-ellipsis pointer-events-none select-none',
+    style: {
+      width: w, fontSize: 10.5, lineHeight: '13px', fontFamily: '"Arial Narrow", "Roboto Condensed", Arial, sans-serif', fontWeight: 600,
+      color: v.rec || u.latch === 'save' ? '#ff8a7d' : '#a3a3a3', letterSpacing: 0.2, WebkitUserSelect: 'none',
+    },
+    title: text,
   }, text);
 }
 
@@ -937,12 +942,13 @@ function Setup({ c, k }: { c: C; k: number }) {
   const lessonWants = !!(c.teaching && c.step?.control && SETUP_CONTROLS.has(c.step.control));
   const open = !!u.setup || lessonWants;
   const targetVal = (id: string) => (c.teaching && c.step?.control === id ? c.step.targetValue : undefined);
+  // Sizes: 10.5 px text and 30 px rows render at >= 9 px and about 26 px on a fitted iPad panel
   const btn = (label: string, active: boolean, onClick: () => void, target?: boolean, key?: string): ReactNode => h('button', {
     key: key ?? label,
     onClick,
     className: `rounded-sm font-bold leading-none select-none ${target ? 'animate-pulse' : ''}`,
     style: {
-      fontSize: 9, padding: '4px 4px', minWidth: 22, minHeight: 20, textAlign: 'left', WebkitUserSelect: 'none',
+      fontSize: 10.5, padding: '5px 5px', minWidth: 26, minHeight: 30, textAlign: 'left', WebkitUserSelect: 'none',
       background: active ? '#e5e5e5' : '#222', color: active ? '#111' : '#bbb',
       border: target ? '2px solid #f97316' : '1px solid #444',
     },
@@ -951,7 +957,7 @@ function Setup({ c, k }: { c: C; k: number }) {
     'data-control': 'm32_setup',
     onClick: () => c.setUi({ setup: !u.setup }),
     className: 'rounded-sm font-bold select-none',
-    style: { fontSize: 8, padding: '2px 6px', background: open ? '#e5e5e5' : '#1f1f1f', color: open ? '#111' : '#bdbdbd', border: '1px solid #555', letterSpacing: 1, WebkitUserSelect: 'none' },
+    style: { fontSize: 10.5, minHeight: 24, padding: '3px 9px', background: open ? '#e5e5e5' : '#1f1f1f', color: open ? '#111' : '#bdbdbd', border: '1px solid #555', letterSpacing: 1, WebkitUserSelect: 'none' },
     'aria-label': 'Setup mode: ASSIGN output, TEMPO input, clock PPQN, save mode, on / off settings, clock division, swing interval and direction',
   }, open ? 'SETUP ✕' : 'SETUP');
   if (!open) return header;
@@ -969,17 +975,17 @@ function Setup({ c, k }: { c: C; k: number }) {
     if (c.step.control === 'step_div') return i === Number(c.step.targetValue) && val('div_type', 0) === 0;
     return c.step.control === 'div_type' && Math.floor(i / 8) === Number(c.step.targetValue) && i % 8 === val('step_div', 5);
   };
-  const title = (t: string) => h('div', { key: t, style: { fontWeight: 700, margin: '6px 0 3px' } }, t);
+  const title = (t: string) => h('div', { key: t, style: { fontWeight: 700, margin: '8px 0 4px' } }, t);
   const grid = (cols: number, items: ReactNode[], key: string) => h('div', { key, className: 'grid gap-1', style: { gridTemplateColumns: `repeat(${cols}, 1fr)` } }, ...items);
   const onOff = (id: string, label: string, d: number) => btn(`${label}: ${val(id, d) ? 'ON' : 'OFF'}`, !!val(id, d), () => c.setValue(id, val(id, d) ? 0 : 1), targetVal(id) !== undefined, id);
-  const divRows = (cur: number, set: (i: number) => void, prefix: string, isTarget: (i: number) => boolean) => DIV_GROUPS.map((g, gi) => h('div', { key: `${prefix}${g}`, className: 'grid gap-1', style: { gridTemplateColumns: '48px repeat(8, 1fr)', marginBottom: 2 } },
-    h('div', { style: { fontSize: 8, color: '#999', alignSelf: 'center' } }, g),
+  const divRows = (cur: number, set: (i: number) => void, prefix: string, isTarget: (i: number) => boolean) => DIV_GROUPS.map((g, gi) => h('div', { key: `${prefix}${g}`, className: 'grid gap-1', style: { gridTemplateColumns: '62px repeat(8, 1fr)', marginBottom: 3 } },
+    h('div', { style: { fontSize: 10.5, color: '#a3a3a3', alignSelf: 'center' } }, g),
     ...DIVISIONS.slice(gi * 8, gi * 8 + 8).map((dv, k2) => btn(dv.name.replace(/[DT]$/, ''), cur === gi * 8 + k2, () => set(gi * 8 + k2), isTarget(gi * 8 + k2), `${prefix}${gi * 8 + k2}`))));
   return h('div', { className: 'relative' },
     header,
     h('div', {
       className: 'absolute z-[60] rounded shadow-2xl overflow-y-auto select-none',
-      style: { right: 0, bottom: 22 * (k / 4.1), width: 330, maxHeight: 430, padding: 8, background: '#111', border: '1px solid #555', color: '#ddd', fontSize: 9, WebkitUserSelect: 'none' },
+      style: { right: 0, bottom: 30 * (k / 4.1), width: 410, maxHeight: 470, padding: 10, background: '#111', border: '1px solid #555', color: '#ddd', fontSize: 10.5, WebkitUserSelect: 'none' },
     },
       title('PAGE 1 · ASSIGN OUTPUT'),
       grid(2, ASSIGN_SOURCES.map((name, i) => btn(`${i + 1}: ${name}`, val('assign_source', 1) === i, () => c.setValue('assign_source', i), targetVal('assign_source') === i, `a${i}`)), 'g1'),
@@ -1007,6 +1013,18 @@ function Setup({ c, k }: { c: C; k: number }) {
 }
 
 export const renderSetup = (k: number) => (c: C) => h(Setup, { c, k });
+
+// ----------------------------------------------------------------------------
+// The printed scale ring of FREQUENCY, PULSE WIDTH, TEMPO and LFO RATE (decoration). Drawn as
+// art, not as a bordered section: a section is a box that the knob's value text must stay in.
+// ----------------------------------------------------------------------------
+
+export const renderRing = (outerMm: number, innerMm: number, k: number) => () => {
+  const D = outerMm * 2 * k;
+  return h('svg', { width: D, height: D, viewBox: `0 0 ${D} ${D}`, 'aria-hidden': true, style: { position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' } },
+    h('circle', { cx: D / 2, cy: D / 2, r: outerMm * k - 0.5, fill: 'none', stroke: '#d9d9d9', strokeWidth: 1 }),
+    h('circle', { cx: D / 2, cy: D / 2, r: innerMm * k - 0.5, fill: 'none', stroke: '#8a8a8a', strokeWidth: 1 }));
+};
 
 // ----------------------------------------------------------------------------
 // MIDI IN socket (decoration)
