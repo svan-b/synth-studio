@@ -115,10 +115,14 @@ export const CP_MUDDY = {
   dfam: DFAM_BOOMY,
 };
 
-/** Frequency slots, one solution: the DFAM high-passed, the stabs' lows and low mids cut, the bass flat */
+/**
+ * Frequency slots, one solution: the DFAM high-passed, the stabs' lows and low mids cut, the
+ * bass flat. The high-pass takes the perc's fundamental away, so its VOLUME comes up to full
+ * (the level is fixed at the instrument, the way the mixdown lesson teaches).
+ */
 export const CP_SLOTTED = {
   xone: { ch3_lo: killKnob(-6), ch3_lomid: midKnob(-3), ch2_lomid: 0 } as Values,
-  dfam: { ...DFAM_BOOMY, vcf_mode: 0, vcf_cutoff: 220 } as Values,
+  dfam: { ...DFAM_BOOMY, vcf_mode: 0, vcf_cutoff: 220, volume: 100 } as Values,
 };
 
 /** Space and depth, start: the slotted mix, completely dry. The delay is on 1/8, the returns flat. */
