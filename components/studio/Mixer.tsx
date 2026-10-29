@@ -4,13 +4,13 @@
 // your MIDI synth's audio input, plugins), two shared returns and the master.
 // Everything here is saved with the project and undoable.
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useStudioStore } from '@/store/studio';
 import { hub } from '@/lib/studio/hub';
 import { DEVICES } from '@/devices';
 import {
-  CHANNEL_DEFAULT, DELAY_DIVISIONS, MIN_DB, audibleChannels, delayOf, formatDb, formatPan, masterOf, reverbOf,
-  type ChannelDoc, type DelayDivision,
+  CHANNEL_DEFAULT, DELAY_DIVISIONS, MIN_DB, audibleChannels, delayOf, formatDb, formatPan, masterOf, outputChannelId, reverbOf,
+  studioChannels, type ChannelDoc, type DelayDivision,
 } from '@/lib/studio/mixerDoc';
 import { levelTrimDb } from '@/lib/studio/levels';
 import { LIMITER_CEILING_DB, LIMITER_LOOKAHEAD } from '@/lib/audio/context';
@@ -49,6 +49,7 @@ export default function Mixer({ onFocus }: { onFocus: (instance: string) => void
   const mixerDoc = useStudioStore(s => s.studio.mixer);
   const routes = useStudioStore(s => s.studio.routes);
   const off = useStudioStore(s => s.studio.off);
+  const outputs = useStudioStore(s => s.studio.outputs);
   const [chainOpen, setChainOpen] = useState(false);
   useSlotsVersion();
   const mixer = hub.mixer;
@@ -59,8 +60,9 @@ export default function Mixer({ onFocus }: { onFocus: (instance: string) => void
     return mixer.watchLevels(() => undefined);
   }, [mixer]);
 
-  const audible = useMemo(() => audibleChannels(mixerDoc, rack, routes), [mixerDoc, rack, routes]);
-  const anySolo = rack.some(r => mixerDoc?.channels?.[r.id]?.solo);
+  const channels = useMemo(() => studioChannels(rack, outputs), [rack, outputs]);
+  const audible = useMemo(() => audibleChannels(mixerDoc, channels, routes), [mixerDoc, channels, routes]);
+  const anySolo = channels.some(c => mixerDoc?.channels?.[c.id]?.solo);
 
   // Mixer devices' inputs (Xone:96 channels) as routing targets
   const targets = useMemo(() => {
@@ -96,18 +98,39 @@ export default function Mixer({ onFocus }: { onFocus: (instance: string) => void
         )}
       </div>
       <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
-        {rack.filter(r => !DEVICES.find(d => d.id === r.device)?.silent).map(r => (
-          <Strip
-            key={r.id}
-            id={r.id}
-            device={r.device}
-            name={instanceLabel(rack, r.id)}
-            audible={audible.has(r.id)}
-            powered={!off?.[r.id]}
-            targets={targets.filter(t => t.mixer !== r.id)}
-            onFocus={onFocus}
-          />
-        ))}
+        {rack.filter(r => !DEVICES.find(d => d.id === r.device)?.silent).map(r => {
+          const outs = hub.getModule(r.device)?.studio?.outputs ?? [];
+          return (
+            <Fragment key={r.id}>
+              <Strip
+                id={r.id}
+                device={r.device}
+                name={instanceLabel(rack, r.id)}
+                audible={audible.has(r.id)}
+                powered={!off?.[r.id]}
+                targets={targets.filter(t => t.mixer !== r.id)}
+                onFocus={onFocus}
+                outputs={outs.length ? { list: outs, used: outputs?.[r.id] ?? [] } : undefined}
+              />
+              {/* its separate outputs in use, each its own channel */}
+              {(outputs?.[r.id] ?? []).map(o => {
+                const id = outputChannelId(r.id, o);
+                return (
+                  <Strip
+                    key={id}
+                    id={id}
+                    device={r.device}
+                    name={`${instanceLabel(rack, r.id)} · ${outs.find(x => x.id === o)?.label ?? o}`}
+                    audible={audible.has(id)}
+                    powered={!off?.[r.id]}
+                    targets={targets.filter(t => t.mixer !== r.id)}
+                    onFocus={() => onFocus(r.id)}
+                  />
+                );
+              })}
+            </Fragment>
+          );
+        })}
         <div className="w-px shrink-0 bg-[#2a2a2a] mx-0.5" />
         <DelayStrip />
         <ReverbStrip />
@@ -132,10 +155,12 @@ function StripShell({ children, accent, dim, label, wide }: { children: React.Re
   );
 }
 
-function Strip({ id, device, name, audible, powered, targets, onFocus }: {
+function Strip({ id, device, name, audible, powered, targets, onFocus, outputs }: {
   id: string; device: string; name: string; audible: boolean; powered: boolean;
   targets: { value: string; label: string; short: string }[];
   onFocus: (id: string) => void;
+  /** The instrument's separate outputs (hardware individual outs), and which are in use */
+  outputs?: { list: { id: string; label: string }[]; used: string[] };
 }) {
   const saved = useStudioStore(s => s.studio.mixer?.channels?.[id]);
   const route = useStudioStore(s => s.studio.routes[id] ?? 'master');
@@ -175,6 +200,7 @@ function Strip({ id, device, name, audible, powered, targets, onFocus }: {
       ) : (
         <span className="w-full text-center text-[10px] text-gray-500 h-[24px] leading-[24px]">→ Master</span>
       )}
+      {outputs && <SeparateOuts instance={id} name={name} outputs={outputs} />}
       <div
         className={viaMixer ? 'opacity-40 pointer-events-none w-full' : 'w-full'}
         aria-disabled={viaMixer || undefined}
@@ -222,6 +248,38 @@ function Strip({ id, device, name, audible, powered, targets, onFocus }: {
         </span>
       )}
     </StripShell>
+  );
+}
+
+/**
+ * The instrument's separate outputs, like the hardware's individual outs: each one turned on
+ * takes that part out of the main channel onto a channel of its own (to EQ a kick on its own
+ * mixer channel, say).
+ */
+function SeparateOuts({ instance, name, outputs }: { instance: string; name: string; outputs: { list: { id: string; label: string }[]; used: string[] } }) {
+  const setOutputUsed = useStudioStore(s => s.setOutputUsed);
+  const n = outputs.used.length;
+  return (
+    <details className="w-full relative">
+      <summary
+        className={`list-none cursor-pointer w-full text-center rounded text-[10px] font-bold h-[24px] leading-[24px] coarse:h-[32px] coarse:leading-[32px] ${n ? 'bg-sky-900/60 text-sky-100' : 'bg-[#232323] text-gray-300'}`}
+        title={`${name}: put parts on channels of their own, like the hardware's separate outputs`}
+      >
+        Outs{n ? ` · ${n}` : ''} ▾
+      </summary>
+      <div className="absolute left-0 top-full mt-1 z-20 w-[150px] rounded border border-[#3a3a3a] bg-[#1a1a1a] p-1.5 shadow-xl" role="group" aria-label={`${name} separate outputs`}>
+        <p className="text-[10px] text-gray-400 leading-snug mb-1">A part with its own output leaves the main channel.</p>
+        {outputs.list.map(o => {
+          const on = outputs.used.includes(o.id);
+          return (
+            <label key={o.id} className="flex items-center gap-2 text-[11px] text-gray-200 min-h-[28px] coarse:min-h-[36px] cursor-pointer">
+              <input type="checkbox" checked={on} onChange={e => setOutputUsed(instance, o.id, e.target.checked)} className="accent-sky-500" />
+              {o.label}
+            </label>
+          );
+        })}
+      </div>
+    </details>
   );
 }
 

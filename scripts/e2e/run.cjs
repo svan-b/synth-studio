@@ -111,6 +111,11 @@ check('touch: a momentary-button do-step counts taps and completes', tm.before?.
 check('touch: spectrum scope draws the output while it plays', sp.playing?.mode === 'spectrum' && sp.flippedTo === 'wave' && sp.playing?.sized && sp.quiet?.lit < 40 && sp.playing?.cols > 0.3 * (sp.playing?.W ?? 1e9),
   { quiet: sp.quiet?.lit, playingCols: sp.playing?.cols, width: sp.playing?.W, mode: sp.playing?.mode, flip: sp.flippedTo });
 
+// ---- Separate outputs (DeviceModule.studio.outputs) ---------------------------
+const so = run(path.join(__dirname, 'outputs.cjs'), [base, path.join(outDir, 'outputs')]);
+check('separate outputs: a channel of its own that routes, mutes, shows in the mixer and goes when off', !so.__error && so.ok && (so.errs ?? []).length === 0,
+  so.__error ?? { on: so.on && { strip: so.on.strip, rms: so.on.rms }, ui: so.ui, mute: so.mute, off: so.off && { strip: so.off.strip } });
+
 // ---- Producer path on iPad ---------------------------------------------------
 const pp = run(path.join(__dirname, 'producer.cjs'), [base, path.join(outDir, 'producer')], 600_000);
 check('producer path: iPad walkthrough of a whole-studio lesson', !pp.__error && pp.total > 0 && (pp.failed ?? []).length === 0 && (pp.errs ?? []).length === 0,
