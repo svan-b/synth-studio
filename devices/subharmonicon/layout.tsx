@@ -1,177 +1,257 @@
 // ============================================================================
 // Moog Subharmonicon panel layout
-// 60HP × 3U Eurorack faceplate (304.8 × 128.5 mm) in a wooden case. All x/y in
-// millimetres from the faceplate's top-left. Control x/y = centre.
+// 60 HP x 3U faceplate (304.8 x 128.5 mm) between wood side pieces. All x/y in
+// millimetres from the faceplate's top-left; control x/y = centre.
 //
-// Arrangement follows the hardware (manual p.10 panel overview):
-//   left    SEQUENCER 1 / SEQUENCER 2 (4 STEP knobs each), POLYRHYTHM
-//           (RHYTHM 1-4 with SEQ 1 / SEQ 2 buttons), TEMPO and transport
-//   centre  VCO 1 and VCO 2 (FREQ, SUB 1/2 FREQ, wave switch, SEQ ASSIGN
-//           OSC/SUB 1/SUB 2, VCO and SUB levels) with SEQ OCT and QUANTIZE
-//           between them
-//   right   CUTOFF, VOLUME, RESONANCE, VCF EG AMT, VCF/VCA ATTACK/DECAY
-//   far right  the 32-point patchbay, 4 columns × 8 rows
-// Positions are measured from panel photos / diagrams, so they are close but
-// not millimetre-exact.
+// Knob, button, switch and jack positions and cap sizes are the manual's own
+// panel drawing (the blank patch sheets, Owner's Manual printed p.50), measured
+// off its vector paths by the patchscore project. The LEDs, headings, rules,
+// screws, nameplate and logo were measured off a 400 dpi render of the same
+// drawing (REFERENCE.md). The panel prints no boxes - only headings: SEQUENCER 1 /
+// 2, POLYRHYTHM, OSCILLATORS (with rules to a boxed 1 and 2), the SEQ 1 / SEQ 2
+// ASSIGN brackets, short lines joining each RHYTHM knob to its SEQ buttons and a
+// centre divider broken by the SEQ OCT and QUANTIZE groups. Knobs: 11 large
+// (19 mm), 10 medium (15 mm), 12 small; the small STEP and RHYTHM caps are drawn
+// at 9 mm (hardware 6.3 mm) so they can be turned on an iPad.
+//
+// Twin aids (not on the hardware, marked in REFERENCE.md): the OFF / ON / HELD
+// keys under EG, the OUT ±5 / OUT UNQ keys beside the SEQ OCT and QUANTIZE buttons
+// (their hold modes), and the rhythm LOGIC switch (MIDI CC 113 on the hardware).
 // ============================================================================
 
-import type { PanelElement, PanelLayout, KnobElement } from '@/types/panel';
+import type { ButtonElement, KnobElement, PanelElement, PanelLayout } from '@/types/panel';
 import { PATCH_GRID } from './spec';
-import { CycleButton, EgButton } from './CycleSelector';
+import { CycleButton, EgButton, Screw, WaveGlyph } from './PanelWidgets';
 
-const PX_PER_MM = 4;
+const PX_PER_MM = 3.55;
 
+// Cap diameters (mm)
+const LARGE = 19;
+const MEDIUM = 15;
+const SMALL = 9;
+
+const TEXT = '#f2f2f2';
+const MUTED = '#c9c9c9';
+const RULE = '#d9d9d9';
+const LED = '#ff3b30';
+
+type LabelOpts = Partial<Extract<PanelElement, { kind: 'label' }>>;
 const knob = (control: string, x: number, y: number, diameter: number, extra: Partial<KnobElement> = {}): PanelElement => ({
   kind: 'knob', control, x, y, diameter, variant: 'moog-black', ...extra,
 });
-const label = (text: string, x: number, y: number, size = 8, extra: Partial<Extract<PanelElement, { kind: 'label' }>> = {}): PanelElement => ({
-  kind: 'label', text, x, y, size, ...extra,
+const label = (text: string, x: number, y: number, size = 8, extra: LabelOpts = {}): PanelElement => ({
+  kind: 'label', text, x, y, size, color: TEXT, ...extra,
 });
-const rule = (x: number, y: number, w: number, h: number): PanelElement => ({
-  kind: 'section', x, y, w, h, border: '1px solid rgba(255,255,255,0.35)', radius: 1.2,
+/** A thin printed rule (w x h mm, top-left) */
+const rule = (x: number, y: number, w: number, h = 0.32): PanelElement => ({ kind: 'section', x, y, w, h, background: RULE, radius: 0 });
+const vrule = (x: number, y0: number, y1: number): PanelElement => rule(x - 0.16, y0, 0.32, y1 - y0);
+/** Backlit rectangular button with its legend on the cap */
+const btn = (control: string, x: number, y: number, w: number, h: number, extra: Partial<ButtonElement> = {}): PanelElement => ({
+  kind: 'button', control, x, y, shape: 'rect', w, h, color: '#2b2b2b', ledColor: LED, label: 'none', ...extra,
+});
+const ledsOf = (engine: Record<string, unknown>) => (engine.leds as Record<string, number> | undefined) ?? {};
+const SCREW = 4.6;
+const screw = (x: number, y: number): PanelElement => ({
+  kind: 'custom', x: x - SCREW / 2, y: y - SCREW / 2, w: SCREW, h: SCREW,
+  render: () => <Screw d={SCREW * PX_PER_MM} />,
+});
+const glyph = (kind: 'square' | 'pwm' | 'saw', x: number, y: number, w: number, h = 2.1): PanelElement => ({
+  kind: 'custom', x: x - w / 2, y: y - h / 2, w, h,
+  render: () => <WaveGlyph kind={kind} w={w * PX_PER_MM} h={h * PX_PER_MM} />,
 });
 
-// --- Left: sequencers and polyrhythm --------------------------------------------
-const COL = (i: number) => 19 + i * 16;
-const SEQ_Y = [18.5, 43.5];
-const RHY_Y = 72;
-const ASSIGN_Y = [84.5, 92];
+// ---------------------------------------------------------------------------
+// Left: sequencers, polyrhythm, tempo and transport
+// ---------------------------------------------------------------------------
+const COL = [12.13, 31.21, 50.29, 69.27];
+const SEQ_Y = [16.61, 41.63];
+const STEP_LED_Y = [26.95, 52.02];
+const RHY_Y = 66.65;
+const ASSIGN_Y = [79.36, 88.37];
+const ASSIGN_H = 6.21;
+const HEAD_X = 40.75;
 
 const leftSection: PanelElement[] = [
-  rule(4, 4, 72, 52),
-  rule(4, 58, 72, 39),
-  label('SEQUENCER 1', 40, 7.2, 8, { letterSpacing: 1 }),
-  label('SEQUENCER 2', 40, 32.2, 8, { letterSpacing: 1 }),
-  label('POLYRHYTHM', 40, 61, 8, { letterSpacing: 1 }),
-  label('RHYTHM', 4.8, RHY_Y, 6.5, { align: 'left', color: '#d4d4d4' }),
-  ...[0, 1].flatMap(s => [0, 1, 2, 3].flatMap((i): PanelElement[] => [
-    knob(`seq${s + 1}_step${i + 1}`, COL(i), SEQ_Y[s], 10.5, { value: 'hover' }),
+  label('SEQUENCER 1', HEAD_X, 6.4, 8.5, { letterSpacing: 1.2 }),
+  label('SEQUENCER 2', HEAD_X, 31.4, 8.5, { letterSpacing: 1.2 }),
+  label('POLYRHYTHM', HEAD_X, 56.2, 8.5, { letterSpacing: 1.2 }),
+  ...[0, 1].flatMap(s => COL.flatMap((x, i): PanelElement[] => [
+    knob(`seq${s + 1}_step${i + 1}`, x, SEQ_Y[s], SMALL, { value: 'hover' }),
     {
-      kind: 'led', x: COL(i), y: SEQ_Y[s] + 8.2, size: 2.4, color: '#ff3b30',
+      kind: 'led', x, y: STEP_LED_Y[s], size: 2.6, color: LED,
       on: ({ engine }) => {
         const steps = engine.steps as Record<string, number> | undefined;
-        return steps && steps[`seq${s + 1}`] === i ? 1 : 0;
+        return steps && steps[`seq${s + 1}`] === i ? (engine.playing ? 1 : 0.55) : 0;
       },
     },
   ])),
-  ...[0, 1, 2, 3].flatMap((r): PanelElement[] => [
-    knob(`rhythm${r + 1}`, COL(r), RHY_Y, 10.5, { labelText: String(r + 1) }),
-    {
-      kind: 'led', x: COL(r) + 6.6, y: RHY_Y - 6.2, size: 2, color: '#ff3b30',
-      on: ({ engine }) => ((engine.leds as Record<string, number> | undefined)?.[`r${r + 1}`] ?? 0),
-    },
-    { kind: 'button', control: `rhythm${r + 1}_seq1`, x: COL(r), y: ASSIGN_Y[0], w: 5, color: '#1b1b1b', ledColor: '#ff3b30', label: 'none' },
-    { kind: 'button', control: `rhythm${r + 1}_seq2`, x: COL(r), y: ASSIGN_Y[1], w: 5, color: '#1b1b1b', ledColor: '#ff3b30', label: 'none' },
+  ...COL.flatMap((x, r): PanelElement[] => [
+    knob(`rhythm${r + 1}`, x, RHY_Y, SMALL),
+    // The printed lines joining each RHYTHM knob to its SEQ 1 and SEQ 2 buttons
+    vrule(x, RHY_Y + SMALL / 2 + 0.6, ASSIGN_Y[0] - ASSIGN_H / 2),
+    vrule(x, ASSIGN_Y[0] + ASSIGN_H / 2, ASSIGN_Y[1] - ASSIGN_H / 2),
+    // The lit SEQ buttons brighten when their generator fires (a teaching aid; REFERENCE.md)
+    ...[0, 1].map((s): PanelElement => btn(`rhythm${r + 1}_seq${s + 1}`, x, ASSIGN_Y[s], 9.4, ASSIGN_H, {
+      capText: `SEQ ${s + 1}`,
+      lit: ({ values, engine }) => (values[`rhythm${r + 1}_seq${s + 1}`] ? (ledsOf(engine)[`r${r + 1}`] ? 1 : 0.72) : 0),
+    })),
   ]),
-  label('SEQ 1', 12.5, ASSIGN_Y[0], 7, { align: 'right', color: '#d4d4d4' }),
-  label('SEQ 2', 12.5, ASSIGN_Y[1], 7, { align: 'right', color: '#d4d4d4' }),
 
-  // Tempo & transport
-  knob('tempo', 15, 111.5, 15),
-  { kind: 'button', control: 'reset', event: 'reset', x: 31, y: 103, w: 6, color: '#1b1b1b', ledColor: '#e5e5e5' },
+  // Tempo and transport
+  knob('tempo', 21.67, 109.69, LARGE),
+  btn('reset', 44.49, 101.38, 7.97, 7.91, { event: 'reset', capText: 'RESET', ledColor: '#f5f5f5' }),
   {
-    kind: 'custom', x: 39, y: 96.6, w: 8, h: 10,
-    render: ({ values, setValue }) => <EgButton value={(values.eg_mode as number) ?? 1} setValue={setValue} pxPerMm={PX_PER_MM} />,
+    kind: 'custom', x: 57.47 - 7.97 / 2, y: 101.38 - 7.91 / 2, w: 7.97, h: 7.91,
+    render: ({ values, setValue, teaching, step }) => (
+      <EgButton value={(values.eg_mode as number) ?? 1} setValue={setValue} w={7.97 * PX_PER_MM} h={7.91 * PX_PER_MM} teaching={teaching} step={step} />
+    ),
   },
-  // EG state legends (tap to select directly; the hardware shows the state on the button itself)
-  ...(['OFF', 'ON', 'HELD'] as const).map((t, i): PanelElement => ({
-    kind: 'button', control: 'eg_mode', setValue: i, x: 37.4 + i * 5.6, y: 110, shape: 'rect', w: 5.2, h: 3.2,
-    color: '#151515', ledColor: '#ff3b30', capText: t, label: 'none',
-  })),
-  { kind: 'button', control: 'next', event: 'next', x: 55, y: 103, w: 6, color: '#1b1b1b', ledColor: '#e5e5e5' },
-  {
-    kind: 'button', control: 'play', x: 32, y: 117, w: 8, color: '#2b1010', ledColor: '#ff3b30', label: 'below',
-    lit: ({ engine, values }) => (engine.playing !== undefined ? !!engine.playing : !!values.play),
-  },
-  { kind: 'button', control: 'trigger', event: 'trigger', x: 48, y: 117, w: 7, color: '#1b1b1b', ledColor: '#e5e5e5', label: 'below',
-    lit: ({ engine }) => ((engine.leds as Record<string, number> | undefined)?.trig ?? 0) },
-  { kind: 'switch', control: 'rhythm_logic', x: 66.5, y: 112, scale: 1.3, labelText: 'LOGIC' },
-  label('GLOBAL', 66.5, 123.2, 6, { color: '#8a8a8a', letterSpacing: 0.6 }),
+  btn('next', 70.55, 101.38, 7.97, 7.91, { event: 'next', capText: 'NEXT', ledColor: '#f5f5f5' }),
+  btn('play', 47.63, 111.69, 13.97, 8.21, { capText: 'PLAY', lit: ({ engine, values }) => (engine.playing !== undefined ? !!engine.playing : !!values.play) }),
+  btn('trigger', 67.4, 111.69, 13.97, 8.21, { event: 'trigger', capText: 'TRIGGER', lit: ({ engine }) => ledsOf(engine).trig ?? 0 }),
+  // EG states in words, so OFF / ON / HELD can be chosen by touch without the long press (twin aid)
+  label('EG', 48.6, 118.3, 6.5, { color: MUTED, align: 'right' }),
+  { kind: 'switch', control: 'eg_mode', x: 58.4, y: 118.3, style: 'buttons', orientation: 'horizontal', label: 'none', scale: 0.85 },
+  // Rhythm logic: a global (MIDI CC 113) setting on the hardware, given a small switch here
+  { kind: 'switch', control: 'rhythm_logic', x: 80.2, y: 103.4, scale: 1.15, labelText: 'LOGIC' },
+  label('CC 113', 80.2, 110.6, 5.5, { color: '#8a8a8a' }),
 ];
 
-// --- Centre: oscillators ------------------------------------------------------------
-const VCO_X = [107, 171];
-const SUB_X = [[94, 120], [158, 184]];
-const ASSIGN_X = [[96, 107, 118], [160, 171, 182]];
+// ---------------------------------------------------------------------------
+// Centre: oscillators, SEQ OCT, QUANTIZE, mixer
+// ---------------------------------------------------------------------------
+const FREQ_X = [106.84, 163.01];
+const WAVE_X = [87.86, 181.99];
+const SUB_X = [[92.88, 120.91], [148.94, 177.07]];
+const ASSIGN_X = [[93.86, 106.84, 119.93], [149.92, 163.01, 175.99]];
+const BRACKET = [[88.0, 125.9], [144.1, 182.0]];
+const OSC_Y = 25.62, SUB_Y = 51.64, ASSIGN_ROW = 69.15, LEVEL_Y = 86.67, SUBLEVEL_Y = 109.69;
+const MID_X = 135.0;
+const LED_X = 134.8;
+const SEQ_OCT_Y = 35.9, QUANT_Y = 86.1;
+// The SEQ OUT keys sit just left of their buttons, clear of the printed divider, LEDs and legends
+const HELD_W = 10, HELD_H = 3.0, HELD_X = 121.6;
 
 const oscSection: PanelElement[] = [
-  rule(80, 4, 124, 120.5),
+  // OSCILLATORS: rules out to a boxed 1 and 2 hanging from them
+  label('OSCILLATORS', MID_X, 3.35, 8.5, { letterSpacing: 1.4 }),
+  rule(87.35, 3.2, 122.3 - 87.35), rule(146.65, 3.2, 182.25 - 146.65),
+  { kind: 'section', x: 81.6, y: 3.2, w: 5.4, h: 5.0, border: `1px solid ${RULE}`, radius: 0.4 },
+  label('1', 84.3, 5.7, 8.5),
+  { kind: 'section', x: 182.8, y: 3.2, w: 5.6, h: 5.0, border: `1px solid ${RULE}`, radius: 0.4 },
+  label('2', 185.6, 5.7, 8.5),
+  // Centre divider, broken by the SEQ OCT and QUANTIZE groups (as drawn, p.50)
+  vrule(MID_X, 6.4, 14.1),
+  vrule(MID_X, 40.7, 58.6),
+  vrule(MID_X, 91.1, 117.5),
   ...[0, 1].flatMap((b): PanelElement[] => {
     const v = b + 1;
-    const waveX = b === 0 ? 88.5 : 191.5;
+    const [bx0, bx1] = BRACKET[b];
+    // The pulse-width glyph sits on the outer side of the switch; VCO 2's clears the position legends
+    const pwmX = b ? WAVE_X[b] + 10.4 : WAVE_X[b] - 8.6;
     return [
-      label(`VCO ${v}`, VCO_X[b], 7.2, 9, { letterSpacing: 1 }),
-      knob(`vco${v}_freq`, VCO_X[b], 25, 17, { labelText: 'FREQ' }),
-      { kind: 'switch', control: `vco${v}_wave`, x: waveX, y: 26, scale: 1.6, labelText: 'WAVE' },
-      knob(`vco${v}_sub1_freq`, SUB_X[b][0], 51, 12.5),
-      knob(`vco${v}_sub2_freq`, SUB_X[b][1], 51, 12.5),
-      label(`SEQ ${v} ASSIGN`, VCO_X[b], 66.3, 7, { color: '#d4d4d4', letterSpacing: 0.6 }),
-      { kind: 'button', control: `seq${v}_osc`, x: ASSIGN_X[b][0], y: 74, w: 5.5, color: '#1b1b1b', ledColor: '#ff3b30' },
-      { kind: 'button', control: `seq${v}_sub1`, x: ASSIGN_X[b][1], y: 74, w: 5.5, color: '#1b1b1b', ledColor: '#ff3b30' },
-      { kind: 'button', control: `seq${v}_sub2`, x: ASSIGN_X[b][2], y: 74, w: 5.5, color: '#1b1b1b', ledColor: '#ff3b30' },
-      knob(`vco${v}_level`, VCO_X[b], 92, 11.5),
-      knob(`vco${v}_sub1_level`, SUB_X[b][0], 112, 11.5),
-      knob(`vco${v}_sub2_level`, SUB_X[b][1], 112, 11.5),
+      knob(`vco${v}_freq`, FREQ_X[b], OSC_Y, LARGE, { labelText: `VCO ${v} FREQ` }),
+      label(`VCO ${v} WAVE`, WAVE_X[b], 17.0, 7),
+      { kind: 'switch', control: `vco${v}_wave`, x: WAVE_X[b] + (b ? 1.2 : -1.6), y: OSC_Y + 1.2, scale: 1.35, label: 'none' },
+      glyph('square', WAVE_X[b], 20.3, 3.0),
+      glyph('pwm', pwmX, OSC_Y + 0.4, 6.2),
+      glyph('saw', WAVE_X[b], 31.9, 3.0),
+      knob(`vco${v}_sub1_freq`, SUB_X[b][0], SUB_Y, MEDIUM),
+      knob(`vco${v}_sub2_freq`, SUB_X[b][1], SUB_Y, MEDIUM),
+      // SEQ n ASSIGN: a word on a bracket that drops beside its three buttons
+      label(`SEQ ${v} ASSIGN`, FREQ_X[b], 63.2, 7, { letterSpacing: 0.6 }),
+      rule(bx0, 63.2, FREQ_X[b] - 9.6 - bx0), rule(FREQ_X[b] + 9.6, 63.2, bx1 - FREQ_X[b] - 9.6),
+      vrule(bx0 + 0.16, 63.2, 69.6), vrule(bx1 - 0.16, 63.2, 69.6),
+      btn(`seq${v}_osc`, ASSIGN_X[b][0], ASSIGN_ROW, 7.97, 7.91, { capText: `OSC ${v}` }),
+      btn(`seq${v}_sub1`, ASSIGN_X[b][1], ASSIGN_ROW, 7.97, 7.91, { capText: 'SUB 1' }),
+      btn(`seq${v}_sub2`, ASSIGN_X[b][2], ASSIGN_ROW, 7.97, 7.91, { capText: 'SUB 2' }),
+      knob(`vco${v}_level`, FREQ_X[b], LEVEL_Y, MEDIUM),
+      knob(`vco${v}_sub1_level`, SUB_X[b][0], SUBLEVEL_Y, MEDIUM),
+      knob(`vco${v}_sub2_level`, SUB_X[b][1], SUBLEVEL_Y, MEDIUM),
     ];
   }),
-  // SEQ OCT and QUANTIZE between the oscillators: LED column + one push button
-  ...([[2, '±5'], [1, '±2'], [0, '±1']] as const).map(([v, t], i): PanelElement => ({
-    kind: 'button', control: 'seq_oct', setValue: v, x: 143, y: 13.5 + i * 4.6, w: 2.9, color: '#2a1212', ledColor: '#ff3b30', label: 'left', labelText: t,
-  })),
+
+  // SEQ OCT: three LEDs (±5 top) over one button that cycles; held = the lit LED flashes
+  ...([[2, '±5'], [1, '±2'], [0, '±1']] as const).map(([v, t], i): PanelElement => (
+    btn('seq_oct', LED_X, [16.93, 21.96, 26.97][i], 2.7, 2.7, {
+      shape: 'round', setValue: v, label: 'right', labelText: t, color: '#2a1212',
+      lit: ({ values, engine }) => (values.seq_oct === v ? (values.seq_oct_held && engine.blink ? 0.15 : 1) : 0),
+    })
+  )),
   {
-    kind: 'custom', x: 135, y: 26.5, w: 8, h: 10,
-    render: ({ values, setValue }) => (
-      <CycleButton control="seq_oct" label="SEQ OCT" value={(values.seq_oct as number) ?? 0} next={v => (v + 1) % 3} setValue={setValue} pxPerMm={PX_PER_MM}
-        description="SEQ OCT: press to cycle the STEP knob range ±1 → ±2 → ±5 octaves." />
+    kind: 'custom', x: MID_X - 10.13 / 2, y: SEQ_OCT_Y - 6.21 / 2, w: 10.13, h: 6.21,
+    render: ({ values, setValue, teaching, step }) => (
+      <CycleButton control="seq_oct" label="SEQ OCT" value={(values.seq_oct as number) ?? 0} next={v => (v + 2) % 3}
+        heldControl="seq_oct_held" held={!!values.seq_oct_held} setValue={setValue}
+        w={10.13 * PX_PER_MM} h={6.21 * PX_PER_MM} teaching={teaching} step={step}
+        description="SEQ OCT: press to step ±5 → ±2 → ±1 octaves. Press and hold until the LED flashes to keep the SEQ jacks at ±5 V (or tap OUT ±5)." />
     ),
   },
-  ...([[1, '12-ET'], [2, '8-ET'], [3, '12-JI'], [4, '8-JI']] as const).map(([v, t], i): PanelElement => ({
-    kind: 'button', control: 'quantize', setValue: v, x: 143, y: 56 + i * 4.6, w: 2.9, color: '#2a1212', ledColor: '#ff3b30', label: 'left', labelText: t,
-  })),
+  btn('seq_oct_held', HELD_X, SEQ_OCT_Y, HELD_W, HELD_H, { capText: 'OUT ±5', color: '#161616' }),
+
+  // QUANTIZE: four LEDs over one button; all dark = off; held = the lit LED flashes
+  ...([[1, '12-ET'], [2, '8-ET'], [3, '12-JI'], [4, '8-JI']] as const).map(([v, t], i): PanelElement => (
+    btn('quantize', LED_X, [62.01, 67.06, 72.05, 77.09][i], 2.7, 2.7, {
+      shape: 'round', setValue: v, label: 'right', labelText: t, color: '#2a1212',
+      lit: ({ values, engine }) => (values.quantize === v ? (values.quantize_held && engine.blink ? 0.15 : 1) : 0),
+    })
+  )),
   {
-    kind: 'custom', x: 135, y: 74, w: 8, h: 10,
-    render: ({ values, setValue }) => (
-      <CycleButton control="quantize" label="QUANTIZE" value={(values.quantize as number) ?? 1} next={v => (v + 1) % 5} setValue={setValue} pxPerMm={PX_PER_MM}
-        description="QUANTIZE: press to cycle 12-ET → 8-ET → 12-JI → 8-JI → off (all LEDs dark)." />
+    kind: 'custom', x: MID_X - 10.82 / 2, y: QUANT_Y - 6.21 / 2, w: 10.82, h: 6.21,
+    render: ({ values, setValue, teaching, step }) => (
+      <CycleButton control="quantize" label="QUANTIZE" value={(values.quantize as number) ?? 1} next={v => (v === 4 ? 0 : v + 1)}
+        heldControl="quantize_held" held={!!values.quantize_held} setValue={setValue}
+        w={10.82 * PX_PER_MM} h={6.21 * PX_PER_MM} teaching={teaching} step={step}
+        description="QUANTIZE: press to step 12-ET → 8-ET → 12-JI → 8-JI → off (all LEDs dark). Press and hold until the LED flashes to unquantize the SEQ jacks (or tap OUT UNQ)." />
     ),
   },
+  btn('quantize_held', HELD_X, QUANT_Y, HELD_W, HELD_H, { capText: 'OUT UNQ', color: '#161616' }),
 ];
 
-// --- Right: filter, envelopes, VCA ------------------------------------------------------
-const F_X = [216, 241];
+// ---------------------------------------------------------------------------
+// Right: filter, envelopes, VCA - two columns, no heading on the panel
+// ---------------------------------------------------------------------------
+const COL_L = 205.1, COL_R = 235.2;
+const ROWS = [16.61, 47.64, 78.66, 109.69];
 const filterSection: PanelElement[] = [
-  rule(206, 4, 47, 120.5),
-  knob('cutoff', F_X[0], 23, 15),
-  knob('volume', F_X[1], 23, 11.5),
-  knob('resonance', F_X[0], 51, 11.5),
-  knob('vcf_eg_amt', F_X[1], 51, 11.5, { labelText: 'EG AMT' }),
-  label('VCF EG', 228.5, 66.5, 7, { color: '#d4d4d4', letterSpacing: 0.8 }),
-  knob('vcf_attack', F_X[0], 80, 11.5, { labelText: 'ATTACK' }),
-  knob('vcf_decay', F_X[1], 80, 11.5, { labelText: 'DECAY' }),
-  label('VCA EG', 228.5, 96, 7, { color: '#d4d4d4', letterSpacing: 0.8 }),
-  knob('vca_attack', F_X[0], 109.5, 11.5, { labelText: 'ATTACK' }),
-  knob('vca_decay', F_X[1], 109.5, 11.5, { labelText: 'DECAY' }),
+  knob('cutoff', COL_L, ROWS[0], LARGE),
+  knob('volume', COL_R, ROWS[0], LARGE),
+  knob('resonance', COL_L, ROWS[1], LARGE),
+  knob('vcf_eg_amt', COL_R, ROWS[1], LARGE),
+  label('(–)', COL_R - 12.4, ROWS[1] + 8.4, 7, { color: MUTED }),
+  label('(+)', COL_R + 12.4, ROWS[1] + 8.4, 7, { color: MUTED }),
+  knob('vcf_attack', COL_L, ROWS[2], LARGE),
+  knob('vcf_decay', COL_R, ROWS[2], LARGE),
+  knob('vca_attack', COL_L, ROWS[3], LARGE),
+  knob('vca_decay', COL_R, ROWS[3], LARGE),
 ];
 
-// --- Patchbay -----------------------------------------------------------------------------
-const PB_X = (c: number) => 262 + c * 10.6;
-const PB_Y = (r: number) => 17 + r * 12.9;
-const SHORT: Record<string, string> = {
-  out_vco1_sub1: 'SUB 1', out_vco1_sub2: 'SUB 2', out_vco2_sub1: 'SUB 1', out_vco2_sub2: 'SUB 2',
-};
+// ---------------------------------------------------------------------------
+// Patchbay: 4 columns x 8 rows, outputs in reversed lettering
+// ---------------------------------------------------------------------------
+const PB_X = (c: number) => 255.17 + c * 13.54;
+const PB_Y = (r: number) => 16.61 + r * 13.51;
 const patchbay: PanelElement[] = [
-  { kind: 'section', x: 255.5, y: 4, w: 46, h: 110, background: '#0b0b0b', border: '1px solid rgba(255,255,255,0.35)', radius: 1.2 },
-  label('IN', 274.5, 7.3, 7, { color: '#d4d4d4' }),
-  label('OUT', 284.5, 7.3, 7, { invert: true }),
-  ...PATCH_GRID.map(({ id, col, row }): PanelElement => ({
-    kind: 'jack', jack: id, x: PB_X(col), y: PB_Y(row), ...(SHORT[id] ? { labelText: SHORT[id] } : {}),
-  })),
+  label('IN', 271.6, 4.1, 7.5, { color: MUTED }),
+  label('/', 274.9, 4.1, 7.5, { color: MUTED }),
+  label('OUT', 279.0, 4.1, 7.5, { invert: true }),
+  // The printed legends, in full (VCO 1 SUB 1 ...): the panel condenses them to fit the column
+  ...PATCH_GRID.map(({ id, col, row }): PanelElement => ({ kind: 'jack', jack: id, x: PB_X(col), y: PB_Y(row) })),
+  // MIDI activity LED, printed just left of the MIDI IN legend (studio clock and keys light it)
+  { kind: 'led', x: 248.4, y: PB_Y(7) - 5.6, size: 2.4, color: LED, on: ({ engine }) => ledsOf(engine).midi ?? 0 },
 ];
 
-// --- Branding -------------------------------------------------------------------------------
-const branding: PanelElement[] = [
-  label('moog', 278.5, 118.6, 19, { font: 'serif', italic: true, weight: 400 }),
-  label('subharmonicon', 278.5, 124.8, 7, { color: '#e5e5e5', letterSpacing: 1.4, weight: 600 }),
+// ---------------------------------------------------------------------------
+// Frame: eight black M3 screws (manual p.40), the nameplate and the logo
+// ---------------------------------------------------------------------------
+const frame: PanelElement[] = [
+  ...[5.0, 75.9, 218.9, 300.0].map(x => screw(x, 3.0)),
+  ...[5.0, 117.0, 218.9, 300.0].map(x => screw(x, 125.5)),
+  label('SUBHARMONICON', 31.5, 124.0, 21, { align: 'left', font: 'condensed', weight: 700, letterSpacing: 0.2, fixed: true }),
+  rule(75.3, 121.7, 0.3, 4.65),
+  label('SEMI-MODULAR ANALOG', 77.1, 122.95, 9.5, { align: 'left', font: 'condensed', weight: 700, letterSpacing: 0.3, fixed: true }),
+  label('POLYRHYTHMIC SYNTHESIZER', 77.1, 125.45, 9.5, { align: 'left', font: 'condensed', weight: 700, letterSpacing: 0.3, fixed: true }),
+  label('moog', 152.6, 123.4, 22, { font: 'sans', weight: 500, letterSpacing: 0.4, fixed: true }),
 ];
 
 export const SUBHARMONICON_LAYOUT: PanelLayout = {
@@ -179,12 +259,12 @@ export const SUBHARMONICON_LAYOUT: PanelLayout = {
   height: 128.5,
   pxPerMm: PX_PER_MM,
   theme: {
-    background: 'linear-gradient(180deg, #161616 0%, #0e0e0e 100%)',
-    text: '#ffffff',
-    muted: '#d4d4d4',
-    cheeks: { width: 9, background: 'linear-gradient(90deg, #4a2f1c 0%, #7a5233 45%, #5c3b24 100%)' },
-    frame: { padding: 1.5, background: '#1c1c1c', radius: 2 },
+    background: 'linear-gradient(180deg, #121212 0%, #0b0b0b 100%)',
+    text: TEXT,
+    muted: MUTED,
+    cheeks: { width: 7.25, background: 'linear-gradient(90deg, #3e2717 0%, #6e4a2c 38%, #8a5e38 52%, #5a3a22 100%)' },
+    frame: { padding: 1.1, background: 'linear-gradient(180deg, #b9bcc0 0%, #8d9094 50%, #b4b7bb 100%)', radius: 1.5 },
     jack: { ring: '#5a5a5a', outputLabelBg: '#f2f2f2', outputLabelText: '#000' },
   },
-  elements: [...leftSection, ...oscSection, ...filterSection, ...patchbay, ...branding],
+  elements: [...frame, ...leftSection, ...oscSection, ...filterSection, ...patchbay],
 };

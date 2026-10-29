@@ -4,29 +4,35 @@ import { SUBHARMONICON_LAYOUT } from './layout';
 import { SUBHARMONICON_LESSONS } from './lessons';
 import { SubharmoniconEngine } from './engine';
 
-export const spec = SUBHARMONICON;
-export const layout = SUBHARMONICON_LAYOUT;
-export const lessons = SUBHARMONICON_LESSONS;
-export const createEngine = () => new SubharmoniconEngine();
-export const transportControl = 'play';
-export const tips = [
-  'PLAY (Space) starts the sequencers. Each RHYTHM knob divides TEMPO by 1-16; its SEQ 1 / SEQ 2 buttons choose which sequencer it clocks. Two rhythms on two sequencers = a polyrhythm.',
-  'SUB FREQ knobs divide their VCO by a whole number (÷1 fully clockwise … ÷16). Hold EG until it blinks (HELD) for a drone to tune chords by ear.',
-  'QUANTIZE and SEQ OCT: press the button to cycle, or tap an LED legend. EG: tap = ON/OFF, press and hold = HELD.',
-  'Patch: tap an output (white label) then an input, or drag. Tap a cable to unplug. Inserting a cable breaks the normal (VCF EG → CUTOFF, VCA EG → VCA, SUB 1 → PWM, VCO 1 → VCO 2 pitch).',
-  'Simplified: MIDI IN is not connected - the computer keyboard (A-K) stands in for it, transposing both VCOs from Middle C and gating the envelopes. RHYTHM LOGIC is a global/MIDI setting on the hardware, shown here as a switch. CV into SUB and RHYTHM inputs shifts divisions by about 1.5 per volt (approximate scaling).',
-];
-export const worklets = ['/worklets/subharmonicon-processors.js'];
-
 const subharmonicon: DeviceModule = {
-  spec,
-  layout,
-  lessons,
-  createEngine,
-  transportControl,
-  tips,
-  worklets,
+  spec: SUBHARMONICON,
+  layout: SUBHARMONICON_LAYOUT,
+  lessons: SUBHARMONICON_LESSONS,
+  createEngine: () => new SubharmoniconEngine(),
+  worklets: ['/worklets/subharmonicon-processors.js'],
+  transportControl: 'play',
+  // The computer keyboard stands in for MIDI IN: notes are offsets from C4 (the A key)
   keyboard: { lowNote: 60 },
+  // MIDI clock: follows the studio transport (one master count per 16th note)
+  studio: { midiSync: true },
+  /**
+   * Lessons' "listen to the target": the sequence from step 1 on the internal clock
+   * (with EG off, or nothing assigned, the envelopes are gated so it still sounds).
+   * If it is already playing it simply keeps playing with the target settings.
+   */
+  audition: api => {
+    api.event('audition');
+    return () => api.event('audition:stop');
+  },
+  tips: [
+    'PLAY (or Space) runs the sequencers. Each RHYTHM knob divides the clock by 1-16; its SEQ 1 / SEQ 2 buttons choose which sequencer it steps. Two rhythms on two sequencers make a polyrhythm.',
+    'SUB FREQ knobs divide their VCO by a whole number: ÷1 fully clockwise (unison) to ÷16. Press and hold EG until it blinks (or tap HELD under it) for a drone, so you can tune chords by ear.',
+    'SEQ OCT and QUANTIZE: press the button to cycle, or tap an LED. Press and hold one until its LED flashes (or tap OUT ±5 / OUT UNQ beside them) to free the SEQ 1 / SEQ 2 jacks from it.',
+    'TEMPO is linear, as on the hardware: 12 o\'clock is about 1510 BPM, so musical tempos sit in its first quarter. 480 BPM counts 16th notes at 120.',
+    'Keys A-K play from C4 (A = no transposition). Stopped, a key plays like TRIGGER with a pitch: a pluck with EG lit, held for as long as the key with EG off. While the sequence runs, keys transpose it.',
+    'In the studio the Subharmonicon follows the studio clock like MIDI: one master count per 16th note, so RHYTHM ÷4 plays quarter notes. A cable from Studio Clock CLOCK into CLOCK takes over the clock; the studio still starts and stops PLAY.',
+    'Patch: tap an output (white label), then an input, or drag. Tap a cable to unplug it. The VCA and CUTOFF jacks add to their envelopes; VCO 1\'s jack also feeds VCO 2 until VCO 2 has a cable; a PWM cable replaces SUB 1\'s sweep.',
+  ],
 };
 
 export default subharmonicon;

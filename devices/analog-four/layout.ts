@@ -1,103 +1,108 @@
 // ============================================================================
 // Analog Four MKII panel layout (mm from the faceplate's top-left)
 //
-// Dark Elektron chassis: OLED top-centre, the ten DATA ENTRY encoders A-J to
-// its right with the six PARAMETER keys beneath, TRACK keys, FUNC and the
-// transport on the left, and the 16 trig keys along the bottom.
-// Proportions follow the 385 mm wide unit; the key positions are drawn from
-// product photos and the manual's front-panel overview, not measured.
+// The black finish. Positions from the manual's front-panel drawing (A4 MKII
+// manual p.12), checked against a top-down image of the unit (geometry.ts;
+// REFERENCE.md lists every element and its source):
+//   top edge  the rear connectors' names
+//   left      Main Volume, Quick Perf Amount, Track Level; GLOBAL QPER TEMPO;
+//             FUNC, KIT SND MIX; PERF TRK PTN SONG; PATTERN MODE LEDs; BANK A-H
+//   centre    the screen window; YES/NO and the arrows; CHAIN, SONG MODE;
+//             RECORD PLAY STOP
+//   right     DATA ENTRY A-J; ARP NOTE OSC1 OSC2 FLTR AMP ENV LFO; OCT-,
+//             OCTAVE LEDs, OCT+, TRNS; the 13-key keyboard
+//   far right logo; T1-T4, FX, CV; FILL; PATTERN PAGE LEDs; PAGE
+//   bottom    the 16 trig keys with A-P, T1-CV and the Quick Performance bracket
+// Legends are in the panel's own title case; FUNC legends are underlined.
 // ============================================================================
 
 import { createElement } from 'react';
-import type { PanelElement, PanelLayout } from '@/types/panel';
-import { CV_TRACK, FX_TRACK, PAGE, PARAM_KEYS, TRACKS, encoderControl, patternId } from './params';
-import { ENC_D, KEY_ROW_Y, PANEL_H, PANEL_W, PKEY_H, PKEY_W, PKEY_X, PX_PER_MM, SCREEN, TRIGS, encPos } from './geometry';
-import { LockEncoders, Screen, SubPageKeys, TrigKeys, keyLit } from './ui';
-
-const KEY = '#4b4e53';      // grey Elektron key caps
-const LED_RED = '#ff3b30';
-const LED_WHITE = '#f4f4f4';
-const MUTED = '#8a8f98';
+import type { CustomElement, PanelElement, PanelLayout } from '@/types/panel';
+import { encoderControl, V } from './params';
+import {
+  ENC_D, HEADPHONE_X, KEYBOARD, KEYS, KNOBS, LOGO, OLED, PANEL_H, PANEL_W, PX_PER_MM, REAR_LEGENDS, REAR_Y, SCREEN_WINDOW, TRIGS, encPos,
+} from './geometry';
+import {
+  COL, Helpers, Legend, LedStrips, LogoMark, Menus, MiniKeyboard, PanelKey, RearIcons, Screen, SoundBrowserLegend, TrigArea, TrigLegends, trackLevelControl,
+} from './ui';
 
 const num = (v: unknown, d = 0) => (typeof v === 'number' ? v : d);
 
-const rectKey = (x: number, y: number, extra: Partial<Extract<PanelElement, { kind: 'button' }>>): PanelElement => ({
-  kind: 'button', shape: 'rect', x, y, w: PKEY_W, h: PKEY_H, color: KEY, ledColor: LED_WHITE, ...extra,
+/** The knob names sit about 4 mm under the caps (manual p.12 drawing) */
+const KNOB_NAME_Y = KNOBS.MAIN_VOLUME.y + KNOBS.MAIN_VOLUME.d / 2 + 4.4;
+
+const keyElement = (name: string): CustomElement => {
+  const b = KEYS[name];
+  return { kind: 'custom', x: b.x - b.w / 2, y: b.y - b.h / 2, w: b.w, h: b.h, render: ctx => createElement(PanelKey, { ctx, name }) };
+};
+
+const label = (text: string, x: number, y: number, opts: Partial<Extract<PanelElement, { kind: 'label' }>> = {}): PanelElement => ({
+  kind: 'label', text, x, y, size: 8, weight: 500, color: COL.legend, ...opts,
+});
+
+/** A knob name in two tones, as printed: "Main" grey, "Volume" white */
+const knobName = (x: number, y: number, a: string, b: string): CustomElement => ({
+  kind: 'custom', x: x - 18, y: y - 2.2, w: 36, h: 4.4,
+  render: () => createElement(Legend, { parts: [{ text: a }, { text: b, strong: true }] }),
 });
 
 const elements: PanelElement[] = [
-  // --- Bezels -------------------------------------------------------------------
-  { kind: 'section', x: SCREEN.x - 3, y: SCREEN.y - 3, w: SCREEN.w + 6, h: SCREEN.h + 6, background: '#0b0b0c', border: '1px solid #2a2b2e', radius: 2 },
-  { kind: 'section', x: TRIGS.x - 3, y: TRIGS.y - 3, w: TRIGS.w + 6, h: TRIGS.h + 6, background: '#121314', border: '1px solid #2a2b2e', radius: 1.5 },
+  // --- Rear connectors' names along the top edge -------------------------------------
+  ...REAR_LEGENDS.map(r => label(r.text, r.x, REAR_Y + (r.text.includes('\n') ? 1.4 : 0), { size: 7, color: COL.legendDim, weight: 500 })),
+  { kind: 'custom', x: HEADPHONE_X - 2, y: REAR_Y - 2, w: 4, h: 4, render: () => createElement(RearIcons) },
 
-  // --- Branding + main volume --------------------------------------------------------
-  { kind: 'knob', control: 'main_volume', x: 24, y: 27, diameter: 15, variant: 'elektron', value: 'hover' },
-  { kind: 'label', text: 'ANALOG FOUR', x: 44, y: 21, size: 13, weight: 800, align: 'left', letterSpacing: 1.2, font: 'condensed' },
-  { kind: 'label', text: 'MKII', x: 44, y: 29, size: 9, weight: 700, align: 'left', color: MUTED, letterSpacing: 2 },
-  { kind: 'label', text: 'elektron', x: PANEL_W - 8, y: PANEL_H - 6, size: 13, weight: 700, align: 'right', color: '#c9cdd3', letterSpacing: 0.5 },
-
-  // --- TRACK keys (2 x 3) -----------------------------------------------------------
-  { kind: 'label', text: 'TRACK', x: 30, y: 55, size: 8.5, color: MUTED, letterSpacing: 1 },
-  ...TRACKS.map((name, i): PanelElement => rectKey(19 + (i % 2) * 22, 66 + Math.floor(i / 2) * 15, {
-    control: 'track', setValue: i, w: 15, h: 9, capText: name, labelText: name, ledColor: i === FX_TRACK ? '#ffb347' : i === CV_TRACK ? '#7dd3fc' : LED_RED, label: 'none',
-  })),
-
-  // --- FUNC + transport -----------------------------------------------------------------
-  rectKey(19, 120, { control: 'func', w: 15, h: 9, capText: 'FUNC', ledColor: '#ffb347', label: 'none' }),
-  { kind: 'button', control: 'grid_rec', x: 14, y: 154.5, w: 11, shape: 'round', color: KEY, ledColor: LED_RED, capText: '●', label: 'below', labelText: 'REC' },
-  { kind: 'button', control: 'play', x: 32, y: 154.5, w: 11, shape: 'round', color: KEY, ledColor: '#4ade80', capText: '▶', label: 'below', labelText: 'PLAY' },
-  { kind: 'button', control: 'play', setValue: false, x: 50, y: 154.5, w: 11, shape: 'round', color: KEY, ledColor: LED_WHITE, capText: '■', label: 'below', labelText: 'STOP', lit: () => false },
-
-  // --- Screen ---------------------------------------------------------------------------
-  { kind: 'display', x: SCREEN.x, y: SCREEN.y, w: SCREEN.w, h: SCREEN.h, style: 'oled', render: ctx => createElement(Screen, ctx) },
-
-  // --- Keys under the screen -----------------------------------------------------------
-  rectKey(128, KEY_ROW_Y, { event: 'pattern', labelText: 'PATTERN', label: 'above' }),
-  rectKey(152, KEY_ROW_Y, { event: 'bank', labelText: 'BANK', label: 'above' }),
-  rectKey(188, KEY_ROW_Y, { control: 'page', setValue: PAGE.TEMPO, labelText: 'TEMPO', label: 'above' }),
-
-  // --- DATA ENTRY encoders A-J (follow track + page) ------------------------------------
-  { kind: 'label', text: 'DATA ENTRY', x: 290, y: 8, size: 8, color: MUTED, letterSpacing: 1.5 },
-  ...Array.from({ length: 10 }, (_, slot): PanelElement => {
-    const p = encPos(slot);
-    return {
-      kind: 'knob', x: p.x, y: p.y, diameter: ENC_D, variant: 'elektron', value: 'hover',
-      labelText: 'ABCDEFGHIJ'[slot],
-      control: ({ values }) => {
-        if (num(values.lock_step) > 0 && num(values.track) < FX_TRACK && num(values.page, 1) !== PAGE.TEMPO) return null; // lock encoders on top
-        return encoderControl(Math.round(num(values.track)), Math.round(num(values.page, 1)), slot);
-      },
-    };
-  }),
-  { kind: 'custom', x: 0, y: 0, w: 0, h: 0, render: ctx => createElement(LockEncoders, ctx) },
-
-  // --- PARAMETER keys ---------------------------------------------------------------------
-  { kind: 'label', text: 'PARAMETER', x: 289.5, y: KEY_ROW_Y - 12.5, size: 8, color: MUTED, letterSpacing: 1.5 },
-  ...PARAM_KEYS.flatMap((k, i): PanelElement[] => [
-    rectKey(PKEY_X(i), KEY_ROW_Y, {
-      control: 'page', setValue: k.page, labelText: k.label, label: 'none',
-      lit: ({ values }) => keyLit(i, Math.round(num(values.page, 1))),
-    }),
-    { kind: 'label', text: k.label, x: PKEY_X(i), y: KEY_ROW_Y - 7.2, size: 9.5, weight: 700 },
-    { kind: 'label', text: k.fx || '–', x: PKEY_X(i), y: KEY_ROW_Y + 7.4, size: 8.5, weight: 600, color: MUTED },
-  ]),
-  { kind: 'custom', x: 0, y: 0, w: 0, h: 0, render: ctx => createElement(SubPageKeys, ctx) },
-  { kind: 'label', text: 'press a lit key again: OSC 1 › NOISE · FILTER › ENV · LFO › LFO 2', x: 289.5, y: KEY_ROW_Y + 16, size: 9, weight: 500, color: '#7d838c' },
-
-  // --- Trig keys ------------------------------------------------------------------------------
-  { kind: 'label', text: 'tap = trig on/off · hold + turn encoder = parameter lock · FUNC lit = mutes (keys 1-4)', x: TRIGS.x, y: TRIGS.y - 8, size: 9.5, weight: 500, align: 'left', color: '#7d838c' },
+  // --- Screen window: black glass, the tag line, the OLED, the name ---------------------
+  { kind: 'section', x: SCREEN_WINDOW.x, y: SCREEN_WINDOW.y, w: SCREEN_WINDOW.w, h: SCREEN_WINDOW.h, background: 'linear-gradient(160deg, #0b0c0e 0%, #040405 55%, #08090b 100%)', border: '1px solid #2a2c31', radius: 2.6 },
+  label('4 Voice Analog Tabletop Synthesizer', OLED.x, SCREEN_WINDOW.y + 4.4, { size: 7, color: '#c4c7cc', align: 'left', weight: 500 }),
+  { kind: 'display', x: OLED.x, y: OLED.y, w: OLED.w, h: OLED.h, style: 'oled', render: ctx => createElement(Screen, ctx) },
   {
-    kind: 'stepgrid', x: TRIGS.x, y: TRIGS.y, w: TRIGS.w, h: TRIGS.h, steps: 16, rows: 1, numbered: true, color: LED_RED,
-    control: ({ values }) => (num(values.track) < FX_TRACK ? patternId(Math.round(num(values.track))) : null),
-    playhead: ({ engine, values }) => {
-      const s = engine.steps as Record<string, number> | undefined;
-      const t = Math.round(num(values.track));
-      const v = s?.[`t${t < FX_TRACK ? t + 1 : 1}`];
-      return engine.playing && typeof v === 'number' && v >= 0 ? v : undefined;
-    },
+    kind: 'custom', x: OLED.x, y: OLED.y + OLED.h + 2.2, w: 60, h: 6.6,
+    render: () => createElement(Legend, { parts: [{ text: 'Analog Four ', strong: true }, { text: 'MKII' }], size: 17, align: 'left', light: true }),
   },
-  { kind: 'custom', x: TRIGS.x, y: TRIGS.y, w: TRIGS.w, h: TRIGS.h, render: ctx => createElement(TrigKeys, ctx) },
-  ...[0, 4, 8, 12].map((s): PanelElement => ({ kind: 'label', text: '▾', x: TRIGS.x + (s + 0.5) * (TRIGS.w / 16), y: TRIGS.y + TRIGS.h + 4, size: 6, color: MUTED })),
+
+  // --- Pots and TRACK LEVEL ------------------------------------------------------
+  // The pots have a white mark and no printed scale; TRACK LEVEL is an endless encoder
+  { kind: 'knob', control: 'main_volume', x: KNOBS.MAIN_VOLUME.x, y: KNOBS.MAIN_VOLUME.y, diameter: KNOBS.MAIN_VOLUME.d, variant: 'elektron', capColor: '#f4f4f4', label: 'none', value: 'hover' },
+  knobName(KNOBS.MAIN_VOLUME.x, KNOB_NAME_Y, 'Main ', 'Volume'),
+  {
+    kind: 'knob', x: KNOBS.QUICK_PERF.x, y: KNOBS.QUICK_PERF.y, diameter: KNOBS.QUICK_PERF.d, variant: 'elektron', capColor: '#f4f4f4', label: 'none', value: 'hover',
+    control: ({ values }) => `perf_${'abcdefghij'[Math.max(0, Math.min(9, Math.round(num(values.qper_sel))))]}`,
+  },
+  knobName(KNOBS.QUICK_PERF.x, KNOB_NAME_Y, 'Quick Perf ', 'Amount'),
+  {
+    kind: 'knob', x: KNOBS.TRACK_LEVEL.x, y: KNOBS.TRACK_LEVEL.y, diameter: KNOBS.TRACK_LEVEL.d, variant: 'elektron', capColor: 'transparent', label: 'none', value: 'hover',
+    // the track's level; the tempo / swing while their menus are open; the accent in the ACCENT menu
+    control: ctx => trackLevelControl(ctx),
+  },
+  knobName(KNOBS.TRACK_LEVEL.x, KNOB_NAME_Y, 'Track ', 'Level'),
+  { kind: 'custom', x: KNOBS.TRACK_LEVEL.x - 12, y: KNOB_NAME_Y + 2, w: 24, h: 4, render: ctx => createElement(SoundBrowserLegend, { ctx }) },
+
+  // --- DATA ENTRY A-J (follow the track and the page) ------------------------------
+  ...Array.from({ length: 10 }, (_, slot): PanelElement[] => {
+    const p = encPos(slot);
+    return [
+      {
+        kind: 'knob', x: p.x, y: p.y, diameter: ENC_D, variant: 'elektron', capColor: 'transparent', label: 'none', value: 'hover',
+        control: ({ values, ui }) => encoderControl(Math.round(num(values.track)), Math.round(num(values.page, V.OSC1)), slot, false, Array.isArray(ui?.heldSteps) && (ui?.heldSteps as unknown[]).length > 0),
+      },
+      label('ABCDEFGHIJ'[slot], p.x, p.y + ENC_D / 2 + 4.6, { size: 8.5, weight: 600, color: COL.legend }),
+    ];
+  }).flat(),
+
+  // --- Keys ----------------------------------------------------------------------------
+  ...Object.keys(KEYS).map(keyElement),
+  { kind: 'custom', x: 0, y: 0, w: 1, h: 1, render: ctx => createElement(LedStrips, { ctx }) },
+
+  // --- Keyboard, trig keys ----------------------------------------------------------
+  { kind: 'custom', x: KEYBOARD.x, y: KEYBOARD.y, w: KEYBOARD.w, h: KEYBOARD.h, render: ctx => createElement(MiniKeyboard, { ctx }) },
+  { kind: 'custom', x: TRIGS.x, y: TRIGS.y, w: TRIGS.w, h: TRIGS.h, render: ctx => createElement(TrigArea, { ctx }) },
+  { kind: 'custom', x: TRIGS.x, y: TRIGS.y + TRIGS.h, w: TRIGS.w, h: PANEL_H - TRIGS.y - TRIGS.h - 1, render: () => createElement(TrigLegends) },
+
+  // --- Logo ------------------------------------------------------------------------------
+  { kind: 'custom', x: LOGO.x - LOGO.w / 2, y: LOGO.y - LOGO.h / 2, w: LOGO.w, h: LOGO.h, render: () => createElement(LogoMark) },
+
+  // --- Menus (portals) and helpers ------------------------------------------------------
+  { kind: 'custom', x: 0, y: 0, w: 1, h: 1, render: ctx => createElement('div', null, createElement(Menus, { ctx }), createElement(Helpers, { ctx })) },
 ];
 
 export const ANALOG_FOUR_LAYOUT: PanelLayout = {
@@ -105,12 +110,12 @@ export const ANALOG_FOUR_LAYOUT: PanelLayout = {
   height: PANEL_H,
   pxPerMm: PX_PER_MM,
   theme: {
-    background: 'linear-gradient(180deg, #242528 0%, #1c1d20 100%)',
-    text: '#eceef1',
-    muted: MUTED,
-    accent: LED_RED,
+    background: 'linear-gradient(180deg, #19191b 0%, #151517 60%, #121214 100%)',
+    text: '#e6e8eb',
+    muted: COL.legend,
+    accent: COL.red,
     font: '"Helvetica Neue", Helvetica, Arial, sans-serif',
-    frame: { padding: 4, background: 'linear-gradient(180deg, #111214, #08090a)', radius: 3 },
+    frame: { padding: 2, background: 'linear-gradient(180deg, #0c0c0d, #060607)', radius: 3 },
   },
   elements,
 };

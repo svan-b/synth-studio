@@ -1,620 +1,722 @@
 // ============================================================================
 // Analog Four MKII audio engine
 //
-// Four preallocated synth voices (one per track, monophonic like the A4's
-// default voice allocation):
+//   T1..T4  a4-voice worklet (one node per track: the whole analog voice, see
+//           public/worklets/analog-four-processors.js)        out0 dry, out1 sends
+//              │ dry ──────────────────────────────────────────────┐
+//              │ sends (cho, del, rev) ──┬─► split ─► chorus ─┐    │
+//              │                         └──────────────────► a4-fx (delay, sends, mix) ─► main ─► out
+//   T(n+1) mono ─► T(n) input (OSC 2 WAV NEI)                  ▲        │ reverb send
+//   a4-fxmod (FX track params, FX LFOs, locks) ─► split ─► chorus / reverb params, a4-fx params
+//                                                         fdn-reverb ◄──┘ ─► revRet ─► main
 //
-//   OSC 1 (Vco: SAW/TPUL/PULS/TRI + PWM LFO) ─┐
-//   SUB 1 (Vco pulse at 1/2, 1/4 or 2/3 f) ───┤
-//   OSC 2 + SUB 2 ────────────────────────────┼─► FILTER 1 ─► FILTER 2 ─► VCA ─► PAN ─► VOL ─► dry
-//   NOISE (white, with fade envelope) ────────┘   4-pole      2-pole      ▲            │
-//                                                 ladder LP   multimode   ENV A        ├─► CHO send
-//   ENV F ─► F1 / F2 cutoff (DEP)                 + OVR       (worklet)                ├─► DEL send
-//   LFO 1, LFO 2 (worklet) ─► 2 destinations each                                      └─► REV send
+// Worklet nodes: 4 voices + a4-fxmod + chorus + fdn-reverb + a4-fx = 8 (the
+// previous version used 36 plus about 120 native nodes). Native: 2 splitters,
+// 2 gains.
 //
-//   FX track: Wideshift-style chorus (two modulated delay lines), Saturator-
-//   style delay (HPF, drive, feedback delay with LPF in the loop, tempo
-//   synced in 128th notes) and a Supervoid-style reverb (convolution).
+// Sequencer: the shared ElektronSequencer with 6 tracks (T1-T4, FX, CV). Trigs
+// carry their parameter locks to the voice at the trig's audio time; the next
+// trig on the track returns unlocked parameters to the track (kit) value, as on
+// the hardware (LockTracker). Parameter slides ramp in the worklet. FX track
+// trigs lock FX parameters and retrigger the FX LFOs. The CV track is
+// sequenced but has no outputs (rear-panel jacks are not in the twin).
+// Track mutes live in the project (Project.mutes, applied by the sequencer).
 //
-// Sequencer: 16 steps per track on the look-ahead Clock (16th notes). Each
-// trig applies that step's NOTE and parameter locks at the trig's audio time;
-// the next trig without a lock returns the parameter to the track value, as on
-// the hardware. Gate length = trig LEN, so sustain/release behave properly.
-//
-// Worklet budget: 4 voices x (4 Vco + ladder + svf + 2 Env + lfo) = 36 nodes.
+// Transport (manual p.38-39): [PLAY] starts, [PLAY] while playing pauses
+// (sounding notes are released) and [PLAY] again resumes (the kit's pressPlay:
+// seq:pause / seq:resume); [STOP] stops and cuts the voices while the send
+// effects ring on; [STOP][STOP] while stopped fades the send effects.
+// Following the studio transport, its start / stop drive the sequencer
+// instead (no pause, like MIDI clock).
 // ============================================================================
 
 import type { ControlValue } from '@/types';
-import { BaseEngine, Clock } from '@/lib/audio/engine';
-import { Delay, Env, Ladder, Reverb, Vco, createDrive, createNoise, midiToHz, setAt, setDriveAmount, smooth } from '@/lib/audio/dsp';
+import { BaseEngine } from '@/lib/audio/engine';
+import type { Transport } from '@/lib/audio/transport';
 import {
-  LFO_MULTS, NUM_TRACKS, PARAM_BY_KEY, STEPS,
-  locksId, notesId, parseLocks, parseNotes, patternId, tid,
-  type StepLocks,
+  ElektronSequencer, LockTracker, NOTE_LENGTHS, asProject, getPattern, type TrigEvent,
+} from '@/lib/sequencer/elektron';
+import {
+  CV_TRACK, FX_BY_KEY, FX_DESTS, FX_KEYS, FX_TRACK, MOD_DESTS, PERF_MACROS, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS,
+  VOICE_KEYS,
 } from './params';
+import { ARP_KEYS, patternArp, type ArpKey } from './arp';
 
-// --- value curves (our approximation of the A4's 0-127 encoder scales) -------
-export const freq127 = (v: number) => 20 * Math.pow(2, (v / 127) * 10);          // 20 Hz .. 20 kHz
-export const time127 = (v: number) => 0.001 * Math.pow(2, (v / 127) * 14);       // 1 ms .. 16 s
-const levGain = (v: number) => (v / 100) * 0.42;
-const sendGain = (v: number) => Math.pow(v / 127, 2);
-const duty = (v: number) => 0.5 + ((v - 64) / 64) * 0.47;
-const pwmHz = (v: number) => 0.1 * Math.pow(2, v / 16);
+const VI: Record<string, number> = Object.fromEntries(VOICE_KEYS.map((k, i) => [k, i]));
+const FI: Record<string, number> = Object.fromEntries(FX_KEYS.map((k, i) => [k, i]));
+/** MIDI note of the first keyboard key at octave 0 (EMU, measured on OS 1.56) */
+const KB_C1 = 72;
+/** OSC 2 WAV index of NEI: the previous track's multimode filter output (manual p.73) */
+const NEI_WAVE = 6;
 
-const SUB_RATIO = [0, 0.5, 0.25, 0.25, 2 / 3];
-const SUB_PW = [0.5, 0.5, 0.5, 0.25, 1 / 3];
-// Waveform → [saw, pulse, tri] gains. TPUL = pulse plus a saw slope on its top.
-const WAVE_MIX: [number, number, number][] = [[1, 0, 0], [0.45, 0.7, 0], [0, 0.85, 0], [0, 0, 1.15]];
 
-/** Depth scale per LFO destination (full DEP = 64) */
-const DEST_SCALE = [0, 1, 1, 0.45, 0.45, 0.42, 0.42, 0.6, 5, 0.6, 5, 0.6, 0.5, 1];
+/** a4-fxmod output channels driving the shared processors (must match the worklet) */
+const FXC = { CHO_RATE: 0, CHO_DEPTH: 1, CHO_DELAY: 2, CHO_FB: 3, CHO_WIDTH: 4, REV_PRE: 5, REV_DECAY: 6, REV_SIZE: 7, REV_DAMP: 8, REV_WIDTH: 9, REV_VOL: 23 };
+const FX_CHANNELS = 25;
+/** [STOP][STOP]: how long the send effects take to fade out */
+const FX_FADE_SEC = 0.3;
+/** A riff for an empty pattern's audition: [step, semitones from the keyboard's C, length in steps] */
+const AUDITION_RIFF: [number, number, number][] = [
+  [0, 0, 2], [2, 7, 1], [4, 12, 2], [6, 10, 1], [8, 7, 2], [10, 3, 1], [12, 5, 1], [14, 7, 2],
+  [16, 0, 2], [18, 7, 1], [20, 12, 2], [22, 15, 1], [24, 14, 3], [28, 12, 4],
+];
 
-interface Osc {
-  vco: Vco;
-  sub: Vco;
-  saw: GainNode; pul: GainNode; tri: GainNode;
-  subGain: GainNode;
-  lev: GainNode;
-  pwmLfo: OscillatorNode;
-  pwmDepth: GainNode;
+function voiceOptions() {
+  const mins: number[] = [], maxs: number[] = [], defs: number[] = [];
+  for (const k of VOICE_KEYS) {
+    const p = SYNTH_BY_KEY[k];
+    mins.push(p ? p.min : -200);
+    maxs.push(p ? p.max : 200);
+    defs.push(p ? p.def : 0);
+  }
+  return { keys: VOICE_KEYS, mins, maxs, defs, dests: MOD_DESTS.map(d => ({ keys: d.keys, range: d.range })) };
 }
 
-interface Voice {
-  track: number;
-  o: [Osc, Osc];
-  noise: AudioBufferSourceNode;
-  noiseFade: GainNode;
-  noiseLev: GainNode;
-  mix: GainNode;
-  f1: Ladder;
-  odComp: GainNode;
-  f2: AudioWorkletNode;
-  vca: GainNode;
-  trem: GainNode;
-  pan: StereoPannerNode;
-  vol: GainNode;
-  cho: GainNode; del: GainNode; rev: GainNode;
-  envA: Env;
-  envF: Env;
-  f1Dep: GainNode;
-  f2Dep: GainNode;
-  lfo: AudioWorkletNode;
-  lfoDepth: GainNode[];   // 1A, 1B, 2A, 2B
-  lfoDest: number[];
-  note: number;
-  locks: StepLocks;
-  offAt: number | null;
-  liveNote: number | null;
+function fxOptions() {
+  const mins: number[] = [], maxs: number[] = [], defs: number[] = [];
+  for (const k of FX_KEYS) {
+    const p = FX_BY_KEY[k];
+    mins.push(p.min); maxs.push(p.max); defs.push(p.def);
+  }
+  return { keys: FX_KEYS, mins, maxs, defs, dests: FX_DESTS.map(d => ({ key: d.key, range: d.range })) };
+}
+
+/** Hardware LPF/HPF 0..127 -> Hz (one semitone a step) */
+const fltHz = (v: number) => 13 * Math.pow(2, v / 12);
+
+interface ArpState {
+  notes: number[];        // the chord (sequencer trig + offsets) or the held keys
+  order: number[];        // play order of the current cycle
+  idx: number;
+  oct: number;
+  next: number;           // audio time of the next arp note
+  end: number;            // gate end (Infinity while keys are held)
+  dir: 1 | -1;
+  vel: number;
+  accent: boolean;
+  live: boolean;
+  lastNote: number;
 }
 
 export class AnalogFourEngine extends BaseEngine {
-  private voices: Voice[] = [];
-  private clock!: Clock;
-  private running = false;
-  private dry!: GainNode;
-  private masterSum!: GainNode;
-  private mainVol!: GainNode;
-
-  // FX track
-  private choIn!: GainNode;
-  private choDl: DelayNode[] = [];
-  private choFb: GainNode[] = [];
-  private choPan: StereoPannerNode[] = [];
-  private choLfo!: OscillatorNode;
-  private choDepth!: GainNode;
-  private choHp!: BiquadFilterNode;
-  private choLp!: BiquadFilterNode;
-  private choOut!: GainNode;
-  private choToDel!: GainNode;
-  private choToRev!: GainNode;
-  private delIn!: GainNode;
-  private delHp!: BiquadFilterNode;
-  private delDrive!: WaveShaperNode;
-  private delay!: Delay;
-  private delOut!: GainNode;
-  private delToRev!: GainNode;
-  private revIn!: GainNode;
-  private revHp!: BiquadFilterNode;
-  private reverb!: Reverb;
-  private revOut!: GainNode;
-  private revTimer: ReturnType<typeof setTimeout> | null = null;
-
-  private lockCache: { src: string; parsed: StepLocks[] }[] = [];
-  private noteCache: { src: string; parsed: (number | null)[] }[] = [];
+  private voices: AudioWorkletNode[] = [];
+  private fxmod!: AudioWorkletNode;
+  private fx!: AudioWorkletNode;
+  private chorus!: AudioWorkletNode;
+  private reverb!: AudioWorkletNode;
+  private main!: GainNode;
+  private seq!: ElektronSequencer;
+  private lastSynth = 0;
+  private locks = new LockTracker(SEQ_TRACKS);
+  /** Track (kit) values of the voice parameters, per synth track */
+  private base: Float64Array[] = [];
+  private fxBase = new Float64Array(FX_KEYS.length);
+  private arpBase: Record<ArpKey, number>[] = [];
+  private arpLock: Partial<Record<ArpKey, number>>[] = [];
+  /** The pattern whose ARP settings each track's arpeggiator follows (they belong to the pattern) */
+  private arpPattern: (string | null)[] = [null, null, null, null];
+  private pending = new Map<MessagePort, number[]>();
+  private flushQueued = false;
+  private arps: (ArpState | null)[] = [null, null, null, null];
+  private arpTimer: ReturnType<typeof setInterval> | null = null;
+  private held: number[][] = [[], [], [], []];   // live keys per track (arp)
+  private liveNote: (number | null)[] = [null, null, null, null];
+  private lastStep: { step: number; time: number }[] = [];
+  private transportUnsub: (() => void) | null = null;
+  private recSerial = 0;
+  /** The audition in progress (a preview): its stop */
+  private auditionEnd: (() => void) | null = null;
+  private fxFaded = false;
+  /** Voice t feeds track t+1's OSC 2 (WAV NEI): it keeps running while its VCA is closed */
+  private feedOn = [false, false, false];
+  /** The playing trig of each synth track locks OSC 2 WAV to NEI */
+  private neiLock = [false, false, false, false];
 
   // --------------------------------------------------------------------------
 
   protected build(): void {
     const ctx = this.ctx;
-    const g = (v = 1) => { const n = ctx.createGain(); n.gain.value = v; return n; };
-
-    this.masterSum = g(1);
-    this.mainVol = g(0.6);
-    this.masterSum.connect(this.mainVol).connect(this.out);
-    this.dry = g(1);
-    this.dry.connect(this.masterSum);
-
-    // --- FX track ---------------------------------------------------------------
-    this.revIn = g(1);
-    this.revHp = ctx.createBiquadFilter(); this.revHp.type = 'highpass';
-    this.reverb = new Reverb(ctx, 2.5);
-    this.revOut = g(0.8);
-    this.revIn.connect(this.revHp).connect(this.reverb.input);
-    this.reverb.output.connect(this.revOut).connect(this.masterSum);
-
-    this.delIn = g(1);
-    this.delHp = ctx.createBiquadFilter(); this.delHp.type = 'highpass';
-    this.delDrive = createDrive(ctx, 0);
-    this.delay = new Delay(ctx, 4);
-    this.delOut = g(0.8);
-    this.delToRev = g(0);
-    this.delIn.connect(this.delHp).connect(this.delDrive).connect(this.delay.input);
-    this.delay.output.connect(this.delOut).connect(this.masterSum);
-    this.delOut.connect(this.delToRev).connect(this.revIn);
-
-    this.choIn = g(1);
-    this.choLfo = ctx.createOscillator(); this.choLfo.type = 'sine'; this.choLfo.frequency.value = 0.6;
-    this.choDepth = g(0.003);
-    const inv = g(-1);
-    this.choLfo.connect(this.choDepth);
-    this.choDepth.connect(inv);
-    this.choHp = ctx.createBiquadFilter(); this.choHp.type = 'highpass';
-    this.choLp = ctx.createBiquadFilter(); this.choLp.type = 'lowpass';
-    this.choOut = g(0.8);
-    this.choToDel = g(0);
-    this.choToRev = g(0);
-    for (let i = 0; i < 2; i++) {
-      const d = ctx.createDelay(0.1); d.delayTime.value = 0.01;
-      const fb = g(0.1);
-      const pan = ctx.createStereoPanner(); pan.pan.value = i === 0 ? -0.8 : 0.8;
-      this.choIn.connect(d);
-      d.connect(fb).connect(d);
-      d.connect(pan).connect(this.choHp);
-      (i === 0 ? this.choDepth : inv).connect(d.delayTime);
-      this.choDl.push(d); this.choFb.push(fb); this.choPan.push(pan);
+    const vo = voiceOptions();
+    for (let t = 0; t < SYNTH_TRACKS; t++) {
+      this.base.push(Float64Array.from(vo.defs));
+      const arp = {} as Record<ArpKey, number>;
+      ARP_KEYS.forEach(k => (arp[k] = SYNTH_BY_KEY[k].def));
+      this.arpBase.push(arp);
+      this.arpLock.push({});
+      this.voices.push(new AudioWorkletNode(ctx, 'a4-voice', {
+        numberOfInputs: 1, numberOfOutputs: 3, outputChannelCount: [2, 3, 1], processorOptions: vo,
+      }));
     }
-    this.choLfo.start();
-    this.choHp.connect(this.choLp).connect(this.choOut).connect(this.masterSum);
-    this.choOut.connect(this.choToDel).connect(this.delIn);
-    this.choOut.connect(this.choToRev).connect(this.revIn);
+    FX_KEYS.forEach((k, i) => (this.fxBase[i] = FX_BY_KEY[k].def));
 
-    // --- Voices --------------------------------------------------------------------
-    for (let t = 0; t < NUM_TRACKS; t++) this.voices.push(this.buildVoice(t));
+    // --- FX track ------------------------------------------------------------
+    this.fxmod = new AudioWorkletNode(ctx, 'a4-fxmod', {
+      numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [FX_CHANNELS], processorOptions: fxOptions(),
+    });
+    const fxSplit = ctx.createChannelSplitter(FX_CHANNELS);
+    this.fxmod.connect(fxSplit);
+    this.chorus = new AudioWorkletNode(ctx, 'chorus', {
+      numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+      processorOptions: { voices: 2, lfoShape: 1, highCut: 18000, lowCut: 20, drive: 0.04, phase: 0.25 },
+    });
+    this.reverb = new AudioWorkletNode(ctx, 'fdn-reverb', {
+      numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+      processorOptions: { lowCut: 60, highCut: 12000, seed: 4 },
+    });
+    // The params' own values sit at their minimum; a4-fxmod adds the rest (locks, LFOs, mapping in one place)
+    const drive = (node: AudioWorkletNode, name: string, ch: number) => {
+      const p = node.parameters.get(name)!;
+      p.value = p.minValue;
+      fxSplit.connect(p, ch);
+    };
+    drive(this.chorus, 'rate', FXC.CHO_RATE); drive(this.chorus, 'depth', FXC.CHO_DEPTH);
+    drive(this.chorus, 'delay', FXC.CHO_DELAY); drive(this.chorus, 'feedback', FXC.CHO_FB); drive(this.chorus, 'width', FXC.CHO_WIDTH);
+    drive(this.reverb, 'predelay', FXC.REV_PRE); drive(this.reverb, 'decay', FXC.REV_DECAY); drive(this.reverb, 'size', FXC.REV_SIZE);
+    drive(this.reverb, 'damping', FXC.REV_DAMP); drive(this.reverb, 'width', FXC.REV_WIDTH);
+    this.reverb.parameters.get('mod')!.value = 0.55;
+    this.reverb.parameters.get('modRate')!.value = 0.5;
 
-    this.clock = new Clock(ctx, (time, tick) => this.onTick(time, tick), this.stepDur());
+    this.fx = new AudioWorkletNode(ctx, 'a4-fx', { numberOfInputs: 4, numberOfOutputs: 2, outputChannelCount: [2, 2] });
+    const sendSplit = ctx.createChannelSplitter(3);
+    const revRet = ctx.createGain();
+    revRet.gain.value = 0;
+    fxSplit.connect(revRet.gain, FXC.REV_VOL);
+    this.main = ctx.createGain();
+    this.main.gain.value = 0.7;
+
+    this.voices.forEach((v, t) => {
+      v.connect(this.fx, 0, 2);   // dry
+      v.connect(this.fx, 1, 0);   // sends
+      v.connect(sendSplit, 1);
+      if (t < SYNTH_TRACKS - 1) v.connect(this.voices[t + 1], 2, 0); // NEI: each voice feeds the next track's OSC 2 (manual p.88, p.110)
+    });
+    sendSplit.connect(this.chorus, 0, 0);
+    this.chorus.connect(this.fx, 0, 1);
+    this.fxmod.connect(this.fx, 0, 3);
+    this.fx.connect(this.main, 0);
+    this.fx.connect(this.reverb, 1, 0);
+    this.reverb.connect(revRet).connect(this.main);
+    this.main.connect(this.out);
+
+    // --- sequencer -------------------------------------------------------------
+    for (let t = 0; t < SEQ_TRACKS; t++) this.lastStep.push({ step: -1, time: 0 });
+    this.seq = new ElektronSequencer({
+      ctx,
+      tracks: SEQ_TRACKS,
+      bpm: this.num('tempo', 120),
+      onTrig: e => this.trig(e),
+      onNoteOff: (track, _note, time) => this.gateOff(track, time),
+      onStep: (track, step, time) => { const s = this.lastStep[track]; s.step = step; s.time = time; },
+      onPlay: playing => {
+        if (playing) { this.unfadeFx(); return; }
+        const now = this.ctx.currentTime;
+        if (this.seq.isPaused) {
+          // [PLAY] while playing pauses: the sequencer releases its notes, the arpeggios end with them
+          for (let t = 0; t < SYNTH_TRACKS; t++) if (this.arps[t] && !this.arps[t]!.live) this.stopArp(t, now);
+        } else {
+          // [STOP] cuts the sound off; the send effects ring on (manual p.38). Keys still held keep playing.
+          for (let t = 0; t < SYNTH_TRACKS; t++) {
+            if (this.liveNote[t] !== null || this.arps[t]?.live) continue;
+            this.arps[t] = null;
+            this.voices[t].port.postMessage({ t: 'cut' });
+          }
+        }
+        this.locks.releaseAll((track, key) => this.revert(track, key, now));
+      },
+    });
+    this.seq.subscribe(s => this.emit({ seq: s, playing: s.playing }));
+    this.sendTempo();
 
     this.onDispose(() => {
-      this.clock.stop();
-      if (this.revTimer) clearTimeout(this.revTimer);
-      try { this.choLfo.stop(); } catch { /* */ }
-      this.voices.forEach(v => {
-        [v.noise, v.o[0].pwmLfo, v.o[1].pwmLfo].forEach(s => { try { s.stop(); } catch { /* */ } });
-        [v.o[0].vco.node, v.o[0].sub.node, v.o[1].vco.node, v.o[1].sub.node, v.f1.node, v.f2, v.envA.node, v.envF.node, v.lfo].forEach(n => n.disconnect());
-      });
+      this.seq.dispose();
+      this.transportUnsub?.();
+      if (this.arpTimer) clearInterval(this.arpTimer);
+      [...this.voices, this.fxmod, this.fx, this.chorus, this.reverb].forEach(n => { try { n.disconnect(); n.port.close(); } catch { /* */ } });
     });
-
-    this.emit({ playing: false, step: -1, steps: { t1: -1, t2: -1, t3: -1, t4: -1 } });
-  }
-
-  private buildVoice(track: number): Voice {
-    const ctx = this.ctx;
-    const g = (v = 1) => { const n = ctx.createGain(); n.gain.value = v; return n; };
-    const mix = g(1);
-
-    const buildOsc = (): Osc => {
-      const vco = new Vco(ctx, 130.81);
-      const sub = new Vco(ctx, 65.4);
-      const saw = g(1), pul = g(0), tri = g(0), subGain = g(0), lev = g(0);
-      vco.saw.connect(saw).connect(lev);
-      vco.pulse.connect(pul).connect(lev);
-      vco.tri.connect(tri).connect(lev);
-      sub.pulse.connect(subGain).connect(lev);
-      lev.connect(mix);
-      const pwmLfo = ctx.createOscillator();
-      pwmLfo.type = 'triangle';
-      pwmLfo.frequency.value = 1;
-      const pwmDepth = g(0);
-      pwmLfo.connect(pwmDepth).connect(vco.pw);
-      pwmLfo.start();
-      return { vco, sub, saw, pul, tri, subGain, lev, pwmLfo, pwmDepth };
-    };
-    const o: [Osc, Osc] = [buildOsc(), buildOsc()];
-
-    const noise = createNoise(ctx);
-    const noiseFade = g(1);
-    const noiseLev = g(0);
-    noise.connect(noiseFade).connect(noiseLev).connect(mix);
-
-    const f1 = new Ladder(ctx, 5000);
-    f1.setMode('lp24');
-    const odComp = g(1);
-    const f2 = new AudioWorkletNode(ctx, 'a4-svf', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], parameterData: { cutoff: 20 } });
-    const vca = g(0);
-    const trem = g(1);
-    const pan = ctx.createStereoPanner();
-    const vol = g(0.6);
-    mix.connect(f1.input);
-    f1.output.connect(odComp).connect(f2).connect(vca).connect(trem).connect(pan).connect(vol).connect(this.dry);
-    const cho = g(0), del = g(0), rev = g(0);
-    vol.connect(cho).connect(this.choIn);
-    vol.connect(del).connect(this.delIn);
-    vol.connect(rev).connect(this.revIn);
-
-    const envA = new Env(ctx, 'adsr');
-    const envF = new Env(ctx, 'adsr');
-    envA.output.connect(vca.gain);
-    const f1Dep = g(0), f2Dep = g(0);
-    envF.output.connect(f1Dep).connect(f1.cutoffCv);
-    envF.output.connect(f2Dep).connect(f2.parameters.get('cutoffCv')!);
-
-    const lfo = new AudioWorkletNode(ctx, 'a4-lfo', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
-    const split = ctx.createChannelSplitter(2);
-    lfo.connect(split);
-    const lfoDepth = [g(0), g(0), g(0), g(0)];
-    split.connect(lfoDepth[0], 0); split.connect(lfoDepth[1], 0);
-    split.connect(lfoDepth[2], 1); split.connect(lfoDepth[3], 1);
-
-    return {
-      track, o, noise, noiseFade, noiseLev, mix, f1, odComp, f2, vca, trem, pan, vol, cho, del, rev,
-      envA, envF, f1Dep, f2Dep, lfo, lfoDepth, lfoDest: [0, 0, 0, 0],
-      note: 48, locks: {}, offAt: null, liveNote: null,
-    };
+    this.emit({ playing: false, seq: this.seq.getState(), kbTrack: this.lastSynth });
   }
 
   // --------------------------------------------------------------------------
-  // Parameter plumbing
+  // Messaging (batched per render tick)
   // --------------------------------------------------------------------------
 
-  private bpm() { return this.num('tempo', 120); }
-  private stepDur() { return 60 / this.bpm() / 4; }
-
-  /** Effective value of a voice parameter for the current trig (lock or track value) */
-  private eff(v: Voice, key: string): number {
-    if (key in v.locks) return v.locks[key];
-    return this.num(tid(v.track, key), PARAM_BY_KEY[key]?.def ?? 0);
-  }
-
-  private set(p: AudioParam, x: number, time?: number) {
-    if (time === undefined) smooth(p, x, this.ctx);
-    else setAt(p, x, time);
-  }
-
-  private oscHz(v: Voice, n: 0 | 1): number {
-    const k = `osc${n + 1}_`;
-    const tracked = this.eff(v, `${k}track`) >= 0.5;
-    const note = (tracked ? v.note : 48) + this.eff(v, `${k}tune`) + this.eff(v, `${k}fine`) / 64;
-    return Math.max(1, midiToHz(note) + (this.eff(v, `${k}detune`) / 64) * 5);
-  }
-
-  private updatePitch(v: Voice, n: 0 | 1, time?: number) {
-    const hz = this.oscHz(v, n);
-    const sub = Math.round(this.eff(v, `osc${n + 1}_sub`));
-    const o = v.o[n];
-    this.set(o.vco.frequency, hz, time);
-    this.set(o.sub.frequency, hz * (SUB_RATIO[sub] || 0.5), time);
-    this.set(o.sub.pw, SUB_PW[sub] ?? 0.5, time);
-    this.set(o.subGain.gain, sub === 0 ? 0 : 0.75, time);
-  }
-
-  private updateCutoffs(v: Voice, time?: number) {
-    const semis = v.note - 60;
-    const c1 = freq127(this.eff(v, 'flt1_freq')) * Math.pow(2, (this.eff(v, 'flt1_track') / 127) * semis / 12);
-    const c2 = freq127(this.eff(v, 'flt2_freq')) * Math.pow(2, (this.eff(v, 'flt2_track') / 127) * semis / 12);
-    this.set(v.f1.cutoff, Math.min(20000, c1), time);
-    this.set(v.f2.parameters.get('cutoff')!, Math.min(20000, c2), time);
-  }
-
-  private lfoRate(v: Voice, n: 1 | 2): number {
-    const spd = this.eff(v, `lfo${n}_speed`);
-    const mul = Number(LFO_MULTS[Math.round(this.eff(v, `lfo${n}_mult`))].replace('K', '000')) || 1;
-    return ((spd * mul) / 128) * (this.bpm() / 240);
-  }
-
-  private routeLfo(v: Voice, idx: number) {
-    const gn = v.lfoDepth[idx];
-    gn.disconnect();
-    const dest = v.lfoDest[idx];
-    const params: AudioParam[] = [];
-    switch (dest) {
-      case 1: params.push(v.o[0].vco.pitch, v.o[0].sub.pitch); break;
-      case 2: params.push(v.o[1].vco.pitch, v.o[1].sub.pitch); break;
-      case 3: params.push(v.o[0].vco.pw); break;
-      case 4: params.push(v.o[1].vco.pw); break;
-      case 5: params.push(v.o[0].lev.gain); break;
-      case 6: params.push(v.o[1].lev.gain); break;
-      case 7: params.push(v.noiseLev.gain); break;
-      case 8: params.push(v.f1.cutoffCv); break;
-      case 9: params.push(v.f1.resonance); break;
-      case 10: params.push(v.f2.parameters.get('cutoffCv')!); break;
-      case 11: params.push(v.f2.parameters.get('resonance')!); break;
-      case 12: params.push(v.trem.gain); break;
-      case 13: params.push(v.pan.pan); break;
-    }
-    params.forEach(p => gn.connect(p));
-  }
-
-  private depthKey(idx: number) {
-    return `lfo${idx < 2 ? 1 : 2}_depth_${idx % 2 === 0 ? 'a' : 'b'}`;
-  }
-
-  private applyDepth(v: Voice, idx: number, time?: number) {
-    const dep = this.eff(v, this.depthKey(idx));
-    this.set(v.lfoDepth[idx].gain, (dep / 64) * (DEST_SCALE[v.lfoDest[idx]] ?? 0), time);
-  }
-
-  /** Apply one synth parameter to a voice (now, or at a trig's audio time) */
-  private applyParam(v: Voice, key: string, val: number, time?: number) {
-    const m = /^osc([12])_(.+)$/.exec(key);
-    if (m) {
-      const n = (Number(m[1]) - 1) as 0 | 1;
-      const o = v.o[n];
-      switch (m[2]) {
-        case 'tune': case 'fine': case 'detune': case 'track': case 'sub': this.updatePitch(v, n, time); return;
-        case 'level': this.set(o.lev.gain, levGain(val), time); return;
-        case 'wave': {
-          const w = WAVE_MIX[Math.round(val)] ?? WAVE_MIX[0];
-          this.set(o.saw.gain, w[0], time); this.set(o.pul.gain, w[1], time); this.set(o.tri.gain, w[2], time);
-          return;
-        }
-        case 'pw': this.set(o.vco.pw, duty(val), time); return;
-        case 'pwm_speed': this.set(o.pwmLfo.frequency, pwmHz(val), time); return;
-        case 'pwm': this.set(o.pwmDepth.gain, (val / 127) * 0.45, time); return;
-      }
-      return;
-    }
-    const lm = /^lfo([12])_(.+)$/.exec(key);
-    if (lm) {
-      const n = Number(lm[1]) as 1 | 2;
-      const P = (name: string) => v.lfo.parameters.get(`${name}${n}`)!;
-      switch (lm[2]) {
-        case 'speed': case 'mult': this.set(P('rate'), this.lfoRate(v, n), time); return;
-        case 'fade': this.set(P('fade'), val, time); return;
-        case 'phase': this.set(P('phase'), val / 128, time); return;
-        case 'mode': this.set(P('mode'), Math.round(val), time); return;
-        case 'wave': this.set(P('wave'), Math.round(val), time); return;
-        case 'dest_a': case 'dest_b': {
-          const idx = (n - 1) * 2 + (lm[2] === 'dest_a' ? 0 : 1);
-          v.lfoDest[idx] = Math.round(val);
-          this.routeLfo(v, idx);
-          this.applyDepth(v, idx);
-          return;
-        }
-        case 'depth_a': this.applyDepth(v, (n - 1) * 2, time); return;
-        case 'depth_b': this.applyDepth(v, (n - 1) * 2 + 1, time); return;
-      }
-      return;
-    }
-    const f2 = (name: string) => v.f2.parameters.get(name)!;
-    switch (key) {
-      case 'noise_level': this.set(v.noiseLev.gain, (val / 127) * 0.6, time); return;
-      case 'flt1_freq': case 'flt1_track': case 'flt2_freq': case 'flt2_track': this.updateCutoffs(v, time); return;
-      case 'flt1_res': this.set(v.f1.resonance, (val / 127) * 1.08, time); return;
-      case 'flt1_overdrive': {
-        const a = val / 127;
-        this.set(v.f1.drive, 1 + Math.pow(a, 1.5) * 7, time);
-        this.set(v.odComp.gain, 1 / (1 + a * 1.2), time);
-        return;
-      }
-      case 'flt1_depth': this.set(v.f1Dep.gain, (val / 64) * 6, time); return;
-      case 'flt2_res': this.set(f2('resonance'), val / 127, time); return;
-      case 'flt2_type': this.set(f2('mode'), Math.round(val), time); return;
-      case 'flt2_depth': this.set(v.f2Dep.gain, (val / 64) * 6, time); return;
-      case 'envf_attack': this.set(v.envF.attack, time127(val), time); return;
-      case 'envf_decay': this.set(v.envF.decay, time127(val), time); return;
-      case 'envf_sustain': this.set(v.envF.sustain, val / 127, time); return;
-      case 'envf_release': this.set(v.envF.release, time127(val), time); return;
-      case 'amp_attack': this.set(v.envA.attack, time127(val), time); return;
-      case 'amp_decay': this.set(v.envA.decay, time127(val), time); return;
-      case 'amp_sustain': this.set(v.envA.sustain, val / 127, time); return;
-      case 'amp_release': this.set(v.envA.release, time127(val), time); return;
-      case 'amp_shape': this.set(v.envA.node.parameters.get('curve')!, Math.round(val), time); return;
-      case 'amp_chorus': this.set(v.cho.gain, sendGain(val), time); return;
-      case 'amp_delay': this.set(v.del.gain, sendGain(val), time); return;
-      case 'amp_reverb': this.set(v.rev.gain, sendGain(val), time); return;
-      case 'amp_pan': this.set(v.pan.pan, Math.max(-1, Math.min(1, val / 64)), time); return;
-      case 'amp_volume': this.set(v.vol.gain, Math.pow(val / 127, 2) * 0.95, time); return;
+  private queue(node: AudioWorkletNode, i: number, v: number) {
+    let l = this.pending.get(node.port);
+    if (!l) { l = []; this.pending.set(node.port, l); }
+    l.push(i, v);
+    if (!this.flushQueued) {
+      this.flushQueued = true;
+      queueMicrotask(() => this.flush());
     }
   }
 
-  private applyFx(key: string, val: number) {
-    const ctx = this.ctx;
-    const hz = (x: number) => freq127(x);
-    switch (key) {
-      case 'cho_pre': this.choDl.forEach(d => smooth(d.delayTime, 0.002 + (val / 127) * 0.025, ctx)); break;
-      case 'cho_speed': smooth(this.choLfo.frequency, 0.05 * Math.pow(2, val / 18), ctx); break;
-      case 'cho_depth': smooth(this.choDepth.gain, (val / 127) * 0.006, ctx); break;
-      case 'cho_width': this.choPan.forEach((p, i) => smooth(p.pan, (i === 0 ? -1 : 1) * (val / 127), ctx)); break;
-      case 'cho_fb': this.choFb.forEach(f => smooth(f.gain, (val / 127) * 0.85, ctx)); break;
-      case 'cho_hpf': smooth(this.choHp.frequency, hz(val), ctx); break;
-      case 'cho_lpf': smooth(this.choLp.frequency, hz(val), ctx); break;
-      case 'cho_delay': smooth(this.choToDel.gain, sendGain(val), ctx); break;
-      case 'cho_reverb': smooth(this.choToRev.gain, sendGain(val), ctx); break;
-      case 'cho_volume': smooth(this.choOut.gain, Math.pow(val / 127, 2) * 1.2, ctx); break;
-      case 'del_time': this.updateDelayTime(); break;
-      case 'del_fb': smooth(this.delay.feedback.gain, (val / 127) * 0.95, ctx); break;
-      case 'del_overdrive': setDriveAmount(this.delDrive, (val / 127) * 0.6); break;
-      case 'del_hpf': smooth(this.delHp.frequency, hz(val), ctx); break;
-      case 'del_lpf': smooth(this.delay.tone.frequency, hz(val), ctx); break;
-      case 'del_reverb': smooth(this.delToRev.gain, sendGain(val), ctx); break;
-      case 'del_volume': smooth(this.delOut.gain, Math.pow(val / 127, 2) * 1.2, ctx); break;
-      case 'rev_pre': smooth(this.reverb.preDelay, (val / 127) * 0.25, ctx); break;
-      case 'rev_decay': {
-        // Regenerating the impulse is expensive: wait until the encoder settles
-        if (this.revTimer) clearTimeout(this.revTimer);
-        this.revTimer = setTimeout(() => { this.revTimer = null; this.reverb.setSize(0.3 * Math.pow(2, (val / 127) * 5)); }, 180);
-        break;
-      }
-      case 'rev_hpf': smooth(this.revHp.frequency, hz(val), ctx); break;
-      case 'rev_lpf': smooth(this.reverb.damping, hz(val), ctx); break;
-      case 'rev_volume': smooth(this.revOut.gain, Math.pow(val / 127, 2) * 1.3, ctx); break;
-    }
+  private flush() {
+    this.flushQueued = false;
+    this.pending.forEach((list, port) => port.postMessage({ t: 'p', list }));
+    this.pending.clear();
   }
 
-  private updateDelayTime() {
-    const secs = (this.num('fx_del_time', 24) * (240 / this.bpm())) / 128;
-    smooth(this.delay.delay.delayTime, Math.min(3.9, secs), this.ctx, 0.05);
+  private bpm(): number {
+    return this.transport ? this.transport.bpm : this.num('tempo', 120);
   }
+
+  private sendTempo() {
+    const bpm = this.bpm();
+    const step = 60 / bpm / 4;
+    this.voices.forEach(v => { v.port.postMessage({ t: 'bpm', v: bpm }); v.port.postMessage({ t: 'step', v: step }); });
+    this.fxmod?.port.postMessage({ t: 'bpm', v: bpm });
+  }
+
+  // --------------------------------------------------------------------------
+  // Parameters
+  // --------------------------------------------------------------------------
 
   protected onParam(id: string, value: ControlValue): void {
-    const n = typeof value === 'number' ? value : value ? 1 : 0;
-    const tm = /^t([1-4])_(.+)$/.exec(id);
-    if (tm) {
-      const v = this.voices[Number(tm[1]) - 1];
-      const key = tm[2];
-      if (!v || !PARAM_BY_KEY[key] || key.startsWith('trig_')) return;
-      if (key in v.locks) return; // the playing trig holds a lock for this parameter
-      this.applyParam(v, key, n);
+    const v = typeof value === 'number' ? value : value ? 1 : 0;
+    const m = /^t([1-6])_(.+)$/.exec(id);
+    if (m) {
+      const t = Number(m[1]) - 1;
+      const key = m[2];
+      if (t >= SYNTH_TRACKS || key.startsWith('trig_')) return;
+      if ((ARP_KEYS as readonly string[]).includes(key)) { this.arpBase[t][key as ArpKey] = v; return; }
+      const i = VI[key];
+      if (i === undefined) return;
+      this.base[t][i] = v;
+      if (key === 'osc2_wav') this.updateFeed(t);
+      if (this.locks.isLocked(t, key)) return; // the playing trig holds a lock for it
+      this.queue(this.voices[t], i, v);
       return;
     }
-    if (id.startsWith('fx_')) { this.applyFx(id.slice(3), n); return; }
+    if (id.startsWith('fx_')) {
+      const key = id.slice(3);
+      const i = FI[key];
+      if (i === undefined) return;
+      this.fxBase[i] = v;
+      if (this.locks.isLocked(FX_TRACK, key)) return;
+      this.queue(this.fxmod, i, v);
+      this.toneFor(key, v);
+      return;
+    }
+    if (/^perf_/.test(id)) { this.applyPerf(); return; }
     switch (id) {
       case 'tempo':
-        this.clock.setInterval(this.stepDur());
-        this.updateDelayTime();
-        this.voices.forEach(v => { this.applyParam(v, 'lfo1_speed', 0); this.applyParam(v, 'lfo2_speed', 0); });
+        this.seq.setTempo(v);
+        if (!this.transport) this.sendTempo();
         break;
-      case 'main_volume': smooth(this.mainVol.gain, Math.pow(n / 127, 2) * 1.6, this.ctx); break;
-      case 'play': this.setRunning(!!value); break;
+      case 'main_volume': {
+        const g = Math.pow(v / 127, 2) * 1.1;
+        this.main.gain.setTargetAtTime(g, this.ctx.currentTime, 0.015);
+        break;
+      }
+      case 'play':
+        // Start / stop. Synced, the hub turns PLAY into the studio transport; [PLAY] while playing
+        // pauses and resumes through the kit's seq:pause / seq:resume events (pressPlay)
+        if (!this.transport) { if (value) this.seq.start(); else this.seq.stop(); }
+        break;
+      case 'track': {
+        // with the FX or CV track active, the keyboard keeps playing the last synth track (manual p.36)
+        const t = Math.round(v);
+        if (t >= 0 && t < SYNTH_TRACKS && t !== this.lastSynth) { this.lastSynth = t; this.emit({ kbTrack: t }); }
+        break;
+      }
     }
+  }
+
+  /** Chorus / reverb tone filters are processor settings, not AudioParams */
+  private toneFor(key: string, v: number) {
+    if (key === 'cho_hpf') this.chorus.port.postMessage({ type: 'set', lowCut: Math.min(4000, Math.max(10, v <= 0 ? 10 : fltHz(v * 0.85))) });
+    else if (key === 'cho_lpf') this.chorus.port.postMessage({ type: 'set', highCut: Math.min(20000, Math.max(500, fltHz(v))) });
+    else if (key === 'rev_hpf') this.reverb.port.postMessage({ type: 'set', lowCut: Math.min(4000, Math.max(20, v <= 0 ? 20 : fltHz(v * 0.85))) });
+    else if (key === 'rev_lpf') this.reverb.port.postMessage({ type: 'set', highCut: Math.min(20000, Math.max(500, fltHz(v))) });
+  }
+
+  /** Performance macros: offsets on every synth track (and the FX track), sent as one message per node */
+  private applyPerf() {
+    const muted = this.bool('perf_mute');
+    const voice: Record<string, number> = {};
+    const fx: Record<string, number> = {};
+    PERF_MACROS.forEach((mac, i) => {
+      const amt = muted ? 0 : this.num(`perf_${'abcdefghij'[i]}`, 0) / 127;
+      if (!amt) return;
+      mac.synth.forEach(([k, d]) => (voice[k] = (voice[k] ?? 0) + d * amt));
+      mac.fx?.forEach(([k, d]) => (fx[k] = (fx[k] ?? 0) + d * amt));
+    });
+    const vl: number[] = [];
+    Object.entries(voice).forEach(([k, d]) => { if (VI[k] !== undefined) vl.push(VI[k], d); });
+    this.voices.forEach(n => n.port.postMessage({ t: 'off2', list: vl }));
+    const fl: number[] = [];
+    Object.entries(fx).forEach(([k, d]) => { if (FI[k] !== undefined) fl.push(FI[k], d); });
+    this.fxmod.port.postMessage({ t: 'off2', list: fl });
+  }
+
+  // --------------------------------------------------------------------------
+  // Data / transport
+  // --------------------------------------------------------------------------
+
+  protected onData(data: unknown): void {
+    this.seq.setProject(data);
+  }
+
+  protected onTransport(t: Transport | null): void {
+    this.transportUnsub?.();
+    this.transportUnsub = null;
+    this.seq.follow(t);
+    if (t) this.transportUnsub = t.onEvent(e => { if (e.type === 'tempo') this.sendTempo(); });
+    this.sendTempo();
   }
 
   // --------------------------------------------------------------------------
   // Sequencer
   // --------------------------------------------------------------------------
 
-  private cachedLocks(t: number): StepLocks[] {
-    const src = this.str(locksId(t));
-    const c = this.lockCache[t];
-    if (c && c.src === src) return c.parsed;
-    const parsed = parseLocks(src);
-    this.lockCache[t] = { src, parsed };
-    return parsed;
+  /** Track t uses OSC 2 WAV NEI (its own value or the playing trig's lock): the voice before it must keep running */
+  private updateFeed(t: number) {
+    if (t < 1 || t >= SYNTH_TRACKS) return;
+    const on = Math.round(this.base[t][VI.osc2_wav]) === NEI_WAVE || this.neiLock[t];
+    if (on === this.feedOn[t - 1]) return;
+    this.feedOn[t - 1] = on;
+    this.voices[t - 1].port.postMessage({ t: 'feed', v: on });
   }
 
-  private cachedNotes(t: number): (number | null)[] {
-    const src = this.str(notesId(t));
-    const c = this.noteCache[t];
-    if (c && c.src === src) return c.parsed;
-    const parsed = parseNotes(src);
-    this.noteCache[t] = { src, parsed };
-    return parsed;
-  }
-
-  private setLocks(v: Voice, locks: StepLocks, time?: number) {
-    const prev = v.locks;
-    v.locks = locks;
-    const keys = new Set([...Object.keys(prev), ...Object.keys(locks)]);
-    keys.forEach(k => { if (!k.startsWith('trig_')) this.applyParam(v, k, this.eff(v, k), time); });
-  }
-
-  /** Fire a voice: note, locks, envelopes, LFO + noise-fade retrigger */
-  private fire(v: Voice, note: number, locks: StepLocks, time: number) {
-    this.setLocks(v, locks, time);
-    v.note = note;
-    this.updatePitch(v, 0, time);
-    this.updatePitch(v, 1, time);
-    this.updateCutoffs(v, time);
-    const vel = this.eff(v, 'trig_vel') / 127;
-    v.envA.gate(time, true, vel);
-    v.envF.gate(time, true, 1);
-    v.lfo.port.postMessage({ type: 'trig', time });
-    const fade = this.eff(v, 'noise_fade');
-    const p = v.noiseFade.gain;
-    p.cancelScheduledValues(time);
-    if (fade === 0) p.setValueAtTime(1, time);
-    else {
-      const tau = 0.02 * Math.pow(2, Math.abs(fade) / 10);
-      p.setValueAtTime(fade > 0 ? 1 : 0, time);
-      p.setTargetAtTime(fade > 0 ? 0 : 1, time, tau);
-    }
-  }
-
-  private gateOff(v: Voice, time: number) {
-    v.envA.gate(time, false);
-    v.envF.gate(time, false);
-  }
-
-  private onTick(time: number, tick: number) {
-    const step = tick % STEPS;
-    const dur = this.stepDur();
-    const mutes = this.str('mutes', '0000');
-    for (let t = 0; t < NUM_TRACKS; t++) {
-      const v = this.voices[t];
-      if (v.offAt !== null && v.offAt <= time + 1e-6) { this.gateOff(v, v.offAt); v.offAt = null; }
-      const pattern = this.str(patternId(t));
-      const on = pattern[step] !== undefined && pattern[step] !== '0';
-      if (on && mutes[t] !== '1' && v.liveNote === null) {
-        v.offAt = null;
-        const note = this.cachedNotes(t)[step] ?? this.num(tid(t, 'trig_note'), 48);
-        this.fire(v, note, this.cachedLocks(t)[step] ?? {}, time);
-        v.offAt = time + Math.max(0.25, this.eff(v, 'trig_len')) * dur * 0.98;
+  private revert(track: number, key: string, time: number) {
+    if (track < SYNTH_TRACKS) {
+      if ((ARP_KEYS as readonly string[]).includes(key)) { delete this.arpLock[track][key as ArpKey]; return; }
+      if (key === 'osc2_wav') { this.neiLock[track] = false; this.updateFeed(track); }
+      const i = VI[key];
+      if (i !== undefined) this.voices[track].port.postMessage({ t: 'at', time, list: [i, this.base[track][i]] });
+    } else if (track === FX_TRACK) {
+      const i = FI[key];
+      if (i !== undefined) {
+        this.fxmod.port.postMessage({ t: 'at', time, list: [i, this.fxBase[i]] });
+        this.toneAt(key, this.fxBase[i], time);
       }
-      if (v.offAt !== null && v.offAt < time + dur - 1e-6) { this.gateOff(v, v.offAt); v.offAt = null; }
     }
-    this.emitAt(time, { step, steps: { t1: step, t2: step, t3: step, t4: step } });
   }
 
-  private setRunning(run: boolean) {
-    if (run === this.running) return;
-    this.running = run;
-    if (run) {
-      this.clock.setInterval(this.stepDur());
-      this.clock.start();
-    } else {
-      this.clock.stop();
-      const now = this.ctx.currentTime;
-      this.voices.forEach(v => { if (v.liveNote === null) this.gateOff(v, now); v.offAt = null; });
+  private toneAt(key: string, v: number, time: number) {
+    if (!/^(cho|rev)_(hpf|lpf)$/.test(key)) return;
+    this.atTime(time, () => this.toneFor(key, v));
+  }
+
+  private trackValue(track: number, key: string): number {
+    if (track < SYNTH_TRACKS) {
+      const i = VI[key];
+      return i !== undefined ? this.base[track][i] : (this.arpBase[track] as Record<string, number>)[key] ?? 0;
     }
-    this.emit({ playing: run, ...(run ? {} : { step: -1, steps: { t1: -1, t2: -1, t3: -1, t4: -1 } }) });
+    if (track === FX_TRACK) { const i = FI[key]; return i !== undefined ? this.fxBase[i] : 0; }
+    return 0;
+  }
+
+  private trig(e: TrigEvent) {
+    const t = e.track;
+    if (t === CV_TRACK) return;
+    if (t === FX_TRACK) {
+      const list: number[] = [];
+      this.locks.apply(t, e.locks,
+        (k, val) => { const i = FI[k]; if (i !== undefined) { list.push(i, val); this.toneAt(k, val, e.time); } },
+        k => { const i = FI[k]; if (i !== undefined) { list.push(i, this.fxBase[i]); this.toneAt(k, this.fxBase[i], e.time); } });
+      if (list.length) this.fxmod.port.postMessage({ t: 'at', time: e.time, list });
+      if (!e.trigless) this.fxmod.port.postMessage({ t: 'trig', time: e.time });
+      return;
+    }
+    const v = this.voices[t];
+    if (!v) return;
+    const list: number[] = [];
+    const nei = this.neiLock[t];
+    this.locks.apply(t, e.locks,
+      (k, val) => {
+        const i = VI[k];
+        if (i !== undefined) list.push(i, val);
+        else if ((ARP_KEYS as readonly string[]).includes(k)) this.arpLock[t][k as ArpKey] = val;
+        if (k === 'osc2_wav') this.neiLock[t] = Math.round(val) === NEI_WAVE;
+      },
+      k => {
+        const i = VI[k];
+        if (i !== undefined) list.push(i, this.base[t][i]);
+        else if ((ARP_KEYS as readonly string[]).includes(k)) delete this.arpLock[t][k as ArpKey];
+        if (k === 'osc2_wav') this.neiLock[t] = false;
+      });
+    if (this.neiLock[t] !== nei) this.updateFeed(t);
+    if (list.length) v.port.postMessage({ t: 'at', time: e.time, list });
+    if (e.paramSlide && e.slideTo) {
+      const to = e.slideTo;
+      const ramp: number[] = [];
+      const keys = new Set([...Object.keys(e.locks), ...Object.keys(to.locks)]);
+      keys.forEach(k => {
+        const i = VI[k];
+        if (i === undefined) return;
+        ramp.push(i, e.locks[k] ?? this.base[t][i], to.locks[k] ?? this.base[t][i]);
+      });
+      if (ramp.length) v.port.postMessage({ t: 'ramp', time: e.time, t1: to.time, list: ramp });
+    }
+    // NOTE page retrig switches (lock only): on for note trigs and off for lock trigs unless locked (manual p.45)
+    const sw = (k: string, d: number) => { const x = e.locks[k]; return x === undefined ? d : x >= 0.5 ? 1 : 0; };
+    if (e.trigless) {
+      const rt = sw('trig_envf', 0) | (sw('trig_env2', 0) << 1) | (sw('trig_lfo1', 0) << 2) | (sw('trig_lfo2', 0) << 3);
+      if (rt) v.port.postMessage({ t: 'rtrg', time: e.time, rt });
+      return;
+    }
+    const rt = sw('trig_envf', 1) | (sw('trig_env2', 1) << 1) | (sw('trig_lfo1', 1) << 2) | (sw('trig_lfo2', 1) << 3);
+    const note = Math.max(0, Math.min(127, e.note + Math.round(this.num('trns', 0))));
+    this.arpPattern[t] = e.pattern;
+    if (this.arpOn(t)) {
+      this.startArp(t, [note, ...this.arpOffsets(t).map(o => note + o)], e.time, e.duration, e.velocity, e.accent, false);
+      return;
+    }
+    v.port.postMessage({ t: 'on', time: e.time, note, vel: e.velocity, acc: e.accent ? 1 : 0, slide: e.slide, rt });
+  }
+
+  private gateOff(track: number, time: number) {
+    if (track >= SYNTH_TRACKS) return;
+    if (this.arps[track] && !this.arps[track]!.live) { this.stopArp(track, time); return; }
+    if (this.liveNote[track] !== null) return; // a held key owns the voice
+    this.voices[track].port.postMessage({ t: 'off', time });
   }
 
   // --------------------------------------------------------------------------
-  // Live play: the computer keyboard / trig preview plays the selected track
+  // Arpeggiator (engine side: schedules notes on the audio clock)
   // --------------------------------------------------------------------------
 
-  private liveVoice(): Voice {
-    const t = Math.round(this.num('track', 0));
-    return this.voices[t < NUM_TRACKS ? t : 0];
+  private arpVal(t: number, k: ArpKey): number {
+    const lock = this.arpLock[t][k];
+    if (lock !== undefined) return lock;
+    const p = asProject(this.data, SEQ_TRACKS);
+    return patternArp(p, this.arpPattern[t] ?? p.active, t)?.[k] ?? this.arpBase[t][k];
   }
 
+  private arpOn(t: number): boolean {
+    return Math.round(this.arpVal(t, 'arp_mod')) > 0;
+  }
+
+  private arpOffsets(t: number): number[] {
+    return (['arp_n2', 'arp_n3', 'arp_n4'] as const).map(k => Math.round(this.arpVal(t, k))).filter(o => o > 0);
+  }
+
+  private startArp(t: number, notes: number[], time: number, duration: number, vel: number, accent: boolean, live: boolean) {
+    const uniq = notes.filter((n, i) => notes.indexOf(n) === i);
+    const st: ArpState = {
+      notes: uniq, order: [], idx: 0, oct: 0, next: time, end: duration === Infinity ? time + 32 * (60 / this.bpm() / 4) : time + duration,
+      dir: 1, vel, accent, live, lastNote: uniq[0],
+    };
+    if (live) st.end = Infinity;
+    st.order = this.arpOrder(t, st);
+    this.arps[t] = st;
+    this.pumpArps();
+    if (!this.arpTimer) this.arpTimer = setInterval(() => this.pumpArps(), 25);
+  }
+
+  private stopArp(t: number, time: number) {
+    const st = this.arps[t];
+    if (!st) return;
+    st.end = Math.min(st.end, time);
+    this.voices[t].port.postMessage({ t: 'off', time: Math.max(time, this.ctx.currentTime) });
+    this.arps[t] = null;
+  }
+
+  private arpOrder(t: number, st: ArpState): number[] {
+    const mode = Math.round(this.arpVal(t, 'arp_mod'));
+    const sorted = [...st.notes].sort((a, b) => a - b);
+    switch (mode) {
+      case 1: return [...st.notes];                                  // THR: in the order the notes came in (manual p.43)
+      case 2: return sorted;                                          // UP
+      case 3: return sorted.reverse();                                // DWN
+      case 4: return sorted.length > 2 ? [...sorted, ...sorted.slice(1, -1).reverse()] : sorted; // CYC
+      case 5: { const s = [...sorted]; for (let i = s.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [s[i], s[j]] = [s[j], s[i]]; } return s; } // SHF
+      default: return sorted;                                         // RND picks per note
+    }
+  }
+
+  private pumpArps() {
+    const horizon = this.ctx.currentTime + 0.12;
+    let active = false;
+    for (let t = 0; t < SYNTH_TRACKS; t++) {
+      const st = this.arps[t];
+      if (!st) continue;
+      active = true;
+      const v = this.voices[t];
+      const stepSec = 60 / this.bpm() / 4;
+      const period = Math.max(1, Math.round(this.arpVal(t, 'arp_spd'))) * (60 / this.bpm() / 24);
+      const nlen = NOTE_LENGTHS[Math.max(0, Math.min(NOTE_LENGTHS.length - 1, Math.round(this.arpVal(t, 'arp_nlen'))))] * stepSec;
+      const legato = this.arpVal(t, 'arp_leg') >= 0.5;
+      const range = Math.max(1, Math.round(this.arpVal(t, 'arp_rng')));
+      const mode = Math.round(this.arpVal(t, 'arp_mod'));
+      while (st.next < horizon && st.next < st.end) {
+        if (st.idx >= st.order.length) {
+          st.idx = 0;
+          st.oct = (st.oct + 1) % range;
+          st.order = this.arpOrder(t, st);
+        }
+        const base = mode === 6 ? st.notes[Math.floor(Math.random() * st.notes.length)] : st.order[st.idx];
+        const note = Math.max(0, Math.min(127, base + 12 * st.oct));
+        v.port.postMessage({ t: 'on', time: st.next, note, vel: st.vel, acc: st.accent ? 1 : 0, slide: false, leg: legato, live: legato });
+        const off = st.next + (legato ? Math.max(nlen, period * 1.02) : Math.min(nlen, period * 0.98));
+        if (!legato || off >= st.end) v.port.postMessage({ t: 'off', time: Math.min(off, st.end) });
+        st.lastNote = note;
+        st.idx++;
+        st.next += period;
+      }
+      if (st.next >= st.end && st.end !== Infinity) {
+        v.port.postMessage({ t: 'off', time: st.end });
+        this.arps[t] = null;
+      }
+    }
+    if (!active && this.arpTimer) { clearInterval(this.arpTimer); this.arpTimer = null; }
+  }
+
+  // --------------------------------------------------------------------------
+  // Live play: the keyboard (panel keys, computer keyboard) plays the active track
+  // --------------------------------------------------------------------------
+
+  /** The synth track the keyboard plays: the active track, or the last synth track while FX / CV is active */
+  private activeTrack(): number {
+    const t = Math.max(0, Math.min(SEQ_TRACKS - 1, Math.round(this.num('track', 0))));
+    return t < SYNTH_TRACKS ? t : this.lastSynth;
+  }
+
+  private octave(): number {
+    return Math.round(this.num('kb_oct', 5)) - 5;
+  }
+
+  private trackVel(t: number): number {
+    const p = asProject(this.data, SEQ_TRACKS);
+    return getPattern(p, p.active).tracks[t]?.vel ?? 100;
+  }
+
+  /** note = MIDI note from the computer keyboard (lowNote 48 + offset) */
   noteOn(note: number, _velocity = 1): void {
     if (!this.started) return;
-    const v = this.liveVoice();
-    const now = this.ctx.currentTime + 0.005;
-    v.offAt = null;
-    v.liveNote = note;
-    this.fire(v, note, {}, now);
+    this.liveOn(note + 12 * this.octave());
   }
 
   noteOff(note: number): void {
     if (!this.started) return;
-    this.voices.forEach(v => {
-      if (v.liveNote === note) { v.liveNote = null; this.gateOff(v, this.ctx.currentTime + 0.005); }
-    });
+    this.liveOff(note + 12 * this.octave());
+  }
+
+  private liveOn(note: number) {
+    const t = this.activeTrack();
+    if (t >= SYNTH_TRACKS) return;
+    this.unfadeFx();
+    const time = this.ctx.currentTime + 0.004;
+    const n = Math.max(0, Math.min(127, note));
+    const held = this.held[t];
+    if (!held.includes(n)) held.push(n);
+    const vel = this.trackVel(t);
+    this.recordLive(t, n, vel);
+    this.arpPattern[t] = this.seq.getState().pattern ?? null;
+    if (this.arpOn(t)) {
+      const notes = [...held];
+      held.length === 1 && this.arpOffsets(t).forEach(o => notes.push(n + o));
+      if (this.arps[t]?.live) { this.arps[t]!.notes = notes; this.arps[t]!.order = this.arpOrder(t, this.arps[t]!); }
+      else this.startArp(t, notes, time, Infinity, vel, false, true);
+      return;
+    }
+    this.liveNote[t] = n;
+    this.voices[t].port.postMessage({ t: 'on', time, note: n, vel, acc: 0, slide: false, live: true });
+  }
+
+  private liveOff(note: number) {
+    const time = this.ctx.currentTime + 0.004;
+    for (let t = 0; t < SYNTH_TRACKS; t++) {
+      const held = this.held[t];
+      const i = held.indexOf(note);
+      if (i < 0) continue;
+      held.splice(i, 1);
+      const st = this.arps[t];
+      if (st?.live) {
+        if (!held.length) this.stopArp(t, time);
+        else { st.notes = [...held]; st.order = this.arpOrder(t, st); }
+        continue;
+      }
+      if (held.length) {
+        // last-note priority: return to the previous held key (legato)
+        const prev = held[held.length - 1];
+        this.liveNote[t] = prev;
+        this.voices[t].port.postMessage({ t: 'on', time, note: prev, vel: this.trackVel(t), acc: 0, slide: false, live: true });
+      } else {
+        this.liveNote[t] = null;
+        this.voices[t].port.postMessage({ t: 'off', time });
+      }
+    }
+  }
+
+  /** LIVE RECORDING: report the played note and its quantised step to the panel (which writes the trig) */
+  private recordLive(t: number, note: number, vel: number) {
+    if (!this.bool('live_rec')) return;
+    const st = this.seq.getState();
+    if (!st.playing || !st.pattern) return;
+    const ls = this.lastStep[t];
+    if (ls.step < 0) return;
+    // LIVE RECORDING places trigs micro-timed: the nearest step plus a µTM offset in 1/24 steps (manual p.40)
+    const stepSec = 60 / this.bpm() / 4;
+    const frac = (this.ctx.currentTime - ls.time) / stepSec;
+    const next = frac > 0.5;
+    const step = next ? ls.step + 1 : ls.step;
+    const micro = Math.max(-23, Math.min(23, Math.round((next ? frac - 1 : frac) * 24)));
+    this.emit({ recNote: { id: ++this.recSerial, track: t, note, vel, step, micro, pattern: st.pattern } });
   }
 
   event(name: string, payload?: unknown): void {
     if (!this.started) return;
-    if (name === 'preview') {
-      // Trig key with GRID RECORDING off: audition that step on the selected track
-      const step = (payload as { step?: number } | undefined)?.step ?? 0;
-      const t = Math.round(this.num('track', 0));
-      if (t >= NUM_TRACKS) return;
-      const v = this.voices[t];
-      const note = this.cachedNotes(t)[step] ?? this.num(tid(t, 'trig_note'), 48);
-      v.offAt = null;
-      v.liveNote = note;
-      this.fire(v, note, this.cachedLocks(t)[step] ?? {}, this.ctx.currentTime + 0.005);
-      return;
-    }
-    if (name === 'preview:up') {
-      this.voices.forEach(v => { if (v.liveNote !== null) { v.liveNote = null; this.gateOff(v, this.ctx.currentTime + 0.005); } });
-      return;
-    }
-    if (name === 'pattern' || name === 'bank') {
-      this.emit({ msg: name === 'pattern' ? 'PATTERN A01 · one pattern per kit here - use Load preset' : 'BANK A · banks not modelled - use Load preset' });
-      this.atTime(this.ctx.currentTime + 2.2, () => this.emit({ msg: '' }));
+    if (this.seq.handleEvent(name, payload)) return;
+    const p = (payload ?? {}) as { offset?: number };
+    switch (name) {
+      case 'kb:on': this.liveOn(KB_C1 + 12 * this.octave() + (p.offset ?? 0)); break;
+      case 'kb:off': this.liveOff(KB_C1 + 12 * this.octave() + (p.offset ?? 0)); break;
+      case 'panic':
+        for (let t = 0; t < SYNTH_TRACKS; t++) { this.held[t] = []; this.liveNote[t] = null; this.stopArp(t, this.ctx.currentTime); this.voices[t].port.postMessage({ t: 'reset' }); }
+        break;
+      // [STOP][STOP] while stopped: the send effects fade out (manual p.38)
+      case 'a4:fxfade': this.fadeFx(); break;
+      case 'a4:audition': this.startAudition(); break;
+      case 'a4:audition:stop': this.auditionEnd?.(); break;
     }
   }
-}
 
+  // --------------------------------------------------------------------------
+  // Send-FX fade, auditions
+  // --------------------------------------------------------------------------
+
+  private fadeFx() {
+    this.fxFaded = true;
+    this.fxmod.port.postMessage({ t: 'fade', dur: FX_FADE_SEC });
+  }
+
+  private unfadeFx() {
+    if (!this.fxFaded) return;
+    this.fxFaded = false;
+    this.fxmod.port.postMessage({ t: 'unfade' });
+  }
+
+  /**
+   * A preview (lessons, the preset browser, audio QA): the pattern from its
+   * start, as [PLAY] would play it; an empty pattern plays a riff on the
+   * keyboard's track instead. The preview ends like [STOP][STOP]: the sound is
+   * cut and the send effects fade.
+   */
+  private startAudition() {
+    this.auditionEnd?.();
+    if (this.seq.getState().playing) return; // already playing: nothing to preview
+    this.unfadeFx();
+    const p = asProject(this.data, SEQ_TRACKS);
+    const pat = getPattern(p, p.active);
+    const hasTrigs = pat.tracks.slice(0, SYNTH_TRACKS).some((tr, t) => !this.seq.isMuted(t) && !tr.mute && Object.values(tr.steps).some(s => s && !s.trigless));
+    if (hasTrigs) {
+      const stop = this.seq.audition();
+      this.auditionEnd = () => { this.auditionEnd = null; stop(); this.fadeFx(); };
+      return;
+    }
+    const t = this.activeTrack();
+    const v = this.voices[t];
+    const stepSec = 60 / this.bpm() / 4;
+    const t0 = this.ctx.currentTime + 0.03;
+    const root = KB_C1 + 12 * this.octave();
+    const vel = this.trackVel(t);
+    for (const [step, semis, len] of AUDITION_RIFF) {
+      const note = Math.max(0, Math.min(127, root + semis));
+      v.port.postMessage({ t: 'on', time: t0 + step * stepSec, note, vel, acc: 0, slide: false });
+      v.port.postMessage({ t: 'off', time: t0 + (step + len) * stepSec - 0.002 });
+    }
+    this.auditionEnd = () => { this.auditionEnd = null; v.port.postMessage({ t: 'cut' }); this.fadeFx(); };
+  }
+}

@@ -11,6 +11,19 @@ import { DFAM_PRESETS } from './presets';
 
 const step = (n: number) => String(n);
 
+/**
+ * VCO FREQUENCY knobs are stored in octaves from noon (the hardware's ten-octave range). The readout
+ * shows the knob's frequency in Hz, so "pitch is frequency" can be read off the panel: noon = 131 Hz
+ * (C3, the twin's reference - see REFERENCE.md), one octave = twice the Hz.
+ */
+const VCO_NOON_HZ = 130.8128;
+const formatVcoFreq = (oct: number) => {
+  const hz = VCO_NOON_HZ * Math.pow(2, oct);
+  // No-break space: the readout must stay on one line under the knob
+  if (hz >= 1000) return `${(hz / 1000).toFixed(2)} kHz`;
+  return `${hz >= 100 ? hz.toFixed(0) : hz.toFixed(1)} Hz`;
+};
+
 /** Sequencer PITCH knobs: volts (1 V = 1 octave), shown in semitones so steps can be tuned by eye */
 const formatPitch = (v: number) => {
   const st = v * 12;
@@ -43,8 +56,9 @@ export const DFAM: DeviceSpec = {
   description: 'Drummer From Another Mother - semi-modular analog percussion synthesizer',
   manualUrl: 'https://www.moogmusic.com/synthesizers/dfam/',
 
-  // 60 HP Eurorack panel (304.8 x 128.5 mm) in wooden end cheeks
-  dimensions: { width: 319, height: 107, depth: 133, eurorackHP: 60 },
+  // 60 HP Eurorack panel (304.8 x 128.5 mm) in wooden end cheeks; the unit is
+  // 12.57" x 4.21" x 5.24" (W x D x H, DFAM manual p.40)
+  dimensions: { width: 319.3, height: 133.1, depth: 106.9, eurorackHP: 60 },
   display: { width: 960, height: 400, scale: 3.0 },
 
   signalFlow: [
@@ -72,8 +86,8 @@ export const DFAM: DeviceSpec = {
       manualReference: 'VCO EG - VCO DECAY',
     },
     seq_pitch_mod: {
-      type: 'switch', label: 'SEQ PITCH MOD', options: ['VCO 1&2', 'OFF', 'VCO 2'], default: 0,
-      description: 'Where the sequencer PITCH knobs go: both VCOs, nowhere (PITCH output only), or VCO 2 only - handy with FM or sync, so VCO 1 holds the root.',
+      type: 'switch', label: 'SEQ PITCH MOD', options: ['VCO 1&2', 'OFF', 'VCO 2'], default: 1,
+      description: 'Where the sequencer PITCH knobs go: both VCOs (melodies, bass lines), nowhere (OFF - the PITCH output still carries them; hats, drones) or VCO 2 only (with FM or sync, so VCO 1 holds the root). Starts on OFF, as in the manual\'s default patch.',
       manualReference: 'VCO EG - SEQ PITCH MOD',
     },
     vco1_eg_amount: {
@@ -90,7 +104,8 @@ export const DFAM: DeviceSpec = {
     // ---- VCOs -------------------------------------------------------------------
     vco1_frequency: {
       type: 'knob', label: 'VCO 1 FREQUENCY', min: -5, max: 5, default: 0, units: 'octaves', bipolar: true, size: 'large',
-      description: 'Starting pitch of VCO 1 over ten octaves (noon is about C3, 131 Hz). The VCO EG, sequencer and VCO 1 CV add to it.',
+      format: formatVcoFreq,
+      description: 'Starting pitch of VCO 1 over ten octaves, about 4 Hz to 4 kHz (noon is about C3, 131 Hz; one octave doubles the Hz). The VCO EG, sequencer and VCO 1 CV add to it.',
       manualReference: 'VCO section - VCO FREQUENCY',
     },
     vco1_wave: {
@@ -110,7 +125,8 @@ export const DFAM: DeviceSpec = {
     },
     vco2_frequency: {
       type: 'knob', label: 'VCO 2 FREQUENCY', min: -5, max: 5, default: 0, units: 'octaves', bipolar: true, size: 'large',
-      description: 'Starting pitch of VCO 2 over ten octaves. With HARD SYNC on it sets the timbre instead.',
+      format: formatVcoFreq,
+      description: 'Starting pitch of VCO 2 over ten octaves, about 4 Hz to 4 kHz. With HARD SYNC on it sets the timbre instead.',
       manualReference: 'VCO section - VCO FREQUENCY',
     },
     vco2_wave: {
