@@ -38,9 +38,10 @@ const legend = (text: string, x: number, y: number, size = LEGEND): PanelElement
 };
 
 /** A bat toggle with its title printed above; position legends sit beside the lever */
-const toggle = (control: string, title: string, x: number, y: number, legendW = 7): PanelElement[] => [
-  { kind: 'switch', control, x: x + legendW / 2, y, scale: 1.9, label: 'none' },
-  { kind: 'label', text: title, x, y: y - (title.includes('\n') ? 9.4 : 8.2), size: LEGEND, letterSpacing: 0.3 },
+/** A toggle as Moog prints it (manual p.9): the title, one position's legend above the lever, the other below */
+const toggle = (control: string, title: string, x: number, y: number): PanelElement[] => [
+  { kind: 'switch', control, x, y, scale: 1.9, label: 'none', legends: 'ends' },
+  { kind: 'label', text: title, x, y: y - (title.includes('\n') ? 12.6 : 11.4), size: LEGEND, letterSpacing: 0.3 },
 ];
 
 /** The legend of a knob with a scale ring, printed above the ring (manual p.9) */
@@ -151,7 +152,7 @@ const elements: PanelElement[] = [
   ...scaleRing(21.7, ROW1), ...scaleRing(80.8, ROW1), ...scaleRing(41.0, ROW3), ...scaleRing(80.8, ROW3),
   hole(36.5, ROW1), hole(65.9, ROW1), hole(95.6, ROW1), hole(95.6, ROW2), hole(95.6, ROW3),
   ringLegend('FREQUENCY', 21.7, ROW1), knob('frequency', 21.7, ROW1),
-  ...toggle('vco_wave', 'VCO WAVE', 51.3, ROW1, 7.5),
+  ...toggle('vco_wave', 'VCO WAVE', 51.3, ROW1),
   ringLegend('PULSE WIDTH', 80.8, ROW1), knob('pulse_width', 80.8, ROW1),
   legend('MIX', 110.3, ROW1), knob('mix', 110.3, ROW1),
   { kind: 'label', text: 'VCO', x: 102.4, y: ROW1 + 12.4, size: 5.6, color: '#bdbdbd' },
@@ -162,7 +163,7 @@ const elements: PanelElement[] = [
   { kind: 'label', text: '2KHz', x: 159.9, y: ROW1 - 7.2, size: 5.6, color: '#bdbdbd' },
   { kind: 'label', text: '20KHz', x: 154.5, y: ROW1 + 12.4, size: 5.6, color: '#bdbdbd' },
   legend('RESONANCE', 181.8, ROW1), knob('resonance', 181.8, ROW1),
-  ...toggle('vca_mode', 'VCA MODE', 206.3, ROW1, 4.5),
+  ...toggle('vca_mode', 'VCA MODE', 206.3, ROW1),
   legend('VOLUME', 228.7, ROW1), knob('volume', 228.7, ROW1),
 
   // --- Row 2: GLIDE, VCO MOD SOURCE / AMOUNT / DEST, VCF MODE, VCF MOD SOURCE / AMOUNT / POLARITY --
@@ -182,13 +183,13 @@ const elements: PanelElement[] = [
     },
     x: 21.8, y: ROW2, diameter: KNOB, variant: 'moog-black', label: 'none',
   },
-  ...toggle('vco_mod_source', 'VCO MOD\nSOURCE', 51.3, ROW2, 5),
+  ...toggle('vco_mod_source', 'VCO MOD\nSOURCE', 51.3, ROW2),
   legend('VCO MOD\nAMOUNT', 80.8, ROW2), knob('vco_mod_amount', 80.8, ROW2),
-  ...toggle('vco_mod_dest', 'VCO MOD\nDEST', 110.5, ROW2, 6),
-  ...toggle('vcf_mode', 'VCF MODE', 139.9, ROW2, 10),
-  ...toggle('vcf_mod_source', 'VCF MOD\nSOURCE', 169.6, ROW2, 5),
+  ...toggle('vco_mod_dest', 'VCO MOD\nDEST', 110.5, ROW2),
+  ...toggle('vcf_mode', 'VCF MODE', 139.9, ROW2),
+  ...toggle('vcf_mod_source', 'VCF MOD\nSOURCE', 169.6, ROW2),
   legend('VCF MOD\nAMOUNT', 199.2, ROW2), knob('vcf_mod_amount', 199.2, ROW2),
-  ...toggle('vcf_mod_polarity', 'VCF MOD\nPOLARITY', 228.6, ROW2, 3),
+  ...toggle('vcf_mod_polarity', 'VCF MOD\nPOLARITY', 228.6, ROW2),
 
   // --- Row 3: TEMPO / GATE LENGTH (SWING), LFO RATE, LFO WAVE, ATTACK, SUSTAIN, DECAY, VC MIX --
   ringLegend('TEMPO / GATE LENGTH', 41.0, ROW3, 7.2),
@@ -207,14 +208,19 @@ const elements: PanelElement[] = [
       if (held.kb && held.step) return 'step_div';
       if (held.kb) return 'div_dotted';
       if (held.step) return 'div_triplet';
+      // A TEMPO-jack clock in SINGLE CLOCK ADVANCE (one step per pulse) or a STEP ADDRESS CV
+      // ignores the knob (manual p.55), so it stays on TEMPO: the internal tempo it returns to.
+      // Only an ANALOG CLOCK (or the studio's MIDI clock) uses the clock division.
+      const tempoMode = Math.round(Number(values.tempo_mode ?? 1));
+      if (engine?.extClock && tempoMode !== 2) return 'tempo';
       return engine?.synced || engine?.extClock ? 'step_div' : 'tempo';
     },
     x: 41.0, y: ROW3, diameter: KNOB, variant: 'moog-black', label: 'none',
   },
   ringLegend('LFO RATE', 80.8, ROW3), knob('lfo_rate', 80.8, ROW3),
-  ...toggle('lfo_wave', 'LFO WAVE', 110.4, ROW3, 5),
+  ...toggle('lfo_wave', 'LFO WAVE', 110.4, ROW3),
   legend('ATTACK', 139.9, ROW3), knob('attack', 139.9, ROW3),
-  ...toggle('sustain', 'SUSTAIN', 169.5, ROW3, 5),
+  ...toggle('sustain', 'SUSTAIN', 169.5, ROW3),
   legend('DECAY', 199.2, ROW3), knob('decay', 199.2, ROW3),
   legend('VC MIX', 228.7, ROW3), knob('vc_mix', 228.7, ROW3),
   { kind: 'label', text: 'LO / MIX 1', x: 216.6, y: ROW3 + 8.4, size: 5.6, color: '#bdbdbd' },

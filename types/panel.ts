@@ -85,6 +85,12 @@ export interface SwitchElement extends Positioned {
   label?: LabelPosition;
   labelText?: string;
   scale?: number;          // visual scale multiplier (1 = DFAM size)
+  /**
+   * Where a vertical toggle's position legends go: beside the lever (default), or 'ends' - the
+   * first above it and the last below, as Moog prints them on the Mother-32 (the middle one of a
+   * three-way switch stays beside)
+   */
+  legends?: 'side' | 'ends';
 }
 
 export interface ButtonElement extends Positioned {

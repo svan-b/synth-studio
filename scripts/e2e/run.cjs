@@ -1,7 +1,7 @@
 // ============================================================================
 // End-to-end regression suite. Run against a production build:
 //   npm run build && npx next start -p 3100
-//   node scripts/e2e/run.cjs http://localhost:3100 [--out <dir>] [--full] [--demos]
+//   node scripts/e2e/run.cjs http://localhost:3100 [--out <dir>] [--full] [--demos] [--monkey]
 //
 // Always: the iPad journey, the studio (clock cable, record, reload), rapid
 // instrument switching, saved-settings upgrades and touch gestures (fine adjust,
@@ -22,6 +22,7 @@ const base = args.find(a => !a.startsWith('--')) ?? 'http://localhost:3100';
 const outIdx = args.indexOf('--out');
 const outDir = path.resolve(outIdx >= 0 ? args[outIdx + 1] : fs.mkdtempSync('/tmp/synth-e2e-'));
 const full = args.includes('--full');
+const monkey = args.includes('--monkey');
 fs.mkdirSync(outDir, { recursive: true });
 
 const root = path.join(__dirname, '..', '..');
@@ -164,6 +165,18 @@ if (full) {
     const l = run(path.join(root, 'scripts', 'lesson-runner.cjs'), [base, d], 900_000);
     if (l.lessons) check(`lessons ${d}: all ${l.lessons} complete`, l.failedLessons === 0 && (l.errors ?? []).length === 0, l.failedLessons ? l.details : l.errors);
   }
+}
+
+// ---- Monkey tests (--monkey): random use, no page errors allowed ---------------
+if (monkey) {
+  const registry = fs.readFileSync(path.join(root, 'devices', 'index.ts'), 'utf8');
+  const devices = [...registry.matchAll(/^\s+id: '([^']+)'/gm)].map(m => m[1]);
+  for (const d of devices) {
+    const m = run(path.join(__dirname, 'monkey.cjs'), [base, d, '30', '7'], 180_000);
+    check(`monkey ${d}: 30 s of random use without a page error`, !m.__error && m.errors === 0, m.__error ?? (m.errors ? m.first : { actions: m.actions }));
+  }
+  const sm = run(path.join(__dirname, 'studio-monkey.cjs'), [base, '120', '5'], 400_000);
+  check('monkey studio: 2 min of random studio use without a page error', !sm.__error && sm.errors === 0, sm.__error ?? (sm.errors ? sm.first : { actions: sm.actions, rack: sm.end?.rack }));
 }
 
 const failed = results.filter(r => !r.ok);

@@ -338,11 +338,9 @@ Sweetwater / Moog patch-sheet series; their descriptions say which.
 
 ## Simplified
 
-- **Toggle legends**: the panel prints each switch's two positions above and below the lever; the
-  twin's switch element shows them beside it, so each lever sits 2-4 mm right of its printed
-  position (the positions above are the printed ones). The legends are the tap targets and the
-  lit one shows the position, so nothing is lost in use; matching the print needs a legend
-  option in the shared switch component.
+- **Toggle legends**: as printed, each switch's first position sits above the lever and the second
+  below (the switch element's `legends: 'ends'`), and the lever sits at its printed position. The
+  legends are the tap targets, and the lit one shows the position.
 - **Knob travel**: the twin's knobs turn through the drawn Moog knobs' 300°, 7 o'clock to 5 o'clock
   (`knobTravel` in layout.ts). The presets were read on the same 300° sweep, so a sheet's
   pointer angles show as drawn.

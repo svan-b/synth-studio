@@ -141,7 +141,7 @@ export const MOTHER32: DeviceSpec = {
     // ---- Row 3 ----------------------------------------------------------------
     tempo: knob({
       label: 'TEMPO', min: 20, max: 300, default: 120, units: 'BPM', curve: 'logarithmic',
-      description: 'Internal clock tempo, 20-300 BPM (16th-note steps by default). While a step is edited it sets that step\'s GATE LENGTH; with SHIFT, SWING. Clocked by the studio (MIDI) or a TEMPO-jack clock, it selects the clock division.',
+      description: 'Internal clock tempo, 20-300 BPM (16th-note steps by default). While a step is edited it sets that step\'s GATE LENGTH; with SHIFT, SWING. Clocked by the studio (MIDI) or an ANALOG CLOCK at the TEMPO jack, it selects the clock division; a SINGLE CLOCK ADVANCE clock ignores it.',
       manualReference: `${M} p.18, p.54 - TEMPO / GATE LENGTH`,
     }),
     lfo_rate: knob({
@@ -242,7 +242,7 @@ export const MOTHER32: DeviceSpec = {
     step_div: knob({
       label: 'CLOCK DIV', min: 0, max: 7, step: 1, default: DIV_DEFAULT, units: 'none',
       format: v => DIVISIONS[divIndex(v, 0)].name,
-      description: 'How long each step is (the note value): 1/16 by default. Clocked by the studio or a TEMPO-jack clock, TEMPO selects it - straight values, two whole notes to 1/64; hold KB for dotted, STEP for triplets. On the internal clock hold KB + STEP while turning TEMPO. Stored with the pattern.',
+      description: 'How long each step is (the note value): 1/16 by default. Clocked by the studio or an ANALOG CLOCK at the TEMPO jack, TEMPO selects it - straight values, two whole notes to 1/64; hold KB for dotted, STEP for triplets. On the internal clock hold KB + STEP while turning TEMPO. Stored with the pattern.',
       manualReference: `${M} p.54 - Clock division`,
     }),
     div_type: {
