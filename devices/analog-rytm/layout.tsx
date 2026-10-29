@@ -266,7 +266,7 @@ function keys(): PanelElement[] {
   // --- Mode row ------------------------------------------------------------------
   out.push(key(26.2, ROW2, SMALL, ctx => <Key ctx={ctx} id="key:global" label={I.gear} title="GLOBAL SETTINGS" sub="Save Project" funcSub onDown={() => press(ctx, () => flash(ctx, 'GLOBAL SETTINGS ARE NOT MODELLED'), () => flash(ctx, 'THE PROJECT SAVES AUTOMATICALLY'))} />));
   MODE_KEYS.forEach(([label, sub, menu, mode], i) => out.push(key(MODE_X[i], ROW2, SMALL, ctx => (
-    <Key ctx={ctx} id={`key:${label.toLowerCase()}`} label={label} sub={sub} funcSub
+    <Key ctx={ctx} id={`key:${mode === 0 ? 'playmode' : label.toLowerCase()}`} label={label} sub={sub} funcSub
       lit={Math.round(num(ctx.values.pad_mode)) === mode ? 1 : (mode === 1 && (projectOf(ctx).mutes ?? []).length > 0) || (mode === 3 && num(ctx.engine.scene, -1) >= 0) ? 0.35 : 0}
       blink={(mode === 3 && typeof ctx.ui.sceneEdit === 'number') || (mode === 4 && typeof ctx.ui.perfEdit === 'number')}
       ledColor={mode === 0 ? RY.green : RY.led} control="pad_mode" value={mode}
@@ -503,7 +503,8 @@ const sequencer: PanelElement[] = [
         <TrigEditor ctx={ctx} tracks={SEQ_TRACKS} portal portalPlacement="top" trackNames={TRACK_NAMES} features={{ retrig: true, accent: true, slide: false, pslide: true, trigMute: true }} lockLimit={LOCK_LIMIT_RYTM}
           lockLabel={k => describe(`bd_${k}`, 0)?.abbr ?? describe(`fx_${k}`, 0)?.abbr ?? k.toUpperCase()}
           noteFormat={n => `${n - 60 >= 0 ? '+' : ''}${n - 60}`} noteRange={[36, 84]} />
-        <PatternPicker ctx={ctx} tracks={SEQ_TRACKS} portal />
+        {/* [BANK] + [TRIG]: the bank window closes once a pattern is chosen (manual p.37) */}
+        <PatternPicker ctx={ctx} tracks={SEQ_TRACKS} portal closeOnPick />
         <ChainBuilder ctx={ctx} tracks={SEQ_TRACKS} portal />
         <SongEditor ctx={ctx} tracks={SEQ_TRACKS} portal trackNames={TRACK_NAMES} loop={false} length={false} tempo={false} />
         <ScaleMenu ctx={ctx} tracks={SEQ_TRACKS} portal trackNames={TRACK_NAMES} />

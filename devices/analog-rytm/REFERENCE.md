@@ -162,7 +162,7 @@ The twin uses the Elektron sequencer library (`lib/sequencer/elektron`, see
 | Retrigs | Per trig: rate 1/1-1/80 (1/16 = one per step), length, velocity curve | (Rytm MKII manual, pp.39, 41) |
 | SAVE / RELOAD PATTERN | [YES] / [NO] + [SCNE]: save the restore point, or go back to it | (Rytm MKII manual, pp.43, 51-52) |
 | Chains | Patterns played in sequence and looped | (Rytm MKII manual, p.53) |
-| Songs | Rows of a pattern or chain × repeats, with song mutes. A song plays to its end and stops; STOP twice goes back to its start | (Rytm MKII manual, pp.53-55) |
+| Songs | Rows of a pattern or chain × repeats, with song mutes per pattern position. A song plays to its end and stops. On the hardware a double STOP moves the song back to its start; in the twin every STOP does | (Rytm MKII manual, pp.53-55) |
 | Tempo | Project tempo, tap tempo, and a 10 % nudge while LEFT / RIGHT are held | (Rytm MKII manual, p.38) |
 
 ## Kits, scenes and performance macros
@@ -219,7 +219,30 @@ its master section is calibrated instead.
 
 ### Measured loudness (audio QA, `--target -18`)
 
-MEASURED_TABLE
+Two runs at 44.1 kHz on the instrument output: `audition` plays each kit's demo pattern through the module's own audition, and `transport` plays it from the studio transport (`--excite analog-rytm=transport`). Audition: median -18.2 LUFS, spread 3.0 LU, worst true peak -1.6 dBTP, 0 of 20 flagged. Transport: median -18.4 LUFS, spread 3.2 LU, worst true peak -1.3 dBTP, 0 of 20 flagged.
+
+| Kit | Audition LUFS | Audition dBTP | Transport LUFS | Transport dBTP |
+|---|---:|---:|---:|---:|
+| Techno / Warehouse | -19.1 | -1.6 | -19.3 | -1.7 |
+| Techno / Industrial Grind | -18.1 | -4.3 | -18.2 | -3.9 |
+| Techno / Dub Chords | -19.6 | -1.6 | -19.7 | -1.3 |
+| House / Deep Garage | -20.0 | -1.9 | -20.3 | -1.9 |
+| House / Nine-O-Nine Box | -18.8 | -2.6 | -18.9 | -2.6 |
+| Electro / Miami Bass | -18.1 | -4.3 | -18.2 | -4.3 |
+| Electro / Robot Funk | -18.1 | -2.0 | -18.3 | -2.5 |
+| Drum Machine / Straight Boom | -18.1 | -3.0 | -18.4 | -3.0 |
+| Hip-Hop / Dusty Boom Bap | -18.2 | -2.3 | -18.4 | -2.6 |
+| Hip-Hop / Trap Sub | -18.1 | -4.1 | -18.2 | -3.9 |
+| Breaks / Jungle Roller | -19.6 | -2.8 | -20.1 | -2.6 |
+| Breaks / Big Beat | -18.4 | -1.8 | -18.3 | -2.9 |
+| Minimal / Micro Clicks | -20.9 | -2.1 | -21.4 | -3.2 |
+| IDM / Glitch Lab | -18.6 | -2.1 | -19.2 | -2.2 |
+| Dub / Echo Chamber | -18.0 | -1.7 | -18.3 | -1.4 |
+| Acoustic / Studio Kit | -18.2 | -4.0 | -18.3 | -3.5 |
+| Acoustic / Brush Jazz | -18.1 | -2.6 | -18.3 | -2.6 |
+| Lo-Fi / Bitcrushed Tape | -17.9 | -2.1 | -18.2 | -2.1 |
+| Percussion / Afro-Latin | -18.2 | -3.7 | -18.4 | -3.7 |
+| Synth / Analog Toys | -18.5 | -3.0 | -18.5 | -2.3 |
 
 ## Model choices (not in the manual)
 
@@ -260,12 +283,14 @@ MEASURED_TABLE
 - Editing a step property on all tracks at once (FUNC held in the TRIG MUTE,
   ACCENT, SWING and PARAMETER SLIDE menus).
 - A trig mute, accent or slide can sit only on a step that holds a trig.
-- Song LOOP and HALT rows, and saved song slots.
+- Songs and chains: one song and one chain per project (the hardware has 16
+  song slots and 64 chains), no scratch pad row, and STOP always returns the
+  song to its first row.
 
 ## Presets
 
-There are twenty kits. Each has a demo pattern in bank B of the default
-project. The demo song is in bank A and plays kit 01, with kit 02 for the drop.
+There are twenty kits. Each has a demo pattern in the default project, in
+B01-B16 and C01-C04. The demo song is in bank A and plays kit 01, with kit 02 for the drop.
 
 The kits are our own sound design in familiar styles; Elektron's factory kits
 and sound packs are not shipped. Names are descriptive ("Techno / Warehouse",
