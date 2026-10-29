@@ -23,7 +23,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Bring your own gear | Web MIDI, Practice synth (works on iPad without hardware), audio input, Web Audio plugins, 16 lessons, Safari guidance. See `docs/EXTERNAL_GEAR.md` |
 | Audio QA tool | `scripts/audio-qa.cjs`, see `docs/AUDIO_QA.md`: LUFS, true peak, DC, clicks, stuck tails per preset. The baseline in `docs/audio-qa-baseline/` predates the rebuilds and needs regenerating |
 | E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs), 36 checks including the iPad producer walkthrough. `--full` adds smoke and lessons for every instrument |
-| iPad | Home-screen install, floating lesson coach, 44 px touch targets, fine-adjust gestures, value bubble. First-load JS 198 kB (MIDI, studio view and coach load on demand) |
+| iPad | Home-screen install, floating lesson coach, 44 px touch targets, fine-adjust gestures, value bubble. Fit may shrink a panel up to 20 % so it ends above the bottom of the screen (the whole Xone:96 at 87 %, the A4 at 90 %), and the control readout shares the toolbar row. First-load JS 198 kB (MIDI, studio view and coach load on demand) |
 | Research notes | `docs/research/<device>/` (sources, signal-flow, presets, lessons) from the official manuals, in our own words. See `docs/research/COPYRIGHT-RULES.md` |
 
 ## Live log (session 3, 2026-10-29, after a usage-limit pause)
@@ -47,9 +47,13 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - The output and VCF jack are capped near the manual's levels.
   - Audition audio QA went from 3/43 flagged to 0/43; lessons 19, 0 failed, 0 manual.
 - 76d4c40: upgrade store v12 / project v9 keeps an untouched Mother-32 DECAY at 60 ms (the default became 180 ms) and is checked in e2e (36 checks).
-- Clock chip: the Subharmonicon's patch sheets played 1.5–6× slow while it followed the studio clock.
+- c5abb5a: the Clock chip. The Subharmonicon's patch sheets played 1.5–6× slow while it followed the studio clock.
   - Sync stays on by default, so ▶ keeps everything in time, as hardware would on MIDI clock.
   - Each syncable instrument now has a **Clock** chip above its panel to switch to its own tempo in one tap.
+- 42081a0: `scripts/checks/xone96.cjs` works again (it loaded its test file onto the wrong channel).
+- iPad fold: on touch screens, Fit may shrink a panel by up to 20 % so it ends above the bottom of the screen, and the control readout moves into the toolbar row (34 px back).
+  - The whole Xone:96 now fits at 87 %, crossfader included; the A4 fits at 90 %.
+  - Desktop is unchanged.
 
 ## Live log (session 2, 2026-10-29)
 
@@ -126,13 +130,11 @@ Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Su
   - a cap variant in `components/controls/Knob.tsx` (the A4 restyles its caps with a scoped stylesheet)
   - knob travel to match the hardware (about 300°, against 270° now)
   - a legend-above/below option in `components/controls/Switch.tsx` (Mother-32)
-- **iPad fold**: the header and preset rows take about 220 px. On the Xone the crossfader starts below the fold; on the A4 at 95 % fit, so does the last legend row.
 - **Studio sets** (`lib/studio/sets.ts`): the Moog sets would start at the guide's level with the Mother-32 and Subharmonicon about 5 dB down.
 - **Old Analog Four and Rytm saves** start fresh. The A4 review suggests keeping the old values under a legacy key and showing a one-time notice.
 - **Full-track gaps on the A4**: POLY, a kit per pattern, separate track outputs, live recording of knob moves, TRANSPOSABLE, and trig/page/sound copy.
 - Mother-32: with a clock in TEMPO the knob shows CLOCK DIV; the engine already ignores it, so only the display is off.
 - Regenerate `docs/audio-qa-baseline/` for every instrument.
-- `scripts/checks/xone96.cjs` is stale: it doesn't set synth-studio-welcomed and uses the old button colour. It isn't part of the gate.
 - StudioView: hide "Output" for Your synth when it has no audio. `hub.push()` should apply data before values.
 - Optional "Hardware synth" studio set (Your synth + Audio input + Xone:96).
 - Delete the `wip/*` branches after their work is merged (ask first).

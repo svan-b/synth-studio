@@ -270,7 +270,7 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
       onFocusCapture={e => noteTouched(e.target)}
       data-instance={instance}
     >
-      <div className={`flex flex-wrap items-center justify-center gap-2 ${compact ? 'mb-1.5' : 'mb-3'} text-sm`}>
+      <div className={`flex flex-wrap items-center justify-center gap-2 ${compact ? 'mb-1.5' : 'mb-3 coarse-lg:mb-2'} text-sm`}>
         {presets.length > 0 && (
           <select
             value={preset}
@@ -316,14 +316,16 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
           </div>
         )}
         {!compact && mod.keyboard && keyboardActive && (
-          <span className="text-[11px] text-gray-500 hidden md:inline">Keys A–K play · Z/X octave ({octave >= 0 ? '+' : ''}{octave})</span>
+          <span className="text-[11px] text-gray-500 hidden md:inline coarse-lg:hidden">Keys A–K play · Z/X octave ({octave >= 0 ? '+' : ''}{octave})</span>
         )}
-        {!compact && mod.transportControl && keyboardActive && <span className="text-[11px] text-gray-500 hidden md:inline">Space = play/stop</span>}
+        {!compact && mod.transportControl && keyboardActive && <span className="text-[11px] text-gray-500 hidden md:inline coarse-lg:hidden">Space = play/stop</span>}
+        {/* On an iPad the status shares the toolbar row, so the panel gets its line */}
+        {!compact && <ControlStatus spec={spec} values={displayValues} touched={touched} inline />}
       </div>
 
       {!compact && <ControlStatus spec={spec} values={displayValues} touched={touched} />}
 
-      <ResponsiveDeviceContainer zoom={zoomOverride ?? zoom} onScaleChange={onScaleChange}>
+      <ResponsiveDeviceContainer zoom={zoomOverride ?? zoom} fitHeight={!compact} onScaleChange={onScaleChange}>
         <SynthPanel
           spec={spec}
           layout={layout}
@@ -378,7 +380,7 @@ function firstSentence(text: string | undefined): string {
  * does. Touch screens have no hover tooltips, and naming the thing you just moved
  * (with its unit) is half of learning a new instrument.
  */
-function ControlStatus({ spec, values, touched }: { spec: DeviceSpec; values: Values; touched: { kind: 'control' | 'jack'; id: string } | null }) {
+function ControlStatus({ spec, values, touched, inline = false }: { spec: DeviceSpec; values: Values; touched: { kind: 'control' | 'jack'; id: string } | null; inline?: boolean }) {
   let name = '';
   let value = '';
   let about = '';
@@ -404,7 +406,12 @@ function ControlStatus({ spec, values, touched }: { spec: DeviceSpec; values: Va
     }
   }
   return (
-    <div className="h-6 mb-1.5 px-2 flex items-center justify-center gap-2 text-[12px] leading-none min-w-0 max-w-full select-none" data-control-status="">
+    <div
+      className={`h-6 px-2 items-center gap-2 text-[12px] leading-none min-w-0 max-w-full select-none ${
+        inline ? 'hidden coarse-lg:flex basis-0 grow min-w-[240px] max-w-[520px] justify-start' : 'flex mb-1.5 justify-center coarse-lg:hidden'
+      }`}
+      data-control-status={inline ? 'inline' : ''}
+    >
       {name ? (
         <>
           <span className="font-bold text-white shrink-0">{name}</span>
