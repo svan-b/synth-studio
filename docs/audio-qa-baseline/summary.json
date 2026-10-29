@@ -1,0 +1,470 @@
+{
+ "kind": "audio-qa-summary",
+ "generated": "2026-10-29T00:35:37.615Z",
+ "devices": [
+  {
+   "id": "dfam",
+   "name": "DFAM",
+   "presets": 38,
+   "excitation": "audition",
+   "output": "mono",
+   "median": -21.58,
+   "spread": 20.09,
+   "iqr": 5.52,
+   "min": -31.25,
+   "max": -11.16,
+   "maxTruePeak": -1.4,
+   "masterOffset": 0.19,
+   "flagged": 12,
+   "flagCounts": {
+    "loudness": 12
+   },
+   "setupErrors": 0,
+   "date": "2026-10-29T00:28:49.500Z",
+   "vsStudio": 0
+  },
+  {
+   "id": "mother32",
+   "name": "Mother-32",
+   "presets": 10,
+   "excitation": "keys",
+   "output": "mono",
+   "median": -19.14,
+   "spread": 20.55,
+   "iqr": 13.06,
+   "min": -34.7,
+   "max": -14.15,
+   "maxTruePeak": -10.62,
+   "masterOffset": 0.2,
+   "flagged": 6,
+   "flagCounts": {
+    "loudness": 5,
+    "dc": 1
+   },
+   "setupErrors": 0,
+   "date": "2026-10-29T00:30:13.211Z",
+   "vsStudio": 2.44
+  },
+  {
+   "id": "subharmonicon",
+   "name": "Subharmonicon",
+   "presets": 9,
+   "excitation": "keys",
+   "output": "mono",
+   "median": -26.87,
+   "spread": 3.63,
+   "iqr": 2.78,
+   "min": -28.23,
+   "max": -24.6,
+   "maxTruePeak": -14.91,
+   "masterOffset": 0.2,
+   "flagged": 2,
+   "flagCounts": {
+    "loudness": 1,
+    "dc": 1
+   },
+   "setupErrors": 0,
+   "date": "2026-10-29T00:31:29.136Z",
+   "vsStudio": -5.29
+  },
+  {
+   "id": "sub37",
+   "name": "Sub 37",
+   "presets": 11,
+   "excitation": "keys",
+   "output": "mono",
+   "median": -17.37,
+   "spread": 20.48,
+   "iqr": 9.75,
+   "min": -29.85,
+   "max": -9.37,
+   "maxTruePeak": 0.88,
+   "masterOffset": 0.2,
+   "flagged": 6,
+   "flagCounts": {
+    "loudness": 6,
+    "true-peak": 1
+   },
+   "setupErrors": 0,
+   "date": "2026-10-29T00:32:56.550Z",
+   "vsStudio": 4.21
+  },
+  {
+   "id": "analog-four",
+   "name": "Analog Four MKII",
+   "presets": 7,
+   "excitation": "transport",
+   "output": "stereo",
+   "median": -31.54,
+   "spread": 12.04,
+   "iqr": 7.38,
+   "min": -36.02,
+   "max": -23.98,
+   "maxTruePeak": -9.97,
+   "masterOffset": 0.19,
+   "flagged": 5,
+   "flagCounts": {
+    "loudness": 4,
+    "long-tail": 1,
+    "stuck-tail": 1
+   },
+   "setupErrors": 0,
+   "date": "2026-10-29T00:33:55.912Z",
+   "vsStudio": -9.96
+  },
+  {
+   "id": "analog-rytm",
+   "name": "Analog Rytm MKII",
+   "presets": 6,
+   "excitation": "transport",
+   "output": "stereo",
+   "median": -13.63,
+   "spread": 14.27,
+   "iqr": 7.42,
+   "min": -20.69,
+   "max": -6.42,
+   "maxTruePeak": 2.08,
+   "masterOffset": -0.05,
+   "flagged": 4,
+   "flagCounts": {
+    "true-peak": 3,
+    "loudness": 3,
+    "long-tail": 1
+   },
+   "setupErrors": 0,
+   "date": "2026-10-29T00:34:43.687Z",
+   "vsStudio": 7.95
+  },
+  {
+   "id": "xone96",
+   "name": "Xone:96",
+   "presets": 5,
+   "excitation": "transport",
+   "output": "stereo",
+   "median": -21.69,
+   "spread": 10.95,
+   "iqr": 1.01,
+   "min": -29.21,
+   "max": -18.26,
+   "maxTruePeak": -5.72,
+   "masterOffset": 0.2,
+   "flagged": 2,
+   "flagCounts": {
+    "loudness": 1,
+    "long-tail": 1
+   },
+   "setupErrors": 0,
+   "date": "2026-10-29T00:35:23.874Z",
+   "vsStudio": -0.11
+  }
+ ],
+ "studioMedian": -21.58,
+ "presets": 86,
+ "flagged": 37,
+ "flagTotals": {
+  "loudness": 32,
+  "dc": 2,
+  "true-peak": 4,
+  "long-tail": 3,
+  "stuck-tail": 1
+ },
+ "top": [
+  {
+   "device": "analog-four",
+   "preset": "Detuned saw lead",
+   "key": "supersaw",
+   "flag": "stuck-tail",
+   "detail": "-14.8 dBFS peak 2 s after stop and not decaying (-0.6 dB/s): a note, gate or drone is left on",
+   "score": 90.2
+  },
+  {
+   "device": "subharmonicon",
+   "preset": "Envelope PWM (cable)",
+   "key": "pwm_envelope",
+   "flag": "dc",
+   "detail": "0.0547 (during the excitation; limit 0.005)",
+   "score": 81.8
+  },
+  {
+   "device": "analog-rytm",
+   "preset": "Breakbeat",
+   "key": "breakbeat",
+   "flag": "true-peak",
+   "detail": "+2.1 dBTP (sample peak +2.1 dBFS, 5810 samples at or above 0 dBFS in 812 overs); ceiling -1 dBTP",
+   "score": 74.6
+  },
+  {
+   "device": "analog-rytm",
+   "preset": "Techno - four on the floor",
+   "key": "techno",
+   "flag": "true-peak",
+   "detail": "+1.4 dBTP (sample peak +1.4 dBFS, 37350 samples at or above 0 dBFS in 4333 overs); ceiling -1 dBTP",
+   "score": 69.1
+  },
+  {
+   "device": "sub37",
+   "preset": "Wobble Bass",
+   "key": "wobble_bass",
+   "flag": "true-peak",
+   "detail": "+0.9 dBTP (sample peak +0.9 dBFS, 476 samples at or above 0 dBFS in 10 overs); ceiling -1 dBTP",
+   "score": 65
+  },
+  {
+   "device": "mother32",
+   "preset": "Delayed Vibrato (VC MIX as VCA)",
+   "key": "delayed_vibrato",
+   "flag": "dc",
+   "detail": "0.0161 (during the excitation; limit 0.005)",
+   "score": 55.3
+  },
+  {
+   "device": "mother32",
+   "preset": "Self-Oscillating Filter (KB → MULT)",
+   "key": "whistle_filter",
+   "flag": "loudness",
+   "detail": "-34.7 LUFS is -15.6 LU from the device target -19.1 LUFS (tolerance 4 LU)",
+   "score": 54.7
+  },
+  {
+   "device": "analog-rytm",
+   "preset": "Hip-hop boom bap",
+   "key": "boombap",
+   "flag": "true-peak",
+   "detail": "-0.5 dBTP (sample peak -0.6 dBFS); ceiling -1 dBTP",
+   "score": 54.2
+  },
+  {
+   "device": "mother32",
+   "preset": "Acid Sequence",
+   "key": "acid_seq",
+   "flag": "loudness",
+   "detail": "-33.0 LUFS is -13.9 LU from the device target -19.1 LUFS (tolerance 4 LU)",
+   "score": 49.6
+  },
+  {
+   "device": "sub37",
+   "preset": "Pluck",
+   "key": "pluck",
+   "flag": "loudness",
+   "detail": "-29.9 LUFS is -12.5 LU from the device target -17.4 LUFS (tolerance 4 LU)",
+   "score": 45.4
+  },
+  {
+   "device": "dfam",
+   "preset": "FX / Sync zap",
+   "key": "fx_sync_zap",
+   "flag": "loudness",
+   "detail": "-13.4 LUFS is +12.2 LU from the FX target -25.6 LUFS (tolerance 4 LU)",
+   "score": 44.7
+  },
+  {
+   "device": "dfam",
+   "preset": "Metal / Sync bell",
+   "key": "metal_sync_bell",
+   "flag": "loudness",
+   "detail": "-11.2 LUFS is +10.4 LU from the device target -21.6 LUFS (tolerance 4 LU)",
+   "score": 39.3
+  },
+  {
+   "device": "dfam",
+   "preset": "Hats / Metallic hat",
+   "key": "hats_metal",
+   "flag": "loudness",
+   "detail": "-31.3 LUFS is -9.7 LU from the device target -21.6 LUFS (tolerance 4 LU)",
+   "score": 37
+  },
+  {
+   "device": "xone96",
+   "preset": "Live stem jam",
+   "key": "stem_jam",
+   "flag": "long-tail",
+   "detail": "-29.9 dBFS peak 2 s after stop, still decaying at -16.5 dB/s (long release or FX tail)",
+   "score": 35.1
+  },
+  {
+   "device": "dfam",
+   "preset": "Hats / Quick hats",
+   "key": "hats_quick",
+   "flag": "loudness",
+   "detail": "-12.7 LUFS is +8.9 LU from the device target -21.6 LUFS (tolerance 4 LU)",
+   "score": 34.6
+  },
+  {
+   "device": "dfam",
+   "preset": "FX / Laser zap",
+   "key": "fx_laser",
+   "flag": "loudness",
+   "detail": "-16.8 LUFS is +8.8 LU from the FX target -25.6 LUFS (tolerance 4 LU)",
+   "score": 34.3
+  },
+  {
+   "device": "sub37",
+   "preset": "Arp Pulse",
+   "key": "arp_pulse",
+   "flag": "loudness",
+   "detail": "-26.1 LUFS is -8.7 LU from the device target -17.4 LUFS (tolerance 4 LU)",
+   "score": 34.2
+  },
+  {
+   "device": "dfam",
+   "preset": "Bass / Sequenced bass",
+   "key": "bass_sequenced",
+   "flag": "loudness",
+   "detail": "-13.0 LUFS is +8.5 LU from the device target -21.6 LUFS (tolerance 4 LU)",
+   "score": 33.6
+  },
+  {
+   "device": "analog-four",
+   "preset": "Ambient drift",
+   "key": "ambient",
+   "flag": "loudness",
+   "detail": "-26.1 LUFS is +8.5 LU from the Drone / ambient target -34.5 LUFS (tolerance 4 LU)",
+   "score": 33.5
+  },
+  {
+   "device": "dfam",
+   "preset": "Snare / Rimshot",
+   "key": "snare_rim",
+   "flag": "loudness",
+   "detail": "-29.7 LUFS is -8.1 LU from the device target -21.6 LUFS (tolerance 4 LU)",
+   "score": 32.2
+  }
+ ],
+ "calibration": {
+  "device": "dfam",
+  "sampleRate": 44100,
+  "tests": [
+   {
+    "id": "reference",
+    "name": "1 kHz sine at -20 dBFS in one channel (BS.1770 reference)",
+    "measured": "sample peak -20.00 dBFS, integrated -23.00 LUFS",
+    "expected": "-20 dBFS +-0.05, -23.01 LUFS +-0.3",
+    "ok": true,
+    "values": [
+     {
+      "what": "sample peak",
+      "value": -20
+     },
+     {
+      "what": "integrated",
+      "value": -23.0008
+     }
+    ]
+   },
+   {
+    "id": "dual-mono",
+    "name": "1 kHz sine at -20 dBFS from a mono node (heard on L and R)",
+    "measured": "sample peak -20.00 dBFS, integrated -19.99 LUFS",
+    "expected": "-20 dBFS +-0.05, -19.99 LUFS +-0.3",
+    "ok": true,
+    "values": [
+     {
+      "what": "sample peak",
+      "value": -20
+     },
+     {
+      "what": "integrated",
+      "value": -19.9905
+     }
+    ]
+   },
+   {
+    "id": "true-peak",
+    "name": "fs/4 sine at 45 deg, amplitude -6.02 dBFS (inter-sample peaks)",
+    "measured": "sample peak -9.03 dBFS, true peak -5.94 dBTP",
+    "expected": "-9.03 dBFS +-0.05, -6.02 dBTP +0.2/-0.4",
+    "ok": true,
+    "values": [
+     {
+      "what": "sample peak",
+      "value": -9.0309
+     },
+     {
+      "what": "true peak",
+      "value": -5.938
+     }
+    ]
+   },
+   {
+    "id": "dc",
+    "name": "constant +0.01 (DC offset)",
+    "measured": "DC 0.0100",
+    "expected": "0.0100 +-0.0002",
+    "ok": true,
+    "values": [
+     {
+      "what": "DC",
+      "value": 0.01
+     }
+    ]
+   },
+   {
+    "id": "click",
+    "name": "1 kHz sine at -20 dBFS with a 90 deg phase jump",
+    "measured": "clicks 1, mid-sound clicks 1",
+    "expected": "1 exactly, 1 exactly",
+    "ok": true,
+    "values": [
+     {
+      "what": "clicks",
+      "value": 1
+     },
+     {
+      "what": "mid-sound clicks",
+      "value": 1
+     }
+    ]
+   },
+   {
+    "id": "silence",
+    "name": "nothing connected (the idle instrument)",
+    "measured": "peak -inf dBFS, silent flag 1 (1 = raised)",
+    "expected": "peak below -70 dBFS, 1 (1 = raised) exactly",
+    "ok": true,
+    "values": [
+     {
+      "what": "peak",
+      "value": null
+     },
+     {
+      "what": "silent flag",
+      "value": 1
+     }
+    ]
+   },
+   {
+    "id": "stuck",
+    "name": "1 kHz sine at -20 dBFS left on after stop",
+    "measured": "tail peak 2 s after stop -20.00 dBFS",
+    "expected": "-20 dBFS +-0.1",
+    "ok": true,
+    "values": [
+     {
+      "what": "tail peak 2 s after stop",
+      "value": -20
+     }
+    ]
+   }
+  ],
+  "ok": true,
+  "master": "-22.81 LUFS, sample peak -19.81 dBFS (+0.19 LU through the master bus)"
+ },
+ "skipped": [
+  {
+   "id": "studio-clock",
+   "why": "no presets"
+  },
+  {
+   "id": "midi-synth",
+   "why": "no presets"
+  },
+  {
+   "id": "audio-in",
+   "why": "no presets"
+  },
+  {
+   "id": "wam-plugin",
+   "why": "no presets"
+  }
+ ]
+}
