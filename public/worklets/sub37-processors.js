@@ -22,7 +22,8 @@
 //               Input: external CV, 4 channels (PITCH, FILTER, VOLUME, KB GATE; 1.0 = 5 V).
 //               Output, 19 channels:
 //                 0 osc1 pitch (oct)   1 osc2 pitch (oct)   2 cutoff CV (oct)
-//                 3 VCA gain           4-6 osc1 tri/saw/pulse gains   7 osc1 pw - 0.02
+//                 3 VCA gain (AMP EG x VCA LEVEL x the MULTIDRIVE make-up x VOL CV)
+//                 4-6 osc1 tri/saw/pulse gains   7 osc1 pw - 0.02
 //                 8-10 osc2 gains      11 osc2 pw - 0.02    12 sub gain
 //                 13 noise gain        14 ladder resonance  15 MULTIDRIVE pre-gain
 //                 16 FDBK / EXT gain   17 KB RESET pulse (-2 then +2 for one sample each)
@@ -31,7 +32,8 @@
 //  'sub37-mix'  the mixer bus: DC blocker, the FDBK / EXT IN channel (the mixer
 //               output fed back into its own input through an AC-coupled,
 //               band-limited path - or the EXT IN audio while a cable is
-//               patched) and the mixer amp's soft, slightly asymmetric limit.
+//               patched) and the mixer amp: clean to 1.5x unity, then a soft
+//               limit that holds the FDBK loop.
 //               A real one-sample feedback loop, which a Web Audio graph cannot
 //               build (cycles need a 128-sample DelayNode).
 //               Inputs: 0 summed sources, 1 FDBK/EXT gain (ctl ch 16), 2 EXT IN audio.
@@ -76,24 +78,45 @@ const flush = v => (v > 1e-20 || v < -1e-20 ? v : 0);
 // Calibrations - devices/sub37/model.ts and REFERENCE.md document the same numbers
 // ---------------------------------------------------------------------------
 const NCH = 19;
-const RES_SELF = 0.985;      // ladder resonance where the 2x core starts to self-oscillate: dial 7.0 (p.28)
+const RES_SELF = 0.985;      // ladder resonance where the 2x core starts to self-oscillate ...
+const RES_ONSET = 7.1;       // ... on the dial: "above 7" (p.28), so 7.0 itself still only rings
 const RES_TOP = 1.16;        // dial 10
 const EG_AMT_OCT = 6 / 5;    // FILTER EG AMT: octaves per dial unit (+-5 -> +-6 oct)
 const PITCH_MOD_OCT = 2;     // PITCH AMT +-5 -> +-2 octaves, squared taper
 const LFO_RATE_MOD_OCT = 4;  // MOD AMT -> the other LFO's RATE
 const EG_TIME_MOD_OCT = 3;   // MOD AMT -> envelope (and glide) times; positive lengthens (p.24)
+const MD_PRE0 = 0.5;         // MULTIDRIVE pre-gain at 0: the OTA / FET stages idle in their clean range
 const MD_MAX_PRE = 40;       // MULTIDRIVE pre-gain at 10
 const FB_MAX = 1.25;         // FDBK loop gain at 10 (unstable near the top: "sometimes chaotic", p.27)
 const SQUARE_LEVEL = 0.85;   // square / pulse / sub peak against the saw
+const MIX_KNEE = 1.5;        // mixer amp: clean to 1.5x unity (the Subsequent 37's mixer headroom) ...
+const MIX_LIMIT = 4.5;       // ... then a soft limit; the overdrive itself happens at the ladder's input (p.27)
+
+/**
+ * MULTIDRIVE make-up after the drive stages, folded into the VCA gain so that a modulated
+ * MULTIDRIVE (PGM DST FILT DRV) keeps its level too: 1 / MD_PRE0 at 0, falling as the stages
+ * saturate. A quiet signal gains about 5 dB at 2 and 11 dB at 4 (it is driven harder); a
+ * full-scale tone gains about 5 dB by 2 and never more than 6 dB - grit more than level.
+ * 257 points over the knob's travel, interpolated.
+ */
+const MD_POST = new Float64Array(258);
+for (let i = 0; i <= 257; i++) {
+  const md = Math.min(1, i / 256);
+  MD_POST[i] = 0.46 + (1 / MD_PRE0 - 0.46) * Math.exp(-Math.pow(md / 0.17, 1.4));
+}
+function mdPost(md) {
+  const x = (md < 0 ? 0 : md > 1 ? 1 : md) * 256, k = x | 0;
+  return MD_POST[k] + (MD_POST[k + 1] - MD_POST[k]) * (x - k);
+}
 
 /** Mixer law: unity at 5 on the dial, (level / 5)^1.5 (+9 dB at 10); above 5 overdrives (p.27) */
-function mixGain(d) { return d <= 0 ? 0 : Math.pow(d * 0.2, 1.5); }
+function mixGain(d) { return d <= 0 ? 0 : Math.pow((d < 10 ? d : 10) * 0.2, 1.5); }
 
 /** RESONANCE dial 0-10 -> ladder resonance; the filter self-oscillates above 7 (p.28) */
 function resOf(d) {
   if (d <= 0) return 0;
-  if (d <= 7) return RES_SELF * (d / 7);
-  return RES_SELF + (RES_TOP - RES_SELF) * Math.min(1, (d - 7) / 3);
+  if (d <= RES_ONSET) return RES_SELF * (d / RES_ONSET);
+  return RES_SELF + (RES_TOP - RES_SELF) * Math.min(1, (d - RES_ONSET) / (10 - RES_ONSET));
 }
 
 // smoothed settings, by index
@@ -600,23 +623,28 @@ class Sub37Ctl extends AudioWorkletProcessor {
       const bw = sm0[S_BEND] + smd[S_BEND] * fi;
       const bend = bw >= 0 ? bw * bendUp : bw * bendDn;
       const cvPitch = cvP ? cvP[i] * 5 : 0;
+      // Modulation is added to a knob's setting and stays inside that control's own range, as the
+      // panel's parameters do (NOISE LEVEL "added to or subtracted from" the mixer level, p.24)
+      const f2Max = drone ? 36 : 7;
       o0[i] = cur[0] + foot1 + tune + (bend1 ? bend : 0) + pit1 + cvPitch;
-      o1[i] = (drone ? 0 : cur[1]) + foot2 + (sm0[S_FREQ2] + smd[S_FREQ2] * fi + dFreq2) / 12 + tune + (bend2 ? bend : 0) + pit2 + cvPitch;
-      oFm2[i] = sm0[S_BEAT] + smd[S_BEAT] * fi + dBeat;
-      const egAmt = sm0[S_EGAMT] + smd[S_EGAMT] * fi + dEgAmt;
+      o1[i] = (drone ? 0 : cur[1]) + foot2 + clamp(sm0[S_FREQ2] + smd[S_FREQ2] * fi + dFreq2, -f2Max, f2Max) / 12 + tune + (bend2 ? bend : 0) + pit2 + cvPitch;
+      oFm2[i] = clamp(sm0[S_BEAT] + smd[S_BEAT] * fi + dBeat, -3.5, 3.5);
+      const egAmt = clamp(sm0[S_EGAMT] + smd[S_EGAMT] * fi + dEgAmt, -5, 5);
       const kbt = clamp(sm0[S_KBT] + smd[S_KBT] * fi + dKbt, 0, 2);
       o2[i] = sm0[S_CUT] + smd[S_CUT] * fi + fEg * egAmt * EG_AMT_OCT + kbt * (cur[0] + 1) + filt + (cvF ? cvF[i] * 5 : 0);
-      // VOLUME CV: 0-5 V sets the VCA ceiling while a cable is in (normalled to full)
-      o3[i] = aEg * vcaMul * (volPatched && cvV ? clamp(cvV[i], 0, 1) : 1);
-      morphTo(sm0[S_WAVE1] + smd[S_WAVE1] * fi + dw1, on1 ? mixGain(sm0[S_L1] + smd[S_L1] * fi + dL1) : 0, mw);
+      const md = clamp(sm0[S_MD] + smd[S_MD] * fi + dMd, 0, 10) * 0.1;
+      oMd[i] = MD_PRE0 + (MD_MAX_PRE - MD_PRE0) * md * md;
+      // VCA: the AMP EG, MOD DEST VCA LEVEL, the MULTIDRIVE make-up, and VOLUME CV: 0-5 V sets the
+      // VCA ceiling while a cable is in (normalled to full)
+      o3[i] = aEg * vcaMul * mdPost(md) * (volPatched && cvV ? clamp(cvV[i], 0, 1) : 1);
+      // WAVE stays on the knob's travel (triangle .. narrowest pulse) however far it is modulated
+      morphTo(clamp(sm0[S_WAVE1] + smd[S_WAVE1] * fi + dw1, 0, 1), on1 ? mixGain(sm0[S_L1] + smd[S_L1] * fi + dL1) : 0, mw);
       oT1[i] = mw[0]; oS1[i] = mw[1]; oP1[i] = mw[2]; oW1[i] = mw[3];
-      morphTo(sm0[S_WAVE2] + smd[S_WAVE2] * fi + dw2, on2 ? mixGain(sm0[S_L2] + smd[S_L2] * fi + dL2) : 0, mw);
+      morphTo(clamp(sm0[S_WAVE2] + smd[S_WAVE2] * fi + dw2, 0, 1), on2 ? mixGain(sm0[S_L2] + smd[S_L2] * fi + dL2) : 0, mw);
       oT2[i] = mw[0]; oS2[i] = mw[1]; oP2[i] = mw[2]; oW2[i] = mw[3];
       oSub[i] = ons ? SQUARE_LEVEL * mixGain(sm0[S_LS] + smd[S_LS] * fi + dLs) : 0;
       oNoise[i] = onn ? mixGain(sm0[S_LN] + smd[S_LN] * fi + dNoise) : 0;
       oRes[i] = resOf(sm0[S_RES] + smd[S_RES] * fi + dRes);
-      const md = clamp(sm0[S_MD] + smd[S_MD] * fi + dMd, 0, 10) * 0.1;
-      oMd[i] = 1 + (MD_MAX_PRE - 1) * md * md;
       const lf = clamp(sm0[S_LF] + smd[S_LF] * fi + dLf, 0, 10) * 0.1;
       oFb[i] = onf ? (ext ? mixGain(lf * 10) : FB_MAX * Math.pow(lf, 1.3)) : 0;
       if (this.resetPulse > 0) { oKbr[i] = this.resetPulse === 2 ? -2 : 2; this.resetPulse--; }
@@ -637,7 +665,7 @@ class Sub37Ctl extends AudioWorkletProcessor {
 }
 
 /**
- * WAVE morph weights for w (0..1; modulation may push it past either end), scaled by the
+ * WAVE morph weights for w (0..1, the knob's travel; modulation is clamped to it), scaled by the
  * mixer gain g: [tri, saw, pulse, pw - 0.02].
  * 0 - 1/3: triangle -> saw   1/3 - 2/3: saw -> square   2/3 - 1: the square narrows to a 10 % pulse.
  * The VCO's pulse is +1 then -1, so it is used inverted: its low half then lines up with the saw's
@@ -701,9 +729,10 @@ class Sub37Mix extends AudioWorkletProcessor {
         flp += (ac - flp) * cLp;
         fb = flp * g;
       }
-      // mixer amp: clean to about unity, then a soft limit near 3x with a little asymmetry
-      const u = (hy + fb) * 0.3333;
-      y = 3 * tanhF(u + 0.08 * u * u);
+      // mixer amp: clean to 1.5x unity, then a soft limit towards 4.5x (it holds the FDBK loop);
+      // a channel above 5 is clean here and overdrives the ladder's input (p.27)
+      const s = hy + fb, as = s < 0 ? -s : s;
+      y = as <= MIX_KNEE ? s : (s < 0 ? -1 : 1) * (MIX_KNEE + (MIX_LIMIT - MIX_KNEE) * tanhF((as - MIX_KNEE) / (MIX_LIMIT - MIX_KNEE)));
       out[i] = y;
     }
     if (!(y === y)) { y = 0; hpx = 0; hpy = 0; fhx = 0; fhy = 0; flp = 0; }

@@ -57,7 +57,12 @@ export default function LessonBrowser({ lessons, studioLessons = [], deviceName,
   // The instrument's own lessons first: grouped by path if they have one,
   // otherwise one "<instrument> lessons" section. Studio lessons and the Producer path come last.
   const byPath = [
-    ...PATHS.filter(p => p.id !== 'other').map(p => ({ ...p, lessons: shown.filter(l => l.path === p.id) })),
+    // This instrument's own studio lessons are named for it: "Studio & full tracks" is the shared section below
+    ...PATHS.filter(p => p.id !== 'other').map(p => ({
+      ...p,
+      ...(p.id === 'studio' ? { title: `${deviceName} in the studio`, blurb: `Wire the ${deviceName} into the studio: clock it, route it, play it with the rest.` } : {}),
+      lessons: shown.filter(l => l.path === p.id),
+    })),
     { id: 'device' as const, title: `${deviceName} lessons`, blurb: '', lessons: shown.filter(l => !l.path) },
     { id: 'studio-all' as const, title: 'Studio & full tracks', blurb: 'Wire instruments together, sync them, mix and arrange a whole track.', lessons: filter(studioSorted) },
     {

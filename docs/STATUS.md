@@ -11,13 +11,13 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Studio v2 | Rack, cables, routing, sync, arranger, recorder, projects, Review, lesson coach v2 |
 | Producer-grade studio | Clean unity master, −1 dBTP true-peak limiter, BS.1770 LUFS meters, mixer strips with sends to a tempo delay and Reverb2, undo/redo, stems, bounce, count-in, loop |
 | All seven instruments rebuilt to their manuals | DFAM, Xone:96, Sub 37, Analog Four MKII, Mother-32, Subharmonicon, Analog Rytm MKII. Each passes audio QA at −18 LUFS with 0 flagged presets and plays all its lessons |
-| Independent expert reviews | A second agent re-checked each instrument against its manual and fixed what it found. Merged: DFAM, Subharmonicon, Xone:96, Analog Four, Mother-32. Each writes `devices/<id>/REVIEW.md` |
+| Independent expert reviews | A second agent re-checked each instrument against its manual and fixed what it found. Merged: DFAM, Subharmonicon, Xone:96, Analog Four, Mother-32, Sub 37. Each writes `devices/<id>/REVIEW.md` |
 | Producer path | Lesson API v3 studio state (whole-studio starts, saved learner studios, loudness-matched A/B, master/channel meters, bounces, mixer and arranger checks) and the first 8 Producer path lessons. See "Lesson API v3" in `docs/PEDAGOGY.md` |
 | Clock chip | Every instrument that can follow the studio clock shows **Clock: studio / own tempo** above its panel. One tap lets a patch sheet play at its drawn TEMPO |
 | Stale-module fix | `useDeviceModule` reads the hub cache on every render, so switching never pairs one instrument's layout with another's data |
 | 60 ms minimum note gate | A quick tap on an on-screen key always sounds |
 | Play starts clocked gear | The studio ▶ presses RUN on every unsynced instrument, cable-clocked ones included, before the clock starts |
-| Saved-settings upgrades | `lib/studio/upgrades.ts`: store v12 / project v9. Untouched controls keep their old defaults; completed lessons carry over to rebuilt successors. Table in section 3 |
+| Saved-settings upgrades | `lib/studio/upgrades.ts`: store v12 / project v9. Untouched controls keep their old defaults; completed lessons carry over to rebuilt successors; settings no conversion can carry are kept and offered as a file. Table in section 3 |
 | DSP core v2 | Band-limited VCO, 2× ladder, DAHDSR env, SVF, Reverb2 (FDN), Chorus. `/bench` page; see `docs/DSP.md` |
 | Elektron sequencer library + UI kit | `docs/ELEKTRON_SEQUENCER.md` (233 tests) |
 | Bring your own gear | Web MIDI, Practice synth (works on iPad without hardware), audio input, Web Audio plugins, 16 lessons, Safari guidance. See `docs/EXTERNAL_GEAR.md` |
@@ -51,9 +51,27 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Sync stays on by default, so ▶ keeps everything in time, as hardware would on MIDI clock.
   - Each syncable instrument now has a **Clock** chip above its panel to switch to its own tempo in one tap.
 - 42081a0: `scripts/checks/xone96.cjs` works again (it loaded its test file onto the wrong channel).
-- iPad fold: on touch screens, Fit may shrink a panel by up to 20 % so it ends above the bottom of the screen, and the control readout moves into the toolbar row (34 px back).
+- 553c565: iPad fold. On touch screens, Fit may shrink a panel by up to 20 % so it ends above the bottom of the screen, and the control readout moves into the toolbar row (34 px back).
   - The whole Xone:96 now fits at 87 %, crossfader included; the A4 fits at 90 %.
   - Desktop is unchanged.
+- Settings that a rebuild can't convert (the old Analog Four and Rytm) are no longer lost silently.
+  - A copy stays in the browser (`synth-studio-old-settings`), and a one-time notice offers it as a file.
+  - Old project files get a notice too; the file itself is the copy.
+  - Checked in e2e (37 checks).
+- Moog knobs turn 300°, as drawn: `PanelLayout.knobTravel` (default 270) is set to 300 on the DFAM, Mother-32 and Subharmonicon, whose manuals' clock positions and preset readings use the 7-to-5 o'clock sweep. Values are unchanged; the pointers and scale marks now line up with the printed legends. The Sub 37 uses the 280° measured on its manual's drawing.
+- New-user walkthrough on iPad (welcome → first lesson → both studio sets playing):
+  - 66fe408: "Start the first lesson" now starts it.
+  - 6ebf36d: the add-instrument button is pinned in a full tab row, the map names each instrument's mixer channel in its box (labels overlapped on converging arrows), and the silent Studio Clock has no mixer strip. Cable names are drawn on top with a halo.
+  - Measured with ▶: the Elektron set at −17.1 LUFS / −1.0 dBTP and the Moog trio at −16.3 LUFS / −2.2 dBTP, with no limiting and no console errors.
+- d6fc40e: merged the **Sub 37 review**.
+  - Mixer levels up to 5 are clean, as the manual says (1.2 % THD at 5, was 2.8 %).
+  - MULTIDRIVE grows even, then odd harmonics, and the filter self-oscillates above 7.
+  - The small buttons have their own touch areas on iPad, and KB TRANSPOSE is in.
+  - Audio QA 0/64 in both modes; lessons 20, 0 failed, 0 manual. No ids or defaults changed.
+  - 22b412c: its knobs turn 280°, as measured on the p.28 drawing, with the legends and CUTOFF marks at their measured angles.
+- 2603002: on iPad the lesson coach moves off the control a step points at (checked on six lessons: no step leaves its target covered).
+- 80c283a: an instrument's own studio lessons are headed "<name> in the studio", no longer a second "Studio & full tracks".
+- A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
 ## Live log (session 2, 2026-10-29)
 
@@ -89,10 +107,10 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 
 | Branch | What | Checkpoint |
 |---|---|---|
-| `wip/review-sub37` | Independent Sub 37 review against the manual | bd3b349 |
 | `wip/review-analog-rytm` | Independent Analog Rytm MKII review against the manual | a0c2d10 |
 | `wip/demo-tracks` | The three designed songs ("Low Tide Lights", "Three Clocks", "Copper Wire") as one-click studios | 0876305 |
-| `wip/producer-path-2` | The remaining Producer path lessons (Elektron and Sub 37 tracks) | — |
+| `wip/producer-path-2` | The remaining Producer path lessons (Elektron and Sub 37 tracks), Elektron pattern swing, and lesson solutions for routes, the arranger and rack counts (0 manual steps left on the Xone, A4 and audio-in; 1 on Your synth, where MIDI learn needs a real controller) | 867e6fc |
+| `wip/perf-analog-four` | Analog Four DSP performance pass, null-tested against the current sound | — |
 
 Each merges through the gate below. Before merging, run `defaults-tool/diff.sh <device> HEAD origin/wip/<branch>` (in the scratchpad) to find changed defaults and removed ids, then add an upgrade entry.
 
@@ -128,10 +146,8 @@ Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Su
 - **Lesson solution API**: add `route` and `arranger` fields, so the lesson runner can solve the Xone routing challenges (st1–st3, 4 manual steps) and the Analog Four song step (st2, 2 manual steps) by itself.
 - **Shared controls**, raised by several reviews:
   - a cap variant in `components/controls/Knob.tsx` (the A4 restyles its caps with a scoped stylesheet)
-  - knob travel to match the hardware (about 300°, against 270° now)
   - a legend-above/below option in `components/controls/Switch.tsx` (Mother-32)
 - **Studio sets** (`lib/studio/sets.ts`): the Moog sets would start at the guide's level with the Mother-32 and Subharmonicon about 5 dB down.
-- **Old Analog Four and Rytm saves** start fresh. The A4 review suggests keeping the old values under a legacy key and showing a one-time notice.
 - **Full-track gaps on the A4**: POLY, a kit per pattern, separate track outputs, live recording of knob moves, TRANSPOSABLE, and trig/page/sound copy.
 - Mother-32: with a clock in TEMPO the knob shows CLOCK DIV; the engine already ignores it, so only the display is off.
 - Regenerate `docs/audio-qa-baseline/` for every instrument.

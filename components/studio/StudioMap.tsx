@@ -82,9 +82,6 @@ export default function StudioMap({ onFocus }: { onFocus: (instance: string) => 
                 <path d={d} stroke={color} strokeWidth={3.5} fill="none" strokeLinecap="round">
                   <title>{`${a.label} ${jackName(c.from)} → ${b.label} ${jackName(c.to)}`}</title>
                 </path>
-                <text x={(ax + bx) / 2} y={(ay + by) / 2 - 6} textAnchor="middle" fontSize={10} fill={color} fontWeight={700}>
-                  {jackName(c.from)} → {jackName(c.to)}
-                </text>
               </g>
             );
           })}
@@ -103,6 +100,21 @@ export default function StudioMap({ onFocus }: { onFocus: (instance: string) => 
               <text x={13} y={31} fontSize={10} fill="#9ca3af">{truncate(n.sub, 28)}</text>
             </g>
           ))}
+          {/* cable names last, with a dark halo: the gap between columns is narrower than the text */}
+          {cableEdges.map(({ c, a, b }) => {
+            const ax = a.kind === 'clock' ? a.x + NODE_W : a.x;
+            const x = Math.abs(a.x - b.x) < 4 ? a.x - 34 : (ax + b.x) / 2;
+            const y = (a.y + b.y) / 2 + NODE_H / 2 - 6;
+            return (
+              <text
+                key={`l${c.from.instance}${c.from.jack}${c.to.instance}${c.to.jack}`}
+                x={x} y={y} textAnchor="middle" fontSize={10} fontWeight={700} fill={c.color ?? '#f97316'}
+                stroke="#121212" strokeWidth={4} paintOrder="stroke" style={{ pointerEvents: 'none' }}
+              >
+                {jackName(c.from)} → {jackName(c.to)}
+              </text>
+            );
+          })}
         </svg>
       </div>
     </section>
@@ -174,13 +186,15 @@ function buildLayout(
       ch.sendA > MIN_DB ? 'A' : null,
       ch.sendB > MIN_DB ? 'B' : null,
       off[r.id] ? 'OFF' : null,
+      // The mixer channel it feeds (in its own box: labels on converging arrows would overlap)
+      inputLabel ? `→ ${inputLabel.replace(/\s*\(.*\)$/, '')}` : null,
     ].filter(Boolean);
     nodes.push({
       id: r.id, x: COL[1], y: top(insts.length) + i * (NODE_H + GAP),
       label: instanceLabel(rack, r.id), sub: tags.join(' · ') || (mod(r)?.spec.manufacturer ?? ''),
       color: deviceColor(r.device), kind: 'inst',
     });
-    routeEdges.push({ from: r.id, to: target, label: inputLabel });
+    routeEdges.push({ from: r.id, to: target });
   });
   mixers.forEach((r, i) => {
     nodes.push({

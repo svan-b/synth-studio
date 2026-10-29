@@ -96,7 +96,7 @@ export default function Mixer({ onFocus }: { onFocus: (instance: string) => void
         )}
       </div>
       <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
-        {rack.map(r => (
+        {rack.filter(r => !DEVICES.find(d => d.id === r.device)?.silent).map(r => (
           <Strip
             key={r.id}
             id={r.id}

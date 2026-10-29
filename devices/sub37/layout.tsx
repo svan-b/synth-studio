@@ -36,6 +36,12 @@ const ROW3 = 132.2;
 const KN = 15;           // standard knob, mm
 const KN_MIX = 14;
 const KN_BIG = 23;       // CUTOFF
+/**
+ * Knob sweep, degrees. Measured on the manual's filter drawing (p.28): the scales run ±140°
+ * (RESONANCE 0 and 10 at ±139.7°, 27.9° a step; CUTOFF's 20 Hz and 20 kHz ticks at ±140°), so not
+ * Moog's 300° sweep of the Mother-32 family. Pointers, ticks and the printed legends all use it.
+ */
+const KNOB_TRAVEL = 280;
 const LABEL = '#f2f2f2';
 const SHIFT_LABEL = '#8fb3ff';
 const LED_RED = '#ff2d2d';
@@ -67,40 +73,48 @@ const custom = (x: number, y: number, w: number, h: number, render: Extract<Pane
  */
 const capAt = (x: number, y: number, render: Extract<PanelElement, { kind: 'custom' }>['render'], w = 10, h = 6): PanelElement =>
   custom(x - w / 2, y - h / 2, w, h, ctx => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{render(ctx)}</div>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', pointerEvents: 'none' }}>{render(ctx)}</div>
   ));
 const box = (x0: number, x1: number, title: string): PanelElement[] => [
   { kind: 'section', x: x0, y: BOX_TOP, w: x1 - x0, h: BOX_BOTTOM - BOX_TOP, border: '1px solid #3a3a3a', background: '#121212', radius: 1.2 },
-  label(title, (x0 + x1) / 2, BOX_TOP + 5, 9, { letterSpacing: 1.4 }),
+  label(title, (x0 + x1) / 2, BOX_TOP + 6, 9, { letterSpacing: 1.4 }),
 ];
 /**
  * A legend on a knob's arc at `deg` (0 = top). Legends left of the knob end at their point and
- * those to the right start there, so they grow away from the knob, never into it.
+ * those to the right start there, so they grow away from the knob, never into it. Below the
+ * knob's centre line a legend moves in along its pointer's line, so it sits no lower than at 45°
+ * under the horizontal: the names printed under the knob keep their room at the 140° end stops.
  */
-const arcLabel = (text: string, cx: number, cy: number, r: number, deg: number, size = 6.5): PanelElement => {
+const arcLabel = (text: string, cx: number, cy: number, r: number, deg: number, size = 6.5, fixed = false, pullIn = true): PanelElement => {
   const a = (deg * Math.PI) / 180;
-  const x = cx + r * Math.sin(a), y = cy - r * Math.cos(a);
-  if (deg < -15) return small(text, x + 1.6, y, { size, align: 'right' });
-  if (deg > 15) return small(text, x - 1.6, y, { size, align: 'left' });
-  return small(text, x, y, { size });
+  const below = -Math.cos(a);
+  const rr = pullIn && below > Math.SQRT1_2 ? (r * Math.SQRT1_2) / below : r;
+  const x = cx + rr * Math.sin(a), y = cy - rr * Math.cos(a);
+  if (deg < -15) return small(text, x + 1.6, y, { size, align: 'right', fixed });
+  if (deg > 15) return small(text, x - 1.6, y, { size, align: 'left', fixed });
+  return small(text, x, y, { size, fixed });
 };
-/** Position legends around a stepped knob, at the pointer's angles (-135 to +135 degrees) */
-const arc = (cx: number, cy: number, r: number, names: string[]): PanelElement[] => names.map((n, i) =>
-  arcLabel(n, cx, cy, r, -135 + (270 * i) / Math.max(1, names.length - 1)));
+/**
+ * Position legends around a stepped knob, at the pointer's angles (-140 to +140 degrees, the
+ * panel's `knobTravel`). Short legends (`fixedSize`) are drawn at one size, so no position reads
+ * larger than its neighbours.
+ */
+const arc = (cx: number, cy: number, r: number, names: string[], fixedSize?: number): PanelElement[] => names.map((n, i) =>
+  arcLabel(n, cx, cy, r, -KNOB_TRAVEL / 2 + (KNOB_TRAVEL * i) / Math.max(1, names.length - 1), fixedSize ?? 6.5, fixedSize !== undefined));
 /** A knob with its printed name above */
 const named = (name: string, control: KnobElement['control'], x: number, y: number, d = KN, extra: Partial<KnobElement> = {}): PanelElement[] => [
   label(name, x, y - d / 2 - 3.2),
   knob(control, x, y, d, extra),
 ];
 /** A stepped knob: its positions on the arc, its name above them */
-const stepped = (name: string, control: string, x: number, y: number, positions: string[], r: number, nameDy: number): PanelElement[] => [
+const stepped = (name: string, control: string, x: number, y: number, positions: string[], r: number, nameDy: number, fixedSize?: number): PanelElement[] => [
   label(name, x, y - nameDy),
   knob(control, x, y),
-  ...arc(x, y, r, positions),
+  ...arc(x, y, r, positions, fixedSize),
 ];
-/** A built-in button with its printed name above */
-const namedBtn = (name: string, control: string, x: number, y: number, under?: string): PanelElement[] => [
-  small(name, x, y - 5.5),
+/** A built-in button with its printed name above (`size`: the name's authored size) */
+const namedBtn = (name: string, control: string, x: number, y: number, under?: string, size = 7): PanelElement[] => [
+  small(name, x, y - 5.5, { size }),
   btn(control, x, y),
   ...(under ? [small(under, x, y + 5.5, { color: '#a8a8a8' })] : []),
 ];
@@ -128,18 +142,20 @@ function modBus(n: 1 | 2, x0: number, x1: number): PanelElement[] {
     small('1', xl - 4, 90), small('2', xl + 4, 90),
     led(xl - 4, 93.5, ctx => v(ctx, `mod${n}_pitch_dest`) !== 2),
     led(xl + 4, 93.5, ctx => v(ctx, `mod${n}_pitch_dest`) !== 1),
-    capAt(xl, 99, ctx => <CycleButton ctx={ctx} control={`mod${n}_pitch_dest`} />),
+    capAt(xl, 99, ctx => <CycleButton ctx={ctx} control={`mod${n}_pitch_dest`} hit={[24, 24, 7, 17]} />),
     small('OSC', xl, 105.5),
-    capAt(xr, 99, ctx => <ControllersButton ctx={ctx} bus={n} />),
+    capAt(xr, 99, ctx => <ControllersButton ctx={ctx} bus={n} hit={[24, 24, 7, 17]} />),
     small('CONTROLLERS', xr, 105.5),
     // MOD DEST: six LEDs (the other LFO's RATE first) beside the DEST button
     ...DEST_LEDS.flatMap((name, i): PanelElement[] => [
       led(x0 + 3.5, 111.5 + i * 5.5, ctx => destLit(v(ctx, `mod${n}_dest`, 1), i)),
       small(i === 0 ? `LFO ${other} RATE` : name, x0 + 6, 111.5 + i * 5.5, { size: 8, align: 'left' }),
     ]),
+    // DEST and MOD AMT 3 mm further apart than the Quickstart legend, so the button's touch
+    // area never reaches into the knob's
     small('DEST', xm + 3, 129.5),
-    capAt(xm + 3, 135.5, ctx => <DestButton ctx={ctx} bus={n} />),
-    ...named('MOD AMT', `mod${n}_mod_amt`, xr + 1, ROW3),
+    capAt(xm + 3, 135.5, ctx => <DestButton ctx={ctx} bus={n} hit={[18, 3, 14, 8]} />),
+    ...named('MOD AMT', `mod${n}_mod_amt`, xr + 4, ROW3),
   ];
 }
 
@@ -154,15 +170,23 @@ function envRow(p: 'feg' | 'aeg', y: number, btnY: number): PanelElement[] {
       label(name, EG_X[i], y - KN / 2 - 3.2),
       // KNOB SHIFT turns ATTACK / DECAY / SUSTAIN / RELEASE into DELAY / HOLD / VEL AMT / KB TRACK (p.30)
       knob(ctx => (ctx.values.knob_shift ? `${p}_${shifted}` : `${p}_${stage}`), EG_X[i], y),
-      small(shiftedName, EG_X[i], y + KN / 2 + 3.2, { color: SHIFT_LABEL, size: 7 }),
+      small(shiftedName, EG_X[i], y + KN / 2 + 3.2, { color: SHIFT_LABEL, size: 9 }),
     ]),
     ...(['multi_trig', 'reset', 'sync', 'loop', 'latch'] as const).flatMap((b, i): PanelElement[] =>
-      namedBtn(['MULTI TRIG', 'RESET', 'SYNC', 'LOOP', 'LATCH ON'][i], `${p}_${b}`, EG_BTN_X[i], btnY)),
+      namedBtn(['MULTI TRIG', 'RESET', 'SYNC', 'LOOP', 'LATCH ON'][i], `${p}_${b}`, EG_BTN_X[i], btnY, undefined, 9)),
   ];
 }
 
 // ---- FILTER: the CUTOFF legend (p.28 drawing) -----------------------------------------
-const CUTOFF_LEGEND: [string, number][] = [['20Hz', -135], ['80Hz', -90], ['320Hz', -43], ['500Hz', 0], ['1.2KHz', 43], ['5KHz', 90], ['20KHz', 135]];
+/**
+ * Each mark sits where the manual's FILTER drawing (p.28) prints it, measured from the knob's
+ * centre on the drawing's long ticks (degrees from 12 o'clock, clockwise positive):
+ * 20 Hz -139.8 and 20 kHz +139.7 (the scale's end ticks, the ends of the 280° sweep);
+ * 80 Hz and 5 kHz -90 / +90 (the horizontal ticks at 9 and 3 o'clock);
+ * 320 Hz -39.7 and 1.2 kHz +39.8 (the fourth tick either side of the top, at 10° a tick);
+ * 500 Hz 0 (the top tick, 12 o'clock).
+ */
+const CUTOFF_LEGEND: [string, number][] = [['20Hz', -140], ['80Hz', -90], ['320Hz', -40], ['500Hz', 0], ['1.2KHz', 40], ['5KHz', 90], ['20KHz', 140]];
 
 const elements: PanelElement[] = [
   // ===== PROGRAMMING (pp.12-14): LCD, ▼ ▲ CURSOR, two button columns, FINE TUNE ===========
@@ -175,19 +199,19 @@ const elements: PanelElement[] = [
   ...box(50.5, 100.9, 'ARPEGGIATOR'),
   ...named('RATE', ctx => (ctx.values.arp_sync ? 'arp_div' : 'arp_rate'), 66, ROW1),
   small('SYNC', 90, 25.5),
-  capAt(90, ROW1, ctx => <SyncTapButton ctx={ctx} />),
-  small('[TAP]', 90, 37.5, { color: '#a8a8a8' }),
+  capAt(90, ROW1, ctx => <SyncTapButton ctx={ctx} hit={[11, 12, 18, 18]} />),
+  small('[TAP]', 90, 37, { color: '#a8a8a8', size: 8 }),
   ...(['-2', '-1', '0', '+1', '+2'] as const).flatMap((t, i): PanelElement[] => {
     const x = 62 + i * 6.5;
     const lit = (r: number) => (t === '0' ? r === 0 || r === 3 || r === 6 : t === '-2' ? r === 0 || r === 1 : t === '+2' ? r === 5 || r === 6 : t === '-1' ? r === 2 : r === 4);
-    return [small(t, x, 43), led(x, 46.5, ctx => lit(v(ctx, 'arp_oct_range', 3)))];
+    return [small(t, x, 43, { size: 9, fixed: true }), led(x, 46.5, ctx => lit(v(ctx, 'arp_oct_range', 3)))];
   }),
-  capAt(64, 54, ctx => <RangeButton ctx={ctx} dir={-1} />),
+  capAt(64, 54, ctx => <RangeButton ctx={ctx} dir={-1} hit={[17, 14, 7, 5]} />),
   small('RANGE', 75.6, 54),
-  capAt(87, 54, ctx => <RangeButton ctx={ctx} dir={1} />),
+  capAt(87, 54, ctx => <RangeButton ctx={ctx} dir={1} hit={[14, 17, 7, 5]} />),
   ...namedBtn('BACK/FORTH', 'arp_back_fwd', 63, 71.5),
   ...namedBtn('INVERT', 'arp_invert', 88.5, 71.5),
-  ...stepped('PATTERN', 'arp_pattern', 75.6, 106, ['UP', 'DWN', 'ORDR', 'RND', 'SEQ', 'REC'], 12.2, 17.6),
+  ...stepped('PATTERN', 'arp_pattern', 75.6, 106, ['UP', 'DWN', 'ORDR', 'RND', 'SEQ', 'REC'], 12.2, 19.1),
   ...namedBtn('ON', 'arp_on', 63.0, 130.5, '[REST]'),
   ...namedBtn('LATCH', 'arp_latch', 88.0, 130.5, '[TIE]'),
 
@@ -197,12 +221,12 @@ const elements: PanelElement[] = [
   small('1', 114, 43), small('2', 122.2, 43),
   led(114, 46.5, ctx => v(ctx, 'glide_osc') !== 2),
   led(122.2, 46.5, ctx => v(ctx, 'glide_osc') !== 1),
-  capAt(118.1, 53, ctx => <CycleButton ctx={ctx} control="glide_osc" />),
+  capAt(118.1, 53, ctx => <CycleButton ctx={ctx} control="glide_osc" hit={[21, 21, 11, 17]} />),
   small('OSC', 118.1, 59),
   ...(['LCR', 'LCT', 'EXP'] as const).flatMap((t, i): PanelElement[] => [
-    small(t, 109.6 + i * 8.5, 66.5), led(109.6 + i * 8.5, 70, ctx => v(ctx, 'glide_type') === i),
+    small(t, 108.1 + i * 10, 66.5, { size: 8 }), led(108.1 + i * 10, 70, ctx => v(ctx, 'glide_type') === i),
   ]),
-  capAt(118.1, 77, ctx => <CycleButton ctx={ctx} control="glide_type" />),
+  capAt(118.1, 77, ctx => <CycleButton ctx={ctx} control="glide_type" hit={[21, 21, 21, 17]} />),
   small('TYPE', 118.1, 83),
   ...namedBtn('GATED', 'glide_gated', 118.1, 97),
   ...namedBtn('LEGATO', 'glide_legato', 118.1, 114.5),
@@ -215,17 +239,17 @@ const elements: PanelElement[] = [
   // ===== OSCILLATORS (pp.25-26) ===========================================================
   ...box(288.1, 360.5, 'OSCILLATORS'),
   small('1', 292.5, 13, { size: 8, color: LABEL, font: 'sans' }),
-  ...stepped('OCTAVE', 'osc1_octave', 305.9, ROW1, ["16'", "8'", "4'", "2'"], 11.5, 14.4),
-  ...stepped('WAVE', 'osc1_wave', 342.5, ROW1, ['TRI', 'SAW', 'SQR', 'PULSE'], 11.5, 14.4),
+  ...stepped('OCTAVE', 'osc1_octave', 305.9, ROW1, ["16'", "8'", "4'", "2'"], 11.5, 14.4, 8.5),
+  ...stepped('WAVE', 'osc1_wave', 342.5, ROW1, ['TRI', 'SAW', 'SQR', 'PULSE'], 11.5, 15.9),
   ...namedBtn('HARD SYNC', 'hard_sync', 305.9, 52),
   ...namedBtn('KB RESET', 'kb_reset', 335.2, 52),
   small('2', 292.5, 63, { size: 8, color: LABEL, font: 'sans' }),
-  ...stepped('OCTAVE', 'osc2_octave', 305.9, ROW2, ["16'", "8'", "4'", "2'"], 11.5, 14.4),
-  ...stepped('WAVE', 'osc2_wave', 342.5, ROW2, ['TRI', 'SAW', 'SQR', 'PULSE'], 11.5, 14.4),
+  ...stepped('OCTAVE', 'osc2_octave', 305.9, ROW2, ["16'", "8'", "4'", "2'"], 11.5, 14.4, 8.5),
+  ...stepped('WAVE', 'osc2_wave', 342.5, ROW2, ['TRI', 'SAW', 'SQR', 'PULSE'], 11.5, 15.9),
   small('LO', 297, 93), small('HI', 305, 93),
   led(297, 96.5, ctx => v(ctx, 'kb_ctrl', 2) === 1),
   led(305, 96.5, ctx => v(ctx, 'kb_ctrl', 2) === 2),
-  capAt(301, 101.5, ctx => <CycleButton ctx={ctx} control="kb_ctrl" />),
+  capAt(301, 101.5, ctx => <CycleButton ctx={ctx} control="kb_ctrl" hit={[14, 24, 12, 20]} />),
   small('KB CTRL', 301, 109),
   ...namedBtn('DUO MODE', 'duo_mode', 340, 102.5),
   ...named('FREQUENCY', 'osc2_frequency', 305.9, ROW3),
@@ -242,17 +266,19 @@ const elements: PanelElement[] = [
   // ===== FILTER (pp.28-29, drawing p.28) =====================================================
   ...box(421.9, 485.9, 'FILTER'),
   knob('cutoff', 453.8, 33, KN_BIG),
-  ...CUTOFF_LEGEND.map(([t, deg]) => arcLabel(t, 453.8, 33, deg === 0 ? 16 : Math.abs(deg) < 90 ? 17 : Math.abs(deg) > 90 ? 15.5 : 16.5, deg)),
-  label('CUTOFF', 453.8, 52.5),
+  // The big knob's end marks stay out on their radius (pulled in, they would sit under its
+  // curve); its name sits 1.5 mm lower, so the marks at the 140° ends keep their size
+  ...CUTOFF_LEGEND.map(([t, deg]) => arcLabel(t, 453.8, 33, deg === 0 ? 16 : Math.abs(deg) < 90 ? 17 : Math.abs(deg) > 90 ? 15.5 : 16.5, deg, 6.5, false, false)),
+  label('CUTOFF', 453.8, 54),
   ...named('RESONANCE', 'resonance', 437.3, ROW2),
   ...named('MULTIDRIVE', 'multidrive', 470.4, ROW2),
   // SLOPE: LEDs 6 12 | button | 18 24 in their own box
   { kind: 'section', x: 431.5, y: 93, w: 44.6, h: 19, border: '1px solid #4a4a4a', background: 'transparent', radius: 1 },
   ...(['6', '12', '18', '24'] as const).flatMap((t, i): PanelElement[] => {
     const x = [437.5, 444.5, 463.1, 470.1][i];
-    return [small(t, x, 96.8), led(x, 100.5, ctx => v(ctx, 'filter_slope', 3) === i)];
+    return [small(t, x, 96.8, { size: 9.5, fixed: true }), led(x, 100.5, ctx => v(ctx, 'filter_slope', 3) === i)];
   }),
-  capAt(453.8, 100.5, ctx => <CycleButton ctx={ctx} control="filter_slope" />),
+  capAt(453.8, 100.5, ctx => <CycleButton ctx={ctx} control="filter_slope" hit={[33, 32, 9, 18]} />),
   small('SLOPE', 453.8, 107.8),
   ...named('EG AMT', 'filter_eg_amt', 437.3, ROW3),
   ...named('KB TRACK', 'filter_kb_amt', 470.4, ROW3),
@@ -262,7 +288,7 @@ const elements: PanelElement[] = [
   label('FILTER', 490.6, 32, 7.5, { rotate: -90, letterSpacing: 1.2, color: '#cfcfcf' }),
   ...envRow('feg', ROW1, 56),
   label('KNOB SHIFT', 509.2, 66),
-  capAt(509.2, 72, ctx => <ShiftButton ctx={ctx} />),
+  capAt(509.2, 72, ctx => <ShiftButton ctx={ctx} hit={[28, 28, 1, 30]} />),
   label('AMPLIFIER', 490.6, 109, 7.5, { rotate: -90, letterSpacing: 1.2, color: '#cfcfcf' }),
   ...envRow('aeg', 105.1, ROW3),
   label('SUB 37', 580, 69, 22, { weight: 900, letterSpacing: 1 }),
@@ -279,17 +305,19 @@ const elements: PanelElement[] = [
   small('KB OCTAVE', 16.5, 145.5),
   custom(4, 148, 26, 7, ctx => <KbOctave ctx={ctx} />),
   small('BANK', 40.5, 145.5),
-  capAt(40.5, 151.5, ctx => <BankButton ctx={ctx} />, 12, 6),
+  capAt(40.5, 151.5, ctx => <BankButton ctx={ctx} hit={[8, 12, 14, 18]} />, 12, 6),
   custom(100, 145.5, 552, 15.5, ctx => <PresetRow ctx={ctx} />),
 
   // ===== left side panel (jacks), wheels, keyboard ===========================================
   { kind: 'section', x: 1.5, y: KEYS_Y, w: 39, h: H - KEYS_Y - 3, border: '1px solid #2e2e2e', background: '#0d0d0d', radius: 1.2 },
   small('LEFT SIDE PANEL', 21, KEYS_Y + 4, { size: 6, letterSpacing: 1 }),
-  { kind: 'jack', jack: 'in_ext', x: 11, y: 183 },
-  { kind: 'jack', jack: 'in_pitch', x: 31, y: 183 },
+  // The three CV inputs in one column; EXT IN sits just above AUDIO OUT (p.8). Each long legend
+  // shares its row with a short one, so neither has to shrink much
+  { kind: 'jack', jack: 'in_pitch', x: 11, y: 183 },
+  { kind: 'jack', jack: 'in_gate', x: 31, y: 183 },
   { kind: 'jack', jack: 'in_filter', x: 11, y: 204 },
-  { kind: 'jack', jack: 'in_volume', x: 31, y: 204 },
-  { kind: 'jack', jack: 'in_gate', x: 11, y: 225 },
+  { kind: 'jack', jack: 'in_ext', x: 31, y: 204 },
+  { kind: 'jack', jack: 'in_volume', x: 11, y: 225 },
   { kind: 'jack', jack: 'out_audio', x: 31, y: 225 },
   // The PITCH wheel springs back, so lessons count "pushed all the way" as the events
   // pitch_wheel_up / pitch_wheel_down
@@ -318,5 +346,6 @@ export const SUB37_LAYOUT: PanelLayout = {
     frame: { padding: 0, background: '#0a0a0a', radius: 2.5 },
     jack: { ring: '#6a6a6a', outputLabelBg: '#e8e8e8', outputLabelText: '#111' },
   },
+  knobTravel: KNOB_TRAVEL,
   elements,
 };

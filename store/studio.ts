@@ -5,6 +5,7 @@ import type { RackSlot, StudioCable } from '@/devices/types';
 import { isStepSatisfied, isValueOnTarget, valueToNorm, defaultOf } from '@/lib/controls/mapping';
 import { transport } from '@/lib/audio/transport';
 import { STORE_VERSION, upgradeCompletedLessons, upgradeDevices } from '@/lib/studio/upgrades';
+import { keepOldSettings, type OldSettings } from '@/lib/studio/legacy';
 import type { ChannelDoc, DelayDoc, MasterDoc, MixerDoc, ReverbDoc } from '@/lib/studio/mixerDoc';
 import { channelOf, delayOf, reverbOf, masterOf } from '@/lib/studio/mixerDoc';
 import { throttledLocalStorage } from '@/lib/studio/persistStorage';
@@ -1297,8 +1298,15 @@ export const useStudioStore = create<StudioStore>()(
         }
         const currentDevice = (old.currentDevice as string) ?? 'dfam';
         const studio = old.studio ?? defaultStudio(currentDevice);
-        // Controls whose meaning changed since this was saved keep sounding the same
-        devices = upgradeDevices(devices, studio.rack ?? [], 'store', version);
+        // Controls whose meaning changed since this was saved keep sounding the same;
+        // settings no conversion can carry over are kept as a copy for the learner
+        const dropped: OldSettings[] = [];
+        const keep = (from: OldSettings['from']) => (instance: string, device: string, values: OldSettings['values']) => dropped.push({ instance, device, from, values });
+        devices = upgradeDevices(devices, studio.rack ?? [], 'store', version, keep('studio'));
+        const lessonBackups = Array.isArray(old.lessonBackups)
+          ? (old.lessonBackups as LessonBackup[]).map(b => ({ ...b, devices: upgradeDevices(b.devices ?? {}, b.studio?.rack ?? [], 'store', version, keep('lesson backup')) }))
+          : [];
+        keepOldSettings(dropped, version);
         return {
           currentDevice,
           devices,
@@ -1307,9 +1315,7 @@ export const useStudioStore = create<StudioStore>()(
           review: (old.review as Record<string, ReviewItem>) ?? {},
           focusMode: (old.focusMode as boolean) ?? true,
           // Studios saved before lessons get the same upgrades, so bringing one back sounds as it did
-          lessonBackups: Array.isArray(old.lessonBackups)
-            ? (old.lessonBackups as LessonBackup[]).map(b => ({ ...b, devices: upgradeDevices(b.devices ?? {}, b.studio?.rack ?? [], 'store', version) }))
-            : [],
+          lessonBackups,
         } as unknown as StudioStore;
       },
     },

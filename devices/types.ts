@@ -99,6 +99,8 @@ export interface DeviceEntry {
   manufacturer: string;
   category: 'Percussion' | 'Synthesizer' | 'Groovebox' | 'DJ Mixer' | 'Studio' | 'External';
   tagline: string;
+  /** Makes no sound of its own (the Studio Clock): no mixer strip */
+  silent?: boolean;
   load: () => Promise<{ default: DeviceModule }>;
 }
 
