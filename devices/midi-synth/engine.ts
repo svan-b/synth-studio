@@ -1,31 +1,54 @@
 // ============================================================================
-// "Your synth (MIDI)" engine - makes no sound itself; it plays real hardware.
+// "Your synth (MIDI)" engine - makes no sound itself; it plays a synth over MIDI
+// (real hardware, or the built-in Practice synth).
 //
 //   knobs k1..k16   -> CC (or 14-bit MSB+LSB) on the configured port/channel
+//   PROGRAM         -> bank select (if set) + program change
 //   noteOn/noteOff  -> notes (on-screen keys, computer keys, MIDI input)
 //   receiveMidi     -> MIDI thru: bend, CCs, aftertouch re-addressed to our channel
 //   sequencer       -> studio transport ticks -> notes with exact MIDI timestamps
+//   monitor         -> the last messages sent, decoded, for the panel
 //
 // Knob positions are NOT sent while the engine replays its stored values on
 // start: opening the page must never overwrite the patch on your synth. Moving a
 // knob sends; "Send all" pushes the whole panel on purpose.
+// MIDI clock to this synth (data.clock) is sent by the shared clock generator
+// (lib/midi/clock-out.ts), so two synths on one port never get double clock.
 // ============================================================================
 
 import type { ControlValue } from '@/types';
 import { BaseEngine, Clock } from '@/lib/audio/engine';
-import { transport as studioTransport, type Transport, type TransportTick } from '@/lib/audio/transport';
+import { PPQN, transport as studioTransport, type Transport, type TransportTick } from '@/lib/audio/transport';
 import { midi, type MidiOutputLike } from '@/lib/midi/access';
+import '@/lib/midi/practice-synth'; // registers the Practice synth as an output
 import { audioClock } from '@/lib/midi/time';
-import { CC_ALL_NOTES_OFF, CC_ALL_SOUND_OFF, isChannelMessage, withChannel } from '@/lib/midi/bytes';
+import { CC_ALL_NOTES_OFF, CC_ALL_SOUND_OFF, describeMidi, isChannelMessage, withChannel } from '@/lib/midi/bytes';
 import type { MidiReceiver } from '@/lib/midi/router';
 import { useMidiStore } from '@/store/midi';
-import { KNOB_IDS, asData, initialData, knobMessages, type MidiSynthData } from './config';
+import { KNOB_IDS, asData, initialData, knobMessages, programMessages, type MidiSynthData } from './config';
 import { StepSequencer, stepTick, type SeqSettings } from './sequencer';
 
 interface Held {
   out: MidiOutputLike | null;
   channel: number;
 }
+
+/** One line of the MIDI monitor */
+export interface MonitorEntry {
+  n: number;
+  /** performance.now() when it was sent */
+  at: number;
+  /** Scheduled ahead with a timestamp (sequencer) */
+  ahead: boolean;
+  kind: string;
+  channel: number | null;
+  detail: string;
+  hex: string;
+}
+
+const MONITOR_LINES = 8;
+/** Wait for a dragged PROGRAM knob to settle before loading a patch on the synth */
+const PROGRAM_SETTLE_MS = 140;
 
 export class MidiSynthEngine extends BaseEngine implements MidiReceiver {
   private cfg: MidiSynthData = initialData();
@@ -43,6 +66,10 @@ export class MidiSynthEngine extends BaseEngine implements MidiReceiver {
   private noteCount = 0;
   private sent = 0;
   private ledTimer: ReturnType<typeof setTimeout> | null = null;
+  private programTimer: ReturnType<typeof setTimeout> | null = null;
+  private monitor: MonitorEntry[] = [];
+  private monitorN = 0;
+  private beat = 0;
 
   protected build(): void {
     // Re-resolve the port when ports come and go (hot-plug) or access is granted
@@ -58,8 +85,9 @@ export class MidiSynthEngine extends BaseEngine implements MidiReceiver {
       this.transportUnsubs.forEach(u => u());
       this.clock?.stop();
       if (this.ledTimer) clearTimeout(this.ledTimer);
+      if (this.programTimer) clearTimeout(this.programTimer);
     });
-    this.emit({ playing: false, step: -1, out: 0, sent: 0 });
+    this.emit({ playing: false, step: -1, out: 0, sent: 0, monitor: [], beat: 0 });
   }
 
   // --------------------------------------------------------------------------
@@ -74,7 +102,7 @@ export class MidiSynthEngine extends BaseEngine implements MidiReceiver {
   /** Send now */
   private send(bytes: number[], out = this.output()) {
     if (!out) return;
-    if (midi.send(out, bytes)) this.activity();
+    if (midi.send(out, bytes)) this.activity(bytes, false);
   }
 
   /** Send at an audio-clock time (sequencer) */
@@ -83,13 +111,22 @@ export class MidiSynthEngine extends BaseEngine implements MidiReceiver {
     const s = useMidiStore.getState().clockOut;
     // Same steady mapping as MIDI clock out, so notes and clock agree exactly
     const ts = audioClock.toMidiTime(this.ctx, audioTime, { compensate: s.compensate, offsetMs: s.offsetMs + this.cfg.offsetMs });
-    if (midi.send(out, bytes, ts)) this.activity();
+    if (midi.send(out, bytes, ts)) this.activity(bytes, true);
   }
 
-  private activity() {
+  private ccLabel = (cc: number) => this.cfg.knobs.find(k => k.cc === cc)?.label;
+
+  private activity(bytes: number[], ahead: boolean) {
     this.sent++;
-    if (this.ledTimer) return;
-    this.emit({ out: 1, sent: this.sent });
+    const d = describeMidi(bytes, this.ccLabel);
+    this.monitor.push({ n: ++this.monitorN, at: performance.now(), ahead, ...d });
+    if (this.monitor.length > MONITOR_LINES) this.monitor.splice(0, this.monitor.length - MONITOR_LINES);
+    const monitor = this.monitor.slice();
+    if (this.ledTimer) {
+      this.emit({ monitor, sent: this.sent });
+      return;
+    }
+    this.emit({ out: 1, sent: this.sent, monitor });
     this.ledTimer = setTimeout(() => {
       this.ledTimer = null;
       this.emit({ out: 0, sent: this.sent });
@@ -106,7 +143,10 @@ export class MidiSynthEngine extends BaseEngine implements MidiReceiver {
     this.cfg = next;
     const portChanged = prev.port?.id !== next.port?.id || prev.port?.name !== next.port?.name;
     if (portChanged) this.portCache = undefined;
-    if (portChanged || prev.channel !== next.channel) this.lastSent.clear();
+    if (portChanged || prev.channel !== next.channel) {
+      this.lastSent.clear();
+      // Notes still sounding on the old port/channel get their note-offs there (held map)
+    }
   }
 
   protected onParam(id: string, value: ControlValue): void {
@@ -115,11 +155,27 @@ export class MidiSynthEngine extends BaseEngine implements MidiReceiver {
       if (this.live && typeof value === 'number') this.sendKnob(k, value);
       return;
     }
+    if (id === 'program') {
+      if (this.live && typeof value === 'number') this.queueProgram();
+      return;
+    }
     if (id === 'play' && !this.transport) {
       // Not following the studio: run the internal clock at the studio tempo
       if (value) this.startClock();
       else this.stopClock();
     }
+  }
+
+  private queueProgram() {
+    if (this.programTimer) clearTimeout(this.programTimer);
+    this.programTimer = setTimeout(() => {
+      this.programTimer = null;
+      this.sendProgram();
+    }, PROGRAM_SETTLE_MS);
+  }
+
+  private sendProgram() {
+    programMessages(this.num('program', 0), this.cfg.channel, this.cfg.bank).forEach(m => this.send(m));
   }
 
   private sendKnob(index: number, pos: number, force = false) {
@@ -174,9 +230,16 @@ export class MidiSynthEngine extends BaseEngine implements MidiReceiver {
 
   event(name: string): void {
     if (name === 'send-all') {
+      // The program first: loading a patch resets its knobs, then the panel's knobs go on top
+      this.sendProgram();
       KNOB_IDS.forEach((id, i) => this.sendKnob(i, this.num(id, 64), true));
     } else if (name === 'panic') {
       this.allNotesOff(true);
+    } else if (name === 'send-program') {
+      this.sendProgram();
+    } else if (name === 'monitor-clear') {
+      this.monitor = [];
+      this.emit({ monitor: [] });
     }
   }
 
@@ -197,6 +260,8 @@ export class MidiSynthEngine extends BaseEngine implements MidiReceiver {
   }
 
   private onStepTick(t: TransportTick, swing: number) {
+    // Beat light: on every quarter note, when you hear it
+    if (t.tick % PPQN === 0) this.emitAt(t.time, { beat: ++this.beat });
     const res = this.seq.tick(t, this.seqSettings(swing));
     if (!res) return;
     const out = this.output();
