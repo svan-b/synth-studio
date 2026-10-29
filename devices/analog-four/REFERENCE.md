@@ -184,7 +184,7 @@ The keyboard is not velocity sensitive: trigs take VEL (A4 MKII manual, p.47).
 | Delay feedback can swell; OVR adds to it | (A4 MKII manual, p.95) |
 | Reverb FRQ and GAI: a shelf that darkens the tail; GAI at its maximum keeps the treble | (A4 MKII manual, p.96) |
 | **[STOP]** cuts the sound while the delay repeats ring out; **[STOP][STOP]** while stopped also fades the send effects | (A4 MKII manual, p.38) |
-| A stop from outside the A4 (the studio's stop, Space, the end of the arranger) is a full stop for the rack: the voices are cut and the send effects fade out in 1.5 s. Only the A4's own [STOP] key lets them ring | not in the manual (twin) |
+| A stop from the studio (its stop, Space, the end of the arranger) is a full stop for the rack: the voices are cut and the send effects fade out in 1.5 s. The A4's own [STOP] key and the end of its own song let them ring | not in the manual (twin) |
 | **[PLAY]** while playing pauses; [PLAY] again resumes | (A4 MKII manual, p.39) |
 | Synced to the studio (like MIDI clock) PLAY and STOP drive the studio transport and there is no pause | not in the manual (twin) |
 
@@ -247,7 +247,7 @@ The shared Elektron sequencer (`lib/sequencer/elektron`, see
 - `a4-fxmod` maps the FX track's values, locks and FX LFOs to channels; the shared `chorus` and `fdn-reverb` processors do the chorus and reverb; `a4-fx` holds the tempo-synced delay (feedback filters and saturation in the loop), the effect-to-effect sends and the dry + wet mix.
 - [STOP] sends `cut` (a 6 ms fade, nothing queued survives); [STOP][STOP] fades the send returns in 0.3 s and empties the delay and reverb; a studio stop fades them in 1.5 s.
 - An `off` followed at the same instant by an `on` flagged `leg` (ARP LEG) keeps the gate open, so overlapping note trigs play legato.
-- The output stage is a native WaveShaper (2x oversampled) between the FX mix and MAIN VOLUME.
+- The output stage is a native WaveShaper (no oversampling, so its curve is an exact bound) between the FX mix and MAIN VOLUME.
 - Previews (lessons, the preset browser, audio QA) play the selected pattern, or a riff on the keyboard's track when it is empty, and end like [STOP][STOP].
 - A voice that feeds the next track (NEI) gets `feed`: it never sleeps, so its multimode output is always there.
 

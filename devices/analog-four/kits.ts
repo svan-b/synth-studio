@@ -399,7 +399,7 @@ export const KITS: KitDef[] = [
     id: 'acid', name: 'Kit / Acid Workout', tempo: 126,
     desc: 'A transistor-pulse acid line with accents and slides, kick, hats and clap. Pattern 2 sweeps the filter with parameter slides.',
     tracks: [
-      { sound: 'bass-acid', p: { amp_del: 24, amp_vol: 84 } },
+      { sound: 'bass-acid', p: { amp_del: 24, amp_vol: 76 } },
       { sound: 'drum-kick', p: { amp_vol: 110 } },
       { sound: 'drum-hat', p: { amp_dec: 38, amp_vol: 90 } },
       { sound: 'drum-clap', p: { noise_lev: 120, flt2_res: 40, lfo1_depa: -64, amp_dec: 52, amp_rel: 36, amp_vol: 100 } },
@@ -481,7 +481,7 @@ export function soundDemoProject(s: SoundDef): Project {
 export function projectFor(index: number): Project | null {
   if (index <= 0) return null;
   // the init project: blank, but for a trig on each beat of T1 (the init saw), so PLAY sounds at once
-  if (index === 1) return project({ A01: pat('INIT', 16, [{ s: 'x...x...x...x...' }]) });
+  if (index === 1) return project({ A01: pat('INIT', 16, [{ s: 'x...x...x...x...', len: LEN.s3 }]) });
   if (index >= SOUND_DEMO_BASE) {
     const s = SOUNDS[index - SOUND_DEMO_BASE];
     return s ? soundDemoProject(s) : null;

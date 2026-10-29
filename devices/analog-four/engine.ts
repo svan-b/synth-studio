@@ -57,9 +57,10 @@ const FX_CHANNELS = 25;
 /** [STOP][STOP]: how long the send effects take to fade out */
 const FX_FADE_SEC = 0.3;
 /**
- * A stop that did not come from the A4's own [STOP] key - the studio's stop (the top bar, Space,
- * the arranger's end, another machine) - is a full stop for the whole rack: the send effects fade
- * out over this time instead of ringing on (twin choice; the manual only describes the A4's keys)
+ * A stop that comes from the studio (the top bar, Space, the arranger's end, another machine) is a
+ * full stop for the whole rack: the send effects fade out over this time instead of ringing on.
+ * The A4's own [STOP] key and the end of its own song let them ring (twin choice; the manual only
+ * describes the A4's keys, p.38).
  */
 const STUDIO_STOP_FADE_SEC = 1.5;
 /** A riff for an empty pattern's audition: [step, semitones from the keyboard's C, length in steps] */
@@ -225,7 +226,8 @@ export class AnalogFourEngine extends BaseEngine {
     stageIn.gain.value = 1 / STAGE_SPAN;
     const stage = ctx.createWaveShaper();
     stage.curve = outputStageCurve();
-    stage.oversample = '2x';
+    // no oversampling: its anti-alias filter overshoots on clipped peaks (+1 dB measured), the curve alone bounds the level
+    stage.oversample = 'none';
     const stageOut = ctx.createGain();
     stageOut.gain.value = STAGE_SPAN;
     stageIn.connect(stage).connect(stageOut).connect(this.main);
@@ -256,8 +258,10 @@ export class AnalogFourEngine extends BaseEngine {
             this.arps[t] = null;
             this.voices[t].port.postMessage({ t: 'cut' });
           }
-          // ... but only the A4's own [STOP] key lets them ring: a studio stop fades them
-          if (now - this.stopKeyAt > 0.6) this.fadeFx(STUDIO_STOP_FADE_SEC);
+          // ... after the A4's own [STOP] key or the end of its song. A studio stop (the transport, or
+          // the PLAY control turned off from outside) fades them
+          const studioStop = this.transport ? !this.transport.playing : !this.bool('play');
+          if (studioStop && now - this.stopKeyAt > 0.6) this.fadeFx(STUDIO_STOP_FADE_SEC);
         }
         this.locks.releaseAll((track, key) => this.revert(track, key, now));
       },

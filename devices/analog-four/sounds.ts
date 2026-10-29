@@ -140,7 +140,7 @@ export const SOUNDS: SoundDef[] = [
     id: 'lead-porta', name: 'Lead / Glide Saw', category: 'Lead',
     desc: 'Portamento ON: every note you play on the keyboard glides from the last one in the SLI time. Portamento leaves the sequencer\'s notes alone, so the demo glides with slide trigs.',
     p: { snd_prt: 1, osc_sli: 50, osc2_lev: 70, osc2_tun: -12, flt1_frq: 96, flt1_res: 24, amp_sus: 127, amp_rel: 20 },
-    demo: GLIDE_DEMO,
+    demo: GLIDE_DEMO, level: 76,
   },
   {
     id: 'lead-whistle', name: 'Lead / Filter Whistle', category: 'Lead',
