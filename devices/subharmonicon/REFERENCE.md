@@ -29,7 +29,7 @@ VCOs, SUB 2 pitch inputs and a TEMPO input instead of PWM inputs and MIDI IN.
 
 | Id | Source |
 |---|---|
-| M | Moog, *Subharmonicon Owner's Manual*. Panel tour pp.12-16, every control pp.18-30, every jack pp.31-37, sync recipes pp.38-39, Eurorack p.40, Fine Tune p.41, MIDI pp.42-44, ten patch sheets pp.45-49, blank sheets with the panel drawing pp.50-55, signal-flow diagram p.56, specifications p.57 |
+| M | Moog, *Subharmonicon Owner's Manual*. Panel tour pp.12-16, every control pp.18-30, every jack pp.31-37, sync recipes pp.38-39, Eurorack p.40, Fine Tune p.41, MIDI pp.42-44, ten patch sheets pp.45-49, blank sheets with the panel drawing pp.50-55, signal-flow diagram pp.56-57 (one spread), specifications p.58 |
 | PWI | Moog, *Subharmonicon: Patching with Intention*. Initialized patch p.3, exercises pp.4-10, jack-by-jack patch ideas pp.12-15 |
 | XPB | Moog, *Subharmonicon Exploration Patchbook*. Ten patch sheets, pp.1-10 (image only) |
 | PS | patchscore (`github.com/miclip/patchscore`): measured every knob, button, switch and jack of the panel drawing (M p.50) from its vector paths; the twin's control positions are PS's, converted to the 304.8 x 128.5 mm faceplate |
@@ -55,7 +55,7 @@ VCOs, SUB 2 pitch inputs and a TEMPO input instead of PWM inputs and MIDI IN.
 Faceplate positions are millimetres from its top-left corner (x, y = centre).
 
 - **Format.** A 60 HP Eurorack panel (304.8 x 128.5 mm) on aluminium rails between finished wood
-  side pieces; the unit is 12.57 x 4.21 x 5.24 in (Subharmonicon manual, pp.9, 57). It comes out of
+  side pieces; the unit is 12.57 x 4.21 x 5.24 in (Subharmonicon manual, pp.9, 58). It comes out of
   its case as a module held by **eight black M3 screws**, and draws at most 360 mA from +12 V and
   nothing from -12 V (Subharmonicon manual, p.40). **verified**. The twin draws 7.25 mm wooden cheeks.
 - **Arrangement.** Left: SEQUENCER 1, SEQUENCER 2, POLYRHYTHM, then TEMPO and the five transport
@@ -247,7 +247,7 @@ pp.12-15). Twin convention: **1.0 = 5 V**.
   CLK or SEQ 2 CLK clock it with a polyrhythm (Subharmonicon manual, p.38). A Mother-32 ASSIGN output
   set to clock into CLOCK IN, pressing the Subharmonicon's PLAY first (Subharmonicon manual, p.39).
   **verified**.
-- **No noise source, audio input or LFO** (Subharmonicon manual, pp.31, 57). **verified**.
+- **No noise source, audio input or LFO** (Subharmonicon manual, pp.31, 58). **verified**.
 
 ## Conflicts and how the twin resolves them
 
@@ -266,7 +266,7 @@ pp.12-15). Twin convention: **1.0 = 5 V**.
 
 | Quantity | Twin value | Why |
 |---|---|---|
-| TEMPO taper | linear in Hz: BPM = 20 + 2980 × travel (12 o'clock 1510 BPM) | under a log taper nearly all 20 Moog sheets would step at 5-30 BPM (Bateria's ÷4 kick at 11 BPM); linear puts every one at a musical rate (Bateria's ÷4 at about 129 BPM) |
+| TEMPO taper | linear in Hz: BPM = 20 + 2980 × travel (12 o'clock 1510 BPM) | under a log taper nearly all 20 Moog sheets would step at 5-30 BPM (Bateria's ÷4 kick at 11 BPM); linear puts every one at a musical rate (Bateria's ÷4 at about 129 BPM). TE agrees: it remaps the stock 20-2999 BPM reading linearly to 40-239 BPM and documents 140 BPM at the knob's centre, which only a linear stock law gives |
 | CUTOFF, ATTACK, DECAY tapers | log (20·1000^p Hz; 1 ms·10^(4p); 5 ms·2000^p) | Bateria needs an 80 Hz cutoff and a 20 ms filter decay at its knob positions |
 | VCO FREQ taper | exponential (C6 at 12 o'clock) | a quantizable pitch knob; the sheets' "a fourth apart" fits |
 | Decay law | DECAY = time to fall 60 dB ("to zero", p.25) | the manual's wording; keeps tails clean |
@@ -279,10 +279,10 @@ pp.12-15). Twin convention: **1.0 = 5 V**.
 | SEQ ASSIGN SUB depth | the raw step at ±5 V full scale, on that scale | the diagram's tap point |
 | PWM jack | duty = 50 % + 9.8 % per volt (1-99 % over ±5 V) | p.32 |
 | MIDDLE-position PWM depth | the SUB 1 saw moves the width ±30 % | |
-| Resonance | self-oscillation from about 78 % (2:20 o'clock) | SOS: about 2 o'clock |
+| Resonance | a ringing peak of about +14 dB at 70 % (2 o'clock); self-oscillation from about 79 % (2:50 o'clock), pitch within 4 cents of CUTOFF from 30 Hz to 14 kHz | SOS: resonance starts to sing near 2 o'clock |
 | Mixer | level² taper per source, then a soft bus saturation: one full source nearly clean, three or more warmly driven | p.21 |
-| Output stage | make-up so the median Moog sheet reads about -18 LUFS at full VOLUME, a DC blocker, and a soft shoulder from -4.4 dBFS that keeps peaks under -1.5 dBFS | the studio's -18 LUFS reference with -1 dBTP |
-| Keys / MIDI notes while stopped | like the TRIGGER button with a pitch: EG lit a trigger, EG unlit a gate while held, HELD nothing; running: transpose only | TE's stock gate calls; FW 1.1 transpose |
+| Output stage | make-up so the median Moog sheet reads about -18 LUFS at full VOLUME, an 8 Hz DC blocker, and a soft shoulder from -4.4 dBFS that keeps peaks under -1.5 dBFS, with a 1 Hz DC servo around the shoulder (driven hard by asymmetric waves it made up to 0.013 of DC; now under 0.003, and the ceiling still holds) | the studio's -18 LUFS reference with -1 dBTP; a hardware output is AC-coupled |
+| Keys / MIDI notes while stopped | like the TRIGGER button with a pitch: EG lit a trigger, EG unlit a gate while held, HELD nothing; running: transpose only, and the last note's transposition stays after note-off (stock, per TE) | TE's stock gate calls; FW 1.1 transpose. Open: TE hooks the stock note-on / note-off call sites (`trigger_both_envelopes` / `release_both_envelopes`), so the stock unit may gate the envelopes on a held note with EG lit too; check against a unit |
 | PLAY override | a press of PLAY, the studio's ■ or the end of an audition holds a gate in PLAY IN off until PLAY is pressed again | "Pressing the PLAY button will override the status" (p.34) |
 | CLOCK / SEQ CLK pulse width | 5 ms (TRIGGER OUT 1 ms, p.37) | TE stock constant |
 | QUANTIZE cycle order | 12-ET → 8-ET → 12-JI → 8-JI → off | panel order |

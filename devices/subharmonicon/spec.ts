@@ -200,12 +200,12 @@ controls.next = {
 };
 controls.trigger = {
   type: 'button', label: 'TRIGGER', momentary: true, default: false,
-  description: 'EG lit: restarts both envelopes at once, without waiting for the next step. EG unlit: a gate - the envelopes rise and hold at their maximum while you press it. EG blinking: no effect.',
+  description: 'EG lit: restarts both envelopes at once, without waiting for the next step. EG unlit: a gate - the envelopes rise and hold at their maximum while you press it (a key held while the sequencers are stopped does the same). EG blinking: no effect.',
   manualReference: 'p.29 – TRIGGER',
 };
 controls.eg_mode = {
   type: 'switch', label: 'EG', options: EG_OPTIONS, default: 1,
-  description: 'ON (lit): every sequencer step fires the VCF and VCA envelopes. OFF (unlit): only TRIGGER, the TRIGGER jack and keys fire them. HELD (press and hold until it blinks): both envelopes held open at maximum - a drone for tuning.',
+  description: 'ON (lit): every sequencer step fires the VCF and VCA envelopes. OFF (unlit): only TRIGGER, the TRIGGER jack and keys fire them - and TRIGGER or a held key is then a gate, so the sound stays at full VOLUME until you let go, much louder than the short steps. HELD (press and hold until it blinks): both envelopes held open at maximum - a drone for tuning.',
   manualReference: 'p.29 – EG',
 };
 
@@ -220,7 +220,7 @@ Object.assign(controls, {
   },
   resonance: {
     type: 'knob', label: 'RESONANCE', min: 0, max: 100, default: 15, units: '%', size: 'large',
-    description: 'Feeds the filter output back to its input, boosting a narrow band at the cutoff. Toward maximum the filter chirps and, past about 2 o\'clock, sings a sine of its own. Like any ladder, the bass thins as it rises.',
+    description: 'Feeds the filter output back to its input, boosting a narrow band at the cutoff. From about 2 o\'clock the filter rings and chirps; from about 3 o\'clock it sings a sine of its own, even with every mixer level down. Like any ladder, the bass thins as it rises.',
     manualReference: 'p.23 – RESONANCE',
   },
   vcf_eg_amt: {
@@ -250,7 +250,7 @@ Object.assign(controls, {
   },
   vca_decay: {
     type: 'knob', label: 'VCA DECAY', min: 5, max: 10000, default: 450, units: 'ms', curve: 'logarithmic', size: 'large',
-    description: 'Fade-out of each note: 5 ms to 10 s. A gate (held TRIGGER, a held key) holds the note at full level until it ends.',
+    description: 'Fade-out of each note: 5 ms to 10 s. With EG off, a gate (TRIGGER held, or a key held while the sequencers are stopped) holds the note at full level until it ends.',
     manualReference: 'p.25 – VCA DECAY',
   },
 } satisfies Record<string, ControlSpec>);

@@ -20,7 +20,7 @@
 // ============================================================================
 
 import type { ButtonElement, KnobElement, PanelElement, PanelLayout } from '@/types/panel';
-import { PATCH_GRID } from './spec';
+import { EG_OPTIONS, PATCH_GRID } from './spec';
 import { CycleButton, EgButton, Screw, WaveGlyph } from './PanelWidgets';
 
 const PX_PER_MM = 3.55;
@@ -109,9 +109,11 @@ const leftSection: PanelElement[] = [
   btn('next', 70.55, 101.38, 7.97, 7.91, { event: 'next', capText: 'NEXT', ledColor: '#f5f5f5' }),
   btn('play', 47.63, 111.69, 13.97, 8.21, { capText: 'PLAY', lit: ({ engine, values }) => (engine.playing !== undefined ? !!engine.playing : !!values.play) }),
   btn('trigger', 67.4, 111.69, 13.97, 8.21, { event: 'trigger', capText: 'TRIGGER', lit: ({ engine }) => ledsOf(engine).trig ?? 0 }),
-  // EG states in words, so OFF / ON / HELD can be chosen by touch without the long press (twin aid)
-  label('EG', 48.6, 118.3, 6.5, { color: MUTED, align: 'right' }),
-  { kind: 'switch', control: 'eg_mode', x: 58.4, y: 118.3, style: 'buttons', orientation: 'horizontal', label: 'none', scale: 0.85 },
+  // EG states in words, so OFF / ON / HELD can be chosen by touch without the long press (twin aid):
+  // three radio keys in the strip between PLAY / TRIGGER and the nameplate, sized for 9 px legends,
+  // with touch areas that stop at PLAY and TRIGGER
+  label('EG', 45.3, 119.4, 8, { color: MUTED, align: 'right' }),
+  ...EG_OPTIONS.map((t, v): PanelElement => btn('eg_mode', 49.9 + v * 9.0, 119.4, 7.6, 3.4, { setValue: v, capText: t, color: '#1c1c1c' })),
   // Rhythm logic: a global (MIDI CC 113) setting on the hardware, given a small switch here
   { kind: 'switch', control: 'rhythm_logic', x: 80.2, y: 103.4, scale: 1.15, labelText: 'LOGIC' },
   label('CC 113', 80.2, 110.6, 5.5, { color: '#8a8a8a' }),
