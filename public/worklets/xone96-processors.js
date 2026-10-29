@@ -24,9 +24,10 @@
 // render quantum. Gains glide over ~5 ms (per-block targets, linear inside the
 // block), so nothing zips or clicks. Nothing looks ahead: zero added latency.
 // Nothing allocates in process(): voices come from pre-filled pools and the
-// meter messages reuse one object. Levels: 0.1 = 0 dBu. Meters: DIN-style
-// ballistics (instant attack, 20 dB in 1.5 s release) and a 1 s PK! hold,
-// reported every 32 ms.
+// meter messages reuse one object. Levels: 0.1 = 0 dBu. Meters: an analogue
+// LED driver's quasi-peak detector (1 ms attack, 20 dB in 1.5 s release; a
+// steady tone reads its level, the sharpest drum transients read 2-4 dB under
+// their sample peak), reported every 32 ms. PK! LEDs are sample-peak, held 1 s.
 // ============================================================================
 
 const SR = sampleRate;
@@ -35,7 +36,11 @@ const TWO_PI = 2 * Math.PI;
 const HALF_PI = Math.PI / 2;
 const GLIDE = 1 - Math.exp(-BLOCK / (0.005 * SR));
 const METER_REL = Math.pow(10, (-20 / 1.5 / 20) * (BLOCK / SR));
+/** Meter attack: the rectified signal charges the reading with a 1 ms time constant (quasi-peak) */
+const METER_ATK = 1 - Math.exp(-1 / (0.001 * SR));
 const PK_LIN = 0.1 * Math.pow(10, 15 / 20);
+/** The LR MIX meters' top LED is printed PK! at +10 dBu: a sample-peak indicator there, held like the channel PK! */
+const PK_MIX_LIN = 0.1 * Math.pow(10, 10 / 20);
 const PK_HOLD = Math.round((1.0 * SR) / BLOCK);
 const METER_EVERY = 12;
 // Keep filtering this long after a channel's input goes quiet (EQ tails), then sleep
@@ -708,10 +713,12 @@ function fixedCoefs(c) {
 }
 
 /**
- * Mid-band bell width against gain, measured from the guide's EQ graphs (p.8, p.10): CH 1-4 about
- * Q 1.4 at +10 dB and 0.88 at -27 dB; the A/B parametric band about 2.4 boosting and 1.2 cutting.
+ * Mid-band bell width against gain, fitted to the guide's EQ graphs (p.8, p.10) at the ends of
+ * the knobs: CH 1-4 about Q 1.65 at +10 dB and 0.7 at -27 dB (the -27 dB cuts still take about
+ * 13 dB an octave from their centre, the +10 dB boosts about 4.3 dB half an octave out); the A/B parametric
+ * band about 2.4 boosting and 1.2 cutting. Q moves linearly with the dB setting in between.
  */
-const midQ = (db, aux) => (aux ? (db >= 0 ? 1.4 + 0.1 * db : 1.4 + 0.0083 * db) : (db >= 0 ? 1 + 0.04 * db : 1 + 0.0045 * db));
+const midQ = (db, aux) => (aux ? (db >= 0 ? 1.4 + 0.1 * db : 1.4 + 0.0083 * db) : (db >= 0 ? 1 + 0.065 * db : 1 + 0.011 * db));
 
 /** First-order all-pass y = c x + x1 - c y1 over buf in place (state z[zo] = x1, z[zo + 1] = y1) */
 function apRun(buf, c, z, zo) {
@@ -900,22 +907,21 @@ class XoneStripsProcessor extends AudioWorkletProcessor {
       }
       if (pkx >= PK_LIN) s.pk = PK_HOLD; else if (s.pk > 0) s.pk--;
 
-      // --- EQ, +20 dBu soft clip, the post-EQ pre-fader meter ---------------
+      // --- EQ, +20 dBu soft clip, the post-EQ pre-fader meter (quasi-peak) ----
       let yL = s.yL, yR = s.yR;
       if (s.kind === K_RTN) { yL = xL; yR = xR; }
       else { s.eq(xL, yL, 0); s.eq(xR, yR, 1); }
-      let peak = 0;
+      let env = s.meter * METER_REL;
       for (let i = 0; i < BLOCK; i++) {
         let l = yL[i], r = yR[i];
         if (l > 0.8 || l < -0.8) yL[i] = l = clip(l, 1);
         if (r > 0.8 || r < -0.8) yR[i] = r = clip(r, 1);
         if (l < 0) l = -l;
         if (r < 0) r = -r;
-        if (l > peak) peak = l;
-        if (r > peak) peak = r;
+        const a = l > r ? l : r;
+        if (a > env) env += (a - env) * METER_ATK;
       }
-      s.meter = peak > s.meter ? peak : s.meter * METER_REL;
-      if (s.meter < 1e-7) s.meter = 0;
+      s.meter = env < 1e-7 ? 0 : env;
 
       // --- the channel VCA (fader x crossfader; A/B: the analogue fader) ---------
       const v0 = c0[P_FADER] * c0[P_XF], v1 = c1[P_FADER] * c1[P_XF];
@@ -927,11 +933,11 @@ class XoneStripsProcessor extends AudioWorkletProcessor {
       // AUX 1: PRE (post-EQ, pre-VCA) or post-VCA; AUX 2 post-VCA. Both before FILTER SELECT.
       route(oS1, yL, yR, c0[P_S1PRE] + v0 * c0[P_S1POST], c1[P_S1PRE] + v1 * c1[P_S1POST]);
       route(oS2, yL, yR, v0 * c0[P_S2], v1 * c1[P_S2]);
-      // CUE 1 and the PHONES 2 source, pre-fader; both follow the global POST EQ switch (block diagram)
+      // CUE 1, pre-fader, pre- or post-EQ by the global POST EQ switch. The PHONES 2 source (CUE 2)
+      // taps the post-EQ line directly, so POST EQ doesn't change it (block diagram, guide p.34).
       route(oC, yL, yR, c0[P_CUE] * c0[P_CUEPOST], c1[P_CUE] * c1[P_CUEPOST]);
       route(oC, xL, xR, c0[P_CUE] * (1 - c0[P_CUEPOST]), c1[P_CUE] * (1 - c1[P_CUEPOST]));
-      route(oC2, yL, yR, c0[P_CUE2] * c0[P_CUEPOST], c1[P_CUE2] * c1[P_CUEPOST]);
-      route(oC2, xL, xR, c0[P_CUE2] * (1 - c0[P_CUEPOST]), c1[P_CUE2] * (1 - c1[P_CUEPOST]));
+      route(oC2, yL, yR, c0[P_CUE2], c1[P_CUE2]);
     }
 
     if (++this.blocks % METER_EVERY === 0) {
@@ -1094,9 +1100,11 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
     const cue = inputs[I_CUE];
     const cL = cue && cue.length ? cue[0] : null, cR = cue && cue.length ? cue[1] || cue[0] : null;
 
-    // Summing amplifier (+21 dBu) and the pre-MASTER meters (music only: no clean feed)
-    const pk = this.peaks;
+    // Summing amplifier (+21 dBu) and the pre-MASTER meters (music only: no clean feed). The LED
+    // ladders are quasi-peak like the channel meters; the PK! flags (the top LED) take sample peaks.
+    const pk = this.peaks, me = this.meters;
     pk[0] = pk[1] = pk[2] = pk[3] = 0;
+    let e0 = me[0] * METER_REL, e1 = me[1] * METER_REL;
     for (let i = 0; i < BLOCK; i++) {
       let l = mL[i], r = mR[i];
       if (l > 0.89 || l < -0.89) mL[i] = l = clip(l, MIX_CLIP);
@@ -1105,18 +1113,24 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
       if (r < 0) r = -r;
       if (l > pk[0]) pk[0] = l;
       if (r > pk[1]) pk[1] = r;
+      if (l > e0) e0 += (l - e0) * METER_ATK;
+      if (r > e1) e1 += (r - e1) * METER_ATK;
     }
+    me[0] = e0; me[1] = e1;
+    let e2 = me[2] * METER_REL, e3 = me[3] * METER_REL;
     if (cL) {
       for (let i = 0; i < BLOCK; i++) {
         const a = cL[i] < 0 ? -cL[i] : cL[i], b = cR[i] < 0 ? -cR[i] : cR[i];
         if (a > pk[2]) pk[2] = a;
         if (b > pk[3]) pk[3] = b;
+        if (a > e2) e2 += (a - e2) * METER_ATK;
+        if (b > e3) e3 += (b - e3) * METER_ATK;
       }
     }
+    me[2] = e2; me[3] = e3;
     for (let k = 0; k < 4; k++) {
-      this.meters[k] = pk[k] > this.meters[k] ? pk[k] : this.meters[k] * METER_REL;
-      if (this.meters[k] < 1e-7) this.meters[k] = 0;
-      if (pk[k] >= PK_LIN) this.pk[k] = PK_HOLD; else if (this.pk[k] > 0) this.pk[k]--;
+      if (me[k] < 1e-7) me[k] = 0;
+      if (pk[k] >= PK_MIX_LIN) this.pk[k] = PK_HOLD; else if (this.pk[k] > 0) this.pk[k]--;
     }
 
     const mon = Math.round(c[M_MONITOR]);

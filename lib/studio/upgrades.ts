@@ -219,6 +219,16 @@ const UPGRADES: Upgrade[] = [
     device: 'analog-rytm',
     apply: () => ({}),
   },
+  {
+    // Mother-32 review: DECAY spans 10 ms - 7 s (was 1.25 ms - 7 s) so the
+    // manual's patch sheets play as drawn, and its default moved from 60 to 180 ms.
+    // Stored times keep their meaning; saves that never touched DECAY keep 60 ms.
+    store: 12,
+    project: 9,
+    device: 'mother32',
+    oldDefaults: { decay: 60 },
+    apply: v => (typeof v.decay === 'number' && v.decay < 10 ? { ...v, decay: 10 } : v),
+  },
 ];
 
 /** Lessons replaced by a rebuild: completing the old one counts for its successor */
@@ -294,8 +304,8 @@ export function upgradeCompletedLessons(done: string[], from: number): string[] 
   return [...out];
 }
 
-export const STORE_VERSION = 11;
-export const PROJECT_VERSION = 8;
+export const STORE_VERSION = 12;
+export const PROJECT_VERSION = 9;
 
 /**
  * Upgrade the control values of every instance saved before version `from`

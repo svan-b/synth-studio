@@ -53,13 +53,14 @@ const KB_C1 = 72;
 
 export const COL = {
   panel: '#161618',
-  key: '#2a2b2e',
+  key: '#2c2d30',
   keyEdge: '#0e0e10',
-  keyText: '#9b9ea4',     // a key's legend while its LED is off
+  keyText: '#a3a6ab',     // a key's legend while its LED is off
   keyBright: '#eceef0',
-  legend: '#9a9da2',      // printed legends
-  legendDim: '#7b7e84',   // the rear connector names
-  label: '#e4e6e9',       // the white half of the two-tone knob names
+  legend: '#cdd0d4',      // printed legends: near-white on the black unit
+  legendGrey: '#a2a5aa',  // the grey half of the two-tone knob names; the letters under the trig keys
+  legendDim: '#a6a9ae',   // the rear connector names
+  label: '#eceef0',       // the white half of the two-tone knob names
   func: '#b9bbbf',        // the light grey FUNC key
   legendWhite: '#d9dbdf', // the FX / CV page names under the PARAMETER keys
   lightBlue: '#7fd6ff',   // a key whose secondary function is used
@@ -75,6 +76,14 @@ export const COL = {
   cyan: '#4fd2ff',
   target: '#ff9f1c',
 };
+
+/**
+ * Text sizes in the panel's native px (3.1 px/mm). Fitted to an iPad in landscape the panel
+ * draws at about 0.95, so these render at about 9.5 CSS px there (the app's floors are 9 for
+ * small legends and readouts, 10 for control names): as large as the panel's spacing allows
+ * without neighbouring legends touching, and the black unit's own proportions.
+ */
+export const TXT = { cap: 10, legend: 10, small: 9.5 };
 
 // ----------------------------------------------------------------------------
 // UI state helpers
@@ -571,6 +580,7 @@ const KEYDEFS: Record<string, KeyDef> = {
       // [STOP] cuts the sound, the send effects ring on; [STOP][STOP] fades them too (manual p.38).
       // A paused pattern stops too, so the next PLAY starts from the top.
       if (!e.playing && !seqStateOf(e.ctx.engine)?.paused && quick) { e.ctx.sendEvent('a4:fxfade'); say(e.ctx, 'SEND FX FADED', 900); }
+      else e.ctx.sendEvent('a4:stopkey'); // this stop lets the send effects ring out (a studio stop fades them)
       pressStop(e.ctx);
       if (e.ctx.values.live_rec) e.ctx.setValue('live_rec', false);
     },
@@ -874,10 +884,13 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
   const ledCol = led ? led[0] : null;
   const amt = led ? led[1] : 0;
   // FUNC: the light grey key (no LED); the ring shows a held / latched FUNC
-  const face = isFunc ? (funcOn ? '#d3d5d8' : COL.func) : down ? '#333438' : COL.key;
-  const text = isFunc ? '#3a3c40' : ledCol ? mix(COL.keyText, ledCol, 0.5 + 0.5 * amt) : COL.keyText;
-  const fs = name.startsWith('BANK') ? 10 : name === 'FUNC' ? 8.5 : big ? 10 : box.w >= 15 ? 8.5 : 7.5;
-  const iconSize = big ? 15 : 11;
+  const face = isFunc ? (funcOn ? '#d3d5d8' : COL.func) : down ? '#36373b' : COL.key;
+  // The keys are backlit through their legends: a lit key shows its legend in the LED colour
+  // with a soft glow, the key itself stays dark (as on the black unit)
+  const text = isFunc ? '#3a3c40' : ledCol ? mix(COL.keyText, ledCol, 0.55 + 0.45 * amt) : COL.keyText;
+  const fs = name.startsWith('BANK') ? 11 : name === 'FUNC' ? 10 : box.w >= 15 ? 10.5 : TXT.cap;
+  // the arrows' chevrons and the transport symbols fill about half the key, as printed
+  const iconSize = big ? 22 : ['UP', 'DOWN', 'LEFT', 'RIGHT'].includes(name) ? 17 : 13;
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <button
@@ -890,23 +903,23 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
         onPointerCancel={onUp}
         onLostPointerCapture={onUp}
         onContextMenu={e => e.preventDefault()}
-        className={[highlight ? 'a4-target' : '', led?.[2] ? 'a4-blink' : ''].filter(Boolean).join(' ') || undefined}
+        className={[highlight ? 'a4-target' : '', led?.[2] ? 'a4-blink' : '', big ? '' : box.w >= 15 ? 'a4-hit-v' : 'a4-hit'].filter(Boolean).join(' ') || undefined}
         style={{
           position: 'absolute', inset: 0, borderRadius: big ? 6 : 4.5, padding: 0, cursor: 'pointer',
           background: ledCol
-            ? `linear-gradient(180deg, ${mix(face, ledCol, 0.1 * amt)} 0%, ${mix(mix(face, '#000000', 0.16), ledCol, 0.06 * amt)} 100%)`
-            : `linear-gradient(180deg, ${face} 0%, ${mix(face, '#000000', 0.16)} 100%)`,
-          border: `1px solid ${ledCol ? mix(COL.keyEdge, ledCol, 0.45 * amt) : COL.keyEdge}`,
+            ? `linear-gradient(180deg, ${mix(mix(face, '#ffffff', 0.035), ledCol, 0.07 * amt)} 0%, ${mix(mix(face, '#000000', 0.2), ledCol, 0.04 * amt)} 100%)`
+            : `linear-gradient(180deg, ${mix(face, '#ffffff', 0.035)} 0%, ${mix(face, '#000000', 0.2)} 100%)`,
+          border: `1px solid ${ledCol ? mix(COL.keyEdge, ledCol, 0.16 * amt) : COL.keyEdge}`,
           boxShadow: [
-            '0 2px 2px rgba(0,0,0,0.6)',
-            isFunc ? 'inset 0 1px 0 rgba(255,255,255,0.35)' : 'inset 0 1px 0 rgba(255,255,255,0.06)',
-            ledCol ? `0 0 ${2 + 5 * amt}px ${ledCol}${amt > 0.6 ? '88' : '44'}` : '',
+            '0 2px 2px rgba(0,0,0,0.65)', '0 1px 0 rgba(0,0,0,0.8)',
+            isFunc ? 'inset 0 1px 0 rgba(255,255,255,0.35)' : 'inset 0 1px 0 rgba(255,255,255,0.09)',
+            ledCol ? `0 0 ${3 + 3 * amt}px ${ledCol}${amt > 0.6 ? '30' : '18'}` : '',
             funcOn ? '0 0 0 2px #e8eaee' : '',
           ].filter(Boolean).join(', '),
           transform: down ? 'translateY(1px)' : undefined,
           opacity: dim ? 0.3 : 1, transition: 'opacity 200ms',
-          color: text, fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 600, fontSize: fs, letterSpacing: 0.3,
-          textShadow: ledCol && amt > 0.5 ? `0 0 4px ${ledCol}` : undefined,
+          color: text, fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 600, fontSize: fs, letterSpacing: 0.2,
+          textShadow: ledCol && amt > 0.3 ? `0 0 ${3 + 4 * amt}px ${ledCol}` : undefined,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           touchAction: 'none', WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none',
         }}
@@ -914,15 +927,15 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
         {def.icon ? <Icon kind={def.icon} color={text} size={iconSize} /> : isFunc ? <span style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>{def.label}</span> : def.label}
       </button>
       {(def.sub || def.rows) && (
-        <div style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', marginTop: 2.5, textAlign: 'center', whiteSpace: 'nowrap', pointerEvents: 'none', opacity: dim ? 0.3 : 1, lineHeight: '9.5px', fontFamily: '"Helvetica Neue", Arial, sans-serif' }}>
+        <div style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', marginTop: 2.5, textAlign: 'center', whiteSpace: 'nowrap', pointerEvents: 'none', opacity: dim ? 0.3 : 1, lineHeight: `${TXT.legend + 1}px`, fontFamily: '"Helvetica Neue", Arial, sans-serif' }}>
           {def.rows && (
             <>
-              <div style={{ fontSize: 7.5, fontWeight: 500, color: COL.legendWhite, minHeight: 9.5 }}>{def.rows[0] || ' '}</div>
-              <div style={{ fontSize: 7.5, fontWeight: 500, color: COL.legendWhite }}>{def.rows[1]}</div>
+              <div style={{ fontSize: TXT.small, fontWeight: 500, color: COL.legendWhite, minHeight: TXT.legend + 1 }}>{def.rows[0] || ' '}</div>
+              <div style={{ fontSize: TXT.small, fontWeight: 500, color: COL.legendWhite }}>{def.rows[1]}</div>
             </>
           )}
           {def.sub && (
-            <div style={{ fontSize: 8, fontWeight: 500, color: COL.legend, textDecoration: def.subPlain ? undefined : 'underline', textUnderlineOffset: 2.5 }}>{def.sub}</div>
+            <div style={{ fontSize: TXT.legend, fontWeight: 500, letterSpacing: -0.1, color: COL.legend, textDecoration: def.subPlain ? undefined : 'underline', textUnderlineOffset: 2.5 }}>{def.sub}</div>
           )}
         </div>
       )}
@@ -939,6 +952,24 @@ export function A4Styles() {
 @keyframes a4Blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: .3 } }
 .a4-blink { animation: a4Blink .6s linear infinite }
 @media (prefers-reduced-motion: reduce) { .a4-target { animation: none; box-shadow: 0 0 0 3px ${COL.target} } .a4-blink { animation-duration: 1.6s } }
+/* touch: the 11 mm keys (about 32 CSS px on an iPad) answer within 44 px; neighbours are 16-17 mm apart */
+@media (pointer: coarse) { .a4-hit::before, .a4-kb-key::before { content: ''; position: absolute; inset: -6px; } .a4-hit-v::before { content: ''; position: absolute; inset: -6px 0; } }
+`}</style>
+  );
+}
+
+/**
+ * The black unit's knobs seen from above: smooth satin-black domes with a soft highlight (the
+ * shared 'elektron' cap shows a knurled grey ring). Restyles only this instance's knob caps;
+ * if the shared Knob markup changes, the shared look simply returns.
+ */
+function KnobCapStyles({ instance }: { instance: string }) {
+  const scope = `[data-instance="${instance.replace(/["\\]/g, '')}"] [aria-roledescription="knob"] > .absolute.inset-0.rounded-full > .absolute.inset-0.rounded-full`;
+  return (
+    <style>{`
+${scope} { background: radial-gradient(circle at 42% 30%, #56585c 0%, #2a2b2e 30%, #141416 62%, #070708 100%) !important; border: 1px solid #2c2d30 !important;
+  box-shadow: 0 3px 5px rgba(0,0,0,.8), 0 1px 1px rgba(0,0,0,.9), inset 0 -2px 3px rgba(0,0,0,.5) !important; }
+${scope} > .absolute.rounded-full:not(.inset-0) { inset: 10% !important; background: radial-gradient(circle at 40% 28%, rgba(255,255,255,.12) 0%, rgba(255,255,255,.03) 45%, rgba(255,255,255,0) 70%) !important; }
 `}</style>
   );
 }
@@ -947,7 +978,7 @@ export function A4Styles() {
 // LED strips
 // ----------------------------------------------------------------------------
 
-function Dot({ on, color, x, y, label, labelBelow = true, underline = false, blink = false }: { on: number; color: string; x: number; y: number; label?: string; labelBelow?: boolean; underline?: boolean; blink?: boolean }) {
+function Dot({ on, color, x, y, label, labelBelow = true, underline = false, blink = false, size = TXT.small }: { on: number; color: string; x: number; y: number; label?: string; labelBelow?: boolean; underline?: boolean; blink?: boolean; size?: number }) {
   const d = 2 * k;
   return (
     <div style={{ position: 'absolute', left: x * k - d / 2, top: y * k - d / 2, width: d, height: d, pointerEvents: 'none' }}>
@@ -957,7 +988,7 @@ function Dot({ on, color, x, y, label, labelBelow = true, underline = false, bli
         style={{ width: d, height: d, borderRadius: '50%', background: on > 0 ? color : COL.ledOff, opacity: on > 0 ? 0.45 + 0.55 * on : 1, boxShadow: on > 0 ? `0 0 ${3 + 5 * on}px ${color}` : 'inset 0 1px 1px rgba(0,0,0,0.7)' }}
       />
       {label && (
-        <div style={{ position: 'absolute', left: '50%', [labelBelow ? 'top' : 'bottom']: '100%', transform: 'translateX(-50%)', [labelBelow ? 'marginTop' : 'marginBottom']: 1.5, fontSize: 7.5, fontWeight: 500, color: COL.legend, whiteSpace: 'nowrap', textAlign: 'center', lineHeight: '9px', textDecoration: underline ? 'underline' : undefined, textUnderlineOffset: 2, fontFamily: '"Helvetica Neue", Arial, sans-serif' }}>
+        <div style={{ position: 'absolute', left: '50%', [labelBelow ? 'top' : 'bottom']: '100%', transform: 'translateX(-50%)', [labelBelow ? 'marginTop' : 'marginBottom']: 1.5, fontSize: size, fontWeight: 500, color: COL.legend, whiteSpace: 'nowrap', textAlign: 'center', lineHeight: `${size + 1}px`, letterSpacing: size < 9 ? -0.4 : size < TXT.legend ? -0.2 : -0.1, textDecoration: underline ? 'underline' : undefined, textUnderlineOffset: 2, fontFamily: '"Helvetica Neue", Arial, sans-serif' }}>
           {label}
         </div>
       )}
@@ -987,13 +1018,14 @@ export function LedStrips({ ctx }: { ctx: CustomRenderContext }) {
       {MODE_LEDS.map((p, i) => {
         const tj = st?.tempJump;
         const on = i === 3 ? (tj === 'armed' || tj === 'active' || cm === 3 ? 1 : 0) : tj === 'active' ? 0 : cm === i ? 1 : 0;
-        return <Dot key={`m${i}`} {...p} on={on} blink={i === 3 && tj === 'armed'} color={COL.amber} label={MODE_NAMES[i]} underline />;
+        return <Dot key={`m${i}`} {...p} on={on} blink={i === 3 && tj === 'armed'} color={COL.amber} label={MODE_NAMES[i]} underline size={TXT.legend} />;
       })}
       {/* OCTAVE: -3 .. +3, the centre one unlabelled */}
       {OCT_LEDS.map((p, i) => <Dot key={`o${i}`} {...p} on={Math.max(-3, Math.min(3, oct)) + 3 === i ? (Math.abs(oct) > 3 ? 0.4 : 1) : 0} color={COL.amber} label={OCT_NAMES[i] || undefined} />)}
       {/* PATTERN PAGE: lit for the pattern's pages, full for the edited one, flashing for the playing one */}
       {PAGE_LEDS.map((p, i) => (
-        <Dot key={`p${i}`} {...p} on={i >= pages ? 0 : i === shown ? 1 : 0.35} color={COL.amber} blink={i === playPage && pages > 1} label={`${i + 1}:4`} labelBelow={false} />
+        // four labels 5 mm apart: the smallest legend on the panel (as printed)
+        <Dot key={`p${i}`} {...p} on={i >= pages ? 0 : i === shown ? 1 : 0.35} color={COL.amber} blink={i === playPage && pages > 1} label={`${i + 1}:4`} labelBelow={false} size={8.5} />
       ))}
     </div>
   );
@@ -1056,6 +1088,7 @@ export function MiniKeyboard({ ctx }: { ctx: CustomRenderContext }) {
           <button
             key={kk.offset}
             type="button"
+            className="a4-kb-key"
             aria-label={`Key ${kk.name}${kk.offset === 12 ? ' (octave up)' : ''} (${formatNote(note)})`}
             onPointerDown={e => press(kk.offset, e)} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release} onContextMenu={e => e.preventDefault()}
             style={{
@@ -1082,7 +1115,7 @@ export function MiniKeyboard({ ctx }: { ctx: CustomRenderContext }) {
 // ----------------------------------------------------------------------------
 
 const OLED_ON = '#e9f1ff';
-const OLED_DIM = '#6f7b90';
+const OLED_DIM = '#8693a9';
 
 function Arc({ norm, bipolar, locked }: { norm: number; bipolar: boolean; locked: boolean }) {
   const r = 7.5, cx = 9, cy = 9;
@@ -1184,7 +1217,7 @@ export function Screen(props: PanelContext) {
           return (
             <div key={i} style={{ textAlign: 'center' }}>
               <Arc norm={v / 127} bipolar={false} locked={false} />
-              <div style={{ fontSize: 8.5, fontWeight: 700, color: sel ? '#050608' : OLED_ON, background: sel ? OLED_ON : 'transparent', borderRadius: 2, whiteSpace: 'nowrap', overflow: 'hidden' }}>{m.name}</div>
+              <div style={{ fontSize: 9, letterSpacing: -0.2, fontWeight: 700, color: sel ? '#050608' : OLED_ON, background: sel ? OLED_ON : 'transparent', borderRadius: 2, whiteSpace: 'nowrap', overflow: 'hidden' }}>{m.name}</div>
             </div>
           );
         })}
@@ -1228,7 +1261,7 @@ export function Screen(props: PanelContext) {
       return (
         <div key={i} style={{ textAlign: 'center', minWidth: 0 }}>
           <Arc norm={slotNorm(p, v)} bipolar={!!p.bipolar} locked={false} />
-          <div style={{ fontSize: 8, color: OLED_DIM, letterSpacing: 0.2, lineHeight: '9px', fontWeight: 700 }}>{p.short}</div>
+          <div style={{ fontSize: TXT.small, color: OLED_DIM, letterSpacing: 0.1, lineHeight: '10px', fontWeight: 700 }}>{p.short}</div>
           <div style={{ fontSize: 10.5, fontWeight: 700, lineHeight: '12px', whiteSpace: 'nowrap', overflow: 'hidden', color: locked ? '#050608' : OLED_ON, background: locked ? OLED_ON : 'transparent', borderRadius: 2, margin: '0 1px' }}>
             {txt}
           </div>
@@ -1258,7 +1291,7 @@ export function Screen(props: PanelContext) {
         <span style={{ ...box(true), whiteSpace: 'nowrap' }}>{bpm.toFixed(1)} {icon}</span>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>{body}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, lineHeight: '11px', fontWeight: 700 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: TXT.small, lineHeight: '11px', fontWeight: 700 }}>
         {note ? (
           <span style={{ ...box(!!msg), flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', color: msg ? '#050608' : OLED_DIM }}>{note}</span>
         ) : (
@@ -1308,7 +1341,7 @@ function TrigStyles({ gap }: { gap: number }) {
   font-size: 15px !important; font-weight: 400 !important; line-height: 16px !important; text-align: center; color: inherit !important;
 }
 .a4-trigs [data-step]::after { content: ''; position: absolute; left: 36%; right: 36%; top: 67%; height: 2px; border-radius: 1px; background: currentColor; opacity: .9; }
-.a4-trigs [data-step]:nth-child(4n+1)::before { content: ''; position: absolute; left: 25%; right: 25%; top: 13%; bottom: 20%; border: 1px solid currentColor; border-radius: 2px; opacity: .55; }
+.a4-trigs [data-step]:nth-child(4n+1)::before { content: ''; position: absolute; left: 13%; right: 13%; top: 13%; bottom: 13%; border: 1px solid currentColor; border-radius: 2px; opacity: .55; }
 .a4-trigs.mode-trig [data-step] {
   background: linear-gradient(180deg, #2c2d30 0%, #232427 100%) !important; border: 1px solid #111214 !important;
   box-shadow: 0 2px 2px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06) !important; filter: none !important; color: ${COL.trigOff};
@@ -1363,7 +1396,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
       >
         <span style={{ position: 'absolute', left: 0, right: 0, top: '22%', textAlign: 'center', fontSize: 14, fontWeight: 400, lineHeight: '15px' }}>{opts.label}</span>
         <span style={{ position: 'absolute', left: '36%', right: '36%', top: '63%', height: 2, borderRadius: 1, background: col }} />
-        {opts.sub && <span style={{ position: 'absolute', left: 1, right: 1, bottom: 1.5, fontSize: 7, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'center', color: COL.trigOff }}>{opts.sub}</span>}
+        {opts.sub && <span style={{ position: 'absolute', left: 1, right: 1, bottom: 1.5, fontSize: 9, letterSpacing: -0.2, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'center', color: COL.trigOff }}>{opts.sub}</span>}
       </button>
     );
   };
@@ -1471,10 +1504,9 @@ export function TrigLegends() {
   const L = TRIG_LEGENDS;
   const y0 = TRIGS.y + TRIGS.h;
   const cx = (i: number) => (i * TRIGS.pitch + TRIGS.keyW / 2) * k;
-  const font = { fontFamily: '"Helvetica Neue", Arial, sans-serif', fontSize: 7.5, fontWeight: 500, color: COL.legend, whiteSpace: 'nowrap' as const, lineHeight: '9px' };
+  const font = { fontFamily: '"Helvetica Neue", Arial, sans-serif', fontSize: TXT.small, fontWeight: 500, color: COL.legendGrey, whiteSpace: 'nowrap' as const, lineHeight: `${TXT.small + 1}px` };
   const x0 = 0, x1 = (9 * TRIGS.pitch + TRIGS.keyW) * k;
   const by = (L.bracketY - y0) * k;
-  const textX = cx(7) + 6;
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', pointerEvents: 'none' }}>
       {Array.from({ length: 16 }, (_, i) => (
@@ -1483,21 +1515,21 @@ export function TrigLegends() {
       {TRACK_NAMES.map((n, i) => (
         <div key={n} style={{ ...font, position: 'absolute', left: cx(i), top: (L.trackY - y0) * k, transform: 'translate(-50%, -50%)' }}>{n}</div>
       ))}
-      <div style={{ position: 'absolute', left: x0, top: by - 2.5 * k, width: 1, height: 2.5 * k, background: COL.legend }} />
-      <div style={{ position: 'absolute', left: x1 - 1, top: by - 2.5 * k, width: 1, height: 2.5 * k, background: COL.legend }} />
-      <div style={{ position: 'absolute', left: x0, top: by, width: textX - 4 - x0, height: 1, background: COL.legend }} />
-      <div style={{ ...font, position: 'absolute', left: textX, top: by, transform: 'translateY(-50%)' }}>Quick Performance</div>
-      <div style={{ position: 'absolute', left: textX + 72, top: by, width: Math.max(0, x1 - textX - 72), height: 1, background: COL.legend }} />
+      {/* the bracket over TRIG 1-10, its name in the line under TRIG 8 (manual p.12) */}
+      <div style={{ position: 'absolute', left: x0, top: by - 2.5 * k, width: 1, height: 2.5 * k, background: COL.legendGrey }} />
+      <div style={{ position: 'absolute', left: x1 - 1, top: by - 2.5 * k, width: 1, height: 2.5 * k, background: COL.legendGrey }} />
+      <div style={{ position: 'absolute', left: x0, top: by, width: x1 - x0, height: 1, background: COL.legendGrey }} />
+      <div style={{ ...font, position: 'absolute', left: cx(7), top: by, transform: 'translate(-50%, -50%)', padding: '0 4px', background: '#131315' }}>Quick Performance</div>
     </div>
   );
 }
 
 /** Printed text in one or two tones ("Main" grey, "Volume" white; "Analog Four" bold, "MKII" light) */
-export function Legend({ parts, size = 8, align = 'center', light = false }: { parts: { text: string; strong?: boolean }[]; size?: number; align?: 'left' | 'center'; light?: boolean }) {
+export function Legend({ parts, size = TXT.legend, align = 'center', light = false }: { parts: { text: string; strong?: boolean }[]; size?: number; align?: 'left' | 'center'; light?: boolean }) {
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: align === 'left' ? 'flex-start' : 'center', whiteSpace: 'nowrap', pointerEvents: 'none', fontFamily: '"Helvetica Neue", Arial, sans-serif', fontSize: size, letterSpacing: light ? -0.2 : 0.1 }}>
       {parts.map((p, i) => (
-        <span key={i} style={{ fontWeight: p.strong ? (light ? 700 : 600) : light ? 300 : 500, color: p.strong ? COL.label : light ? '#a7aab0' : COL.legend, whiteSpace: 'pre' }}>{p.text}</span>
+        <span key={i} style={{ fontWeight: p.strong ? (light ? 700 : 600) : light ? 300 : 500, color: p.strong ? COL.label : light ? '#a7aab0' : COL.legendGrey, whiteSpace: 'pre' }}>{p.text}</span>
       ))}
     </div>
   );
@@ -1545,7 +1577,7 @@ export function SoundBrowserLegend({ ctx }: { ctx: CustomRenderContext }) {
       type="button"
       aria-label="Sound browser (TRACK LEVEL push)"
       onPointerDown={e => { e.preventDefault(); e.stopPropagation(); toggleA4Menu(ctx, 'sound'); }}
-      style={{ width: '100%', height: '100%', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: open ? COL.white : COL.legend, fontSize: 8, fontWeight: 500, textDecoration: 'underline', textUnderlineOffset: 2.5, fontFamily: '"Helvetica Neue", Arial, sans-serif', whiteSpace: 'nowrap' }}
+      style={{ width: '100%', height: '100%', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: open ? COL.white : COL.legend, fontSize: TXT.legend, fontWeight: 500, textDecoration: 'underline', textUnderlineOffset: 2.5, fontFamily: '"Helvetica Neue", Arial, sans-serif', whiteSpace: 'nowrap' }}
     >
       Sound Browser
     </button>
@@ -1853,7 +1885,7 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.instance]);
 
-  return null;
+  return <KnobCapStyles instance={ctx.instance} />;
 }
 
 // ----------------------------------------------------------------------------

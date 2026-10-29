@@ -23,7 +23,7 @@ const { chromium } = require('playwright');
   });
   const read = () => p.evaluate(() => {
     const s = JSON.parse(localStorage.getItem('synth-studio-storage'));
-    return { version: s.version, dfamTempo: s.state.devices.dfam?.controlValues.tempo, vco1: s.state.devices.dfam?.controlValues.vco1_freq, m32Tempo: s.state.devices.mother32?.controlValues.tempo, lessonCarried: (s.state.completedLessons || []).includes('sub37-f1-oscillators') };
+    return { version: s.version, dfamTempo: s.state.devices.dfam?.controlValues.tempo, vco1: s.state.devices.dfam?.controlValues.vco1_freq, m32Tempo: s.state.devices.mother32?.controlValues.tempo, m32Decay: s.state.devices.mother32?.controlValues.decay, lessonCarried: (s.state.completedLessons || []).includes('sub37-f1-oscillators') };
   });
   let first = null;
   let afterReload = null;
