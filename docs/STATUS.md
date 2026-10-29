@@ -86,13 +86,11 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Lesson solutions can set routes, the arranger and rack counts. Manual steps left: Xone 0 (was 4), A4 0 (2), Rytm 0 (1), audio input 0 (3), Your synth 1 (MIDI learn needs a real controller), and studio-5 2.
   - In Producer lessons the app follows the step's instrument. The iPad coach picks the corner that hides least of the step's highlight, replacing the left/right version.
   - A second iPad walkthrough (First beat by touch, Groove's SWING) joins the gate: **e2e 38/38**.
-  - The demo-excerpt hooks (`info.play`, `listen.demo`) wait for the demo tracks.
-- 2c697b7: merged the **three demo tracks**: Low Tide Lights, Three Clocks and Copper Wire.
+  - 2c697b7: merged the **three demo tracks**: Low Tide Lights, Three Clocks and Copper Wire.
   - Each is a one-tap studio: rack, cables, routes, sync, sounds, patterns, mix, master and arrangement.
   - The studio view's Demo tracks section has Play and Load and a live caption with the section, bar and teaching note; Welcome offers "Play a demo track".
   - Bounces: −10.9 / −13.4 / −10.7 LUFS, each at −1.0 dBTP. No instrument or Xone channel clips.
   - Gate: e2e with `--demos` **80/80** (38 core + 42 demo checks).
-  - The Producer lessons' demo-excerpt hooks are not wired yet: it needs a studio swap during a lesson; the API sketch is in the merge report.
   - Its agent is now lining up the Elektron sets and "The whole studio" (the Rytm runs about +6 into the Xone; that set's LR MIX lit PK! half the time).
 - b27e315: merged the **Analog Four performance pass**: 8.3× → 13.9× realtime on /bench (1.68×), bit-identical output in 163 of 163 null-test renders.
   - The idle-voice FREE-LFO bug it found (the LFOs of a silent voice stood still) is fixed in its own commit.
@@ -107,6 +105,12 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - The shared chorus skips its work on silence and stays bit-identical (756/756 lockstep runs, 163/163 A4 renders).
   - With no send it idles in every quantum of the A4's /bench demo: 0.57 % → 0.15 % of a core.
   - The FDN reverb already idled below about −131 dBFS. Idling it earlier would shift its modulation phase audibly, so it is unchanged.
+- d050c81: merged **demo excerpts**.
+  - The Producer path's `info.play` (L1, L3, L4, L5, L6, L8, L12, L15) and `listen.demo` (L2, L7, L9, L11, L13, L14) play pre-rendered recordings of the demos: 16 excerpts and 3 full songs, AAC in `public/demos` (8.85 MB, with a manifest).
+  - The studio is never swapped mid-lesson. It keeps running and metering, held back from the speakers only while a recording plays. Every way playback can end unmutes it.
+  - Demo cards have Listen, which plays the recording without loading the studio.
+  - `scripts/render-demos.cjs` re-renders the recordings after an instrument changes (see `docs/AUDIO_QA.md`).
+  - Not tested here: AAC decoding in Safari and Chrome. Playwright's Chromium can't decode AAC, so the tests decode the same files to WAV.
 - **Vercel build rate limit.** Previews from 49f3469 on failed with `build-rate-limit`, not a code error (local builds pass). Every push to any branch, the agents' `wip/*` included, starts a preview build. Pushes are now batched. Option for the user: disable preview builds for scratch branches with `vercel.json` → `"git": { "deploymentEnabled": { "wip/*": false } }`.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
@@ -140,13 +144,12 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 - 7a606eb: merged **Subharmonicon** (QA 0/36 for audition and transport, lessons 20/20, in-app check passing). Upgrade store v10 covers TEMPO 240, EG AMT ×0.625 and the 5 ms decay floor.
 - c05786b: merged **Analog Rytm MKII** (QA 0/20 for audition and transport, lessons 20/20, in-app check 29/29). 391 of 421 ids were replaced, so **old Rytm settings start fresh** by design; completed rytm-* lessons carry over. Upgrade store v11. **All seven instrument rebuilds are now merged.**
 - Smoke test fix: buttons that a paged panel removed are skipped after 1 s; the Rytm smoke went from 498 s to 34 s (the app was never slow, at 67–125 ms per press).
-## 2. In progress (each on `wip/<name>`, not merged)
+## 2. In progress
 
-| Branch | What | Checkpoint |
-|---|---|---|
-| `wip/demo-excerpts` | The Producer path's `info.play` and `listen.demo` on pre-rendered AAC excerpts of the demos (no studio swap mid-lesson), plus Listen on the demo cards | — |
+Nothing. All 22 `wip/*` branches on GitHub are fully merged into the working branch (checked with `git merge-base --is-ancestor`), so they can be deleted once the user agrees:
+`analog-four`, `analog-rytm`, `demo-excerpts`, `demo-tracks`, `dfam-review`, `elektron-sequencer`, `mother32`, `panel-teaching`, `perf-analog-four`, `perf-shared-fx`, `producer-path`, `producer-path-2`, `review-analog-four`, `review-analog-rytm`, `review-mother32`, `review-sub37`, `review-subharmonicon`, `review-xone96`, `studio`, `sub37`, `subharmonicon`, `xone96`.
 
-Each merges through the gate below. Before merging, run `defaults-tool/diff.sh <device> HEAD origin/wip/<branch>` (in the scratchpad) to find changed defaults and removed ids, then add an upgrade entry.
+New work merges through the gate below. Before merging an instrument change, compare `specDefaults(<device>)` at both commits to find changed defaults and removed ids, then add an upgrade entry.
 
 ## 3. Merge gate (run for every merge)
 
