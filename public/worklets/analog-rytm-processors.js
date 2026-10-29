@@ -187,6 +187,8 @@ const CLICK = new Float32Array(Math.max(8, Math.round(0.0005 * SR)));
 const BUMP = new Float32Array(Math.max(6, Math.round(0.00035 * SR)));
 (() => { const n = BUMP.length; for (let i = 0; i < n; i++) { const u = (i + 0.5) / n; BUMP[i] = Math.pow(Math.sin(Math.PI * u), 2); } })();
 const CLICK_N = CLICK.length, BUMP_N = BUMP.length;
+/** Sample-layer fade before a one-shot's end point (in buffer samples) */
+const SMP_FADE_N = Math.max(32, Math.round(0.003 * SR));
 
 // ---------------------------------------------------------------------------
 // Sample layer: synthesized one-shots (generated on first use)
@@ -312,6 +314,8 @@ class Voice {
     this.quiet = 0;
     this.dts = new Float64Array(6);
     this.lastY = 0; this.dclArm = false; this.dcl = 0; this.dclN = 0;
+    // filter-input side of the retrigger declick (see renderVoice)
+    this.lastX = 0; this.dclIn = 0; this.dclInN = 0;
   }
 
   noise() { let x = this.rng; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.rng = x >>> 0; return (x | 0) * 4.656612873077393e-10; }
@@ -623,7 +627,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     if (!v.active || prevTrack !== tr) v.amp = v.active ? v.amp * 0.5 : 0;
     v.ampStage = 1;
     v.ampHoldLeft = -1;
-    if (!v.active) { v.ic1 = 0; v.ic2 = 0; v.lastY = 0; }
+    if (!v.active) { v.ic1 = 0; v.ic2 = 0; v.lastY = 0; v.lastX = 0; v.dclN = 0; v.dclInN = 0; }
     else { v.dclArm = true; v.fin = 0; }
     v.active = true;
     v.quiet = 0;
@@ -860,6 +864,11 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           fb[4] = Math.pow(clamp(P[6], 0, 127) / 127, 1.5);
           v.k[3] = P[7] >= 127 ? 1 : k60(expT(P[7], 0.01, 2));
         }
+        // Output trim per machine (twin calibration). With the closed path's fixed drop and short DEC,
+        // CH CLASSIC, HH BASIC and CH METALLIC sat 10-17 LU under every other voice at their init
+        // values, so closed hats vanished in a groove. These put each hat machine's init hit within
+        // about 3 LU of the others on the voice (the open hat a little louder, as it rings longer).
+        fb[5] = m === CH_CLASSIC || m === HH_BASIC ? 2.24 : m === CH_METALLIC ? 1.78 : 1;
         break;
       }
       case CY_CLASSIC: case CY_METALLIC: case CY_RIDE: {
@@ -1269,7 +1278,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         break;
       }
       case CH_CLASSIC: case OH_CLASSIC: case CH_METALLIC: case OH_METALLIC: case HH_BASIC: case HH_LAB: {
-        const m = v.m, lev = fb[3];
+        const m = v.m, lev = fb[3], trim = fb[5];
         const f = v.f;
         const dt0 = f[0] * INV_SR, dt1 = f[1] * INV_SR, dt2 = f[2] * INV_SR, dt3 = f[3] * INV_SR, dt4 = f[4] * INV_SR, dt5 = f[5] * INV_SR;
         const gH = fb[0], gB = fb[1];
@@ -1305,7 +1314,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           e[0] *= k[0];
           let y = hp * env * 4.6;
           if (m === HH_BASIC && t < BUMP_N) y += BUMP[t] * 0.34;
-          G[i] = y * lev * (m === HH_LAB ? 1.6 : 1);
+          G[i] = y * lev * trim;
         }
         alive = e[0] * lev;
         break;
@@ -1499,14 +1508,18 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     const genAlive = this.generate(v, G, i0, i1);
     // sample layer
     if (v.sOn && v.sBuf) {
-      const buf = v.sBuf, inc = v.sInc, end = v.sEnd, g = v.sGain, q = v.sQ;
+      const buf = v.sBuf, inc = v.sInc, end = v.sEnd, g = v.sGain, q = v.sQ, loop = v.sLoop;
       let pos = v.sPos;
       const rev = inc < 0;
       for (let i = i0; i < i1; i++) {
-        if (rev ? pos <= end : pos >= end) { if (v.sLoop) pos = v.sStart + (pos - end); else { v.sOn = false; break; } }
+        if (rev ? pos <= end : pos >= end) { if (loop) pos = v.sStart + (pos - end); else { v.sOn = false; break; } }
         const ip = pos | 0, fr = pos - ip;
         let x = buf[ip] + (buf[ip + 1 < buf.length ? ip + 1 : ip] - buf[ip]) * fr;
         if (q) x = Math.round(x * q) / q;
+        // Without a loop the last 3 ms before the end point fade out (a raised cosine). Most
+        // one-shots are still ringing at their end (KICK 909 at -20 dB, CRASH at -36 dB re their
+        // peak), and an END set inside a sample stops it mid-wave: both used to stop dead, a click.
+        if (!loop) { const d = rev ? pos - end : end - pos; if (d < SMP_FADE_N) x *= d > 0 ? 0.5 - 0.5 * Math.cos(Math.PI * d / SMP_FADE_N) : 0; }
         G[i] += x * g;
         pos += inc;
       }
@@ -1554,6 +1567,13 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       // a retrigger: the new sound fades in, so a bright onset over a ringing voice is no step
       if (v.fin < RETRIG_FADE_N) { x *= FADE_W[v.fin]; v.fin++; }
       if (drv > 0) x = tanhF(x * drvG) * drvN;
+      // ...and the filter input carries on from the old sound's last value, fading out over the
+      // same 1.3 ms. Without this the input stepped to the new sound's first value and the open
+      // filter's 2-3 sample response to that step got past the output-side declick below (whose
+      // offset is taken on the first sample): a dip of about 40 % of the ringing level.
+      if (v.dclArm) { v.dclIn = v.lastX - x; v.dclInN = DECLICK_N; }
+      if (v.dclInN > 0) { x += v.dclIn * DECLICK_W[v.dclInN]; v.dclInN--; }
+      v.lastX = x;
       const v3 = x - ic2;
       const v1 = a1 * ic1 + a2 * v3;
       const v2 = ic2 + a2 * ic1 + a3 * v3;
@@ -1791,6 +1811,18 @@ function sat12(u) {
   const a2 = a * a, a4 = a2 * a2, a12 = a4 * a4 * a4;
   return u * Math.pow(1 + a12, -1 / 12);
 }
+/**
+ * The main outputs' headroom: their maximum level is +15 dBu (manual p.76), taken as full scale,
+ * so the output stage saturates there instead of passing the compressor's makeup (up to +40 dB)
+ * and the delay's build-up unbounded. The same order-12 curve: unchanged below -6 dBFS, about
+ * -0.16 dB at -1 dBFS.
+ */
+function satOut(u) {
+  const a = u < 0 ? -u : u;
+  if (a < 0.5) return u;
+  const a2 = a * a, a4 = a2 * a2, a12 = a4 * a4 * a4;
+  return u * Math.pow(1 + a12, -1 / 12);
+}
 
 /** First-order section y = k x - k r x[-1] + P y[-1] with peak gain 1 */
 function scSection(fp, fz, fs) {
@@ -1927,7 +1959,8 @@ class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
       l *= g; r *= g;
       if (delPost) { l += del; r += delR; }
       if (revPost) { l += rev; r += revR; }
-      // AC-coupled output
+      // the output stage's headroom, then the AC-coupled output
+      l = satOut(l); r = satOut(r);
       dyl = l - dxl + dcR * dyl; dxl = l;
       dyr = r - dxr + dcR * dyr; dxr = r;
       oL[i] = dyl; if (oR !== oL) oR[i] = dyr;

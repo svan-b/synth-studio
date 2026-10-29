@@ -197,12 +197,21 @@ section is the FX defaults (`KIT01_MASTER` in `model.ts`).
   order-12 soft clipper at about 0.68 / 0.72 of full scale, and it is there even
   at AMT 0. It holds the peaks. Dub Chords, Deep Garage and Jungle Roller keep
   their drive at 18: there, bright hats ride on a big kick, and deeper clipping
-  notches them on the kick's flattened crest, which crackles.
+  notches them on the kick's flattened crest, which crackles. For the same
+  reason Warehouse (20), Big Beat (12) and Lo-Fi (20) were turned down once the
+  closed hats got louder: dense downbeats drove them three to four times past
+  the knee, where the output flattens into a plateau right after a fast rise.
+  The audio-QA click detector flagged that now and then; it sounds like crunch,
+  but it is an artefact of driving the whole mix that far.
 - **COMP** keeps each kit's character (threshold, attack, release, ratio, SEQ).
   MIX is parallel compression, with MUP matched to the wet path's fixed loss
   plus the average gain reduction.
-- **VOL** puts the kit at the target, with the worst true peak of four takes at
-  or under -1.7 dBTP.
+- **VOL** puts the kit at the target where its crest factor allows, with the
+  worst true peak of 12 random states (offline, at the studio's 120 BPM) at or
+  under -1.5 dBTP. Kits with parallel compression and delays returned POST have
+  the most crest; Warehouse, Industrial Grind, Deep Garage, Dub Chords, Jungle
+  Roller, Big Beat, Micro Clicks, Glitch Lab and Lo-Fi sit about 2-3 LU under
+  the target.
 - Echo kits return the delay **POST** (DIST page DEL), so the drive doesn't
   lift their tails. Their feedback and reverb decay are set so the tails fall
   below -60 dBFS within 2 s of stop.
@@ -219,30 +228,32 @@ its master section is calibrated instead.
 
 ### Measured loudness (audio QA, `--target -18`)
 
-Two runs at 44.1 kHz on the instrument output: `audition` plays each kit's demo pattern through the module's own audition, and `transport` plays it from the studio transport (`--excite analog-rytm=transport`). Neither run has a click, DC or tail flag. Audition: median -18.1 LUFS, spread 3.1 LU, worst true peak -1.6 dBTP, 0 of 20 flagged. Transport: median -18.4 LUFS, spread 3.0 LU, worst true peak -1.3 dBTP, 0 of 20 flagged.
+Two runs at 44.1 kHz on the instrument output: `audition` plays each kit's demo pattern through the module's own audition, and `transport` plays it from the studio transport (`--excite analog-rytm=transport`). Both play the kits synced to the studio's 120 BPM. Neither run has a click, DC or tail flag. Audition: median -18.9 LUFS, spread 3.1 LU, worst true peak -1.7 dBTP, 0 of 20 flagged. Transport: median -19.0 LUFS, spread 3.4 LU, worst true peak -1.7 dBTP, 0 of 20 flagged.
+
+The true peaks were also checked offline over 12 random states per kit (the browser starts each kit from whatever state the kits before it left: hat oscillator phases, noise, the sample buffers), because single takes vary by up to 1.5 dB. Every kit's worst case is at or under -1.5 dBTP there. Bright hats raise the risk: around 9-12 kHz a true peak can sit 2.4-3.6 dB above the samples at 44.1 kHz.
 
 | Kit | Audition LUFS | Audition dBTP | Transport LUFS | Transport dBTP |
 |---|---:|---:|---:|---:|
-| Techno / Warehouse | -19.1 | -1.9 | -19.3 | -1.8 |
-| Techno / Industrial Grind | -18.1 | -4.2 | -18.3 | -3.9 |
-| Techno / Dub Chords | -19.6 | -1.7 | -19.7 | -1.3 |
-| House / Deep Garage | -20.2 | -1.8 | -20.4 | -1.4 |
-| House / Nine-O-Nine Box | -17.8 | -2.3 | -18.7 | -2.3 |
-| Electro / Miami Bass | -18.0 | -4.4 | -18.2 | -4.2 |
-| Electro / Robot Funk | -18.0 | -3.0 | -18.3 | -2.7 |
-| Drum Machine / Straight Boom | -18.1 | -3.1 | -18.4 | -2.8 |
-| Hip-Hop / Dusty Boom Bap | -17.7 | -2.3 | -18.3 | -2.3 |
-| Hip-Hop / Trap Sub | -18.1 | -4.2 | -18.2 | -3.7 |
-| Breaks / Jungle Roller | -19.8 | -2.5 | -19.9 | -2.3 |
-| Breaks / Big Beat | -18.4 | -2.2 | -18.4 | -2.9 |
-| Minimal / Micro Clicks | -20.8 | -2.4 | -21.2 | -2.4 |
-| IDM / Glitch Lab | -19.3 | -2.3 | -19.1 | -2.4 |
-| Dub / Echo Chamber | -18.0 | -1.6 | -18.3 | -1.6 |
-| Acoustic / Studio Kit | -18.2 | -3.8 | -18.2 | -4.1 |
-| Acoustic / Brush Jazz | -18.1 | -2.5 | -18.3 | -3.1 |
-| Lo-Fi / Bitcrushed Tape | -17.9 | -2.1 | -18.3 | -2.1 |
-| Percussion / Afro-Latin | -18.3 | -4.2 | -18.4 | -4.3 |
-| Synth / Analog Toys | -18.3 | -2.5 | -18.5 | -3.1 |
+| Techno / Warehouse | -20.3 | -1.7 | -20.4 | -1.7 |
+| Techno / Industrial Grind | -20.9 | -3.5 | -21.0 | -4.3 |
+| Techno / Dub Chords | -20.2 | -2.1 | -20.4 | -1.7 |
+| House / Deep Garage | -20.5 | -2.3 | -20.6 | -1.7 |
+| House / Nine-O-Nine Box | -18.8 | -2.5 | -18.8 | -2.4 |
+| Electro / Miami Bass | -17.9 | -3.3 | -18.1 | -4.0 |
+| Electro / Robot Funk | -18.3 | -2.6 | -18.5 | -2.8 |
+| Drum Machine / Straight Boom | -17.7 | -1.9 | -17.9 | -1.9 |
+| Hip-Hop / Dusty Boom Bap | -18.5 | -2.0 | -18.7 | -1.9 |
+| Hip-Hop / Trap Sub | -17.8 | -3.1 | -18.0 | -3.8 |
+| Breaks / Jungle Roller | -20.7 | -3.8 | -21.3 | -2.4 |
+| Breaks / Big Beat | -20.2 | -2.0 | -20.1 | -2.2 |
+| Minimal / Micro Clicks | -20.5 | -2.2 | -20.7 | -2.0 |
+| IDM / Glitch Lab | -20.0 | -2.5 | -20.0 | -2.9 |
+| Dub / Echo Chamber | -18.2 | -1.9 | -18.5 | -2.0 |
+| Acoustic / Studio Kit | -18.3 | -3.8 | -18.3 | -3.7 |
+| Acoustic / Brush Jazz | -18.0 | -3.0 | -18.3 | -2.8 |
+| Lo-Fi / Bitcrushed Tape | -19.8 | -1.9 | -20.1 | -1.9 |
+| Percussion / Afro-Latin | -18.1 | -4.1 | -18.5 | -3.8 |
+| Synth / Analog Toys | -19.0 | -3.9 | -19.1 | -2.8 |
 
 ## Model choices (not in the manual)
 
@@ -250,15 +261,16 @@ Two runs at 44.1 kHz on the instrument output: `audition` plays each kit's demo 
 |---|---|
 | Machine DSP | Each machine is modelled on the firmware's machine functions (rytm-mods): the two-oscillator circuit on BD, SD, RS and CP; the tuned resonator on the toms; the six-square hat bank (TR-808 ratios); and the cymbal and cowbell bank. Where no source gives absolute curves (Hz, ms), they are tuned by ear |
 | Hat metal | The six squares feed a ringing band-pass (Q about 3.3) and a high-pass, so their edges blend into a sizzle rather than single-sample spikes |
+| Hat levels | An output trim per hat machine: CH CLASSIC and HH BASIC +7 dB, CH METALLIC +5 dB, the others 0 dB. Without it the closed machines' init hits sat 10-17 LU under every other voice (momentary loudness -41.8 LUFS for CH CLASSIC against -24 to -30 for the kicks, snares and toms), so closed hats vanished in a groove. Each hat machine's init hit is now within about 3 LU of the others on the voice |
 | Digital clicks | TIC, TRA and the snare and rim ticks use one smooth 0.5 ms tick (CLICK) and a 0.35 ms push (BUMP). Both are defined in time, so they sound the same at 44.1 and 48 kHz |
 | Attack | AMP ATK 0 is a 0.4 ms linear ramp |
-| Retrigger | A trig on a sounding voice crossfades: the old sound's offset fades out over 1.3 ms and the new sound fades in over 0.3 ms (raised cosines). The amp carries on from its current level |
+| Retrigger | A trig on a sounding voice crossfades: the old sound's offset fades out over 1.3 ms and the new sound fades in over 0.3 ms (raised cosines), at both the filter input and the voice output. The amp carries on from its current level. The input side keeps the filter from ringing on the step between the two sounds |
 | STOP | Every voice fades out over about 5 ms; the delay and reverb ring on |
-| Output | AC coupled: a 5 Hz high-pass after the returns, so asymmetric kicks leave no DC |
+| Output | The main outputs' maximum level is +15 dBu (Rytm MKII manual, p.76), taken as full scale: an order-12 soft saturation there (unchanged below -6 dBFS), then AC coupling (a 5 Hz high-pass), so asymmetric kicks leave no DC. With every level, the makeup and the delay feedback at maximum the output stays near 0 dBFS instead of reaching +31 dBFS |
 | Filter | A Simper state-variable filter. FRQ moves one semitone per step, with 440 Hz at 60. A moving cutoff glides sample by sample |
 | Compressor | The rytm-mods calibrated model: a SEQ-filtered peak detector, a softplus curve per RAT, and ballistics from ATK and REL. Makeup is about 0.6 dB per step up to 48, and VOL follows a measured table. The output gain is smoothed by two one-pole stages |
 | Reverb | The studio's Reverb2 (FDN), not the Rytm's algorithm |
-| Samples | 32 synthesized one-shots (kick, snare, hats, percussion, noise) stand in for the +Drive sample library |
+| Samples | 32 synthesized one-shots (kick, snare, hats, percussion, noise) stand in for the +Drive sample library. Without a loop, the last 3 ms before the end point fade out (a raised cosine): most one-shots are still ringing when their buffer ends (KICK 909 at -20 dB re its peak, CRASH at -36 dB), and an END set inside a sample stops it mid-wave, so both used to click |
 | Trig LEN with AMP HLD AUTO | The amp holds for the trig's length. The manual describes AUTO only for pads |
 
 ## Simplified or not modelled

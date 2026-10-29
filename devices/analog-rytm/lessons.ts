@@ -554,13 +554,15 @@ const s3: Lesson = {
     {
       kind: 'do', control: 'ch_flt_typ', targetValue: 4, concept: 'filter-type', scope: 'spectrum',
       instruction: 'Set encoder G (TYP) to HP2.',
-      principle: 'A high-pass removes lows the hats don\'t need, which leaves room for the kick.',
+      principle: 'A high-pass removes everything below its cutoff and keeps what is above it.',
+      explanation: 'The hat circuit already filters out the lows, so a high-pass only changes a hat once its cutoff reaches the sizzle, in the kilohertz.',
       manualReference: REF('p.79'),
     },
     {
-      kind: 'do', control: 'ch_flt_frq', targetValue: 70, concept: 'filter-cutoff',
-      instruction: 'Set encoder E (FRQ) to about 70.',
-      principle: 'The cutoff sets where a high-pass starts removing the lows.',
+      kind: 'do', control: 'ch_flt_frq', targetValue: 104, concept: 'filter-cutoff',
+      instruction: 'Set encoder E (FRQ) to about 104 (5.6 kHz) and tap CH.',
+      principle: 'A high-pass inside a sound\'s own range thins it out.',
+      explanation: 'The lower part of the sizzle goes, so the hat gets thinner and sits further above the snare.',
     },
     {
       kind: 'do', control: 'rec', targetValue: 1, focus: ['key:rec'], concept: 'sequencer-pattern',
@@ -591,7 +593,7 @@ const s3: Lesson = {
     {
       kind: 'listen', concept: 'filter-type', scope: 'spectrum',
       instruction: 'Compare the closed hat full-range and high-passed. Watch the spectrum.',
-      listen: { a: { track: CH, ch_flt_typ: 0, ch_flt_frq: 127 }, b: { track: CH, ch_flt_typ: 4, ch_flt_frq: 70 }, labels: ['Full range', 'High-passed'] },
+      listen: { a: { track: CH, ch_flt_typ: 0, ch_flt_frq: 127 }, b: { track: CH, ch_flt_typ: 4, ch_flt_frq: 104 }, labels: ['Full range', 'High-passed'] },
     },
     {
       kind: 'do', control: 'track', targetValue: CY, focus: ['key:trk', 'pad:cy'], concept: 'signal-routing',
@@ -606,9 +608,9 @@ const s3: Lesson = {
     },
     {
       kind: 'match', instruction: 'Ear challenge: recreate the open hat by ear.', concept: 'envelope-decay',
-      setup: { track: OH, page: PAGE.SRC, oh_dec: 30, oh_flt_typ: 4, oh_flt_frq: 90 },
-      match: { target: { oh_dec: 90, oh_flt_frq: 40, oh_flt_typ: 4 }, controls: ['oh_dec', 'oh_flt_frq'] },
-      hints: ['Listen to the length first, then the body.', 'Longer, with more low-mid body.', 'SRC DEC near 90, FLTR FRQ near 40.'],
+      setup: { track: OH, page: PAGE.SRC, oh_dec: 30, oh_col: 30 },
+      match: { target: { oh_dec: 90, oh_col: -30 }, controls: ['oh_dec', 'oh_col'] },
+      hints: ['Listen to the length first, then the colour of the metal.', 'Longer, and darker.', 'SRC DEC near 90, COL near -30.'],
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',
