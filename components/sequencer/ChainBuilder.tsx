@@ -27,7 +27,7 @@ export interface ChainBuilderProps extends OverlayProps {
   ctx: CustomRenderContext;
   tracks?: number;
   banks?: number;
-  /** Most entries allowed (default 64) */
+  /** Most entries allowed (default 256: the hardware has 256 pattern entries for its chains, A4 MKII manual p.55, Rytm MKII manual p.53) */
   maxLength?: number;
 }
 
@@ -42,7 +42,7 @@ export default function ChainBuilder(props: ChainBuilderProps) {
 
   const project = projectOf(ctx, tracks);
   const chain = project.chain;
-  const max = props.maxLength ?? 64;
+  const max = props.maxLength ?? 256;
   const st = seqStateOf(ctx.engine);
   const chainPlaying = !!st?.playing && st.mode === 'chain';
   const playingIdx = chainPlaying ? st!.chainIndex : -1;
