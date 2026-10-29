@@ -8,7 +8,10 @@
 //            CHANGE sets when a cued or chained pattern takes over (OFF = at the
 //            master length; INF + OFF = never)
 //   LENGTH   1..64 steps         SCALE  2x 3/2x 1x 3/4x 1/2x 1/4x 1/8x
-//   SWING    50..80 % (every second step is late)
+//            A length that grows into new pages fills them with copies of the
+//            existing pages, as on the hardware (`copyPages`, default on):
+//            2 pages made 4 play pages 1, 2, 1, 2
+//   SWING    50..80 % (the swing trigs - every second step by default - are late)
 // Edits the pattern the trig keys show, and in PER TRACK mode the selected
 // track. Opens with ui.seqMenu = 'scale' (MenuKey), or pass `open`.
 // Lesson focus ids: 'seq:scale:mode', 'seq:scale:length', 'seq:scale:speed',
@@ -33,6 +36,11 @@ export interface ScaleMenuProps extends OverlayProps {
   /** Pattern edited (default: the one the trig keys show) */
   pattern?: PatternId;
   trackNames?: string[];
+  /**
+   * A longer length copies the existing pages into the new ones (default true,
+   * as the hardware's SCALE menu does); false leaves the new pages as they are
+   */
+  copyPages?: boolean;
 }
 
 export default function ScaleMenu(props: ScaleMenuProps) {
@@ -51,8 +59,12 @@ export default function ScaleMenu(props: ScaleMenuProps) {
   const t = pat.tracks[track];
   const ownLen = perTrack && t?.length !== undefined;
   const ownSpeed = perTrack && t?.speed !== undefined;
-  const set = (patch: Parameters<typeof updatePatternSettings>[2]) => editProject(ctx, tracks, p => updatePatternSettings(p, pattern, patch));
-  const setTrack = (patch: { length?: number | null; speed?: Speed | null }) => editProject(ctx, tracks, p => setTrackScale(p, pattern, track, patch));
+  const copyPages = props.copyPages !== false;
+  const set = (patch: Parameters<typeof updatePatternSettings>[2]) => editProject(ctx, tracks, p => updatePatternSettings(p, pattern, patch, { copyPages }));
+  const setTrack = (patch: { length?: number | null; speed?: Speed | null }) => editProject(ctx, tracks, p => setTrackScale(p, pattern, track, patch, { copyPages }));
+  const copyNote = copyPages && (
+    <span style={{ fontSize: 10, color: C.dim, alignSelf: 'center' }}>Longer: the new pages start as copies of the existing ones.</span>
+  );
 
   const speeds = (value: Speed, onPick: (s: Speed) => void, key: string) => (
     <Group label={key === 'track' ? `${trackName} SCALE` : perTrack ? 'MASTER SCALE' : 'SCALE'} highlight={hi('speed')}>
@@ -102,6 +114,7 @@ export default function ScaleMenu(props: ScaleMenuProps) {
                 <Group label="MASTER CHANGE" highlight={hi('change')}>
                   <Stepper value={pat.change} min={0} max={MASTER_MAX} onChange={v => set({ change: v })} format={formatChange} width={50} name="master change" title="Steps before a cued or chained pattern starts (OFF = at the master length)" />
                 </Group>
+                {copyNote}
               </div>
               {speeds(trackSpeed(pat, track), s => setTrack({ speed: s }), 'track')}
               {(ownLen || ownSpeed) && (
@@ -125,12 +138,13 @@ export default function ScaleMenu(props: ScaleMenuProps) {
                     <SeqButton key={l} active={pat.length === l} color={C.white} minWidth={34} onPress={() => set({ length: l })}>{l}</SeqButton>
                   ))}
                 </Group>
+                {copyNote}
               </div>
               {speeds(pat.speed, s => set({ speed: s }), 'pattern')}
             </>
           )}
           <Group label="SWING" highlight={hi('swing')}>
-            <Stepper value={pat.swing} min={SWING_MIN} max={SWING_MAX} onChange={v => set({ swing: v })} format={v => `${v}%`} width={50} name="swing" title="50% = straight; every second step is late" />
+            <Stepper value={pat.swing} min={SWING_MIN} max={SWING_MAX} onChange={v => set({ swing: v })} format={v => `${v}%`} width={50} name="swing" title="50% = straight; the swing trigs (every second step unless you moved them) are late" />
             {[50, 54, 58, 62, 66].map(v => (
               <SeqButton key={v} active={pat.swing === v} color={C.white} minWidth={38} onPress={() => set({ swing: v })}>{v}%</SeqButton>
             ))}

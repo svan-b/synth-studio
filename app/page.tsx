@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { Lesson } from '@/types';
 import type { DeviceModule } from '@/devices/types';
@@ -14,15 +15,25 @@ import { history } from '@/lib/studio/history';
 import { showNotice } from '@/lib/studio/notices';
 import { isStandalone } from '@/lib/studio/platform';
 import DeviceHost from '@/components/DeviceHost';
-import Instructions from '@/components/teaching/Instructions';
-import LessonBrowser from '@/components/teaching/LessonBrowser';
-import ReviewSession from '@/components/teaching/ReviewSession';
 import TransportBar from '@/components/studio/TransportBar';
-import StudioView from '@/components/studio/StudioView';
 import UndoRedo from '@/components/studio/UndoRedo';
 import SystemNotices from '@/components/studio/SystemNotices';
-import Welcome, { type WelcomeChoice } from '@/components/onboarding/Welcome';
+import type { WelcomeChoice } from '@/components/onboarding/Welcome';
 import MidiButton from '@/components/midi/MidiButton'; // external gear: MIDI settings
+
+// Shown only in a tab, a dialog or a running lesson: loaded on demand so the
+// first visit (an iPad on a phone connection) downloads less up front.
+const StudioView = dynamic(() => import('@/components/studio/StudioView'), {
+  ssr: false,
+  loading: () => <p className="text-sm text-gray-400 p-6 animate-pulse motion-reduce:animate-none">Opening the studio…</p>,
+});
+const Instructions = dynamic(() => import('@/components/teaching/Instructions'), {
+  ssr: false,
+  loading: () => <aside className="w-full lg:w-96 shrink-0 p-4 text-sm text-gray-400">Loading the lesson…</aside>,
+});
+const LessonBrowser = dynamic(() => import('@/components/teaching/LessonBrowser'), { ssr: false });
+const ReviewSession = dynamic(() => import('@/components/teaching/ReviewSession'), { ssr: false });
+const Welcome = dynamic(() => import('@/components/onboarding/Welcome'), { ssr: false });
 
 type View = 'instrument' | 'studio';
 
@@ -34,6 +45,16 @@ export default function Home() {
     // after the hub: undo history never sits between a knob and its engine
     history.init();
     setHydrated(true);
+    // Fetch the on-demand views once the page is idle, so the first click on the
+    // Studio tab or a lesson is instant while the first download stays small
+    const prefetch = () => {
+      void import('@/components/studio/StudioView');
+      void import('@/components/teaching/Instructions');
+      void import('@/components/teaching/LessonBrowser');
+    };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    if (w.requestIdleCallback) w.requestIdleCallback(prefetch, { timeout: 1500 });
+    else setTimeout(prefetch, 1200); // Safari has no requestIdleCallback
   }, []);
   if (!hydrated) return <div className="min-h-screen bg-hardware-bg" />;
   return <App />;
@@ -276,7 +297,7 @@ function App() {
         )}
       </footer>
 
-      <Welcome open={welcomeOpen} onClose={closeWelcome} onChoose={onWelcome} />
+      {welcomeOpen && <Welcome open={welcomeOpen} onClose={closeWelcome} onChoose={onWelcome} />}
 
       {/* Instrument picker */}
       <Dialog.Root open={devicesOpen} onOpenChange={setDevicesOpen}>

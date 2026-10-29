@@ -28,8 +28,24 @@ its own `wip/*` branch on GitHub, committed but **not yet merged or browser-veri
 - 19c9d56: merged `wip/elektron-sequencer` (library: 225/225 tests). A finisher is adding the UI kit and docs.
 - 89ed17f: merged `wip/studio`: clean master, −1 dBTP limiter, LUFS meters, mixer, undo, stems. The iPad audio-input capture-count contract is now complete on both sides.
 - 01a09bc: merged `wip/panel-teaching`. The `store/studio.ts` import conflict was resolved by keeping both sides. tsc, lint and validate are clean; build OK; **e2e 23/23**. First-load JS is now **242 kB**: lazy-loading is a priority follow-up.
+- Full run on 01a09bc: **73/73**, covering every instrument's smoke test and lessons plus the 23 core checks.
+- 6fca612: the studio view, coach, lesson browser, review and welcome now load on demand; first-load JS **242 → 215 kB**; e2e 23/23.
+- 20480ee: README rewritten for the studio, your own gear, learning, tests and the iPad install.
+- 32abdc4: merged the sequencer **UI kit** and manual-cited docs (233 tests; e2e 23/23). It adds trig-mute, swing and solo modes, `stampDefaults`, PLAY→pause `TransportKeys`, SAVE/RELOAD/undo, TEMP JUMP arm, chain rows in songs and the lock budget. The A4 and Rytm finishers are told to adopt them.
+- 7818e6c: merged the panel/teaching finish (the same tree as tested: full suite 83/83). Adds 10 touch e2e tests; knob drags are faster than the baseline (A4 script 333 → 293 ms, long frames 2.5 → 1.5).
+- 58e78bb: merged **Xone:96**. Audio QA 0/21 flagged (median −18.6 LUFS); lessons 18/18; e2e 33/33; unity within 0.011 dB.
+  - Upgrade store v6 / project v3 (MASTER/BOOTH law, crossfader curve, per-channel PRE, sends ×0.707).
+  - Studio sends are now off for instruments routed into a mixer, which fixes a −45 dBFS leak when the Xone was muted.
+- 679f8db: iPad polish.
+  - The lesson coach floats on touch screens, so the panel keeps the full width (Sub 37 at 86%, was about 58%).
+  - Toolbar buttons are 44 px on touch.
+  - MIDI loads after first paint (`lib/midi/lite.ts`): first-load JS 216 → **195 kB**.
+  - Idle prefetch of the studio view, coach and lesson browser.
+  - Meters no longer use `will-change`.
+  - Audio input lists the Xone channels.
+  - Verified: gear e2e 31/31, e2e 33/33.
 - Nine finishers are working on their `wip/*` branches and push there after each milestone: analog-four, analog-rytm, xone96, mother32, subharmonicon, sub37, elektron-sequencer (UI kit), dfam-review (verification), panel-teaching (touch e2e and perf). Each merges 01a09bc before its final gate.
-- **Next:** merge each finisher as it passes the gate (section 3). Then add upgrades.ts entries, run audio QA for every instrument, implement the producer path and demo tracks, run independent reviews, do lazy-loading and rewrite the README.
+- **Next:** merge each finisher as it passes the gate (section 3). Then add upgrades.ts entries, run audio QA for every instrument, implement the producer path and demo tracks, run independent reviews, do and lazy-load the MIDI code in DeviceHost.
 
 ## 2. Work in progress (each on `wip/<name>`, not merged)
 
@@ -80,8 +96,11 @@ Merge each in this order, with the gate in section 3. Bases: most were branched 
 - Audio-input contract `globalThis.__synthCaptureCount`: the gear side is merged and the studio side is in `wip/studio`. After merging both, verify on iPad that recording keeps the play-and-record session.
 - `scripts/validate-devices.ts` fake state: add `events: {}`, `notesPlayed: []`, needed for panel-teaching.
 - `components/sequencer/*`: add `WebkitUserSelect` (done in wip/elektron-sequencer).
-- iPad: dock or stack the lesson coach for wide panels (`app/page.tsx`).
-- StudioView: hide "Output" for Your synth (no audio). DeviceHost toolbar buttons to 44 px. `hub.push()` must apply data before values.
+- (done) iPad: dock or stack the lesson coach for wide panels (`app/page.tsx`). With the side coach they drop to about 58% zoom.
+- Performance: dragging a knob while a sequencer runs costs extra compositing. It comes from the value bubble's fixed layer plus 4 `will-change: transform` layers in the studio meters; drop `will-change` and throttle the meters.
+- (done) Split `@/lib/midi` behind a light entry point for DeviceHost, saving about 44 kB of first-load JS.
+- `scripts/checks/xone96.cjs` is stale: it doesn't set synth-studio-welcomed and uses the old button colour. It isn't part of the gate.
+- StudioView: hide "Output" for Your synth (no audio). `hub.push()` must apply data before values. (Toolbar 44 px: done.)
 - Optional "Hardware synth" studio set (Your synth + Audio input + Xone:96).
 - First-load JS is 181 kB: lazy-load the MIDI and gear code.
 - After the device merges:

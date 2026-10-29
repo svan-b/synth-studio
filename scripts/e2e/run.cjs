@@ -4,7 +4,9 @@
 //   node scripts/e2e/run.cjs http://localhost:3100 [--out <dir>] [--full]
 //
 // Always: the iPad journey, the studio (clock cable, record, reload), rapid
-// instrument switching and saved-settings upgrades.
+// instrument switching, saved-settings upgrades and touch gestures (fine adjust,
+// value bubble, double-tap reset, no page scroll, a momentary lesson step, the
+// spectrum scope).
 // --full: also scripts/smoke.cjs and scripts/lesson-runner.cjs for every
 // instrument in devices/index.ts.
 // Exits non-zero if anything fails, so it can gate merges.
@@ -77,6 +79,31 @@ check('upgrade: no errors', !u.__error && (u.errs ?? []).length === 0, u.__error
 check('upgrade: old DFAM TEMPO keeps its speed (120 -> 30)', u.first?.dfamTempo === 30 && u.first?.version >= 5, u.first);
 check('upgrade: other values and instruments untouched', u.first?.vco1 === 220 && u.first?.m32Tempo === 120, u.first);
 check('upgrade: runs only once', u.afterReload?.dfamTempo === 30, u.afterReload);
+
+// ---- Touch gestures (iPad) -----------------------------------------------------
+const t = run(path.join(__dirname, 'touch.cjs'), [base, path.join(outDir, 'touch')]);
+const tl = t.log ?? {};
+/** Speed relative to a plain drag of the same distance */
+const speed = (r, want, tol) => typeof r === 'number' && Math.abs(r - want) <= tol;
+const tb = tl.bubble ?? {};
+const sw = tl.sideways ?? {};
+const tm = tl.momentary ?? {};
+const sp = tl.spectrum ?? {};
+check('touch: runs without errors', !t.__error && (t.errs ?? []).length === 0, t.__error ?? t.errs);
+check('touch: a knob drag moves it at full speed', tl.coarse > 10, tl.coarse);
+check('touch: value bubble shows name and value above the finger, then goes', !!tb.during?.label && tb.matchesKnob && tb.aboveFinger && tb.hiddenAfterRelease && !!tb.during?.hint,
+  { label: tb.during?.label, value: tb.during?.value, knob: tb.knobText, above: tb.aboveFinger, hint: tb.during?.hint, hidden: tb.hiddenAfterRelease });
+check('touch: second finger = fine adjust, lifting it = full speed', speed(tl.secondFinger?.ratio, 0.1, 0.05) && tl.secondFinger?.mode === 'Fine' && speed(tl.secondFinger?.afterLiftRatio, 1, 0.25), tl.secondFinger);
+check('touch: long press, then drag = fine adjust', speed(tl.longPress?.ratio, 0.1, 0.05) && tl.longPress?.modeWhileHolding === 'Fine', tl.longPress);
+check('touch: sliding sideways = half speed, further = fine', speed(sw.half?.ratio, 0.5, 0.12) && sw.half?.mode === 'Half speed' && speed(sw.fine?.ratio, 0.1, 0.05) && sw.fine?.mode === 'Fine' && sw.half?.sidewaysMoved === 0 && sw.fine?.sidewaysMoved === 0,
+  { half: sw.half?.ratio, halfMode: sw.half?.mode, fine: sw.fine?.ratio, fineMode: sw.fine?.mode });
+check('touch: double-tap resets to default, slow taps do not', tl.doubleTap?.after === 0 && tl.doubleTap?.mode === 'Reset to default' && tl.doubleTap?.slowTaps === 50, tl.doubleTap);
+check('touch: no page scroll while dragging a knob (beside the panel scrolls)', tl.scroll?.duringKnobDrag === 0 && tl.scroll?.withSecondFinger === 0 && tl.scroll?.knobMoved > 10 && tl.scroll?.lockReleased === true && tl.scroll?.besidePanel > 100, tl.scroll);
+check('touch: a momentary-button do-step counts taps and completes', tm.before?.presses === 0 && tm.before?.ring === 'ssc-spot-target' && tm.afterOne?.presses === 1 && !tm.afterOne?.satisfied && /1 of 2/.test(tm.afterOne?.counter ?? '')
+  && tm.afterTwo?.satisfied && tm.afterTwo?.ring === 'ssc-spot-done' && tm.afterTwo?.gotIt && tm.advanced,
+  { presses: [tm.before?.presses, tm.afterOne?.presses, tm.afterTwo?.presses], counter: tm.afterOne?.counter, ring: tm.afterTwo?.ring, advanced: tm.advanced });
+check('touch: spectrum scope draws the output while it plays', sp.playing?.mode === 'spectrum' && sp.flippedTo === 'wave' && sp.playing?.sized && sp.quiet?.lit < 40 && sp.playing?.cols > 0.3 * (sp.playing?.W ?? 1e9),
+  { quiet: sp.quiet?.lit, playingCols: sp.playing?.cols, width: sp.playing?.W, mode: sp.playing?.mode, flip: sp.flippedTo });
 
 // ---- Every instrument (--full) -----------------------------------------------
 if (full) {

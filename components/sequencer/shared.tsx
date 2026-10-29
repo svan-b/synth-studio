@@ -49,9 +49,23 @@ export const UI = {
   clipboard: 'seqClipboard',
   /** Open overlay menu: 'pattern' | 'chain' | 'song' | 'scale' | null */
   menu: 'seqMenu',
+  /** TrigKeys mode when its `mode` prop is not given (TrigModeKey sets it) */
+  trigMode: 'seqTrigMode',
+  /** PatternPicker: what the last PASTE / CLEAR replaced ({ id, pattern, what }), for UNDO */
+  undo: 'seqUndo',
 } as const;
 
 export type SeqMenu = 'pattern' | 'chain' | 'song' | 'scale';
+
+/**
+ * What a tap on a trig key does:
+ *   trig      place / remove trigs (hold to lock, long hold or double tap: TrigEditor)
+ *   accent | slide | pslide | trigmute   toggle that trig flag (the hardware's
+ *             ACCENT, NOTE SLIDE, PARAMETER SLIDE and TRIG MUTE menus)
+ *   swing     place / remove the pattern's swing trigs (SWING menu)
+ *   mute      keys 1..N mute / unmute tracks; solo: keys 1..N solo tracks
+ */
+export type TrigKeysMode = 'trig' | 'accent' | 'slide' | 'pslide' | 'mute' | 'trigmute' | 'swing' | 'solo';
 
 export interface TrigEditorTarget {
   track: number;
@@ -121,11 +135,16 @@ export function editProject(ctx: CustomRenderContext, tracks: number, fn: (p: Pr
   ctx.updateData(d => fn(asProject(d, tracks)));
 }
 
-/** Lesson focus ids for the current step ('seq:trig:5', 'seq:patterns'...), or null */
+/**
+ * Lesson focus ids for the current step ('seq:trig:5', 'seq:patterns'...), or
+ * null. A step's `event` counts too, so a press step on a kit key that sends
+ * that event ('seq:temp-jump', 'seq:pause'...) lights the key.
+ */
 export function lessonFocus(ctx: CustomRenderContext): Set<string> | null {
   if (!ctx.teaching || !ctx.step) return null;
   const s = new Set<string>(ctx.step.focus ?? []);
   if (ctx.step.control) s.add(ctx.step.control);
+  if (ctx.step.event) s.add(ctx.step.event);
   return s.size ? s : null;
 }
 
@@ -452,6 +471,44 @@ export function MenuKey({ ctx, menu, label, color = C.white, style, title }: {
       style={{ width: '100%', height: '100%', ...style }}
     >
       {label ?? menu.toUpperCase()}
+    </SeqButton>
+  );
+}
+
+/** LED colour of each trig-key mode (the hardware's menu colours) */
+export const TRIG_MODE_COLOR: Readonly<Record<TrigKeysMode, string>> = {
+  trig: C.red, accent: C.pink, slide: C.yellow, pslide: C.cyan, mute: C.green, trigmute: C.green, swing: C.yellow, solo: C.cyan,
+};
+const TRIG_MODE_LABEL: Record<TrigKeysMode, string> = {
+  trig: 'TRIGS', accent: 'ACCENT', slide: 'NOTE SLIDE', pslide: 'P.SLIDE', mute: 'MUTE', trigmute: 'TRIG MUTE', swing: 'SWING', solo: 'SOLO',
+};
+
+/** TrigKeys mode from ui.seqTrigMode (TrigModeKey), else 'trig' */
+export function trigModeOf(ctx: CustomRenderContext): TrigKeysMode {
+  const m = ctx.ui[UI.trigMode];
+  return typeof m === 'string' && Object.prototype.hasOwnProperty.call(TRIG_MODE_LABEL, m) ? (m as TrigKeysMode) : 'trig';
+}
+
+/**
+ * Switches the trig keys into a mode and back to TRIGS (ui.seqTrigMode) - the
+ * hardware's [FUNC] + [BANK E-H] menus. Works with TrigKeys that have no
+ * `mode` prop. Lesson focus id: 'seq:trig-mode:<mode>'.
+ */
+export function TrigModeKey({ ctx, mode, label, color, style, title }: {
+  ctx: CustomRenderContext; mode: TrigKeysMode; label?: ReactNode; color?: string; style?: CSSProperties; title?: string;
+}) {
+  const on = trigModeOf(ctx) === mode;
+  const focus = lessonFocus(ctx);
+  return (
+    <SeqButton
+      active={on}
+      color={color ?? TRIG_MODE_COLOR[mode]}
+      highlight={!!focus?.has(`seq:trig-mode:${mode}`)}
+      onPress={() => ctx.setUi({ [UI.trigMode]: on ? 'trig' : mode })}
+      title={title ?? (on ? 'Back to placing trigs' : `Trig keys: ${TRIG_MODE_LABEL[mode].toLowerCase()}`)}
+      style={{ width: '100%', height: '100%', ...style }}
+    >
+      {label ?? TRIG_MODE_LABEL[mode]}
     </SeqButton>
   );
 }
