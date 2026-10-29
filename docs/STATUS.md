@@ -58,7 +58,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - A copy stays in the browser (`synth-studio-old-settings`), and a one-time notice offers it as a file.
   - Old project files get a notice too; the file itself is the copy.
   - Checked in e2e (37 checks).
-- Moog knobs turn 300°, as drawn: `PanelLayout.knobTravel` (default 270) is set to 300 on the DFAM, Mother-32 and Subharmonicon, whose manuals' clock positions and preset readings use the 7-to-5 o'clock sweep. Values are unchanged; the pointers and scale marks now line up with the printed legends. The Sub 37 reviewer decides for its panel.
+- Moog knobs turn 300°, as drawn: `PanelLayout.knobTravel` (default 270) is set to 300 on the DFAM, Mother-32 and Subharmonicon, whose manuals' clock positions and preset readings use the 7-to-5 o'clock sweep. Values are unchanged; the pointers and scale marks now line up with the printed legends. The Sub 37 uses the 280° measured on its manual's drawing.
 - New-user walkthrough on iPad (welcome → first lesson → both studio sets playing):
   - 66fe408: "Start the first lesson" now starts it.
   - 6ebf36d: the add-instrument button is pinned in a full tab row, the map names each instrument's mixer channel in its box (labels overlapped on converging arrows), and the silent Studio Clock has no mixer strip. Cable names are drawn on top with a halo.
@@ -68,7 +68,8 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - MULTIDRIVE grows even, then odd harmonics, and the filter self-oscillates above 7.
   - The small buttons have their own touch areas on iPad, and KB TRANSPOSE is in.
   - Audio QA 0/64 in both modes; lessons 20, 0 failed, 0 manual. No ids or defaults changed.
-  - Its reviewer is applying the 280° knob sweep it measured on the p.28 drawing.
+  - 22b412c: its knobs turn 280°, as measured on the p.28 drawing, with the legends and CUTOFF marks at their measured angles.
+- 2603002: on iPad the lesson coach moves off the control a step points at (checked on six lessons: no step leaves its target covered).
 - 80c283a: an instrument's own studio lessons are headed "<name> in the studio", no longer a second "Studio & full tracks".
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
@@ -106,7 +107,6 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 
 | Branch | What | Checkpoint |
 |---|---|---|
-| `wip/review-sub37` | Follow-up: the 280° knob sweep and legend angles measured on the manual's drawing | 133c9f6 (merged) |
 | `wip/review-analog-rytm` | Independent Analog Rytm MKII review against the manual | a0c2d10 |
 | `wip/demo-tracks` | The three designed songs ("Low Tide Lights", "Three Clocks", "Copper Wire") as one-click studios | 0876305 |
 | `wip/producer-path-2` | The remaining Producer path lessons (Elektron and Sub 37 tracks), Elektron pattern swing, and lesson solutions for routes, the arranger and rack counts (0 manual steps left on the Xone, A4 and audio-in; 1 on Your synth, where MIDI learn needs a real controller) | 867e6fc |
