@@ -33,7 +33,7 @@ Every existing wrapper constructor and method works unchanged, and new options a
    | sin(2πx) | odd polynomial | 7e-9 |
 
 4. **Denormals and blow-ups.** Filter and loop states are flushed to 0 below 1e-20 at the end of each quantum. NaN or Infinity on any input resets the affected state instead of silencing the node for good, which the original VCO did.
-5. **Pay only for what you use.** `vco.useOutputs('saw', 'pulse')` stops computing the other outputs. An idle `Reverb2` (silent input, tail below -140 dB) skips all work. Idle and sustaining envelopes fill a constant and return.
+5. **Pay only for what you use.** `vco.useOutputs('saw', 'pulse')` stops computing the other outputs. An idle `Reverb2` (silent input, tail below -140 dB) skips all work. An idle `Chorus` (input exactly zero and both delay lines empty) outputs exact zeros and only advances its LFO, exactly as if it had run. Idle and sustaining envelopes fill a constant and return.
 
 ## Wrapper API (lib/audio/dsp.ts)
 
