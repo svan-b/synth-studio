@@ -137,6 +137,17 @@ const UPGRADES: Upgrade[] = [
       return o;
     },
   },
+  {
+    // Analog Four MKII rebuild to the OS 1.55 manual: every sound and sequencer
+    // parameter was redefined (about 500 ids replaced; old patterns lived in control
+    // strings). No faithful conversion exists, and keeping the few surviving ids
+    // would only make a hybrid, so old A4 settings start fresh: the new defaults
+    // and the demo song.
+    store: 7,
+    project: 4,
+    device: 'analog-four',
+    apply: () => ({}),
+  },
 ];
 
 export const STORE_VERSION = 7;
