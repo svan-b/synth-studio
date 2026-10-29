@@ -496,12 +496,16 @@ export function capstoneTransitions(): SongSection[] {
   return s;
 }
 
-/** The capstone's mixdown (measured): channel GAIN and faders, and MASTER 1 for headroom at the studio master */
-export const CAPSTONE_MIX: Values = { ch1_gain: -1, ch2_gain: -5, ch3_gain: -2, ch1_fader: 10, ch2_fader: 9.5, ch3_fader: 9, master: 8.5 };
-/** The master fader (DRIVE into the limiter) for a streaming master, measured on the bounce */
-export const CAPSTONE_DRIVE = 7.2;
+/**
+ * The capstone's mixdown (measured): the drums lead at full fader, the A4 and the Sub 37's arpeggio
+ * a little under them, MASTER 1 for about -4 dBFS peaks in the Drop. The dense arpeggio carries
+ * loudness without peaks, so the master needs little limiting.
+ */
+export const CAPSTONE_MIX: Values = { ch1_gain: -1, ch2_gain: -5, ch3_gain: -2, ch1_fader: 10, ch2_fader: 9.5, ch3_fader: 9.5, master: 8.5 };
+/** The master fader (DRIVE into the glue and the limiter) for a streaming master: about -14 LUFS, the limiter catching about 1 dB */
+export const CAPSTONE_DRIVE = 6;
 /**
  * The master's GLUE compressor (measured on the bounce): 3:1 with a 1 ms attack holds the drums'
- * peaks, so at -14 LUFS the limiter only catches the odd one (about 3 dB at most)
+ * peaks, so at -14 LUFS the limiter only catches the odd one (1-2 dB)
  */
 export const CAPSTONE_GLUE = { on: true, threshold: -20, ratio: 3, attack: 0.001, release: 0.3, auto: true, makeup: 5, mix: 1 };
