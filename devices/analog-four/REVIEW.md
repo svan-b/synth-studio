@@ -144,3 +144,55 @@ The panel geometry was verified first, because the earlier verdict on this instr
 | the same with `--excite analog-four=transport` | exit 0: 0 of 47 flagged, median -19.0 LUFS, max true peak -1.6 dBTP |
 | in-app checks (Playwright) | worst case on all four tracks +0.20 dBFS at the tap; Dub Chords rings after the [STOP] key (-35 / -47 dBFS at 1 / 2 s) and fades after a studio stop (-51 / -103 dBFS) |
 | screenshots (desktop 1440 x 900, iPad 1180 x 820) | read against M p.12 and IMG at equal scale; no legend touches another; the last legend row sits just below the iPad fold (see "Panel") |
+
+## Performance
+
+On an iPad every instrument shares one audio thread, and the twin cost about four times the average instrument. Its worklets were reworked to do the same arithmetic with less overhead. The output does not change.
+
+| | before | after |
+|---|---|---|
+| `/bench` × realtime: 10 s demo render, headless Chromium, best of 5 renders; median of 6 interleaved runs | 8.30 | 13.93 (1.68× faster) |
+| the four voices once everything is optimised (offline harness, % of one core): bench demo / full demo song | 2.76 / 3.33 | 1.17 / 1.22 |
+
+Equivalence was checked with an offline harness. It runs the real engine (sequencer, kits, presets) on a fake AudioContext and drives the old and the new processors in lockstep, with the same seeded `Math.random`. It compares every node output of every render quantum over 163 renders:
+- the demo song;
+- every preset, by transport and by audition;
+- the keyboard phrase on every sound;
+- delay idle and wake cases;
+- 24 fuzzed kits.
+
+All 163 are bit-identical.
+
+What made it faster, largest first:
+- **Stable object shapes for V8.** Each bench render starts in a fresh audio scope, where V8 compiles the code from scratch. Numeric state fields created with integers (`this.l0 = 0`) became doubles at their first fractional value. That deprecated the object's map and threw away the optimised code: the voice's `process()` was compiled 10 times per render. Every such field is now created holding a double. The voice's parameter-index map was in dictionary mode, so each of the ~150 name lookups per control tick was a hash lookup. It is now a frozen table in the voice's own parameter order.
+- **Less work per control tick** (3 kHz per voice):
+  - each envelope reads only the running stage's time;
+  - control-rate `exp2`, `pow`, `tan`, `sin`, `cos` and `exp` are memoised on their inputs;
+  - the 40 parameters read after the modulation routes get their effective values in one pass;
+  - only the modulation entries the last tick wrote are cleared.
+- **Smaller units for the JIT.**
+  - `process()` is split into ticks, events, ramps, idle blocks and the sample loop.
+  - The control tick is split into modulation, pitch, tone and amp parts.
+  - A part that meets a path it has not seen run (a first glide, accent or noise fade) is recompiled on its own.
+  - Queued events share one shape.
+  - `route()` gets its type feedback at construction.
+- **Per-block constants in the sample loops.** The oscillator, filter and VCA loops read each control block's settings once. A still cutoff computes its filter coefficients once per block, and the saw's split is computed once per block.
+- **Idle work skipped, exactly.**
+  - The delay skips its loop while both lines hold only zeros and nothing feeds it.
+  - A silent voice does not zero its outputs again.
+  - The FX parameters are read by index, with no closures per quantum.
+
+The shared `fdn-reverb` and `chorus` processors are now a large part of what the A4 costs. The chorus runs even when no track sends to it.
+
+Audio QA (`--target -18`) varies from run to run with the old code too. Oscillator phases and noise seeds are random:
+- Wobble's sub and OSC 2 sit at the same pitch, so its loudness swings by up to 2.8 LU;
+- the snare's peaks vary by about 3 dB;
+- the old code had flagged runs as well (1 of 2 in each mode).
+
+The final build passes both modes:
+- **audition:** median −18.8 LUFS, spread 7.4 LU, 0 of 47 flagged;
+- **transport:** median −19.0 LUFS, spread 7.4 LU, 0 of 47 flagged.
+
+The old code over two runs per mode gave −19.05 / 7.69 LU (audition) and −19.03 / 7.57 LU (transport). The presets whose level repeats within 0.2 LU from run to run differ by a median of 0.01 LU between the versions.
+
+Kept as found: an idle voice's free-running LFOs do not actually run. `this.lfo1.ph -= Math.floor(this.lfo1.ph += d1)` reads the phase before the addition, so the phase stays put. After a wrap it sticks at a negative value until the voice wakes. Fixing it would change the sound, so it is left for a separate change.
