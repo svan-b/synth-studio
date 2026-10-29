@@ -108,14 +108,24 @@ iPad. **Fix**: PITCH, FILTER and VOLUME in one column; KB GATE, EXT IN and AUDIO
 (EXT IN above AUDIO OUT). KB GATE now fits at 7.3 px, the smallest jack name at 6.5 px. Jack ids are
 unchanged, so saved cables still connect.
 
-### P3. Boom-Bah Arp: a clipped edge read as a click
+### P3. Boom-Bah Arp: a clipped edge read as a click, and a level that wandered
 
-The audio QA flagged one "mid" click in Boom-Bah Arp in most runs. Captured with the control
-processor's channels alongside: no control value steps; the flagged sample is the first oscillator edge
-after the filter envelope snaps open (1 ms attack, EG AMT 6), clipped by MULTIDRIVE 3 into a step 8×
-steeper than anything in the 50 ms around it. That is what the circuit does, but it is a tick rather
-than a "bah". **Fix**: MULTIDRIVE back to 2 (its value before this review) and a 3 ms filter attack:
-0 flags in 10 captures (2 in 4 before).
+The audio QA flagged one "mid" click in Boom-Bah Arp in three of its four full runs. Captured with the
+control processor's channels alongside: no control value steps; the flagged sample is the first
+oscillator edge after the filter envelope snaps open (1 ms attack, EG AMT +3), clipped by MULTIDRIVE
+into a step 8× steeper than anything in the 50 ms before it, worst on the top notes, where KB TRACK
+opens the filter furthest. That is what the circuit does, but it is a tick rather than a "bah". Its
+level also wandered from −18.5 to −23.2 LUFS between captures: OSC 1 and OSC 2 sit on the same pitch
+and drift past each other slower than the phrase lasts. **Fix**: MULTIDRIVE 2 (its value before this
+review), a 3 ms filter attack, EG AMT +2.5 and BEAT FREQ +0.4 Hz (a slow Moog-style beat that cycles
+within the phrase): 0 flagged in 14 captures with the QA's own capture, −19.6 to −20.9 LUFS.
+
+### P3. Cold Wind: level set by where the LFO happened to be
+
+Cold Wind's gusts come from a free-running 0.15 Hz LFO, so a 4 s phrase caught it open or closed:
+−16.4 to −23.4 LUFS between captures, and the re-levelling had aimed it at the ambient target (−21)
+although the QA judges a NOISE preset at −18. **Fix**: the LFO's KB RESET (every key starts a gust
+from the same point) and PRESET VOL 75: −18.6 to −18.8 LUFS.
 
 ## Left as they are (P3)
 
@@ -195,25 +205,30 @@ control processor's channels. "Manual" is the Subsequent 37 Owner's Manual (same
 | Envelope KB TRACK shortens decay and release up the keyboard (p.32) | 1:1 at noon | decay to −20 dB 267 / 134 / 67 / 34 ms at MIDI 36 / 48 / 60 / 72 |
 | LOOP repeats D-A-H-D-R (p.31) | | A 50 / D 100 / S 50 % / R 100 ms: a 297 ms cycle |
 | LATCH ON, MULTI TRIG, RESET (p.31) | | sustain held with no key; legato retrigger only with MULTI TRIG; RESET restarts from zero |
+| GATE SRC BOTH / NOTES / EXT (pp.41-42) | | BOTH: a key or +5 V at KB GATE opens both envelopes; NOTES: the jack alone stays silent; EXT: a key alone stays silent |
 | LFO 0.1-100 Hz, ×10 HI RANGE (pp.22-23) | | 5 / 50 Hz exact; HI RANGE 5 → 50 Hz, 100 → 1000 Hz |
 | MOD 1 on the wheel, MOD 2 full (p.22) | | MOD 1 PITCH AMT +1: 0 / 48 / 96 cents at wheel 0 / 50 / 100 %; MOD 2 96 cents with the wheel down |
 | LFO waves, KB RESET from zero (p.23) | TRI SQR SAW RAMP S&H | triangle rises from 0; SAW falls, RAMP rises; S&H holds one value per cycle |
 | Mixer: ≤ 5 clean, above 5 overdrives the filter (p.27) | | one source (a sine) at 3 / 5 / 7 / 10: 0.35 / 1.2 / 2.9 / 7.6 % THD at the output (was 0.65 / 2.8 / 6.6 / 13.7 %) |
 | MULTIDRIVE: asymmetric tube-like warmth to hard clipping (p.28) | | at 1 / 2 / 3 / 5 / 10: 1.8 / 5.0 / 11.8 / 27 / 42 % THD; even ≈ odd harmonics at 1-2, odd hard clipping at 10 (was odd-led from the start) |
-| FDBK can raise the volume considerably (p.27) | | default panel +3 / +7 / +10 dB at FDBK 4 / 7 / 10 |
+| FDBK can raise the volume considerably (p.27) | | default panel +3.7 / +8.8 / +12.7 dB at FDBK 4 / 7 / 10 (was +3 / +7 / +10: the mixer now has headroom before its limiter) |
+| Levels | | default panel (saw, MIDI 48): −18.8 dBFS RMS, −11.9 peak; everything at 10: −4.4 RMS, +0.1 peak (was −3.3 / +2.3) |
 | DUO MODE (p.26) | HI: OSC 2 the top key | C3 + G3 held: OSC 2 alone gives G3 60 dB over C3 with HI, the reverse with LO; mono plays the last key |
 | DC | | below 0.001 everywhere (mixer and output DC blockers) |
 
 ## Presets
 
-All 52 factory citations match `S37presets` (name, bank, slot, category), the names are "Category /
+All 52 factory citations match `S37presets` (name, bank, slot and category, checked by a script; the
+other 12 presets are Synth Studio originals), the names are "Category /
 Name" in the factory categories, and the settings carry what their names promise: the bass family on
 16' saws, square and sub; pads with slow envelopes and wave or filter LFOs; DUO presets that play
 two-note voicings; sync leads that sweep the slave; the arpeggio presets' patterns (INVERT, RANGE,
 RND) match their descriptions. Fixed: the four tempo-sync presets and four inaudible modulations (P2).
-After the gain-staging change every preset was re-levelled with PRESET VOL from the audio QA; Ticking
-Boom Bass, Synth Kick, Clock-Synced Chirps and Boom-Bah Arp, already at PRESET VOL 100, got a little
-more mixer level or MULTIDRIVE instead.
+After the gain-staging change every preset was re-levelled with PRESET VOL from the audio QA. Three
+presets already at PRESET VOL 100 were re-voiced instead: Ticking Boom Bass is a little brighter and longer (−22.8 → −20.2 LUFS), Synth Kick
+plays its body at 8' (MIDI 36-43 is 65-98 Hz, a kick's range; it was a 33-49 Hz rumble at 16',
+−22.9 → −20.6 LUFS), Clock-Synced Chirps has more sub and MULTIDRIVE (−21.0 LUFS). Boom-Bah Arp and
+Cold Wind: see P3 above.
 
 ## Lessons
 
@@ -224,10 +239,21 @@ harmonics at the filter input; MULTIDRIVE warm then clipping; self-oscillation a
 "just under self-oscillation" range of the acid challenge). Ear targets differ by 20 % or more of knob
 travel (the fine ones by 7.5-8 %). Lesson runner: 20 lessons, 0 failed, 0 manual steps.
 
-QA
+## QA
+
+Audio QA (`--target -18 --suggest`; the Sub 37 has no transport control, so `--excite sub37=transport`
+falls back to its own audition and is a second pass of the same captures):
+
+| Run | Before | After |
+|---|---|---|
+| audition | median −18.1 LUFS, spread 4.5 LU, 0 of 64 flagged (exit 0) | AFTER_AUD |
+| `--excite sub37=transport` | median −18.0 LUFS, spread 5.7 LU, 1 of 64 flagged: Boom-Bah Arp, 1 click (exit 1) | AFTER_TR |
+
+GATE_LINE
 
 ## Upgrade notes
 
-No control id, range or default changed, so saved settings need no conversion. Saved patches will
-sound slightly different: cleaner at mixer levels up to 6, and with MULTIDRIVE above 3 up to about
-3 dB quieter than before (the old drive was mostly level).
+No control id, jack id, range or default changed, so saved settings and cables need no conversion
+(four side-panel jacks only moved on the panel). Saved patches will sound slightly different: cleaner
+at mixer levels up to 6, and with MULTIDRIVE at 4-6 up to about 3.5 dB quieter than before (the old
+drive was mostly level); the default panel is 0.4 dB louder.

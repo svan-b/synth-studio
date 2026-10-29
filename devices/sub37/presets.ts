@@ -195,11 +195,11 @@ export const SUB37_PRESETS: Record<string, PresetSpec> = {
     aeg_attack: 600, aeg_decay: 2000, aeg_sustain: 90, aeg_release: 1900, mod1_rate: 0.3, mod1_pitch_amt: 6,
     mod1_pitch_dest: 2, mod2_source: 4, mod2_rate: 4, mod2_filter_amt: 30,
   }),
-  cold_wind: preset("Noise / Cold Wind", "A wintry wind: pink noise only, through a resonant 12 dB filter that a slow triangle LFO sweeps like gusts. Recreation of the Sub 37 factory preset “COLD NOISE” (bank 2, preset 10, NOISE); Moog's own settings are not published, so these are ours. Play: Hold a key for wind; higher keys whistle more (KB TRACK 1.0).", 2, 11, {
-    preset_volume: 58.7, mix_osc1: 0, mix_noise: 80, cutoff: 800, resonance: 60, filter_slope: 1, filter_eg_amt: 20,
+  cold_wind: preset("Noise / Cold Wind", "A wintry wind: pink noise only, through a resonant 12 dB filter that a slow triangle LFO sweeps like gusts; with the LFO's KB RESET every key starts a new gust. Recreation of the Sub 37 factory preset “COLD NOISE” (bank 2, preset 10, NOISE); Moog's own settings are not published, so these are ours. Play: Hold a key for wind; higher keys whistle more (KB TRACK 1.0).", 2, 11, {
+    preset_volume: 75, mix_osc1: 0, mix_noise: 80, cutoff: 800, resonance: 60, filter_slope: 1, filter_eg_amt: 20,
     feg_attack: 800,
     feg_decay: 2000, feg_sustain: 60, feg_release: 2000, aeg_attack: 600, aeg_decay: 1000, aeg_release: 2000,
-    mod2_rate: 0.15, mod2_filter_amt: 30,
+    mod2_rate: 0.15, mod2_filter_amt: 30, mod2_kb_reset: true,
   }),
   pressure_sparkle_lead: preset("Lead / Pressure Sparkle Lead", "A soft lead that sparkles when you press into the keys: aftertouch scales a fast wave-shape wobble on the octave-up OSC 2 (MOD 2 depth from AFTERTOUCH). Recreation of the Sub 37 factory preset “SOFT PRESS 4 SPARKLE” (bank 2, preset 12, LEAD); Moog's own settings are not published, so these are ours. On the hardware the depth comes from aftertouch; the twin’s keys have no pressure, so the MOD wheel stands in. Play: Play softly, then lean into long notes for the sparkle.", 2, 12, {
     preset_volume: 100, osc1_wave: 0, osc2_octave: 2, osc2_wave: 67, mix_osc2: 30, cutoff: 2000, resonance: 10,
@@ -255,9 +255,9 @@ export const SUB37_PRESETS: Record<string, PresetSpec> = {
     mod2_dest: 4, mod2_mod_amt: 30,
   }),
   boom_bah_arp: preset("Arp / Boom-Bah Arp", "An arpeggio that alternates low \"boom\" and high \"bah\": RANGE +1 with INVERT plays each note and then its octave before moving on (C, C', E, E'…). Recreation of the Sub 37 factory preset “BOOM BAH” (bank 3, preset 13, ARP); Moog's own settings are not published, so these are ours. Play: Hold a two- or three-note chord low on the keyboard; it bounces between octaves.", 3, 4, {
-    preset_volume: 100, osc1_octave: 0, osc2_octave: 0, osc2_wave: 67, mix_osc1: 60, mix_sub: 30, mix_osc2: 40,
-    cutoff: 450,
-    resonance: 30, multidrive: 20, filter_eg_amt: 60, feg_attack: 3, feg_decay: 180, feg_sustain: 0, feg_release: 120,
+    preset_volume: 100, osc1_octave: 0, osc2_octave: 0, osc2_wave: 67, beat_freq: 0.4, mix_osc1: 60, mix_sub: 30,
+    mix_osc2: 40, cutoff: 450,
+    resonance: 30, multidrive: 20, filter_eg_amt: 50, feg_attack: 3, feg_decay: 180, feg_sustain: 0, feg_release: 120,
     feg_multi_trig: true, aeg_sustain: 30, aeg_release: 150, aeg_multi_trig: true, arp_on: true, arp_sync: true,
     arp_div: 13, arp_oct_range: 4, arp_invert: true,
   }),
