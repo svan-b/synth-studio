@@ -16,7 +16,7 @@
 //               parameter is a destination. LFO 2 and the envelopes run first,
 //               so they can modulate LFO 1 (as on the hardware).
 //               Outputs: [0] dry L/R, [1] sends (chorus, delay, reverb),
-//               [2] mono post-VCA signal (the next track's NEI input).
+//               [2] mono multimode-filter output, before the VCA (the next track's NEI input).
 //               Input [0]: the neighbour track's mono signal (OSC 2 WAV NEI).
 //   'a4-fxmod'  the FX track's parameters: FX locks on the audio clock, the two
 //               FX LFOs, and the value mapping. A pure source (no inputs) whose
@@ -273,6 +273,7 @@ class A4Voice extends AudioWorkletProcessor {
     this.stepSec = 0.125;
 
     this.note = 60; this.pitch = 60; this.glideFrom = 60; this.glideT = 0; this.glideTime = 0;
+    this.bendAmt = 0; this.bendT = 0; this.bendTime = 0;   // auto bend (OSC 1&2 BND)
     this.vel = 100 / 127; this.acc = 0; this.gate = false;
     this.envA = new Env(); this.envF = new Env(); this.env2 = new Env();
     this.lfo1 = new Lfo(); this.lfo2 = new Lfo();
@@ -285,6 +286,7 @@ class A4Voice extends AudioWorkletProcessor {
     this.feed = false;
     this.p1 = Math.random(); this.p2 = Math.random();
     this.s1 = 1; this.s2 = 1; this.c1 = 0; this.c2 = 0;   // sub dividers
+    // ladder stages, multimode integrators, FDB coupling (lp1: the DC level the feedback path blocks), ladder output
     this.l0 = 0; this.l1 = 0; this.l2 = 0; this.l3 = 0; this.ic1 = 0; this.ic2 = 0; this.lp1 = 0; this.fb = 0;
     this.gain = 0; this.panL = Math.SQRT1_2; this.panR = Math.SQRT1_2; this.sendC = 0; this.sendD = 0; this.sendR = 0;
     this.g1 = 0.5; this.g2 = 0.5; this.dt1 = 0.005; this.dt2 = 0.005;
@@ -340,11 +342,21 @@ class A4Voice extends AudioWorkletProcessor {
     }
   }
 
+  /**
+   * The sequencer ends an overlapping note at the instant the next one starts. With ARP LEG on, that
+   * next note plays legato (manual p.44): its gate takes over and the envelopes run on.
+   */
+  static legatoNext(q, time) {
+    for (let i = 0; i < q.length && q[i].time <= time + 1e-6; i++) if (q[i].t === 'on') return !!q[i].leg;
+    return false;
+  }
+
   /** The end of a cut: every envelope at rest, no gate */
   silence() {
     for (const e of [this.envA, this.envF, this.env2]) { e.v = 0; e.stage = 0; e.gate = false; e.pending = false; e.gateEnd = Infinity; }
     this.gate = false;
     this.glideTime = 0;
+    this.bendAmt = 0;
     this.gS = 0;
   }
 
@@ -361,13 +373,17 @@ class A4Voice extends AudioWorkletProcessor {
     this.vel = Math.max(1, ev.vel) / 127;
     this.acc = ev.acc ? 1 : 0;
     const prt = P[I.snd_prt];
-    const glide = ev.slide || prt === 1 || (prt === 2 && wasGate && ev.live);
+    const legMode = P[I.snd_leg] >= 0.5;
+    // SOUND SETTINGS PORTAMENTO acts only on notes played on the keyboard (or from MIDI), never on
+    // the sequencer's; LEG glides between overlapping played notes and needs LEGATO MODE on (manual
+    // p.35). Slide trigs always glide (p.52).
+    const glide = ev.slide || (ev.live && (prt === 1 || (prt === 2 && legMode && wasGate)));
     if (glide && !this.idle) {
       this.glideFrom = this.pitch;
-      this.glideTime = 0.008 * exp2((this.E(I.osc_sli) / 127) * 9);
+      this.glideTime = A4Voice.slideSec(this.E(I.osc_sli));
       this.glideT = 0;
     } else { this.pitch = ev.note; this.glideTime = 0; }
-    const legato = wasGate && ((ev.slide) || ev.leg || (P[I.snd_leg] >= 0.5 && ev.live));
+    const legato = wasGate && ((ev.slide) || ev.leg || (legMode && ev.live));
     this.gate = true;
     if (!legato) {
       // ev.rt: the NOTE page retrig switches (1 ENV F, 2 ENV 2, 4 LFO 1, 8 LFO 2; all on by default)
@@ -376,6 +392,10 @@ class A4Voice extends AudioWorkletProcessor {
       this.retrig(rt, now);
       this.vibFade = P[I.osc_vfa] < 0 ? 0 : 1;
       this.noiseFade = P[I.noise_fad] < 0 ? 0 : 1;
+      // BND, the auto bend: every trigged note starts offset by BND and glides to its pitch in the
+      // SLI time (manual p.88); 0.5 semitone a step, so +/-64 is about +/-2.7 octaves
+      const bnd = this.E(I.osc_bnd);
+      this.bendAmt = bnd * 0.5; this.bendT = 0; this.bendTime = A4Voice.slideSec(this.E(I.osc_sli));
       if (P[I.osc_trg] >= 0.5) { this.p1 = 0; this.p2 = 0; this.c1 = 0; this.c2 = 0; this.s1 = 1; this.s2 = 1; }
     }
     this.velMod = this.vel;
@@ -459,9 +479,22 @@ class A4Voice extends AudioWorkletProcessor {
       this.drift2 = this.drift2 * 0.9995 + (Math.random() - 0.5) * 0.002;
     } else { this.drift1 = 0; this.drift2 = 0; }
 
+    // Auto bend (BND): from the offset back to the note over the SLI time, fast at first. With sync on
+    // only the synced oscillator bends: OSC 2 for 1>2, OSC 1 for 2>1, both for metal (manual p.88)
+    let bend1 = 0, bend2 = 0;
+    if (this.bendAmt !== 0) {
+      this.bendT += dt;
+      const k = this.bendTime > 0 ? Math.min(1, this.bendT / this.bendTime) : 1;
+      const b = this.bendAmt * (1 - k) * (1 - k);
+      const smd = Math.round(P[I.osc_smd]);
+      if (smd !== 1) bend1 = b;
+      if (smd !== 2) bend2 = b;
+      if (k >= 1) this.bendAmt = 0;
+    }
+
     // Oscillator increments
-    const n1 = (P[I.osc1_trk] >= 0.5 ? this.pitch : 60) + this.E(I.osc1_tun) + this.E(I.osc1_fin) / 128 + this.M[I.osc1_pmod] + vib + this.drift1 * 0.05;
-    const n2 = (P[I.osc2_trk] >= 0.5 ? this.pitch : 60) + this.E(I.osc2_tun) + this.E(I.osc2_fin) / 128 + this.M[I.osc2_pmod] + vib + this.drift2 * 0.05;
+    const n1 = (P[I.osc1_trk] >= 0.5 ? this.pitch : 60) + this.E(I.osc1_tun) + this.E(I.osc1_fin) / 128 + this.M[I.osc1_pmod] + vib + bend1 + this.drift1 * 0.05;
+    const n2 = (P[I.osc2_trk] >= 0.5 ? this.pitch : 60) + this.E(I.osc2_tun) + this.E(I.osc2_fin) / 128 + this.M[I.osc2_pmod] + vib + bend2 + this.drift2 * 0.05;
     const sr = sampleRate;
     const hz1 = 440 * exp2((n1 - 69) / 12) + this.E(I.osc1_det) * 0.125;
     const hz2 = 440 * exp2((n2 - 69) / 12) + this.E(I.osc2_det) * 0.125;
@@ -493,9 +526,11 @@ class A4Voice extends AudioWorkletProcessor {
     this.bNHpK[b] = col > 0 ? 1 - Math.exp((-TWO_PI * 30 * exp2(col * 8.06)) / sr) : 0;
     this.bNHpG[b] = 1 + 1.5 * col * col * col * col;
 
-    // Filter 1: ladder (keytrack: 32 = 1:1; DEP 64 = the full range)
+    // Filter 1: ladder (keytrack: 32 = 1:1; DEP 64 = the full range). An accent trig opens the filter
+    // envelope further as well as raising the level (manual p.51): DEP x (1 + 0.8 x ACC/127)
     const semis = this.pitch - 60;
-    const f1 = this.E(I.flt1_frq) + (this.E(I.flt1_trk) / 32) * semis + this.E(I.flt1_dep) * 2 * ef;
+    const accF = 1 + this.acc * 0.8 * (this.E(I.snd_acc) / 127);
+    const f1 = this.E(I.flt1_frq) + (this.E(I.flt1_trk) / 32) * semis + this.E(I.flt1_dep) * 2 * ef * accF;
     this.bG1[b + 1] = tanF((Math.PI * Math.min(sr * 0.45, fltHz(clamp(f1, -24, 140)))) / sr);
     const r1 = this.E(I.flt1_res) / 127;
     const k1 = 4.3 * Math.pow(r1, 1.3);
@@ -508,7 +543,7 @@ class A4Voice extends AudioWorkletProcessor {
     this.bInDrive[b] = 1 + on * on * 7;
     this.bInComp[b] = 1 / Math.sqrt(1 + on * on * 2.5);
     // Filter 2: multimode
-    const f2 = this.E(I.flt2_frq) + (this.E(I.flt2_trk) / 32) * semis + this.E(I.flt2_dep) * 2 * ef;
+    const f2 = this.E(I.flt2_frq) + (this.E(I.flt2_trk) / 32) * semis + this.E(I.flt2_dep) * 2 * ef * accF;
     this.bG2[b + 1] = tanF((Math.PI * Math.min(sr * 0.45, fltHz(clamp(f2, -24, 140)))) / sr);
     const r2 = this.E(I.flt2_res) / 127;
     const type2 = Math.round(P[I.flt2_typ]);
@@ -538,6 +573,9 @@ class A4Voice extends AudioWorkletProcessor {
     this.am1 = P[I.osc_am1] >= 0.5; this.am2 = P[I.osc_am2] >= 0.5;
     return ea;
   }
+
+  /** SLI 0..127 -> seconds (8 ms .. 4 s): note slides, portamento and the auto bend */
+  static slideSec(sli) { return 0.008 * exp2((clamp(sli, 0, 127) / 127) * 9); }
 
   // Naive waveform value / slope (per unit phase) at phase p. Every wave has a variable shape (PW):
   //   SAW  a second, phase-offset saw joins the first (64 = one saw, the ends = an octave up)
@@ -727,7 +765,7 @@ class A4Voice extends AudioWorkletProcessor {
         if (ev.t === 'at') { const l = ev.list; for (let k = 0; k < l.length; k += 2) P[l[k]] = l[k + 1]; }
         else if (ev.t === 'on') this.noteOn(ev, now);
         else if (ev.t === 'rtrg') { this.retrig(ev.rt, now); this.idle = false; }
-        else if (ev.t === 'off') this.noteOff();
+        else if (ev.t === 'off') { if (!A4Voice.legatoNext(q, ev.time)) this.noteOff(); }
         else if (ev.t === 'ramp') { const l = ev.list; for (let k = 0; k < l.length; k += 3) this.ramps.push({ i: l[k], from: l[k + 1], to: l[k + 2], t0: ev.time, t1: ev.t1 }); }
       }
       if (this.ramps.length) {
@@ -783,6 +821,7 @@ class A4Voice extends AudioWorkletProcessor {
     let rng = this.rng, nCount = this.nCount, nVal = this.nVal, nHp = this.nHp, pk0 = this.pk0, pk1 = this.pk1, pk2 = this.pk2, nRed = this.nRed;
     const w1 = this.w1, w2 = this.w2, am1 = this.am1, am2 = this.am2, type2 = this.type2;
     const redK = 1 - Math.exp((-TWO_PI * 20) / sr);
+    const fdbK = 1 - Math.exp((-TWO_PI * 25) / sr);
     const bG1 = this.bG1, bG2 = this.bG2, bGain = this.bGain, bPanL = this.bPanL, bPanR = this.bPanR, bSC = this.bSC, bSD = this.bSD, bSR = this.bSR;
     for (let i = 0; i < n; i++) {
       const b = (i / BLOCK) | 0, f = (i - b * BLOCK + 1) / BLOCK;
@@ -792,7 +831,10 @@ class A4Voice extends AudioWorkletProcessor {
       // oscillators: delay-compensated output with the presence FIR
       let o1 = w1 <= 3 || this.sub1 ? FIR_C * W1[i + 1] + FIR_S * (W1[i] + W1[i + 2]) : 0;
       let o2 = w2 <= 3 || this.sub2 ? FIR_C * W2[i + 1] + FIR_S * (W2[i] + W2[i + 2]) : 0;
-      if (w1 === 6) o1 += fb * 1.6;                          // FDB: filter 1 output fed back
+      // FDB: the ladder's output, AC-coupled (25 Hz), becomes OSC 1 (manual p.73). LEV sets the loop
+      // gain: moderate levels thicken and overload what OSC 2 sends in; above about 100 the loop
+      // self-oscillates, its pitch and tone set by the cutoff and resonance
+      if (w1 === 6) { lp1 += (fb - lp1) * fdbK; o1 += (fb - lp1) * 2.6; }
       if (w2 === 6) o2 += nbIn ? nbIn[i] * 2.5 : 0;          // NEI: the neighbour track
       if (am1 || am2) {
         const g1 = 0.5 + 0.5 * tanhF(o1 * 8), g2 = 0.5 + 0.5 * tanhF(o2 * 8);
