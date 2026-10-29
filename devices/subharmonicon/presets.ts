@@ -163,7 +163,7 @@ export const SUBHARMONICON_PRESETS: Record<string, PresetSpec> = {
 
   // ------------------------------------------------------------- Owner's Manual patch sheets (pp.45-49)
   man_aquatic: preset('Chords / Bubbling sub chords',
-    'Based on the Owner\'s Manual sheet "Aquatic Chords" (p.45). EG is off and CLOCK OUT is patched into TRIGGER IN, so every master pulse plucks both envelopes while the two sequencers (÷4 and ÷5) change the sub-rich chords underneath; SEQ 1 also moves the cutoff. The sheet calls its sequencer pitches suggestions.',
+    'Based on the Owner\'s Manual sheet "Aquatic Chords" (p.45). EG is off and CLOCK OUT is patched into TRIGGER IN, so every master pulse plucks both envelopes while the two sequencers (÷4 and ÷5) change the sub-rich chords underneath; SEQ 1 also moves the cutoff. The sheet calls its sequencer pitches suggestions. With EG off, a key held while stopped is a gate: the full chord sounds at full VOLUME until you let go.',
     'manual', {
       vco1: { freq: 1567.98, sub1: 5, sub2: 4, wave: DOWN, levels: [44, 53, 54] },
       vco2: { freq: C6, sub1: 9, sub2: 3, wave: UP, levels: [55, 47, 50] },
@@ -173,7 +173,7 @@ export const SUBHARMONICON_PRESETS: Record<string, PresetSpec> = {
       rhythm: [[4, true, false], [5, false, true], off, off], tempo: 407, eg_mode: EG_OFF,
     }, [cable('out_seq1', 'in_cutoff'), cable('out_clock', 'in_trigger')]),
   man_mellow: preset('Arp / Hand-faded harmony arp',
-    'Based on the Owner\'s Manual sheet "Mellow Harmonies" (p.45). EG is off and SEQ 1 CLK fires the envelopes, so only Sequencer 1\'s moves pluck: a steady arpeggio at ÷1 while Sequencer 2 (÷8) shifts VCO 2 slowly. The sheet marks all four SUB LEVEL knobs as performance controls with no set position; here they are well up - fade the undertones in and out to change the harmony.',
+    'Based on the Owner\'s Manual sheet "Mellow Harmonies" (p.45). EG is off and SEQ 1 CLK fires the envelopes, so only Sequencer 1\'s moves pluck: a steady arpeggio at ÷1 while Sequencer 2 (÷8) shifts VCO 2 slowly. The sheet marks all four SUB LEVEL knobs as performance controls with no set position; here they are well up - fade the undertones in and out to change the harmony. With EG off, a key held while stopped holds the sound at full VOLUME until you let go.',
     'manual', {
       vco1: { freq: 1567.98, sub1: 5, sub2: 4, wave: DOWN, levels: [50, 80, 80] },
       vco2: { freq: C6, sub1: 3, sub2: 6, wave: UP, levels: [50, 80, 80] },
@@ -183,7 +183,7 @@ export const SUBHARMONICON_PRESETS: Record<string, PresetSpec> = {
       rhythm: [[1, true, false], [8, false, true], off, off], tempo: 407, eg_mode: EG_OFF,
     }, [cable('out_seq1', 'in_cutoff'), cable('out_seq1_clk', 'in_trigger')]),
   man_slip: preset('Rhythm / Self-tripping cross-sequence',
-    'Based on the Owner\'s Manual sheet "Slip & Fall" (p.46), all five cables: each VCO is played by both sequencers (its own assign plus a crossed cable), and both envelopes feed back into RHYTHM 1 and 2, so every note bends the rhythm and the groove stumbles and recovers. EG is off; SEQ 1 CLK fires the envelopes.',
+    'Based on the Owner\'s Manual sheet "Slip & Fall" (p.46), all five cables: each VCO is played by both sequencers (its own assign plus a crossed cable), and both envelopes feed back into RHYTHM 1 and 2, so every note bends the rhythm and the groove stumbles and recovers. EG is off; SEQ 1 CLK fires the envelopes, and a key held while stopped is a gate that holds the sound open until you let go.',
     'manual', {
       vco1: { freq: C8, sub1: 6, sub2: 7, wave: UP, levels: [71, 0, 55.5] },
       vco2: { freq: C6, sub1: 3, sub2: 3, wave: UP, levels: [71, 0, 90] },
@@ -223,7 +223,7 @@ export const SUBHARMONICON_PRESETS: Record<string, PresetSpec> = {
       rhythm: [[8, true, false], [4, false, true], off, [16, true, false]], tempo: 515, eg_mode: EG_ON,
     }, [cable('out_seq1', 'in_rhythm1'), cable('out_seq2', 'in_rhythm2'), cable('out_seq1_clk', 'in_cutoff'), cable('out_seq2_clk', 'in_vca')]),
   man_spiral: preset('Ambient / Accelerating spiral',
-    'Based on the Owner\'s Manual sheet "Spiral Ways" (p.48). The VCF envelope patched into RHYTHM 1 makes Sequencer 1 rush on every swell and relax as it decays; VCF ATTACK sets how far it builds. The sheet tunes VCO 1 SUB 1 to a fifth and suggests sweeping VCO 2 SUB 2 FREQ toward a major third (÷5 to ÷3). As printed, EG and PLAY are unlit and nothing fires the envelopes, so the patch is silent; this recreation lights EG.',
+    'Based on the Owner\'s Manual sheet "Spiral Ways" (p.48). The VCF envelope patched into RHYTHM 1 makes Sequencer 1 rush on every swell and relax as it decays; VCF ATTACK sets how far it builds. The sheet tunes VCO 1 SUB 1 to a fifth (÷6) and VCO 2 SUB 2 to a major third (÷5), with an arrow to sweep it. As printed, EG and PLAY are unlit and nothing fires the envelopes, so the patch is silent; this recreation lights EG.',
     'manual', {
       vco1: { freq: C8, sub1: 6, sub2: 7, wave: MID, levels: [60, 59, 59] },
       vco2: { freq: C6, sub1: 2, sub2: 5, wave: DOWN, levels: [65, 100, 100] },

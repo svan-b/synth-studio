@@ -20,7 +20,7 @@
 // ============================================================================
 
 import type { ButtonElement, KnobElement, PanelElement, PanelLayout } from '@/types/panel';
-import { PATCH_GRID } from './spec';
+import { EG_OPTIONS, PATCH_GRID } from './spec';
 import { CycleButton, EgButton, Screw, WaveGlyph } from './PanelWidgets';
 
 const PX_PER_MM = 3.55;
@@ -72,9 +72,11 @@ const ASSIGN_H = 6.21;
 const HEAD_X = 40.75;
 
 const leftSection: PanelElement[] = [
-  label('SEQUENCER 1', HEAD_X, 6.4, 8.5, { letterSpacing: 1.2 }),
-  label('SEQUENCER 2', HEAD_X, 31.4, 8.5, { letterSpacing: 1.2 }),
-  label('POLYRHYTHM', HEAD_X, 56.2, 8.5, { letterSpacing: 1.2 }),
+  // Headings 0.8 mm above the drawing's (6.4 / 31.4 / 56.2 mm), so the STEP and RHYTHM legends under
+  // them reach the same legible size as their neighbours
+  label('SEQUENCER 1', HEAD_X, 5.6, 8.5, { letterSpacing: 1.2 }),
+  label('SEQUENCER 2', HEAD_X, 30.6, 8.5, { letterSpacing: 1.2 }),
+  label('POLYRHYTHM', HEAD_X, 55.4, 8.5, { letterSpacing: 1.2 }),
   ...[0, 1].flatMap(s => COL.flatMap((x, i): PanelElement[] => [
     knob(`seq${s + 1}_step${i + 1}`, x, SEQ_Y[s], SMALL, { value: 'hover' }),
     {
@@ -109,9 +111,11 @@ const leftSection: PanelElement[] = [
   btn('next', 70.55, 101.38, 7.97, 7.91, { event: 'next', capText: 'NEXT', ledColor: '#f5f5f5' }),
   btn('play', 47.63, 111.69, 13.97, 8.21, { capText: 'PLAY', lit: ({ engine, values }) => (engine.playing !== undefined ? !!engine.playing : !!values.play) }),
   btn('trigger', 67.4, 111.69, 13.97, 8.21, { event: 'trigger', capText: 'TRIGGER', lit: ({ engine }) => ledsOf(engine).trig ?? 0 }),
-  // EG states in words, so OFF / ON / HELD can be chosen by touch without the long press (twin aid)
-  label('EG', 48.6, 118.3, 6.5, { color: MUTED, align: 'right' }),
-  { kind: 'switch', control: 'eg_mode', x: 58.4, y: 118.3, style: 'buttons', orientation: 'horizontal', label: 'none', scale: 0.85 },
+  // EG states in words, so OFF / ON / HELD can be chosen by touch without the long press (twin aid):
+  // three radio keys in the strip between PLAY / TRIGGER and the nameplate, sized for 9 px legends,
+  // with touch areas that end about where PLAY and TRIGGER begin
+  label('EG', 45.3, 118.5, 8, { color: MUTED, align: 'right' }),
+  ...EG_OPTIONS.map((t, v): PanelElement => btn('eg_mode', 49.9 + v * 9.0, 118.5, 7.6, 3.4, { setValue: v, capText: t, color: '#1c1c1c' })),
   // Rhythm logic: a global (MIDI CC 113) setting on the hardware, given a small switch here
   { kind: 'switch', control: 'rhythm_logic', x: 80.2, y: 103.4, scale: 1.15, labelText: 'LOGIC' },
   label('CC 113', 80.2, 110.6, 5.5, { color: '#8a8a8a' }),
@@ -232,9 +236,9 @@ const filterSection: PanelElement[] = [
 const PB_X = (c: number) => 255.17 + c * 13.54;
 const PB_Y = (r: number) => 16.61 + r * 13.51;
 const patchbay: PanelElement[] = [
-  label('IN', 271.6, 4.1, 7.5, { color: MUTED }),
+  label('IN', 271.0, 4.1, 7.5, { color: MUTED }),
   label('/', 274.9, 4.1, 7.5, { color: MUTED }),
-  label('OUT', 279.0, 4.1, 7.5, { invert: true }),
+  label('OUT', 279.8, 4.1, 7.5, { invert: true }),
   // The printed legends, in full (VCO 1 SUB 1 ...): the panel condenses them to fit the column
   ...PATCH_GRID.map(({ id, col, row }): PanelElement => ({ kind: 'jack', jack: id, x: PB_X(col), y: PB_Y(row) })),
   // MIDI activity LED, printed just left of the MIDI IN legend (studio clock and keys light it)
