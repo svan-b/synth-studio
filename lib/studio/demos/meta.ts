@@ -34,6 +34,8 @@ export interface DemoMeta {
   target: { lufs: number; truePeak: number };
   sections: DemoSection[];
   accent: string;
+  /** One thing about how the studio is set up, shown while the demo is loaded and stopped */
+  tip?: string;
 }
 
 const C = { intro: '#38bdf8', groove: '#a78bfa', drop: '#f97316', brk: '#22c55e', build: '#eab308', peak: '#f43f5e', outro: '#14b8a6' };
@@ -49,6 +51,7 @@ export const DEMOS: DemoMeta[] = [
     instruments: ['analog-rytm', 'analog-four', 'xone96', 'studio-clock'],
     target: { lufs: -10.5, truePeak: -1 },
     accent: '#f97316',
+    tip: 'Swing lives in the patterns (54 % on both Elektrons), not on the studio clock, so both machines swing the same amount from the same place.',
     sections: [
       { id: 'ltl-intro', name: 'INTRO', bars: 8, color: C.intro, note: 'DJ-friendly: 8 bars of drums let a DJ (or a listener) lock onto the tempo. The rim\'s 1:2 condition turns a 1-bar loop into a 2-bar phrase.' },
       { id: 'ltl-groove', name: 'GROOVE', bars: 8, color: C.groove, note: 'The bass enters behind a low-pass filter (Xone FILTER 2 on channel 2), so it is felt before it is heard: adding a part doesn\'t have to mean adding brightness.' },
@@ -71,6 +74,7 @@ export const DEMOS: DemoMeta[] = [
     instruments: ['dfam', 'mother32', 'subharmonicon', 'xone96', 'studio-clock'],
     target: { lufs: -13, truePeak: -1 },
     accent: '#38bdf8',
+    tip: 'The DFAM has no reset: before ▶ it must sit on step 8 (press ADVANCE), so the first clock pulse plays step 1. The demo parks it for you on load and after every stop.',
     sections: [
       { id: 'tc-clockwork', name: 'CLOCKWORK', bars: 8, color: C.intro, note: 'A polyrhythm alone: SEQ 1 steps every beat, SEQ 2 every three 16ths, and the envelopes fire on both. Listen for the pattern that repeats every 3 beats inside a 4-beat bar.' },
       { id: 'tc-pulse', name: 'PULSE', bars: 8, color: C.groove, note: 'An anchor makes a polyrhythm readable: the DFAM\'s kick on every beat tells the ear where the bar is, so the 3-step cycle now sounds like syncopation, not confusion.' },
@@ -91,6 +95,7 @@ export const DEMOS: DemoMeta[] = [
     instruments: ['analog-rytm', 'sub37', 'xone96'],
     target: { lufs: -11, truePeak: -1 },
     accent: '#22c55e',
+    tip: 'The Sub 37\'s two presets are arranger snapshots: each section\'s snapshot carries the whole sound and its sequence, as the hardware stores a sequence with every preset.',
     sections: [
       { id: 'cw-intro', name: 'INTRO', bars: 8, color: C.intro, note: 'A broken beat can still be DJ-friendly: the kick pattern repeats every two bars, so the phrase is easy to count. Straight timing is a style choice.' },
       { id: 'cw-verse1', name: 'VERSE 1', bars: 16, color: C.groove, note: 'Kick and bass interlock: every bass note sits on a step the kick leaves free, so a busy bassline and a busy kick never collide. The filter starts slightly closed, leaving room for Verse 2.' },

@@ -1,7 +1,7 @@
 // ============================================================================
 // End-to-end regression suite. Run against a production build:
 //   npm run build && npx next start -p 3100
-//   node scripts/e2e/run.cjs http://localhost:3100 [--out <dir>] [--full]
+//   node scripts/e2e/run.cjs http://localhost:3100 [--out <dir>] [--full] [--demos]
 //
 // Always: the iPad journey, the studio (clock cable, record, reload), rapid
 // instrument switching, saved-settings upgrades and touch gestures (fine adjust,
@@ -113,6 +113,17 @@ check('touch: spectrum scope draws the output while it plays', sp.playing?.mode 
 const pp = run(path.join(__dirname, 'producer.cjs'), [base, path.join(outDir, 'producer')], 600_000);
 check('producer path: iPad walkthrough of a whole-studio lesson', !pp.__error && pp.total > 0 && (pp.failed ?? []).length === 0 && (pp.errs ?? []).length === 0,
   pp.__error ?? { passed: pp.passed, total: pp.total, failed: pp.failed });
+
+// ---- Demo tracks (--demos, or --full) -------------------------------------------
+// Each demo loaded from the studio, played from bar 1 to its end, its mix measured and bounced
+// (scripts/e2e/demos.cjs; about 20 minutes, the demos play in real time)
+if (full || args.includes('--demos')) {
+  const dm = run(path.join(__dirname, 'demos.cjs'), [base, '--out', path.join(outDir, 'demos')], 3_600_000);
+  for (const [id, d] of Object.entries(dm.demos ?? {})) {
+    for (const c of d.checks ?? []) check(`demo ${id}: ${c.name}`, c.ok, c.detail);
+  }
+  if (dm.__error || !Object.keys(dm.demos ?? {}).length) check('demos: run', false, dm.__error ?? 'no report');
+}
 
 // ---- Every instrument (--full) -----------------------------------------------
 if (full) {

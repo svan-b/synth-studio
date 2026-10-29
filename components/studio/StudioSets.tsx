@@ -188,22 +188,25 @@ function DemoCaption({ demo }: { demo: DemoMeta }) {
   const info = cur ? DEMO_SECTION[cur.id] : undefined;
   const shown = info ?? DEMO_SECTION[sections[0]?.id ?? ''];
   if (!shown) return null;
-  const label = info
-    ? `${info.section.name} · bar ${head.bar + 1}/${cur!.bars}`
-    : `${demo.title} is loaded · ${sections.length} sections`;
-  const body = info ? info.section.note : `Press ▶ to play it from bar 1. While it plays, this shows what each section teaches. First up, ${shown.section.name}: ${shown.section.note}`;
+  // the bar counter changes every bar: kept out of the live region, which speaks once a section
+  const bar = info ? <span aria-hidden> · bar {head.bar + 1}/{cur!.bars}</span> : null;
 
   return (
     <>
-      <div ref={ref} className="mt-2 rounded-lg border border-[#2f2f2f] bg-[#171717] px-3 py-2" role="status" aria-live="polite" data-demo-caption={info ? info.section.id : 'idle'}>
-        <p className="text-[11px] font-bold tabular-nums" style={{ color: info ? info.section.color : '#9ca3af' }}>
-          {info ? `Now playing · ${label}` : label}
-        </p>
-        <p className="text-[12px] text-gray-200 leading-snug mt-0.5">{body}</p>
+      <div ref={ref} className="mt-2 rounded-lg border border-[#2f2f2f] bg-[#171717] px-3 py-2" data-demo-caption={info ? info.section.id : 'idle'}>
+        <div role="status" aria-live="polite">
+          <p className="text-[11px] font-bold tabular-nums" style={{ color: info ? info.section.color : '#9ca3af' }}>
+            {info ? <>Now playing · {info.section.name}{bar}</> : `${demo.title} is loaded · ${sections.length} sections`}
+          </p>
+          <p className="text-[12px] text-gray-200 leading-snug mt-0.5">
+            {info ? info.section.note : `Press ▶ to play it from bar 1. While it plays, this shows what each section teaches. First up, ${shown.section.name}: ${shown.section.note}`}
+          </p>
+        </div>
+        {!info && demo.tip && <p className="text-[11px] text-gray-400 leading-snug mt-1">{demo.tip}</p>}
       </div>
       {info && !inView && (
         <div className="fixed left-3 bottom-3 z-30 max-w-[min(520px,calc(100vw-1.5rem))] rounded-lg border border-[#3a3a3a] bg-[#141414]/95 px-3 py-2 shadow-2xl pointer-events-none" aria-hidden>
-          <p className="text-[11px] font-bold tabular-nums" style={{ color: info.section.color }}>{demo.title} · {label}</p>
+          <p className="text-[11px] font-bold tabular-nums" style={{ color: info.section.color }}>{demo.title} · {info.section.name}{bar}</p>
           <p className="text-[12px] text-gray-200 leading-snug mt-0.5">{info.section.note}</p>
         </div>
       )}
