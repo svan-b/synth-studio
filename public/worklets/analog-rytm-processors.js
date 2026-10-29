@@ -860,6 +860,11 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           fb[4] = Math.pow(clamp(P[6], 0, 127) / 127, 1.5);
           v.k[3] = P[7] >= 127 ? 1 : k60(expT(P[7], 0.01, 2));
         }
+        // Output trim per machine (twin calibration). With the closed path's fixed drop and short DEC,
+        // CH CLASSIC, HH BASIC and CH METALLIC sat 10-17 LU under every other voice at their init
+        // values, so closed hats vanished in a groove. These put each hat machine's init hit within
+        // about 3 LU of the others on the voice (the open hat a little louder, as it rings longer).
+        fb[5] = m === CH_CLASSIC || m === HH_BASIC ? 2.24 : m === CH_METALLIC ? 1.78 : 1;
         break;
       }
       case CY_CLASSIC: case CY_METALLIC: case CY_RIDE: {
@@ -1269,7 +1274,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         break;
       }
       case CH_CLASSIC: case OH_CLASSIC: case CH_METALLIC: case OH_METALLIC: case HH_BASIC: case HH_LAB: {
-        const m = v.m, lev = fb[3];
+        const m = v.m, lev = fb[3], trim = fb[5];
         const f = v.f;
         const dt0 = f[0] * INV_SR, dt1 = f[1] * INV_SR, dt2 = f[2] * INV_SR, dt3 = f[3] * INV_SR, dt4 = f[4] * INV_SR, dt5 = f[5] * INV_SR;
         const gH = fb[0], gB = fb[1];
@@ -1305,7 +1310,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           e[0] *= k[0];
           let y = hp * env * 4.6;
           if (m === HH_BASIC && t < BUMP_N) y += BUMP[t] * 0.34;
-          G[i] = y * lev * (m === HH_LAB ? 1.6 : 1);
+          G[i] = y * lev * trim;
         }
         alive = e[0] * lev;
         break;
