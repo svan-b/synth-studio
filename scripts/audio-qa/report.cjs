@@ -13,7 +13,8 @@ const FLAGS = {
   errors: 'console, page or render errors (processor errors, NaN/Inf, dropouts, failed run)',
   silent: 'whole render below the silence threshold',
   'true-peak': 'true peak above the ceiling at the instrument output',
-  'stuck-tail': 'still sounding after stop',
+  'stuck-tail': 'still sounding after stop and not decaying (a note, gate or drone left on)',
+  'long-tail': 'still above the tail threshold after stop, but decaying (long release or FX tail)',
   clicks: 'clicks / discontinuities',
   dc: 'DC offset',
   loudness: 'loudness outlier against the category target',
@@ -98,7 +99,8 @@ function computeFlags(p, th) {
   if (i.tail && fin(i.tail.peakDb) && i.tail.peakDb > th.tailDbfs && !(p.rule && p.rule.sustain)) {
     const rate = i.tail.decayDbPerSec;
     const ringing = fin(rate) && rate < th.ringingDbPerSec;
-    add('stuck-tail', `${fx(i.tail.peakDb)} dBFS peak ${i.tail.afterSec} s after stop, ${ringing ? `still decaying at ${fx(rate)} dB/s (long release or FX tail)` : `not decaying (${fin(rate) ? fx(rate) + ' dB/s' : 'flat'}): a note, gate or drone is left on`}`, ringing ? 20 + (i.tail.peakDb - th.tailDbfs) / 2 : 45 + (i.tail.peakDb - th.tailDbfs));
+    if (ringing) add('long-tail', `${fx(i.tail.peakDb)} dBFS peak ${i.tail.afterSec} s after stop, still decaying at ${fx(rate)} dB/s (long release or FX tail)`, 20 + (i.tail.peakDb - th.tailDbfs) / 2);
+    else add('stuck-tail', `${fx(i.tail.peakDb)} dBFS peak ${i.tail.afterSec} s after stop and not decaying (${fin(rate) ? signed(rate) + ' dB/s' : 'flat'}): a note, gate or drone is left on`, 45 + (i.tail.peakDb - th.tailDbfs));
   }
   if (i.clicks && i.clicks.count >= th.clicksMin) {
     const k = i.clicks.kinds;
@@ -166,7 +168,9 @@ function evaluateDevice(rep, cfg, opts = {}) {
   const flagCounts = {};
   rep.presets.forEach(p => p.flags.forEach(f => { flagCounts[f.id] = (flagCounts[f.id] || 0) + 1; }));
   const tps = rep.presets.filter(p => p.inst && fin(p.inst.truePeakDb)).map(p => p.inst.truePeakDb);
+  const setupErrors = (rep.setupErrors || []).length;
   rep.stats = {
+    setupErrors,
     presets: rep.presets.length,
     measured: measured.length,
     silent: rep.presets.filter(p => p.inst && p.inst.silent).length,
@@ -235,7 +239,7 @@ function deviceMarkdown(rep) {
   L.push('');
   L.push(`${d.manufacturer ? d.manufacturer + ' ' : ''}${d.name}, ${s.presets} presets. Excitation **${d.excitation.mode}** (${d.excitation.why}), ${r.options.seconds} s + ${r.options.tail} s tail, ${r.sampleRate} Hz. Instrument output: ${d.output}${d.output === 'mono' ? ' (measured as the stereo bus hears it: L = R)' : ''}.`);
   L.push('');
-  L.push(`Run ${r.date} against ${r.baseUrl}${r.commit ? `, commit \`${r.commit}\`` : ''}${r.buildId ? `, build \`${r.buildId}\`` : ''}.`);
+  L.push(`Run ${r.date} against ${r.baseUrl}${r.appCommit ? `, app code at \`${r.appCommit}\`` : ''}${r.commit && r.commit !== r.appCommit ? ` (tool at \`${r.commit}\`)` : ''}${r.buildId ? `, build \`${r.buildId}\`` : ''}, Chromium ${r.browser || '?'}.`);
   L.push('');
   L.push('| Median | Spread | IQR | Max true peak | Master vs instrument | Flagged |');
   L.push('|---|---|---|---|---|---|');
@@ -243,6 +247,12 @@ function deviceMarkdown(rep) {
   L.push('');
   L.push(`Flags: ${flagSummary(s.flagCounts)}. Loudness reference: ${fx(s.reference)} LUFS (${s.referenceKind}).`);
   L.push('');
+  if (s.setupErrors) {
+    L.push(`**Errors while the app loaded this instrument (${s.setupErrors}):**`);
+    L.push('');
+    rep.setupErrors.forEach(e => L.push(`- ${e.kind}: ${esc(e.message)}`));
+    L.push('');
+  }
 
   L.push('## Presets by loudness');
   L.push('');
@@ -257,13 +267,14 @@ function deviceMarkdown(rep) {
     const i = p.inst;
     const m = p.master;
     const flags = p.flags.map(f => f.id).join(', ') || 'ok';
+    const label = `${esc(p.name)}${p.cables ? ` · ${p.cables} cable${p.cables > 1 ? 's' : ''}` : ''}`;
     if (!i) {
-      L.push(`| ${idx + 1} | ${esc(p.name)} | ${esc(p.category)} | - | - | - | - | - | - | - | - | - | - | - | - | ${flags} |`);
+      L.push(`| ${idx + 1} | ${label} | ${esc(p.category)} | - | - | - | - | - | - | - | - | - | - | - | - | ${flags} |`);
       return;
     }
     const vs = fin(i.lufs) && fin(p.target) ? signed(i.lufs - p.target) : '-';
     const corr = d.output === 'mono' ? 'mono' : fx(i.correlation, 2, '-');
-    L.push(`| ${idx + 1} | ${esc(p.name)} | ${esc(p.category)} | ${fx(i.lufs)} | ${vs} | ${fx(i.maxShortTermLufs)} | ${signed(i.truePeakDb)} | ${signed(i.samplePeakDb)} | ${i.clip ? i.clip.samples : '-'} | ${fin(Math.max(i.dc || 0, i.dcTail || 0)) ? Math.max(i.dc || 0, i.dcTail || 0).toFixed(4) : '-'} | ${fx(i.crestDb)} | ${i.clicks ? i.clicks.count : '-'} | ${i.tail ? fx(i.tail.peakDb) : '-'} | ${corr} | ${m ? fx(m.lufs) : 'n/a'} | ${flags} |`);
+    L.push(`| ${idx + 1} | ${label} | ${esc(p.category)} | ${fx(i.lufs)} | ${vs} | ${fx(i.maxShortTermLufs)} | ${signed(i.truePeakDb)} | ${signed(i.samplePeakDb)} | ${i.clip ? i.clip.samples : '-'} | ${fin(Math.max(i.dc || 0, i.dcTail || 0)) ? Math.max(i.dc || 0, i.dcTail || 0).toFixed(4) : '-'} | ${fx(i.crestDb)} | ${i.clicks ? i.clicks.count : '-'} | ${i.tail ? fx(i.tail.peakDb) : '-'} | ${corr} | ${m ? fx(m.lufs) : 'n/a'} | ${flags} |`);
   });
   L.push('');
 
@@ -329,6 +340,9 @@ function loadDeviceReports(dir) {
 
 function topProblems(reports, n = 20) {
   const all = [];
+  reports.forEach(rep => (rep.setupErrors || []).slice(0, 3).forEach(e => {
+    all.push({ device: rep.device.id, preset: '(loading the instrument)', key: null, flag: 'errors', detail: `${e.kind}: ${e.message}`, score: 110 });
+  }));
   reports.forEach(rep => rep.presets.forEach(p => p.flags.forEach(f => {
     all.push({ device: rep.device.id, preset: p.name, key: p.key, flag: f.id, detail: f.detail, score: f.score });
   })));
@@ -343,7 +357,7 @@ function summaryOf(reports, extra = {}) {
     id: rep.device.id, name: rep.device.name, presets: rep.stats.presets, excitation: rep.device.excitation.mode,
     output: rep.device.output, median: rep.stats.median, spread: rep.stats.spread, iqr: rep.stats.iqr,
     min: rep.stats.min, max: rep.stats.max, maxTruePeak: rep.stats.maxTruePeak, masterOffset: rep.stats.masterOffset,
-    flagged: rep.stats.flagged, flagCounts: rep.stats.flagCounts, date: rep.run.date,
+    flagged: rep.stats.flagged, flagCounts: rep.stats.flagCounts, setupErrors: rep.stats.setupErrors || 0, date: rep.run.date,
   }));
   const studioMedian = median(devices.map(d => d.median));
   devices.forEach(d => { d.vsStudio = fin(studioMedian) && fin(d.median) ? round(d.median - studioMedian) : null; });
@@ -369,8 +383,13 @@ function summaryMarkdown(sum, reports) {
   reports = [...reports].sort((a, b) => (pos.get(a.device.id) ?? 1e6) - (pos.get(b.device.id) ?? 1e6));
   L.push('# Audio QA: all devices');
   L.push('');
-  const runs = [...new Set(reports.map(r => `${r.run.baseUrl}${r.run.commit ? ` at \`${r.run.commit}\`` : ''}`))];
+  const runs = [...new Set(reports.map(r => `${r.run.baseUrl}${r.run.appCommit || r.run.commit ? `, app code at \`${r.run.appCommit || r.run.commit}\`` : ''}`))];
   L.push(`${sum.devices.length} devices, ${sum.presets} presets, ${sum.flagged} flagged. Measured against ${runs.join('; ')}. Generated ${sum.generated}.`);
+  const loadErr = sum.devices.filter(d => d.setupErrors);
+  if (loadErr.length) {
+    L.push('');
+    L.push(`Errors while loading: ${loadErr.map(d => `${d.id} (${d.setupErrors})`).join(', ')}. See the device reports.`);
+  }
   L.push('');
   if (sum.calibration) {
     L.push('## Meter calibration');
@@ -419,6 +438,6 @@ function calibrationMarkdown(cal) {
 }
 
 module.exports = {
-  FLAGS, FLAG_ORDER, computeFlags, evaluateDevice, deviceMarkdown, summaryOf, summaryMarkdown, calibrationMarkdown,
+  FLAGS, FLAG_ORDER, computeFlags, evaluateDevice, ruleFor, deviceMarkdown, summaryOf, summaryMarkdown, calibrationMarkdown,
   loadDeviceReports, topProblems, compact, categoryOf, median, fx, signed, round, fin,
 };

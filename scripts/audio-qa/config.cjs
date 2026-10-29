@@ -17,7 +17,7 @@ module.exports = {
     tailAfterSec: 2,
     /** ... above this */
     tailDbfs: -60,
-    /** a tail falling faster than this (dB/s) is reported as ringing, not stuck */
+    /** a loud tail falling faster than this (dB/s) is a long-tail (release, FX), otherwise a stuck-tail */
     ringingDbPerSec: -6,
     /** loudness: allowed distance from the category target (LU), unless a rule sets its own */
     loudnessLu: 4,
@@ -27,7 +27,7 @@ module.exports = {
 
   /** Click detector (scripts/audio-qa/metrics.cjs detectClicks) */
   clicks: {
-    contextMs: 30, guardSamples: 3, isolation: 2.5, rmsRatio: 10, straightness: 4, floorDb: -50, relative: 0.02, quietDb: -60,
+    contextMs: 50, guardSamples: 3, isolation: 2.5, rmsRatio: 10, straightness: 4, floorDb: -50, relative: 0.02, quietDb: -60,
     /** abrupt ends: the last cutRecentMs within cutDropDb of the cutEarlierMs before, then cutPostMs below cutSilentDb */
     cutRecentMs: 0.5, cutEarlierMs: 5, cutDropDb: 12, cutPostMs: 10, cutSilentDb: -80,
   },

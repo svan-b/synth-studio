@@ -196,7 +196,7 @@ function pageLib(args) {
     if (!s) throw new Error('window.__synthStudio is not exposed (hub not initialised)');
     return s;
   };
-  const st = { instance: null, mod: null, ctx: null, node: null, sink: null, tap: null, level: [0, 0], levelAt: 0, chunks: [], marks: [], waiting: new Map() };
+  const st = { instance: null, mod: null, ctx: null, node: null, sink: null, tap: null, level: [0, 0], levelAt: 0, chunks: [], marks: [], waiting: new Map(), gen: 0 };
 
   function onMessage(e) {
     const m = e.data || {};
@@ -217,10 +217,11 @@ function pageLib(args) {
 
   const mark = name => st.node.port.postMessage({ type: 'mark', name });
 
-  async function untilAudio(t) {
+  async function untilAudio(t, gen) {
     const ctx = st.ctx;
     const deadline = performance.now() + Math.max(0, t - ctx.currentTime) * 4000 + 5000;
     while (ctx.currentTime < t) {
+      if (gen !== undefined && gen !== st.gen) throw new Error('capture superseded by a newer one');
       if (ctx.state !== 'running') throw new Error(`AudioContext is ${ctx.state}`);
       if (performance.now() > deadline) throw new Error(`the audio clock stopped advancing (currentTime ${ctx.currentTime.toFixed(3)} s)`);
       await sleep(Math.max(1, Math.min(15, (t - ctx.currentTime) * 1000)));
@@ -469,6 +470,8 @@ function pageLib(args) {
     const { hub, transport } = S();
     const ctx = st.ctx;
     const inst = st.instance;
+    // A capture the driver gave up on must not keep running into this one
+    const gen = ++st.gen;
     if (o.settleMs) await sleep(o.settleMs);
     const taps = connectTaps();
     QA.errors.length = 0;
@@ -486,33 +489,33 @@ function pageLib(args) {
     const wall0 = performance.now();
     let stopRet = null;
     try {
-      await untilAudio(audio0 + o.preroll);
+      await untilAudio(audio0 + o.preroll, gen);
       const ex0 = ctx.currentTime;
       mark('excite');
       if (o.mode === 'keys') {
         for (const ev of o.events) {
-          await untilAudio(ex0 + ev.t);
+          await untilAudio(ex0 + ev.t, gen);
           if (ev.on) { hub.noteOn(inst, ev.note, o.velocity); notes.on++; } else { hub.noteOff(inst, ev.note); notes.off++; }
         }
-        await untilAudio(ex0 + o.seconds);
+        await untilAudio(ex0 + o.seconds, gen);
       } else if (o.mode === 'transport') {
         hub.startAll();
-        await untilAudio(ex0 + o.seconds);
+        await untilAudio(ex0 + o.seconds, gen);
         hub.stopAll();
       } else if (o.mode === 'audition') {
         hub.audition(inst, null, { ms: (o.seconds + 120) * 1000 });
-        await untilAudio(ex0 + o.seconds);
+        await untilAudio(ex0 + o.seconds, gen);
         hub.stopAudition();
       } else if (o.mode === 'signal') {
         if (!o.signal.steady) sig.start();
-        await untilAudio(ex0 + o.seconds);
+        await untilAudio(ex0 + o.seconds, gen);
         if (!o.signal.keepAfterStop && !o.signal.steady) sig.stop();
       } else {
         throw new Error(`unknown excitation mode '${o.mode}'`);
       }
       mark('stop');
       stopRet = { transportPlaying: transport.playing };
-      await untilAudio(ctx.currentTime + o.tail);
+      await untilAudio(ctx.currentTime + o.tail, gen);
     } finally {
       if (sig) sig.stop();
     }

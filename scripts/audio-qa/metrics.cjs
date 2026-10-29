@@ -279,16 +279,17 @@ function sanitize(x) {
 // Clicks / discontinuities
 //
 // A click is a step in the waveform's value. For every sample n a "step
-// estimate" s[n] compares two short lines: one through x[n-3], x[n-2] (the
-// signal just before) and one through x[n+1], x[n+2] (just after). If the lines
-// cross anywhere over the 3-sample gap the signal only bent there (a corner, a
-// steep but smooth transient, curvature) and s = 0; otherwise s is their
-// smallest distance over the gap, which is the height of the step, also when
-// it is spread over 2-3 samples by band-limiting. A step counts as a click when
+// estimate" s[n] extrapolates the signal into a 3-sample gap from both sides:
+// a parabola through x[n-4..n-2] (just before) and one through x[n+1..n+3]
+// (just after). If the two meet anywhere in the gap the signal only bent there
+// (a corner such as an instant attack, a curving transient, a fast sweep) and
+// s = 0; otherwise s is their smallest distance over the gap, which is the
+// height of the step, also when band-limiting spreads it over 2-3 samples.
+// A step counts as a click when
 //   - s is above an absolute floor (default -50 dBFS, and 2 % of the capture peak),
-//   - the signal is locally straight on both sides: s is at least `straightness` x
-//     the second difference there (a sharp but smooth edge curves into the gap),
-//   - s is at least `isolation` x every other s within +-30 ms (outside the
+//   - the signal is locally smooth on both sides: s is at least `straightness` x
+//     the third difference there (a sharp but smooth edge bends into the gap),
+//   - s is at least `isolation` x every other s within +-50 ms (outside the
 //     +-3 samples a step occupies): saw / square / sync edges repeat every
 //     period, and noise bursts or bright transients put several step-like
 //     values within a few samples, so they never count; and
@@ -321,11 +322,19 @@ function detectClicksChannel(x, fs, opts) {
   const E = Math.max(3, opts.guardSamples | 0);
   const S = W - E;
   const a = new Float32Array(N);
-  for (let n = 3; n < N - 2; n++) {
-    const base = x[n + 1] - x[n - 2];
-    const d0 = base - 3 * (x[n + 2] - x[n + 1]); // right line minus left line at n-2
-    const d1 = base - 3 * (x[n - 2] - x[n - 3]); // ... at n+1
-    a[n] = (d0 > 0) !== (d1 > 0) ? 0 : Math.min(Math.abs(d0), Math.abs(d1));
+  for (let n = 4; n < N - 3; n++) {
+    // left parabola (Newton backward differences at n-2), right one (forward at n+1)
+    const p = x[n - 2], pd1 = p - x[n - 3], pd2 = p - 2 * x[n - 3] + x[n - 4];
+    const q = x[n + 1], qd1 = x[n + 2] - q, qd2 = x[n + 3] - 2 * x[n + 2] + q;
+    let min = Infinity, pos = false, neg = false;
+    for (let k = 0; k <= 3; k++) { // t = n-2+k, the right side extrapolates j = 3-k back
+      const j = 3 - k;
+      const D = (q - j * qd1 + (j * (j + 1) / 2) * qd2) - (p + k * pd1 + (k * (k + 1) / 2) * pd2);
+      if (D > 0) pos = true; else if (D < 0) neg = true; else { pos = neg = true; }
+      const m = Math.abs(D);
+      if (m < min) min = m;
+    }
+    a[n] = pos && neg ? 0 : min;
   }
   const cum2 = new Float64Array(N + 1);
   for (let n = 0; n < N; n++) cum2[n + 1] = cum2[n] + a[n] * a[n];
@@ -345,13 +354,13 @@ function detectClicksChannel(x, fs, opts) {
   const thr = opts.threshold;
   const quietWin = Math.round(0.005 * fs);
   const quietLevel = opts.quietLevel;
-  for (let n = 4; n < N - 3; n++) {
+  for (let n = 5; n < N - 4; n++) {
     const v = a[n];
     if (v < thr || v < a[n - 1] || v < a[n + 1]) continue;
-    // A step sits between locally straight signal; a fast but smooth edge (a
-    // band-limited wrap behind a resonant filter) curves on both sides of it
-    const curve = Math.max(Math.abs(x[n - 2] - 2 * x[n - 3] + x[n - 4]), Math.abs(x[n + 3] - 2 * x[n + 2] + x[n + 1]));
-    if (v <= opts.straightness * curve) continue;
+    // A step sits between locally smooth signal; a fast but smooth edge (a
+    // band-limited wrap behind a resonant filter) bends on both sides of it
+    const bend = Math.max(Math.abs(x[n - 2] - 3 * x[n - 3] + 3 * x[n - 4] - x[n - 5]), Math.abs(x[n + 4] - 3 * x[n + 3] + 3 * x[n + 2] - x[n + 1]));
+    if (v <= opts.straightness * bend) continue;
     const m2 = Math.max(rangeMax(n - W, n - E - 1), rangeMax(n + E + 1, n + W));
     if (v <= opts.isolation * m2) continue;
     const [s1, c1] = rangeSq(n - W, n - E - 1);
@@ -396,7 +405,7 @@ function detectCutoffs(chs, fs, threshold, opts) {
 
 function detectClicks(chs, fs, opts = {}) {
   const o = {
-    contextMs: 30, guardSamples: 3, isolation: 2.5, rmsRatio: 10, straightness: 4,
+    contextMs: 50, guardSamples: 3, isolation: 2.5, rmsRatio: 10, straightness: 4,
     floorDb: -50, relative: 0.02, quietDb: -60, maxEvents: 40,
     cutRecentMs: 0.5, cutEarlierMs: 5, cutDropDb: 12, cutPostMs: 10, cutSilentDb: -80, ...opts,
   };

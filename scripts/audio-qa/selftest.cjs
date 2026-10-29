@@ -114,6 +114,7 @@ function run({ log = console.log } = {}) {
 
   // Clicks: periodic discontinuities and noise must not count
   const clicks = x => M.detectClicks([x, x], fs).count;
+  check('clicks in a naive saw, 25 Hz', clicks(naiveSaw(fs, 2, 25, 0.5)), 0, 0);
   check('clicks in a naive saw, 40 Hz', clicks(naiveSaw(fs, 2, 40, 0.5)), 0, 0);
   check('clicks in a naive saw, 110 Hz', clicks(naiveSaw(fs, 2, 110, 0.5)), 0, 0);
   check('clicks in a naive saw, 1.76 kHz', clicks(naiveSaw(fs, 2, 1760, 0.5)), 0, 0);

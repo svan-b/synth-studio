@@ -34,7 +34,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const DEFAULTS = require('./audio-qa/config.cjs');
 const M = require('./audio-qa/metrics.cjs');
 const R = require('./audio-qa/report.cjs');
@@ -130,13 +130,22 @@ function storeVersion() {
   return 5;
 }
 
+const git = (...args) => execFileSync('git', args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+/** Paths that do not change what the app sounds like: this tool and the docs */
+const NOT_APP = [':(exclude)scripts/audio-qa.cjs', ':(exclude)scripts/audio-qa', ':(exclude)docs'];
+
 function gitCommit() {
   try {
-    const sha = execSync('git rev-parse --short HEAD', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-    const dirty = execSync('git status --porcelain --untracked-files=no', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-    return dirty ? `${sha}+dirty` : sha;
+    const sha = git('rev-parse', '--short', 'HEAD');
+    const dirty = git('status', '--porcelain', '--untracked-files=no', '--', '.', ...NOT_APP);
+    // The app code measured: the oldest first-parent ancestor whose app files equal HEAD's
+    let app = sha;
+    for (const c of git('rev-list', '--first-parent', '--max-count=50', 'HEAD').split('\n')) {
+      try { git('diff', '--quiet', c, 'HEAD', '--', '.', ...NOT_APP); app = c.slice(0, 7); } catch { break; }
+    }
+    return { commit: sha, appCommit: dirty ? `${app}+local changes` : app };
   } catch {
-    return null;
+    return { commit: null, appCommit: null };
   }
 }
 
@@ -343,13 +352,12 @@ async function calibrate(page, info, run) {
 // ----------------------------------------------------------------------------
 // One preset
 // ----------------------------------------------------------------------------
-function analyzeCapture(rec, cap, run) {
+function analyzeCapture(rec, cap, run, th) {
   const sr = cap.sampleRate;
   const ch = cap.pcm.map(decodeF32);
   const marks = {};
   cap.marks.forEach(m => { marks[m.name] = m.frame; });
   const stereo = cap.layout[0][2] > 0;
-  const th = run.th;
   rec.output = stereo ? 'stereo' : 'mono';
   rec.inst = R.compact(M.analyzeTap([ch[0], ch[1]], sr, { excite: marks.excite, stop: marks.stop }, {
     stereo, clicks: run.cfg.clicks, tail: { afterSec: th.tailAfterSec }, silentDb: th.silentDbfs,
@@ -372,7 +380,7 @@ function analyzeCapture(rec, cap, run) {
 }
 
 async function runPreset(dp, pr, idx, total, run) {
-  const { page, sink } = dp;
+  const { page, sink, th } = dp;
   const device = dp.info.device;
   const rec = { key: pr.key, name: pr.name, source: pr.source, cables: pr.cables, errors: [], runNotes: [] };
   sink.bucket = rec.errors;
@@ -393,13 +401,14 @@ async function runPreset(dp, pr, idx, total, run) {
       velocity: run.ex.velocity, events: dp.excitation.mode === 'keys' ? keyEvents(run.ex) : null,
     };
     const cap = await withTimeout(page.evaluate(o => window.__qa.capture(o), opts), (run.ex.seconds + run.ex.tail) * 4000 + 30000, 'capture');
-    ch = analyzeCapture(rec, cap, run);
+    ch = analyzeCapture(rec, cap, run, th);
   } catch (err) {
     rec.runError = String((err && err.message) || err).split('\n')[0].slice(0, 300);
   }
   sink.bucket = null;
   rec.ms = Date.now() - t0;
-  const flags = R.computeFlags({ ...rec, target: null }, run.th);
+  const rule = R.ruleFor(pr.name, dp.rules);
+  const flags = R.computeFlags({ ...rec, target: null, rule: rule ? { name: rule.name, sustain: !!rule.sustain } : null }, th);
   const i = rec.inst;
   const line = i
     ? `${lpad(R.fx(i.lufs), 6)} LUFS  TP ${lpad(R.signed(i.truePeakDb), 5)}  tail ${lpad(i.tail ? R.fx(i.tail.peakDb, 0) : '-', 4)}  ${flags.length ? flags.map(f => (f.id === 'clicks' ? `clicks(${i.clicks.count})` : f.id)).join(', ') : 'ok'}`
@@ -440,6 +449,9 @@ async function runDevice(browser, device, run, calibration) {
   let presets = info.presets;
   if (run.presetRe) presets = presets.filter(p => run.presetRe.test(p.key) || run.presetRe.test(p.name));
   if (run.limit) presets = presets.slice(0, run.limit);
+  const dcfg = (run.cfg.devices && run.cfg.devices[device]) || {};
+  dp.th = { ...run.cfg.thresholds, ...(dcfg.thresholds || {}) };
+  dp.rules = dcfg.categories || run.cfg.categories || [];
   dp.excitation = chooseExcitation(info, entry, run.override, run.cfg);
   console.log(`[${device}] ${info.name}: ${presets.length}${presets.length !== info.presets.length ? ` of ${info.presets.length}` : ''} presets, excitation ${dp.excitation.mode} (${dp.excitation.why}), ${info.sampleRate} Hz, tap ${info.tap}, ${info.masterFeeds ? 'master tapped' : 'no master tap'}${info.presetSelect ? '' : ', preset menu not found (store fallback)'}`);
   if (dp.sink.setup.length) console.log(`  setup errors: ${dp.sink.setup.map(e => e.message).join(' | ').slice(0, 300)}`);
@@ -467,6 +479,9 @@ async function runDevice(browser, device, run, calibration) {
       try {
         const reopened = await openDevicePage(browser, device, run);
         reopened.excitation = dp.excitation;
+        reopened.th = dp.th;
+        reopened.rules = dp.rules;
+        reopened.sink.setup.unshift(...dp.sink.setup);
         dp = reopened;
       } catch (err) {
         console.log(`  [${device}] could not reopen: ${err.message || err}`);
@@ -483,7 +498,7 @@ async function runDevice(browser, device, run, calibration) {
     kind: 'audio-qa-device',
     tool: { name: 'audio-qa', version: VERSION },
     run: {
-      date: new Date().toISOString(), started: run.started, baseUrl: run.baseUrl, commit: run.commit, buildId: info.buildId, browser: run.browserVersion,
+      date: new Date().toISOString(), started: run.started, baseUrl: run.baseUrl, commit: run.commit, appCommit: run.appCommit, buildId: info.buildId, browser: run.browserVersion,
       sampleRate: info.sampleRate, options: { ...run.ex, presets: run.args.presets || null, excite: run.args.excite || 'auto' },
     },
     device: {
@@ -609,6 +624,7 @@ async function main() {
   if (args.excite) {
     String(args.excite).split(',').forEach(part => {
       const [k, v] = part.includes('=') ? part.split('=') : ['*', part];
+      if (!['auto', 'audition', 'keys', 'transport'].includes(v.trim())) throw new Error(`--excite: unknown mode '${v.trim()}' (auto | audition | keys | transport)`);
       override[k.trim()] = v.trim();
     });
   }
@@ -630,7 +646,7 @@ async function main() {
     target: args.target !== undefined ? num(args.target, 'target', -70, 0) : null,
     wav: args.wav ? (args.wav === 'all' ? 'all' : 'flagged') : null,
     sampleRate: args['sample-rate'] ? num(args['sample-rate'], 'sample-rate', 8000, 192000) : 0,
-    storeVersion: storeVersion(), commit: gitCommit(), browserVersion: browser.version(), started: new Date().toISOString(),
+    storeVersion: storeVersion(), ...gitCommit(), browserVersion: browser.version(), started: new Date().toISOString(),
   };
   console.log(`audio-qa ${baseUrl}: ${devices.join(', ')}; ${ex.seconds} s + ${ex.tail} s tail; reports in ${out}`);
   const results = [];
@@ -661,10 +677,10 @@ async function main() {
   if (args.suggest) printSuggestions(reports, args.suggest === 'all');
   if (results.some(r => r.error)) return 2;
   if (calibration && calibration.result && !calibration.result.ok) return 2;
-  return reports.some(r => r.stats.flagged) && !args['no-fail'] ? 1 : 0;
+  return reports.some(r => r.stats.flagged || r.stats.setupErrors) && !args['no-fail'] ? 1 : 0;
 }
 
 main().then(code => { process.exitCode = code; }, err => {
-  console.error(`audio-qa: ${err && err.stack ? err.stack : err}`);
+  console.error(`audio-qa: ${process.env.AUDIO_QA_DEBUG && err && err.stack ? err.stack : (err && err.message) || err}`);
   process.exitCode = 2;
 });
