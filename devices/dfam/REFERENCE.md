@@ -44,7 +44,7 @@ Page numbers are the manual's printed page numbers, which are also its PDF page 
 | Legends are printed white on black, one line above each control | one-line legends above each control | (DFAM manual, p.7) | **verified** |
 | Printed scales: rings around VCO 1 FREQUENCY, VCO 2 FREQUENCY and TEMPO; 20Hz, 200Hz, 2kHz and 20kHz around CUTOFF; (-) and (+) under the three EG AMOUNT knobs | drawn in our own style | (DFAM manual, p.7) | **verified** |
 | Inputs have standard lettering, outputs reverse lettering | outputs in white boxes with black text | (DFAM manual, p.24, p.7) | **verified** |
-| Knob travel: the manual's clock positions start at 7 o'clock for the minimum, so the knobs turn about 300 degrees (to 5 o'clock) | values map by fraction of travel; the twin's knobs turn 270 degrees on screen, so the manual's 3 o'clock (80 % of travel) shows at about 2:40 | (DFAM manual, p.15, p.19, p.21) | **likely** |
+| Knob travel: the manual's clock positions start at 7 o'clock for the minimum, so the knobs turn about 300 degrees (to 5 o'clock) | values map by fraction of travel, and the twin's knobs turn the same 300 degrees on screen (`knobTravel` in layout.ts), so the manual's 3 o'clock (80 % of travel) shows at 3 o'clock | (DFAM manual, p.15, p.19, p.21) | **likely** |
 
 ## Controls
 

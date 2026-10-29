@@ -178,6 +178,13 @@ export function Wheel({ label, control, value, min, max, spring, onChange, onEnd
 // Buttons
 // ---------------------------------------------------------------------------
 
+/**
+ * Touch area beyond a cap's edges, native px: one number for every side, or [left, right, top,
+ * bottom]. The caps are drawn hardware-small (8.5 x 5 mm), about 14 x 8 CSS px on an iPad, so
+ * each one reaches out into the free panel around it (never into a neighbour's own touch area).
+ */
+export type Hit = number | [number, number, number, number];
+
 interface CapProps {
   lit: number;
   blink?: boolean;
@@ -191,11 +198,15 @@ interface CapProps {
   w?: number;
   h?: number;
   highlighted?: boolean;
+  hit?: Hit;
+  /** Font size of the cap's own legend (native px) */
+  fontSize?: number;
 }
 
 /** The Sub 37's lit rectangular button cap (w / h in px) */
-function Cap({ lit, blink, label, control, preset, title, aria, onDown, onUp, w = 17, h = 10, highlighted }: CapProps) {
+function Cap({ lit, blink, label, control, preset, title, aria, onDown, onUp, w = 17, h = 10, highlighted, hit, fontSize = 9 }: CapProps) {
   const on = lit > 0.02;
+  const [hl, hr, ht, hb] = typeof hit === 'number' ? [hit, hit, hit, hit] : hit ?? [0, 0, 0, 0];
   return (
     <button
       type="button"
@@ -216,14 +227,16 @@ function Cap({ lit, blink, label, control, preset, title, aria, onDown, onUp, w 
       className={blink ? 'animate-pulse' : undefined}
       style={{
         ...noSelect,
+        position: 'relative', flexShrink: 0, pointerEvents: 'auto',
         width: w, height: h, borderRadius: 2, cursor: 'pointer', padding: 0,
         border: highlighted ? '2px solid #f97316' : '1px solid #4a4a4a',
         background: on ? `linear-gradient(${RED}, #b3201b)` : 'linear-gradient(#2c2c2c, #151515)',
         opacity: on ? 0.45 + 0.55 * Math.min(1, lit) : 1,
         boxShadow: on ? `0 0 ${3 + 5 * lit}px ${RED}` : 'inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 3px rgba(0,0,0,0.6)',
-        color: on ? '#160303' : '#d8d8d8', fontSize: 9, fontWeight: 800, lineHeight: 1,
+        color: on ? '#160303' : '#d8d8d8', fontSize, fontWeight: 800, lineHeight: 1,
       }}
     >
+      {(hl || hr || ht || hb) ? <span aria-hidden style={{ position: 'absolute', left: -hl, right: -hr, top: -ht, bottom: -hb }} /> : null}
       {label}
     </button>
   );
@@ -232,7 +245,7 @@ function Cap({ lit, blink, label, control, preset, title, aria, onDown, onUp, w 
 const targeted = (ctx: Ctx, id: string) => !!(ctx.teaching && ctx.step?.control === id);
 
 /** One button stepping a switch through its positions; the positions show on separate LEDs */
-export function CycleButton({ ctx, control, order, reverse }: { ctx: Ctx; control: string; order?: number[]; reverse?: boolean }) {
+export function CycleButton({ ctx, control, order, reverse, hit }: { ctx: Ctx; control: string; order?: number[]; reverse?: boolean; hit?: Hit }) {
   const spec = SUB37.controls[control];
   const n = spec?.type === 'switch' ? spec.options.length : 1;
   const seq = order ?? Array.from({ length: n }, (_, i) => i);
@@ -243,7 +256,7 @@ export function CycleButton({ ctx, control, order, reverse }: { ctx: Ctx; contro
     ctx.setValue(control, seq[j < 0 ? 0 : j]);
   };
   const label = spec?.type === 'switch' ? spec.options[cur] : '';
-  return <Cap lit={0} control={control} aria={`${spec?.label ?? control}: ${label}`} onDown={next} highlighted={targeted(ctx, control)} />;
+  return <Cap lit={0} control={control} aria={`${spec?.label ?? control}: ${label}`} onDown={next} highlighted={targeted(ctx, control)} hit={hit} />;
 }
 
 /**
@@ -251,7 +264,7 @@ export function CycleButton({ ctx, control, order, reverse }: { ctx: Ctx; contro
  * to make that control the destination (combos.ts). A long press and release keeps it held
  * for the next control you move (mouse).
  */
-export function DestButton({ ctx, bus }: { ctx: Ctx; bus: 1 | 2 }) {
+export function DestButton({ ctx, bus, hit }: { ctx: Ctx; bus: 1 | 2; hit?: Hit }) {
   const control = `mod${bus}_dest`;
   const timer = useRef<Timer | null>(null);
   const down = () => {
@@ -277,11 +290,11 @@ export function DestButton({ ctx, bus }: { ctx: Ctx; bus: 1 | 2 }) {
   };
   const held = Number(ctx.ui.destHeld ?? 0) === bus;
   const latched = Number(ctx.ui.destLatched ?? 0) === bus;
-  return <Cap lit={held ? 1 : 0} blink={latched} control={control} aria={`MOD ${bus} DEST: ${MOD_DESTS[Math.round(Number(ctx.values[control] ?? 1))]}`} onDown={down} onUp={up} highlighted={targeted(ctx, control)} />;
+  return <Cap lit={held ? 1 : 0} blink={latched} control={control} aria={`MOD ${bus} DEST: ${MOD_DESTS[Math.round(Number(ctx.values[control] ?? 1))]}`} onDown={down} onUp={up} highlighted={targeted(ctx, control)} hit={hit} />;
 }
 
 /** CONTROLLERS: opens the bus's MOD CONTROL menu on the LCD (p.50) */
-export function ControllersButton({ ctx, bus }: { ctx: Ctx; bus: 1 | 2 }) {
+export function ControllersButton({ ctx, bus, hit }: { ctx: Ctx; bus: 1 | 2; hit?: Hit }) {
   const open = ctx.ui.menu === `mod${bus}`;
   return (
     <Cap
@@ -289,12 +302,13 @@ export function ControllersButton({ ctx, bus }: { ctx: Ctx; bus: 1 | 2 }) {
       control={`mod${bus}_controllers`}
       aria={`MOD ${bus} CONTROLLERS`}
       onDown={() => ctx.setUi(open ? { menu: null } : { menu: `mod${bus}`, menuRow: 0, menuEdit: false })}
+      hit={hit}
     />
   );
 }
 
 /** Arpeggiator RANGE < and > (7 states, p.15); with BANK held they rotate the sequence (p.19) */
-export function RangeButton({ ctx, dir }: { ctx: Ctx; dir: -1 | 1 }) {
+export function RangeButton({ ctx, dir, hit }: { ctx: Ctx; dir: -1 | 1; hit?: Hit }) {
   const press = () => {
     const ui = uiOf(ctx.instance);
     if (bankHeld(ui)) {
@@ -306,11 +320,11 @@ export function RangeButton({ ctx, dir }: { ctx: Ctx; dir: -1 | 1 }) {
     const cur = Math.round(Number(ctx.values.arp_oct_range ?? 3));
     ctx.setValue('arp_oct_range', Math.max(0, Math.min(6, cur + dir)));
   };
-  return <Cap lit={0} control="arp_oct_range" aria={dir < 0 ? 'RANGE down' : 'RANGE up'} label={dir < 0 ? '◀' : '▶'} onDown={press} highlighted={targeted(ctx, 'arp_oct_range')} />;
+  return <Cap lit={0} control="arp_oct_range" aria={dir < 0 ? 'RANGE down' : 'RANGE up'} label={dir < 0 ? '◀' : '▶'} onDown={press} highlighted={targeted(ctx, 'arp_oct_range')} hit={hit} fontSize={10} />;
 }
 
 /** SYNC: press toggles; hold one second for TAP tempo, where taps set the internal clock (p.15) */
-export function SyncTapButton({ ctx }: { ctx: Ctx }) {
+export function SyncTapButton({ ctx, hit }: { ctx: Ctx; hit?: Hit }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
   const taps = useRef<number[]>([]);
@@ -343,13 +357,13 @@ export function SyncTapButton({ ctx }: { ctx: Ctx }) {
     }
     ctx.setValue('arp_sync', !ctx.values.arp_sync);
   };
-  return <Cap lit={ctx.values.arp_sync ? 1 : 0} blink={tapMode} control="arp_sync" aria={tapMode ? 'TAP tempo' : 'ARP SYNC'} onDown={down} onUp={up} highlighted={targeted(ctx, 'arp_sync')} />;
+  return <Cap lit={ctx.values.arp_sync ? 1 : 0} blink={tapMode} control="arp_sync" aria={tapMode ? 'TAP tempo' : 'ARP SYNC'} onDown={down} onUp={up} highlighted={targeted(ctx, 'arp_sync')} hit={hit} />;
 }
 
 /** KNOB SHIFT: blinks while the envelope knobs are shifted (p.30) */
-export function ShiftButton({ ctx }: { ctx: Ctx }) {
+export function ShiftButton({ ctx, hit }: { ctx: Ctx; hit?: Hit }) {
   const on = !!ctx.values.knob_shift;
-  return <Cap lit={on ? 1 : 0} blink={on} control="knob_shift" aria="KNOB SHIFT" onDown={() => ctx.setValue('knob_shift', !on)} highlighted={targeted(ctx, 'knob_shift')} />;
+  return <Cap lit={on ? 1 : 0} blink={on} control="knob_shift" aria="KNOB SHIFT" onDown={() => ctx.setValue('knob_shift', !on)} highlighted={targeted(ctx, 'knob_shift')} hit={hit} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -448,29 +462,30 @@ export function ProgButtons({ ctx }: { ctx: Ctx }) {
   // As the manual draws it (p.13): ▼ ▲ CURSOR in a row under the LCD, then COMPARE / SAVE,
   // MIDI / GLOBAL and PRESET (EDIT) / PANEL (INIT) in two columns; names under the buttons.
   // Positions are mm from this block's top-left corner (2 px per mm).
-  const cell = (id: string, name: string, xMm: number, yMm: number, lit: boolean, h?: ReturnType<typeof holdable>, extra: { above?: string; invert?: boolean; aria?: string } = {}) => (
+  const cell = (id: string, name: string, xMm: number, yMm: number, lit: boolean, h?: ReturnType<typeof holdable>, extra: { above?: string; invert?: boolean; aria?: string; hit?: Hit } = {}) => (
     <div key={id} style={{ position: 'absolute', left: xMm * 2, top: yMm * 2, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       {extra.above && <span style={{ ...PROG_TAG, position: 'absolute', bottom: '100%', marginBottom: 1 }}>{extra.above}</span>}
-      <Cap lit={lit ? 1 : 0} control={`prog_${id}`} aria={extra.aria ?? name} onDown={h ? h.onDown : () => press(id)} onUp={h?.onUp} w={20} h={12} />
+      <Cap lit={lit ? 1 : 0} control={`prog_${id}`} aria={extra.aria ?? name} onDown={h ? h.onDown : () => press(id)} onUp={h?.onUp} w={20} h={12} hit={extra.hit} />
       <span style={{ ...PROG_NAME, ...(extra.invert ? PROG_INVERT : {}) }}>{name}</span>
     </div>
   );
   return (
-    <div style={{ ...noSelect, position: 'relative', width: '100%', height: '100%' }}>
-      {cell('dec', '▼', 10.5, 1, false, undefined, { aria: 'DEC ▼' })}
-      {cell('inc', '▲', 24.5, 1, false, undefined, { aria: 'INC ▲' })}
-      {cell('cursor', 'CURSOR', 38.5, 1, !!ctx.ui.menuEdit)}
-      {cell('compare', 'COMPARE', 12.5, 14, false)}
-      {cell('save', 'SAVE', 36.5, 14, false, undefined, { invert: true })}
-      {cell('midi', 'MIDI', 12.5, 27, false)}
-      {cell('global', 'GLOBAL', 36.5, 27, menu === 'global')}
-      {cell('preset', 'PRESET', 12.5, 46, !menu || menu === 'preset', presetBtn, { above: 'EDIT' })}
-      {cell('panel', 'PANEL ▶', 36.5, 46, false, panelBtn, { above: 'INIT', aria: 'PANEL' })}
+    <div style={{ ...noSelect, position: 'relative', width: '100%', height: '100%', pointerEvents: 'none' }}>
+      {cell('dec', '▼', 10.5, 1, false, undefined, { aria: 'DEC ▼', hit: [10, 4, 5, 7] })}
+      {cell('inc', '▲', 24.5, 1, false, undefined, { aria: 'INC ▲', hit: [4, 4, 5, 7] })}
+      {cell('cursor', 'CURSOR', 38.5, 1, !!ctx.ui.menuEdit, undefined, { hit: [4, 10, 5, 7] })}
+      {cell('compare', 'COMPARE', 12.5, 14, false, undefined, { hit: [14, 14, 7, 7] })}
+      {cell('save', 'SAVE', 36.5, 14, false, undefined, { invert: true, hit: [14, 14, 7, 7] })}
+      {cell('midi', 'MIDI', 12.5, 27, false, undefined, { hit: [14, 14, 7, 12] })}
+      {cell('global', 'GLOBAL', 36.5, 27, menu === 'global', undefined, { hit: [14, 14, 7, 12] })}
+      {cell('preset', 'PRESET', 12.5, 46, !menu || menu === 'preset', presetBtn, { above: 'EDIT', hit: [14, 14, 12, 16] })}
+      {cell('panel', 'PANEL ▶', 36.5, 46, false, panelBtn, { above: 'INIT', aria: 'PANEL', hit: [14, 14, 12, 16] })}
     </div>
   );
 }
 
-const PROG_FONT = '"Arial Narrow", "Roboto Condensed", Arial, sans-serif';
+// Condensed faces on every platform (iPadOS has no Arial Narrow: Avenir Next / Helvetica Neue condensed)
+const PROG_FONT = '"Arial Narrow", "Roboto Condensed", "Avenir Next Condensed", "HelveticaNeue-CondensedBold", Arial, sans-serif';
 const PROG_NAME: React.CSSProperties = { fontFamily: PROG_FONT, fontSize: 10.5, lineHeight: 1.1, fontWeight: 700, color: '#e8e8e8', letterSpacing: '0.3px', whiteSpace: 'nowrap', marginTop: 2, padding: '0 2px' };
 const PROG_INVERT: React.CSSProperties = { background: '#e8e8e8', color: '#111', borderRadius: 2 };
 const PROG_TAG: React.CSSProperties = { fontFamily: PROG_FONT, fontSize: 9.5, lineHeight: 1, fontStyle: 'italic', fontWeight: 700, color: '#bdbdbd', whiteSpace: 'nowrap' };
@@ -495,6 +510,17 @@ function useNoteWriter(ctx: Ctx) {
     recSeen.set(key.sid, key.n);
     const ui = uiOf(ctx.instance);
     const values = useStudioStore.getState().devices[ctx.instance]?.controlValues ?? ctx.values;
+    if (ui.kbBoth) {
+      // both KB OCTAVE buttons held: a key in the lower two octaves sets KB TRANSPOSE, middle C
+      // (MIDI 48) for 0, the keys below it down and the keys above it up (p.14)
+      const raw = key.note - Math.round(Number(values.kb_transpose ?? 0)) - 12 * Math.round(Number(values.kb_octave ?? 0));
+      if (raw >= 36 && raw <= 60) {
+        const tr = raw - 48;
+        ctx.setValue('kb_transpose', tr);
+        ctx.setUi({ note: `KB TRANSPOSE: ${tr > 0 ? '+' : ''}${tr}`, noteAt: Date.now() });
+      }
+      return;
+    }
     const pattern = Math.round(Number(values.arp_pattern ?? 0));
     const s = readSeq(values);
     const sel = ui.stepEdit ? selectedStep(ui) : null;
@@ -513,7 +539,7 @@ function useNoteWriter(ctx: Ctx) {
 }
 
 /** LCD text: a condensed face, so a 45 mm screen holds its lines at a legible size on an iPad */
-const LCD_FONT = '"Arial Narrow", "Roboto Condensed", Arial, sans-serif';
+const LCD_FONT = PROG_FONT;
 const LCD_SMALL = 10.5;
 const LCD_BIG = 12.5;
 const LCD_ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 4, fontSize: LCD_SMALL, lineHeight: 1.15, whiteSpace: 'nowrap' };
@@ -695,15 +721,18 @@ export function KbOctave({ ctx }: { ctx: Ctx }) {
   const press = (dir: -1 | 1) => {
     downs.current.add(dir);
     if (downs.current.size === 2) {
-      // both together: back to the standard octave; held for a second: MIDI panic (p.14)
+      // both together: back to the standard octave; held for a second: MIDI panic; while both
+      // are held, a key in the lower two octaves sets KB TRANSPOSE (p.14)
       both.current.used = true;
       ctx.setValue('kb_octave', 0);
+      ctx.setUi({ kbBoth: true, note: 'KB TRANSPOSE: PLAY A KEY', noteAt: Date.now() });
       both.current.timer = setTimeout(() => { ctx.sendEvent('panic'); ctx.setUi({ note: 'MIDI: PANIC', noteAt: Date.now() }); }, HOLD_MS);
     }
   };
   const release = (dir: -1 | 1) => {
     const wasBoth = downs.current.size === 2 || both.current.used;
     downs.current.delete(dir);
+    if (uiOf(ctx.instance).kbBoth) ctx.setUi({ kbBoth: false });
     if (both.current.timer) { clearTimeout(both.current.timer); both.current.timer = null; }
     if (wasBoth) { if (!downs.current.size) both.current.used = false; return; }
     const ui = uiOf(ctx.instance);
@@ -725,10 +754,10 @@ export function KbOctave({ ctx }: { ctx: Ctx }) {
   };
   const lit = (dir: -1 | 1) => (Math.sign(oct) === dir ? (Math.abs(oct) === 2 ? 1 : 0.45) : 0);
   return (
-    <div style={{ ...noSelect, display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+    <div style={{ ...noSelect, display: 'flex', gap: 6, alignItems: 'flex-end', pointerEvents: 'none' }}>
       {([-1, 1] as const).map(d => (
         <div key={d} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-          <Cap lit={lit(d)} control={d < 0 ? 'kb_octave_down' : 'kb_octave_up'} aria={d < 0 ? 'KB OCTAVE down' : 'KB OCTAVE up'} label={d < 0 ? '▼' : '▲'} onDown={() => press(d)} onUp={() => release(d)} w={20} highlighted={targeted(ctx, 'kb_octave')} />
+          <Cap lit={lit(d)} control={d < 0 ? 'kb_octave_down' : 'kb_octave_up'} aria={d < 0 ? 'KB OCTAVE down' : 'KB OCTAVE up'} label={d < 0 ? '▼' : '▲'} onDown={() => press(d)} onUp={() => release(d)} w={20} highlighted={targeted(ctx, 'kb_octave')} hit={d < 0 ? [6, 3, 12, 20] : [3, 8, 12, 20]} fontSize={10} />
         </div>
       ))}
     </div>
@@ -741,7 +770,7 @@ export function KbOctave({ ctx }: { ctx: Ctx }) {
  * LATCH (STEP EDIT), a step (select it), KB OCTAVE (page), RANGE (rotate), BACK/FORTH and
  * INVERT (ratchet count), PATTERN to REC (quick erase).
  */
-export function BankButton({ ctx }: { ctx: Ctx }) {
+export function BankButton({ ctx, hit }: { ctx: Ctx; hit?: Hit }) {
   const timer = useRef<Timer | null>(null);
   const down = () => {
     const ui = uiOf(ctx.instance);
@@ -762,7 +791,7 @@ export function BankButton({ ctx }: { ctx: Ctx }) {
   };
   const held = bankHeld(ctx.ui);
   const lit = ctx.ui.bankMode || held ? 1 : ctx.ui.stepEdit && ctx.ui.stepSel == null ? 0.5 : 0;
-  return <Cap lit={lit} blink={!!ctx.ui.bankLatched || (!!ctx.ui.stepEdit && ctx.ui.stepSel == null)} control="preset_bank" aria="BANK" onDown={down} onUp={up} w={22} />;
+  return <Cap lit={lit} blink={!!ctx.ui.bankLatched || (!!ctx.ui.stepEdit && ctx.ui.stepSel == null)} control="preset_bank" aria="BANK" onDown={down} onUp={up} w={22} hit={hit} />;
 }
 
 export function PresetRow({ ctx }: { ctx: Ctx }) {
@@ -822,7 +851,7 @@ export function PresetRow({ ctx }: { ctx: Ctx }) {
   };
 
   return (
-    <div style={{ ...noSelect, display: 'grid', gridTemplateColumns: 'repeat(16, 1fr)', gap: 4, width: '100%', height: '100%', alignItems: 'end' }}>
+    <div style={{ ...noSelect, display: 'grid', gridTemplateColumns: 'repeat(16, 1fr)', gap: 4, width: '100%', height: '100%', alignItems: 'end', pointerEvents: 'none' }}>
       {Array.from({ length: 16 }, (_, i) => {
         const step = page * 16 + i;
         let lit = 0, blink = false;
@@ -847,8 +876,10 @@ export function PresetRow({ ctx }: { ctx: Ctx }) {
               onUp={() => up(i)}
               w={26}
               h={12}
+              hit={[19, 19, 7, 17]}
+              fontSize={10.5}
             />
-            <span style={{ fontFamily: LCD_FONT, fontSize: 8.5, color: '#b0b0b0', height: 9, lineHeight: 1, ...TRUNC, maxWidth: 34 }}>
+            <span style={{ fontFamily: LCD_FONT, fontSize: 10.5, color: '#b0b0b0', height: 11, lineHeight: 1, ...TRUNC, maxWidth: 60 }}>
               {stepEdit && stepNote ? stepLabel(s, step) : ''}
             </span>
           </div>

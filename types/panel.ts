@@ -237,4 +237,7 @@ export interface PanelLayout {
   pxPerMm: number;         // native render scale
   theme: PanelTheme;
   elements: PanelElement[];
+  /** Degrees a knob turns from minimum to maximum (default 270). Moog's drawn knobs turn
+   *  about 300, from 7 o'clock to 5 o'clock, and their manuals' clock positions assume it */
+  knobTravel?: number;
 }

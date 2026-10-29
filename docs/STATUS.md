@@ -11,7 +11,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Studio v2 | Rack, cables, routing, sync, arranger, recorder, projects, Review, lesson coach v2 |
 | Producer-grade studio | Clean unity master, −1 dBTP true-peak limiter, BS.1770 LUFS meters, mixer strips with sends to a tempo delay and Reverb2, undo/redo, stems, bounce, count-in, loop |
 | All seven instruments rebuilt to their manuals | DFAM, Xone:96, Sub 37, Analog Four MKII, Mother-32, Subharmonicon, Analog Rytm MKII. Each passes audio QA at −18 LUFS with 0 flagged presets and plays all its lessons |
-| Independent expert reviews | A second agent re-checked each instrument against its manual and fixed what it found. Merged: DFAM, Subharmonicon, Xone:96, Analog Four, Mother-32. Each writes `devices/<id>/REVIEW.md` |
+| Independent expert reviews | A second agent re-checked each instrument against its manual and fixed what it found. Merged: DFAM, Subharmonicon, Xone:96, Analog Four, Mother-32, Sub 37. Each writes `devices/<id>/REVIEW.md` |
 | Producer path | Lesson API v3 studio state (whole-studio starts, saved learner studios, loudness-matched A/B, master/channel meters, bounces, mixer and arranger checks) and the first 8 Producer path lessons. See "Lesson API v3" in `docs/PEDAGOGY.md` |
 | Clock chip | Every instrument that can follow the studio clock shows **Clock: studio / own tempo** above its panel. One tap lets a patch sheet play at its drawn TEMPO |
 | Stale-module fix | `useDeviceModule` reads the hub cache on every render, so switching never pairs one instrument's layout with another's data |
@@ -22,7 +22,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Elektron sequencer library + UI kit | `docs/ELEKTRON_SEQUENCER.md` (233 tests) |
 | Bring your own gear | Web MIDI, Practice synth (works on iPad without hardware), audio input, Web Audio plugins, 16 lessons, Safari guidance. See `docs/EXTERNAL_GEAR.md` |
 | Audio QA tool | `scripts/audio-qa.cjs`, see `docs/AUDIO_QA.md`: LUFS, true peak, DC, clicks, stuck tails per preset. The baseline in `docs/audio-qa-baseline/` predates the rebuilds and needs regenerating |
-| E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs), 36 checks including the iPad producer walkthrough. `--full` adds smoke and lessons for every instrument |
+| E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs), 37 checks including the iPad producer walkthrough. `--full` adds smoke and lessons for every instrument: 87/87 at the last full run |
 | iPad | Home-screen install, floating lesson coach, 44 px touch targets, fine-adjust gestures, value bubble. Fit may shrink a panel up to 20 % so it ends above the bottom of the screen (the whole Xone:96 at 87 %, the A4 at 90 %), and the control readout shares the toolbar row. First-load JS 198 kB (MIDI, studio view and coach load on demand) |
 | Research notes | `docs/research/<device>/` (sources, signal-flow, presets, lessons) from the official manuals, in our own words. See `docs/research/COPYRIGHT-RULES.md` |
 
@@ -58,6 +58,22 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - A copy stays in the browser (`synth-studio-old-settings`), and a one-time notice offers it as a file.
   - Old project files get a notice too; the file itself is the copy.
   - Checked in e2e (37 checks).
+- Moog knobs turn 300°, as drawn: `PanelLayout.knobTravel` (default 270) is set to 300 on the DFAM, Mother-32 and Subharmonicon, whose manuals' clock positions and preset readings use the 7-to-5 o'clock sweep. Values are unchanged; the pointers and scale marks now line up with the printed legends. The Sub 37 uses the 280° measured on its manual's drawing.
+- New-user walkthrough on iPad (welcome → first lesson → both studio sets playing):
+  - 66fe408: "Start the first lesson" now starts it.
+  - 6ebf36d: the add-instrument button is pinned in a full tab row, the map names each instrument's mixer channel in its box (labels overlapped on converging arrows), and the silent Studio Clock has no mixer strip. Cable names are drawn on top with a halo.
+  - Measured with ▶: the Elektron set at −17.1 LUFS / −1.0 dBTP and the Moog trio at −16.3 LUFS / −2.2 dBTP, with no limiting and no console errors.
+- d6fc40e: merged the **Sub 37 review**.
+  - Mixer levels up to 5 are clean, as the manual says (1.2 % THD at 5, was 2.8 %).
+  - MULTIDRIVE grows even, then odd harmonics, and the filter self-oscillates above 7.
+  - The small buttons have their own touch areas on iPad, and KB TRANSPOSE is in.
+  - Audio QA 0/64 in both modes; lessons 20, 0 failed, 0 manual. No ids or defaults changed.
+  - 22b412c: its knobs turn 280°, as measured on the p.28 drawing, with the legends and CUTOFF marks at their measured angles.
+- 2603002: on iPad the lesson coach moves off the control a step points at (checked on six lessons: no step leaves its target covered).
+- 80c283a: an instrument's own studio lessons are headed "<name> in the studio", no longer a second "Studio & full tracks".
+- Full suite on 22b412c (`run.cjs --full`): **87/87**, covering smoke for every instrument, every lesson of every instrument and the 37 core checks.
+  - Lessons: DFAM 20, Mother-32 19, Subharmonicon 20, Sub 37 20, A4 20, Rytm 20, Xone 18, Your synth 7, Audio input 5, Web Audio plugin 4.
+- **Vercel build rate limit.** Previews from 49f3469 on failed with `build-rate-limit`, not a code error (local builds pass). Every push to any branch, the agents' `wip/*` included, starts a preview build. Pushes are now batched. Option for the user: disable preview builds for scratch branches with `vercel.json` → `"git": { "deploymentEnabled": { "wip/*": false } }`.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
 ## Live log (session 2, 2026-10-29)
@@ -94,7 +110,6 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 
 | Branch | What | Checkpoint |
 |---|---|---|
-| `wip/review-sub37` | Independent Sub 37 review against the manual | bd3b349 |
 | `wip/review-analog-rytm` | Independent Analog Rytm MKII review against the manual | a0c2d10 |
 | `wip/demo-tracks` | The three designed songs ("Low Tide Lights", "Three Clocks", "Copper Wire") as one-click studios | 0876305 |
 | `wip/producer-path-2` | The remaining Producer path lessons (Elektron and Sub 37 tracks), Elektron pattern swing, and lesson solutions for routes, the arranger and rack counts (0 manual steps left on the Xone, A4 and audio-in; 1 on Your synth, where MIDI learn needs a real controller) | 867e6fc |
@@ -134,7 +149,6 @@ Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Su
 - **Lesson solution API**: add `route` and `arranger` fields, so the lesson runner can solve the Xone routing challenges (st1–st3, 4 manual steps) and the Analog Four song step (st2, 2 manual steps) by itself.
 - **Shared controls**, raised by several reviews:
   - a cap variant in `components/controls/Knob.tsx` (the A4 restyles its caps with a scoped stylesheet)
-  - knob travel to match the hardware (about 300°, against 270° now)
   - a legend-above/below option in `components/controls/Switch.tsx` (Mother-32)
 - **Studio sets** (`lib/studio/sets.ts`): the Moog sets would start at the guide's level with the Mother-32 and Subharmonicon about 5 dB down.
 - **Full-track gaps on the A4**: POLY, a kit per pattern, separate track outputs, live recording of knob moves, TRANSPOSABLE, and trig/page/sound copy.

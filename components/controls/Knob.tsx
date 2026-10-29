@@ -34,6 +34,8 @@ export interface KnobProps {
   hitSize?: number;
   /** Lesson spotlight: the step's target, or context the step points at */
   spot?: 'target' | 'focus' | null;
+  /** Degrees from minimum to maximum (the panel's `knobTravel`; Moog's drawn knobs turn about 300) */
+  travel?: number;
 }
 
 /**
@@ -70,6 +72,7 @@ function Knob({
   valueFit,
   hitSize,
   spot,
+  travel = 270,
 }: KnobProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
@@ -78,9 +81,9 @@ function Knob({
   latest.current = { spec, value, onChange };
 
   const norm = valueToNorm(spec, value);
-  const rotation = -135 + norm * 270;
+  const rotation = -travel / 2 + norm * travel;
   const onTarget = targetValue !== undefined && isValueOnTarget(spec, value, targetValue);
-  const targetRotation = targetValue !== undefined ? -135 + valueToNorm(spec, targetValue) * 270 : undefined;
+  const targetRotation = targetValue !== undefined ? -travel / 2 + valueToNorm(spec, targetValue) * travel : undefined;
   const shownLabel = labelText ?? spec.label;
 
   const commitNorm = useCallback((n: number) => {
@@ -200,7 +203,7 @@ function Knob({
         </div>
       )}
 
-      {!spec.endless && <Ticks diameter={diameter} variant={variant} bipolar={!!spec.bipolar} />}
+      {!spec.endless && <Ticks diameter={diameter} variant={variant} bipolar={!!spec.bipolar} travel={travel} />}
 
       {ringClass && <div className={`${styles.spot} ${ringClass}`} style={{ inset: -3 }} />}
       <div className="absolute inset-0 rounded-full">
@@ -256,7 +259,7 @@ function labelPlacement(pos: LabelPosition, gap: number, valueSize: number): Rea
   }
 }
 
-const Ticks = memo(function Ticks({ diameter, variant, bipolar }: { diameter: number; variant: KnobVariant; bipolar: boolean }) {
+const Ticks = memo(function Ticks({ diameter, variant, bipolar, travel }: { diameter: number; variant: KnobVariant; bipolar: boolean; travel: number }) {
   const count = diameter >= 50 ? 11 : diameter >= 36 ? 9 : 7;
   const pad = variant === 'moog-silver' ? 6 : 5;
   const color = variant === 'xone' ? '#bbb' : variant === 'moog-silver' ? '#555' : '#9a9a9a';
@@ -264,7 +267,7 @@ const Ticks = memo(function Ticks({ diameter, variant, bipolar }: { diameter: nu
   return (
     <div className="absolute pointer-events-none" style={{ width: diameter + pad * 2, height: diameter + pad * 2, left: -pad, top: -pad }}>
       {Array.from({ length: count }, (_, i) => {
-        const angle = -135 + (i * 270) / (count - 1);
+        const angle = -travel / 2 + (i * travel) / (count - 1);
         const isEnd = i === 0 || i === count - 1;
         const isCenter = i === Math.floor(count / 2);
         return (

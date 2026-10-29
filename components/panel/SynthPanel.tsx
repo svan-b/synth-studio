@@ -340,6 +340,7 @@ function Faceplate(p: FaceplateProps) {
             labelFit={fits.label[i]}
             valueFit={fits.value[i]}
             hitSize={hitFor(i, d)}
+            travel={layout.knobTravel}
           />
         );
       }
@@ -646,9 +647,10 @@ interface KnobElProps {
   labelFit?: TextFit;
   valueFit?: TextFit;
   hitSize: number;
+  travel?: number;
 }
 
-const KnobEl = memo(function KnobEl({ el, id, spec, value, onChange, x, y, d, labelColor, highlighted, targetValue, showTarget, dim, spot, labelFit, valueFit, hitSize }: KnobElProps) {
+const KnobEl = memo(function KnobEl({ el, id, spec, value, onChange, x, y, d, labelColor, highlighted, targetValue, showTarget, dim, spot, labelFit, valueFit, hitSize, travel }: KnobElProps) {
   const change = useCallback((v: number) => { if (id) onChange(id, v); }, [id, onChange]);
   return (
     <Anchor x={x} y={y} dim={dim}>
@@ -672,6 +674,7 @@ const KnobEl = memo(function KnobEl({ el, id, spec, value, onChange, x, y, d, la
           valueFit={valueFit}
           hitSize={hitSize}
           spot={spot}
+          travel={travel}
         />
       ) : (
         // Unbound encoder (nothing on this page) - draw an inert cap
