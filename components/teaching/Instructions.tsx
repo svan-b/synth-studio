@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { ControlValue, DeviceSpec, Lesson, LessonStep, MultipleChoice } from '@/types';
+import type { ControlValue, DeviceSpec, Lesson, LessonPatternPatch, LessonStep, MultipleChoice } from '@/types';
 import { useStudioStore, stepKind, buildCheckState, getSpec, type StepSession } from '@/store/studio';
 import { describeValue, pressTargetOf, pressesNeeded } from '@/lib/controls/mapping';
 import { hub } from '@/lib/studio/hub';
 import { getLessonLive, onLessonLive } from '@/lib/studio/lessonLive';
-import { captureInto, goTo, isStudioListen, studioAB } from '@/lib/studio/lessonRuntime';
+import { captureInto, goTo, isStudioListen, setPatternSettings, studioAB } from '@/lib/studio/lessonRuntime';
+import { withPatternPatch } from '@/lib/studio/elektronEdits';
 import { onProducerLessons, producerLessonsNow } from '@/lib/studio/producerIndex';
 import Scope from './Scope';
 import { canShowMe, cancelShowMe, showMe } from './coachActions';
@@ -293,6 +294,8 @@ function StepCard({ lesson, stepIndex, step, spec, satisfied, session, instance,
   };
   // A control's printed name; for an event (pads, trig keys) the button's own legend
   const labelOf = (id: string) => {
+    // An Elektron pattern setting being matched (v3): the pattern's SWING menu
+    if (id === 'pattern:swing') return 'SWING';
     const c = spec?.controls[id];
     if (c) return c.label;
     const el = hub.getModule(store.deviceOf(instance))?.layout.elements.find(e => e.kind === 'button' && e.event === id);
@@ -502,12 +505,14 @@ function MultipleChoiceView({ mc, answer, onAnswer, reveal, predict }: { mc: Mul
  * Switch between two sounds instantly, on the same phrase. Short echoic memory is
  * the limit in ear training: fast A/B switching is how producers compare.
  */
-function ABToggle({ instance, a, b, labels, patchesA }: {
+function ABToggle({ instance, a, b, labels, patchesA, patternA }: {
   instance: string;
   a: Record<string, ControlValue> | null;
   b: Record<string, ControlValue> | null;
   labels: [string, string];
   patchesA?: { from: string; to: string }[];
+  /** Side A plays these Elektron pattern settings (SWING) on every pattern, the learner's are kept */
+  patternA?: LessonPatternPatch;
 }) {
   const [side, setSide] = useState<'a' | 'b' | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -516,7 +521,12 @@ function ABToggle({ instance, a, b, labels, patchesA }: {
     if (timer.current) clearTimeout(timer.current);
     if (side === which) { hub.stopAudition(); setSide(null); return; }
     const ms = 3400;
-    hub.audition(instance, which === 'a' ? a : b, which === 'a' && patchesA ? { patches: patchesA, ms } : { ms });
+    const data = which === 'a' && patternA ? withPatternPatch(useStudioStore.getState().devices[instance]?.data, patternA, { all: true }) : undefined;
+    hub.audition(instance, which === 'a' ? a : b, {
+      ms,
+      ...(which === 'a' && patchesA ? { patches: patchesA } : {}),
+      ...(data !== undefined ? { data } : {}),
+    });
     setSide(which);
     timer.current = setTimeout(() => setSide(null), ms);
   };
@@ -730,7 +740,9 @@ function MatchView({ step, session, instance, labelOf, announce }: {
   const attempts = session?.attempts ?? 0;
   const result = session?.match;
   const solved = (result?.score ?? 0) >= 1;
-  const n = m.controls.length;
+  // The controls being matched, and an Elektron pattern setting (SWING) when the step has one
+  const tested = [...m.controls, ...(m.pattern ? ['pattern:swing'] : [])];
+  const n = tested.length;
   const right = result ? Math.round(result.score * n) : 0;
 
   // Feedback fades in: a count, then which control, then which way and how far
@@ -752,9 +764,9 @@ function MatchView({ step, session, instance, labelOf, announce }: {
   return (
     <div className="mt-2 space-y-2">
       <p className="text-[11px] text-gray-300">
-        Adjust {m.controls.map(labelOf).join(', ')} until yours sounds like the target. Everything else is already set.
+        Adjust {tested.map(labelOf).join(', ')} until yours sounds like the target. Everything else is already set.
       </p>
-      <ABToggle instance={instance} a={m.target} b={null} labels={['A · Target', 'B · Yours']} patchesA={m.patches} />
+      <ABToggle instance={instance} a={m.target} b={null} labels={['A · Target', 'B · Yours']} patchesA={m.patches} patternA={m.pattern?.target} />
       {!solved && (
         <button onClick={store.checkMatch} className="w-full py-2 rounded bg-teaching-target text-black font-bold text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300">
           Check my sound
@@ -770,6 +782,7 @@ function MatchView({ step, session, instance, labelOf, announce }: {
             m.controls.forEach(c => { vals[c] = m.target[c]; });
             store.markStepShown();
             store.setControlValues(instance, vals);
+            if (m.pattern) setPatternSettings(instance, m.pattern.target);
             setTimeout(store.checkMatch, 50);
           }}
           className="text-[11px] text-amber-300 underline"
