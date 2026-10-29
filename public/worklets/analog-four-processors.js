@@ -1050,8 +1050,11 @@ class A4Voice extends AudioWorkletProcessor {
     const P = this.P;
     const d1 = lfoHz(P[I.lfo1_spd], Math.round(P[I.lfo1_mul]), this.bpm) * dtBlock;
     const d2 = lfoHz(P[I.lfo2_spd], Math.round(P[I.lfo2_mul]), this.bpm) * dtBlock;
-    this.lfo1.ph -= Math.floor(this.lfo1.ph += d1);
-    this.lfo2.ph -= Math.floor(this.lfo2.ph += d2);
+    // Advance, then wrap. (The old one-liner `ph -= Math.floor(ph += d)` read the phase before
+    // the add, so a silent voice's FREE LFOs stood still instead of running on as on the unit.)
+    const l1 = this.lfo1, l2 = this.lfo2;
+    l1.ph += d1; if (l1.ph >= 1 || l1.ph < 0) l1.ph -= Math.floor(l1.ph);
+    l2.ph += d2; if (l2.ph >= 1 || l2.ph < 0) l2.ph -= Math.floor(l2.ph);
     this.bDt1[b + 1] = this.bDt1[b]; this.bDt2[b + 1] = this.bDt2[b]; this.bPw1[b + 1] = this.bPw1[b]; this.bPw2[b + 1] = this.bPw2[b];
     this.bG1[b + 1] = this.bG1[b]; this.bG2[b + 1] = this.bG2[b];
     this.bGain[b + 1] = 0; this.bPanL[b + 1] = this.bPanL[b]; this.bPanR[b + 1] = this.bPanR[b];

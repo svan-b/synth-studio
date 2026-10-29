@@ -87,6 +87,16 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - In Producer lessons the app follows the step's instrument. The iPad coach picks the corner that hides least of the step's highlight, replacing the left/right version.
   - A second iPad walkthrough (First beat by touch, Groove's SWING) joins the gate: **e2e 38/38**.
   - The demo-excerpt hooks (`info.play`, `listen.demo`) wait for the demo tracks.
+- 2c697b7: merged the **three demo tracks**: Low Tide Lights, Three Clocks and Copper Wire.
+  - Each is a one-tap studio: rack, cables, routes, sync, sounds, patterns, mix, master and arrangement.
+  - The studio view's Demo tracks section has Play and Load and a live caption with the section, bar and teaching note; Welcome offers "Play a demo track".
+  - Bounces: −10.9 / −13.4 / −10.7 LUFS, each at −1.0 dBTP. No instrument or Xone channel clips.
+  - Gate: e2e with `--demos` **80/80** (38 core + 42 demo checks).
+  - The Producer lessons' demo-excerpt hooks are not wired yet: it needs a studio swap during a lesson; the API sketch is in the merge report.
+  - Its agent is now lining up the Elektron sets and "The whole studio" (the Rytm runs about +6 into the Xone; that set's LR MIX lit PK! half the time).
+- b27e315: merged the **Analog Four performance pass**: 8.3× → 13.9× realtime on /bench (1.68×), bit-identical output in 163 of 163 null-test renders.
+  - The idle-voice FREE-LFO bug it found (the LFOs of a silent voice stood still) is fixed in its own commit.
+  - The shared reverb and chorus are now a large share of the A4's cost, and the chorus runs with nothing sending to it: a follow-up.
 - **Vercel build rate limit.** Previews from 49f3469 on failed with `build-rate-limit`, not a code error (local builds pass). Every push to any branch, the agents' `wip/*` included, starts a preview build. Pushes are now batched. Option for the user: disable preview builds for scratch branches with `vercel.json` → `"git": { "deploymentEnabled": { "wip/*": false } }`.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
@@ -124,8 +134,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 
 | Branch | What | Checkpoint |
 |---|---|---|
-| `wip/demo-tracks` | The three designed songs ("Low Tide Lights", "Three Clocks", "Copper Wire") as one-click studios | 0876305 |
-| `wip/perf-analog-four` | Analog Four DSP performance pass, null-tested against the current sound | — |
+| `wip/demo-tracks` | Follow-up: line up the Elektron sets and "The whole studio" on the Xone's meters | 3329d65 (demos merged) |
 
 Each merges through the gate below. Before merging, run `defaults-tool/diff.sh <device> HEAD origin/wip/<branch>` (in the scratchpad) to find changed defaults and removed ids, then add an upgrade entry.
 

@@ -195,4 +195,4 @@ The final build passes both modes:
 
 The old code over two runs per mode gave −19.05 / 7.69 LU (audition) and −19.03 / 7.57 LU (transport). The presets whose level repeats within 0.2 LU from run to run differ by a median of 0.01 LU between the versions.
 
-Kept as found: an idle voice's free-running LFOs do not actually run. `this.lfo1.ph -= Math.floor(this.lfo1.ph += d1)` reads the phase before the addition, so the phase stays put. After a wrap it sticks at a negative value until the voice wakes. Fixing it would change the sound, so it is left for a separate change.
+Found here and fixed in a separate commit after the merge: an idle voice's free-running LFOs did not actually run. `this.lfo1.ph -= Math.floor(this.lfo1.ph += d1)` read the phase before the addition, so the phase stayed put, and after a wrap it stuck at a negative value until the voice woke. `idleBlock` now advances, then wraps. A FREE LFO keeps running while its voice is silent, as on the unit, so the phase a note starts on depends on how long the voice rested.
