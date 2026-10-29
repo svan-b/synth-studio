@@ -23,6 +23,14 @@ its own `wip/*` branch on GitHub, committed but **not yet merged or browser-veri
 | iPad home-screen install | Manifest (standalone), icons, Apple web-app meta |
 | Research notes | `docs/research/<device>/` (sources, signal-flow, presets, lessons) from the official manuals, in our own words. See `docs/research/COPYRIGHT-RULES.md` |
 
+## Live log (session 2, 2026-10-29)
+
+- 19c9d56: merged `wip/elektron-sequencer` (library: 225/225 tests). A finisher is adding the UI kit and docs.
+- 89ed17f: merged `wip/studio`: clean master, −1 dBTP limiter, LUFS meters, mixer, undo, stems. The iPad audio-input capture-count contract is now complete on both sides.
+- 01a09bc: merged `wip/panel-teaching`. The `store/studio.ts` import conflict was resolved by keeping both sides. tsc, lint and validate are clean; build OK; **e2e 23/23**. First-load JS is now **242 kB**: lazy-loading is a priority follow-up.
+- Nine finishers are working on their `wip/*` branches and push there after each milestone: analog-four, analog-rytm, xone96, mother32, subharmonicon, sub37, elektron-sequencer (UI kit), dfam-review (verification), panel-teaching (touch e2e and perf). Each merges 01a09bc before its final gate.
+- **Next:** merge each finisher as it passes the gate (section 3). Then add upgrades.ts entries, run audio QA for every instrument, implement the producer path and demo tracks, run independent reviews, do lazy-loading and rewrite the README.
+
 ## 2. Work in progress (each on `wip/<name>`, not merged)
 
 Merge each in this order, with the gate in section 3. Bases: most were branched from `ec79288`. Panel/teaching started from `ec79288`, the sequencer from `89801d8` and DFAM-review from `cfed080`.

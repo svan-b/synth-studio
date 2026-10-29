@@ -132,6 +132,12 @@ export interface LabelElement extends Positioned {
   invert?: boolean;        // white box with dark text (Moog output-jack style)
   letterSpacing?: number;
   rotate?: number;
+  /**
+   * Keep this exact size and colour. By default the panel raises small text to a legible
+   * size for the current zoom and shrinks it again where it would collide; logos and
+   * artwork that must not change can opt out.
+   */
+  fixed?: boolean;
 }
 
 export interface SectionElement extends Positioned {

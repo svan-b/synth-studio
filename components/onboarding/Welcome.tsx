@@ -19,7 +19,7 @@ export default function Welcome({ open, onClose, onChoose }: { open: boolean; on
     <Dialog.Root open={open} onOpenChange={o => { if (!o) onClose(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/85 backdrop-blur-sm z-40" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#141414] border-2 border-[#333] rounded-2xl p-6 w-[calc(100%-2rem)] max-w-3xl shadow-2xl z-50 max-h-[90vh] overflow-y-auto">
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#141414] border-2 border-[#333] rounded-2xl p-6 w-[calc(100%-2rem)] max-w-3xl shadow-2xl z-50 max-h-[90dvh] overflow-y-auto">
           <Dialog.Title className="text-2xl font-bold text-white">Welcome to Synth Studio</Dialog.Title>
           <Dialog.Description className="text-sm text-gray-400 mt-1 max-w-xl">
             Real instruments you can play, patch and take apart - and lessons that teach you <i>why</i> they sound the way they do,

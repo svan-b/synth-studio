@@ -1,5 +1,7 @@
 'use client';
 
+import { memo } from 'react';
+
 interface StepGridProps {
   steps: number;
   rows: number;
@@ -10,16 +12,19 @@ interface StepGridProps {
   target?: string;
   highlighted?: boolean;
   onToggle: (index: number) => void;
+  /** Step-number font size (native px) from the panel's legibility pass */
+  numberSize?: number;
 }
 
 /**
  * Trig keys / step buttons. Lit = step on, white outline = playhead,
  * orange dot = the lesson wants this step on, red dot = the lesson wants it off.
  */
-export default function StepGrid({ steps, rows, pattern, playhead, color = '#ff5a36', numbered = true, target, highlighted, onToggle }: StepGridProps) {
+function StepGrid({ steps, rows, pattern, playhead, color = '#ff5a36', numbered = true, target, highlighted, onToggle, numberSize }: StepGridProps) {
   const perRow = Math.ceil(steps / rows);
+  const num = Math.max(7, numberSize ?? 7);
   return (
-    <div className="w-full h-full flex flex-col gap-[3px] select-none">
+    <div className="w-full h-full flex flex-col gap-[3px] select-none" role="group" aria-label="Steps">
       {Array.from({ length: rows }, (_, r) => (
         <div key={r} className="flex-1 flex gap-[3px]">
           {Array.from({ length: perRow }, (_, c) => {
@@ -33,7 +38,8 @@ export default function StepGrid({ steps, rows, pattern, playhead, color = '#ff5
               <button
                 key={c}
                 onPointerDown={e => { e.preventDefault(); onToggle(i); }}
-                className="flex-1 relative rounded-sm"
+                onKeyDown={e => { if ((e.key === 'Enter') && !e.repeat) { e.preventDefault(); onToggle(i); } }}
+                className="flex-1 relative rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
                 style={{
                   touchAction: 'none',
                   background: on ? color : '#1e1e1e',
@@ -45,15 +51,16 @@ export default function StepGrid({ steps, rows, pattern, playhead, color = '#ff5
                   border: '1px solid #3a3a3a',
                   filter: isHead && !on ? 'brightness(2)' : undefined,
                 }}
-                aria-label={`Step ${i + 1} ${on ? 'on' : 'off'}`}
+                aria-label={`Step ${i + 1}`}
+                aria-pressed={on}
               >
                 {numbered && (
-                  <span className="absolute left-1/2 -translate-x-1/2 bottom-[2px] text-[7px] font-bold" style={{ color: on ? '#000' : '#777' }}>
+                  <span className="absolute left-1/2 -translate-x-1/2 bottom-[2px] font-bold leading-none" style={{ fontSize: num, color: on ? '#000' : '#8a8a8a' }}>
                     {i + 1}
                   </span>
                 )}
                 {mismatch && (
-                  <span className={`absolute top-[2px] right-[2px] w-[5px] h-[5px] rounded-full ${want ? 'bg-orange-400' : 'bg-red-500'} animate-pulse`} />
+                  <span className={`absolute top-[2px] right-[2px] w-[5px] h-[5px] rounded-full ${want ? 'bg-orange-400' : 'bg-red-500'} motion-safe:animate-pulse`} />
                 )}
               </button>
             );
@@ -63,3 +70,5 @@ export default function StepGrid({ steps, rows, pattern, playhead, color = '#ff5
     </div>
   );
 }
+
+export default memo(StepGrid);
