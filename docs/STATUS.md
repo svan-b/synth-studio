@@ -44,7 +44,14 @@ its own `wip/*` branch on GitHub, committed but **not yet merged or browser-veri
   - Meters no longer use `will-change`.
   - Audio input lists the Xone channels.
   - Verified: gear e2e 31/31, e2e 33/33.
-- Nine finishers are working on their `wip/*` branches and push there after each milestone: analog-four, analog-rytm, xone96, mother32, subharmonicon, sub37, elektron-sequencer (UI kit), dfam-review (verification), panel-teaching (touch e2e and perf). Each merges 01a09bc before its final gate.
+- 0474376: saved-settings upgrades now restore the **old defaults** of controls a save never touched, before converting. Saves keep only touched controls, so default changes used to leak in: an untouched DFAM VCO 2 went silent and TEMPO ran 4× fast.
+- 8035392: merged **Sub 37** (QA 0/64, lessons 20/20, check 14/14). Upgrade store v7 covers the arp, KB CTRL and drones, the key-tracking re-pivot, the mod-bus mapping and glide.
+- 33acba0: merged **Analog Four MKII** (QA 0/47, lessons 20/20). Every A4 parameter was redefined (about 500 ids), so **old A4 settings start fresh** on the new defaults and demo song, by design.
+- 7289210: completed lessons carry over to their rebuilt successors (Sub 37, then Mother-32 and Subharmonicon). Checked in e2e.
+- 2a41240: merged **Mother-32** (QA 0/43 for keys and transport, lessons 19/19, check 18/18). Upgrade store v8 covers the flipped switches, VCF MOD amount and polarity, ranges, per-step gates and the old default sequence.
+- 9e75bfa: merged the **DFAM review** (QA 0/40, lessons 20/20, 0 manual). Upgrade store v9: untouched SEQ PITCH MOD keeps VCO 1&2. The audio-QA click threshold for the DFAM is 2, for its lo-fi crackle.
+- 7a606eb: merged **Subharmonicon** (QA 0/36 for audition and transport, lessons 20/20, in-app check passing). Upgrade store v10 covers TEMPO 240, EG AMT ×0.625 and the 5 ms decay floor.
+- Still running: the **Analog Rytm** finisher (kit loudness and lessons) and the **producer-path** agent (lesson-engine hooks and first studio lessons). and push there after each milestone: analog-four, analog-rytm, xone96, mother32, subharmonicon, sub37, elektron-sequencer (UI kit), dfam-review (verification), panel-teaching (touch e2e and perf). Each merges 01a09bc before its final gate.
 - **Next:** merge each finisher as it passes the gate (section 3). Then add upgrades.ts entries, run audio QA for every instrument, implement the producer path and demo tracks, run independent reviews, do and lazy-load the MIDI code in DeviceHost.
 
 ## 2. Work in progress (each on `wip/<name>`, not merged)
