@@ -306,6 +306,30 @@ const voiceIndex = I => ({
   snd_acc: I.snd_acc, snd_leg: I.snd_leg, snd_prt: I.snd_prt, snd_drf: I.snd_drf, snd_bst: I.snd_bst, level: I.level,
 });
 
+// The voice's own parameter order (processorOptions.keys, the engine's order, is mapped onto it once,
+// and the indices in messages as they arrive). The first NLATE are the parameters a control tick reads
+// only after all its modulation routes: their effective values are computed together, in one pass.
+const VOICE_PARAMS = [
+  'amp_atk', 'amp_dec', 'amp_sus', 'amp_rel', 'osc_vsp', 'osc_vib', 'osc1_tun', 'osc1_fin', 'osc1_det', 'osc2_tun',
+  'osc2_fin', 'osc2_det', 'osc1_spd', 'osc2_spd', 'osc1_pw', 'osc1_pwm', 'osc2_pw', 'osc2_pwm', 'osc1_lev', 'osc2_lev',
+  'noise_lev', 'noise_snh', 'noise_col', 'snd_acc', 'flt1_frq', 'flt1_trk', 'flt1_dep', 'flt1_res', 'flt1_ovr', 'flt2_frq',
+  'flt2_trk', 'flt2_dep', 'flt2_res', 'amp_vol', 'level', 'amp_pan', 'amp_cho', 'amp_del', 'amp_rev', 'osc_snc',
+  // NLATE = 40
+  'osc1_trk', 'osc1_wav', 'osc1_sub', 'noise_fad', 'osc2_trk', 'osc2_wav', 'osc2_sub', 'osc_am1', 'osc_smd', 'osc_bnd',
+  'osc_sli', 'osc_am2', 'osc_trg', 'osc_vfa', 'flt2_typ', 'amp_shp',
+  'envf_atk', 'envf_dec', 'envf_sus', 'envf_rel', 'envf_shp', 'envf_len', 'envf_dsta', 'envf_depa', 'envf_dstb', 'envf_depb',
+  'env2_atk', 'env2_dec', 'env2_sus', 'env2_rel', 'env2_shp', 'env2_len', 'env2_dsta', 'env2_depa', 'env2_dstb', 'env2_depb',
+  'lfo1_spd', 'lfo1_mul', 'lfo1_fad', 'lfo1_sph', 'lfo1_mod', 'lfo1_wav', 'lfo1_dsta', 'lfo1_depa', 'lfo1_dstb', 'lfo1_depb',
+  'lfo2_spd', 'lfo2_mul', 'lfo2_fad', 'lfo2_sph', 'lfo2_mod', 'lfo2_wav', 'lfo2_dsta', 'lfo2_depa', 'lfo2_dstb', 'lfo2_depb',
+  'vmod_dst1', 'vmod_dep1', 'vmod_dst2', 'vmod_dep2', 'vmod_dst3', 'vmod_dep3', 'vmod_dst4', 'vmod_dep4', 'vmod_dst5', 'vmod_dep5',
+  'snd_leg', 'snd_prt', 'snd_drf', 'snd_bst', 'osc1_pmod', 'osc2_pmod',
+];
+const NLATE = 40;
+const VIDX = {};
+VOICE_PARAMS.forEach((k, i) => (VIDX[k] = i));
+// Index by name: a frozen constant table, so the optimised code's I.xxx reads are plain numbers
+const I = Object.freeze(voiceIndex(VIDX));
+
 // ============================================================================
 // Voice
 // ============================================================================
@@ -333,21 +357,28 @@ class A4Voice extends AudioWorkletProcessor {
     this.fdbK = 1 - Math.exp((-TWO_PI * 25) / sampleRate);   // FDB AC coupling (25 Hz)
     // the modulation entries the last control tick wrote (the rest of M is zero)
     this.mIdx = new Int32Array(64); this.mN = 0;
+    // the output arrays a silent quantum zeroed (process() skips zeroing them again while silent)
+    this.zL = null; this.zC = null; this.zM = null;
     const o = (options && options.processorOptions) || {};
     const keys = o.keys || [];
-    const I = {};
-    keys.forEach((k, i) => (I[k] = i));
-    this.I = voiceIndex(I);
-    this.N = keys.length;
+    // engine key index -> the voice's index (VOICE_PARAMS); a key it does not know -> a spare slot
+    const NV = VOICE_PARAMS.length;
+    this.N = NV + 1;
+    this.perm = new Int32Array(keys.length);
+    keys.forEach((k, i) => { const j = VIDX[k]; this.perm[i] = j === undefined ? NV : j; });
     this.P = new Float32Array(this.N);
     this.O = new Float32Array(this.N);
     this.M = new Float32Array(this.N);
-    this.mins = Float32Array.from(o.mins || []);
-    this.maxs = Float32Array.from(o.maxs || []);
-    (o.defs || []).forEach((v, i) => (this.P[i] = v));
-    this.dests = (o.dests || []).map(d => ({ idx: d.keys.map(k => I[k]).filter(x => x !== undefined), range: d.range }));
-    this.vmDst = [1, 2, 3, 4, 5].map(n => I['vmod_dst' + n]);
-    this.vmDep = [1, 2, 3, 4, 5].map(n => I['vmod_dep' + n]);
+    this.mins = new Float32Array(this.N);
+    this.maxs = new Float32Array(this.N);
+    const own = (list, dst) => list.forEach((v, i) => { if (i < keys.length) dst[this.perm[i]] = v; });
+    own(o.mins || [], this.mins);
+    own(o.maxs || [], this.maxs);
+    own(o.defs || [], this.P);
+    this.EV = new Float64Array(NLATE);   // effective values of the first NLATE parameters (each control tick)
+    this.dests = (o.dests || []).map(d => ({ idx: d.keys.map(k => VIDX[k]).filter(x => x !== undefined), range: d.range }));
+    this.vmDst = [1, 2, 3, 4, 5].map(n => VIDX['vmod_dst' + n]);
+    this.vmDep = [1, 2, 3, 4, 5].map(n => VIDX['vmod_dep' + n]);
     this.q = [];
     this.ramps = [];
     this.bpm = 120;
@@ -379,6 +410,12 @@ class A4Voice extends AudioWorkletProcessor {
     this.nb = 8; // control blocks per quantum
     this.alloc(128);
     this.port.onmessage = e => this.msg(e.data);
+    // Run route() once now, on this voice's own still-zero modulation, and undo it: its whole body
+    // then has type feedback before the control tick it is inlined into gets optimised (otherwise
+    // the first modulated note deoptimises that tick and has it recompiled)
+    this.route(1, 1);
+    for (let k = 0; k < this.mN; k++) this.M[this.mIdx[k]] = 0;
+    this.mN = 0;
   }
 
   alloc(n) {
@@ -401,10 +438,16 @@ class A4Voice extends AudioWorkletProcessor {
     this.W2 = new Float64Array(n + LAT + 1);
   }
 
+  /** The voice's index for an engine key index (-1, a no-op typed-array index, for none) */
+  own(i) {
+    const j = this.perm[i];
+    return j === undefined ? -1 : j;
+  }
+
   msg(m) {
     switch (m.t) {
-      case 'p': { const l = m.list; for (let k = 0; k < l.length; k += 2) this.P[l[k]] = l[k + 1]; break; }
-      case 'off2': { this.O.fill(0); const l = m.list; for (let k = 0; k < l.length; k += 2) this.O[l[k]] = l[k + 1]; break; }
+      case 'p': { const l = m.list; for (let k = 0; k < l.length; k += 2) this.P[this.own(l[k])] = l[k + 1]; break; }
+      case 'off2': { this.O.fill(0); const l = m.list; for (let k = 0; k < l.length; k += 2) this.O[this.own(l[k])] = l[k + 1]; break; }
       case 'bpm': this.bpm = m.v; break;
       case 'step': this.stepSec = m.v; break;
       case 'feed': this.feed = !!m.v; break;
@@ -418,16 +461,23 @@ class A4Voice extends AudioWorkletProcessor {
         this.gate = false;
         if (!this.idle || this.envA.stage !== 0) { this.cutN = Math.max(1, Math.round((0.006 * sampleRate) / BLOCK)); this.cutLeft = this.cutN; }
         break;
-      default: enqueue(this.q, A4Voice.event(m));
+      default: enqueue(this.q, this.event(m));
     }
   }
 
   /**
    * A queued event, in one shape for every kind (the messages' shapes differ by kind and sender), so
-   * the code that reads the queue on the audio clock sees a single object map
+   * the code that reads the queue on the audio clock sees a single object map. Parameter lists
+   * ('at': index, value...; 'ramp': index, from, to...) get the voice's indices.
    */
-  static event(m) {
-    return { t: m.t, time: m.time, t1: m.t1, list: m.list, note: m.note, vel: m.vel, acc: m.acc, slide: m.slide, live: m.live, leg: m.leg, rt: m.rt };
+  event(m) {
+    let list = m.list;
+    if (list && (m.t === 'at' || m.t === 'ramp')) {
+      const step = m.t === 'at' ? 2 : 3;
+      list = list.slice();
+      for (let k = 0; k < list.length; k += step) list[k] = this.own(list[k]);
+    }
+    return { t: m.t, time: m.time, t1: m.t1, list, note: m.note, vel: m.vel, acc: m.acc, slide: m.slide, live: m.live, leg: m.leg, rt: m.rt };
   }
 
   /**
@@ -455,7 +505,7 @@ class A4Voice extends AudioWorkletProcessor {
   }
 
   noteOn(ev, now) {
-    const I = this.I, P = this.P;
+    const P = this.P;
     if (this.cutLeft > 0) { this.cutLeft = 0; this.silence(); }
     const wasGate = this.gate;
     this.note = ev.note;
@@ -493,7 +543,7 @@ class A4Voice extends AudioWorkletProcessor {
 
   /** Restart the modulators a trig asks for (a note, or a lock trig with retrig switches locked on) */
   retrig(rt, now) {
-    const P = this.P, I = this.I;
+    const P = this.P;
     const lsec = v => (v > 0 ? 0.125 * exp2(((v - 1) / 126) * 10) * this.stepSec : 0);
     // without a sounding note, a retrigged envelope runs for one step
     const gate = v => lsec(v) || (this.gate ? 0 : this.stepSec);
@@ -504,7 +554,7 @@ class A4Voice extends AudioWorkletProcessor {
   }
 
   noteOff() {
-    const P = this.P, I = this.I;
+    const P = this.P;
     this.gate = false;
     this.envA.release(Math.round(P[I.amp_shp]));
     if (this.envF.gateEnd === Infinity) this.envF.release(Math.round(P[I.envf_shp]));
@@ -528,7 +578,7 @@ class A4Voice extends AudioWorkletProcessor {
 
   /** One control tick: modulation, envelopes, coefficients for block b */
   control(now, dt, b) {
-    const I = this.I, P = this.P, sr = sampleRate;
+    const P = this.P, sr = sampleRate;
     // clear last tick's modulation: only the entries it wrote are non-zero
     const M = this.M, mIdx = this.mIdx;
     for (let k = 0, n = this.mN; k < n; k++) M[mIdx[k]] = 0;
@@ -551,6 +601,15 @@ class A4Voice extends AudioWorkletProcessor {
     this.route2(I.lfo1_dsta, I.lfo1_depa, l1);
     this.route2(I.lfo1_dstb, I.lfo1_depb, l1);
 
+    // The modulation is complete: the effective values of everything read from here on, in one pass
+    // (each the same sum and clamp as E())
+    const EV = this.EV, O = this.O, mins = this.mins, maxs = this.maxs;
+    for (let i = 0; i < NLATE; i++) {
+      const v = P[i] + O[i] + M[i];
+      const lo = mins[i], hi = maxs[i];
+      EV[i] = v < lo ? lo : v > hi ? hi : v;
+    }
+
     const ea = this.envA.tick(dt, this, I.amp_atk, I.amp_dec, I.amp_sus, I.amp_rel, Math.round(P[I.amp_shp]), now, P[I.amp_rel] >= 127);
 
     // Glide (constant time, smooth ends)
@@ -562,7 +621,7 @@ class A4Voice extends AudioWorkletProcessor {
     } else this.pitch = this.note;
 
     // Vibrato, drift (phase wraps by subtracting 0 or 1: no branch that runs only now and then)
-    const vsp = this.E(I.osc_vsp);
+    const vsp = EV[I.osc_vsp];
     if (vsp !== this.kVsp) { this.kVsp = vsp; this.cVsp = exp2(vsp / 26); }
     this.vibPh += 0.5 * this.cVsp * dt;
     this.vibPh -= this.vibPh >= 1 ? 1 : 0;
@@ -573,7 +632,7 @@ class A4Voice extends AudioWorkletProcessor {
       this.vibFade = vfa < 0 ? Math.min(1, this.vibFade + st) : Math.max(0, this.vibFade - st);
     } else this.vibFade = 1;
     // depth 0 gives a vibrato of (+/-)0, which leaves the pitch sums below unchanged
-    const vdep = this.E(I.osc_vib);
+    const vdep = EV[I.osc_vib];
     const vib = vdep !== 0 ? sin2pi(this.vibPh) * (vdep / 127) * 0.6 * this.vibFade : 0;
     if (P[I.snd_drf] >= 0.5) {
       this.drift1 = this.drift1 * 0.9995 + (Math.random() - 0.5) * 0.002;
@@ -594,26 +653,26 @@ class A4Voice extends AudioWorkletProcessor {
     }
 
     // Oscillator increments
-    const n1 = (P[I.osc1_trk] >= 0.5 ? this.pitch : 60) + this.E(I.osc1_tun) + this.E(I.osc1_fin) / 128 + this.M[I.osc1_pmod] + vib + bend1 + this.drift1 * 0.05;
-    const n2 = (P[I.osc2_trk] >= 0.5 ? this.pitch : 60) + this.E(I.osc2_tun) + this.E(I.osc2_fin) / 128 + this.M[I.osc2_pmod] + vib + bend2 + this.drift2 * 0.05;
+    const n1 = (P[I.osc1_trk] >= 0.5 ? this.pitch : 60) + EV[I.osc1_tun] + EV[I.osc1_fin] / 128 + this.M[I.osc1_pmod] + vib + bend1 + this.drift1 * 0.05;
+    const n2 = (P[I.osc2_trk] >= 0.5 ? this.pitch : 60) + EV[I.osc2_tun] + EV[I.osc2_fin] / 128 + this.M[I.osc2_pmod] + vib + bend2 + this.drift2 * 0.05;
     if (n1 !== this.kN1) { this.kN1 = n1; this.cN1 = 440 * exp2((n1 - 69) / 12); }
     if (n2 !== this.kN2) { this.kN2 = n2; this.cN2 = 440 * exp2((n2 - 69) / 12); }
-    const hz1 = this.cN1 + this.E(I.osc1_det) * 0.125;
-    const hz2 = this.cN2 + this.E(I.osc2_det) * 0.125;
+    const hz1 = this.cN1 + EV[I.osc1_det] * 0.125;
+    const hz2 = this.cN2 + EV[I.osc2_det] * 0.125;
     this.bDt1[b + 1] = clamp(hz1, 0.1, sr * 0.45) / sr;
     this.bDt2[b + 1] = clamp(hz2, 0.1, sr * 0.45) / sr;
 
     // PWM LFOs (triangle) and pulse widths
-    const sp1 = this.E(I.osc1_spd), sp2 = this.E(I.osc2_spd);
+    const sp1 = EV[I.osc1_spd], sp2 = EV[I.osc2_spd];
     if (sp1 !== this.kSp1) { this.kSp1 = sp1; this.cSp1 = 0.1 * exp2(sp1 / 16); }
     if (sp2 !== this.kSp2) { this.kSp2 = sp2; this.cSp2 = 0.1 * exp2(sp2 / 16); }
     this.pwm1 += this.cSp1 * dt; this.pwm1 -= this.pwm1 >= 1 ? 1 : 0;
     this.pwm2 += this.cSp2 * dt; this.pwm2 -= this.pwm2 >= 1 ? 1 : 0;
     // PW shapes every waveform; 0 is the plain wave, the extremes mute the pulses (manual p.72, p.87)
-    this.bPw1[b + 1] = clamp(0.5 + (this.E(I.osc1_pw) / 64) * 0.5 + triLfo(this.pwm1) * (this.E(I.osc1_pwm) / 127) * 0.45, 0.002, 0.998);
-    this.bPw2[b + 1] = clamp(0.5 + (this.E(I.osc2_pw) / 64) * 0.5 + triLfo(this.pwm2) * (this.E(I.osc2_pwm) / 127) * 0.45, 0.002, 0.998);
-    this.bLev1[b] = this.E(I.osc1_lev) / 127;
-    this.bLev2[b] = this.E(I.osc2_lev) / 127;
+    this.bPw1[b + 1] = clamp(0.5 + (EV[I.osc1_pw] / 64) * 0.5 + triLfo(this.pwm1) * (EV[I.osc1_pwm] / 127) * 0.45, 0.002, 0.998);
+    this.bPw2[b + 1] = clamp(0.5 + (EV[I.osc2_pw] / 64) * 0.5 + triLfo(this.pwm2) * (EV[I.osc2_pwm] / 127) * 0.45, 0.002, 0.998);
+    this.bLev1[b] = EV[I.osc1_lev] / 127;
+    this.bLev2[b] = EV[I.osc2_lev] / 127;
 
     // Noise
     const fad = P[I.noise_fad];
@@ -622,15 +681,15 @@ class A4Voice extends AudioWorkletProcessor {
       const st = dt / this.cNfa;
       this.noiseFade = fad > 0 ? Math.max(0, this.noiseFade - st) : Math.min(1, this.noiseFade + st);
     } else this.noiseFade = 1;
-    const nLev = (this.E(I.noise_lev) / 127) * this.noiseFade * 0.9;
+    const nLev = (EV[I.noise_lev] / 127) * this.noiseFade * 0.9;
     this.bNLev[b] = nLev;
     // the sample loop reads the other noise settings of a block only when its level is above 0
     if (nLev > 0) {
-      const snh = this.E(I.noise_snh) / 127;
+      const snh = EV[I.noise_snh] / 127;
       this.bNHold[b] = snh <= 0 ? 1 : Math.round(1 + snh * snh * 360);
       // COL (manual p.87): 0 white; negative low-passed, -32 pink (-3 dB/oct), -64 red (-6 dB/oct);
       // positive high-passed (30 Hz .. 8 kHz, level compensated)
-      const col = clamp(this.E(I.noise_col) / 64, -1, 1);
+      const col = clamp(EV[I.noise_col] / 64, -1, 1);
       this.bNCol[b] = col;
       if (col !== this.kCol) { this.kCol = col; this.cHpK = col > 0 ? 1 - Math.exp((-TWO_PI * 30 * exp2(col * 8.06)) / sr) : 0; }
       this.bNHpK[b] = this.cHpK;
@@ -641,16 +700,16 @@ class A4Voice extends AudioWorkletProcessor {
     // envelope further as well as raising the level (manual p.51): DEP x (1 + 0.8 x ACC/127).
     // Without an accent (acc 0) both accent factors are exactly 1.
     const semis = this.pitch - 60;
-    const accF = this.acc !== 0 ? 1 + this.acc * 0.8 * (this.E(I.snd_acc) / 127) : 1;
-    const f1 = this.E(I.flt1_frq) + (this.E(I.flt1_trk) / 32) * semis + this.E(I.flt1_dep) * 2 * ef * accF;
+    const accF = this.acc !== 0 ? 1 + this.acc * 0.8 * (EV[I.snd_acc] / 127) : 1;
+    const f1 = EV[I.flt1_frq] + (EV[I.flt1_trk] / 32) * semis + EV[I.flt1_dep] * 2 * ef * accF;
     if (f1 !== this.kF1) { this.kF1 = f1; this.cG1 = tanF((Math.PI * Math.min(sr * 0.45, fltHz(clamp(f1, -24, 140)))) / sr); }
     this.bG1[b + 1] = this.cG1;
-    const r1 = this.E(I.flt1_res) / 127;
+    const r1 = EV[I.flt1_res] / 127;
     if (r1 !== this.kR1) { this.kR1 = r1; this.cK1 = 4.3 * Math.pow(r1, 1.3); }
     const k1 = this.cK1;
     this.bK1[b] = k1;
     this.bComp[b] = P[I.snd_bst] >= 0.5 ? 1 + k1 * 0.45 : 1 + k1 * 0.08;
-    const ovr = this.E(I.flt1_ovr);
+    const ovr = EV[I.flt1_ovr];
     if (ovr !== this.kOvr) {
       this.kOvr = ovr;
       const op = ovr > 0 ? Math.min(1, ovr / 63) : 0, on = ovr < 0 ? Math.min(1, -ovr / 64) : 0;
@@ -664,10 +723,10 @@ class A4Voice extends AudioWorkletProcessor {
     this.bInDrive[b] = this.cInDrive;
     this.bInComp[b] = this.cInComp;
     // Filter 2: multimode
-    const f2 = this.E(I.flt2_frq) + (this.E(I.flt2_trk) / 32) * semis + this.E(I.flt2_dep) * 2 * ef * accF;
+    const f2 = EV[I.flt2_frq] + (EV[I.flt2_trk] / 32) * semis + EV[I.flt2_dep] * 2 * ef * accF;
     if (f2 !== this.kF2) { this.kF2 = f2; this.cG2 = tanF((Math.PI * Math.min(sr * 0.45, fltHz(clamp(f2, -24, 140)))) / sr); }
     this.bG2[b + 1] = this.cG2;
-    const r2 = this.E(I.flt2_res) / 127;
+    const r2 = EV[I.flt2_res] / 127;
     const type2 = Math.round(P[I.flt2_typ]);
     this.type2 = type2;
     if (r2 !== this.kR2) { this.kR2 = r2; this.cK2 = 2 - 1.94 * Math.pow(r2, 0.8); }
@@ -677,23 +736,23 @@ class A4Voice extends AudioWorkletProcessor {
     // VCA: envelope x velocity x accent x volume x track level; pan; sends. The VCA's control
     // voltage is smoothed (as on the analog original), so no modulation steps the gain faster
     // than about half a millisecond - a square LFO on VOL gates without clicking.
-    const vol = this.E(I.amp_vol) / 127, lvl = this.E(I.level) / 127;
-    const acc = this.acc !== 0 ? 1 + this.acc * (this.E(I.snd_acc) / 127) : 1;
+    const vol = EV[I.amp_vol] / 127, lvl = EV[I.level] / 127;
+    const acc = this.acc !== 0 ? 1 + this.acc * (EV[I.snd_acc] / 127) : 1;
     const gT = ea * (0.08 + 0.92 * this.vel) * acc * vol * vol * 1.6 * lvl * lvl * 1.6;
     this.gS += (gT - this.gS) * this.kGain;
     this.bGain[b + 1] = this.gS;
-    const pan = (clamp(this.E(I.amp_pan), -64, 64) + 64) / 128;
+    const pan = (clamp(EV[I.amp_pan], -64, 64) + 64) / 128;
     if (pan !== this.kPan) { this.kPan = pan; this.cPanL = Math.cos(pan * Math.PI * 0.5); this.cPanR = Math.sin(pan * Math.PI * 0.5); }
     this.bPanL[b + 1] = this.cPanL;
     this.bPanR[b + 1] = this.cPanR;
-    this.bSC[b + 1] = sq127(this.E(I.amp_cho));
-    this.bSD[b + 1] = sq127(this.E(I.amp_del));
-    this.bSR[b + 1] = sq127(this.E(I.amp_rev));
+    this.bSC[b + 1] = sq127(EV[I.amp_cho]);
+    this.bSD[b + 1] = sq127(EV[I.amp_del]);
+    this.bSR[b + 1] = sq127(EV[I.amp_rev]);
 
     this.w1 = Math.round(P[I.osc1_wav]); this.w2 = Math.round(P[I.osc2_wav]);
     this.sub1 = Math.round(P[I.osc1_sub]); this.sub2 = Math.round(P[I.osc2_sub]);
     this.smd = Math.round(P[I.osc_smd]);
-    this.snc = this.E(I.osc_snc) / 127;
+    this.snc = EV[I.osc_snc] / 127;
     this.am1 = P[I.osc_am1] >= 0.5; this.am2 = P[I.osc_am2] >= 0.5;
     return ea;
   }
@@ -888,12 +947,17 @@ class A4Voice extends AudioWorkletProcessor {
     // control ticks (events at block starts, then targets for each block); a voice that stays
     // silent all quantum (and was silent at its start) skips the DSP
     if (!this.ticks() && this.bGain[0] === 0) {
-      L.fill(0); if (R !== L) R.fill(0);
-      if (SC) { SC.fill(0); SD.fill(0); SRv.fill(0); }
-      if (MO) MO.fill(0);
-      this.W1.fill(0); this.W2.fill(0);
+      // silence, unless these very arrays already hold the zeros this voice wrote last quantum
+      if (this.zL !== L || this.zC !== SC || this.zM !== MO) {
+        L.fill(0); if (R !== L) R.fill(0);
+        if (SC) { SC.fill(0); SD.fill(0); SRv.fill(0); }
+        if (MO) MO.fill(0);
+        this.W1.fill(0); this.W2.fill(0);
+        this.zL = L; this.zC = SC; this.zM = MO;
+      }
       return true;
     }
+    this.zL = this.zC = this.zM = null;
     this.oscPass(n);                                  // oscillators (band-limited)
     this.render(n, L, R, SC, SD, SRv, MO, nbIn);      // noise, filters, VCA per sample
     return true;
@@ -950,7 +1014,7 @@ class A4Voice extends AudioWorkletProcessor {
 
   /** A block of a silent voice: keep the free-running LFOs moving, hold the targets */
   idleBlock(b, dtBlock) {
-    const I = this.I, P = this.P;
+    const P = this.P;
     const d1 = lfoHz(P[I.lfo1_spd], Math.round(P[I.lfo1_mul]), this.bpm) * dtBlock;
     const d2 = lfoHz(P[I.lfo2_spd], Math.round(P[I.lfo2_mul]), this.bpm) * dtBlock;
     this.lfo1.ph -= Math.floor(this.lfo1.ph += d1);
