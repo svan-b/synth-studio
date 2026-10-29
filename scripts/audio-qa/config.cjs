@@ -77,5 +77,8 @@ module.exports = {
     // DFAM manual describes, p.12 and p.20). One such crackle in a render is character, not a
     // defect; real click bugs repeat. See devices/dfam/REVIEW.md.
     dfam: { thresholds: { clicksMin: 2 } },
+    // Its presets set up a live input (level, monitoring); with no microphone or interface in a
+    // headless browser it can only be silent
+    'audio-in': { skip: 'plays a live audio input only' },
   },
 };

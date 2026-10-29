@@ -21,7 +21,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | DSP core v2 | Band-limited VCO, 2× ladder, DAHDSR env, SVF, Reverb2 (FDN), Chorus. `/bench` page; see `docs/DSP.md` |
 | Elektron sequencer library + UI kit | `docs/ELEKTRON_SEQUENCER.md` (233 tests) |
 | Bring your own gear | Web MIDI, Practice synth (works on iPad without hardware), audio input, Web Audio plugins, 16 lessons, Safari guidance. See `docs/EXTERNAL_GEAR.md` |
-| Audio QA tool | `scripts/audio-qa.cjs`, see `docs/AUDIO_QA.md`: LUFS, true peak, DC, clicks, stuck tails per preset. The baseline in `docs/audio-qa-baseline/` predates the rebuilds and needs regenerating |
+| Audio QA tool | `scripts/audio-qa.cjs`, see `docs/AUDIO_QA.md`: LUFS, true peak, DC, clicks, stuck tails per preset. Baseline regenerated at aa0a41a: 271 presets on 7 instruments, medians −18.0 to −19.1 LUFS, 2 intermittent click flags (each clean in 4 of 4 re-runs) |
 | E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs), 38 checks including two iPad producer walkthroughs. `--full` adds smoke and lessons for every instrument: 87/87 at the last full run |
 | iPad | Home-screen install, floating lesson coach, 44 px touch targets, fine-adjust gestures, value bubble. Fit may shrink a panel up to 20 % so it ends above the bottom of the screen (the whole Xone:96 at 87 %, the A4 at 90 %), and the control readout shares the toolbar row. First-load JS 198 kB (MIDI, studio view and coach load on demand) |
 | Research notes | `docs/research/<device>/` (sources, signal-flow, presets, lessons) from the official manuals, in our own words. See `docs/research/COPYRIGHT-RULES.md` |
@@ -182,7 +182,6 @@ Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Su
   - a legend-above/below option in `components/controls/Switch.tsx` (Mother-32)
 - **Full-track gaps on the A4**: POLY, a kit per pattern, separate track outputs, live recording of knob moves, TRANSPOSABLE, and trig/page/sound copy.
 - Mother-32: with a clock in TEMPO the knob shows CLOCK DIV; the engine already ignores it, so only the display is off.
-- Regenerate `docs/audio-qa-baseline/` for every instrument.
 - StudioView: hide "Output" for Your synth when it has no audio. `hub.push()` should apply data before values.
 - Optional "Hardware synth" studio set (Your synth + Audio input + Xone:96).
 - Delete the `wip/*` branches after their work is merged (ask first).

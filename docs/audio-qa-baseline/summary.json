@@ -1,333 +1,167 @@
 {
  "kind": "audio-qa-summary",
- "generated": "2026-10-29T00:35:37.615Z",
+ "generated": "2026-10-29T17:31:53.883Z",
  "devices": [
   {
    "id": "dfam",
    "name": "DFAM",
-   "presets": 38,
+   "presets": 40,
    "excitation": "audition",
-   "output": "mono",
-   "median": -21.58,
-   "spread": 20.09,
-   "iqr": 5.52,
-   "min": -31.25,
-   "max": -11.16,
-   "maxTruePeak": -1.4,
-   "masterOffset": 0.19,
-   "flagged": 12,
-   "flagCounts": {
-    "loudness": 12
-   },
+   "output": "stereo",
+   "median": -19.1,
+   "spread": 5.18,
+   "iqr": 1.48,
+   "min": -22.98,
+   "max": -17.8,
+   "maxTruePeak": -2.23,
+   "masterOffset": 0,
+   "flagged": 0,
+   "flagCounts": {},
    "setupErrors": 0,
-   "date": "2026-10-29T00:28:49.500Z",
-   "vsStudio": 0
+   "date": "2026-10-29T16:58:02.412Z",
+   "vsStudio": -0.54
   },
   {
    "id": "mother32",
    "name": "Mother-32",
-   "presets": 10,
-   "excitation": "keys",
-   "output": "mono",
-   "median": -19.14,
-   "spread": 20.55,
-   "iqr": 13.06,
-   "min": -34.7,
-   "max": -14.15,
-   "maxTruePeak": -10.62,
-   "masterOffset": 0.2,
-   "flagged": 6,
-   "flagCounts": {
-    "loudness": 5,
-    "dc": 1
-   },
+   "presets": 43,
+   "excitation": "audition",
+   "output": "stereo",
+   "median": -18.1,
+   "spread": 8.94,
+   "iqr": 1.54,
+   "min": -24.16,
+   "max": -15.22,
+   "maxTruePeak": -1.78,
+   "masterOffset": 0,
+   "flagged": 0,
+   "flagCounts": {},
    "setupErrors": 0,
-   "date": "2026-10-29T00:30:13.211Z",
-   "vsStudio": 2.44
+   "date": "2026-10-29T17:03:49.729Z",
+   "vsStudio": 0.46
   },
   {
    "id": "subharmonicon",
    "name": "Subharmonicon",
-   "presets": 9,
-   "excitation": "keys",
-   "output": "mono",
-   "median": -26.87,
-   "spread": 3.63,
-   "iqr": 2.78,
-   "min": -28.23,
-   "max": -24.6,
-   "maxTruePeak": -14.91,
-   "masterOffset": 0.2,
-   "flagged": 2,
-   "flagCounts": {
-    "loudness": 1,
-    "dc": 1
-   },
+   "presets": 36,
+   "excitation": "audition",
+   "output": "stereo",
+   "median": -18.45,
+   "spread": 5.58,
+   "iqr": 2.17,
+   "min": -22.21,
+   "max": -16.63,
+   "maxTruePeak": -1.49,
+   "masterOffset": 0,
+   "flagged": 0,
+   "flagCounts": {},
    "setupErrors": 0,
-   "date": "2026-10-29T00:31:29.136Z",
-   "vsStudio": -5.29
+   "date": "2026-10-29T17:08:56.897Z",
+   "vsStudio": 0.11
   },
   {
    "id": "sub37",
    "name": "Sub 37",
-   "presets": 11,
-   "excitation": "keys",
-   "output": "mono",
-   "median": -17.37,
-   "spread": 20.48,
-   "iqr": 9.75,
-   "min": -29.85,
-   "max": -9.37,
-   "maxTruePeak": 0.88,
-   "masterOffset": 0.2,
-   "flagged": 6,
-   "flagCounts": {
-    "loudness": 6,
-    "true-peak": 1
-   },
+   "presets": 64,
+   "excitation": "audition",
+   "output": "stereo",
+   "median": -18.02,
+   "spread": 5.19,
+   "iqr": 0.61,
+   "min": -22.35,
+   "max": -17.16,
+   "maxTruePeak": -3.54,
+   "masterOffset": 0,
+   "flagged": 0,
+   "flagCounts": {},
    "setupErrors": 0,
-   "date": "2026-10-29T00:32:56.550Z",
-   "vsStudio": 4.21
+   "date": "2026-10-29T17:17:22.827Z",
+   "vsStudio": 0.54
   },
   {
    "id": "analog-four",
    "name": "Analog Four MKII",
-   "presets": 7,
-   "excitation": "transport",
+   "presets": 47,
+   "excitation": "audition",
    "output": "stereo",
-   "median": -31.54,
-   "spread": 12.04,
-   "iqr": 7.38,
-   "min": -36.02,
-   "max": -23.98,
-   "maxTruePeak": -9.97,
-   "masterOffset": 0.19,
-   "flagged": 5,
+   "median": -18.99,
+   "spread": 7.58,
+   "iqr": 2.16,
+   "min": -24.43,
+   "max": -16.85,
+   "maxTruePeak": -1.56,
+   "masterOffset": 0,
+   "flagged": 1,
    "flagCounts": {
-    "loudness": 4,
-    "long-tail": 1,
-    "stuck-tail": 1
+    "clicks": 1
    },
    "setupErrors": 0,
-   "date": "2026-10-29T00:33:55.912Z",
-   "vsStudio": -9.96
+   "date": "2026-10-29T17:23:29.238Z",
+   "vsStudio": -0.43
   },
   {
    "id": "analog-rytm",
    "name": "Analog Rytm MKII",
-   "presets": 6,
-   "excitation": "transport",
+   "presets": 20,
+   "excitation": "audition",
    "output": "stereo",
-   "median": -13.63,
-   "spread": 14.27,
-   "iqr": 7.42,
-   "min": -20.69,
-   "max": -6.42,
-   "maxTruePeak": 2.08,
-   "masterOffset": -0.05,
-   "flagged": 4,
+   "median": -18.95,
+   "spread": 3.25,
+   "iqr": 2.17,
+   "min": -20.74,
+   "max": -17.49,
+   "maxTruePeak": -1.66,
+   "masterOffset": 0,
+   "flagged": 1,
    "flagCounts": {
-    "true-peak": 3,
-    "loudness": 3,
-    "long-tail": 1
+    "clicks": 1
    },
    "setupErrors": 0,
-   "date": "2026-10-29T00:34:43.687Z",
-   "vsStudio": 7.95
+   "date": "2026-10-29T17:26:06.260Z",
+   "vsStudio": -0.39
   },
   {
    "id": "xone96",
    "name": "Xone:96",
-   "presets": 5,
-   "excitation": "transport",
+   "presets": 21,
+   "excitation": "audition",
    "output": "stereo",
-   "median": -21.69,
-   "spread": 10.95,
-   "iqr": 1.01,
-   "min": -29.21,
-   "max": -18.26,
-   "maxTruePeak": -5.72,
-   "masterOffset": 0.2,
-   "flagged": 2,
-   "flagCounts": {
-    "loudness": 1,
-    "long-tail": 1
-   },
+   "median": -18.56,
+   "spread": 5.67,
+   "iqr": 0.76,
+   "min": -21.47,
+   "max": -15.8,
+   "maxTruePeak": -1.74,
+   "masterOffset": 0,
+   "flagged": 0,
+   "flagCounts": {},
    "setupErrors": 0,
-   "date": "2026-10-29T00:35:23.874Z",
-   "vsStudio": -0.11
+   "date": "2026-10-29T17:28:52.026Z",
+   "vsStudio": 0
   }
  ],
- "studioMedian": -21.58,
- "presets": 86,
- "flagged": 37,
+ "studioMedian": -18.56,
+ "presets": 271,
+ "flagged": 2,
  "flagTotals": {
-  "loudness": 32,
-  "dc": 2,
-  "true-peak": 4,
-  "long-tail": 3,
-  "stuck-tail": 1
+  "clicks": 2
  },
  "top": [
   {
-   "device": "analog-four",
-   "preset": "Detuned saw lead",
-   "key": "supersaw",
-   "flag": "stuck-tail",
-   "detail": "-14.8 dBFS peak 2 s after stop and not decaying (-0.6 dB/s): a note, gate or drone is left on",
-   "score": 90.2
-  },
-  {
-   "device": "subharmonicon",
-   "preset": "Envelope PWM (cable)",
-   "key": "pwm_envelope",
-   "flag": "dc",
-   "detail": "0.0547 (during the excitation; limit 0.005)",
-   "score": 81.8
-  },
-  {
    "device": "analog-rytm",
-   "preset": "Breakbeat",
-   "key": "breakbeat",
-   "flag": "true-peak",
-   "detail": "+2.1 dBTP (sample peak +2.1 dBFS, 5810 samples at or above 0 dBFS in 812 overs); ceiling -1 dBTP",
-   "score": 74.6
-  },
-  {
-   "device": "analog-rytm",
-   "preset": "Techno - four on the floor",
-   "key": "techno",
-   "flag": "true-peak",
-   "detail": "+1.4 dBTP (sample peak +1.4 dBFS, 37350 samples at or above 0 dBFS in 4333 overs); ceiling -1 dBTP",
-   "score": 69.1
-  },
-  {
-   "device": "sub37",
-   "preset": "Wobble Bass",
-   "key": "wobble_bass",
-   "flag": "true-peak",
-   "detail": "+0.9 dBTP (sample peak +0.9 dBFS, 476 samples at or above 0 dBFS in 10 overs); ceiling -1 dBTP",
-   "score": 65
-  },
-  {
-   "device": "mother32",
-   "preset": "Delayed Vibrato (VC MIX as VCA)",
-   "key": "delayed_vibrato",
-   "flag": "dc",
-   "detail": "0.0161 (during the excitation; limit 0.005)",
-   "score": 55.3
-  },
-  {
-   "device": "mother32",
-   "preset": "Self-Oscillating Filter (KB → MULT)",
-   "key": "whistle_filter",
-   "flag": "loudness",
-   "detail": "-34.7 LUFS is -15.6 LU from the device target -19.1 LUFS (tolerance 4 LU)",
-   "score": 54.7
-  },
-  {
-   "device": "analog-rytm",
-   "preset": "Hip-hop boom bap",
-   "key": "boombap",
-   "flag": "true-peak",
-   "detail": "-0.5 dBTP (sample peak -0.6 dBFS); ceiling -1 dBTP",
-   "score": 54.2
-  },
-  {
-   "device": "mother32",
-   "preset": "Acid Sequence",
-   "key": "acid_seq",
-   "flag": "loudness",
-   "detail": "-33.0 LUFS is -13.9 LU from the device target -19.1 LUFS (tolerance 4 LU)",
-   "score": 49.6
-  },
-  {
-   "device": "sub37",
-   "preset": "Pluck",
-   "key": "pluck",
-   "flag": "loudness",
-   "detail": "-29.9 LUFS is -12.5 LU from the device target -17.4 LUFS (tolerance 4 LU)",
-   "score": 45.4
-  },
-  {
-   "device": "dfam",
-   "preset": "FX / Sync zap",
-   "key": "fx_sync_zap",
-   "flag": "loudness",
-   "detail": "-13.4 LUFS is +12.2 LU from the FX target -25.6 LUFS (tolerance 4 LU)",
-   "score": 44.7
-  },
-  {
-   "device": "dfam",
-   "preset": "Metal / Sync bell",
-   "key": "metal_sync_bell",
-   "flag": "loudness",
-   "detail": "-11.2 LUFS is +10.4 LU from the device target -21.6 LUFS (tolerance 4 LU)",
-   "score": 39.3
-  },
-  {
-   "device": "dfam",
-   "preset": "Hats / Metallic hat",
-   "key": "hats_metal",
-   "flag": "loudness",
-   "detail": "-31.3 LUFS is -9.7 LU from the device target -21.6 LUFS (tolerance 4 LU)",
-   "score": 37
-  },
-  {
-   "device": "xone96",
-   "preset": "Live stem jam",
-   "key": "stem_jam",
-   "flag": "long-tail",
-   "detail": "-29.9 dBFS peak 2 s after stop, still decaying at -16.5 dB/s (long release or FX tail)",
-   "score": 35.1
-  },
-  {
-   "device": "dfam",
-   "preset": "Hats / Quick hats",
-   "key": "hats_quick",
-   "flag": "loudness",
-   "detail": "-12.7 LUFS is +8.9 LU from the device target -21.6 LUFS (tolerance 4 LU)",
-   "score": 34.6
-  },
-  {
-   "device": "dfam",
-   "preset": "FX / Laser zap",
-   "key": "fx_laser",
-   "flag": "loudness",
-   "detail": "-16.8 LUFS is +8.8 LU from the FX target -25.6 LUFS (tolerance 4 LU)",
-   "score": 34.3
-  },
-  {
-   "device": "sub37",
-   "preset": "Arp Pulse",
-   "key": "arp_pulse",
-   "flag": "loudness",
-   "detail": "-26.1 LUFS is -8.7 LU from the device target -17.4 LUFS (tolerance 4 LU)",
-   "score": 34.2
-  },
-  {
-   "device": "dfam",
-   "preset": "Bass / Sequenced bass",
-   "key": "bass_sequenced",
-   "flag": "loudness",
-   "detail": "-13.0 LUFS is +8.5 LU from the device target -21.6 LUFS (tolerance 4 LU)",
-   "score": 33.6
+   "preset": "Breaks / Big Beat",
+   "key": "bigbeat",
+   "flag": "clicks",
+   "detail": "1 (1 mid); worst step 6.6 dBFS; first at 3.6992 s",
+   "score": 68.3
   },
   {
    "device": "analog-four",
-   "preset": "Ambient drift",
-   "key": "ambient",
-   "flag": "loudness",
-   "detail": "-26.1 LUFS is +8.5 LU from the Drone / ambient target -34.5 LUFS (tolerance 4 LU)",
-   "score": 33.5
-  },
-  {
-   "device": "dfam",
-   "preset": "Snare / Rimshot",
-   "key": "snare_rim",
-   "flag": "loudness",
-   "detail": "-29.7 LUFS is -8.1 LU from the device target -21.6 LUFS (tolerance 4 LU)",
-   "score": 32.2
+   "preset": "Bass / Metallic AM",
+   "key": "sound-bass-am",
+   "flag": "clicks",
+   "detail": "1 (1 mid); worst step -34.4 dBFS; first at 1.5546 s",
+   "score": 47.8
   }
  ],
  "calibration": {
@@ -447,7 +281,7 @@
    }
   ],
   "ok": true,
-  "master": "-22.81 LUFS, sample peak -19.81 dBFS (+0.19 LU through the master bus)"
+  "master": "-23.00 LUFS, sample peak -20.00 dBFS (-0.00 LU through the master bus)"
  },
  "skipped": [
   {
@@ -459,12 +293,12 @@
    "why": "no presets"
   },
   {
-   "id": "audio-in",
+   "id": "wam-plugin",
    "why": "no presets"
   },
   {
-   "id": "wam-plugin",
-   "why": "no presets"
+   "id": "audio-in",
+   "why": "plays a live audio input only"
   }
  ]
 }

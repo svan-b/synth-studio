@@ -436,6 +436,13 @@ async function runDevice(browser, device, run, calibration) {
     await closePage(dp);
     return { device, skipped: 'no presets' };
   }
+  // Devices with no sound of their own (config `skip`): their presets are routings or levels
+  const skipWhy = run.cfg.devices && run.cfg.devices[device] && run.cfg.devices[device].skip;
+  if (skipWhy) {
+    console.log(`[${device}] ${info.name}: ${skipWhy} - skipped`);
+    await closePage(dp);
+    return { device, skipped: skipWhy };
+  }
   if (calibration && !calibration.done) {
     console.log(`calibration (${device}, ${info.sampleRate} Hz):`);
     try {

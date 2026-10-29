@@ -115,5 +115,5 @@
   }
  ],
  "ok": true,
- "master": "-22.81 LUFS, sample peak -19.81 dBFS (+0.19 LU through the master bus)"
+ "master": "-23.00 LUFS, sample peak -20.00 dBFS (-0.00 LU through the master bus)"
 }

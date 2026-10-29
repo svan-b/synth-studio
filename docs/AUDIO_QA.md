@@ -216,20 +216,24 @@ For the best excitation, give your module an `audition()` that plays what a user
 - **Short captures.** The integrated loudness of a 4 s excitation includes the partly filled blocks at its edges. They are the same for every preset, so comparisons hold, but the number reads a little lower than it would over a long performance.
 - **Instrument output only.** The flags judge the instrument output. The master columns include the master limiter, and its Chrome make-up gain reads about +2 dB.
 - **Hybrids.** Hybrid instruments (keyboard plus sequencer) are measured one way per run: see Excitation.
-- **Not measured.** Devices without presets are listed but not measured. That is Studio Clock (CV only), Your synth (MIDI) (no sound of its own), Audio input and Web Audio plugin.
+- **Not measured.** Devices without presets, and devices marked `skip` in the config, are listed but not measured: Studio Clock (CV only), Your synth (MIDI) (no sound of its own), Audio input (a live input only) and Web Audio plugin.
 
 ## Baseline
 
-`docs/audio-qa-baseline/` holds the reports of every current device at app commit `ec79288`: 86 presets on 7 instruments, headless Chromium 141 at 44.1 kHz. The meter calibration passed: the BS.1770 reference read -20.00 dBFS and -23.00 LUFS. See its `SUMMARY.md`.
+`docs/audio-qa-baseline/` holds the reports of every instrument after the rebuilds, the independent reviews and the performance passes (app commit `aa0a41a`). It covers 271 presets on 7 instruments, run with `--target -18` in headless Chromium 141 at 44.1 kHz, each instrument with its default excitation. The meter calibration passed. See `SUMMARY.md`.
 
-| Device | Presets | Excitation | Median LUFS | Spread LU | Flagged |
-|---|---|---|---|---|---|
-| DFAM | 38 | audition | -21.6 | 20.1 | 12: loudness 12 |
-| Mother-32 | 10 | keys | -19.1 | 20.6 | 6: loudness 5, dc 1 |
-| Subharmonicon | 9 | keys | -26.9 | 3.6 | 2: loudness 1, dc 1 |
-| Sub 37 | 11 | keys | -17.4 | 20.5 | 6: loudness 6, true-peak 1 |
-| Analog Four MKII | 7 | transport | -31.5 | 12.0 | 5: loudness 4, stuck-tail 1, long-tail 1 |
-| Analog Rytm MKII | 6 | transport | -13.6 | 14.3 | 4: true-peak 3, loudness 3, long-tail 1 |
-| Xone:96 | 5 | transport | -21.7 | 10.9 | 2: loudness 1, long-tail 1 |
+| Device | Presets | Median LUFS | Spread LU | Flagged |
+|---|---|---|---|---|
+| DFAM | 40 | -19.1 | 5.2 | 0 |
+| Mother-32 | 43 | -18.1 | 8.9 | 0 |
+| Subharmonicon | 36 | -18.4 | 5.6 | 0 |
+| Sub 37 | 64 | -18.0 | 5.2 | 0 |
+| Analog Four MKII | 47 | -19.0 | 7.6 | 1: clicks (Bass / Metallic AM) |
+| Analog Rytm MKII | 20 | -18.9 | 3.3 | 1: clicks (Breaks / Big Beat) |
+| Xone:96 | 21 | -18.6 | 5.7 | 0 |
 
-The instrument medians span 18 LU, from the Analog Four (-31.5) to the Rytm (-13.6). Line them up with `--target` once the master-bus rework sets the studio level.
+Every instrument's median is within 1.1 LU of the studio's -18 LUFS line-up; at the first baseline (`ec79288`) they spanned 18 LU.
+
+The two flags are single mid-note detections on transient-heavy material: the A4's audio-rate AM, and the Rytm kit with master drive. Re-run on their own, each preset was clean in 4 of 4 runs. Both reviews saw such rare hits with the code before them too (see `devices/analog-rytm/REVIEW.md` and `devices/analog-four/REVIEW.md`).
+
+Audio input is skipped (config `skip`): its presets set up a live input, and a headless browser has none.

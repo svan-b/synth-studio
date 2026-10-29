@@ -12,4 +12,4 @@ Test signals injected into the instrument tap (the slot's outGain, dfam) and mea
 | nothing connected (the idle instrument) | peak -inf dBFS, silent flag 1 (1 = raised) | peak below -70 dBFS, 1 (1 = raised) exactly | pass |
 | 1 kHz sine at -20 dBFS left on after stop | tail peak 2 s after stop -20.00 dBFS | -20 dBFS +-0.1 | pass |
 
-Master output during the one-channel reference: -22.81 LUFS, sample peak -19.81 dBFS (+0.19 LU through the master bus).
+Master output during the one-channel reference: -23.00 LUFS, sample peak -20.00 dBFS (-0.00 LU through the master bus).
