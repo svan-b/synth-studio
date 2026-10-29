@@ -146,10 +146,10 @@ export const SUB37_PRESETS: Record<string, PresetSpec> = {
     feg_release: 3000, aeg_attack: 1500, aeg_decay: 2000, aeg_release: 1900, mod2_rate: 0.12, mod2_filter_amt: 16,
   }),
   ticking_boom_bass: preset("Bass / Ticking Boom Bass", "A boomy sub-heavy bass with a click (\"tick\") on every note: KB RESET makes the attack identical each time, and a 15 ms filter-envelope blip adds the tick. Recreation of the Sub 37 factory preset “Bomb Bass Tick” (bank 1, preset 3, BASS); Moog's own settings are not published, so these are ours. Play: Short notes on the beat or the off-beat, MIDI 36–55. Leave space; it booms.", 2, 3, {
-    preset_volume: 100, osc1_octave: 0, osc1_wave: 50, osc2_octave: 0, osc2_wave: 0, kb_reset: true, mix_osc1: 70,
-    mix_sub: 90,
-    mix_osc2: 40, cutoff: 160, resonance: 10, multidrive: 40, filter_eg_amt: 80, filter_kb_amt: 50, feg_decay: 15,
-    feg_sustain: 0, feg_release: 40, feg_multi_trig: true, feg_reset: true, aeg_decay: 700, aeg_sustain: 0,
+    preset_volume: 100, osc1_octave: 0, osc1_wave: 40, osc2_octave: 0, osc2_wave: 0, kb_reset: true, mix_osc1: 60,
+    mix_sub: 80,
+    mix_osc2: 50, cutoff: 200, resonance: 10, multidrive: 25, filter_eg_amt: 80, filter_kb_amt: 50, feg_decay: 15,
+    feg_sustain: 0, feg_release: 40, feg_multi_trig: true, feg_reset: true, aeg_decay: 1000, aeg_sustain: 0,
     aeg_release: 250, aeg_multi_trig: true,
   }),
   bright_pwm_keys: preset("Classic / Bright PWM Keys", "A classic bright PWM sound: both oscillators near square with MOD 2 sweeping their width, the filter open, two voices. Recreation of the Sub 37 factory preset “BRIGHT PWM MOTION” (bank 1, preset 5, CLASSIC); Moog's own settings are not published, so these are ours. Play: Chordal two-note parts and riffs; the motion makes long notes shimmer.", 2, 4, {
@@ -221,11 +221,11 @@ export const SUB37_PRESETS: Record<string, PresetSpec> = {
     aeg_decay: 1500, aeg_sustain: 90, aeg_release: 1000, mod1_rate: 0.47, mod1_dest: 4, mod1_mod_amt: 40,
     mod2_rate: 0.3, mod2_dest: 2, mod2_mod_amt: 40,
   }),
-  synth_kick: preset("Percussion / Synth Kick", "A synth kick drum: a triangle with a 45 ms pitch drop (Filter EG through MOD 2), a click from the filter envelope, MULTIDRIVE for punch. Recreation of the Sub 37 factory preset “Analog Kick” (bank 3, preset 6, PERCUSSION); Moog's own settings are not published, so these are ours. Play: MIDI 36–43, one hit per beat; the key tunes the kick.", 2, 15, {
-    preset_volume: 100, osc1_octave: 0, osc1_wave: 0, kb_reset: true, mix_osc1: 100, cutoff: 300, multidrive: 55,
+  synth_kick: preset("Percussion / Synth Kick", "A synth kick drum: a triangle with a 45 ms pitch drop (Filter EG through MOD 2), a click from the filter envelope, MULTIDRIVE for punch. Recreation of the Sub 37 factory preset “Analog Kick” (bank 3, preset 6, PERCUSSION); Moog's own settings are not published, so these are ours. Play: MIDI 36–43 (a 65-98 Hz body), one hit per beat; the key tunes the kick.", 2, 15, {
+    preset_volume: 100, osc1_wave: 0, kb_reset: true, mix_osc1: 90, cutoff: 500, multidrive: 40,
     filter_eg_amt: 40,
     filter_kb_amt: 50, feg_decay: 45, feg_sustain: 0, feg_release: 40, feg_multi_trig: true, feg_reset: true,
-    aeg_decay: 350, aeg_sustain: 0, aeg_release: 300, aeg_multi_trig: true, aeg_reset: true, mod2_source: 5,
+    aeg_decay: 450, aeg_sustain: 0, aeg_release: 300, aeg_multi_trig: true, aeg_reset: true, mod2_source: 5,
     mod2_pitch_amt: 80,
   }),
   clarinet: preset("Woodwind / Clarinet", "A clarinet: a hollow square wave (odd harmonics only), a breath of pink noise, a gentle filter swell and wheel vibrato. Recreation of the Sub 37 factory preset “KLARINETIK” (bank 3, preset 7, WOODWIND); Moog's own settings are not published, so these are ours. Play: Woodwind lines in the middle register (MIDI 50–70), legato phrasing.", 2, 16, {

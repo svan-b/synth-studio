@@ -255,7 +255,7 @@ mono on both sides. **verified** (Subsequent 37 manual, p.34).
 | RESONANCE | The ladder self-oscillates from 7.1 on the dial ("above 7"; 7.0 still only rings), feedback 0.985 of the core's threshold there, up to 1.16 at 10 |
 | CUTOFF taper | 20 Hz × 1000^travel: the knob's centre is 632 Hz. The legend is the hardware's (20, 80, 320, 500, 1.2k, 5k, 20k Hz at 45° steps), which implies a taper compressed around noon that the shared knob mapping (linear / log / exponential only) cannot draw, so the printed marks read 0.3-0.7 octave off the value (the LCD and readout always show the true value) |
 | FILTER EG AMT | ±6 octaves at ±5 |
-| MULTIDRIVE | Drive 0.5 at 0 (clean) to 40 at 10 (square law) into an asymmetric soft clipper, 2× oversampled. Low settings add even and odd harmonics about equally (1.8 % THD at 1, 5 % at 2), 10 is hard clipping (42 %, odd). Its make-up rides on the VCA gain (2× at 0, falling to 0.39×), so a unity tone gains about 2 dB at 3 and 5 dB at 10: grit more than level |
+| MULTIDRIVE | Drive 0.5 at 0 (clean) to 40 at 10 (square law) into an asymmetric soft clipper, 2× oversampled. Low settings add even and odd harmonics about equally (1.8 % THD at 1, 5 % at 2), 10 is hard clipping (42 %, odd). Its make-up rides on the VCA gain (2× at 0, falling to 0.46× as the stages saturate), so a full-scale tone gains about 5 dB by 2 and never more than 6 dB, while a quiet one is driven harder (about +5 dB at 2, +11 dB at 4): grit more than level |
 | MOD amounts | PITCH AMT ±2 octaves at ±5 (squared taper, for fine vibrato); FILTER AMT ±5 octaves; MOD AMT: the other LFO's rate ±4 octaves, VCA gain 0-2, WAVE ±100 % of travel, NOISE ±10 on the dial, EG TIME ±3 octaves. A modulated parameter stays inside its own control's range: mixer levels 0-10, WAVE triangle to the narrowest pulse, EG AMT ±5, FREQUENCY ±7 (±36 as a drone), BEAT FREQ ±3.5 Hz |
 | CONTROLLERS | Depth = wheel × MOD WHEEL + velocity × VELOCITY, clamped to ±1; with both OFF, full depth |
 | LFO | SAW falls, RAMP rises; S&H takes a new value each cycle; the SINE and NOISE LFO sources follow the bus's LFO clock; LFO KBTRACK doubles the rate per octave at 100 % around MIDI 48 |
@@ -264,7 +264,7 @@ mono on both sides. **verified** (Subsequent 37 manual, p.34).
 | ARP without SYNC | Steps at CLOCK DIV (default 1/16) of RATE |
 | Oscillators | 1.5 cents of slow drift (about 0.2 Hz); OSC 2 tolerance ±2 cents |
 | Output | −6 dB output trim after the VCA (`OUTPUT_TRIM_DB`); VOLUME law (dial / 10)^2 × 0.9; HEADPHONES unity at 7 against VOLUME. A fresh panel plays about −15 LUFS at VOLUME 7; the presets are levelled to −18 LUFS with PRESET VOL |
-| Sound of the two models | The twin has one voicing: the Subsequent 37's cleaner mixer headroom is the 5-is-unity law above |
+| Sound of the two models | The twin has one voicing, the Subsequent 37's: the mixer amp's headroom (clean to 1.5× unity) and the overdrive at the ladder's input above 5 |
 
 ## Where the twin differed from the hardware, and how it was resolved
 
