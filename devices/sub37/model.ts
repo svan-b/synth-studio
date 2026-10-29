@@ -306,11 +306,13 @@ export function ctlSettings(v: Values, opts: { lfoHz: [number, number]; extPatch
 // Post-filter stages (native nodes)
 // ---------------------------------------------------------------------------
 
-/** Ladder input scale (the mixer at 5 on one oscillator stays almost clean) and the make-up after it */
-export const LADDER_DRIVE = 0.45;
-export const LADDER_MAKEUP = 2.1;
-/** MULTIDRIVE: post gain so the knob adds grit more than level (0-100 %) */
-export const mdPostGain = (pct: number) => 1 / (1 + 0.009 * Math.max(0, Math.min(100, pct)));
+/**
+ * Ladder input scale and the make-up after it. One source at 5 reaches the ladder at 0.36: about
+ * 1 % distortion, "a clean signal to the filter"; at 10 (+9 dB) the input pair overdrives gently,
+ * and several sources above 5 drive it hard (p.27). The mixer amp ahead of it is clean to 1.5x.
+ */
+export const LADDER_DRIVE = 0.36;
+export const LADDER_MAKEUP = 2.625;
 /**
  * Output level of the twin (dB), after the VCA: with VOLUME at its default 7 a fresh panel (one
  * saw, the filter open) plays the standard phrase at about -15 LUFS, and the presets are levelled
@@ -325,8 +327,10 @@ export const volumeGain = (pct: number) => Math.pow(Math.max(0, pct) / 100, 2) *
 export const phonesGain = (pct: number) => Math.pow(Math.max(0, pct) / 70, 2);
 
 /**
- * MULTIDRIVE transfer curve over x in -8..8: clean below about 1.5, an asymmetric knee (more
- * even harmonics, "tube-like") and a hard limit near +-3 at high drive.
+ * MULTIDRIVE transfer curve over x in -8..8: nearly linear below about 0.8, an asymmetric knee
+ * (more even than odd harmonics: the "tube-like warmth" of low settings) and a hard limit near
+ * +-3 at high drive (p.28). The drive into it runs from 0.5 at 0 (clean) to 40 at 10, and its
+ * make-up rides on the VCA gain (MD_POST in public/worklets/sub37-processors.js).
  */
 export function multidriveCurve(n = 4096): Float32Array<ArrayBuffer> {
   const c = new Float32Array(new ArrayBuffer(n * 4));

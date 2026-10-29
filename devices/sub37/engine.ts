@@ -31,7 +31,7 @@ import { Arp, isSeqPattern, seqNextStep, seqStepFrom } from './arp';
 import {
   C4_HZ, DEST_PGM, DIVISIONS, F_RATCHET, F_REST, F_TIE, LADDER_DRIVE, LADDER_MAKEUP, MD_CURVE_RANGE, MIDDLE_C, PATTERN_REC,
   PGM_ARP_RATE, SLOPE_MODES, SOURCE_PGM,
-  charFlags, charNote, ctlSettings, firstSeqNote, lfoHz, mdPostGain, multidriveCurve, phonesGain, volumeGain,
+  charFlags, charNote, ctlSettings, firstSeqNote, lfoHz, multidriveCurve, phonesGain, volumeGain,
 } from './model';
 import { SUB37 } from './spec';
 
@@ -54,7 +54,6 @@ export class Sub37Engine extends BaseEngine {
   private osc2!: Vco;
   private syncGain!: GainNode;
   private ladder!: Ladder;
-  private mdPost!: GainNode;
   private presetVol!: GainNode;
   private volume!: GainNode;
   private mute!: GainNode;
@@ -178,20 +177,20 @@ export class Sub37Engine extends BaseEngine {
     this.mix.connect(this.ladder.input);
 
     // --- MULTIDRIVE (OTA / FET stages after the filter, p.28), DC blocker, VCA, outputs -----------
+    // The drive (ctl 15) goes in front of the shaper; its make-up rides on the VCA gain (ctl 3)
     const makeup = g(LADDER_MAKEUP / MD_CURVE_RANGE);
     const mdPre = g(0);
     split.connect(mdPre.gain, 15);
     const shaper = ctx.createWaveShaper();
     shaper.curve = multidriveCurve();
     shaper.oversample = '2x';
-    this.mdPost = g(1);
     const dc = ctx.createBiquadFilter();
     dc.type = 'highpass';
     dc.frequency.value = 12;
     dc.Q.value = -3.01; // Butterworth (Q in dB for highpass)
     const vca = g(0);
     split.connect(vca.gain, 3);
-    this.ladder.output.connect(makeup).connect(mdPre).connect(shaper).connect(this.mdPost).connect(dc).connect(vca);
+    this.ladder.output.connect(makeup).connect(mdPre).connect(shaper).connect(dc).connect(vca);
     // OUTPUT (p.34): PRESET VOL and VOLUME feed both jacks; MUTE silences AUDIO OUT only;
     // HEADPHONES balances against VOLUME
     this.presetVol = g(1);
@@ -330,7 +329,6 @@ export class Sub37Engine extends BaseEngine {
         break;
       }
       case 'filter_slope': this.ladder.setMode(SLOPE_MODES[Math.round(Number(value))] ?? 'lp24'); break;
-      case 'multidrive': this.mdPost.gain.setTargetAtTime(mdPostGain(Number(value)), t, 0.01); break;
       case 'master_volume': this.volume.gain.setTargetAtTime(volumeGain(Number(value)), t, 0.01); break;
       case 'output_mute': this.mute.gain.setTargetAtTime(value ? 0 : 1, t, 0.005); break;
       case 'phones_volume': this.phones.gain.setTargetAtTime(phonesGain(Number(value)), t, 0.01); break;
