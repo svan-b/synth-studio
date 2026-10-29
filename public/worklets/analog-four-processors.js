@@ -146,7 +146,12 @@ const SHAPES = [[0, 0], [1, 1], [2, 0], [2, 1], [3, 0], [3, 1]];
 const D = 0.5;
 
 class Env {
-  constructor() { this.v = this.x = D; this.stage = 0; this.v = 0; this.gate = false; this.pending = false; this.gateEnd = Infinity; this.x = 0; }
+  constructor() {
+    this.v = this.x = this.kA = this.tA = this.kD = this.tD = this.kR = this.tR = this.kI = this.eI = this.kE = this.eE = D;
+    this.stage = 0; this.v = 0; this.gate = false; this.pending = false; this.gateEnd = Infinity; this.x = 0;
+    // memoised stage times and exponentials: input -> value (NaN: nothing yet)
+    this.kA = this.kD = this.kR = this.kI = this.kE = NaN;
+  }
   trig(shape, now, lenSec) {
     if (shape & 1) this.v = 0;            // (R): restart from zero
     this.stage = 1;
@@ -160,11 +165,16 @@ class Env {
     if (this.stage === 0) return;
     this.stage = 4;
   }
-  tick(dt, atk, dec, sus, rel, shape, now, inf) {
+  /**
+   * One control tick. vc.E(iA / iD / iS / iR): the voice's attack, decay, sustain and release values,
+   * read only for the stage that runs (each stage uses one time; the stage times are memoised).
+   */
+  tick(dt, vc, iA, iD, iS, iR, shape, now, inf) {
     if (this.gate && now >= this.gateEnd) { this.gateEnd = Infinity; this.release(shape); }
     const s = SHAPES[shape >> 1];
     switch (this.stage) {
       case 1: {
+        const atk = this.atk(vc.E(iA));
         if (s[0] === 3) {
           // full: up to full level at once (within the shortest rise), then held for the ATK time
           this.v = Math.min(1, this.v + dt / ENV_MIN_RISE);
@@ -174,34 +184,43 @@ class Env {
         }
         const inc = dt / (atk > ENV_MIN_RISE ? atk : ENV_MIN_RISE);
         if (s[0] === 0) this.v += inc;
-        else if (s[0] === 1) this.v += (1.32 - this.v) * (1 - Math.exp(-inc * 1.4));
-        else { this.x += inc; this.v = this.x * this.x * this.x; }
+        else if (s[0] === 1) {
+          if (inc !== this.kI) { this.kI = inc; this.eI = 1 - Math.exp(-inc * 1.4); }
+          this.v += (1.32 - this.v) * this.eI;
+        } else { this.x += inc; this.v = this.x * this.x * this.x; }
         if (this.v >= 1) { this.v = 1; this.stage = 2; }
         break;
       }
-      case 2:
+      case 2: {
+        const dec = this.dec(vc.E(iD)), sus = vc.E(iS) / 127;
         if (s[1] === 0) { this.v -= (dt / dec) * (1 - sus + 1e-3); if (this.v <= sus) { this.v = sus; this.stage = 3; } }
-        else { this.v = sus + (this.v - sus) * Math.exp((-dt * 5) / dec); if (this.v - sus < 1e-4) { this.v = sus; this.stage = 3; } }
+        else { this.v = sus + (this.v - sus) * this.ex((-dt * 5) / dec); if (this.v - sus < 1e-4) { this.v = sus; this.stage = 3; } }
         if (this.stage === 3 && (this.pending || !this.gate)) { this.pending = false; this.stage = 4; }
         break;
+      }
       case 3:
-        this.v = sus;
+        this.v = vc.E(iS) / 127;
         if (!this.gate) this.stage = 4;
         break;
       case 4:
         if (inf) break;
-        if (s[1] === 0) this.v -= dt / rel; else this.v *= Math.exp((-dt * 5) / rel);
+        if (s[1] === 0) this.v -= dt / this.rel(vc.E(iR)); else this.v *= this.ex((-dt * 5) / this.rel(vc.E(iR)));
         if (this.v <= 1e-4) { this.v = 0; this.stage = 0; }
         break;
     }
     return this.v;
   }
+  atk(v) { if (v !== this.kA) { this.kA = v; this.tA = envTime(v); } return this.tA; }
+  dec(v) { if (v !== this.kD) { this.kD = v; this.tD = envTime(v); } return this.tD; }
+  rel(v) { if (v !== this.kR) { this.kR = v; this.tR = envTime(v); } return this.tR; }
+  ex(a) { if (a !== this.kE) { this.kE = a; this.eE = Math.exp(a); } return this.eE; }
 }
 
 class Lfo {
   constructor() {
-    this.ph = this.left = this.hold = this.fade = this.rnd = this.last = D;
+    this.ph = this.left = this.hold = this.fade = this.rnd = this.last = this.kF = this.cF = D;
     this.ph = Math.random(); this.run = true; this.left = Infinity; this.hold = 0; this.holding = false; this.fade = 1; this.rnd = Math.random() * 2 - 1; this.last = 0;
+    this.kF = NaN;   // memoised fade time: FAD -> 0.02 x 2^(|FAD| / 8)
   }
   trig(mode, sph, fad) {
     this.fade = fad < 0 ? 0 : 1;
@@ -224,7 +243,8 @@ class Lfo {
       if (this.ph >= 1 || this.ph < 0) { this.ph -= Math.floor(this.ph); this.rnd = Math.random() * 2 - 1; }
     } else if (mode !== 3 && mode !== 4) { this.run = true; this.left = Infinity; }
     if (fad !== 0) {
-      const st = dt / (0.02 * exp2((fad < 0 ? -fad : fad) / 8));
+      if (fad !== this.kF) { this.kF = fad; this.cF = 0.02 * exp2((fad < 0 ? -fad : fad) / 8); }
+      const st = dt / this.cF;
       this.fade = fad < 0 ? Math.min(1, this.fade + st) : Math.max(0, this.fade - st);
     } else this.fade = 1;
     const p = this.ph;
@@ -254,6 +274,8 @@ function enqueue(q, ev) {
 
 // Oscillator event kinds
 const E_WRAP = 1, E_PW = 2, E_HALF = 3, E_RESET = 4;
+// Sub divider output for count c: 2PUL is high for two counts of four, the others for one
+const subHi = (sub, c) => (sub === 2 ? c < 2 : c < 1);
 
 // The parameter indices the code reads by name, as an object literal with a fixed shape. The map the
 // nodes get (processorOptions.keys) is built by keyed stores, and with ~100 keys V8 keeps that object
@@ -298,6 +320,18 @@ class A4Voice extends AudioWorkletProcessor {
     this.gain = this.sendC = this.sendD = this.sendR = this.gS = D;
     // set by each control tick (created here, so the object's shape never changes)
     this.w1 = 0; this.w2 = 0; this.sub1 = 0; this.sub2 = 0; this.smd = 0; this.snc = 0; this.am1 = false; this.am2 = false; this.type2 = 0;
+    // Memoised control-rate functions, input -> value (k*: the input, NaN = nothing yet). Most inputs
+    // stay put between control ticks; each value is the same expression of the same input as before.
+    this.kVsp = this.cVsp = this.kVfa = this.cVfa = this.kN1 = this.cN1 = this.kN2 = this.cN2 = D;
+    this.kSp1 = this.cSp1 = this.kSp2 = this.cSp2 = this.kNfa = this.cNfa = this.kCol = this.cHpK = D;
+    this.kF1 = this.cG1 = this.kF2 = this.cG2 = this.kR1 = this.cK1 = this.kR2 = this.cK2 = D;
+    this.kOvr = this.cDrive = this.cOvr = this.cInDrive = this.cInComp = this.kPan = this.cPanL = this.cPanR = D;
+    this.kVsp = this.kVfa = this.kN1 = this.kN2 = this.kSp1 = this.kSp2 = this.kNfa = this.kCol = NaN;
+    this.kF1 = this.kF2 = this.kR1 = this.kR2 = this.kOvr = this.kPan = NaN;
+    this.redK = 1 - Math.exp((-TWO_PI * 20) / sampleRate);   // red noise pole (20 Hz)
+    this.fdbK = 1 - Math.exp((-TWO_PI * 25) / sampleRate);   // FDB AC coupling (25 Hz)
+    // the modulation entries the last control tick wrote (the rest of M is zero)
+    this.mIdx = new Int32Array(64); this.mN = 0;
     const o = (options && options.processorOptions) || {};
     const keys = o.keys || [];
     const I = {};
@@ -359,7 +393,6 @@ class A4Voice extends AudioWorkletProcessor {
     this.bGain = f(); this.bPanL = f(); this.bPanR = f(); this.bSC = f(); this.bSD = f(); this.bSR = f();
     this.bK1 = f(); this.bComp = f(); this.bDrive = f(); this.bOvr = f(); this.bK2 = f(); this.bPk = f();
     this.bLev1 = f(); this.bLev2 = f(); this.bNLev = f(); this.bNHold = f(); this.bNCol = f(); this.bNHpK = f(); this.bNHpG = f();
-    this.bOn = new Uint8Array(nb);
     const cap = 8 * n + 16;
     this.evI = new Int32Array(cap); this.evK = new Int32Array(cap); this.evO = new Int8Array(cap);
     this.evD = new Float64Array(cap); this.evH = new Float64Array(cap); this.evS = new Float64Array(cap);
@@ -384,8 +417,16 @@ class A4Voice extends AudioWorkletProcessor {
         this.gate = false;
         if (!this.idle || this.envA.stage !== 0) { this.cutN = Math.max(1, Math.round((0.006 * sampleRate) / BLOCK)); this.cutLeft = this.cutN; }
         break;
-      default: enqueue(this.q, m);
+      default: enqueue(this.q, A4Voice.event(m));
     }
+  }
+
+  /**
+   * A queued event, in one shape for every kind (the messages' shapes differ by kind and sender), so
+   * the code that reads the queue on the audio clock sees a single object map
+   */
+  static event(m) {
+    return { t: m.t, time: m.time, t1: m.t1, list: m.list, note: m.note, vel: m.vel, acc: m.acc, slide: m.slide, live: m.live, leg: m.leg, rt: m.rt };
   }
 
   /**
@@ -473,35 +514,42 @@ class A4Voice extends AudioWorkletProcessor {
     const d = this.dests[dstIdx];
     if (!d) return;
     const a = amount * d.range;
-    for (let k = 0; k < d.idx.length; k++) this.M[d.idx[k]] += a;
+    const idx = d.idx, M = this.M, mIdx = this.mIdx;
+    for (let k = 0; k < idx.length; k++) { M[idx[k]] += a; mIdx[this.mN++] = idx[k]; }
+  }
+
+  /** A modulator's route: destination P[iDst], amount E(iDep) / 128 x value (the depth is read only when routed) */
+  route2(iDst, iDep, x) {
+    const d = Math.round(this.P[iDst]);
+    if (d) this.route(d, (this.E(iDep) / 128) * x);
   }
 
   /** One control tick: modulation, envelopes, coefficients for block b */
   control(now, dt, b) {
-    const I = this.I, P = this.P;
-    this.M.fill(0);
+    const I = this.I, P = this.P, sr = sampleRate;
+    // clear last tick's modulation: only the entries it wrote are non-zero
+    const M = this.M, mIdx = this.mIdx;
+    for (let k = 0, n = this.mN; k < n; k++) M[mIdx[k]] = 0;
+    this.mN = 0;
     const vm = this.velMod;
     for (let n = 0; n < 5; n++) {
       const dep = P[this.vmDep[n]];
       if (dep !== 0) this.route(Math.round(P[this.vmDst[n]]), (dep / 128) * vm);
     }
-    const ef = this.envF.tick(dt, envTime(this.E(I.envf_atk)), envTime(this.E(I.envf_dec)), this.E(I.envf_sus) / 127,
-      envTime(this.E(I.envf_rel)), Math.round(P[I.envf_shp]), now, P[I.envf_rel] >= 127);
-    const e2 = this.env2.tick(dt, envTime(this.E(I.env2_atk)), envTime(this.E(I.env2_dec)), this.E(I.env2_sus) / 127,
-      envTime(this.E(I.env2_rel)), Math.round(P[I.env2_shp]), now, P[I.env2_rel] >= 127);
-    this.route(Math.round(P[I.envf_dsta]), (this.E(I.envf_depa) / 128) * ef);
-    this.route(Math.round(P[I.envf_dstb]), (this.E(I.envf_depb) / 128) * ef);
-    this.route(Math.round(P[I.env2_dsta]), (this.E(I.env2_depa) / 128) * e2);
-    this.route(Math.round(P[I.env2_dstb]), (this.E(I.env2_depb) / 128) * e2);
+    const ef = this.envF.tick(dt, this, I.envf_atk, I.envf_dec, I.envf_sus, I.envf_rel, Math.round(P[I.envf_shp]), now, P[I.envf_rel] >= 127);
+    const e2 = this.env2.tick(dt, this, I.env2_atk, I.env2_dec, I.env2_sus, I.env2_rel, Math.round(P[I.env2_shp]), now, P[I.env2_rel] >= 127);
+    this.route2(I.envf_dsta, I.envf_depa, ef);
+    this.route2(I.envf_dstb, I.envf_depb, ef);
+    this.route2(I.env2_dsta, I.env2_depa, e2);
+    this.route2(I.env2_dstb, I.env2_depb, e2);
     const l2 = this.lfo2.tick(dt, lfoHz(this.E(I.lfo2_spd), Math.round(P[I.lfo2_mul]), this.bpm), Math.round(P[I.lfo2_wav]), Math.round(P[I.lfo2_mod]), this.E(I.lfo2_fad));
-    this.route(Math.round(P[I.lfo2_dsta]), (this.E(I.lfo2_depa) / 128) * l2);
-    this.route(Math.round(P[I.lfo2_dstb]), (this.E(I.lfo2_depb) / 128) * l2);
+    this.route2(I.lfo2_dsta, I.lfo2_depa, l2);
+    this.route2(I.lfo2_dstb, I.lfo2_depb, l2);
     const l1 = this.lfo1.tick(dt, lfoHz(this.E(I.lfo1_spd), Math.round(P[I.lfo1_mul]), this.bpm), Math.round(P[I.lfo1_wav]), Math.round(P[I.lfo1_mod]), this.E(I.lfo1_fad));
-    this.route(Math.round(P[I.lfo1_dsta]), (this.E(I.lfo1_depa) / 128) * l1);
-    this.route(Math.round(P[I.lfo1_dstb]), (this.E(I.lfo1_depb) / 128) * l1);
+    this.route2(I.lfo1_dsta, I.lfo1_depa, l1);
+    this.route2(I.lfo1_dstb, I.lfo1_depb, l1);
 
-    const ea = this.envA.tick(dt, envTime(this.E(I.amp_atk)), envTime(this.E(I.amp_dec)), this.E(I.amp_sus) / 127,
-      envTime(this.E(I.amp_rel)), Math.round(P[I.amp_shp]), now, P[I.amp_rel] >= 127);
+    const ea = this.envA.tick(dt, this, I.amp_atk, I.amp_dec, I.amp_sus, I.amp_rel, Math.round(P[I.amp_shp]), now, P[I.amp_rel] >= 127);
 
     // Glide (constant time, smooth ends)
     if (this.glideTime > 0) {
@@ -511,15 +559,20 @@ class A4Voice extends AudioWorkletProcessor {
       if (k >= 1) this.glideTime = 0;
     } else this.pitch = this.note;
 
-    // Vibrato, drift
-    this.vibPh += 0.5 * exp2(this.E(I.osc_vsp) / 26) * dt;
-    if (this.vibPh >= 1) this.vibPh -= 1;
+    // Vibrato, drift (phase wraps by subtracting 0 or 1: no branch that runs only now and then)
+    const vsp = this.E(I.osc_vsp);
+    if (vsp !== this.kVsp) { this.kVsp = vsp; this.cVsp = exp2(vsp / 26); }
+    this.vibPh += 0.5 * this.cVsp * dt;
+    this.vibPh -= this.vibPh >= 1 ? 1 : 0;
     const vfa = P[I.osc_vfa];
     if (vfa !== 0) {
-      const st = dt / (0.02 * exp2((vfa < 0 ? -vfa : vfa) / 8));
+      if (vfa !== this.kVfa) { this.kVfa = vfa; this.cVfa = 0.02 * exp2((vfa < 0 ? -vfa : vfa) / 8); }
+      const st = dt / this.cVfa;
       this.vibFade = vfa < 0 ? Math.min(1, this.vibFade + st) : Math.max(0, this.vibFade - st);
     } else this.vibFade = 1;
-    const vib = sin2pi(this.vibPh) * (this.E(I.osc_vib) / 127) * 0.6 * this.vibFade;
+    // depth 0 gives a vibrato of (+/-)0, which leaves the pitch sums below unchanged
+    const vdep = this.E(I.osc_vib);
+    const vib = vdep !== 0 ? sin2pi(this.vibPh) * (vdep / 127) * 0.6 * this.vibFade : 0;
     if (P[I.snd_drf] >= 0.5) {
       this.drift1 = this.drift1 * 0.9995 + (Math.random() - 0.5) * 0.002;
       this.drift2 = this.drift2 * 0.9995 + (Math.random() - 0.5) * 0.002;
@@ -541,15 +594,19 @@ class A4Voice extends AudioWorkletProcessor {
     // Oscillator increments
     const n1 = (P[I.osc1_trk] >= 0.5 ? this.pitch : 60) + this.E(I.osc1_tun) + this.E(I.osc1_fin) / 128 + this.M[I.osc1_pmod] + vib + bend1 + this.drift1 * 0.05;
     const n2 = (P[I.osc2_trk] >= 0.5 ? this.pitch : 60) + this.E(I.osc2_tun) + this.E(I.osc2_fin) / 128 + this.M[I.osc2_pmod] + vib + bend2 + this.drift2 * 0.05;
-    const sr = sampleRate;
-    const hz1 = 440 * exp2((n1 - 69) / 12) + this.E(I.osc1_det) * 0.125;
-    const hz2 = 440 * exp2((n2 - 69) / 12) + this.E(I.osc2_det) * 0.125;
+    if (n1 !== this.kN1) { this.kN1 = n1; this.cN1 = 440 * exp2((n1 - 69) / 12); }
+    if (n2 !== this.kN2) { this.kN2 = n2; this.cN2 = 440 * exp2((n2 - 69) / 12); }
+    const hz1 = this.cN1 + this.E(I.osc1_det) * 0.125;
+    const hz2 = this.cN2 + this.E(I.osc2_det) * 0.125;
     this.bDt1[b + 1] = clamp(hz1, 0.1, sr * 0.45) / sr;
     this.bDt2[b + 1] = clamp(hz2, 0.1, sr * 0.45) / sr;
 
     // PWM LFOs (triangle) and pulse widths
-    this.pwm1 += 0.1 * exp2(this.E(I.osc1_spd) / 16) * dt; if (this.pwm1 >= 1) this.pwm1 -= 1;
-    this.pwm2 += 0.1 * exp2(this.E(I.osc2_spd) / 16) * dt; if (this.pwm2 >= 1) this.pwm2 -= 1;
+    const sp1 = this.E(I.osc1_spd), sp2 = this.E(I.osc2_spd);
+    if (sp1 !== this.kSp1) { this.kSp1 = sp1; this.cSp1 = 0.1 * exp2(sp1 / 16); }
+    if (sp2 !== this.kSp2) { this.kSp2 = sp2; this.cSp2 = 0.1 * exp2(sp2 / 16); }
+    this.pwm1 += this.cSp1 * dt; this.pwm1 -= this.pwm1 >= 1 ? 1 : 0;
+    this.pwm2 += this.cSp2 * dt; this.pwm2 -= this.pwm2 >= 1 ? 1 : 0;
     // PW shapes every waveform; 0 is the plain wave, the extremes mute the pulses (manual p.72, p.87)
     this.bPw1[b + 1] = clamp(0.5 + (this.E(I.osc1_pw) / 64) * 0.5 + triLfo(this.pwm1) * (this.E(I.osc1_pwm) / 127) * 0.45, 0.002, 0.998);
     this.bPw2[b + 1] = clamp(0.5 + (this.E(I.osc2_pw) / 64) * 0.5 + triLfo(this.pwm2) * (this.E(I.osc2_pwm) / 127) * 0.45, 0.002, 0.998);
@@ -559,55 +616,74 @@ class A4Voice extends AudioWorkletProcessor {
     // Noise
     const fad = P[I.noise_fad];
     if (fad !== 0) {
-      const st = dt / (0.005 * exp2((fad < 0 ? -fad : fad) / 7));
+      if (fad !== this.kNfa) { this.kNfa = fad; this.cNfa = 0.005 * exp2((fad < 0 ? -fad : fad) / 7); }
+      const st = dt / this.cNfa;
       this.noiseFade = fad > 0 ? Math.max(0, this.noiseFade - st) : Math.min(1, this.noiseFade + st);
     } else this.noiseFade = 1;
-    this.bNLev[b] = (this.E(I.noise_lev) / 127) * this.noiseFade * 0.9;
-    const snh = this.E(I.noise_snh) / 127;
-    this.bNHold[b] = snh <= 0 ? 1 : Math.round(1 + snh * snh * 360);
-    // COL (manual p.87): 0 white; negative low-passed, -32 pink (-3 dB/oct), -64 red (-6 dB/oct);
-    // positive high-passed (30 Hz .. 8 kHz, level compensated)
-    const col = clamp(this.E(I.noise_col) / 64, -1, 1);
-    this.bNCol[b] = col;
-    this.bNHpK[b] = col > 0 ? 1 - Math.exp((-TWO_PI * 30 * exp2(col * 8.06)) / sr) : 0;
-    this.bNHpG[b] = 1 + 1.5 * col * col * col * col;
+    const nLev = (this.E(I.noise_lev) / 127) * this.noiseFade * 0.9;
+    this.bNLev[b] = nLev;
+    // the sample loop reads the other noise settings of a block only when its level is above 0
+    if (nLev > 0) {
+      const snh = this.E(I.noise_snh) / 127;
+      this.bNHold[b] = snh <= 0 ? 1 : Math.round(1 + snh * snh * 360);
+      // COL (manual p.87): 0 white; negative low-passed, -32 pink (-3 dB/oct), -64 red (-6 dB/oct);
+      // positive high-passed (30 Hz .. 8 kHz, level compensated)
+      const col = clamp(this.E(I.noise_col) / 64, -1, 1);
+      this.bNCol[b] = col;
+      if (col !== this.kCol) { this.kCol = col; this.cHpK = col > 0 ? 1 - Math.exp((-TWO_PI * 30 * exp2(col * 8.06)) / sr) : 0; }
+      this.bNHpK[b] = this.cHpK;
+      this.bNHpG[b] = 1 + 1.5 * col * col * col * col;
+    }
 
     // Filter 1: ladder (keytrack: 32 = 1:1; DEP 64 = the full range). An accent trig opens the filter
-    // envelope further as well as raising the level (manual p.51): DEP x (1 + 0.8 x ACC/127)
+    // envelope further as well as raising the level (manual p.51): DEP x (1 + 0.8 x ACC/127).
+    // Without an accent (acc 0) both accent factors are exactly 1.
     const semis = this.pitch - 60;
-    const accF = 1 + this.acc * 0.8 * (this.E(I.snd_acc) / 127);
+    const accF = this.acc !== 0 ? 1 + this.acc * 0.8 * (this.E(I.snd_acc) / 127) : 1;
     const f1 = this.E(I.flt1_frq) + (this.E(I.flt1_trk) / 32) * semis + this.E(I.flt1_dep) * 2 * ef * accF;
-    this.bG1[b + 1] = tanF((Math.PI * Math.min(sr * 0.45, fltHz(clamp(f1, -24, 140)))) / sr);
+    if (f1 !== this.kF1) { this.kF1 = f1; this.cG1 = tanF((Math.PI * Math.min(sr * 0.45, fltHz(clamp(f1, -24, 140)))) / sr); }
+    this.bG1[b + 1] = this.cG1;
     const r1 = this.E(I.flt1_res) / 127;
-    const k1 = 4.3 * Math.pow(r1, 1.3);
+    if (r1 !== this.kR1) { this.kR1 = r1; this.cK1 = 4.3 * Math.pow(r1, 1.3); }
+    const k1 = this.cK1;
     this.bK1[b] = k1;
     this.bComp[b] = P[I.snd_bst] >= 0.5 ? 1 + k1 * 0.45 : 1 + k1 * 0.08;
     const ovr = this.E(I.flt1_ovr);
-    const op = ovr > 0 ? Math.min(1, ovr / 63) : 0, on = ovr < 0 ? Math.min(1, -ovr / 64) : 0;
-    this.bDrive[b] = 1 + op * op * 24;
-    this.bOvr[b] = Math.min(1, op * 12);
-    this.bInDrive[b] = 1 + on * on * 7;
-    this.bInComp[b] = 1 / Math.sqrt(1 + on * on * 2.5);
+    if (ovr !== this.kOvr) {
+      this.kOvr = ovr;
+      const op = ovr > 0 ? Math.min(1, ovr / 63) : 0, on = ovr < 0 ? Math.min(1, -ovr / 64) : 0;
+      this.cDrive = 1 + op * op * 24;
+      this.cOvr = Math.min(1, op * 12);
+      this.cInDrive = 1 + on * on * 7;
+      this.cInComp = 1 / Math.sqrt(1 + on * on * 2.5);
+    }
+    this.bDrive[b] = this.cDrive;
+    this.bOvr[b] = this.cOvr;
+    this.bInDrive[b] = this.cInDrive;
+    this.bInComp[b] = this.cInComp;
     // Filter 2: multimode
     const f2 = this.E(I.flt2_frq) + (this.E(I.flt2_trk) / 32) * semis + this.E(I.flt2_dep) * 2 * ef * accF;
-    this.bG2[b + 1] = tanF((Math.PI * Math.min(sr * 0.45, fltHz(clamp(f2, -24, 140)))) / sr);
+    if (f2 !== this.kF2) { this.kF2 = f2; this.cG2 = tanF((Math.PI * Math.min(sr * 0.45, fltHz(clamp(f2, -24, 140)))) / sr); }
+    this.bG2[b + 1] = this.cG2;
     const r2 = this.E(I.flt2_res) / 127;
     const type2 = Math.round(P[I.flt2_typ]);
     this.type2 = type2;
-    this.bK2[b] = type2 === 6 ? 1.2 : 2 - 1.94 * Math.pow(r2, 0.8);
+    if (r2 !== this.kR2) { this.kR2 = r2; this.cK2 = 2 - 1.94 * Math.pow(r2, 0.8); }
+    this.bK2[b] = type2 === 6 ? 1.2 : this.cK2;
     this.bPk[b] = type2 === 6 ? r2 * 3 : 0;
 
     // VCA: envelope x velocity x accent x volume x track level; pan; sends. The VCA's control
     // voltage is smoothed (as on the analog original), so no modulation steps the gain faster
     // than about half a millisecond - a square LFO on VOL gates without clicking.
     const vol = this.E(I.amp_vol) / 127, lvl = this.E(I.level) / 127;
-    const acc = 1 + this.acc * (this.E(I.snd_acc) / 127);
+    const acc = this.acc !== 0 ? 1 + this.acc * (this.E(I.snd_acc) / 127) : 1;
     const gT = ea * (0.08 + 0.92 * this.vel) * acc * vol * vol * 1.6 * lvl * lvl * 1.6;
     this.gS += (gT - this.gS) * this.kGain;
     this.bGain[b + 1] = this.gS;
     const pan = (clamp(this.E(I.amp_pan), -64, 64) + 64) / 128;
-    this.bPanL[b + 1] = Math.cos(pan * Math.PI * 0.5);
-    this.bPanR[b + 1] = Math.sin(pan * Math.PI * 0.5);
+    if (pan !== this.kPan) { this.kPan = pan; this.cPanL = Math.cos(pan * Math.PI * 0.5); this.cPanR = Math.sin(pan * Math.PI * 0.5); }
+    this.bPanL[b + 1] = this.cPanL;
+    this.bPanR[b + 1] = this.cPanR;
     this.bSC[b + 1] = sq127(this.E(I.amp_cho));
     this.bSD[b + 1] = sq127(this.E(I.amp_del));
     this.bSR[b + 1] = sq127(this.E(I.amp_rev));
@@ -663,113 +739,118 @@ class A4Voice extends AudioWorkletProcessor {
     const bDt1 = this.bDt1, bDt2 = this.bDt2, bPw1 = this.bPw1, bPw2 = this.bPw2;
     const edged1 = w1 <= 3, edged2 = w2 <= 3;
     const div1 = sub1 === 1 ? 2 : sub1 === 4 ? 3 : 4, div2 = sub2 === 1 ? 2 : sub2 === 4 ? 3 : 4;
-    const subHi = (sub, c) => (sub === 2 ? c < 2 : c < 1);
     const subDc1 = sub1 === 3 ? -0.5 : sub1 === 4 ? -0.333 : 0, subDc2 = sub2 === 3 ? -0.5 : sub2 === 4 ? -0.333 : 0;
     const SUB = 0.7;
     let e = 0;
     const W = A4Voice.wave, S = A4Voice.slope;
-    for (let i = 0; i < n; i++) {
-      const b = (i / BLOCK) | 0, f = (i - b * BLOCK + 1) / BLOCK;
-      const dt1 = bDt1[b] + (bDt1[b + 1] - bDt1[b]) * f;
-      const dt2 = bDt2[b] + (bDt2[b + 1] - bDt2[b]) * f;
-      const pw1 = bPw1[b] + (bPw1[b + 1] - bPw1[b]) * f;
-      const pw2 = bPw2[b] + (bPw2[b + 1] - bPw2[b]) * f;
-      // advance both phases; d = time since a wrap within this sample (-1: none)
-      let q1 = p1 + dt1, d1 = -1;
-      if (q1 >= 1) { q1 -= 1; d1 = q1 / dt1; }
-      let q2 = p2 + dt2, d2 = -1;
-      if (q2 >= 1) { q2 -= 1; d2 = q2 / dt2; }
-      // pulse-width crossings / triangle corners before any reset
-      let r1 = -1, r2 = -1; // reset times (since the event) for each oscillator
-      if ((smd === 1 || smd === 3) && d1 >= 0 && snc > 0) r2 = d1;
-      if ((smd === 2 || smd === 3) && d2 >= 0 && snc > 0 && r2 < 0) r1 = d2;
+    // per control block: the start values and steps of the per-sample interpolations
+    for (let b = 0, i = 0; i < n; b++) {
+      const end = i + BLOCK < n ? i + BLOCK : n, i0 = b * BLOCK;
+      const dt1a = bDt1[b], dt1d = bDt1[b + 1] - dt1a, dt2a = bDt2[b], dt2d = bDt2[b + 1] - dt2a;
+      const pw1a = bPw1[b], pw1d = bPw1[b + 1] - pw1a, pw2a = bPw2[b], pw2d = bPw2[b + 1] - pw2a;
+      for (; i < end; i++) {
+        const f = (i - i0 + 1) / BLOCK;
+        const dt1 = dt1a + dt1d * f;
+        const dt2 = dt2a + dt2d * f;
+        const pw1 = pw1a + pw1d * f;
+        const pw2 = pw2a + pw2d * f;
+        // advance both phases; d = time since a wrap within this sample (-1: none)
+        let q1 = p1 + dt1, d1 = -1;
+        if (q1 >= 1) { q1 -= 1; d1 = q1 / dt1; }
+        let q2 = p2 + dt2, d2 = -1;
+        if (q2 >= 1) { q2 -= 1; d2 = q2 / dt2; }
+        // pulse-width crossings / triangle corners before any reset
+        let r1 = -1, r2 = -1; // reset times (since the event) for each oscillator
+        if ((smd === 1 || smd === 3) && d1 >= 0 && snc > 0) r2 = d1;
+        if ((smd === 2 || smd === 3) && d2 >= 0 && snc > 0 && r2 < 0) r1 = d2;
 
-      // ---- OSC 1
-      if (r1 >= 0) {
-        // reset at r1 samples ago: phase then (pre-reset), scaled by the sync amount
-        let qs = p1 + dt1 * (1 - r1); qs -= Math.floor(qs);
-        const pn = qs * (1 - snc);
-        if (edged1) {
-          this.push(e++, i, r1, E_RESET, W(w1, pn, pw1) - W(w1, qs, pw1), (S(w1, pn, pw1) - S(w1, qs, pw1)) * dt1, 1);
+        // ---- OSC 1
+        if (r1 >= 0) {
+          // reset at r1 samples ago: phase then (pre-reset), scaled by the sync amount
+          let qs = p1 + dt1 * (1 - r1); qs -= Math.floor(qs);
+          const pn = qs * (1 - snc);
+          if (edged1) {
+            this.push(e++, i, r1, E_RESET, W(w1, pn, pw1) - W(w1, qs, pw1), (S(w1, pn, pw1) - S(w1, qs, pw1)) * dt1, 1);
+          }
+          q1 = pn + dt1 * r1;
+          d1 = r1;
+        } else if (edged1) {
+          const split1 = w1 === 0 && sawSplit(pw1);
+          const ep1 = split1 ? 1 - sawOff(pw1) : pw1;          // the second edge / corner
+          const pulse1 = w1 === 1 || w1 === 2 || split1;
+          const corner1 = w1 === 3 ? (2 / pw1 + 2 / (1 - pw1)) * dt1 : 0;
+          const eh1 = w1 === 1 ? -1.3 : w1 === 2 ? -2 : -1;
+          const es1 = w1 === 1 ? (0.7 / pw1) * dt1 : 0;
+          if (d1 >= 0) {
+            if (w1 === 0) this.push(e++, i, d1, E_WRAP, split1 ? -1 : -2, 0, 1);
+            else if (w1 === 3) this.push(e++, i, d1, E_WRAP, 0, corner1, 1);
+            else this.push(e++, i, d1, E_WRAP, 2, w1 === 1 ? (-0.7 / pw1) * dt1 : 0, 1);
+            if (pulse1 && q1 >= ep1) this.push(e++, i, (q1 - ep1) / dt1, E_PW, eh1, es1, 1);
+            if (w1 === 3 && q1 >= ep1) this.push(e++, i, (q1 - ep1) / dt1, E_HALF, 0, -corner1, 1);
+          } else if (pulse1 && p1 < ep1 && q1 >= ep1) {
+            this.push(e++, i, (q1 - ep1) / dt1, E_PW, eh1, es1, 1);
+          } else if (w1 === 3 && p1 < ep1 && q1 >= ep1) {
+            this.push(e++, i, (q1 - ep1) / dt1, E_HALF, 0, -corner1, 1);
+          }
         }
-        q1 = pn + dt1 * r1;
-        d1 = r1;
-      } else if (edged1) {
-        const split1 = w1 === 0 && sawSplit(pw1);
-        const ep1 = split1 ? 1 - sawOff(pw1) : pw1;          // the second edge / corner
-        const pulse1 = w1 === 1 || w1 === 2 || split1;
-        const corner1 = w1 === 3 ? (2 / pw1 + 2 / (1 - pw1)) * dt1 : 0;
-        const eh1 = w1 === 1 ? -1.3 : w1 === 2 ? -2 : -1;
-        const es1 = w1 === 1 ? (0.7 / pw1) * dt1 : 0;
-        if (d1 >= 0) {
-          if (w1 === 0) this.push(e++, i, d1, E_WRAP, split1 ? -1 : -2, 0, 1);
-          else if (w1 === 3) this.push(e++, i, d1, E_WRAP, 0, corner1, 1);
-          else this.push(e++, i, d1, E_WRAP, 2, w1 === 1 ? (-0.7 / pw1) * dt1 : 0, 1);
-          if (pulse1 && q1 >= ep1) this.push(e++, i, (q1 - ep1) / dt1, E_PW, eh1, es1, 1);
-          if (w1 === 3 && q1 >= ep1) this.push(e++, i, (q1 - ep1) / dt1, E_HALF, 0, -corner1, 1);
-        } else if (pulse1 && p1 < ep1 && q1 >= ep1) {
-          this.push(e++, i, (q1 - ep1) / dt1, E_PW, eh1, es1, 1);
-        } else if (w1 === 3 && p1 < ep1 && q1 >= ep1) {
-          this.push(e++, i, (q1 - ep1) / dt1, E_HALF, 0, -corner1, 1);
+        if (sub1 === 4) {
+          // half-cycle steps: high for one of every three (2/3 f, 33%)
+          const hd = d1 >= 0 ? d1 : p1 < 0.5 && q1 >= 0.5 ? (q1 - 0.5) / dt1 : -1;
+          if (hd >= 0) {
+            cnt1 = (cnt1 + 1) % 3;
+            const ns = cnt1 === 0 ? 1 : -1;
+            if (ns !== s1) { this.push(e++, i, hd, E_WRAP, (ns - s1) * SUB, 0, 3); s1 = ns; }
+          }
+        } else if (sub1 && d1 >= 0) {
+          cnt1 = (cnt1 + 1) % div1;
+          const ns = subHi(sub1, cnt1) ? 1 : -1;
+          if (ns !== s1) { this.push(e++, i, d1, E_WRAP, (ns - s1) * SUB, 0, 3); s1 = ns; }
         }
-      }
-      if (sub1 === 4) {
-        // half-cycle steps: high for one of every three (2/3 f, 33%)
-        const hd = d1 >= 0 ? d1 : p1 < 0.5 && q1 >= 0.5 ? (q1 - 0.5) / dt1 : -1;
-        if (hd >= 0) {
-          cnt1 = (cnt1 + 1) % 3;
-          const ns = cnt1 === 0 ? 1 : -1;
-          if (ns !== s1) { this.push(e++, i, hd, E_WRAP, (ns - s1) * SUB, 0, 3); s1 = ns; }
-        }
-      } else if (sub1 && d1 >= 0) {
-        cnt1 = (cnt1 + 1) % div1;
-        const ns = subHi(sub1, cnt1) ? 1 : -1;
-        if (ns !== s1) { this.push(e++, i, d1, E_WRAP, (ns - s1) * SUB, 0, 3); s1 = ns; }
-      }
 
-      // ---- OSC 2
-      if (r2 >= 0) {
-        let qs = p2 + dt2 * (1 - r2); qs -= Math.floor(qs);
-        const pn = qs * (1 - snc);
-        if (edged2) this.push(e++, i, r2, E_RESET, W(w2, pn, pw2) - W(w2, qs, pw2), (S(w2, pn, pw2) - S(w2, qs, pw2)) * dt2, 2);
-        q2 = pn + dt2 * r2;
-        d2 = r2;
-      } else if (edged2) {
-        const split2 = w2 === 0 && sawSplit(pw2);
-        const ep2 = split2 ? 1 - sawOff(pw2) : pw2;          // the second edge / corner
-        const pulse2 = w2 === 1 || w2 === 2 || split2;
-        const corner2 = w2 === 3 ? (2 / pw2 + 2 / (1 - pw2)) * dt2 : 0;
-        const eh2 = w2 === 1 ? -1.3 : w2 === 2 ? -2 : -1;
-        const es2 = w2 === 1 ? (0.7 / pw2) * dt2 : 0;
-        if (d2 >= 0) {
-          if (w2 === 0) this.push(e++, i, d2, E_WRAP, split2 ? -1 : -2, 0, 2);
-          else if (w2 === 3) this.push(e++, i, d2, E_WRAP, 0, corner2, 2);
-          else this.push(e++, i, d2, E_WRAP, 2, w2 === 1 ? (-0.7 / pw2) * dt2 : 0, 2);
-          if (pulse2 && q2 >= ep2) this.push(e++, i, (q2 - ep2) / dt2, E_PW, eh2, es2, 2);
-          if (w2 === 3 && q2 >= ep2) this.push(e++, i, (q2 - ep2) / dt2, E_HALF, 0, -corner2, 2);
-        } else if (pulse2 && p2 < ep2 && q2 >= ep2) {
-          this.push(e++, i, (q2 - ep2) / dt2, E_PW, eh2, es2, 2);
-        } else if (w2 === 3 && p2 < ep2 && q2 >= ep2) {
-          this.push(e++, i, (q2 - ep2) / dt2, E_HALF, 0, -corner2, 2);
+        // ---- OSC 2
+        if (r2 >= 0) {
+          let qs = p2 + dt2 * (1 - r2); qs -= Math.floor(qs);
+          const pn = qs * (1 - snc);
+          if (edged2) this.push(e++, i, r2, E_RESET, W(w2, pn, pw2) - W(w2, qs, pw2), (S(w2, pn, pw2) - S(w2, qs, pw2)) * dt2, 2);
+          q2 = pn + dt2 * r2;
+          d2 = r2;
+        } else if (edged2) {
+          const split2 = w2 === 0 && sawSplit(pw2);
+          const ep2 = split2 ? 1 - sawOff(pw2) : pw2;          // the second edge / corner
+          const pulse2 = w2 === 1 || w2 === 2 || split2;
+          const corner2 = w2 === 3 ? (2 / pw2 + 2 / (1 - pw2)) * dt2 : 0;
+          const eh2 = w2 === 1 ? -1.3 : w2 === 2 ? -2 : -1;
+          const es2 = w2 === 1 ? (0.7 / pw2) * dt2 : 0;
+          if (d2 >= 0) {
+            if (w2 === 0) this.push(e++, i, d2, E_WRAP, split2 ? -1 : -2, 0, 2);
+            else if (w2 === 3) this.push(e++, i, d2, E_WRAP, 0, corner2, 2);
+            else this.push(e++, i, d2, E_WRAP, 2, w2 === 1 ? (-0.7 / pw2) * dt2 : 0, 2);
+            if (pulse2 && q2 >= ep2) this.push(e++, i, (q2 - ep2) / dt2, E_PW, eh2, es2, 2);
+            if (w2 === 3 && q2 >= ep2) this.push(e++, i, (q2 - ep2) / dt2, E_HALF, 0, -corner2, 2);
+          } else if (pulse2 && p2 < ep2 && q2 >= ep2) {
+            this.push(e++, i, (q2 - ep2) / dt2, E_PW, eh2, es2, 2);
+          } else if (w2 === 3 && p2 < ep2 && q2 >= ep2) {
+            this.push(e++, i, (q2 - ep2) / dt2, E_HALF, 0, -corner2, 2);
+          }
         }
-      }
-      if (sub2 === 4) {
-        // half-cycle steps: high for one of every three (2/3 f, 33%)
-        const hd = d2 >= 0 ? d2 : p2 < 0.5 && q2 >= 0.5 ? (q2 - 0.5) / dt2 : -1;
-        if (hd >= 0) {
-          cnt2 = (cnt2 + 1) % 3;
-          const ns = cnt2 === 0 ? 1 : -1;
-          if (ns !== s2) { this.push(e++, i, hd, E_WRAP, (ns - s2) * SUB, 0, 4); s2 = ns; }
+        if (sub2 === 4) {
+          // half-cycle steps: high for one of every three (2/3 f, 33%)
+          const hd = d2 >= 0 ? d2 : p2 < 0.5 && q2 >= 0.5 ? (q2 - 0.5) / dt2 : -1;
+          if (hd >= 0) {
+            cnt2 = (cnt2 + 1) % 3;
+            const ns = cnt2 === 0 ? 1 : -1;
+            if (ns !== s2) { this.push(e++, i, hd, E_WRAP, (ns - s2) * SUB, 0, 4); s2 = ns; }
+          }
+        } else if (sub2 && d2 >= 0) {
+          cnt2 = (cnt2 + 1) % div2;
+          const ns = subHi(sub2, cnt2) ? 1 : -1;
+          if (ns !== s2) { this.push(e++, i, d2, E_WRAP, (ns - s2) * SUB, 0, 4); s2 = ns; }
         }
-      } else if (sub2 && d2 >= 0) {
-        cnt2 = (cnt2 + 1) % div2;
-        const ns = subHi(sub2, cnt2) ? 1 : -1;
-        if (ns !== s2) { this.push(e++, i, d2, E_WRAP, (ns - s2) * SUB, 0, 4); s2 = ns; }
+        p1 = q1; p2 = q2;
+        const k = i + LAT;
+        W1[k] = (edged1 ? W(w1, p1, pw1) : 0) + (sub1 ? s1 * SUB - subDc1 * SUB : 0);
+        W2[k] = (edged2 ? W(w2, p2, pw2) : 0) + (sub2 ? s2 * SUB - subDc2 * SUB : 0);
       }
-      p1 = q1; p2 = q2;
-      const k = i + LAT;
-      W1[k] = (edged1 ? W(w1, p1, pw1) : 0) + (sub1 ? s1 * SUB - subDc1 * SUB : 0);
-      W2[k] = (edged2 ? W(w2, p2, pw2) : 0) + (sub2 ? s2 * SUB - subDc2 * SUB : 0);
     }
     W1[LAT] += c1; W1[n + LAT] = 0;
     W2[LAT] += c2; W2[n + LAT] = 0;
@@ -792,13 +873,23 @@ class A4Voice extends AudioWorkletProcessor {
     const nbIn = inputs[0] && inputs[0][0];
     const n = L.length;
     if (n !== this.n) this.alloc(n);
-    const sr = sampleRate;
-    const t0 = currentTime;
-    const dtBlock = BLOCK / sr;
-    const I = this.I, P = this.P;
-    const nb = this.nb;
+    // control ticks (events at block starts, then targets for each block); a voice that stays
+    // silent all quantum (and was silent at its start) skips the DSP
+    if (!this.ticks() && this.bGain[0] === 0) {
+      L.fill(0); if (R !== L) R.fill(0);
+      if (SC) { SC.fill(0); SD.fill(0); SRv.fill(0); }
+      if (MO) MO.fill(0);
+      this.W1.fill(0); this.W2.fill(0);
+      return true;
+    }
+    this.oscPass(n);                                  // oscillators (band-limited)
+    this.render(n, L, R, SC, SD, SRv, MO, nbIn);      // noise, filters, VCA per sample
+    return true;
+  }
 
-    // ---- control ticks: events at block starts, then targets for each block
+  /** The control ticks of a quantum; false when the voice was silent in every block */
+  ticks() {
+    const sr = sampleRate, t0 = currentTime, dtBlock = BLOCK / sr, nb = this.nb;
     let any = false;
     this.bDt1[0] = this.dt1; this.bDt2[0] = this.dt2; this.bPw1[0] = this.bPw1[nb]; this.bPw2[0] = this.bPw2[nb];
     this.bG1[0] = this.g1; this.bG2[0] = this.g2; this.bGain[0] = this.gain;
@@ -806,132 +897,144 @@ class A4Voice extends AudioWorkletProcessor {
     for (let b = 0; b < nb; b++) {
       const now = t0 + (b * BLOCK) / sr;
       const q = this.q;
-      while (q.length && q[0].time <= now + 1e-6) {
-        const ev = q.shift();
-        if (ev.t === 'at') { const l = ev.list; for (let k = 0; k < l.length; k += 2) P[l[k]] = l[k + 1]; }
-        else if (ev.t === 'on') this.noteOn(ev, now);
-        else if (ev.t === 'rtrg') { this.retrig(ev.rt, now); this.idle = false; }
-        else if (ev.t === 'off') { if (!A4Voice.legatoNext(q, ev.time)) this.noteOff(); }
-        else if (ev.t === 'ramp') { const l = ev.list; for (let k = 0; k < l.length; k += 3) this.ramps.push({ i: l[k], from: l[k + 1], to: l[k + 2], t0: ev.time, t1: ev.t1 }); }
-      }
-      if (this.ramps.length) {
-        for (let r = this.ramps.length - 1; r >= 0; r--) {
-          const rp = this.ramps[r];
-          const k = rp.t1 > rp.t0 ? clamp((now - rp.t0) / (rp.t1 - rp.t0), 0, 1) : 1;
-          P[rp.i] = rp.from + (rp.to - rp.from) * k;
-          if (k >= 1) this.ramps.splice(r, 1);
-        }
-      }
-      if (this.idle && this.envA.stage === 0 && !this.feed) {
-        // silent voice: keep the free-running LFOs moving, skip the DSP
-        this.bOn[b] = 0;
-        const d1 = lfoHz(P[I.lfo1_spd], Math.round(P[I.lfo1_mul]), this.bpm) * dtBlock;
-        const d2 = lfoHz(P[I.lfo2_spd], Math.round(P[I.lfo2_mul]), this.bpm) * dtBlock;
-        this.lfo1.ph -= Math.floor(this.lfo1.ph += d1);
-        this.lfo2.ph -= Math.floor(this.lfo2.ph += d2);
-        this.bDt1[b + 1] = this.bDt1[b]; this.bDt2[b + 1] = this.bDt2[b]; this.bPw1[b + 1] = this.bPw1[b]; this.bPw2[b + 1] = this.bPw2[b];
-        this.bG1[b + 1] = this.bG1[b]; this.bG2[b + 1] = this.bG2[b];
-        this.bGain[b + 1] = 0; this.bPanL[b + 1] = this.bPanL[b]; this.bPanR[b + 1] = this.bPanR[b];
-        this.bSC[b + 1] = 0; this.bSD[b + 1] = 0; this.bSR[b + 1] = 0;
-        continue;
-      }
-      this.bOn[b] = 1;
+      if (q.length && q[0].time <= now + 1e-6) this.events(now);
+      if (this.ramps.length) this.applyRamps(now);
+      if (this.idle && this.envA.stage === 0 && !this.feed) { this.idleBlock(b, dtBlock); continue; }
       any = true;
       const ea = this.control(now, dtBlock, b);
-      if (this.cutLeft > 0) {
-        this.cutLeft--;
-        this.bGain[b + 1] *= this.cutLeft / this.cutN;
-        if (this.cutLeft === 0) this.silence();
-      }
+      if (this.cutLeft > 0) this.cutStep(b);
       if (this.envA.stage === 0 && ea <= 1e-5 && !this.gate && this.gS < 1e-5) this.idle = true;
     }
     // carry the last targets into the next quantum
     this.dt1 = this.bDt1[nb]; this.dt2 = this.bDt2[nb]; this.g1 = this.bG1[nb]; this.g2 = this.bG2[nb];
     this.gain = this.bGain[nb]; this.panL = this.bPanL[nb]; this.panR = this.bPanR[nb];
     this.sendC = this.bSC[nb]; this.sendD = this.bSD[nb]; this.sendR = this.bSR[nb];
+    return any;
+  }
 
-    if (!any && this.bGain[0] === 0) {
-      L.fill(0); if (R !== L) R.fill(0);
-      if (SC) { SC.fill(0); SD.fill(0); SRv.fill(0); }
-      if (MO) MO.fill(0);
-      this.W1.fill(0); this.W2.fill(0);
-      return true;
+  /** The queued events due at `now` */
+  events(now) {
+    const q = this.q, P = this.P;
+    while (q.length && q[0].time <= now + 1e-6) {
+      const ev = q.shift();
+      if (ev.t === 'at') { const l = ev.list; for (let k = 0; k < l.length; k += 2) P[l[k]] = l[k + 1]; }
+      else if (ev.t === 'on') this.noteOn(ev, now);
+      else if (ev.t === 'rtrg') { this.retrig(ev.rt, now); this.idle = false; }
+      else if (ev.t === 'off') { if (!A4Voice.legatoNext(q, ev.time)) this.noteOff(); }
+      else if (ev.t === 'ramp') { const l = ev.list; for (let k = 0; k < l.length; k += 3) this.ramps.push({ i: l[k], from: l[k + 1], to: l[k + 2], t0: ev.time, t1: ev.t1 }); }
     }
+  }
 
-    // ---- oscillators (band-limited)
-    this.oscPass(n);
+  /** Parameter slides */
+  applyRamps(now) {
+    const P = this.P;
+    for (let r = this.ramps.length - 1; r >= 0; r--) {
+      const rp = this.ramps[r];
+      const k = rp.t1 > rp.t0 ? clamp((now - rp.t0) / (rp.t1 - rp.t0), 0, 1) : 1;
+      P[rp.i] = rp.from + (rp.to - rp.from) * k;
+      if (k >= 1) this.ramps.splice(r, 1);
+    }
+  }
+
+  /** A block of a silent voice: keep the free-running LFOs moving, hold the targets */
+  idleBlock(b, dtBlock) {
+    const I = this.I, P = this.P;
+    const d1 = lfoHz(P[I.lfo1_spd], Math.round(P[I.lfo1_mul]), this.bpm) * dtBlock;
+    const d2 = lfoHz(P[I.lfo2_spd], Math.round(P[I.lfo2_mul]), this.bpm) * dtBlock;
+    this.lfo1.ph -= Math.floor(this.lfo1.ph += d1);
+    this.lfo2.ph -= Math.floor(this.lfo2.ph += d2);
+    this.bDt1[b + 1] = this.bDt1[b]; this.bDt2[b + 1] = this.bDt2[b]; this.bPw1[b + 1] = this.bPw1[b]; this.bPw2[b + 1] = this.bPw2[b];
+    this.bG1[b + 1] = this.bG1[b]; this.bG2[b + 1] = this.bG2[b];
+    this.bGain[b + 1] = 0; this.bPanL[b + 1] = this.bPanL[b]; this.bPanR[b + 1] = this.bPanR[b];
+    this.bSC[b + 1] = 0; this.bSD[b + 1] = 0; this.bSR[b + 1] = 0;
+  }
+
+  /** [STOP]: one block of the cut-off fade */
+  cutStep(b) {
+    this.cutLeft--;
+    this.bGain[b + 1] *= this.cutLeft / this.cutN;
+    if (this.cutLeft === 0) this.silence();
+  }
+
+  /**
+   * Noise, filters, VCA per sample over the quantum. Each control block's settings and the start
+   * values and steps of its interpolations are read once per block.
+   */
+  render(n, L, R, SC, SD, SRv, MO, nbIn) {
     const W1 = this.W1, W2 = this.W2;
-
-    // ---- noise, filters, VCA per sample
     let l0 = this.l0, l1 = this.l1, l2 = this.l2, l3 = this.l3, ic1 = this.ic1, ic2 = this.ic2, lp1 = this.lp1, fb = this.fb;
     let rng = this.rng, nCount = this.nCount, nVal = this.nVal, nHp = this.nHp, pk0 = this.pk0, pk1 = this.pk1, pk2 = this.pk2, nRed = this.nRed;
     const w1 = this.w1, w2 = this.w2, am1 = this.am1, am2 = this.am2, type2 = this.type2;
-    const redK = 1 - Math.exp((-TWO_PI * 20) / sr);
-    const fdbK = 1 - Math.exp((-TWO_PI * 25) / sr);
+    const osc1 = w1 <= 3 || this.sub1, osc2 = w2 <= 3 || this.sub2;
+    const redK = this.redK, fdbK = this.fdbK;
     const bG1 = this.bG1, bG2 = this.bG2, bGain = this.bGain, bPanL = this.bPanL, bPanR = this.bPanR, bSC = this.bSC, bSD = this.bSD, bSR = this.bSR;
-    for (let i = 0; i < n; i++) {
-      const b = (i / BLOCK) | 0, f = (i - b * BLOCK + 1) / BLOCK;
-      const g1 = bG1[b] + (bG1[b + 1] - bG1[b]) * f;
-      const g2 = bG2[b] + (bG2[b + 1] - bG2[b]) * f;
-      const gain = bGain[b] + (bGain[b + 1] - bGain[b]) * f;
-      // oscillators: delay-compensated output with the presence FIR
-      let o1 = w1 <= 3 || this.sub1 ? FIR_C * W1[i + 1] + FIR_S * (W1[i] + W1[i + 2]) : 0;
-      let o2 = w2 <= 3 || this.sub2 ? FIR_C * W2[i + 1] + FIR_S * (W2[i] + W2[i + 2]) : 0;
-      // FDB: the ladder's output, AC-coupled (25 Hz), becomes OSC 1 (manual p.73). LEV sets the loop
-      // gain: moderate levels thicken and overload what OSC 2 sends in; above about 100 the loop
-      // self-oscillates, its pitch and tone set by the cutoff and resonance
-      if (w1 === 6) { lp1 += (fb - lp1) * fdbK; o1 += (fb - lp1) * 2.6; }
-      if (w2 === 6) o2 += nbIn ? nbIn[i] * 2.5 : 0;          // NEI: the neighbour track
-      if (am1 || am2) {
-        const g1 = 0.5 + 0.5 * tanhF(o1 * 8), g2 = 0.5 + 0.5 * tanhF(o2 * 8);
-        if (am1) o1 *= g2;
-        if (am2) o2 *= g1;
-      }
-      // noise
-      let nz = 0;
-      const nLev = this.bNLev[b];
-      if (nLev > 0) {
-        if (++nCount >= this.bNHold[b]) {
-          nCount = 0;
-          rng ^= rng << 13; rng ^= rng >>> 17; rng ^= rng << 5;
-          nVal = ((rng >>> 0) / 4294967296) * 2 - 1;
+    for (let b = 0, i = 0; i < n; b++) {
+      const end = i + BLOCK < n ? i + BLOCK : n, i0 = b * BLOCK;
+      const g1a = bG1[b], g1d = bG1[b + 1] - g1a, g2a = bG2[b], g2d = bG2[b + 1] - g2a, ga = bGain[b], gd = bGain[b + 1] - ga;
+      const pLa = bPanL[b], pLd = bPanL[b + 1] - pLa, pRa = bPanR[b], pRd = bPanR[b + 1] - pRa;
+      const sCa = bSC[b], sCd = bSC[b + 1] - sCa, sDa = bSD[b], sDd = bSD[b + 1] - sDa, sRa = bSR[b], sRd = bSR[b + 1] - sRa;
+      const nLev = this.bNLev[b], nHold = this.bNHold[b], nCol = this.bNCol[b], nHpK = this.bNHpK[b], nHpG = this.bNHpG[b];
+      const lev1 = this.bLev1[b], lev2 = this.bLev2[b];
+      const k1 = this.bK1[b], comp = this.bComp[b], inDrive = this.bInDrive[b], inComp = this.bInComp[b];
+      const om = this.bOvr[b], dr = this.bDrive[b], odK = 1.4 / (1 + 0.04 * (dr - 1));
+      const k2 = this.bK2[b], pk = this.bPk[b];
+      for (; i < end; i++) {
+        const f = (i - i0 + 1) / BLOCK;
+        const g1 = g1a + g1d * f;
+        const g2 = g2a + g2d * f;
+        const gain = ga + gd * f;
+        // oscillators: delay-compensated output with the presence FIR
+        let o1 = osc1 ? FIR_C * W1[i + 1] + FIR_S * (W1[i] + W1[i + 2]) : 0;
+        let o2 = osc2 ? FIR_C * W2[i + 1] + FIR_S * (W2[i] + W2[i + 2]) : 0;
+        // FDB: the ladder's output, AC-coupled (25 Hz), becomes OSC 1 (manual p.73). LEV sets the loop
+        // gain: moderate levels thicken and overload what OSC 2 sends in; above about 100 the loop
+        // self-oscillates, its pitch and tone set by the cutoff and resonance
+        if (w1 === 6) { lp1 += (fb - lp1) * fdbK; o1 += (fb - lp1) * 2.6; }
+        if (w2 === 6) o2 += nbIn ? nbIn[i] * 2.5 : 0;          // NEI: the neighbour track
+        if (am1 || am2) {
+          const ag1 = 0.5 + 0.5 * tanhF(o1 * 8), ag2 = 0.5 + 0.5 * tanhF(o2 * 8);
+          if (am1) o1 *= ag2;
+          if (am2) o2 *= ag1;
         }
-        const c = this.bNCol[b];
-        let wn = nVal;
-        if (c < 0) {
-          // white -> pink (Kellet's 3-pole approximation) -> red (one pole at 20 Hz), equal RMS
-          pk0 = 0.99765 * pk0 + nVal * 0.099046; pk1 = 0.963 * pk1 + nVal * 0.2965164; pk2 = 0.57 * pk2 + nVal * 1.0526913;
-          const pink = (pk0 + pk1 + pk2 + nVal * 0.1848) * 0.335;
-          nRed += (nVal - nRed) * redK;
-          const m = -2 * c;
-          wn = m <= 1 ? nVal + (pink - nVal) * m : pink + (nRed * 26 - pink) * (m - 1);
-        } else if (c > 0) {
-          nHp += (nVal - nHp) * this.bNHpK[b];
-          wn = (nVal - nHp) * this.bNHpG[b];
+        // noise
+        let nz = 0;
+        if (nLev > 0) {
+          if (++nCount >= nHold) {
+            nCount = 0;
+            rng ^= rng << 13; rng ^= rng >>> 17; rng ^= rng << 5;
+            nVal = ((rng >>> 0) / 4294967296) * 2 - 1;
+          }
+          let wn = nVal;
+          if (nCol < 0) {
+            // white -> pink (Kellet's 3-pole approximation) -> red (one pole at 20 Hz), equal RMS
+            pk0 = 0.99765 * pk0 + nVal * 0.099046; pk1 = 0.963 * pk1 + nVal * 0.2965164; pk2 = 0.57 * pk2 + nVal * 1.0526913;
+            const pink = (pk0 + pk1 + pk2 + nVal * 0.1848) * 0.335;
+            nRed += (nVal - nRed) * redK;
+            const m = -2 * nCol;
+            wn = m <= 1 ? nVal + (pink - nVal) * m : pink + (nRed * 26 - pink) * (m - 1);
+          } else if (nCol > 0) {
+            nHp += (nVal - nHp) * nHpK;
+            wn = (nVal - nHp) * nHpG;
+          }
+          nz = wn * nLev;
         }
-        nz = wn * nLev;
-      }
-      const x = (o1 * this.bLev1[b] + o2 * this.bLev2[b] + nz) * 0.5;
+        const x = (o1 * lev1 + o2 * lev2 + nz) * 0.5;
 
-      // Filter 1: 4-pole ladder (TPT stages, linear feedback estimate, tanh at the input pair)
-      const G = g1 / (1 + g1), ig = 1 / (1 + g1);
-      const G2 = G * G, G3 = G2 * G, G4 = G3 * G;
-      const sigma = G3 * l0 * ig + G2 * l1 * ig + G * l2 * ig + l3 * ig;
-      const k1 = this.bK1[b];
-      const xin = x * this.bComp[b] * this.bInDrive[b];
-      const u = tanhF(xin - (k1 * (G4 * xin + sigma)) / (1 + k1 * G4));
-      let v = (u - l0) * G; const a1 = v + l0; l0 = a1 + v;
-      v = (a1 - l1) * G; const a2 = v + l1; l1 = a2 + v;
-      v = (a2 - l2) * G; const a3 = v + l2; l2 = a3 + v;
-      v = (a3 - l3) * G; const a4 = v + l3; l3 = a4 + v;
-      fb = a4;
-      let y = a4 * 1.9 * this.bInComp[b];
-      // Overdrive between the filters
-      const om = this.bOvr[b];
-      if (om > 0) { const dr = this.bDrive[b]; y += (tanhF(y * dr) * (1.4 / (1 + 0.04 * (dr - 1))) - y) * om; }
-      // Filter 2: multimode
-      {
-        const k2 = this.bK2[b];
+        // Filter 1: 4-pole ladder (TPT stages, linear feedback estimate, tanh at the input pair)
+        const G = g1 / (1 + g1), ig = 1 / (1 + g1);
+        const G2 = G * G, G3 = G2 * G, G4 = G3 * G;
+        const sigma = G3 * l0 * ig + G2 * l1 * ig + G * l2 * ig + l3 * ig;
+        const xin = x * comp * inDrive;
+        const u = tanhF(xin - (k1 * (G4 * xin + sigma)) / (1 + k1 * G4));
+        let v = (u - l0) * G; const a1 = v + l0; l0 = a1 + v;
+        v = (a1 - l1) * G; const a2 = v + l1; l1 = a2 + v;
+        v = (a2 - l2) * G; const a3 = v + l2; l2 = a3 + v;
+        v = (a3 - l3) * G; const a4 = v + l3; l3 = a4 + v;
+        fb = a4;
+        let y = a4 * 1.9 * inComp;
+        // Overdrive between the filters
+        if (om > 0) y += (tanhF(y * dr) * odK - y) * om;
+        // Filter 2: multimode
         const A1 = 1 / (1 + g2 * (g2 + k2)), A2 = g2 * A1, A3 = g2 * A2;
         const v3 = y - ic2;
         const v1 = A1 * ic1 + A2 * v3;
@@ -945,20 +1048,20 @@ class A4Voice extends AudioWorkletProcessor {
           case 3: y = y - k2 * v1 - v2 + v1; break;        // HP1: high + band
           case 4: y = y - k2 * v1 - v2; break;
           case 5: y = y - k2 * v1; break;
-          case 6: y = y + this.bPk[b] * k2 * v1; break;
+          case 6: y = y + pk * k2 * v1; break;
           default: y = v2;
         }
+        // VCA, pan, sends
+        const vo = y * gain;
+        L[i] = vo * (pLa + pLd * f);
+        R[i] = vo * (pRa + pRd * f);
+        if (SC) {
+          SC[i] = vo * (sCa + sCd * f);
+          SD[i] = vo * (sDa + sDd * f);
+          SRv[i] = vo * (sRa + sRd * f);
+        }
+        if (MO) MO[i] = y;
       }
-      // VCA, pan, sends
-      const vo = y * gain;
-      L[i] = vo * (bPanL[b] + (bPanL[b + 1] - bPanL[b]) * f);
-      R[i] = vo * (bPanR[b] + (bPanR[b + 1] - bPanR[b]) * f);
-      if (SC) {
-        SC[i] = vo * (bSC[b] + (bSC[b + 1] - bSC[b]) * f);
-        SD[i] = vo * (bSD[b] + (bSD[b + 1] - bSD[b]) * f);
-        SRv[i] = vo * (bSR[b] + (bSR[b + 1] - bSR[b]) * f);
-      }
-      if (MO) MO[i] = y;
     }
     // carry the oscillator work buffers (latency history and BLEP taps)
     W1[0] = W1[n]; W1[1] = W1[n + 1]; W1[2] = W1[n + 2]; W1[3] = W1[n + 3]; W1[4] = W1[n + 4];
@@ -968,7 +1071,6 @@ class A4Voice extends AudioWorkletProcessor {
     this.l0 = l0; this.l1 = l1; this.l2 = l2; this.l3 = l3; this.ic1 = ic1; this.ic2 = ic2; this.lp1 = lp1; this.fb = fb;
     this.rng = rng; this.nCount = nCount; this.nVal = nVal; this.nHp = flush(nHp);
     this.pk0 = flush(pk0); this.pk1 = flush(pk1); this.pk2 = flush(pk2); this.nRed = flush(nRed);
-    return true;
   }
 }
 
