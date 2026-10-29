@@ -28,7 +28,8 @@ clock, route into a mixer, and can be arranged into full tracks and bounced to W
 
 - **One clock.** The ▶ in the top bar starts everything. MIDI-capable instruments follow the studio
   tempo. Instruments without MIDI (the DFAM, or the Mother-32's TEMPO input) follow
-  clock pulses over a cable, exactly like hardware.
+  clock pulses over a cable, exactly like hardware. Each MIDI-capable instrument's **Clock**
+  chip switches it to its own tempo, for patch sheets drawn at their own speed.
 - **Mixing.** A channel strip per instrument: fader, pan, mute, solo, delay and reverb
   sends. Instruments can also go into the Xone:96. The master is clean, with a true-peak
   limiter at −1 dBTP and LUFS meters.
@@ -40,6 +41,7 @@ clock, route into a mixer, and can be arranged into full tracks and bounced to W
 Lessons follow [docs/PEDAGOGY.md](docs/PEDAGOGY.md):
 - **Each lesson:** predict, observe, explain; ear-training "match the sound" challenges with fading hints; self-explanation.
 - **Over time:** spaced daily review of past lessons.
+- **Producer path:** whole-studio lessons, from a beat to a mixed, mastered and bounced track.
 
 The coach highlights the control to change and checks your result.
 
