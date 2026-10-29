@@ -58,14 +58,8 @@ for (const p of CV_PARAMS) {
 }
 
 const MAN = 'Manual - Front panel';
-// Track mutes ([FUNC] + [TRACK]): global, so they stay put when patterns change
-TRACK_NAMES.forEach((name, t) => {
-  controls[tid(t, 'mute')] = {
-    type: 'button', label: `${name} MUTE`, default: false,
-    description: `Mutes ${name}: its trigs stop playing until you unmute it. [FUNC] + [${name}]; the track key goes dark.`,
-    manualReference: `${MAN}, [FUNC] + [TRACK]`,
-  };
-});
+// Track mutes ([FUNC] + [TRACK], manual p.37) are not controls: they belong to the project
+// (Project.mutes), stay put when patterns change and are applied by the sequencer.
 Object.assign(controls, {
   tempo: {
     type: 'knob', label: 'TEMPO', min: 30, max: 300, default: 120, step: 1, units: 'BPM', endless: true,
@@ -92,7 +86,7 @@ Object.assign(controls, {
     type: 'switch', label: 'QUICK PERF', options: PERF_MACROS.map((m, i) => `${'ABCDEFGHIJ'[i]} ${m.name}`), default: 0,
     description: 'The macro the QUICK PERF knob controls ([QPER] + [TRIG 1-10]).', manualReference: `${MAN}, [QPER]`,
   },
-  play: { type: 'button', label: 'PLAY', default: false, description: 'Start / stop the sequencer (Space bar). Synced to the studio it is the studio transport.', manualReference: `${MAN}, [PLAY] / [STOP]` },
+  play: { type: 'button', label: 'PLAY', default: false, description: 'Start / stop the sequencer (Space bar). [PLAY] while playing pauses and [PLAY] again resumes; synced to the studio it is the studio transport.', manualReference: 'Manual p.38-39, PATTERN CONTROL' },
   rec: { type: 'button', label: 'REC', default: true, description: 'GRID RECORDING: lit, the trig keys enter and remove trigs; dark, they play the steps.', manualReference: `${MAN}, [RECORD]` },
   live_rec: { type: 'button', label: 'LIVE REC', default: false, description: 'LIVE RECORDING ([REC] + [PLAY]): notes you play on the keyboard are recorded into the playing pattern.', manualReference: 'Manual - Sequencer, LIVE RECORDING' },
   track: {
@@ -112,9 +106,9 @@ Object.assign(controls, {
     description: 'Live transpose of the synth tracks\' note trigs (hold [TRNS] and press a keyboard key).', manualReference: `${MAN}, [TRNS]`,
   },
   trig_mode: {
-    type: 'switch', label: 'TRIG MODE', options: ['TRIGS', 'ACCENT', 'NOTE SLIDE', 'PARAM SLIDE'], default: 0,
-    description: 'What tapping the trig keys does: enter trigs, or set accents, note slides or parameter slides ([FUNC] + [BANK F/G/H]).',
-    manualReference: 'Manual - Sequencer, trig types',
+    type: 'switch', label: 'TRIG MODE', options: ['TRIGS', 'ACCENT', 'NOTE SLIDE', 'PARAM SLIDE', 'TRIG MUTE'], default: 0,
+    description: 'What tapping the trig keys does: enter trigs, or set accents, note slides, parameter slides or trig mutes ([FUNC] + [BANK F/G/H/E]).',
+    manualReference: 'Manual p.51-53, TRIG MUTE, ACCENT, NOTE SLIDE and PARAMETER SLIDE menus',
   },
   kit_project: { type: 'switch', label: 'PROJECT', options: KIT_PROJECT_IDS, default: 0, description: 'Kit presets load their project (patterns and song) through this.', manualReference: 'Manual - Projects' },
   kit_project_loaded: { type: 'switch', label: 'PROJECT LOADED', options: KIT_PROJECT_IDS, default: 0, description: 'Which kit project is in the pattern memory.', manualReference: 'Manual - Projects' },

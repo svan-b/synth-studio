@@ -279,7 +279,7 @@ function oscPage(n: 1 | 2): ParamDef[] {
     { key: `${o}wav`, page, slot: 5, short: 'WAV', name: `Osc ${n} waveform`, min: 0, max: 7, def: 0, options: waves, fmt: opt(waves), manual: M, desc: n === 1
       ? 'SAW sawtooth, TRP transistor pulse, PUL pulse, TRI triangle, INL/INR the audio inputs, FDB filter feedback, OFF.'
       : 'SAW sawtooth, TRP transistor pulse, PUL pulse, TRI triangle, INL/INR the audio inputs, NEI the previous track\'s sound (T2 hears T1), OFF.' },
-    { key: `${o}sub`, page, slot: 6, short: 'SUB', name: `Osc ${n} sub oscillator`, min: 0, max: 4, def: 0, options: SUBS, fmt: opt(SUBS), manual: M, desc: '1OCT square one octave down, 2OCT square two octaves down, 2PUL 25% pulse two octaves down, 5TH 33% pulse at a third of the frequency.' },
+    { key: `${o}sub`, page, slot: 6, short: 'SUB', name: `Osc ${n} sub oscillator`, min: 0, max: 4, def: 0, options: SUBS, fmt: opt(SUBS), manual: M, desc: '1OCT a square one octave down, 2OCT a square two octaves down, 2PUL a 25% pulse two octaves down, 5TH a 33% pulse a fifth (7 semitones) below, at 2/3 of the frequency. PW and PWM leave the sub alone.' },
     { key: `${o}pw`, page, slot: 7, short: 'PW', name: `Osc ${n} pulse width`, min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: `${M} (manual p.72, p.87)`, desc: 'Reshapes every wave; 0 is the plain one. PUL / TRP: the pulse width (the extremes mute them). TRI: towards a reversed saw. SAW: a second, phase-shifted saw (single again at the extremes).' },
     { key: `${o}spd`, page, slot: 8, short: 'SPD', name: `Osc ${n} PWM speed`, min: 0, max: 127, def: n === 1 ? 10 : 37, fmt: int, manual: M, desc: 'Speed of the oscillator\'s own pulse-width LFO.' },
     { key: `${o}pwm`, page, slot: 9, short: 'PWM', name: `Osc ${n} PWM depth`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'How far that LFO sweeps the pulse width: a moving, chorus-like thickness.' },
@@ -368,8 +368,8 @@ export const SYNTH_PARAMS: ParamDef[] = [
 
   ...oscPage(1),
   // NOISE (OSC 1, second page)
-  { key: 'noise_snh', page: 'noise', slot: 0, short: 'SNH', name: 'Noise sample & hold', min: 0, max: 127, def: 0, fmt: int, manual: `${APX}, NOISE page`, desc: 'Holds each noise sample for a while: 0 is plain white noise, higher values give grainy, bit-crushed noise.' },
-  { key: 'noise_col', page: 'noise', slot: 1, short: 'COL', name: 'Noise colour', min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: `${APX}, NOISE page`, desc: 'Tilts the noise: negative is darker (rumble), positive brighter (hiss).' },
+  { key: 'noise_snh', page: 'noise', slot: 0, short: 'S&H', name: 'Noise sample & hold', min: 0, max: 127, def: 0, fmt: int, manual: `${APX}, NOISE page`, desc: 'Holds each noise sample for a while: 0 is plain white noise, higher values give grainy, bit-crushed noise.' },
+  { key: 'noise_col', page: 'noise', slot: 1, short: 'COL', name: 'Noise colour', min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: `${APX}, NOISE page`, desc: 'Filters the noise: 0 is white; negative is low-passed (-32 pink, -64 red, which falls 6 dB an octave); positive is high-passed, thinner and hissier.' },
   { key: 'noise_fad', page: 'noise', slot: 2, short: 'FAD', name: 'Noise fade', min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: `${APX}, NOISE page`, desc: '0 = constant noise. Positive fades the noise out after each trig, negative fades it in.' },
   { key: 'noise_lev', page: 'noise', slot: 4, short: 'LEV', name: 'Noise level', min: 0, max: 127, def: 0, fmt: int, manual: `${APX}, NOISE page`, desc: 'Level of the noise generator into the filters.' },
 

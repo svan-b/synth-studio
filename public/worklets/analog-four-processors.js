@@ -42,8 +42,13 @@
 //   { t: 'ramp', time, t1, list: [i, from, to] }   parameter slide
 //   { t: 'off2', list }                            performance-macro offsets
 //   { t: 'bpm', v } / { t: 'step', v }             tempo (LFO sync) / step length (LEN)
+//   { t: 'rtrg', time, rt }                        lock trig: restart ENV F / ENV 2 / LFO 1 / LFO 2 (bits 1 2 4 8)
 //   { t: 'trig', time }                            FX LFO retrigger (FX track)
-//   { t: 'reset' }                                 release everything (stop)
+//   { t: 'cut' }                                   [STOP]: silence now (6 ms), drop everything queued
+//   { t: 'reset' }                                 release everything (panic)
+//   { t: 'feed', v }                               the next track uses this voice (OSC 2 WAV NEI): keep the
+//                                                  oscillators and filters running while the VCA is closed
+//   a4-fxmod: { t: 'fade', dur } / { t: 'unfade' } [STOP][STOP]: fade the send effects out / back in
 // Control rate: every 16 samples (3 kHz); gains, cutoff coefficients and
 // oscillator increments are interpolated per sample in between.
 // ============================================================================
@@ -264,7 +269,10 @@ class A4Voice extends AudioWorkletProcessor {
     this.vibPh = 0; this.vibFade = 1; this.pwm1 = Math.random(); this.pwm2 = Math.random();
     this.noiseFade = 1; this.drift1 = 0; this.drift2 = 0;
     this.rng = ((Math.random() * 4294967295) >>> 0) || 1;
-    this.nCount = 0; this.nVal = 0; this.nLp = 0; this.nHp = 0;
+    this.nCount = 0; this.nVal = 0; this.nHp = 0; this.pk0 = 0; this.pk1 = 0; this.pk2 = 0; this.nRed = 0;
+    // NEI: the next track takes this voice's multimode output, which (like the analog original's)
+    // keeps running while the VCA is closed - so a feeding voice never sleeps
+    this.feed = false;
     this.p1 = Math.random(); this.p2 = Math.random();
     this.s1 = 1; this.s2 = 1; this.c1 = 0; this.c2 = 0;   // sub dividers
     this.l0 = 0; this.l1 = 0; this.l2 = 0; this.l3 = 0; this.ic1 = 0; this.ic2 = 0; this.lp1 = 0; this.fb = 0;
@@ -287,7 +295,7 @@ class A4Voice extends AudioWorkletProcessor {
     this.bInDrive = f().fill(1); this.bInComp = f().fill(1);
     this.bGain = f(); this.bPanL = f(); this.bPanR = f(); this.bSC = f(); this.bSD = f(); this.bSR = f();
     this.bK1 = f(); this.bComp = f(); this.bDrive = f(); this.bOvr = f(); this.bK2 = f(); this.bPk = f();
-    this.bLev1 = f(); this.bLev2 = f(); this.bNLev = f(); this.bNHold = f(); this.bNCol = f(); this.bNHpMix = f();
+    this.bLev1 = f(); this.bLev2 = f(); this.bNLev = f(); this.bNHold = f(); this.bNCol = f(); this.bNHpK = f(); this.bNHpG = f();
     this.bOn = new Uint8Array(nb);
     const cap = 8 * n + 16;
     this.evI = new Int32Array(cap); this.evK = new Int32Array(cap); this.evO = new Int8Array(cap);
@@ -302,6 +310,7 @@ class A4Voice extends AudioWorkletProcessor {
       case 'off2': { this.O.fill(0); const l = m.list; for (let k = 0; k < l.length; k += 2) this.O[l[k]] = l[k + 1]; break; }
       case 'bpm': this.bpm = m.v; break;
       case 'step': this.stepSec = m.v; break;
+      case 'feed': this.feed = !!m.v; break;
       case 'reset':
         this.q.length = 0; this.ramps.length = 0;
         if (this.gate) this.noteOff();
@@ -461,9 +470,12 @@ class A4Voice extends AudioWorkletProcessor {
     this.bNLev[b] = (this.E(I.noise_lev) / 127) * this.noiseFade * 0.9;
     const snh = this.E(I.noise_snh) / 127;
     this.bNHold[b] = snh <= 0 ? 1 : Math.round(1 + snh * snh * 360);
-    const col = this.E(I.noise_col) / 64;
-    this.bNCol[b] = col < 0 ? 1 - Math.exp((-TWO_PI * 18000 * Math.pow(0.012, -col)) / sr) : 1;
-    this.bNHpMix[b] = col > 0 ? col * 1.5 : 0;
+    // COL (manual p.87): 0 white; negative low-passed, -32 pink (-3 dB/oct), -64 red (-6 dB/oct);
+    // positive high-passed (30 Hz .. 8 kHz, level compensated)
+    const col = clamp(this.E(I.noise_col) / 64, -1, 1);
+    this.bNCol[b] = col;
+    this.bNHpK[b] = col > 0 ? 1 - Math.exp((-TWO_PI * 30 * exp2(col * 8.06)) / sr) : 0;
+    this.bNHpG[b] = 1 + 1.5 * col * col * col * col;
 
     // Filter 1: ladder (keytrack: 32 = 1:1; DEP 64 = the full range)
     const semis = this.pitch - 60;
@@ -706,7 +718,7 @@ class A4Voice extends AudioWorkletProcessor {
           if (k >= 1) this.ramps.splice(r, 1);
         }
       }
-      if (this.idle && this.envA.stage === 0) {
+      if (this.idle && this.envA.stage === 0 && !this.feed) {
         // silent voice: keep the free-running LFOs moving, skip the DSP
         this.bOn[b] = 0;
         const d1 = lfoHz(P[I.lfo1_spd], Math.round(P[I.lfo1_mul]), this.bpm) * dtBlock;
@@ -748,9 +760,9 @@ class A4Voice extends AudioWorkletProcessor {
 
     // ---- noise, filters, VCA per sample
     let l0 = this.l0, l1 = this.l1, l2 = this.l2, l3 = this.l3, ic1 = this.ic1, ic2 = this.ic2, lp1 = this.lp1, fb = this.fb;
-    let rng = this.rng, nCount = this.nCount, nVal = this.nVal, nLp = this.nLp, nHp = this.nHp;
+    let rng = this.rng, nCount = this.nCount, nVal = this.nVal, nHp = this.nHp, pk0 = this.pk0, pk1 = this.pk1, pk2 = this.pk2, nRed = this.nRed;
     const w1 = this.w1, w2 = this.w2, am1 = this.am1, am2 = this.am2, type2 = this.type2;
-    const hpCoef = 1 - Math.exp((-TWO_PI * 600) / sr);
+    const redK = 1 - Math.exp((-TWO_PI * 20) / sr);
     const bG1 = this.bG1, bG2 = this.bG2, bGain = this.bGain, bPanL = this.bPanL, bPanR = this.bPanR, bSC = this.bSC, bSD = this.bSD, bSR = this.bSR;
     for (let i = 0; i < n; i++) {
       const b = (i / BLOCK) | 0, f = (i - b * BLOCK + 1) / BLOCK;
@@ -776,9 +788,20 @@ class A4Voice extends AudioWorkletProcessor {
           rng ^= rng << 13; rng ^= rng >>> 17; rng ^= rng << 5;
           nVal = ((rng >>> 0) / 4294967296) * 2 - 1;
         }
-        nLp += (nVal - nLp) * this.bNCol[b];
-        nHp += (nLp - nHp) * hpCoef;
-        nz = (nLp + (nLp - nHp) * this.bNHpMix[b]) * nLev;
+        const c = this.bNCol[b];
+        let wn = nVal;
+        if (c < 0) {
+          // white -> pink (Kellet's 3-pole approximation) -> red (one pole at 20 Hz), equal RMS
+          pk0 = 0.99765 * pk0 + nVal * 0.099046; pk1 = 0.963 * pk1 + nVal * 0.2965164; pk2 = 0.57 * pk2 + nVal * 1.0526913;
+          const pink = (pk0 + pk1 + pk2 + nVal * 0.1848) * 0.335;
+          nRed += (nVal - nRed) * redK;
+          const m = -2 * c;
+          wn = m <= 1 ? nVal + (pink - nVal) * m : pink + (nRed * 26 - pink) * (m - 1);
+        } else if (c > 0) {
+          nHp += (nVal - nHp) * this.bNHpK[b];
+          wn = (nVal - nHp) * this.bNHpG[b];
+        }
+        nz = wn * nLev;
       }
       const x = (o1 * this.bLev1[b] + o2 * this.bLev2[b] + nz) * 0.5;
 
@@ -835,7 +858,8 @@ class A4Voice extends AudioWorkletProcessor {
     l0 = flush(l0); l1 = flush(l1); l2 = flush(l2); l3 = flush(l3); ic1 = flush(ic1); ic2 = flush(ic2); lp1 = flush(lp1);
     if (!Number.isFinite(l0 + l1 + l2 + l3 + ic1 + ic2 + lp1)) { l0 = l1 = l2 = l3 = ic1 = ic2 = lp1 = 0; fb = 0; }
     this.l0 = l0; this.l1 = l1; this.l2 = l2; this.l3 = l3; this.ic1 = ic1; this.ic2 = ic2; this.lp1 = lp1; this.fb = fb;
-    this.rng = rng; this.nCount = nCount; this.nVal = nVal; this.nLp = nLp; this.nHp = nHp;
+    this.rng = rng; this.nCount = nCount; this.nVal = nVal; this.nHp = flush(nHp);
+    this.pk0 = flush(pk0); this.pk1 = flush(pk1); this.pk2 = flush(pk2); this.nRed = flush(nRed);
     return true;
   }
 }

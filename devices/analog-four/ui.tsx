@@ -28,9 +28,10 @@ import {
 } from '@/components/sequencer';
 import { C as SC, Frame, Group, Overlay, SeqButton, UI, lessonFocus, seqStateOf, viewPattern } from '@/components/sequencer/shared';
 import {
-  CHANGE_MODES, TRIG_CONDITIONS, asProject, clearPattern, copyPattern, formatLength, formatNote, getPattern, parsePatternId, setStep as setStepFn,
-  pastePattern, patternHasContent, patternId, setActive, setChain, setChangeMode, setPlayMode, trackLength, updateSteps, withTrack,
-  type Pattern, type Project, type Step,
+  CHANGE_MODES, TRIG_CONDITIONS, asProject, clearPattern, copyPattern, formatLength, formatNote, getPattern, parsePatternId, rowEntry, setStep as setStepFn,
+  pastePattern, patternHasContent, patternId, setActive, setChain, setChangeMode, setMasterMute, setMasterMutes, setPlayMode, setTrigMute, trackLength,
+  trackTrigDefaults, updateSteps, withSteps, withTrack,
+  type Pattern, type Project, type SeqState, type Step,
 } from '@/lib/sequencer/elektron';
 import {
   CV_BY_KEY, FX_BY_KEY, FX_TRACK, PAGE_TITLE, PERF_MACROS, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS, TRACK_NAMES, V, VIEWS, keyOfView, levelControl, pageFor,
@@ -89,6 +90,7 @@ const UIK = {
   recDown: 'a4recDown',
   clip: 'a4clip',
   trnsLock: 'a4trnsLock',
+  perfPending: 'a4perfPending', // PERF mode: tracks whose mute toggles when FUNC is released
 } as const;
 
 const num = (v: ControlValue | undefined, d = 0) => (typeof v === 'number' ? v : typeof v === 'boolean' ? (v ? 1 : 0) : d);
@@ -101,6 +103,53 @@ function project(ctx: { data?: unknown }): Project {
   return asProject(ctx.data, TRACKS);
 }
 
+/** Track mutes ([FUNC] + [TRACK]) are the project's: global, kept through pattern changes (manual p.37) */
+function masterMuted(pr: Project, t: number): boolean {
+  return !!pr.mutes?.includes(t);
+}
+
+/** Song mutes of the playing song position: their track keys show half-bright (manual p.56) */
+function songMuted(pr: Project, st: SeqState | undefined, t: number): boolean {
+  if (!st?.playing || st.mode !== 'song' || st.arranged) return false;
+  const row = pr.song.rows[st.songRow];
+  return !!row && !!rowEntry(row, st.songPos ?? 0).mutes?.includes(t);
+}
+
+/**
+ * A trig takes the NOTE menu's NOT, VEL and LEN as it is placed, so changing them
+ * later only affects trigs placed afterwards (manual p.45). `after` is `before`
+ * plus an edit; every note trig it creates gets the values it lacks.
+ */
+export function stampNewTrigs(before: Project, after: Project): Project {
+  if (before === after) return after;
+  let out = after;
+  for (const id in after.patterns) {
+    const pa = after.patterns[id];
+    const pb = before.patterns[id];
+    if (pa === pb) continue;
+    pa.tracks.forEach((ta, t) => {
+      const tb = pb?.tracks[t];
+      if (tb && ta.steps === tb.steps) return;
+      const fresh: number[] = [];
+      for (const k in ta.steps) {
+        const s = ta.steps[k];
+        const prev = tb?.steps[Number(k)];
+        if (s.trigless || (prev && !prev.trigless)) continue;
+        if (s.note === undefined || s.vel === undefined || s.len === undefined) fresh.push(Number(k));
+      }
+      if (!fresh.length) return;
+      const d = trackTrigDefaults(out, id, t);
+      out = withSteps(out, id, t, fresh, s => (s ? { ...s, note: s.note ?? d.note, vel: s.vel ?? d.vel, len: s.len ?? d.len } : s));
+    });
+  }
+  return out;
+}
+
+/** An edit of the pattern data whose new trigs get their NOTE menu values */
+function editTrigs(ctx: Pick<CustomRenderContext, 'updateData'>, fn: (p: Project) => Project) {
+  ctx.updateData(d => { const p = asProject(d, TRACKS); return stampNewTrigs(p, fn(p)); });
+}
+
 /** Show a short message on the OLED */
 function say(ctx: CustomRenderContext, text: string, ms = 2200) {
   ctx.setUi({ [UIK.msg]: { text, until: Date.now() + ms } });
@@ -109,6 +158,25 @@ function say(ctx: CustomRenderContext, text: string, ms = 2200) {
 function funcActive(ctx: CustomRenderContext): boolean {
   const f = liveUi(ctx)[UIK.func];
   return f === 'held' || f === 'latched';
+}
+
+/** PERF mode mute changes waiting for FUNC to be released */
+function pendingMutes(ctx: CustomRenderContext): number[] {
+  const p = liveUi(ctx)[UIK.perfPending];
+  return Array.isArray(p) ? (p as number[]) : [];
+}
+
+/** FUNC released (or a latched FUNC tapped off): the PERF mode mute changes take effect together (manual p.27) */
+function applyPendingMutes(ctx: CustomRenderContext) {
+  const p = pendingMutes(ctx);
+  if (!p.length) return;
+  ctx.setUi({ [UIK.perfPending]: [] });
+  ctx.updateData(d => {
+    const pr = asProject(d, TRACKS);
+    const m = new Set(pr.mutes ?? []);
+    p.forEach(t => (m.has(t) ? m.delete(t) : m.add(t)));
+    return setMasterMutes(pr, Array.from(m));
+  });
 }
 
 /** After a FUNC combination: a latched FUNC is used up */
@@ -242,19 +310,20 @@ const trackKey = (t: number): KeyDef => ({
   sub: 'Mute',
   aria: `Track ${TRACK_NAMES[t]}`,
   led: e => {
-    const pat = getPattern(project(e.ctx), viewPattern(e.ctx, project(e.ctx)));
-    const muted = !!e.ctx.values[`t${t + 1}_mute`] || !!pat.tracks[t]?.mute;
+    const pr = project(e.ctx);
+    const muted = masterMuted(pr, t) || !!getPattern(pr, viewPattern(e.ctx, pr)).tracks[t]?.mute;
     // red = active, yellow = active and muted, green = audible, dark = muted; with the FX or CV
-    // track active, the synth track the keyboard still plays is half-bright red (manual p.13, p.36)
+    // track active, the synth track the keyboard still plays is half-bright red (manual p.13, p.36);
+    // a song mute of the playing song position shows half-bright (p.56)
     if (e.track === t) return muted ? [COL.yellow, 1] : [COL.red, 1];
     if (trackKind(e.track) !== 'synth' && e.ctx.engine.kbTrack === t) return [COL.red, 0.4];
-    return muted ? null : [COL.green, 0.7];
+    if (muted) return null;
+    return songMuted(pr, seqStateOf(e.ctx.engine), t) ? [COL.green, 0.3] : [COL.green, 0.7];
   },
   press: e => {
     if (e.func) {
-      const id = `t${t + 1}_mute`;
-      const m = !e.ctx.values[id];
-      e.ctx.setValue(id, m);
+      const m = !masterMuted(project(e.ctx), t);
+      e.ctx.updateData(d => setMasterMute(asProject(d, TRACKS), t, m));
       useFunc(e.ctx);
       say(e.ctx, `${TRACK_NAMES[t]} ${m ? 'MUTED' : 'UNMUTED'}`, 1000);
       return;
@@ -266,25 +335,32 @@ const trackKey = (t: number): KeyDef => ({
     e.ctx.setValue('track', t);
     if (twice) toggleA4Menu(e.ctx, 'sound');
   },
-  target: (c, v) => (c === 'track' && v === t) || c === `t${t + 1}_mute`,
+  target: (c, v) => c === 'track' && v === t,
 });
+
+/** BANK E-H: the trig flag each one sets with a held trig, its trig_mode, its LED colour (manual p.51-53) */
+const BANK_FLAGS = [
+  { flag: 'mute', mode: 4, color: COL.green, name: 'TRIG MUTE' },
+  { flag: 'accent', mode: 1, color: COL.pink, name: 'ACCENT' },
+  { flag: 'slide', mode: 2, color: COL.yellow, name: 'NOTE SLIDE' },
+  { flag: 'pslide', mode: 3, color: COL.cyan, name: 'PARAMETER SLIDE' },
+] as const;
 
 function bankKey(b: number): KeyDef {
   const letter = 'ABCDEFGH'[b];
   const subs = ['', '', '', '', 'Trig Mute', 'Accent', 'Note Slide', 'Param Slide'];
+  const bf = b >= 4 ? BANK_FLAGS[b - 4] : null;
   return {
     label: letter,
     sub: subs[b] || undefined,
     aria: `Bank ${letter}`,
     led: e => {
       const u = e.ctx.ui;
-      const h = b >= 5 ? heldTrig(e.ctx) : null;
-      if (h) return h.first?.[(['accent', 'slide', 'pslide'] as const)[b - 5]] ? [[COL.pink, COL.yellow, COL.cyan][b - 5], 1] : null;
+      // a held trig lights the BANK key of each flag it carries (manual p.51-53)
+      const h = bf ? heldTrig(e.ctx) : null;
+      if (h && bf) return h.first?.[bf.flag] ? [bf.color, 1] : null;
       if (u[UIK.bank] === b) return [COL.red, 1];
-      if (e.func && b >= 5) {
-        const m = num(e.ctx.values.trig_mode);
-        return m === b - 4 ? [[COL.pink, COL.yellow, COL.cyan][b - 5], 1] : [COL.white, 0.25];
-      }
+      if (e.func && bf) return num(e.ctx.values.trig_mode) === bf.mode ? [bf.color, 1] : [COL.white, 0.25];
       const pr = project(e.ctx);
       const st = seqStateOf(e.ctx.engine);
       const playing = st?.playing && st.pattern ? parsePatternId(st.pattern)?.bank : undefined;
@@ -301,30 +377,30 @@ function bankKey(b: number): KeyDef {
           say(e.ctx, ['SEQUENTIAL', 'DIRECT START', 'DIRECT JUMP', 'TEMP JUMP'][b]);
           return;
         }
-        if (b === 4) { say(e.ctx, 'TRIG MUTE: not modelled in the twin'); return; }
         const cur = num(e.ctx.values.trig_mode);
-        const mode = b - 4;
+        const mode = bf!.mode;
         e.ctx.setValue('trig_mode', cur === mode ? 0 : mode);
-        say(e.ctx, cur === mode ? 'TRIGS' : ['', 'ACCENT: tap trigs to accent them', 'NOTE SLIDE: tap trigs to slide into them', 'PARAMETER SLIDE: tap trigs'][mode]);
+        say(e.ctx, cur === mode ? 'TRIGS' : TRIG_MODE_HINTS[mode]);
         return;
       }
-      const h = b >= 4 ? heldTrig(e.ctx) : null;
-      if (h) {
-        if (b === 4) { say(e.ctx, 'TRIG MUTE: not modelled in the twin'); return; }
-        const flag = (['accent', 'slide', 'pslide'] as const)[b - 5];
-        const on = !h.first?.[flag];
-        e.ctx.updateData(d => updateSteps(asProject(d, TRACKS), h.pattern, h.track, h.steps, { [flag]: on ? true : null }, { create: false }));
+      const h = bf ? heldTrig(e.ctx) : null;
+      if (h && bf) {
+        const on = !h.first?.[bf.flag];
+        if (bf.flag === 'mute') e.ctx.updateData(d => setTrigMute(asProject(d, TRACKS), h.pattern, h.track, h.steps, on));
+        else e.ctx.updateData(d => updateSteps(asProject(d, TRACKS), h.pattern, h.track, h.steps, { [bf.flag]: on ? true : null }, { create: false }));
         e.ctx.setUi({ [UI.heldEdited]: true });
-        say(e.ctx, `${['ACCENT', 'NOTE SLIDE', 'PARAMETER SLIDE'][b - 5]} ${on ? 'ON' : 'OFF'}`, 1000);
+        say(e.ctx, `${bf.name} ${on ? 'ON' : 'OFF'}`, 1000);
         return;
       }
       const cur = liveUi(e.ctx)[UIK.bank];
       e.ctx.setUi({ [UIK.bank]: cur === b ? null : b, [UIK.qper]: false });
       if (cur !== b) say(e.ctx, `BANK ${letter}: CHOOSE PTN`, 1500);
     },
-    target: (c, v) => c === 'trig_mode' && v === b - 4 && b >= 5,
+    target: (c, v) => !!bf && c === 'trig_mode' && v === bf.mode,
   };
 }
+
+const TRIG_MODE_HINTS = ['TRIGS', 'ACCENT: tap trigs to accent them', 'NOTE SLIDE: tap trigs to slide into them', 'PARAMETER SLIDE: tap trigs', 'TRIG MUTE: tap trigs to mute them'];
 
 const KEYDEFS: Record<string, KeyDef> = {
   GLOBAL: {
@@ -450,6 +526,15 @@ const KEYDEFS: Record<string, KeyDef> = {
         return;
       }
       if (e.ctx.values.live_rec && e.playing) { e.ctx.setValue('live_rec', false); say(e.ctx, 'LIVE RECORDING OFF'); return; }
+      // [PLAY] while playing pauses, [PLAY] again resumes (manual p.39). Following the studio
+      // transport (like MIDI clock) there is no pause: PLAY / STOP drive the studio transport.
+      const st = seqStateOf(e.ctx.engine);
+      if (e.playing && !st?.following) {
+        e.ctx.sendEvent('a4:pause');
+        e.ctx.setValue('play', false);
+        say(e.ctx, 'PAUSED: PLAY RESUMES, STOP STOPS', 1400);
+        return;
+      }
       e.ctx.setValue('play', !e.playing);
     },
     target: (c, v) => c === 'play' && v === true,
@@ -464,6 +549,8 @@ const KEYDEFS: Record<string, KeyDef> = {
       lastStopPress.at = now;
       // [STOP] cuts the sound, the send effects ring on; [STOP][STOP] fades them too (manual p.38)
       if (!e.playing && quick) { e.ctx.sendEvent('a4:fxfade'); say(e.ctx, 'SEND FX FADED', 900); }
+      // a paused pattern stops too, so the next PLAY starts from the top
+      if (!seqStateOf(e.ctx.engine)?.following) e.ctx.sendEvent('a4:stop');
       e.ctx.setValue('play', false);
       if (e.ctx.values.live_rec) e.ctx.setValue('live_rec', false);
     },
@@ -545,7 +632,7 @@ function arrow(e: KeyEnv, dx: number, dy: number) {
     const tdef = getPattern(p0, pat).tracks[track];
     if (dy) {
       const note = Math.max(0, Math.min(127, (first?.note ?? tdef?.note ?? 60) + dy * (e.func ? 12 : 1)));
-      ctx.updateData(d => updateSteps(asProject(d, TRACKS), pat, track, held, { note }, { create: 'note' }));
+      editTrigs(ctx, p => updateSteps(p, pat, track, held, { note }, { create: 'note' }));
       say(ctx, `NOTE ${formatNote(note)}`, 900);
     } else {
       const micro = Math.max(-23, Math.min(23, (first?.micro ?? 0) + dx * (e.func ? 6 : 1)));
@@ -727,7 +814,7 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
     setDown(true);
     if (isFunc) {
       const cur = liveUi(ctx)[UIK.func];
-      if (cur === 'latched') ctx.setUi({ [UIK.func]: null });
+      if (cur === 'latched') { ctx.setUi({ [UIK.func]: null }); applyPendingMutes(ctx); }
       else ctx.setUi({ [UIK.func]: 'held', [UIK.funcUsed]: false });
       return;
     }
@@ -741,7 +828,10 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
     if (isFunc) {
       const u = liveUi(ctx);
       // a tap without using FUNC latches it for the next key (mouse); a used hold releases it
-      if (u[UIK.func] === 'held') ctx.setUi({ [UIK.func]: u[UIK.funcUsed] ? null : 'latched', [UIK.funcUsed]: false });
+      if (u[UIK.func] === 'held') {
+        ctx.setUi({ [UIK.func]: u[UIK.funcUsed] ? null : 'latched', [UIK.funcUsed]: false });
+        if (u[UIK.funcUsed]) applyPendingMutes(ctx);
+      }
       return;
     }
     def.release?.({ ...env, func: funcActive(ctx) });
@@ -903,7 +993,7 @@ export function MiniKeyboard({ ctx }: { ctx: CustomRenderContext }) {
       const track = u[UI.heldTrack] as number;
       const pat = (u[UI.heldPattern] as string) ?? project(ctx).active;
       const note = Math.max(0, Math.min(127, KB_C1 + 12 * oct + offset));
-      ctx.updateData(d => updateSteps(asProject(d, TRACKS), pat, track, steps, { note }, { create: 'note' }));
+      editTrigs(ctx, p => updateSteps(p, pat, track, steps, { note }, { create: 'note' }));
       ctx.setUi({ [UI.heldEdited]: true });
       say(ctx, `TRIG ${steps.map(s => s + 1).join(' ')}: NOTE ${formatNote(note)}`, 1100);
     }
@@ -1028,7 +1118,8 @@ export function Screen(props: PanelContext) {
   const levelId = levelControl(track);
   const level = levelId ? num(values[levelId], 100) : 0;
   const title = page ? PAGE_TITLE[page] : '---';
-  const icon = values.live_rec && playing ? '●▶' : playing ? '▶' : values.rec ? '●' : '■';
+  // the transport symbol: record, play, pause or stop (manual p.18)
+  const icon = values.live_rec && playing ? '●▶' : playing ? '▶' : st?.paused ? '❚❚' : values.rec ? '●' : '■';
 
   let body: ReactNode;
   if (!page) {
@@ -1066,7 +1157,7 @@ export function Screen(props: PanelContext) {
     body = (
       <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: 78, paddingTop: 6 }}>
         {lv.map((v, i) => {
-          const muted = !!values[`t${i + 1}_mute`] || !!getPattern(pr, shownPattern).tracks[i]?.mute;
+          const muted = masterMuted(pr, i) || !!getPattern(pr, shownPattern).tracks[i]?.mute;
           return (
             <div key={i} style={{ textAlign: 'center', width: 34 }}>
               <div style={{ height: 52, width: 10, margin: '0 auto', border: `1px solid ${OLED_DIM}`, position: 'relative' }}>
@@ -1087,9 +1178,10 @@ export function Screen(props: PanelContext) {
       const v = num(values[id], p.def);
       let locked = false;
       if (heldOn && step) {
-        if (p.key === 'trig_note') locked = step.note !== undefined;
-        else if (p.key === 'trig_vel') locked = step.vel !== undefined;
-        else if (p.key === 'trig_len') locked = step.len !== undefined;
+        // every trig carries the NOT / VEL / LEN it was placed with: shown locked when it differs from the NOTE page
+        if (p.key === 'trig_note') locked = step.note !== undefined && step.note !== tr?.note;
+        else if (p.key === 'trig_vel') locked = step.vel !== undefined && step.vel !== tr?.vel;
+        else if (p.key === 'trig_len') locked = step.len !== undefined && step.len !== tr?.len;
         else if (p.key === 'trig_micro') locked = !!step.micro;
         else if (p.key === 'trig_cond') locked = !!step.cond;
         else locked = !!step.locks && p.key in step.locks;
@@ -1155,6 +1247,8 @@ export function Screen(props: PanelContext) {
 // ----------------------------------------------------------------------------
 
 const TRIG_MODES = ['trig', 'accent', 'slide', 'pslide'] as const;
+/** trig_mode value of TRIG MUTE (the A4's own strip; the kit's TrigKeys has no trig-mute mode) */
+const TRIG_MUTE_MODE = 4;
 
 /** Lessons: the trig keys step back (dimmed) while a step is about the sound, not the sequencer */
 function trigAreaDimmed(ctx: CustomRenderContext, focusMode: boolean): boolean {
@@ -1283,19 +1377,56 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
     });
   }
   if (view === V.PERF) {
-    // PERFORMANCE mode: [TRIG 1-6] mute the tracks; audible = full bright, muted = dim red (manual p.27)
+    // PERFORMANCE mode: [TRIG 1-6] mute the tracks; audible = full bright, muted = dim red. With
+    // [FUNC] held the changes wait for its release: half-bright = will unmute, half-bright
+    // blinking = will mute (manual p.27). These are the project's track mutes.
+    const pending = pendingMutes(ctx);
     return strip(i => {
       if (i >= TRACKS) return keyBtn(i, { lit: null, label: `${i + 1}`, aria: 'unused', onPress: () => undefined });
-      const id = `t${i + 1}_mute`;
-      const muted = !!ctx.values[id];
+      const muted = masterMuted(pr, i);
+      const will = pending.includes(i);
       return keyBtn(i, {
-        lit: COL.red, amt: muted ? 0.25 : 1, label: `${i + 1}`, sub: `${TRACK_NAMES[i]}${muted ? ' -' : ''}`, aria: `Mute ${TRACK_NAMES[i]}`,
-        onPress: () => { ctx.setValue(id, !muted); say(ctx, `${TRACK_NAMES[i]} ${muted ? 'UNMUTED' : 'MUTED'}`, 900); },
+        lit: COL.red, amt: will ? 0.5 : muted ? 0.25 : 1, blink: will && !muted, label: `${i + 1}`,
+        sub: `${TRACK_NAMES[i]}${will ? (muted ? ' +' : ' *') : muted ? ' -' : ''}`, aria: `Mute ${TRACK_NAMES[i]}`,
+        onPress: () => {
+          if (funcActive(ctx)) {
+            ctx.setUi({ [UIK.perfPending]: will ? pending.filter(x => x !== i) : [...pending, i] });
+            if (liveUi(ctx)[UIK.func] === 'held') ctx.setUi({ [UIK.funcUsed]: true });
+            say(ctx, 'MUTES CHANGE WHEN FUNC IS RELEASED', 1100);
+            return;
+          }
+          ctx.updateData(d => setMasterMute(asProject(d, TRACKS), i, !muted));
+          say(ctx, `${TRACK_NAMES[i]} ${muted ? 'UNMUTED' : 'MUTED'}`, 900);
+        },
+      });
+    });
+  }
+  if (Math.round(num(ctx.values.trig_mode)) === TRIG_MUTE_MODE) {
+    // TRIG MUTE ([FUNC] + [BANK E]): note and lock trigs light light green, muted ones darker
+    // green; tap a trig to mute or unmute it (manual p.51)
+    const pat = viewPattern(ctx, pr);
+    const ptn = getPattern(pr, pat);
+    const len = trackLength(ptn, track);
+    const page = Math.min(Math.max(0, Math.ceil(len / 16) - 1), Math.round(Number(ctx.ui[UI.stepPage]) || 0));
+    return strip(i => {
+      const step = page * 16 + i;
+      const s = ptn.tracks[track]?.steps[step];
+      const head = !!st?.playing && st.pattern === pat && st.steps[track] === step;
+      return keyBtn(i, {
+        lit: s && step < len ? COL.green : null, amt: s?.mute ? 0.3 : 1, outline: head, label: `${step + 1}`,
+        aria: `Trig mute, step ${step + 1}${s?.mute ? ' (muted)' : ''}`,
+        onPress: () => {
+          if (!s || step >= len) return;
+          ctx.updateData(d => setTrigMute(asProject(d, TRACKS), pat, track, [step], !s.mute));
+          say(ctx, `TRIG ${step + 1} ${s.mute ? 'UNMUTED' : 'MUTED'}`, 900);
+        },
       });
     });
   }
   const mode = TRIG_MODES[Math.round(num(ctx.values.trig_mode))] ?? 'trig';
   const editable = ctx.values.rec !== false;
+  // New trigs take the NOTE menu's NOT / VEL / LEN as they are placed (manual p.45)
+  const trigCtx: CustomRenderContext = { ...ctx, updateData: fn => ctx.updateData(d => { const p = asProject(d, TRACKS); return stampNewTrigs(p, asProject(fn(p), TRACKS)); }) };
   // [FUNC] + [TRIG] in GRID RECORDING places (or removes) a lock trig (manual p.40)
   const onFuncTrig = (e: React.PointerEvent) => {
     if (!editable || mode !== 'trig' || !funcActive(ctx)) return;
@@ -1314,7 +1445,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
   return (
     <div className={`a4-trigs mode-${mode}`} onPointerDownCapture={onFuncTrig} style={{ width: '100%', height: '100%', ...dimStyle }}>
       <TrigStyles gap={(TRIGS.pitch - TRIGS.keyW) * k} />
-      <TrigKeys ctx={ctx} tracks={TRACKS} mode={mode} editable={editable} trackNames={[...TRACK_NAMES]} color={COL.red} />
+      <TrigKeys ctx={trigCtx} tracks={TRACKS} mode={mode} editable={editable} trackNames={[...TRACK_NAMES]} color={COL.red} />
     </div>
   );
 }
@@ -1632,13 +1763,13 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
     const pr = project(ctx);
     const len = trackLength(getPattern(pr, rec.pattern), rec.track);
     const step = ((rec.step % len) + len) % len;
-    ctx.updateData(d => updateSteps(asProject(d, TRACKS), rec.pattern, rec.track, [step], { note: rec.note, trigless: null, micro: rec.micro ? rec.micro : null }, { create: 'note' }));
+    editTrigs(ctx, p => updateSteps(p, rec.pattern, rec.track, [step], { note: rec.note, trigless: null, micro: rec.micro ? rec.micro : null }, { create: 'note' }));
   }, [rec, ctx]);
 
   // Shift on a computer keyboard works as FUNC
   useEffect(() => {
     const down = (e: KeyboardEvent) => { if (e.key === 'Shift' && !e.repeat) ctx.setUi({ [UIK.func]: 'held', [UIK.funcUsed]: false }); };
-    const up = (e: KeyboardEvent) => { if (e.key === 'Shift') ctx.setUi({ [UIK.func]: null }); };
+    const up = (e: KeyboardEvent) => { if (e.key === 'Shift') { ctx.setUi({ [UIK.func]: null }); applyPendingMutes(ctx); } };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };

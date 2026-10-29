@@ -20,6 +20,13 @@
 // the hardware (LockTracker). Parameter slides ramp in the worklet. FX track
 // trigs lock FX parameters and retrigger the FX LFOs. The CV track is
 // sequenced but has no outputs (rear-panel jacks are not in the twin).
+// Track mutes live in the project (Project.mutes, applied by the sequencer).
+//
+// Transport (manual p.38-39): [PLAY] starts, [PLAY] while playing pauses
+// (sounding notes are released) and [PLAY] again resumes; [STOP] stops and
+// cuts the voices while the send effects ring on; [STOP][STOP] while stopped
+// fades the send effects. Following the studio transport, its start / stop
+// drive the sequencer instead (no pause, like MIDI clock).
 // ============================================================================
 
 import type { ControlValue } from '@/types';
@@ -38,6 +45,8 @@ const VI: Record<string, number> = Object.fromEntries(VOICE_KEYS.map((k, i) => [
 const FI: Record<string, number> = Object.fromEntries(FX_KEYS.map((k, i) => [k, i]));
 /** MIDI note of the first keyboard key at octave 0 (EMU, measured on OS 1.56) */
 const KB_C1 = 72;
+/** OSC 2 WAV index of NEI: the previous track's multimode filter output (manual p.73) */
+const NEI_WAVE = 6;
 
 
 /** a4-fxmod output channels driving the shared processors (must match the worklet) */
@@ -117,6 +126,10 @@ export class AnalogFourEngine extends BaseEngine {
   /** The audition in progress (a preview): its stop */
   private auditionEnd: (() => void) | null = null;
   private fxFaded = false;
+  /** Voice t feeds track t+1's OSC 2 (WAV NEI): it keeps running while its VCA is closed */
+  private feedOn = [false, false, false];
+  /** The playing trig of each synth track locks OSC 2 WAV to NEI */
+  private neiLock = [false, false, false, false];
 
   // --------------------------------------------------------------------------
 
@@ -195,12 +208,17 @@ export class AnalogFourEngine extends BaseEngine {
       onStep: (track, step, time) => { const s = this.lastStep[track]; s.step = step; s.time = time; },
       onPlay: playing => {
         if (playing) { this.unfadeFx(); return; }
-        // [STOP] cuts the sound off; the send effects ring on (manual p.38). Keys still held keep playing.
         const now = this.ctx.currentTime;
-        for (let t = 0; t < SYNTH_TRACKS; t++) {
-          if (this.liveNote[t] !== null || this.arps[t]?.live) continue;
-          this.arps[t] = null;
-          this.voices[t].port.postMessage({ t: 'cut' });
+        if (this.seq.isPaused) {
+          // [PLAY] while playing pauses: the sequencer releases its notes, the arpeggios end with them
+          for (let t = 0; t < SYNTH_TRACKS; t++) if (this.arps[t] && !this.arps[t]!.live) this.stopArp(t, now);
+        } else {
+          // [STOP] cuts the sound off; the send effects ring on (manual p.38). Keys still held keep playing.
+          for (let t = 0; t < SYNTH_TRACKS; t++) {
+            if (this.liveNote[t] !== null || this.arps[t]?.live) continue;
+            this.arps[t] = null;
+            this.voices[t].port.postMessage({ t: 'cut' });
+          }
         }
         this.locks.releaseAll((track, key) => this.revert(track, key, now));
       },
@@ -258,12 +276,12 @@ export class AnalogFourEngine extends BaseEngine {
     if (m) {
       const t = Number(m[1]) - 1;
       const key = m[2];
-      if (key === 'mute') { this.seq.setMute(t, !!value); return; }
       if (t >= SYNTH_TRACKS || key.startsWith('trig_')) return;
       if ((ARP_KEYS as readonly string[]).includes(key)) { this.arpBase[t][key as ArpKey] = v; return; }
       const i = VI[key];
       if (i === undefined) return;
       this.base[t][i] = v;
+      if (key === 'osc2_wav') this.updateFeed(t);
       if (this.locks.isLocked(t, key)) return; // the playing trig holds a lock for it
       this.queue(this.voices[t], i, v);
       return;
@@ -290,7 +308,10 @@ export class AnalogFourEngine extends BaseEngine {
         break;
       }
       case 'play':
-        if (!this.transport) { if (value) this.seq.start(); else this.seq.stop(); }
+        // Synced, the hub turns PLAY into the studio transport. Paused ([PLAY] while playing), PLAY resumes.
+        if (this.transport) break;
+        if (value) { if (!this.seq.resume()) this.seq.start(); }
+        else if (!this.seq.isPaused) this.seq.stop();
         break;
       case 'track': {
         // with the FX or CV track active, the keyboard keeps playing the last synth track (manual p.36)
@@ -348,9 +369,19 @@ export class AnalogFourEngine extends BaseEngine {
   // Sequencer
   // --------------------------------------------------------------------------
 
+  /** Track t uses OSC 2 WAV NEI (its own value or the playing trig's lock): the voice before it must keep running */
+  private updateFeed(t: number) {
+    if (t < 1 || t >= SYNTH_TRACKS) return;
+    const on = Math.round(this.base[t][VI.osc2_wav]) === NEI_WAVE || this.neiLock[t];
+    if (on === this.feedOn[t - 1]) return;
+    this.feedOn[t - 1] = on;
+    this.voices[t - 1].port.postMessage({ t: 'feed', v: on });
+  }
+
   private revert(track: number, key: string, time: number) {
     if (track < SYNTH_TRACKS) {
       if ((ARP_KEYS as readonly string[]).includes(key)) { delete this.arpLock[track][key as ArpKey]; return; }
+      if (key === 'osc2_wav') { this.neiLock[track] = false; this.updateFeed(track); }
       const i = VI[key];
       if (i !== undefined) this.voices[track].port.postMessage({ t: 'at', time, list: [i, this.base[track][i]] });
     } else if (track === FX_TRACK) {
@@ -391,17 +422,21 @@ export class AnalogFourEngine extends BaseEngine {
     const v = this.voices[t];
     if (!v) return;
     const list: number[] = [];
+    const nei = this.neiLock[t];
     this.locks.apply(t, e.locks,
       (k, val) => {
         const i = VI[k];
         if (i !== undefined) list.push(i, val);
         else if ((ARP_KEYS as readonly string[]).includes(k)) this.arpLock[t][k as ArpKey] = val;
+        if (k === 'osc2_wav') this.neiLock[t] = Math.round(val) === NEI_WAVE;
       },
       k => {
         const i = VI[k];
         if (i !== undefined) list.push(i, this.base[t][i]);
         else if ((ARP_KEYS as readonly string[]).includes(k)) delete this.arpLock[t][k as ArpKey];
+        if (k === 'osc2_wav') this.neiLock[t] = false;
       });
+    if (this.neiLock[t] !== nei) this.updateFeed(t);
     if (list.length) v.port.postMessage({ t: 'at', time: e.time, list });
     if (e.paramSlide && e.slideTo) {
       const to = e.slideTo;
@@ -631,6 +666,9 @@ export class AnalogFourEngine extends BaseEngine {
       case 'panic':
         for (let t = 0; t < SYNTH_TRACKS; t++) { this.held[t] = []; this.liveNote[t] = null; this.stopArp(t, this.ctx.currentTime); this.voices[t].port.postMessage({ t: 'reset' }); }
         break;
+      // [PLAY] while playing pauses; [STOP] stops, also from a pause (manual p.38-39)
+      case 'a4:pause': if (!this.transport) this.seq.pause(); break;
+      case 'a4:stop': if (!this.transport) this.seq.stop(); break;
       // [STOP][STOP] while stopped: the send effects fade out (manual p.38)
       case 'a4:fxfade': this.fadeFx(); break;
       case 'a4:audition': this.startAudition(); break;

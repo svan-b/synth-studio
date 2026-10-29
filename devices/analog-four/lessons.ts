@@ -42,6 +42,10 @@ const stepsOf = (s: LessonCheckState, track: number, pattern?: string): Record<n
 const noteTrigs = (s: LessonCheckState, track: number, pattern?: string): [number, Step][] =>
   Object.entries(stepsOf(s, track, pattern)).filter(([, st]) => !st.trigless).map(([k, st]) => [Number(k), st]);
 const instanceOf = (s: LessonCheckState, device: string) => Object.entries(s.instances).find(([, i]) => i.device === device)?.[0];
+/** Track mutes ([FUNC] + [TRACK]) are the project's (manual p.37) */
+const muted = (s: LessonCheckState, track: number) => !!proj(s).mutes?.includes(track);
+/** The NOTE page's NOT for a track (what newly placed trigs get) */
+const trackNote = (s: LessonCheckState, track: number) => getPattern(proj(s), proj(s).active).tracks[track]?.note ?? 60;
 /** LFO speed x multiplier (128 = one cycle per bar); 0 when the multiplier is a free (BPM-less) one */
 const lfoProduct = (s: LessonCheckState, lfo: string) => {
   const mult = LFO_MULTS[Math.round(num(s, `${lfo}_mul`))] ?? '';
@@ -1097,13 +1101,17 @@ const sq1: Lesson = {
       predict: mc('What happens when you hold a trig and press a key?', ['That trig stores the key\'s note', 'The whole track transposes', 'The key plays once and nothing is stored'], 0,
         'Holding a trig makes the keyboard edit it: the note is stored on that step. The other trigs keep their notes.'),
       principle: 'A held trig turns the keyboard into a note editor for that step.',
-      check: s => typeof stepsOf(s, 1)[3]?.note === 'number',
+      // a placed trig already carries the NOTE page's NOT: the key press gives it its own
+      check: s => {
+        const st = stepsOf(s, 1)[3];
+        return !!st && !st.trigless && typeof st.note === 'number' && (st.note !== trackNote(s, 1) || (s.events?.['kb:on'] ?? 0) > 0);
+      },
       solution: { data: SQ1_NOTE },
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
-      quiz: mc('A trig that never got its own note plays…', ['The track\'s default note (NOTE page, nothing held)', 'Nothing', 'A random note'], 0,
-        'Each track has default NOTE, VEL and LEN values. A trig uses them unless it has its own.'),
+      quiz: mc('With no trig held you change NOT on the NOTE page. Which trigs get the new note?', ['Only the trigs you place from now on', 'Every trig on the track', 'None of them'], 0,
+        'A trig keeps the NOT, VEL and LEN it was placed with: the NOTE page sets them for new trigs. To change one trig, hold it and set its note.'),
     },
     {
       kind: 'info', concept: 'sequencer-pattern',
@@ -1373,6 +1381,10 @@ export const SEQUENCING: Lesson[] = [sq1, sq2, sq3, sq4];
 // PERFORMANCE
 // ============================================================================
 
+const P1_START = nightPatterns('A02');
+/** The same with the drums (T1) muted */
+const P1_MUTED = edited(P1_START, p => { p.mutes = [0]; });
+
 const p1: Lesson = {
   id: 'analog-four-p1-perform', device: 'analog-four', path: 'performance', order: O(18), difficulty: 'intermediate',
   name: 'Perform: mutes, keys and Quick Perf',
@@ -1382,20 +1394,24 @@ const p1: Lesson = {
   prerequisites: ['analog-four-sq4-chains-songs'],
   concepts: ['sequencer-pattern', 'filter-cutoff'],
   tags: ['performance', 'mutes', 'macro', 'live'],
-  start: { reset: true, values: { ...nightValues(), page: V.OSC1 }, data: nightPatterns('A02') },
+  start: { reset: true, values: { ...nightValues(), page: V.OSC1 }, data: P1_START },
   steps: [
     playStep('Press PLAY: the Night Drive groove with drums, bass, chord stabs and an arpeggio.', 'Live performance starts from a loop that already works.'),
     {
-      kind: 'predict', control: 't1_mute', targetValue: true, concept: 'sequencer-pattern', focus: ['key:FUNC'],
+      kind: 'predict', concept: 'sequencer-pattern', focus: ['key:FUNC', 'key:T1'],
       instruction: 'Hold FUNC and press T1.',
       predict: mc('Muting a track…', ['Silences its trigs; the pattern is untouched', 'Deletes its trigs', 'Stops the whole A4'], 0,
         'A mute only stops the track from playing. Its trigs stay, so unmuting brings it straight back.'),
       principle: 'Muting removes a part without losing it, so it can come back at any time.',
+      check: s => muted(s, 0),
+      solution: { data: P1_MUTED },
     },
     {
-      kind: 'do', control: 't1_mute', targetValue: false, concept: 'sequencer-pattern', focus: ['key:FUNC'],
+      kind: 'do', concept: 'sequencer-pattern', focus: ['key:FUNC', 'key:T1'],
       instruction: 'Count to the first beat of a bar, then press FUNC + T1 again: the drums are back.',
       principle: 'Bringing a part back on the first beat of a bar is the simplest live arrangement.',
+      check: s => !muted(s, 0),
+      solution: { data: P1_START },
     },
     {
       kind: 'do', control: 'track', targetValue: 3, concept: 'signal-routing',
@@ -1429,12 +1445,12 @@ const p1: Lesson = {
       kind: 'challenge', concept: 'sequencer-pattern',
       instruction: 'Set up a breakdown: drums muted and the LP SWEEP macro at least halfway, so only a dark groove is left.',
       checklist: [
-        { text: 'T1 (drums) muted', check: s => s.values.t1_mute === true },
+        { text: 'T1 (drums) muted', check: s => muted(s, 0) },
         { text: 'LP SWEEP (PERF A) at 64 or more', check: s => num(s, 'perf_a') >= 64 },
-        { text: 'The bass (T2) still playing', check: s => s.values.t2_mute !== true },
+        { text: 'The bass (T2) still playing', check: s => !muted(s, 1) },
       ],
       hints: ['FUNC + T1 mutes the drums.', 'QUICK PERF controls LP SWEEP.'],
-      solution: { values: { t1_mute: true, t2_mute: false, perf_a: 90 } },
+      solution: { values: { perf_a: 90 }, data: P1_MUTED },
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',
@@ -1469,7 +1485,7 @@ const st1: Lesson = {
   prerequisites: ['analog-four-p1-perform'],
   concepts: ['timing-tempo', 'signal-routing'],
   tags: ['studio', 'sync', 'Analog Rytm'],
-  start: { reset: true, values: { ...nightValues() }, data: nightPatterns('A02') },
+  start: { reset: true, values: { ...nightValues() }, data: P1_START },
   steps: [
     {
       kind: 'info', concept: 'timing-tempo',
@@ -1487,9 +1503,11 @@ const st1: Lesson = {
       hints: ['SYNC is on by default for both.', 'Each instrument\'s card in the Studio tab has its own SYNC switch.'],
     },
     {
-      kind: 'do', control: 't1_mute', targetValue: true, concept: 'signal-routing', focus: ['key:FUNC'],
+      kind: 'do', concept: 'signal-routing', focus: ['key:FUNC', 'key:T1'],
       instruction: 'The Rytm will play the drums: hold FUNC and press T1 to mute the A4\'s own drum track.',
       principle: 'With two drum sources, give each part one home so they don\'t clash.',
+      check: s => muted(s, 0),
+      solution: { data: P1_MUTED },
     },
     {
       kind: 'predict', control: 'play', targetValue: true, concept: 'timing-tempo',
@@ -1507,12 +1525,12 @@ const st1: Lesson = {
       kind: 'challenge', concept: 'signal-routing',
       instruction: 'Make it a duo: the Rytm plays the drums and the A4 plays the bass, chords and arpeggio, both running.',
       checklist: [
-        { text: 'A4 T1 (drums) muted', check: s => s.values.t1_mute === true },
-        { text: 'A4 T2, T3 and T4 playing', check: s => [2, 3, 4].every(t => s.values[`t${t}_mute`] !== true) },
+        { text: 'A4 T1 (drums) muted', check: s => muted(s, 0) },
+        { text: 'A4 T2, T3 and T4 playing', check: s => [1, 2, 3].every(t => !muted(s, t)) },
         { text: 'The A4 is playing', check: s => s.values.play === true },
       ],
       hints: ['FUNC + a track key mutes or unmutes it.', 'Press PLAY if it stopped.'],
-      solution: { values: { t1_mute: true, t2_mute: false, t3_mute: false, t4_mute: false, play: true } },
+      solution: { values: { play: true }, data: P1_MUTED },
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',

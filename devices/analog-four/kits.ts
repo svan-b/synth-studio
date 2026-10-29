@@ -16,7 +16,7 @@
 // ============================================================================
 
 import {
-  createPattern, createProject, LEN_1_STEP, type Locks, type Pattern, type Project, type SongRow, type Step,
+  createPattern, createProject, LEN_1_STEP, setSongLoop, type Locks, type Pattern, type Project, type SongRow, type Step,
 } from '@/lib/sequencer/elektron';
 import { SEQ_TRACKS, SYNTH_BY_KEY, FX_BY_KEY, V, dest, tid, fxid } from './params';
 import { SOUNDS, SOUND_BY_ID, type SoundDef, type SoundParams } from './sounds';
@@ -78,15 +78,24 @@ export function pat(name: string, length: number, tracks: (TrackSpec | null)[], 
     if (t.vel !== undefined) tr.vel = t.vel;
     if (t.len !== undefined) tr.len = t.len;
     if (t.mute) tr.mute = true;
+    // every note trig carries the NOTE menu's NOT / VEL / LEN it was placed with (manual p.45)
+    for (const k in tr.steps) {
+      const st = tr.steps[k];
+      if (st.trigless) continue;
+      st.note ??= tr.note;
+      st.vel ??= tr.vel;
+      st.len ??= tr.len;
+    }
   });
   return p;
 }
 
-export function project(patterns: Record<string, Pattern>, opts: { song?: SongRow[]; loopRow?: number; mode?: Project['mode']; active?: string; chain?: string[]; songName?: string } = {}): Project {
+export function project(patterns: Record<string, Pattern>, opts: { song?: SongRow[]; mode?: Project['mode']; active?: string; chain?: string[]; songName?: string } = {}): Project {
   const pr = createProject({ tracks: SEQ_TRACKS, defaults: { note: 60, vel: 100, len: LEN_1_STEP } });
   pr.patterns = patterns;
   pr.active = opts.active ?? Object.keys(patterns)[0] ?? 'A01';
-  if (opts.song) pr.song = { name: opts.songName ?? '', rows: opts.song, loop: true, loopRow: opts.loopRow ?? 0 };
+  // a song plays its rows once and stops, as on the hardware (manual p.55-56); setSongLoop makes one loop
+  if (opts.song) pr.song = { name: opts.songName ?? '', rows: opts.song, loop: false };
   if (opts.chain) pr.chain = opts.chain;
   if (opts.mode) pr.mode = opts.mode;
   return pr;
@@ -256,16 +265,19 @@ function nightDrive(): Project {
     })() },
     { s: rep('x...............', 4), n: arpNotes, len: LEN.s16, L: arpL(() => ({ flt1_frq: 76 })) },
   ]), 3, { arp_rng: 3 });
-  return project(
+  const song = project(
     { A01: intro, A02: groove, A03: breakdown, A04: drop },
     {
       song: [
         { pattern: 'A01', repeats: 1 }, { pattern: 'A02', repeats: 2 }, { pattern: 'A03', repeats: 1 },
         { pattern: 'A04', repeats: 2 }, { pattern: 'A02', repeats: 1 },
       ],
-      loopRow: 1, mode: 'song', songName: 'NIGHT DRIVE', chain: ['A01', 'A02', 'A02', 'A03', 'A04'],
+      mode: 'song', songName: 'NIGHT DRIVE', chain: ['A01', 'A02', 'A02', 'A03', 'A04'],
     },
   );
+  // The demo song the A4 opens on keeps playing while you explore: after the last row it goes
+  // back to the groove (row 2). The hardware's songs stop at the end; SONG EDIT > END restores that.
+  return setSongLoop(song, true, 1);
 }
 
 // ---- Acid Workout -------------------------------------------------------------
@@ -452,7 +464,7 @@ export const SOUND_DEMO_BASE = 2 + KITS.length;
 export function soundDemoProject(s: SoundDef): Project {
   const p = createPattern(SEQ_TRACKS, { name: 'DEMO', length: 16, swing: 50 });
   const steps: Record<number, Step> = {};
-  for (const [step, note, len] of s.demo ?? [[0, 60, LEN_1_STEP]]) steps[step] = { note, len };
+  for (const [step, note, len] of s.demo ?? [[0, 60, LEN_1_STEP]]) steps[step] = { note, vel: 100, len };
   p.tracks[0].steps = steps;
   return project({ A01: p });
 }
