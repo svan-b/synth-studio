@@ -497,8 +497,11 @@ export function capstoneTransitions(): SongSection[] {
 }
 
 /** The capstone's mixdown (measured): channel GAIN and faders, and MASTER 1 for headroom at the studio master */
-export const CAPSTONE_MIX: Values = { ch1_gain: 1, ch2_gain: -5, ch3_gain: -2, ch1_fader: 10, ch2_fader: 9.5, ch3_fader: 9, master: 8.5 };
+export const CAPSTONE_MIX: Values = { ch1_gain: -1, ch2_gain: -5, ch3_gain: -2, ch1_fader: 10, ch2_fader: 9.5, ch3_fader: 9, master: 8.5 };
 /** The master fader (DRIVE into the limiter) for a streaming master, measured on the bounce */
-export const CAPSTONE_DRIVE = 6.5;
-/** The master's GLUE compressor: 2:1, fast enough to take the edge off the kick's peaks, so the limiter only has the odd peak left */
-export const CAPSTONE_GLUE = { on: true, threshold: -20, ratio: 2, attack: 0.003, release: 0.3, auto: true, makeup: 3, mix: 1 };
+export const CAPSTONE_DRIVE = 7.2;
+/**
+ * The master's GLUE compressor (measured on the bounce): 3:1 with a 1 ms attack holds the drums'
+ * peaks, so at -14 LUFS the limiter only catches the odd one (about 3 dB at most)
+ */
+export const CAPSTONE_GLUE = { on: true, threshold: -20, ratio: 3, attack: 0.001, release: 0.3, auto: true, makeup: 5, mix: 1 };

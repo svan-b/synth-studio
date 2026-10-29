@@ -1112,7 +1112,7 @@ const capstone: Lesson = {
         { text: 'Bounced from bar 1 to the end of the song', check: s => !!s.bounce?.last?.complete },
         { text: 'Stems bounced with it', check: s => (s.bounce?.last?.stems ?? 0) >= 2 },
       ],
-      hints: ['Raise the master fader (DRIVE) a dB at a time, and play the loudest section.', 'If the limiter works too hard, switch on GLUE: 2:1 with a fast attack takes the edge off the kick\'s peaks before the limiter.', 'Bounce (top bar) from bar 1 with stems on, then read its loudness in the readout.'],
+      hints: ['Raise the master fader (DRIVE) a dB at a time, and play the loudest section.', 'If the limiter works too hard, switch on GLUE: about 3:1 with a fast attack holds the drums\' peaks before the limiter.', 'Bounce (top bar) from bar 1 with stems on, then read its loudness in the readout.'],
       solution: { master: { gain: CAPSTONE_DRIVE, glue: CAPSTONE_GLUE }, bounce: { stems: true } },
     },
     {
