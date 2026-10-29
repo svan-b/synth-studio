@@ -49,9 +49,10 @@ import {
 } from '@/lib/sequencer/elektron';
 import {
   ARP_PLY, CV_TRACK, FX_BY_KEY, FX_DESTS, FX_KEYS, FX_TRACK, MOD_DESTS, PERF_MACROS, POLY_UNISON, SEQ_TRACKS, SYNTH_BY_KEY,
-  SYNTH_TRACKS, VOICE_KEYS,
+  SYNTH_TRACKS, VOICE_KEYS, tid,
 } from './params';
 import { ARP_KEYS, isArpKey, isTransposable, patternArp, type ArpKey } from './arp';
+import { kitFull, projectKits } from './kits';
 
 const VI: Record<string, number> = Object.fromEntries(VOICE_KEYS.map((k, i) => [k, i]));
 const FI: Record<string, number> = Object.fromEntries(FX_KEYS.map((k, i) => [k, i]));
@@ -178,6 +179,9 @@ export class AnalogFourEngine extends BaseEngine {
   private lastStep: { step: number; time: number }[] = [];
   private transportUnsub: (() => void) | null = null;
   private recSerial = 0;
+  /** The loaded kit's slot ('' = none linked), and a counter for the panel's kitNow reports */
+  private kitNow = '';
+  private kitSerial = 0;
   /** LIVE RECORDING quantized ([RECORD] + [PLAY][PLAY]): notes land on the grid, no micro timing (manual p.41) */
   private liveQuant = false;
   /**
@@ -315,6 +319,8 @@ export class AnalogFourEngine extends BaseEngine {
       onTrig: e => this.trig(e),
       onNoteOff: (track, _note, time) => this.gateOff(track, time),
       onStep: (track, step, time) => { const s = this.lastStep[track]; s.step = step; s.time = time; },
+      // a pattern linked to another kit brings it in where it starts (manual p.16, p.24)
+      onPattern: (id, time) => this.patternKit(id, time),
       onPlay: playing => {
         if (playing) { this.unfadeFx(); return; }
         const now = this.ctx.currentTime;
@@ -490,6 +496,56 @@ export class AnalogFourEngine extends BaseEngine {
 
   protected onData(data: unknown): void {
     this.seq.setProject(data);
+    // the kit the panel loaded (KIT menu, a pattern picked while stopped)
+    this.kitNow = projectKits(asProject(data, SEQ_TRACKS)).active;
+  }
+
+  /**
+   * A pattern starts at `time`: when it is linked to a kit other than the loaded one, that kit's
+   * settings take over exactly there - the voices', the FX track's - and the panel is told, so the
+   * knobs show it from the moment you hear it (manual p.16, p.24). Unlinked patterns change nothing.
+   */
+  private patternKit(id: string, time: number) {
+    const p = asProject(this.data, SEQ_TRACKS);
+    const k = getPattern(p, id).kit;
+    if (!k || k === this.kitNow) return;
+    const slot = projectKits(p).kits[k];
+    if (!slot) return;
+    this.kitNow = k;
+    const v = kitFull(slot.values);
+    // a kit with another POLY CONFIG: the new pool is set up now, so the new pattern's first trigs (scheduled
+    // next) already use it; the panel's echo of these values then changes nothing
+    let polyMoved = false;
+    for (const id of ['poly_v1', 'poly_v2', 'poly_v3', 'poly_v4', 'poly_alloc', 'poly_trk', 'poly_det', 'poly_spr']) {
+      const x = v[id];
+      if (x !== undefined && x !== this.params[id]) { this.params[id] = x; polyMoved = true; }
+    }
+    if (polyMoved) this.polyConfig();
+    for (let t = 0; t < SYNTH_TRACKS; t++) {
+      const list: number[] = [];
+      for (let i = 0; i < VOICE_KEYS.length; i++) {
+        const key = VOICE_KEYS[i];
+        const x = v[tid(t, key)];
+        if (typeof x !== 'number' || x === this.base[t][i]) continue;
+        this.base[t][i] = x;
+        if (this.pool[t]) this.polyParamAt(t, i, key, time);
+        else list.push(i, x);
+      }
+      if (list.length) this.voices[t].port.postMessage({ t: 'at', time, list });
+      this.updateFeed(t);
+    }
+    const fl: number[] = [];
+    for (let i = 0; i < FX_KEYS.length; i++) {
+      const key = FX_KEYS[i];
+      const x = v[`fx_${key}`];
+      if (typeof x !== 'number' || x === this.fxBase[i]) continue;
+      this.fxBase[i] = x;
+      fl.push(i, x);
+      this.toneAt(key, x, time);
+    }
+    if (fl.length) this.fxmod.port.postMessage({ t: 'at', time, list: fl });
+    // the panel follows when you hear it (earlier, its knobs would reach the voices before the pattern change)
+    this.emitAt(time, { kitNow: { n: ++this.kitSerial, kit: k } });
   }
 
   protected onTransport(t: Transport | null): void {
@@ -1035,6 +1091,18 @@ export class AnalogFourEngine extends BaseEngine {
         const s = segs[k];
         if (s.owner !== t || key in s.locks) continue;
         this.queueAt(u, Math.max(s.time, now), i, this.segValue(s, i));
+      }
+    }
+  }
+
+  /** polyParam at an audio time (a kit change where a pattern starts) */
+  private polyParamAt(t: number, i: number, key: string, time: number) {
+    for (const u of this.poolVoices) {
+      const segs = this.segs[u];
+      for (let k = Math.max(0, this.segAt(u, time)); k < segs.length; k++) {
+        const s = segs[k];
+        if (s.owner !== t || key in s.locks) continue;
+        this.voices[u].port.postMessage({ t: 'at', time: Math.max(s.time, time), list: [i, this.segValue(s, i)] });
       }
     }
   }

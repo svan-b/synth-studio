@@ -31,7 +31,7 @@ import {
   CHANGE_MODES, LEN_1_STEP, LOCK_LIMIT_A4, NOTE_LENGTHS, QUANTIZE_MAX, TRIG_CONDITIONS, addChordNote, asProject, clearPattern, copyPattern, formatChord, formatLength, formatNote, getPattern,
   lengthSteps, parsePatternId, reloadPattern, stepSeconds, trackSpeed,
   reloadTrack, rowEntry, savePattern, saveTrack, setStep as setStepFn, pastePattern, patternHasContent, patternId, setActive, setChain, setChangeMode,
-  clearLocks, clearPage, copyPage, copyTrigs, pastePage, pasteTrigs, setLock, setMasterMute, setMasterMutes, setPlayMode, setTrackQuantize, setTrigMute, trackLength, trackTrigDefaults, updatePatternSettings, updateSteps, withSteps,
+  clearLocks, clearPage, copyPage, copyTrigs, pastePage, pasteTrigs, setLock, withPattern, setMasterMute, setMasterMutes, setPlayMode, setTrackQuantize, setTrigMute, trackLength, trackTrigDefaults, updatePatternSettings, updateSteps, withSteps,
   withTrack,
   type Pattern, type Project, type SeqState, type Step, type StepsClip,
 } from '@/lib/sequencer/elektron';
@@ -41,7 +41,9 @@ import {
 } from './params';
 import { KEYS, PX_PER_MM, TRIGS, TRIG_LEGENDS, KEYBOARD, KB_KEY, KB_KEYS, MODE_LEDS, OCT_LEDS, PAGE_LEDS, LOGO } from './geometry';
 import { SOUNDS, SOUND_CATEGORIES, type SoundDef } from './sounds';
-import { KITS, KIT_PROJECT_IDS, SOUND_DEMO_BASE, kitValues, projectFor, soundTrackValues } from './kits';
+import {
+  KITS, KIT_PROJECT_IDS, SOUND_DEMO_BASE, freeKitSlot, kitFull, kitSnapshot, kitValues, projectFor, projectKits, soundTrackValues, type A4Project,
+} from './kits';
 import { isTransposable, setTransposable } from './arp';
 
 const TRACKS = SEQ_TRACKS;
@@ -536,7 +538,17 @@ const KEYDEFS: Record<string, KeyDef> = {
   KIT: {
     label: 'KIT', sub: 'Save Kit', aria: 'Kit menu',
     led: e => (e.ctx.ui[UIK.menu] === 'kit' ? [COL.red, 1] : null),
-    press: e => { if (e.func) { spendFunc(e.ctx); say(e.ctx, 'KIT SAVED (with the project)'); return; } toggleA4Menu(e.ctx, 'kit'); },
+    // [FUNC] / [YES] + [KIT] saves the kit, [NO] + [KIT] reloads it (manual p.25, p.54)
+    press: e => {
+      const yn = liveUi(e.ctx)[UIK.yesNo];
+      if (e.func || yn === 'yes') { if (e.func) spendFunc(e.ctx); saveKit(e.ctx, false); return; }
+      if (yn === 'no') {
+        const { active } = projectKits(project(e.ctx));
+        if (active) { switchKit(e.ctx, active, { saved: true }); say(e.ctx, 'KIT RELOADED'); } else say(e.ctx, 'SAVE A KIT FIRST ([FUNC] + [KIT])');
+        return;
+      }
+      toggleA4Menu(e.ctx, 'kit');
+    },
   },
   SND: {
     label: 'SND', sub: 'Settings', aria: 'Sound menu',
@@ -1989,6 +2001,87 @@ function SoundMenu({ ctx }: { ctx: CustomRenderContext }) {
   );
 }
 
+// ---- The project's kits: each pattern is linked to a kit (manual p.16, p.24-25, p.38) -----------
+
+/** The loaded kit's settings right now (the store, not the render's snapshot) */
+function liveKitValues(ctx: CustomRenderContext): Record<string, ControlValue> {
+  return useStudioStore.getState().devices[ctx.instance]?.controlValues ?? {};
+}
+
+/**
+ * Load kit slot `k` (a pattern linked to it started, or was picked while stopped): the kit being left
+ * keeps its edits, and the knobs take the new kit. With `link`, the active pattern is linked to it.
+ */
+export function switchKit(ctx: CustomRenderContext, k: string, opts: { saved?: boolean; link?: boolean } = {}) {
+  const { kits, active } = projectKits(project(ctx));
+  const slot = kits[k];
+  if (!slot) return;
+  const left = kitSnapshot(liveKitValues(ctx));
+  ctx.updateData(d => {
+    const p = asProject(d, TRACKS) as A4Project;
+    const ks = { ...(p.a4kits ?? {}) };
+    if (active && ks[active] && active !== k) ks[active] = { ...ks[active], values: left };
+    if (opts.saved) ks[k] = { ...ks[k], values: ks[k].saved };
+    const next: A4Project = { ...p, a4kits: ks, a4kit: k };
+    return opts.link ? withPattern(next, next.active, x => (x.kit === k ? x : { ...x, kit: k })) : next;
+  });
+  useStudioStore.getState().setControlValues(ctx.instance, kitFull(opts.saved ? slot.saved : slot.values));
+}
+
+/** SAVE KIT: the loaded settings into a slot (the loaded kit's, or a new one), linked to the active pattern (manual p.25) */
+function saveKit(ctx: CustomRenderContext, asNew: boolean) {
+  const pr = project(ctx);
+  const { active } = projectKits(pr);
+  const slot = asNew || !active ? freeKitSlot(pr) : active;
+  if (!slot) { say(ctx, 'ALL 128 KITS ARE IN USE'); return; }
+  const snap = kitSnapshot(liveKitValues(ctx));
+  ctx.updateData(d => {
+    const p = asProject(d, TRACKS) as A4Project;
+    const ks = { ...(p.a4kits ?? {}) };
+    ks[slot] = { name: ks[slot]?.name ?? `KIT ${slot.padStart(2, '0')}`, values: snap, saved: snap };
+    const next: A4Project = { ...p, a4kits: ks, a4kit: slot };
+    return withPattern(next, next.active, x => ({ ...x, kit: slot }));
+  });
+  say(ctx, `KIT ${slot} SAVED, LINKED TO ${pr.active}`, 1600);
+}
+
+/** KIT menu: the project's own kits - SAVE, LOAD (links the active pattern), RELOAD, CLEAR (manual p.24-25) */
+function ProjectKits({ ctx }: { ctx: CustomRenderContext }) {
+  const pr = project(ctx);
+  const { kits, active } = projectKits(pr);
+  const linked = getPattern(pr, pr.active).kit;
+  const slots = Object.keys(kits).sort((a, b) => Number(a) - Number(b));
+  const used = new Set(Object.values(pr.patterns).map(p => p.kit).filter(Boolean));
+  const focus = lessonFocus(ctx);
+  const name = (k: string) => kits[k]?.name ?? `KIT ${k}`;
+  return (
+    <Group label="THE PROJECT'S KITS" highlight={!!focus?.has('a4:kits')}>
+      <span style={{ fontSize: 11, color: SC.text, flex: '1 1 100%' }}>
+        {`Pattern ${pr.active}: ${linked ? `linked to ${name(linked)}` : 'no kit linked (it plays the loaded kit)'}. Loaded: ${active ? name(active) : 'unsaved'}.`}
+      </span>
+      <SeqButton height={40} color={SC.green} highlight={!!focus?.has('a4:kit-save')} onPress={() => saveKit(ctx, false)} title="[FUNC] + [KIT]: the loaded settings into the loaded kit's slot, linked to this pattern">SAVE KIT</SeqButton>
+      <SeqButton height={40} highlight={!!focus?.has('a4:kit-save-new')} onPress={() => saveKit(ctx, true)} title="Into a new slot, linked to this pattern">SAVE AS NEW</SeqButton>
+      <SeqButton height={40} disabled={!active} onPress={() => { switchKit(ctx, active, { saved: true }); say(ctx, `${name(active)} RELOADED`); }} title="[NO] + [KIT]: back to its last save">RELOAD KIT</SeqButton>
+      <SeqButton height={40} onPress={() => { useStudioStore.getState().setControlValues(ctx.instance, kitFull({})); say(ctx, 'KIT CLEARED: SAVE IT TO KEEP THAT'); }} title="Init sounds; nothing is lost until you save the kit">CLEAR KIT</SeqButton>
+      {linked && <SeqButton height={40} onPress={() => { ctx.updateData(d => withPattern(asProject(d, TRACKS), pr.active, x => ({ ...x, kit: '' }))); say(ctx, `${pr.active} UNLINKED`); }} title="The pattern then plays whatever kit is loaded">UNLINK</SeqButton>}
+      {slots.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, flex: '1 1 100%' }}>
+          {slots.map(k => (
+            <SeqButton key={k} height={40} active={k === active} color={SC.red}
+              onPress={() => { switchKit(ctx, k, { link: true, saved: k === active }); say(ctx, `${name(k)} ${k === active ? 'RELOADED' : 'LOADED'}, LINKED TO ${pr.active}`, 1500); }}
+              title={`Load ${name(k)} and link it to ${pr.active}${used.has(k) ? '' : ' (no pattern uses it yet)'}`}>
+              {`${name(k)}${used.has(k) ? '' : ' *'}`}
+            </SeqButton>
+          ))}
+        </div>
+      )}
+      <span style={{ fontSize: 11, color: SC.dim, flex: '1 1 100%' }}>
+        A pattern linked to a kit brings its sounds in when it starts: in a chain or a song each section can sound different. Patterns that share a kit share its edits. * = used by no pattern.
+      </span>
+    </Group>
+  );
+}
+
 function KitMenu({ ctx }: { ctx: CustomRenderContext }) {
   const load = (i: number, withProject: boolean) => {
     const kit = KITS[i];
@@ -2005,13 +2098,15 @@ function KitMenu({ ctx }: { ctx: CustomRenderContext }) {
     say(ctx, `${withProject ? 'PROJECT' : 'KIT'}: ${kit.name.split(' / ')[1].toUpperCase()}`);
   };
   return (
-    <Overlay portal portalSize={{ w: 680, h: 440 }}>
+    <Overlay portal portalSize={{ w: 700, h: 600 }}>
       <Frame title="KIT" sub="four sounds + the FX track" onClose={() => ctx.setUi({ [UIK.menu]: null })}>
         <div style={{ fontSize: 11, color: SC.dim, marginBottom: 6 }}>LOAD SOUNDS keeps your patterns. WITH PATTERNS also loads the kit&apos;s patterns and song, replacing the pattern memory.</div>
         <Group label="THIS KIT">
           <SeqButton height={40} onPress={() => ctx.setUi({ [UIK.menu]: 'poly' })} title="[FUNC] + [MIX]">POLY CONFIG</SeqButton>
           <span style={{ fontSize: 11, color: SC.dim, flex: '1 1 260px' }}>The kit&apos;s polyphony: which voices the poly tracks share, and how notes find a voice.</span>
         </Group>
+        <div style={{ height: 6 }} />
+        <ProjectKits ctx={ctx} />
         <div style={{ height: 6 }} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {KITS.map((kit, i) => (
@@ -2476,6 +2571,33 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
     editTrigs(ctx, p => updateSteps(p, pat, pa.track, [pa.step], { len: best }));
     say(ctx, `STEP ${pa.step + 1}: LEN ${formatLength(best)}`, 900);
   }, [kbOff, ctx]);
+
+  // KITS (manual p.16, p.24, p.38). A pattern linked to another kit started: the engine switched the
+  // sound right there, and the knobs follow (the kit left behind keeps its edits). Picking a linked
+  // pattern while stopped loads its kit. An unlinked pattern you edit joins the loaded kit.
+  const kitNow = ctx.engine.kitNow as { n: number; kit: string } | undefined;
+  useEffect(() => {
+    if (!kitNow || projectKits(project(ctx)).active === kitNow.kit) return;
+    switchKit(ctx, kitNow.kit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kitNow?.n]);
+  const prNow = project(ctx);
+  const activeKitLink = getPattern(prNow, prNow.active).kit;
+  useEffect(() => {
+    if (!activeKitLink || seqStateOf(ctx.engine)?.playing) return;
+    if (projectKits(project(ctx)).active !== activeKitLink) switchKit(ctx, activeKitLink);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prNow.active, activeKitLink]);
+  const editedPattern = prNow.patterns[prNow.active];
+  const lastEdited = useRef<{ id: string; pat: unknown }>({ id: prNow.active, pat: editedPattern });
+  useEffect(() => {
+    const prev = lastEdited.current;
+    lastEdited.current = { id: prNow.active, pat: editedPattern };
+    if (prev.id !== prNow.active || prev.pat === editedPattern || !editedPattern || editedPattern.kit) return;
+    const { active } = projectKits(prNow);
+    if (active) ctx.updateData(d => withPattern(asProject(d, TRACKS), prNow.active, x => (x.kit ? x : { ...x, kit: active })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prNow.active, editedPattern]);
 
   // LIVE RECORDING over: the knobs show the kit's values again
   const liveOn = !!ctx.values.live_rec;
