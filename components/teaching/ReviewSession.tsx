@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Lesson, MultipleChoice } from '@/types';
 import { useStudioStore, dueReviewItems, registerLessons, resolveReviewItem, questionFingerprint } from '@/store/studio';
 import { hub } from '@/lib/studio/hub';
+import { loadProducerLessons } from '@/lib/studio/producerIndex';
 import { DEVICES } from '@/devices';
 
 interface Item { id: string; lesson: Lesson; mc: MultipleChoice }
@@ -25,9 +26,13 @@ export default function ReviewSession({ onClose }: { onClose: () => void }) {
   const [score, setScore] = useState({ right: 0, total: 0 });
 
   // Load every module so review can pull questions from any instrument, then settle the queue
+  // (the Producer path's lessons load on demand too)
   useEffect(() => {
     let alive = true;
-    Promise.all(DEVICES.map(d => hub.loadModule(d.id).then(m => { registerLessons(d.id, m.lessons); return true; }).catch(() => false)))
+    Promise.all([
+      ...DEVICES.map(d => hub.loadModule(d.id).then(m => { registerLessons(d.id, m.lessons); return true; }).catch(() => false)),
+      loadProducerLessons().then(() => true).catch(() => false),
+    ])
       .then(loaded => {
         if (!alive) return;
         const st = useStudioStore.getState();

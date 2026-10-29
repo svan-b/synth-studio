@@ -253,7 +253,25 @@ export interface LessonStep {
    */
   kind?: 'do' | 'patch' | 'info' | 'predict' | 'listen' | 'match' | 'quiz' | 'reflect' | 'challenge';
   predict?: MultipleChoice;
-  listen?: { a: Record<string, ControlValue>; b: Record<string, ControlValue>; labels?: [string, string]; question?: MultipleChoice };
+  listen?: {
+    a: Record<string, ControlValue>;
+    b: Record<string, ControlValue>;
+    labels?: [string, string];
+    question?: MultipleChoice;
+    // ---- v3, studio state (docs/PEDAGOGY.md "Lesson API v3 – studio state") ----
+    /**
+     * Play both sides at the same loudness: each side's loudness is measured on the master
+     * meter (momentary LUFS) and the louder one is turned down after the master, so "louder"
+     * never wins by default. The coach shows the gain it applied.
+     */
+    matchLoudness?: boolean;
+    /** Values on several instruments at once: { [instance or device]: values } per side */
+    parts?: { a: Record<string, Record<string, ControlValue>>; b: Record<string, Record<string, ControlValue>> };
+    /** The studio master section per side: fader into the limiter (dB), glue and EQ on/off */
+    master?: { a: LessonMasterPatch; b: LessonMasterPatch };
+    /** Studio-wide settings per side (swing 0..0.75) */
+    studio?: { a: { swing?: number }; b: { swing?: number } };
+  };
   match?: {
     target: Record<string, ControlValue>;
     /** The controls the learner must get right (others are set from `target` before the step) */
@@ -302,6 +320,83 @@ export interface LessonStep {
   play?: { count?: number; notes?: number[]; anyOctave?: boolean };
   /** Scope view for this step - 'spectrum' for EQ and filter work. The coach switches to it; the learner can still change it. */
   scope?: 'wave' | 'spectrum' | 'both';
+
+  // ---- v3, studio state (docs/PEDAGOGY.md "Lesson API v3 – studio state") ----
+  /**
+   * Live numbers the coach shows under the step: 'loudness' (LUFS M / S / I and the time
+   * measured), 'peaks' (pre-limiter peak and true peak), 'limiter' (gain reduction now and
+   * the most since Play), 'channels' (every mixer-device channel meter, with PK).
+   */
+  readout?: ('loudness' | 'peaks' | 'limiter' | 'channels')[];
+  /** Where on screen the step happens: the coach offers to take the learner there */
+  area?: 'mixer' | 'master' | 'arranger' | 'transport' | 'rack';
+}
+
+/** A studio master section patch (lesson A/B, solutions) */
+export interface LessonMasterPatch {
+  /** Master fader in dB: the gain into the limiter */
+  gain?: number;
+  glue?: { on?: boolean; threshold?: number; ratio?: number; attack?: number; release?: number; auto?: boolean; makeup?: number; mix?: number };
+  eq?: { on?: boolean; low?: number; tilt?: number; high?: number };
+}
+
+/** A studio cable in a start state or solution: each end by instance id */
+export interface LessonStudioCable {
+  from: { instance: string; jack: string };
+  to: { instance: string; jack: string };
+  color?: string;
+}
+
+/**
+ * A whole studio a lesson starts from ("checkpoint"): rack, every instrument's settings,
+ * routes, sync, cables, the mix, the song and the tempo. The learner's own studio is saved
+ * first and can be restored with one press (store: lessonBackups).
+ */
+export interface LessonStudioStart {
+  /** Instruments in rack order. Each starts from its defaults plus `values` (or keeps its settings with `keep`) */
+  rack: {
+    id: string;
+    device: string;
+    label?: string;
+    values?: Record<string, ControlValue>;
+    patches?: PatchConnection[];
+    data?: unknown;
+    /** Keep the instrument's current settings (and data) when it is already in the rack; `values` still apply */
+    keep?: boolean;
+  }[];
+  /** instance -> 'master' | '<mixer instance>:<input>' */
+  routes?: Record<string, string>;
+  /** instance -> follows the studio clock */
+  sync?: Record<string, boolean>;
+  cables?: LessonStudioCable[];
+  bpm?: number;
+  /** Studio swing, 0..0.75 of a 16th (TransportBar shows 50 % + swing × 50) */
+  swing?: number;
+  /** The studio mixer: channel strips per instance, the returns and the master section. Anything left out is at its default. */
+  mixer?: {
+    channels?: Record<string, { gain?: number; pan?: number; mute?: boolean; solo?: boolean; sendA?: number; sendB?: number }>;
+    delay?: { level?: number; mute?: boolean; division?: string; feedback?: number; tone?: number; pingPong?: boolean };
+    reverb?: { level?: number; mute?: boolean; decay?: number; damping?: number; predelay?: number; size?: number };
+    master?: LessonMasterPatch;
+  };
+  /** The song: sections in order (ids are generated) */
+  arrangement?: {
+    enabled?: boolean;
+    loop?: boolean;
+    sections: { name: string; bars: number; color?: string; parts?: Record<string, { pattern?: string; snapshot?: Record<string, ControlValue>; muted?: boolean }> }[];
+  };
+  /** Instance shown first (and the default instance of steps without one) */
+  focus?: string;
+  /**
+   * The lesson also works on the learner's own studio. The coach then offers "Use my own
+   * studio": this sentence says what that studio needs ("a mix with at least two channels").
+   */
+  ownStudio?: string;
+  /**
+   * Pressing ▶ parks clock-stepped sequencers (a DFAM clocked from the Studio Clock) so their
+   * step 1 lands on the bar the song starts from, the way a reset input would. Default true.
+   */
+  alignClocked?: boolean;
 }
 
 /** One way to complete a step - "show me" and the automated lesson runner use it */
@@ -319,6 +414,32 @@ export interface LessonSolution {
   studioCables?: { from: { instance?: string; device?: string; jack: string }; to: { instance?: string; device?: string; jack: string } }[];
   /** Start or stop the studio transport */
   transport?: 'play' | 'stop';
+
+  // ---- v3, studio state ------------------------------------------------------
+  /** Values on several instruments: { [instance or device]: values } */
+  parts?: Record<string, Record<string, ControlValue>>;
+  /** The studio master section */
+  master?: LessonMasterPatch;
+  /** Studio mixer channel strips: { [instance or device]: fader dB, pan, sends... } */
+  channels?: Record<string, { gain?: number; pan?: number; mute?: boolean; solo?: boolean; sendA?: number; sendB?: number }>;
+  /** Studio tempo, swing and routing */
+  studio?: { bpm?: number; swing?: number; routes?: Record<string, string>; sync?: Record<string, boolean> };
+  /** Replace the song (same shape as a start state's arrangement) */
+  arrangement?: LessonStudioStart['arrangement'];
+  /**
+   * Arranger snapshots to capture, in order: the instrument's current knobs (or only
+   * `controls`) become the snapshot of that section (by name, case-insensitive)
+   */
+  capture?: { section: string; instance: string; values?: Record<string, ControlValue>; controls?: string[] }[];
+  /**
+   * Play the studio (from bar 1 with `fromStart`, or the whole song with `song`) and keep
+   * playing for `seconds`, so meter checks have something to measure (the lesson runner waits)
+   */
+  play?: { seconds?: number; fromStart?: boolean; song?: boolean };
+  /** Bounce the song (Bounce dialog), optionally with stems. The runner waits until it is done. */
+  bounce?: { stems?: boolean };
+  /** Record with REC for `seconds` (optionally with stems) */
+  record?: { seconds: number; stems?: boolean };
 }
 
 export interface MultipleChoice {
@@ -342,7 +463,8 @@ export interface LessonCheckState {
   routes: Record<string, string>;
   /** instance -> follows the studio clock (missing = default on for MIDI-syncable gear) */
   sync: Record<string, boolean>;
-  transport: { playing: boolean; bpm: number };
+  /** `swing` (v3): studio swing 0..0.75 of a 16th; 0.08 = 54 % */
+  transport: { playing: boolean; bpm: number; swing?: number };
   arrangement: { enabled: boolean; loop: boolean; sections: { name: string; bars: number; parts: Record<string, { pattern?: string; snapshot?: unknown; muted?: boolean }> }[] };
   /**
    * Presses the learner made during this step on the step's instrument, keyed by control
@@ -355,7 +477,121 @@ export interface LessonCheckState {
   notesPlayed?: number[];
   /** Presses during this step on every instrument: instance -> id -> count (studio lessons) */
   eventsByInstance?: Record<string, Record<string, number>>;
+
+  // ---- v3, studio state (docs/PEDAGOGY.md "Lesson API v3 – studio state") --------
+  // Optional in the type so hand-built states still compile; set while a lesson runs.
+  /** The studio mixer with defaults filled in: channel strips by instance, returns, master */
+  mixer?: LessonMixerView;
+  /** The studio master section in curriculum terms (the limiter is always on, -1 dBTP) */
+  master?: { gainDb: number; limiterOn: boolean; ceilingDbTP: number; glueOn: boolean; eqOn: boolean };
+  /** Live meters: the studio master (BS.1770-4) and every channel meter */
+  meters?: LessonMeters;
+  /** REC and Bounce: in progress, and the last finished take */
+  bounce?: LessonBounceState;
+  /** What the learner did since the lesson started */
+  history?: LessonHistory;
+  /** The song position while song mode plays: section index (-1 when stopped) and bar in it (0-based) */
+  arranger?: { section: number; bar: number; name?: string };
 }
+
+export interface LessonMixerView {
+  channels: Record<string, { gain: number; pan: number; mute: boolean; solo: boolean; sendA: number; sendB: number }>;
+  delay: { level: number; mute: boolean; division: string; feedback: number; tone: number; pingPong: boolean };
+  reverb: { level: number; mute: boolean; decay: number; damping: number; predelay: number; size: number };
+  master: { gain: number; eq: { on: boolean; low: number; tilt: number; high: number }; glue: { on: boolean; threshold: number; ratio: number; attack: number; release: number; auto: boolean; makeup: number; mix: number } };
+}
+
+/** The studio master meter, as lesson checks see it. dB values are -Infinity for silence. */
+export interface LessonMasterMeters {
+  /** LUFS now: momentary (0.4 s), short-term (3 s), integrated since Play (null below the gate) */
+  lufsM: number | null;
+  lufsS: number | null;
+  lufsI: number | null;
+  /** Loudest short-term loudness since Play */
+  lufsSMax: number | null;
+  /** Sample peak going into the limiter (after the master fader): the last 3 s, and the most since Play, dBFS */
+  peakDb: number;
+  maxPeakDb: number;
+  /** True peak of the output (4x oversampled): the last 3 s, and the most since Play, dBTP */
+  truePeakDb: number;
+  maxTruePeakDb: number;
+  /** Limiter gain reduction: the last second, and the most since Play, dB */
+  grDb: number;
+  maxGrDb: number;
+  /** Glue compressor gain reduction now, dB */
+  glueGrDb: number;
+  /** 50 ms windows that went over 0 dBFS before the limiter since Play */
+  overs: number;
+  /** Seconds of playing measured since Play */
+  measuredSec: number;
+  /** This measurement started at bar 1 (the song from the top) */
+  fromStart: boolean;
+  /** Nothing in the mix or the master changed since Play (song automation excluded) */
+  steady: boolean;
+}
+
+export interface LessonChannelMeter {
+  /** Highest reading in the last 2 s and now, in the meter's own unit (dBu on a Xone:96, dBFS on a studio strip) */
+  peak: number;
+  now: number;
+  /** PK (the overload LED) lit in the last 2 s */
+  pk: boolean;
+  /** Highest reading since Play */
+  maxSincePlay: number;
+  unit: 'dBu' | 'dBFS';
+}
+
+export interface LessonMeters {
+  /** The master meter is reporting (audio running) */
+  live: boolean;
+  master: LessonMasterMeters;
+  /** Mixer-device channels by input ('xone96:1' … 'xone96:4', 'xone96:a' … 'xone96:d') and studio strips ('strip:<instance>') */
+  channels: Record<string, LessonChannelMeter>;
+}
+
+/** One finished REC take or bounce, measured live on the master meter */
+export interface LessonTake {
+  kind: 'rec' | 'bounce';
+  /** Length of the music in it (transport time), seconds */
+  seconds: number;
+  /** Integrated loudness of the take (gated, from the master meter), LUFS */
+  lufsI: number | null;
+  /** Highest true peak in the take, dBTP */
+  truePeakDb: number;
+  /** Largest limiter gain reduction in the take, dB */
+  maxGrDb: number;
+  /** Stems recorded alongside the master (channel strips and returns) */
+  stems: number;
+  /** It played from bar 1 */
+  fromStart: boolean;
+  /** Bounce: it reached the end of the song (not cancelled) */
+  complete: boolean;
+  /** Song length when it was made, seconds (0 without song sections) */
+  songSeconds: number;
+  at: number;
+}
+
+export interface LessonBounceState {
+  recording: boolean;
+  bouncing: boolean;
+  last?: LessonTake;
+  /** Finished takes since the lesson started */
+  count: number;
+}
+
+export interface LessonHistory {
+  /** The control changed at least once since the lesson started (instance or device name) */
+  changed(instance: string, control: string): boolean;
+  /** A button was on at some point since the lesson started */
+  wasOn(instance: string, control: string): boolean;
+  /** Smallest / largest value a numeric control had since the lesson started, its starting value included */
+  min(instance: string, control: string): number | undefined;
+  max(instance: string, control: string): number | undefined;
+}
+
+/** Curriculum paths (LessonBrowser groups by them; the validator checks them) */
+export const LESSON_PATHS = ['foundations', 'sound-design', 'sequencing', 'performance', 'studio', 'ear-training', 'producer'] as const;
+export type LessonPath = (typeof LESSON_PATHS)[number];
 
 export interface Lesson {
   id: string;
@@ -374,11 +610,17 @@ export interface Lesson {
   // ---- v2 -------------------------------------------------------------------
   /** Learning objective - "By the end you can ..." */
   objective?: string;
-  /** Curriculum path and order within it */
-  path?: 'foundations' | 'sound-design' | 'sequencing' | 'performance' | 'studio' | 'ear-training';
+  /**
+   * Curriculum path and order within it. 'producer' (v3) is the cross-instrument Producer
+   * path (docs/research/producer-path/curriculum.md): studio lessons, device 'studio'.
+   */
+  path?: LessonPath;
   order?: number;
-  /** State applied at lesson start; the learner's own patch is kept and can be restored */
-  start?: { values?: Record<string, ControlValue>; patches?: PatchConnection[]; reset?: boolean; data?: unknown };
+  /**
+   * State applied at lesson start; the learner's own patch is kept and can be restored.
+   * `studio` (v3, studio lessons): a whole studio to start from; the learner's studio is saved first.
+   */
+  start?: { values?: Record<string, ControlValue>; patches?: PatchConnection[]; reset?: boolean; data?: unknown; studio?: LessonStudioStart };
   /** Retrieval questions that join the spaced-review queue after the lesson */
   review?: MultipleChoice[];
   /** Studio lessons (device: 'studio'): instruments the lesson needs in the rack */

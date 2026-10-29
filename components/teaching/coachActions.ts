@@ -11,6 +11,7 @@
 import type { ControlSpec, ControlValue, LessonStep } from '@/types';
 import { normToValue, valueToNorm } from '@/lib/controls/mapping';
 import { hub } from '@/lib/studio/hub';
+import { applyStudioSolution, isTimedSolution, resolveInstance } from '@/lib/studio/lessonRuntime';
 import { useStudioStore, getSpec } from '@/store/studio';
 
 const prefersReducedMotion = () =>
@@ -116,8 +117,18 @@ export async function showMe(step: LessonStep, instance: string, labelOf: (id: s
       for (const [id, v] of Object.entries(sol.values ?? {})) await sweep(target, id, tspec?.controls[id], v, 450);
       sol.patches?.forEach(p => useStudioStore.getState().addPatchConnection(target, p.from, p.to));
       if (sol.data !== undefined) useStudioStore.getState().setDeviceData(target, sol.data);
+      // Other instruments' knobs sweep too, so the learner sees and hears each move
+      for (const [k, vals] of Object.entries(sol.parts ?? {})) {
+        const inst = resolveInstance(k);
+        if (!inst) continue;
+        const pspec = getSpec(store.deviceOf(inst));
+        for (const [id, v] of Object.entries(vals)) await sweep(inst, id, pspec?.controls[id], v, 350);
+      }
+      // The studio itself: the mix, the master, the song, snapshots, the transport
+      applyStudioSolution({ ...sol, parts: undefined });
+      if (sol.transport === 'play') hub.startAll();
       store.setLessonDemo(null);
-      return { message: 'That is one way to do it. Listen, then change one thing and make it yours.' };
+      return { message: isTimedSolution(sol) ? 'That is one way to set it up. Now play it through and listen.' : 'That is one way to do it. Listen, then change one thing and make it yours.' };
     }
     return null;
   } finally {
