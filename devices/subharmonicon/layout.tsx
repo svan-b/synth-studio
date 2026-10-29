@@ -15,7 +15,7 @@
 // at 9 mm (hardware 6.3 mm) so they can be turned on an iPad.
 //
 // Twin aids (not on the hardware, marked in REFERENCE.md): the OFF / ON / HELD
-// keys under EG, the SEQ OUT ±5 / SEQ OUT UNQ keys beside the SEQ OCT and QUANTIZE buttons
+// keys under EG, the OUT ±5 / OUT UNQ keys beside the SEQ OCT and QUANTIZE buttons
 // (their hold modes), and the rhythm LOGIC switch (MIDI CC 113 on the hardware).
 // ============================================================================
 
@@ -130,7 +130,7 @@ const MID_X = 135.0;
 const LED_X = 134.8;
 const SEQ_OCT_Y = 35.9, QUANT_Y = 86.1;
 // The SEQ OUT keys sit just left of their buttons, clear of the printed divider, LEDs and legends
-const HELD_W = 11, HELD_H = 3.0, HELD_X = 122.3;
+const HELD_W = 10, HELD_H = 3.0, HELD_X = 121.6;
 
 const oscSection: PanelElement[] = [
   // OSCILLATORS: rules out to a boxed 1 and 2 hanging from them
@@ -184,10 +184,10 @@ const oscSection: PanelElement[] = [
       <CycleButton control="seq_oct" label="SEQ OCT" value={(values.seq_oct as number) ?? 0} next={v => (v + 2) % 3}
         heldControl="seq_oct_held" held={!!values.seq_oct_held} setValue={setValue}
         w={10.13 * PX_PER_MM} h={6.21 * PX_PER_MM} teaching={teaching} step={step}
-        description="SEQ OCT: press to step ±5 → ±2 → ±1 octaves. Press and hold until the LED flashes to keep the SEQ jacks at ±5 V (or tap SEQ OUT ±5)." />
+        description="SEQ OCT: press to step ±5 → ±2 → ±1 octaves. Press and hold until the LED flashes to keep the SEQ jacks at ±5 V (or tap OUT ±5)." />
     ),
   },
-  btn('seq_oct_held', HELD_X, SEQ_OCT_Y, HELD_W, HELD_H, { capText: 'SEQ OUT ±5', color: '#161616' }),
+  btn('seq_oct_held', HELD_X, SEQ_OCT_Y, HELD_W, HELD_H, { capText: 'OUT ±5', color: '#161616' }),
 
   // QUANTIZE: four LEDs over one button; all dark = off; held = the lit LED flashes
   ...([[1, '12-ET'], [2, '8-ET'], [3, '12-JI'], [4, '8-JI']] as const).map(([v, t], i): PanelElement => (
@@ -202,10 +202,10 @@ const oscSection: PanelElement[] = [
       <CycleButton control="quantize" label="QUANTIZE" value={(values.quantize as number) ?? 1} next={v => (v === 4 ? 0 : v + 1)}
         heldControl="quantize_held" held={!!values.quantize_held} setValue={setValue}
         w={10.82 * PX_PER_MM} h={6.21 * PX_PER_MM} teaching={teaching} step={step}
-        description="QUANTIZE: press to step 12-ET → 8-ET → 12-JI → 8-JI → off (all LEDs dark). Press and hold until the LED flashes to unquantize the SEQ jacks (or tap SEQ OUT UNQ)." />
+        description="QUANTIZE: press to step 12-ET → 8-ET → 12-JI → 8-JI → off (all LEDs dark). Press and hold until the LED flashes to unquantize the SEQ jacks (or tap OUT UNQ)." />
     ),
   },
-  btn('quantize_held', HELD_X, QUANT_Y, HELD_W, HELD_H, { capText: 'SEQ OUT UNQ', color: '#161616' }),
+  btn('quantize_held', HELD_X, QUANT_Y, HELD_W, HELD_H, { capText: 'OUT UNQ', color: '#161616' }),
 ];
 
 // ---------------------------------------------------------------------------

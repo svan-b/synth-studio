@@ -111,12 +111,12 @@ for (const s of [1, 2]) {
 
 controls.seq_oct = {
   type: 'switch', label: 'SEQ OCT', options: SEQ_OCT_OPTIONS, default: 0,
-  description: 'How far each STEP knob reaches above and below the VCO FREQ setting: ±1, ±2 or ±5 octaves, shared by both sequencers. For the full ±5, set both VCO FREQ knobs fully counter-clockwise. Press to cycle; press and hold until the LED flashes to free the SEQ jacks (SEQ OUT ±5).',
+  description: 'How far each STEP knob reaches above and below the VCO FREQ setting: ±1, ±2 or ±5 octaves, shared by both sequencers. For the full ±5, set both VCO FREQ knobs fully counter-clockwise. Press to cycle; press and hold until the LED flashes to free the SEQ jacks (OUT ±5 beside it does the same).',
   manualReference: 'p.28 – SEQ OCT',
 };
 controls.quantize = {
   type: 'switch', label: 'QUANTIZE', options: QUANTIZE_OPTIONS, default: 1,
-  description: 'Snaps the VCO FREQ knobs and the sequencer steps to a scale on C: 12-ET chromatic or 8-ET major in equal temperament, 12-JI and 8-JI the same in just intonation (whole-number ratios, like the subharmonics). All LEDs dark = off: continuous pitch. Press to cycle; press and hold until the LED flashes to unquantize the SEQ jacks (SEQ OUT UNQ).',
+  description: 'Snaps the VCO FREQ knobs and the sequencer steps to a scale on C: 12-ET chromatic or 8-ET major in equal temperament, 12-JI and 8-JI the same in just intonation (whole-number ratios, like the subharmonics). All LEDs dark = off: continuous pitch. Press to cycle; press and hold until the LED flashes to unquantize the SEQ jacks (OUT UNQ beside it does the same).',
   manualReference: 'p.21 – QUANTIZE',
 };
 // The two "held" modes (no separate panel control on the hardware: hold the button until its LED flashes)

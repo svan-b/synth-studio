@@ -161,7 +161,7 @@ Faceplate positions are millimetres from its top-left corner (x, y = centre).
 ### Twin aids (not on the hardware)
 
 - `EG` OFF / ON / HELD radio row under PLAY and TRIGGER: chooses the EG state by touch and shows it in words.
-- `SEQ OUT ±5` and `SEQ OUT UNQ` keys beside the SEQ OCT and QUANTIZE buttons: the two hold modes without the long
+- `OUT ±5` and `OUT UNQ` keys beside the SEQ OCT and QUANTIZE buttons: the two hold modes without the long
   press. While a hold mode is on, the lit LED of its button flashes (as on the hardware).
 - `LOGIC` switch: the CC 113 global setting.
 - The lit rhythm SEQ buttons brighten when their generator fires.
