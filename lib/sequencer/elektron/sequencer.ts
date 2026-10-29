@@ -956,7 +956,11 @@ export class ElektronSequencer {
         }
         break;
       case 'locate':
-        if (this.followRunning) this.startPending = true;
+        // Song position pointer: re-line up on the next tick (also after a song without loop ended)
+        if (this.followRunning || this.transport?.playing) {
+          this.followRunning = true;
+          this.startPending = true;
+        }
         break;
       case 'tempo':
         this.changed();
@@ -1065,7 +1069,11 @@ export class ElektronSequencer {
       this.external = false;
       this.playMode = this.effectiveMode();
       this.enterMode(T, this.transport !== null && T > 0, true);
-      if (!this.cur) return; // a song without loop that has already ended at this song position
+      if (!this.cur) {
+        // A song without loop that has already ended at this song position
+        if (!wasPlaying) this.o.onPlay?.(false, this.time);
+        return;
+      }
     }
     if (this.cuePending && this.cur) {
       this.cuePending = false;
