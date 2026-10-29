@@ -1,9 +1,14 @@
 'use client';
 
-import { useRef, useState, useCallback } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { KnobSpec } from '@/types';
 import type { KnobVariant, LabelPosition, ValueDisplay } from '@/types/panel';
-import { valueToNorm, normToValue, formatValue, isValueOnTarget } from '@/lib/controls/mapping';
+import { valueToNorm, normToValue, formatValue, isValueOnTarget, describeValue } from '@/lib/controls/mapping';
+import { knobTravelPx, markPointerEnter, wheelBelongsToControl, wheelDelta } from '@/lib/controls/gesture';
+import { fitTransform, type TextFit } from '@/lib/controls/textFit';
+import { useContinuousDrag } from './useContinuousDrag';
+import ValueBubble from './ValueBubble';
+import styles from './controlStyles';
 
 export interface KnobProps {
   id: string;
@@ -20,23 +25,33 @@ export interface KnobProps {
   highlighted?: boolean;
   targetValue?: number;
   showTarget?: boolean;
+  // ---- optional, set by the panel ----
+  /** Legend size/condense/truncation from the panel's legibility pass */
+  labelFit?: TextFit;
+  /** Readout font size from the panel's legibility pass */
+  valueFit?: TextFit;
+  /** Minimum hit area (px, same units as diameter) - touch targets bigger than the cap */
+  hitSize?: number;
+  /** Lesson spotlight: the step's target, or context the step points at */
+  spot?: 'target' | 'focus' | null;
 }
-
-const DRAG_PX_FULL_TRAVEL = 220;   // pixels of drag for the full 270° sweep
-const DOUBLE_TAP_MS = 320;
 
 /**
  * Knob - anchor-based: the wrapper is exactly the knob circle, so positioning the
  * wrapper's centre positions the knob's centre. Labels/values are absolutely
  * positioned around it.
  *
- * Interaction (mouse, pen and touch via Pointer Events):
- *   drag up/down (or right/left)   adjust
- *   Shift + drag                   fine adjust
- *   double-click / double-tap      reset to default
- *   arrow keys (when focused)      nudge, Shift for bigger steps
+ * Interaction (mouse, pen and touch via Pointer Events, pointer capture, no page scroll):
+ *   drag up/down (mouse: or left/right)   adjust - travel scales with the knob's size
+ *   Shift + drag                          fine adjust (desktop)
+ *   touch: slide sideways away, a second  finer and finer (half, quarter, fine)
+ *     finger off the controls, or hold
+ *     still before dragging
+ *   double-click / double-tap             reset to default
+ *   wheel / trackpad                      adjust (a page scroll passing over it keeps scrolling)
+ *   arrows (Shift = x10), PageUp/Down     step when focused; Home/End = min/max; Delete = default
  */
-export default function Knob({
+function Knob({
   id,
   spec,
   value,
@@ -51,117 +66,144 @@ export default function Knob({
   highlighted = false,
   targetValue,
   showTarget = false,
+  labelFit,
+  valueFit,
+  hitSize,
+  spot,
 }: KnobProps) {
-  const [dragging, setDragging] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
-  const drag = useRef<{ x: number; y: number; norm: number; moved: boolean; pointer: number } | null>(null);
-  const lastTap = useRef(0);
+  const enteredAt = useRef(-1);
+  const latest = useRef({ spec, value, onChange });
+  latest.current = { spec, value, onChange };
 
   const norm = valueToNorm(spec, value);
   const rotation = -135 + norm * 270;
   const onTarget = targetValue !== undefined && isValueOnTarget(spec, value, targetValue);
   const targetRotation = targetValue !== undefined ? -135 + valueToNorm(spec, targetValue) * 270 : undefined;
+  const shownLabel = labelText ?? spec.label;
 
-  const commit = useCallback((n: number) => {
-    const v = normToValue(spec, n);
-    if (v !== value) onChange(v);
-  }, [spec, value, onChange]);
+  const commitNorm = useCallback((n: number) => {
+    const { spec: s, value: v, onChange: change } = latest.current;
+    const next = normToValue(s, n);
+    if (next !== v) change(next);
+  }, []);
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 && e.pointerType === 'mouse') return;
-    e.preventDefault();
-    const now = performance.now();
-    if (now - lastTap.current < DOUBLE_TAP_MS) {
-      lastTap.current = 0;
-      onChange(spec.default);
-      return;
-    }
-    lastTap.current = now;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { x: e.clientX, y: e.clientY, norm, moved: false, pointer: e.pointerId };
-    setDragging(true);
-  };
+  const format = useCallback((n: number) => describeValue(latest.current.spec, normToValue(latest.current.spec, n)), []);
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (!d || d.pointer !== e.pointerId) return;
-    const dy = d.y - e.clientY;
-    const dx = e.clientX - d.x;
-    const delta = Math.abs(dy) >= Math.abs(dx) ? dy : dx;
-    if (Math.abs(delta) > 2) d.moved = true;
-    const fine = e.shiftKey ? 0.2 : 1;
-    let n = d.norm + (delta / DRAG_PX_FULL_TRAVEL) * fine;
-    if (spec.endless) n = Math.min(1, Math.max(0, n));
-    commit(n);
-  };
+  const { dragging, bubble, flash, handlers } = useContinuousDrag({
+    getNorm: () => valueToNorm(latest.current.spec, latest.current.value),
+    commit: commitNorm,
+    reset: () => { if (latest.current.value !== latest.current.spec.default) latest.current.onChange(latest.current.spec.default); },
+    travelPx: () => {
+      const r = rootRef.current?.getBoundingClientRect();
+      return knobTravelPx(r ? r.width : diameter, latest.current.spec);
+    },
+    axis: 'knob',
+    bounds: () => rootRef.current?.getBoundingClientRect() ?? null,
+    format,
+    label: shownLabel,
+  });
 
-  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (!d || d.pointer !== e.pointerId) return;
-    if (d.moved) lastTap.current = 0;
-    drag.current = null;
-    setDragging(false);
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
-  };
+  // Wheel / trackpad: needs a non-passive listener to keep the page from scrolling
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!wheelBelongsToControl(enteredAt.current)) return;
+      const d = wheelDelta(e);
+      if (!d) return;
+      e.preventDefault();
+      const { spec: s, value: v } = latest.current;
+      const r = el.getBoundingClientRect();
+      const fine = e.shiftKey || e.altKey;
+      let n: number;
+      if (s.step && (s.max - s.min) / s.step <= 64) {
+        // Detented: one detent per wheel notch
+        const next = Math.min(s.max, Math.max(s.min, v + Math.sign(d) * s.step));
+        n = valueToNorm(s, next);
+      } else {
+        n = valueToNorm(s, v) + (d / (knobTravelPx(r.width, s) * 2)) * (fine ? 0.1 : 1);
+      }
+      commitNorm(Math.min(1, Math.max(0, n)));
+      flash(Math.min(1, Math.max(0, n)));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [commitNorm, flash]);
 
   const handleKey = (e: React.KeyboardEvent) => {
-    const stepN = spec.step ? Math.max(spec.step / (spec.max - spec.min), 0.001) : 0.01;
-    const amount = e.shiftKey ? stepN * 10 : stepN;
-    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { e.preventDefault(); commit(norm + amount); }
-    else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { e.preventDefault(); commit(norm - amount); }
-    else if (e.key === 'Home') { e.preventDefault(); onChange(spec.default); }
+    const s = spec;
+    const detents = s.step ? (s.max - s.min) / s.step : 0;
+    const coarse = e.shiftKey || e.key === 'PageUp' || e.key === 'PageDown';
+    const sign = e.key === 'ArrowUp' || e.key === 'ArrowRight' || e.key === 'PageUp' ? 1
+      : e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'PageDown' ? -1 : 0;
+    let next: number | null = null;
+    if (sign) {
+      if (detents && detents <= 200) next = Math.min(s.max, Math.max(s.min, value + sign * s.step! * (coarse ? Math.max(1, Math.round(detents / 10)) : 1)));
+      else next = normToValue(s, norm + sign * (coarse ? 0.1 : e.altKey ? 0.002 : 0.01));
+    } else if (e.key === 'Home') next = s.min;
+    else if (e.key === 'End') next = s.max;
+    else if (e.key === 'Delete' || e.key === 'Backspace') next = s.default;
+    if (next === null) return;
+    e.preventDefault();
+    if (next !== value) onChange(next);
+    flash(valueToNorm(s, next));
   };
 
-  const ring = highlighted
-    ? onTarget
-      ? '0 0 0 3px rgba(34,197,94,0.9), 0 0 14px rgba(34,197,94,0.6)'
-      : '0 0 0 3px rgba(249,115,22,0.95), 0 0 16px rgba(249,115,22,0.7)'
-    : undefined;
+  const ringState = spot ? (spot === 'target' && onTarget ? 'done' : spot) : highlighted ? (onTarget ? 'done' : 'target') : null;
+  const ringClass = ringState === 'done' ? styles.spotDone : ringState === 'target' ? styles.spotTarget : ringState === 'focus' ? styles.spotFocus : '';
 
-  const labelSize = diameter >= 50 ? 10 : diameter >= 36 ? 9 : diameter >= 26 ? 8 : 7;
-  const shownLabel = labelText ?? spec.label;
+  const labelSize = labelFit?.size ?? (diameter >= 50 ? 10 : diameter >= 36 ? 9 : diameter >= 26 ? 8 : 7);
   const showValue = valueDisplay === 'always' || (valueDisplay === 'hover' && (hovered || dragging));
   const valueAbove = valueDisplay === 'hover' && label !== 'above';
+  const valueSize = valueFit?.size ?? (diameter >= 30 ? 9 : 8);
+  const pad = hitSize && hitSize > diameter ? (hitSize - diameter) / 2 : 0;
+  const placement = labelPlacement(label, variant === 'moog-silver' ? 2 : 4, valueSize);
 
   return (
     <div
-      className={`relative select-none outline-none ${highlighted && !onTarget ? 'animate-pulse' : ''}`}
+      ref={rootRef}
+      className={`relative select-none ${styles.control} ${styles.round}`}
       style={{ width: diameter, height: diameter, touchAction: 'none', cursor: dragging ? 'grabbing' : 'grab' }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
-      onPointerEnter={() => setHovered(true)}
+      {...handlers}
+      onPointerEnter={() => { enteredAt.current = markPointerEnter(); setHovered(true); }}
       onPointerLeave={() => setHovered(false)}
       onKeyDown={handleKey}
       tabIndex={0}
       role="slider"
+      aria-roledescription="knob"
       aria-label={shownLabel}
       aria-valuemin={spec.min}
       aria-valuemax={spec.max}
       aria-valuenow={value}
+      aria-valuetext={describeValue(spec, value)}
       data-control={id}
-      title={spec.description}
+      title={labelFit?.title ? `${labelFit.title}${spec.description ? `\n${spec.description}` : ''}` : spec.description}
     >
+      {pad > 0 && <div className={styles.hit} style={{ inset: -pad, borderRadius: '50%' }} />}
+
       {label !== 'none' && shownLabel && (
         <div
-          className="absolute text-center font-bold whitespace-nowrap pointer-events-none"
+          className="absolute text-center font-bold whitespace-pre pointer-events-none"
           style={{
-            ...labelPlacement(label, variant === 'moog-silver' ? 2 : 4),
+            ...placement,
+            transform: fitTransform(labelFit, placement.transform as string | undefined),
             fontSize: labelSize,
-            color: labelColor,
-            opacity: 0.92,
+            color: labelFit?.color ?? labelColor,
+            opacity: labelFit?.color ? 1 : 0.92,
             letterSpacing: '0.3px',
             lineHeight: 1.05,
           }}
         >
-          {shownLabel}
+          {labelFit?.text ?? shownLabel}
         </div>
       )}
 
       {!spec.endless && <Ticks diameter={diameter} variant={variant} bipolar={!!spec.bipolar} />}
 
-      <div className="absolute inset-0 rounded-full" style={{ boxShadow: ring, transition: 'box-shadow 120ms' }}>
+      {ringClass && <div className={`${styles.spot} ${ringClass}`} style={{ inset: -3 }} />}
+      <div className="absolute inset-0 rounded-full">
         <Cap variant={variant} capColor={capColor} rotation={rotation} diameter={diameter} endless={!!spec.endless} />
       </div>
 
@@ -176,11 +218,12 @@ export default function Knob({
 
       {showValue && (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 font-mono text-green-400 bg-black/90 px-1 py-px rounded text-center pointer-events-none ${valueDisplay === 'hover' ? 'z-50 shadow-lg border border-green-900' : ''}`}
+          className={`absolute left-1/2 -translate-x-1/2 font-mono text-green-400 bg-black/90 px-1 py-px rounded text-center pointer-events-none whitespace-nowrap ${valueDisplay === 'hover' ? 'z-50 shadow-lg border border-green-900' : ''}`}
           style={{
             ...(valueAbove ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 3 }),
-            fontSize: diameter >= 30 ? 9 : 8,
-            minWidth: 30,
+            fontSize: valueSize,
+            lineHeight: 1.15,
+            minWidth: Math.max(30, valueSize * 3.3),
             textShadow: '0 0 4px rgba(0,255,0,0.5)',
           }}
         >
@@ -191,25 +234,29 @@ export default function Knob({
       {showTarget && highlighted && targetValue !== undefined && !onTarget && (
         <div
           className="absolute left-1/2 -translate-x-1/2 font-mono text-orange-400 font-bold whitespace-nowrap pointer-events-none bg-black/80 px-1 rounded z-40"
-          style={{ top: '100%', marginTop: showValue && !valueAbove ? 19 : 3, fontSize: 9 }}
+          style={{ top: '100%', marginTop: showValue && !valueAbove ? valueSize * 1.15 + 8 : 3, fontSize: Math.max(9, valueSize) }}
         >
           → {formatValue(spec, targetValue)}
         </div>
       )}
+      <ValueBubble state={bubble} />
     </div>
   );
 }
 
-function labelPlacement(pos: LabelPosition, gap: number): React.CSSProperties {
+export default memo(Knob);
+
+function labelPlacement(pos: LabelPosition, gap: number, valueSize: number): React.CSSProperties {
   switch (pos) {
-    case 'below': return { top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: gap + 14 };
-    case 'left': return { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: gap + 4 };
-    case 'right': return { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: gap + 4 };
+    // Below the knob, under its value readout
+    case 'below': return { top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: gap + valueSize * 1.15 + 5 };
+    case 'left': return { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: gap + 4, transformOrigin: 'right center' };
+    case 'right': return { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: gap + 4, transformOrigin: 'left center' };
     default: return { bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: gap };
   }
 }
 
-function Ticks({ diameter, variant, bipolar }: { diameter: number; variant: KnobVariant; bipolar: boolean }) {
+const Ticks = memo(function Ticks({ diameter, variant, bipolar }: { diameter: number; variant: KnobVariant; bipolar: boolean }) {
   const count = diameter >= 50 ? 11 : diameter >= 36 ? 9 : 7;
   const pad = variant === 'moog-silver' ? 6 : 5;
   const color = variant === 'xone' ? '#bbb' : variant === 'moog-silver' ? '#555' : '#9a9a9a';
@@ -237,9 +284,9 @@ function Ticks({ diameter, variant, bipolar }: { diameter: number; variant: Knob
       })}
     </div>
   );
-}
+});
 
-function Cap({ variant, capColor, rotation, diameter, endless }: { variant: KnobVariant; capColor?: string; rotation: number; diameter: number; endless: boolean }) {
+const Cap = memo(function Cap({ variant, capColor, rotation, diameter, endless }: { variant: KnobVariant; capColor?: string; rotation: number; diameter: number; endless: boolean }) {
   const pointer = (style: React.CSSProperties) => (
     <div className="absolute inset-0 pointer-events-none" style={{ transform: `rotate(${rotation}deg)` }}>
       <div className="absolute left-1/2 -translate-x-1/2 rounded-full" style={style} />
@@ -295,4 +342,4 @@ function Cap({ variant, capColor, rotation, diameter, endless }: { variant: Knob
         </div>
       );
   }
-}
+});

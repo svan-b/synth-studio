@@ -177,7 +177,7 @@ export function SeqButton({ children, onPress, active, color = C.red, blink, dim
         background: active ? color : C.key,
         color: active ? '#111' : dim ? C.faint : C.text,
         fontFamily: FONT, fontSize: 11, fontWeight: 700, letterSpacing: 0.4,
-        lineHeight: 1, whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none',
+        lineHeight: 1, whiteSpace: 'nowrap', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none',
         cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.4 : 1,
         boxShadow: active ? `0 0 8px ${color}88` : 'inset 0 -2px 0 rgba(0,0,0,0.35)',
         ...style,
@@ -265,7 +265,7 @@ export function Stepper({ value, min, max, step = 1, onChange, format, label, mu
       onContextMenu={e => e.preventDefault()}
       style={{
         width: 30, height: 30, borderRadius: 4, border: `1px solid ${C.border}`, background: C.key, color: C.text,
-        fontSize: 15, fontWeight: 700, lineHeight: 1, touchAction: 'none', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', cursor: 'pointer', flex: 'none',
+        fontSize: 15, fontWeight: 700, lineHeight: 1, touchAction: 'none', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: 'pointer', flex: 'none',
       }}
     >
       {glyph}
@@ -309,7 +309,7 @@ export function Stepper({ value, min, max, step = 1, onChange, format, label, mu
             width, height: 30, borderRadius: 4, background: '#0b0c0d', border: `1px solid ${C.border}`,
             color: muted ? C.dim : C.text, fontFamily: MONO, fontSize: 13, fontWeight: 700,
             display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', cursor: 'ns-resize',
-            userSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden',
+            userSelect: 'none', WebkitUserSelect: 'none', whiteSpace: 'nowrap', overflow: 'hidden',
           }}
         >
           {format ? format(value) : String(value)}
@@ -508,7 +508,7 @@ export function PatternGrid({ ctx, project, bank, onBank, onPattern, selected, b
           border: `2px solid ${isSel ? C.white : isQueued ? C.amber : C.border}`,
           background: isPlaying ? C.green : isQueued ? '#5a3d12' : has ? '#3a2422' : C.key,
           color: isPlaying ? '#0d1a10' : has ? C.text : C.dim,
-          fontFamily: MONO, fontSize: 11, fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none',
+          fontFamily: MONO, fontSize: 11, fontWeight: 700, cursor: 'pointer', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none',
           boxShadow: isPlaying ? `0 0 8px ${C.green}88` : undefined,
         }}
       >

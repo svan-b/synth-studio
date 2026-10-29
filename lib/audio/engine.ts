@@ -339,6 +339,11 @@ export abstract class BaseEngine implements SynthEngine {
 // ============================================================================
 
 export class Clock {
+  /**
+   * Minimum look-ahead for every Clock, seconds (0 = each clock's own). The studio raises
+   * it while the page is hidden: WebKit runs hidden pages' timers only once a second.
+   */
+  static minLookahead = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
   private nextTime = 0;
   private tick = 0;
@@ -379,7 +384,7 @@ export class Clock {
   }
 
   private schedule(): void {
-    const horizon = this.ctx.currentTime + this.lookahead;
+    const horizon = this.ctx.currentTime + Math.max(this.lookahead, Clock.minLookahead);
     // If the tab was throttled, skip ahead instead of firing a burst of old ticks
     if (this.nextTime < this.ctx.currentTime - 0.25) this.nextTime = this.ctx.currentTime + 0.01;
     let guard = 0;
