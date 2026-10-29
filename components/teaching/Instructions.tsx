@@ -56,6 +56,7 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
   const [collapsed, setCollapsed] = useState(false);
   // Touch screens: the coach floats over the panel, on the side the learner picks
   const [side, setSide] = useState<'right' | 'left'>('right');
+  const asideRef = useRef<HTMLElement>(null);
   const [showScope, setShowScope] = useState(true);
   const [showList, setShowList] = useState(false);
   const [restored, setRestored] = useState(false);
@@ -73,6 +74,26 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
 
   // A demonstration never outlives its step
   useEffect(() => () => cancelShowMe(), [currentStep, lesson?.id]);
+
+  // Touch screens: never float over the control the step points at. Once the step's spotlight
+  // has drawn, move to the other side if this one covers it and that one doesn't.
+  useEffect(() => {
+    if (!lesson || !window.matchMedia('(pointer: coarse) and (min-width: 1024px)').matches) return;
+    const t = setTimeout(() => {
+      const coach = asideRef.current?.getBoundingClientRect();
+      const targets = [...document.querySelectorAll('.ssc-spot-target')].map(e => e.getBoundingClientRect()).filter(r => r.width > 0);
+      if (!coach || !targets.length) return;
+      const covers = (at: 'left' | 'right') => {
+        const left = at === 'left' ? 12 : window.innerWidth - 12 - coach.width;
+        return targets.some(r => r.left < left + coach.width && r.right > left && r.top < coach.bottom && r.bottom > coach.top);
+      };
+      setSide(cur => {
+        const other = cur === 'left' ? 'right' : 'left';
+        return covers(cur) && !covers(other) ? other : cur;
+      });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [lesson, currentStep]);
 
   // Screen readers: the new step, then whether it is done
   const step = lesson?.steps[currentStep];
@@ -110,6 +131,7 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
 
   return (
     <aside
+      ref={asideRef}
       className={`w-full lg:w-[22rem] shrink-0 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 shadow-2xl lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] flex flex-col overflow-y-auto coarse-lg:fixed coarse-lg:top-auto coarse-lg:bottom-3 coarse-lg:z-30 coarse-lg:w-[20rem] coarse-lg:max-h-[58dvh] ${side === 'left' ? 'coarse-lg:left-3' : 'coarse-lg:right-3'}`}
       aria-label="Lesson coach"
     >
