@@ -37,6 +37,7 @@ function makeWav(freq, seconds, rate = 44100) {
     await page.addInitScript(() => {
       if (!sessionStorage.getItem('seeded')) {
         localStorage.setItem('synth-studio-storage', JSON.stringify({ state: { currentDevice: 'xone96', devices: {}, completedLessons: [] }, version: 3 }));
+        localStorage.setItem('synth-studio-welcomed', '1');
         sessionStorage.setItem('seeded', '1');
       }
     });
@@ -59,7 +60,7 @@ function makeWav(freq, seconds, rate = 44100) {
   // ---------------- Desktop / mouse -------------------------------------------
   const page = await open({ width: 1440, height: 900 }, false);
   await page.screenshot({ path: path.join(outDir, 'xone96-full-desktop.png'), fullPage: true });
-  const unlock = page.getByRole('button', { name: /enable audio/i });
+  const unlock = page.getByRole('button', { name: /enable audio|tap for sound/i });
   if (await unlock.count()) await unlock.click(); else await page.mouse.click(4, 4);
   await page.waitForTimeout(700);
   await page.mouse.click(4, 4);
@@ -117,10 +118,11 @@ function makeWav(freq, seconds, rate = 44100) {
   // 3. Load an audio file on channel 1 (it should switch to USB 1 and play the file)
   const wav = path.join(outDir, 'xone96-test-tone.wav');
   fs.writeFileSync(wav, makeWav(220, 2));
-  await page.locator('input[type="file"]').nth(2).setInputFiles(wav); // columns: A, B, 1, ...
+  const ch1File = '[aria-label="Load an audio file onto channel 1 USB"]';
+  await page.locator(`${ch1File} input[type="file"], input[type="file"]${ch1File}`).first().setInputFiles(wav);
   await page.waitForTimeout(1500);
-  const usb = page.locator('[data-control="ch1_input"] button', { hasText: 'USB 1' }).first();
-  result.checks.fileSwitchedToUsb = await usb.evaluate(el => getComputedStyle(el).backgroundColor === 'rgb(229, 229, 229)');
+  // INPUT position 0 is USB 1 (read from the saved settings: the panel draws it as a selector knob and buttons)
+  result.checks.fileSwitchedToUsb = await page.evaluate(() => JSON.parse(localStorage.getItem('synth-studio-storage')).state.devices.xone96?.controlValues.ch1_input === 0);
   result.checks.filePeak = await peak(page, 1500);
   result.checks.fileStatus = await page.getByText(/xone96-test-tone\.wav/).first().innerText().catch(() => null);
   if (!result.checks.fileSwitchedToUsb || !(result.checks.filePeak > 0.05)) fail.push('loaded file did not play on channel 1');

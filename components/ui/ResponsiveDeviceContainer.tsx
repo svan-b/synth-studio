@@ -6,6 +6,12 @@ interface ResponsiveDeviceContainerProps {
   children: ReactNode;
   /** 'fit' scales the panel to the available width; a number is a fixed zoom */
   zoom: 'fit' | number;
+  /**
+   * On touch screens, let 'fit' shrink the panel a little more (at most 20%) so
+   * it ends above the bottom of the screen: a mixer's faders and crossfader stay
+   * in view with its EQs. Taller panels keep the width fit and scroll.
+   */
+  fitHeight?: boolean;
   minScale?: number;
   maxScale?: number;
   onScaleChange?: (scale: number, fitScale: number) => void;
@@ -19,6 +25,7 @@ interface ResponsiveDeviceContainerProps {
 export default function ResponsiveDeviceContainer({
   children,
   zoom,
+  fitHeight = false,
   minScale = 0.35,
   maxScale = 1.25,
   onScaleChange,
@@ -27,6 +34,8 @@ export default function ResponsiveDeviceContainer({
   const innerRef = useRef<HTMLDivElement>(null);
   const [native, setNative] = useState({ w: 0, h: 0 });
   const [avail, setAvail] = useState(0);
+  // Room below the panel's top edge on a touch screen (0 = don't fit the height)
+  const [room, setRoom] = useState(0);
 
   useLayoutEffect(() => {
     const outer = outerRef.current;
@@ -35,15 +44,25 @@ export default function ResponsiveDeviceContainer({
     const measure = () => {
       setAvail(outer.clientWidth);
       setNative({ w: inner.offsetWidth, h: inner.offsetHeight });
+      const touch = fitHeight && window.matchMedia('(pointer: coarse)').matches;
+      // From the page top, so scrolling doesn't change it; 12 px clear of the bottom edge
+      setRoom(touch ? window.innerHeight - (outer.getBoundingClientRect().top + window.scrollY) - 12 : 0);
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(outer);
     ro.observe(inner);
-    return () => ro.disconnect();
-  }, []);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [fitHeight]);
 
-  const fitScale = native.w > 0 && avail > 0 ? Math.max(minScale, Math.min(maxScale, (avail - 8) / native.w)) : 1;
+  const widthFit = native.w > 0 && avail > 0 ? Math.max(minScale, Math.min(maxScale, (avail - 8) / native.w)) : 1;
+  const heightFit = room > 0 && native.h > 0 ? room / native.h : Infinity;
+  const fitBase = Math.min(1, widthFit);
+  const fitScale = heightFit < fitBase && heightFit >= fitBase * 0.8 ? heightFit : widthFit;
   const scale = zoom === 'fit' ? Math.min(1, fitScale) : zoom;
 
   const lastReported = useRef('');
