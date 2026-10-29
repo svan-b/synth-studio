@@ -113,3 +113,57 @@ export const isChannelMessage = (data: ArrayLike<number>) => data.length > 0 && 
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 /** MIDI note name, middle C (60) = C4 */
 export const midiNoteName = (n: number) => `${NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
+
+// ----------------------------------------------------------------------------
+// Human-readable messages (the MIDI monitor in "Your synth", tests, docs)
+// ----------------------------------------------------------------------------
+
+/** Standard controller names (General MIDI / GM2); synths may use the rest freely */
+export const CC_NAMES: Record<number, string> = {
+  0: 'Bank select', 1: 'Mod wheel', 2: 'Breath', 4: 'Foot pedal', 5: 'Glide time', 6: 'Data entry', 7: 'Volume', 8: 'Balance',
+  10: 'Pan', 11: 'Expression', 32: 'Bank select LSB', 64: 'Sustain pedal', 65: 'Glide on/off', 66: 'Sostenuto', 67: 'Soft pedal',
+  71: 'Resonance', 72: 'Release', 73: 'Attack', 74: 'Cutoff', 75: 'Decay', 76: 'Vibrato rate', 77: 'Vibrato depth', 78: 'Vibrato delay',
+  91: 'Reverb send', 93: 'Chorus send', 98: 'NRPN LSB', 99: 'NRPN MSB', 100: 'RPN LSB', 101: 'RPN MSB',
+  120: 'All sound off', 121: 'Reset controllers', 122: 'Local control', 123: 'All notes off', 124: 'Omni off', 125: 'Omni on', 126: 'Mono mode', 127: 'Poly mode',
+};
+
+export interface DescribedMidi {
+  /** "Note on", "CC", "Program"... */
+  kind: string;
+  /** 0-based channel, null for system messages */
+  channel: number | null;
+  /** "C3 (48) · vel 100", "74 Cutoff = 87" */
+  detail: string;
+  /** "90 30 64" */
+  hex: string;
+}
+
+export const toHex = (data: ArrayLike<number>) => Array.from(data, b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+
+/** Describe one message. `ccLabel` names CCs the way the panel does (its knob labels). */
+export function describeMidi(data: ArrayLike<number>, ccLabel?: (cc: number) => string | undefined): DescribedMidi {
+  const hex = toHex(data);
+  const m = parseMidi(data);
+  if (!m) return { kind: 'Data', channel: null, detail: '', hex };
+  switch (m.type) {
+    case 'noteon': return { kind: 'Note on', channel: m.channel, detail: `${midiNoteName(m.note)} (${m.note}) · vel ${m.velocity}`, hex };
+    case 'noteoff': return { kind: 'Note off', channel: m.channel, detail: `${midiNoteName(m.note)} (${m.note})`, hex };
+    case 'cc': {
+      const name = ccLabel?.(m.cc) ?? CC_NAMES[m.cc];
+      return { kind: 'CC', channel: m.channel, detail: `${m.cc}${name ? ` ${name}` : ''} = ${m.value}`, hex };
+    }
+    case 'program': return { kind: 'Program', channel: m.channel, detail: `${m.program + 1} (MIDI value ${m.program})`, hex };
+    case 'pitchbend': {
+      const v = m.raw - 8192;
+      return { kind: 'Pitch bend', channel: m.channel, detail: `${v > 0 ? '+' : ''}${v}`, hex };
+    }
+    case 'aftertouch': return { kind: 'Aftertouch', channel: m.channel, detail: String(m.value), hex };
+    case 'polyaftertouch': return { kind: 'Poly AT', channel: m.channel, detail: `${midiNoteName(m.note)} = ${m.value}`, hex };
+    case 'clock': return { kind: 'Clock', channel: null, detail: '24 per beat', hex };
+    case 'start': return { kind: 'Start', channel: null, detail: '', hex };
+    case 'continue': return { kind: 'Continue', channel: null, detail: '', hex };
+    case 'stop': return { kind: 'Stop', channel: null, detail: '', hex };
+    case 'songposition': return { kind: 'Song position', channel: null, detail: `16th ${m.position}`, hex };
+    default: return { kind: 'System', channel: null, detail: '', hex };
+  }
+}
