@@ -107,7 +107,7 @@ export default function Welcome({ open, onClose, onChoose }: { open: boolean; on
             <li>Use headphones or decent speakers - a lot of synthesis lives in the low end.</li>
             <li>On iPad, turn the ringer/silent switch or Silent Mode off if you hear nothing, and use landscape.</li>
             <li>Your work saves automatically in this browser. Use Project → Save to keep a file, and REC to bounce a WAV.</li>
-            <li>Got your own synth? Add “Your synth (MIDI)” or “Audio input” from + Instrument.</li>
+            <li>Got your own synth? Add “Your synth (MIDI)” or “Audio input” with the Instruments button next to the tabs.</li>
           </ul>
           <div className="mt-4 flex justify-end">
             <Dialog.Close asChild><button className="px-4 py-2 bg-[#2a2a2a] text-white rounded-lg text-sm">Skip</button></Dialog.Close>
