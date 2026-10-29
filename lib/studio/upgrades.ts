@@ -209,6 +209,16 @@ const UPGRADES: Upgrade[] = [
       return o;
     },
   },
+  {
+    // Analog Rytm MKII rebuild to the OS 1.72 manual: the voices, machines and
+    // sequencer were redefined (391 of 421 ids replaced; old patterns lived in
+    // control strings). No faithful conversion exists, so old Rytm settings start
+    // fresh: the new defaults and the demo song.
+    store: 11,
+    project: 8,
+    device: 'analog-rytm',
+    apply: () => ({}),
+  },
 ];
 
 /** Lessons replaced by a rebuild: completing the old one counts for its successor */
@@ -258,6 +268,21 @@ const LESSON_RENAMES: { store: number; map: Record<string, string> }[] = [
       'subh-clock-patching': 'subharmonicon-st1-studio-clock',
     },
   },
+  {
+    store: 11,
+    map: {
+      'rytm-kick-anatomy': 'analog-rytm-s1-kick',
+      'rytm-snare': 'analog-rytm-s2-snare-clap',
+      'rytm-hats-choke': 'analog-rytm-s3-hats-cymbals-choke',
+      'rytm-filter-amp-env': 'analog-rytm-s4-toms-envelopes',
+      'rytm-sends': 'analog-rytm-s5-sends',
+      'rytm-compressor-glue': 'analog-rytm-s6-dist-comp',
+      'rytm-four-on-the-floor': 'analog-rytm-q1-rhythm-basics',
+      'rytm-backbeat-syncopation': 'analog-rytm-q1-rhythm-basics',
+      'rytm-ghosts-accents': 'analog-rytm-q2-groove',
+      'rytm-swing-groove': 'analog-rytm-q2-groove',
+    },
+  },
 ];
 
 /** Carry lesson completions over to the lessons that replaced them */
@@ -269,8 +294,8 @@ export function upgradeCompletedLessons(done: string[], from: number): string[] 
   return [...out];
 }
 
-export const STORE_VERSION = 10;
-export const PROJECT_VERSION = 7;
+export const STORE_VERSION = 11;
+export const PROJECT_VERSION = 8;
 
 /**
  * Upgrade the control values of every instance saved before version `from`
