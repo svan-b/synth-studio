@@ -175,6 +175,14 @@ older browser saves and project files, and on studios kept while a lesson ran. A
 lesson id goes in `LESSON_RENAMES`, so completions carry over. To find changed defaults and
 removed ids between two commits, compare `specDefaults(<device>)` at both.
 
+## Separate outputs
+Hardware with individual outputs (the Rytm's voice outs, say) can offer them to the studio:
+- Declare them in `studio.outputs: [{ id, label, stereo? }]`.
+- Implement `connectOutput(id, destination | null)` on the engine. With a destination, send that part there and take it out of the main output; with `null`, put it back.
+- The learner turns outputs on in the mixer (the instrument strip's **Outs** menu). Each one becomes a channel `<instance>/<id>` with its own fader, pan, sends, mute, solo, meter, route and stem.
+- The arranger's mutes of the instrument mute its outputs too. Sets and lesson studios start with every output off.
+- The main output must sound exactly as before while no output is connected.
+
 ## Song arranger
 - Pattern-based instruments provide `studio.patterns(data) => [{ id, label }]` and handle
   `event('arranger:pattern', { id, time })` by switching pattern at audio `time` (a bar line).

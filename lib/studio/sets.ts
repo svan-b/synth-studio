@@ -350,6 +350,7 @@ export function loadStudioSet(set: StudioSet) {
         bpm: set.bpm ?? s.studio.bpm,
         off: {},
         mixer,
+        outputs: {},
       },
       currentDevice: set.focus ?? set.rack[0].id,
     };

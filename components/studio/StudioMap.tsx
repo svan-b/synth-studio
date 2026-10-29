@@ -8,7 +8,7 @@ import { useMemo } from 'react';
 import type { RackSlot, StudioCable } from '@/devices/types';
 import { useStudioStore } from '@/store/studio';
 import { hub } from '@/lib/studio/hub';
-import { channelOf, MIN_DB, audibleChannels } from '@/lib/studio/mixerDoc';
+import { channelOf, MIN_DB, audibleChannels, outputChannelId, studioChannels } from '@/lib/studio/mixerDoc';
 import { deviceColor, instanceLabel } from './Mixer';
 import { useSlotsVersion } from './hooks';
 
@@ -26,15 +26,16 @@ export default function StudioMap({ onFocus }: { onFocus: (instance: string) => 
   const cables = useStudioStore(s => s.studio.cables);
   const mixer = useStudioStore(s => s.studio.mixer);
   const off = useStudioStore(s => s.studio.off);
+  const outputs = useStudioStore(s => s.studio.outputs);
   // The layout reads each device's module (is it a mixer? does it follow the clock?), so it is
   // rebuilt when modules arrive: a whole studio loaded at once (a demo) draws before they load
   const slots = useSlotsVersion();
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- slots: the modules the layout reads have loaded
-  const layout = useMemo(() => buildLayout(rack, routes, sync, mixer, off ?? {}), [rack, routes, sync, mixer, off, slots]);
+  const layout = useMemo(() => buildLayout(rack, routes, sync, mixer, off ?? {}, outputs ?? {}), [rack, routes, sync, mixer, off, outputs, slots]);
   const { nodes, height, routeEdges, syncEdges } = layout;
   const pos = (id: string) => nodes.find(n => n.id === id);
-  const audible = useMemo(() => audibleChannels(mixer, rack, routes), [mixer, rack, routes]);
+  const audible = useMemo(() => audibleChannels(mixer, studioChannels(rack, outputs), routes), [mixer, rack, routes, outputs]);
 
   const cableEdges = cables.map(c => ({ c, a: pos(c.from.instance), b: pos(c.to.instance) })).filter(e => e.a && e.b) as { c: StudioCable; a: Node; b: Node }[];
 
@@ -60,9 +61,9 @@ export default function StudioMap({ onFocus }: { onFocus: (instance: string) => 
           {routeEdges.map(e => {
             const a = pos(e.from)!, b = pos(e.to)!;
             const y2 = b.y + NODE_H / 2 + (e.slot ?? 0);
-            const on = e.from === 'master' || audible.has(e.from) || nodes.find(n => n.id === e.from)?.kind === 'mixer';
+            const on = e.from === 'master' || audible.has(e.id ?? e.from) || nodes.find(n => n.id === e.from)?.kind === 'mixer';
             return (
-              <g key={`r${e.from}`}>
+              <g key={`r${e.id ?? e.from}`}>
                 <path d={curve(a.x + NODE_W, a.y + NODE_H / 2, b.x, y2)} stroke={on ? '#9ca3af' : '#4b5563'} strokeWidth={2} fill="none" markerEnd="url(#arrow)" opacity={on ? 0.9 : 0.5} />
                 {e.label && (
                   <text x={b.x - 6} y={y2 - 4} textAnchor="end" fontSize={10} fill="#d1d5db">{e.label}</text>
@@ -151,6 +152,7 @@ function jackName(end: { instance: string; jack: string }) {
 function buildLayout(
   rack: RackSlot[], routes: Record<string, string>, sync: Record<string, boolean>,
   mixer: ReturnType<typeof useStudioStore.getState>['studio']['mixer'], off: Record<string, boolean>,
+  outputs: Record<string, string[]>,
 ) {
   const mod = (r: RackSlot) => hub.getModule(r.device);
   // A mixer only counts once it exposes inputs other instruments can be routed into
@@ -175,7 +177,14 @@ function buildLayout(
       color: '#94a3b8', kind: 'clock',
     });
   });
-  const routeEdges: { from: string; to: string; label?: string; slot?: number }[] = [];
+  const routeEdges: { from: string; to: string; label?: string; slot?: number; id?: string }[] = [];
+  /** Where a channel goes: a mixer in the rack with that input, or the master */
+  const targetOf = (channel: string) => {
+    const route = routes[channel] ?? 'master';
+    const [mx, input] = route.split(':');
+    const mxSlot = mixers.find(m => m.id === mx);
+    return route !== 'master' && mxSlot && mod(mxSlot)?.studio?.mixerInputs?.some(x => x.id === input) ? mx : 'master';
+  };
   insts.forEach((r, i) => {
     const ch = channelOf(mixer, r.id);
     const route = routes[r.id] ?? 'master';
@@ -191,6 +200,7 @@ function buildLayout(
       off[r.id] ? 'OFF' : null,
       // The mixer channel it feeds (in its own box: labels on converging arrows would overlap)
       inputLabel ? `→ ${inputLabel.replace(/\s*\(.*\)$/, '')}` : null,
+      (outputs[r.id] ?? []).length ? `+${outputs[r.id].length} out${outputs[r.id].length > 1 ? 's' : ''}` : null,
     ].filter(Boolean);
     nodes.push({
       id: r.id, x: COL[1], y: top(insts.length) + i * (NODE_H + GAP),
@@ -198,6 +208,11 @@ function buildLayout(
       color: deviceColor(r.device), kind: 'inst',
     });
     routeEdges.push({ from: r.id, to: target });
+    // separate outputs: one more arrow each, to wherever that channel goes
+    (outputs[r.id] ?? []).forEach(o => {
+      const id = outputChannelId(r.id, o);
+      routeEdges.push({ from: r.id, to: targetOf(id), id });
+    });
   });
   mixers.forEach((r, i) => {
     nodes.push({

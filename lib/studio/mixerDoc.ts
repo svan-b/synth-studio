@@ -86,6 +86,21 @@ export const MASTER_DEFAULT: MasterDoc = {
   glue: { on: false, threshold: -18, ratio: 2, attack: 0.01, release: 0.3, auto: true, makeup: 0, mix: 1 },
 };
 
+/** The channel of an instrument's separate output (DeviceModule.studio.outputs): '<instance>/<output>' */
+export const outputChannelId = (instance: string, output: string) => `${instance}/${output}`;
+/** The instrument a channel belongs to: a separate output's channel belongs to its instrument */
+export const channelInstance = (id: string) => id.split('/')[0];
+
+/** Every channel of the studio: one per instrument, then its separate outputs in use */
+export function studioChannels(rack: { id: string }[], outputs: Record<string, string[]> | undefined): { id: string }[] {
+  const out: { id: string }[] = [];
+  rack.forEach(r => {
+    out.push({ id: r.id });
+    (outputs?.[r.id] ?? []).forEach(o => out.push({ id: outputChannelId(r.id, o) }));
+  });
+  return out;
+}
+
 export function channelOf(doc: MixerDoc | undefined, instance: string): ChannelDoc {
   const c = doc?.channels?.[instance];
   return c ? { ...CHANNEL_DEFAULT, ...c } : CHANNEL_DEFAULT;

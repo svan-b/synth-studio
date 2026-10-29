@@ -69,6 +69,8 @@ export interface StudioDoc {
   off?: Record<string, boolean>;
   /** Mixer: channel strips, returns, master section. Optional on disk: lib/studio/mixerDoc.ts fills defaults. */
   mixer?: MixerDoc;
+  /** instance -> separate outputs in use (DeviceModule.studio.outputs ids), each its own channel '<instance>/<id>' */
+  outputs?: Record<string, string[]>;
   /** Metronome click and 1-bar count-in (a working preference: not undoable) */
   metronome?: { click?: boolean; countIn?: boolean };
 }
@@ -180,6 +182,8 @@ interface StudioStore extends StudioStoreState {
   removeStudioCable: (cable: StudioCable) => void;
   clearStudioCables: (instance?: string) => void;
   setRoute: (instance: string, route: string) => void;
+  /** Use one of an instrument's separate outputs (its own mixer channel), or put it back in the main output */
+  setOutputUsed: (instance: string, output: string, on: boolean) => void;
   setSync: (instance: string, on: boolean) => void;
   setPowered: (instance: string, on: boolean) => void;
   setBpm: (bpm: number) => void;
@@ -377,10 +381,20 @@ const sameStudioCable = (c: StudioCable, d: StudioCable) =>
 
 /** The mixer without an instance's channel (it left the rack) */
 const withoutChannel = (m: MixerDoc | undefined, instance: string): MixerDoc | undefined => {
-  if (!m?.channels?.[instance]) return m;
+  const mine = (k: string) => k === instance || k.startsWith(`${instance}/`);
+  if (!m?.channels || !Object.keys(m.channels).some(mine)) return m;
   const channels = { ...m.channels };
-  delete channels[instance];
+  Object.keys(channels).forEach(k => { if (mine(k)) delete channels[k]; });
   return { ...m, channels };
+};
+
+/** An instance's route, separate outputs and mixer channels (its own and its outputs') removed */
+const withoutRouting = (st: StudioDoc, instance: string): Pick<StudioDoc, 'routes' | 'outputs' | 'mixer'> => {
+  const routes = { ...st.routes };
+  Object.keys(routes).forEach(k => { if (k === instance || k.startsWith(`${instance}/`)) delete routes[k]; });
+  const outputs = { ...(st.outputs ?? {}) };
+  delete outputs[instance];
+  return { routes, outputs, mixer: withoutChannel(st.mixer, instance) };
 };
 
 /** Device type of an instance id when the rack doesn't know it ('mother32#2' -> 'mother32') */
@@ -749,15 +763,12 @@ export const useStudioStore = create<StudioStore>()(
           const rack = s.studio.rack.some(r => r.id === instance)
             ? s.studio.rack.map(r => (r.id === instance ? { id, device } : r))
             : [...s.studio.rack, { id, device }];
-          const routes = { ...s.studio.routes };
-          delete routes[instance];
           set({
             studio: {
               ...s.studio,
               rack,
-              routes,
+              ...withoutRouting(s.studio, instance),
               cables: s.studio.cables.filter(c => c.from.instance !== instance && c.to.instance !== instance),
-              mixer: withoutChannel(s.studio.mixer, instance),
             },
             currentDevice: id,
           });
@@ -769,16 +780,15 @@ export const useStudioStore = create<StudioStore>()(
           const s = get();
           if (s.studio.rack.length <= 1) return; // keep at least one instrument
           const rack = s.studio.rack.filter(r => r.id !== instance);
-          const routes = { ...s.studio.routes };
-          delete routes[instance];
-          Object.keys(routes).forEach(k => { if (routes[k].startsWith(`${instance}:`)) routes[k] = 'master'; });
+          const gone = withoutRouting(s.studio, instance);
+          // channels that went into it (it was a mixer) go to the master
+          Object.keys(gone.routes).forEach(k => { if (gone.routes[k].startsWith(`${instance}:`)) gone.routes[k] = 'master'; });
           set({
             studio: {
               ...s.studio,
               rack,
-              routes,
+              ...gone,
               cables: s.studio.cables.filter(c => c.from.instance !== instance && c.to.instance !== instance),
-              mixer: withoutChannel(s.studio.mixer, instance),
             },
             currentDevice: s.currentDevice === instance ? rack[0].id : s.currentDevice,
           });
@@ -869,6 +879,14 @@ export const useStudioStore = create<StudioStore>()(
           })),
 
         setRoute: (instance, route) => updateStudio(st => ({ ...st, routes: { ...st.routes, [instance]: route } })),
+
+        setOutputUsed: (instance, output, on) => updateStudio(st => {
+          const now = st.outputs?.[instance] ?? [];
+          if (now.includes(output) === on) return st;
+          const outputs = { ...(st.outputs ?? {}), [instance]: on ? [...now, output] : now.filter(o => o !== output) };
+          if (!outputs[instance].length) delete outputs[instance];
+          return { ...st, outputs };
+        }),
 
         setSync: (instance, on) => updateStudio(st => ({ ...st, sync: { ...st.sync, [instance]: on } })),
 

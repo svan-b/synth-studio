@@ -27,7 +27,7 @@ import {
 } from '@/lib/audio/context';
 import { transport } from '@/lib/audio/transport';
 import { StudioMixer, type ChannelStrip } from './mixer';
-import { masterOf, dbToGain } from './mixerDoc';
+import { masterOf, dbToGain, channelInstance, outputChannelId, studioChannels } from './mixerDoc';
 import { levelTrimDb } from './levels';
 import { withoutHistory } from './historyGate';
 import { metronome } from './metronome';
@@ -67,6 +67,8 @@ type Listener = () => void;
 
 class EngineHub {
   private modules = new Map<string, Promise<DeviceModule>>();
+  /** Route state of the separate outputs' channels, by channel id '<instance>/<output>' */
+  private outRoutes = new Map<string, { key: string; teardown: (() => void) | null }>();
   private loaded = new Map<string, DeviceModule>();
   private slots = new Map<string, Slot>();
   private pending = new Set<string>();
@@ -116,13 +118,14 @@ class EngineHub {
       if (s.studio === prev.studio && s.devices === prev.devices) return;
       if (s.studio.rack !== prev.studio.rack || s.studio.off !== prev.studio.off) this.reconcileRack();
       if (s.devices !== prev.devices) this.pushAll();
-      if (s.studio.routes !== prev.studio.routes || s.studio.rack !== prev.studio.rack) this.applyRouting();
+      if (s.studio.outputs !== prev.studio.outputs) this.applyOutputs();
+      if (s.studio.routes !== prev.studio.routes || s.studio.rack !== prev.studio.rack || s.studio.outputs !== prev.studio.outputs) this.applyRouting();
       if (s.studio.cables !== prev.studio.cables) this.applyCables();
       if (s.studio.sync !== prev.studio.sync) this.applySync();
       // Undo, projects and sets change these without going through setBpm / setSwing
       if (s.studio.bpm !== prev.studio.bpm) transport.setBpm(s.studio.bpm);
       if (s.studio.swing !== prev.studio.swing) transport.setSwing(s.studio.swing);
-      if (s.studio.mixer !== prev.studio.mixer || s.studio.routes !== prev.studio.routes ||
+      if (s.studio.mixer !== prev.studio.mixer || s.studio.routes !== prev.studio.routes || s.studio.outputs !== prev.studio.outputs ||
         s.studio.rack !== prev.studio.rack || s.studio.bpm !== prev.studio.bpm) this.applyMixer();
     });
     onAudioStateChange(running => {
@@ -286,6 +289,10 @@ class EngineHub {
       const strip = slot.strip;
       setTimeout(() => { if (mixer.get(instance) === strip) mixer.removeStrip(instance); else strip.dispose(); }, 90);
     }
+    if (mixer) {
+      const outs = [...mixer.strips.entries()].filter(([id]) => id.includes('/') && channelInstance(id) === instance);
+      setTimeout(() => outs.forEach(([id, s]) => { if (mixer.get(id) === s) this.dropOutputChannel(id); }), 90);
+    }
     this.slots.delete(instance);
     this.slotListeners.forEach(l => l());
   }
@@ -425,6 +432,7 @@ class EngineHub {
       slot.outGain = slot.strip.input;
       slot.engine.start(ctx, slot.strip.input);
       slot.started = true;
+      this.applyOutputs();
       this.applyMixer();
       this.applyRouting();
       this.applyCables();
@@ -444,36 +452,87 @@ class EngineHub {
     const master = getMasterBus();
     this.slots.forEach(slot => {
       if (!slot.started || !slot.strip) return;
-      let route = routes[slot.instance] ?? 'master';
-      let target: { mixer: Slot; input: string } | null = null;
-      if (route !== 'master') {
-        const [mixerId, input] = route.split(':');
-        const mixer = this.slots.get(mixerId);
-        if (mixer && mixer.started && mixer !== slot) target = { mixer, input };
-        else route = 'master';
-      }
-      const key = target ? `${target.mixer.instance}:${target.input}` : 'master';
-      if (key === slot.routeKey) return;
-      slot.routeTeardown?.();
-      slot.routeTeardown = null;
-      const out = slot.strip.output;
-      try { out.disconnect(master); } catch { /* not connected */ }
-      if (target) {
-        const teardown = target.mixer.engine.connectExternal(target.input, { node: out });
-        if (teardown) slot.routeTeardown = teardown;
-        else out.connect(master);
-      } else {
-        out.connect(master);
-      }
-      slot.routeKey = key;
+      const next = this.routeChannel(slot.instance, slot.instance, slot.strip.output, { key: slot.routeKey, teardown: slot.routeTeardown }, routes, master);
+      slot.routeKey = next.key;
+      slot.routeTeardown = next.teardown;
     });
+    // Separate outputs route like instruments
+    this._mixer?.strips.forEach((strip, id) => {
+      if (!id.includes('/')) return;
+      const cur = this.outRoutes.get(id) ?? { key: '', teardown: null };
+      this.outRoutes.set(id, this.routeChannel(id, channelInstance(id), strip.output, cur, routes, master));
+    });
+  }
+
+  /** Send one channel to the master, or into a mixer device's input ('<mixer>:<input>'); returns its new route */
+  private routeChannel(
+    id: string, owner: string, out: AudioNode, cur: { key: string; teardown: (() => void) | null },
+    routes: Record<string, string>, master: AudioNode,
+  ): { key: string; teardown: (() => void) | null } {
+    const route = routes[id] ?? 'master';
+    let target: { mixer: Slot; input: string } | null = null;
+    if (route !== 'master') {
+      const [mixerId, input] = route.split(':');
+      const mixer = this.slots.get(mixerId);
+      if (mixer && mixer.started && mixer.instance !== owner) target = { mixer, input };
+    }
+    const key = target ? `${target.mixer.instance}:${target.input}` : 'master';
+    if (key === cur.key) return cur;
+    cur.teardown?.();
+    try { out.disconnect(master); } catch { /* not connected */ }
+    let teardown: (() => void) | null = null;
+    if (target) {
+      teardown = target.mixer.engine.connectExternal(target.input, { node: out });
+      if (!teardown) out.connect(master);
+    } else {
+      out.connect(master);
+    }
+    return { key, teardown };
+  }
+
+  /**
+   * Separate outputs in use (studio.outputs) get their own channel strip, '<instance>/<output>':
+   * the engine moves that part off its main output onto the strip. Turning one off puts it back.
+   */
+  private applyOutputs() {
+    const mixer = this._mixer;
+    if (this._status !== 'on' || !mixer) return;
+    const used = useStudioStore.getState().studio.outputs ?? {};
+    const wanted = new Set<string>();
+    this.slots.forEach(slot => {
+      const outs = slot.module.studio?.outputs;
+      if (!slot.started || !outs?.length || !slot.engine.connectOutput) return;
+      outs.forEach(o => {
+        const id = outputChannelId(slot.instance, o.id);
+        if ((used[slot.instance] ?? []).includes(o.id)) {
+          wanted.add(id);
+          if (!mixer.get(id)) {
+            const strip = mixer.createStrip(id, { trimDb: levelTrimDb(slot.device), stereo: !!o.stereo });
+            slot.engine.connectOutput!(o.id, strip.input);
+          }
+        } else if (mixer.get(id)) {
+          slot.engine.connectOutput!(o.id, null);
+        }
+      });
+    });
+    // Channels no longer wanted (turned off, or their instrument left)
+    [...mixer.strips.keys()].forEach(id => {
+      if (!id.includes('/') || wanted.has(id) || !this.slots.has(channelInstance(id))) return;
+      this.dropOutputChannel(id);
+    });
+  }
+
+  private dropOutputChannel(id: string) {
+    this.outRoutes.get(id)?.teardown?.();
+    this.outRoutes.delete(id);
+    this._mixer?.removeStrip(id);
   }
 
   private applyMixer() {
     const mixer = this._mixer;
     if (!mixer) return;
     const st = useStudioStore.getState().studio;
-    mixer.apply(st.mixer, st.rack, st.routes, st.bpm);
+    mixer.apply(st.mixer, studioChannels(st.rack, st.outputs), st.routes, st.bpm);
     const m = masterOf(st.mixer);
     setMasterSettings({ gain: dbToGain(m.gain), eq: m.eq, glue: m.glue });
   }
@@ -661,7 +720,10 @@ class EngineHub {
   setMuted(instance: string, muted: boolean, time?: number) {
     const strip = this.slots.get(instance)?.strip;
     if (!strip) return;
-    strip.setArrangerMute(muted, time ?? getAudioContext().currentTime);
+    const t = time ?? getAudioContext().currentTime;
+    strip.setArrangerMute(muted, t);
+    // a part muted by the arranger is muted on its separate outputs too
+    this._mixer?.strips.forEach((s, id) => { if (id !== instance && channelInstance(id) === instance) s.setArrangerMute(muted, t); });
   }
 
   getEngine(instance: string): SynthEngine | undefined {
@@ -670,6 +732,7 @@ class EngineHub {
 
   /** The node an instrument's channel outputs (post-fader) - for stems and tests */
   getStripOutput(instance: string): AudioNode | null {
+    if (instance.includes('/')) return this._mixer?.get(instance)?.output ?? null; // a separate output's channel
     return this.slots.get(instance)?.strip?.output ?? null;
   }
 
