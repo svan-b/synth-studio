@@ -14,6 +14,7 @@ import { getAudioContext } from '@/lib/audio/context';
 import { useStudioStore, type ArrangementSection } from '@/store/studio';
 import { hub } from './hub';
 import { withoutHistory } from './historyGate';
+import { atAudioTime } from './platform';
 
 type Listener = (state: { section: number; bar: number }) => void;
 
@@ -23,6 +24,8 @@ class ArrangementPlayer {
   private started = false;
   /** Bounce: stop at the end even when the song loops, and report the end time */
   private stopAtEnd: ((endTime: number) => void) | null = null;
+  /** Bounce without a song: stop on this bar line (0-based bar index) */
+  private stopBar: { bar: number; done: (endTime: number) => void } | null = null;
   state = { section: -1, bar: 0 };
 
   init() {
@@ -62,12 +65,25 @@ class ArrangementPlayer {
     this.stopAtEnd = onEnd;
   }
 
+  /** Stop on the line before bar `bar` (0-based) and call `onEnd(endTime)` - a loop bounce */
+  stopAtBarOnce(bar: number, onEnd: (endTime: number) => void) {
+    this.stopBar = { bar, done: onEnd };
+  }
+
   cancelStopAtEnd() {
     this.stopAtEnd = null;
+    this.stopBar = null;
   }
 
   private onTick(t: TransportTick) {
     if (t.tick % (PPQN * 4) !== 0) return; // bar boundaries only
+    if (this.stopBar && t.bar >= this.stopBar.bar) {
+      const done = this.stopBar.done;
+      this.stopBar = null;
+      hub.stopAll(t.time);
+      done(t.time);
+      return;
+    }
     const arr = useStudioStore.getState().studio.arrangement;
     if (!arr.enabled || !arr.sections.length) return;
     const total = arr.sections.reduce((n, s) => n + Math.max(1, s.bars), 0);
@@ -76,8 +92,9 @@ class ArrangementPlayer {
       if (!arr.loop || this.stopAtEnd) {
         const done = this.stopAtEnd;
         this.stopAtEnd = null;
-        const delay = Math.max(0, (t.time - getAudioContext().currentTime) * 1000);
-        setTimeout(() => { if (transport.playing) hub.stopAll(); }, delay);
+        // Stop scheduling right here (nothing after the last bar line gets queued, however
+        // far ahead the transport looks) and let the music stop on that bar line
+        hub.stopAll(t.time);
         done?.(t.time);
         return;
       }
@@ -114,10 +131,10 @@ class ArrangementPlayer {
       if (!part) return;
       if (part.pattern) hub.event(slot.id, 'arranger:pattern', { id: part.pattern, time });
       if (part.snapshot) {
-        const delay = Math.max(0, (time - getAudioContext().currentTime) * 1000 - 5);
         const snap = part.snapshot;
-        // Song automation, not an edit: keep it out of undo
-        setTimeout(() => withoutHistory(() => useStudioStore.getState().setControlValues(slot.id, snap)), delay);
+        // On the audio clock, just before the bar line (setTimeout lags up to a second on a
+        // hidden iPad page). Song automation, not an edit: keep it out of undo.
+        atAudioTime(time - 0.005, () => withoutHistory(() => useStudioStore.getState().setControlValues(slot.id, snap)));
       }
     });
   }

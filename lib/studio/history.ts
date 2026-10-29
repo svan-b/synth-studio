@@ -219,8 +219,11 @@ class StudioHistory {
     const now = performance.now();
     const top = this.past[this.past.length - 1];
     const sameGesture = top && this.pendingPointer && top.pointer && top.gesture === this.gesture;
+    // Only continuous values merge by time (a knob nudged with arrow keys, a MIDI knob,
+    // typing a tempo); structural edits (rack, cables, routing...) are always their own step
     const sameTargets = top && !this.pendingPointer && !top.pointer && now - top.last < MERGE_MS &&
-      top.changes.size === changes.size && [...changes.keys()].every(k => top.changes.has(k));
+      top.changes.size === changes.size && [...changes.keys()].every(k => top.changes.has(k)) &&
+      [...changes.values()].every(c => continuous(c.target));
     if (top && (sameGesture || sameTargets) && this.future.length === 0) {
       changes.forEach((c, k) => {
         const old = top.changes.get(k);
@@ -254,6 +257,12 @@ class StudioHistory {
 // ----------------------------------------------------------------------------
 // Diff and apply
 // ----------------------------------------------------------------------------
+
+/** Values that change in small steps and merge into one undo step when edited in a quick run */
+function continuous(t: Target): boolean {
+  if (t.kind === 'cv' || t.kind === 'channel' || t.kind === 'mixer') return true;
+  return t.kind === 'studio' && (t.key === 'bpm' || t.key === 'swing' || t.key === 'arrangement');
+}
 
 function deviceOfInstance(s: S, instance: string): string {
   return s.studio.rack.find(r => r.id === instance)?.device ?? instance.split('#')[0];

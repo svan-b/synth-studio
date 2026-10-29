@@ -559,8 +559,11 @@ class RecorderProcessor extends AudioWorkletProcessor {
     super();
     const o = (options && options.processorOptions) || {};
     this.chunkFrames = o.chunkFrames || 8192;
-    this.left = new Float32Array(this.chunkFrames);
-    this.right = new Float32Array(this.chunkFrames);
+    // 'int24': interleaved 24-bit little-endian PCM bytes, ready for a WAV file (stems: no
+    // float buffering, no encoding on the main thread). 'float': two Float32Arrays.
+    this.int24 = o.format === 'int24';
+    if (this.int24) this.bytes = new Uint8Array(this.chunkFrames * 6);
+    else { this.left = new Float32Array(this.chunkFrames); this.right = new Float32Array(this.chunkFrames); }
     this.fill = 0;
     this.start = -1;      // first frame to record
     this.stop = Infinity; // first frame not recorded
@@ -582,10 +585,44 @@ class RecorderProcessor extends AudioWorkletProcessor {
 
   flush() {
     if (this.fill === 0) return;
-    const l = this.left.slice(0, this.fill);
-    const r = this.right.slice(0, this.fill);
-    this.port.postMessage({ type: 'chunk', l, r }, [l.buffer, r.buffer]);
+    if (this.int24) {
+      const b = this.bytes.slice(0, this.fill * 6);
+      this.port.postMessage({ type: 'pcm', bytes: b, frames: this.fill }, [b.buffer]);
+    } else {
+      const l = this.left.slice(0, this.fill);
+      const r = this.right.slice(0, this.fill);
+      this.port.postMessage({ type: 'chunk', l, r }, [l.buffer, r.buffer]);
+    }
     this.fill = 0;
+  }
+
+  /** Append frames [i, end) of l / r (null = silence) */
+  put(l, r, i, end) {
+    while (i < end) {
+      const k = Math.min(end - i, this.chunkFrames - this.fill);
+      if (this.int24) {
+        const b = this.bytes;
+        let o = this.fill * 6;
+        for (let j = i; j < i + k; j++) {
+          for (let c = 0; c < 2; c++) {
+            let x = l ? (c === 0 ? l[j] : r[j]) : 0;
+            if (!(x === x)) x = 0;
+            x = x > 1 ? 1 : x < -1 ? -1 : x;
+            const v = Math.round(x < 0 ? x * 8388608 : x * 8388607);
+            b[o] = v & 255; b[o + 1] = (v >> 8) & 255; b[o + 2] = (v >> 16) & 255;
+            o += 3;
+          }
+        }
+      } else if (l) {
+        this.left.set(l.subarray(i, i + k), this.fill);
+        this.right.set(r.subarray(i, i + k), this.fill);
+      } else {
+        this.left.fill(0, this.fill, this.fill + k);
+        this.right.fill(0, this.fill, this.fill + k);
+      }
+      this.fill += k; this.frames += k; i += k;
+      if (this.fill === this.chunkFrames) this.flush();
+    }
   }
 
   process(inputs) {
@@ -597,15 +634,7 @@ class RecorderProcessor extends AudioWorkletProcessor {
     if (b > a) {
       const l = input && input.length ? input[0] : null;
       const r = input && input.length ? input[1] || input[0] : null;
-      let i = a - f0;
-      const end = b - f0;
-      while (i < end) {
-        const k = Math.min(end - i, this.chunkFrames - this.fill);
-        if (l) { this.left.set(l.subarray(i, i + k), this.fill); this.right.set(r.subarray(i, i + k), this.fill); }
-        else { this.left.fill(0, this.fill, this.fill + k); this.right.fill(0, this.fill, this.fill + k); }
-        this.fill += k; this.frames += k; i += k;
-        if (this.fill === this.chunkFrames) this.flush();
-      }
+      this.put(l, r, a - f0, b - f0);
     }
     if (f0 + n >= this.stop) {
       this.flush();

@@ -22,7 +22,7 @@ class Metronome {
       if (!useStudioStore.getState().studio.metronome?.click) return;
       this.click(t.time, t.tick % (PPQN * 4) === 0);
     });
-    transport.onEvent(e => { if (e.type === 'stop') this.cancel(); });
+    transport.onEvent(e => { if (e.type === 'stop') this.cancel(e.time); });
   }
 
   /** One bar of clicks ending at `downbeat` (audio time) */
@@ -43,12 +43,12 @@ class Metronome {
     return () => this.countInListeners.delete(l);
   }
 
-  /** Stop clicks that haven't sounded yet (stop during a count-in) */
-  cancel() {
-    const now = getAudioContext().currentTime;
-    this.pending.forEach(p => { if (p.time > now) { try { p.osc.stop(); } catch { /* */ } } });
-    this.pending = [];
-    this.countInEnd = 0;
+  /** Stop clicks that haven't sounded yet, or only those at/after `from` (a song's end) */
+  cancel(from?: number) {
+    const t = Math.max(getAudioContext().currentTime, from ?? 0);
+    this.pending.forEach(p => { if (p.time >= t) { try { p.osc.stop(); } catch { /* */ } } });
+    this.pending = this.pending.filter(p => p.time < t);
+    if (!from) this.countInEnd = 0;
     this.countInListeners.forEach(l => l());
   }
 

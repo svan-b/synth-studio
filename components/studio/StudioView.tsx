@@ -223,6 +223,7 @@ function CableOverlay({ containerRef, cables, onRemove, collapsed, nameOf }: {
   const [points, setPoints] = useState<{ c: StudioCable; a: { x: number; y: number }; b: { x: number; y: number } }[]>([]);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [hover, setHover] = useState<string | null>(null);
+  const press = useRef<{ x: number; y: number; id: number; key: string } | null>(null);
 
   const measure = useCallback(() => {
     const root = containerRef.current;
@@ -251,15 +252,23 @@ function CableOverlay({ containerRef, cables, onRemove, collapsed, nameOf }: {
     measure();
     const root = containerRef.current;
     if (!root) return;
-    const ro = new ResizeObserver(() => requestAnimationFrame(measure));
+    let queued = 0;
+    const later = () => { if (!queued) queued = requestAnimationFrame(() => { queued = 0; measure(); }); };
+    const ro = new ResizeObserver(later);
     ro.observe(root);
-    root.querySelectorAll('[data-instance]').forEach(n => ro.observe(n));
-    const t = setInterval(measure, 1000); // modules load asynchronously
-    window.addEventListener('resize', measure);
+    const observePanels = () => root.querySelectorAll('[data-instance]').forEach(n => ro.observe(n));
+    observePanels();
+    // Instrument panels render when their module has loaded: re-measure then (no polling)
+    const mo = new MutationObserver(() => { observePanels(); later(); });
+    mo.observe(root, { childList: true, subtree: true });
+    const unsub = hub.onSlotsChange(later);
+    window.addEventListener('resize', later);
     return () => {
       ro.disconnect();
-      clearInterval(t);
-      window.removeEventListener('resize', measure);
+      mo.disconnect();
+      unsub();
+      if (queued) cancelAnimationFrame(queued);
+      window.removeEventListener('resize', later);
     };
   }, [measure, containerRef, collapsed]);
 
@@ -285,7 +294,14 @@ function CableOverlay({ containerRef, cables, onRemove, collapsed, nameOf }: {
               style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
               onPointerEnter={() => setHover(key)}
               onPointerLeave={() => setHover(h => (h === key ? null : h))}
-              onPointerDown={e => { e.stopPropagation(); onRemove(c); }}
+              // Unplug on a tap (released within 8 px): a scroll that starts on a cable must not unplug it
+              onPointerDown={e => { e.stopPropagation(); press.current = { x: e.clientX, y: e.clientY, id: e.pointerId, key }; }}
+              onPointerUp={e => {
+                const p0 = press.current;
+                press.current = null;
+                if (p0 && p0.id === e.pointerId && p0.key === key && Math.hypot(e.clientX - p0.x, e.clientY - p0.y) < 8) onRemove(c);
+              }}
+              onPointerCancel={() => { press.current = null; }}
             >
               <title>{`${nameOf(c.from.instance)} ${jackLabel(c.from)} → ${nameOf(c.to.instance)} ${jackLabel(c.to)} - tap to unplug`}</title>
             </path>

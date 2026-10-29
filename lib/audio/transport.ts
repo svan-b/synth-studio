@@ -53,8 +53,16 @@ export class Transport {
   private recentTime = new Float64Array(128);
   private recentTick = new Float64Array(128);
   private recentN = 0;
-  readonly lookahead = 0.1;
+  /** How far ahead ticks are scheduled, seconds. Raised while the page is hidden (setLookahead). */
+  lookahead = 0.1;
   readonly interval = 0.02;
+  /** Normal look-ahead while the page is visible */
+  static readonly LOOKAHEAD = 0.1;
+  /**
+   * Look-ahead while the page is hidden. WebKit (iPad) aligns hidden pages' timers to
+   * one second even while audio plays, so 100 ms of look-ahead would run dry.
+   */
+  static readonly HIDDEN_LOOKAHEAD = 1.8;
 
   attach(ctx: BaseAudioContext) {
     this.ctx = ctx;
@@ -91,6 +99,12 @@ export class Transport {
     this.eventListeners.forEach(l => l({ type: 'tempo', bpm: b }));
   }
 
+  /** Change the scheduling look-ahead (seconds); takes effect on the next pump */
+  setLookahead(seconds: number) {
+    this.lookahead = Math.max(0.05, Math.min(3, seconds));
+    if (this._playing) this.pump();
+  }
+
   /** Swing amount 0..0.75: fraction of a 16th that off-beat 16ths are delayed by */
   setSwing(amount: number) {
     this._swing = Math.max(0, Math.min(0.75, amount));
@@ -115,12 +129,16 @@ export class Transport {
     this.pump();
   }
 
-  stop() {
+  /**
+   * Stop scheduling now. `atTime` (audio time, optional) is when the music stops: notes
+   * already scheduled before it still play (a song's end on its last bar line).
+   */
+  stop(atTime?: number) {
     if (!this._playing || !this.ctx) return;
     this._playing = false;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
-    const t = this.ctx.currentTime;
+    const t = Math.max(this.ctx.currentTime, atTime ?? 0);
     this.eventListeners.forEach(l => l({ type: 'stop', time: t }));
   }
 
@@ -174,7 +192,12 @@ export class Transport {
       this.recentTime[r] = ev.time;
       this.recentTick[r] = tick;
       this.recentN++;
-      this.tickListeners.forEach(l => l(ev));
+      // A listener may stop the transport (the song's end): nobody else gets that tick
+      for (const l of this.tickListeners) {
+        l(ev);
+        if (!this._playing) break;
+      }
+      if (!this._playing) return;
       this.tickCount++;
       this.nextTickTime += dur;
     }

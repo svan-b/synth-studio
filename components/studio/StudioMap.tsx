@@ -42,7 +42,7 @@ export default function StudioMap({ onFocus }: { onFocus: (instance: string) => 
         <Legend />
       </div>
       <div className="overflow-x-auto">
-        <svg viewBox={`0 0 860 ${height}`} className="w-full min-w-[640px]" style={{ maxHeight: Math.max(160, height) }} role="img" aria-label="How the instruments are clocked, wired and routed">
+        <svg viewBox={`0 0 860 ${height}`} width={860} height={height} className="max-w-full h-auto min-w-[640px]" role="img" aria-label="How the instruments are clocked, wired and routed">
           <defs>
             <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z" fill="#9ca3af" />

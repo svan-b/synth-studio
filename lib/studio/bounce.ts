@@ -23,6 +23,7 @@ import { arranger } from './arranger';
 import { withoutHistory } from './historyGate';
 import { makeZip, zipSize, ZIP_LIMIT, type ZipEntry } from './zip';
 import { LoudnessMeter, normalizeChunks, type LoudnessStats } from './loudness';
+import { saveFilesOrOffer, type SaveItem, type SaveResult } from './platform';
 
 export function instanceName(id: string): string {
   const st = useStudioStore.getState();
@@ -51,16 +52,6 @@ export function stemTaps(): TakeTap[] {
     if (t.id === '__reverb') taps.push({ id: t.id, name: `${String(n++).padStart(2, '0')} Return B - Reverb`, node: t.node });
   });
   return taps;
-}
-
-export function downloadBlob(blob: Blob, filename: string) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
 }
 
 const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
@@ -104,20 +95,19 @@ function packStems(tracks: TakeTrack[], master: WavStream, extra: string[], base
   return makeZip(entries);
 }
 
-function downloadTake(tracks: TakeTrack[], master: WavStream, stems: boolean, label: string, extra: string[] = []) {
+/** The files of a take: the master WAV, or a .zip with the master, every stem and a README */
+function takeFiles(tracks: TakeTrack[], master: WavStream, stems: boolean, label: string, extra: string[] = []): SaveItem[] {
   const base = `synth-studio-${label}-${stamp()}`;
-  if (!stems) {
-    downloadBlob(master.blob(), `${base}.wav`);
-    return;
-  }
+  if (!stems) return [{ blob: master.blob(), name: `${base}.wav` }];
   const estimate = zipSize(tracks.map(t => ({ name: t.name, data: [], size: t.wav.fileSize(), crc: 0 })));
   if (estimate >= ZIP_LIMIT) {
     // Too big for a zip: separate files
-    downloadBlob(master.blob(), `${base}-Master.wav`);
-    tracks.forEach(t => { if (t.id !== 'master') downloadBlob(t.wav.blob(), `${base}-${t.name}.wav`); });
-    return;
+    return [
+      { blob: master.blob(), name: `${base}-Master.wav` },
+      ...tracks.filter(t => t.id !== 'master').map(t => ({ blob: t.wav.blob(), name: `${base}-${t.name}.wav` })),
+    ];
   }
-  downloadBlob(packStems(tracks, master, extra, base), `${base}-stems.zip`);
+  return [{ blob: packStems(tracks, master, extra, base), name: `${base}-stems.zip` }];
 }
 
 // ----------------------------------------------------------------------------
@@ -150,7 +140,7 @@ export async function stopRecording(): Promise<void> {
   if (!cur) return;
   const tracks = await cur.take.stop();
   const master = tracks.find(t => t.id === 'master')!.wav;
-  downloadTake(tracks, master, cur.stems, 'take');
+  await saveFilesOrOffer(takeFiles(tracks, master, cur.stems, 'take'), cur.stems ? 'stems' : 'WAV');
 }
 
 // ----------------------------------------------------------------------------
@@ -174,7 +164,7 @@ export interface BounceProgress {
   bars?: number;
   seconds?: number;
   message?: string;
-  result?: { seconds: number; master: LoudnessStats; normalized?: LoudnessStats; gainDb?: number; files: number };
+  result?: { seconds: number; master: LoudnessStats; normalized?: LoudnessStats; gainDb?: number; files: number; items: SaveItem[]; saved: SaveResult };
 }
 
 let bouncing: { cancel: () => void } | null = null;
@@ -244,7 +234,10 @@ export async function bounceSong(opts: BounceOptions, onProgress: (p: BounceProg
     let end = t0 + bars * barDur;
     let ended = false;
     const onEnd = (time: number) => { end = time; ended = true; };
+    // The arranger stops the transport on the last bar line, before any instrument hears
+    // the next bar's tick (it listens to the transport first)
     if (song) arranger.stopAtEndOnce(onEnd);
+    else arranger.stopAtBarOnce(bars, onEnd);
     hub.startAll({ at: t0, countIn: false, fromTick: 0 });
     // Progress while playing
     await new Promise<void>(resolve => {
@@ -254,11 +247,6 @@ export async function bounceSong(opts: BounceOptions, onProgress: (p: BounceProg
         const t = transport.tickAt(now);
         const bar = t === null ? 0 : Math.floor(t / (PPQN * 4)) + 1;
         onProgress({ phase: 'playing', bar: Math.min(bars, bar), bars, seconds: Math.max(0, now - t0) });
-        if (!song && !ended && now >= end - 0.11) {
-          ended = true;
-          // the stop lands on the last bar line (the transport schedules 100 ms ahead)
-          setTimeout(() => hub.stopAll(), Math.max(0, (end - ctx.currentTime) * 1000));
-        }
         if (ended && now >= end) { resolve(); return; }
         if (!transport.playing && now > t0 + 0.5) { end = Math.min(end, now); resolve(); return; }
         setTimeout(tick, 100);
@@ -303,9 +291,11 @@ export async function bounceSong(opts: BounceOptions, onProgress: (p: BounceProg
     }
     const lat = getLatencyInfo();
     if (lat) extra.push(`Recorded at ${lat.sampleRate} Hz; the master was shifted by the limiter's ${(lat.lookahead * 1000).toFixed(2)} ms look-ahead to line up with the stems.`);
-    downloadTake(tracks, master, opts.stems, song ? 'song' : `${bars}-bars`, extra);
+    const items = takeFiles(tracks, master, opts.stems, song ? 'song' : `${bars}-bars`, extra);
+    // On iPad the share sheet needs a recent tap: after a long bounce the dialog offers "Save"
+    const saved = await saveFilesOrOffer(items, opts.stems ? 'stems' : 'WAV');
     const seconds = master.frames / ctx.sampleRate;
-    onProgress({ phase: 'done', result: { seconds, master: measured, normalized, gainDb, files: opts.stems ? tracks.length + 1 : 1 } });
+    onProgress({ phase: 'done', result: { seconds, master: measured, normalized, gainDb, files: opts.stems ? tracks.length + 1 : 1, items, saved } });
   } catch (e) {
     console.error('[bounce]', e);
     restore();

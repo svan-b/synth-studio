@@ -90,9 +90,13 @@ export class WavStream {
 
   push(l: Float32Array, r: Float32Array) {
     if (this.floats) this.floats.push({ l, r });
-    const bytes = encodeInt24(l, r);
+    this.pushBytes(encodeInt24(l, r), l.length);
+  }
+
+  /** Interleaved 24-bit stereo PCM (the recorder worklet encodes stems itself) */
+  pushBytes(bytes: Uint8Array<ArrayBuffer>, frames: number) {
     this.crc = crc32(bytes, this.crc);
-    this.frames += l.length;
+    this.frames += frames;
     this.size += bytes.length;
     this.pendingBytes.push(bytes);
     this.pendingSize += bytes.length;
@@ -206,6 +210,8 @@ export class Take {
     const t = time ?? ctx.currentTime + 0.1;
     this.startTime = t;
     this.taps.forEach((tap, i) => {
+      // Floats only where someone needs them (normalising, a loudness meter); 24-bit otherwise
+      const float = !!(tap.keepFloats || tap.onChunk);
       const node = new AudioWorkletNode(ctx, 'recorder', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
@@ -213,12 +219,14 @@ export class Take {
         channelCount: 2,
         channelCountMode: 'explicit',
         channelInterpretation: 'speakers',
+        processorOptions: { format: float ? 'float' : 'int24' },
       });
       const track = this.tracks[i];
       this.done.push(new Promise<void>(resolve => {
         node.port.onmessage = e => {
-          const d = e.data as { type: string; l: Float32Array; r: Float32Array };
-          if (d.type === 'chunk') { track.wav.push(d.l, d.r); tap.onChunk?.(d.l, d.r); }
+          const d = e.data as { type: string; l: Float32Array; r: Float32Array; bytes: Uint8Array<ArrayBuffer>; frames: number };
+          if (d.type === 'pcm') track.wav.pushBytes(d.bytes, d.frames);
+          else if (d.type === 'chunk') { track.wav.push(d.l, d.r); tap.onChunk?.(d.l, d.r); }
           else if (d.type === 'done') resolve();
         };
       }));

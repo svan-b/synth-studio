@@ -6,6 +6,7 @@ import { isStepSatisfied, isValueOnTarget, valueToNorm, defaultOf } from '@/lib/
 import { transport } from '@/lib/audio/transport';
 import { STORE_VERSION, upgradeDevices } from '@/lib/studio/upgrades';
 import type { ChannelDoc, DelayDoc, MasterDoc, MixerDoc, ReverbDoc } from '@/lib/studio/mixerDoc';
+import { throttledLocalStorage } from '@/lib/studio/persistStorage';
 
 // ============================================================================
 // Synth Studio store
@@ -176,6 +177,9 @@ interface StudioStore extends StudioStoreState {
   // ---- spaced review --------------------------------------------------------
   recordReview: (itemId: string, correct: boolean, lesson: string) => void;
 }
+
+/** The browser save of the studio (throttled; see lib/studio/persistStorage.ts) */
+export const studioStorage = throttledLocalStorage<unknown>();
 
 // Device specs registered at runtime (module scope - not persisted)
 const specs: Record<string, DeviceSpec> = {};
@@ -884,6 +888,8 @@ export const useStudioStore = create<StudioStore>()(
     {
       name: 'synth-studio-storage',
       version: STORE_VERSION,
+      // Written at most every 600 ms (and on hide / close), not on every knob move
+      storage: studioStorage,
       partialize: s => ({
         currentDevice: s.currentDevice,
         devices: s.devices,

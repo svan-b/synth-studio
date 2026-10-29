@@ -65,7 +65,7 @@ export default function StudioSets() {
       {open && (
         <>
           <p className="text-[11px] text-gray-500 mt-1.5">{p.blurb} Each stage is a complete studio: wired, routed and mixed. Loading one keeps your sounds and patterns.</p>
-          <ol className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2 mt-2">
+          <ol className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 mt-2">
             {p.stages.map(set => {
               const active = here?.id === set.id;
               return (

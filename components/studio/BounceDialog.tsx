@@ -4,6 +4,8 @@ import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useStudioStore } from '@/store/studio';
 import { bounceSong, cancelBounce, type BounceProgress } from '@/lib/studio/bounce';
+import { saveFiles } from '@/lib/studio/platform';
+import { dismissNotice } from '@/lib/studio/notices';
 
 const fmt = (v: number | undefined) => (v === undefined || !Number.isFinite(v) ? '–' : v.toFixed(1));
 
@@ -29,7 +31,7 @@ export default function BounceDialog({ open, onOpenChange }: { open: boolean; on
     <Dialog.Root open={open} onOpenChange={o => { if (!busy) { onOpenChange(o); if (!o) setProgress(null); } }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/70 z-40" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#161616] border-2 border-[#333] rounded-xl p-5 w-[calc(100%-2rem)] max-w-md shadow-2xl z-50">
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#161616] border-2 border-[#333] rounded-xl p-5 w-[calc(100%-2rem)] max-w-md shadow-2xl z-50 max-h-[90dvh] overflow-y-auto">
           <Dialog.Title className="text-lg font-bold text-white">Bounce song</Dialog.Title>
           <Dialog.Description className="text-xs text-gray-400 mt-1 leading-relaxed">
             {song
@@ -71,7 +73,11 @@ export default function BounceDialog({ open, onOpenChange }: { open: boolean; on
               {progress.phase === 'encoding' && <p className="text-gray-300">{progress.message}</p>}
               {progress.phase === 'done' && progress.result && (
                 <div className="text-gray-200 space-y-1">
-                  <p className="text-green-400 font-bold">Done - {progress.result.files > 1 ? `${progress.result.files} files in a .zip` : 'WAV'} downloaded ({fmt(progress.result.seconds)} s).</p>
+                  <p className="text-green-400 font-bold">
+                    {progress.result.saved === 'needs-tap'
+                      ? `Ready: ${progress.result.files > 1 ? `${progress.result.files} files in a .zip` : 'WAV'} (${fmt(progress.result.seconds)} s). Tap Save to keep it.`
+                      : `Done - ${progress.result.files > 1 ? `${progress.result.files} files in a .zip` : 'WAV'} ${progress.result.saved === 'shared' ? 'saved' : progress.result.saved === 'cancelled' ? 'ready' : 'downloaded'} (${fmt(progress.result.seconds)} s).`}
+                  </p>
                   <p className="text-xs text-gray-400 tabular-nums">
                     Your mix: {fmt(progress.result.master.integrated)} LUFS integrated, true peak {fmt(progress.result.master.truePeak)} dBTP.
                   </p>
@@ -93,6 +99,14 @@ export default function BounceDialog({ open, onOpenChange }: { open: boolean; on
             ) : (
               <>
                 <Dialog.Close asChild><button className="px-4 py-2 rounded bg-[#2a2a2a] text-gray-200 text-sm">Close</button></Dialog.Close>
+                {progress?.phase === 'done' && progress.result && (
+                  <button
+                    onClick={() => { const items = progress.result!.items; dismissNotice('save-file'); void saveFiles(items).then(saved => setProgress(p => (p?.result ? { ...p, result: { ...p.result, saved } } : p))); }}
+                    className={`px-4 py-2 rounded text-sm font-bold ${progress.result.saved === 'needs-tap' ? 'bg-sky-600 text-white' : 'bg-[#2a2a2a] text-gray-200'}`}
+                  >
+                    {progress.result.saved === 'needs-tap' ? 'Save' : 'Save again'}
+                  </button>
+                )}
                 <button onClick={start} className="px-4 py-2 rounded bg-red-600 text-white text-sm font-bold">
                   {progress?.phase === 'done' ? 'Bounce again' : 'Bounce'}
                 </button>

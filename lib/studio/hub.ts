@@ -23,7 +23,7 @@ import { DEVICES } from '@/devices';
 import { useStudioStore, specDefaults, getSpec } from '@/store/studio';
 import {
   getAudioContext, getMasterBus, installAudioUnlock, loadExtraWorklet, loadWorklets, onAudioStateChange, resumeAudio,
-  resetMasterMeter, setMasterSettings,
+  resetMasterMeter, setMasterSettings, getLastMasterMeter, getLatencyInfo, audioSupportProblem, onProcessorError,
 } from '@/lib/audio/context';
 import { transport } from '@/lib/audio/transport';
 import { StudioMixer, type ChannelStrip } from './mixer';
@@ -31,6 +31,10 @@ import { masterOf, dbToGain } from './mixerDoc';
 import { levelTrimDb } from './levels';
 import { withoutHistory } from './historyGate';
 import { metronome } from './metronome';
+import { showNotice, dismissNotice } from './notices';
+import {
+  atAudioTime, holdWakeLock, initMediaSession, releaseWakeLock, requestPersistentStorage, setMediaPlaying, watchVisibility,
+} from './platform';
 
 export type AudioStatus = 'off' | 'starting' | 'on' | 'error';
 
@@ -71,7 +75,7 @@ class EngineHub {
   private auditionStop: (() => void) | null = null;
   private auditionTimers: ReturnType<typeof setTimeout>[] = [];
   private _mixer: StudioMixer | null = null;
-  private runTimer: ReturnType<typeof setTimeout> | null = null;
+  private runCancel: (() => void) | null = null;
 
   get status() { return this._status; }
   get error() { return this._error; }
@@ -82,14 +86,26 @@ class EngineHub {
   init() {
     if (this.initialised || typeof window === 'undefined') return;
     this.initialised = true;
-    // Test/automation hook (lesson runner, smoke tests)
-    (window as unknown as { __synthStudio?: unknown }).__synthStudio = { store: useStudioStore, hub: this, transport };
+    // Test/automation hook (lesson runner, smoke tests, mixer/master checks)
+    (window as unknown as { __synthStudio?: unknown }).__synthStudio = {
+      store: useStudioStore, hub: this, transport,
+      audio: { getAudioContext, getMasterBus, getLastMasterMeter, getLatencyInfo },
+    };
     installAudioUnlock();
     const st = useStudioStore.getState();
     transport.attach(getAudioContext());
     transport.setBpm(st.studio.bpm);
     transport.setSwing(st.studio.swing);
     metronome.init();
+    // iPad: schedule further ahead while hidden; headphone / lock-screen play and stop
+    watchVisibility();
+    initMediaSession({ play: () => this.startAll(), stop: () => this.stopAll() });
+    onProcessorError(name => showNotice({
+      id: 'processor',
+      level: 'error',
+      text: `An audio processor stopped working ('${name}'), so the instrument using it is silent. Reload the page to restart it (your work is saved). If it happens again, note what you were doing.`,
+      action: { label: 'Reload', run: () => window.location.reload() },
+    }));
     this.reconcileRack();
     useStudioStore.subscribe((s, prev) => {
       if (s.studio === prev.studio && s.devices === prev.devices) return;
@@ -112,6 +128,8 @@ class EngineHub {
       if (e.type !== 'start' && e.type !== 'stop') return;
       // Integrated loudness counts from Play
       if (e.type === 'start') resetMasterMeter();
+      setMediaPlaying(e.type === 'start');
+      if (e.type === 'stop') releaseWakeLock();
       // Mirror the studio transport into synced instruments' own play buttons
       const playing = e.type === 'start';
       const store = useStudioStore.getState();
@@ -343,7 +361,15 @@ class EngineHub {
 
   startAudio(): Promise<void> {
     if (this.starting) return this.starting;
+    const problem = audioSupportProblem();
+    if (problem) {
+      // Say why, visibly: an iPad on plain http:// has no AudioWorklet at all
+      this.setStatus('error', problem);
+      showNotice({ id: 'audio', level: 'error', text: problem });
+      return Promise.resolve();
+    }
     this.setStatus('starting');
+    requestPersistentStorage();
     this.starting = (async () => {
       try {
         await resumeAudio();
@@ -358,6 +384,7 @@ class EngineHub {
         this.loaded.forEach(m => m.worklets?.forEach(u => urls.add(u)));
         await Promise.all([...urls].map(loadExtraWorklet));
         this.setStatus('on');
+        dismissNotice('audio');
         this.slots.forEach(slot => this.startSlot(slot));
         this.applyRouting();
         this.applyCables();
@@ -365,7 +392,13 @@ class EngineHub {
         this.applyMixer();
       } catch (e) {
         console.error('[hub] audio failed to start', e);
-        this.setStatus('error', e instanceof Error ? e.message : String(e));
+        const msg = e instanceof Error ? e.message : String(e);
+        this.setStatus('error', msg);
+        showNotice({
+          id: 'audio', level: 'error',
+          text: `The audio engine didn't start: ${msg}`,
+          action: { label: 'Try again', run: () => this.ensureAudio() },
+        });
       } finally {
         this.starting = null;
       }
@@ -537,6 +570,8 @@ class EngineHub {
   startAll(opts: { countIn?: boolean; at?: number; fromTick?: number } = {}) {
     this.ensureAudio();
     if (transport.playing) return;
+    // Called from the Play gesture: keep the screen on while the studio plays
+    holdWakeLock();
     const st = useStudioStore.getState();
     const ctx = getAudioContext();
     transport.setBpm(st.studio.bpm);
@@ -560,28 +595,37 @@ class EngineHub {
     const clocked = unsynced.filter(s => this.clockedByCable(s.instance));
     const free = unsynced.filter(s => !clocked.includes(s));
     press(clocked);
-    const wait = (t0 - ctx.currentTime - 0.03) * 1000;
-    if (this.runTimer) clearTimeout(this.runTimer);
-    this.runTimer = null;
-    if (wait > 15 && free.length) {
-      this.runTimer = setTimeout(() => { this.runTimer = null; if (transport.playing) press(free); }, wait);
+    this.runCancel?.();
+    this.runCancel = null;
+    if (free.length && t0 - ctx.currentTime > 0.045) {
+      // on the audio clock: a hidden iPad page runs setTimeout only once a second
+      this.runCancel = atAudioTime(t0 - 0.03, () => { this.runCancel = null; if (transport.playing) press(free); });
     } else press(free);
     transport.start(t0, opts.fromTick ?? 0);
   }
 
-  /** The big ■: stop the clock and every instrument's own sequencer */
-  stopAll() {
-    if (this.runTimer) { clearTimeout(this.runTimer); this.runTimer = null; }
-    metronome.cancel();
-    transport.stop();
-    const st = useStudioStore.getState();
-    withoutHistory(() => {
-      this.slots.forEach(slot => {
-        const tc = slot.module.transportControl;
-        if (!tc) return;
-        if (st.devices[slot.instance]?.controlValues[tc]) st.setControlValue(slot.instance, tc, false);
+  /**
+   * The big ■: stop the clock and every instrument's own sequencer. With `atTime` (the
+   * song's last bar line) scheduling stops now and the music at that audio time.
+   */
+  stopAll(atTime?: number) {
+    this.runCancel?.();
+    this.runCancel = null;
+    metronome.cancel(atTime);
+    transport.stop(atTime);
+    releaseWakeLock();
+    const pressStop = () => {
+      const st = useStudioStore.getState();
+      withoutHistory(() => {
+        this.slots.forEach(slot => {
+          const tc = slot.module.transportControl;
+          if (!tc) return;
+          if (st.devices[slot.instance]?.controlValues[tc]) st.setControlValue(slot.instance, tc, false);
+        });
       });
-    });
+    };
+    if (atTime !== undefined && atTime > getAudioContext().currentTime + 0.01) atAudioTime(atTime - 0.005, () => { if (!transport.playing) pressStop(); });
+    else pressStop();
   }
 
   getState(instance: string): EngineState {

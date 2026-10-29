@@ -104,7 +104,7 @@ export function MasterMeterPanel({ height = 168 }: { height?: number }) {
         <StereoMeter read={readMaster} showClip />
       </div>
       <div className="relative w-[7px] bg-black/70 rounded-[1px] overflow-hidden" style={{ height }} title="Limiter gain reduction (0 at the top, 12 dB at the bottom)">
-        <div className="absolute top-0 left-0 right-0 bg-amber-400" style={{ height: `${grPct * 100}%` }} />
+        <div className="absolute inset-0 origin-top bg-amber-400" style={{ transform: `scaleY(${grPct.toFixed(3)})` }} />
       </div>
       <dl className="text-[10px] leading-tight grid grid-cols-[auto_auto] gap-x-1.5 gap-y-0.5 tabular-nums font-mono">
         <dt className="text-gray-500" title="Momentary loudness: the last 0.4 s">M</dt><dd className="text-right text-gray-200">{fmt(f?.m)}</dd>

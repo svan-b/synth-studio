@@ -6,6 +6,7 @@
 import { useStudioStore, type InstanceState, type StudioDoc } from '@/store/studio';
 import { PROJECT_VERSION, upgradeDevices } from './upgrades';
 import { history } from './history';
+import { requestPersistentStorage, saveFilesOrOffer } from './platform';
 
 export interface ProjectFile {
   format: 'synth-studio-project';
@@ -36,14 +37,20 @@ export function newProject() {
   history.clear();
 }
 
+const LAST_EXPORT_KEY = 'synth-studio-last-export';
+
+/** Save the project to a file (the share sheet on iPad: Save to Files) */
 export function downloadProject(name = 'My track') {
   const file = exportProject(name);
   const blob = new Blob([JSON.stringify(file)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${name.replace(/[^\w\- ]+/g, '').trim() || 'project'}.synthstudio.json`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+  void saveFilesOrOffer([{ blob, name: `${name.replace(/[^\w\- ]+/g, '').trim() || 'project'}.synthstudio.json` }], 'project file');
+  try { localStorage.setItem(LAST_EXPORT_KEY, String(Date.now())); } catch { /* */ }
+  requestPersistentStorage(true);
+}
+
+/** When the project was last saved to a file in this browser (0 = never) */
+export function lastProjectExport(): number {
+  try { return Number(localStorage.getItem(LAST_EXPORT_KEY)) || 0; } catch { return 0; }
 }
 
 export async function importProject(file: File): Promise<string> {

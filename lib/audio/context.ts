@@ -87,10 +87,54 @@ export function getLatencyInfo(): LatencyInfo | null {
 // Context and master graph
 // ---------------------------------------------------------------------------
 
+/**
+ * Why audio can't run here, or null. On plain http:// (an iPad opening a LAN address)
+ * browsers hide AudioWorklet, which every instrument needs.
+ */
+export function audioSupportProblem(): string | null {
+  if (typeof window === 'undefined') return null;
+  const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AC) return 'This browser has no Web Audio, so it can\'t make sound. Use a current Safari, Chrome, Edge or Firefox.';
+  if (typeof isSecureContext !== 'undefined' && !isSecureContext) {
+    return 'Sound needs a secure page. Open Synth Studio with an https:// address (or http://localhost on this computer): on plain http:// the browser switches off the audio engine (AudioWorklet).';
+  }
+  if (!('audioWorklet' in AC.prototype)) {
+    return 'This browser has no AudioWorklet, which every instrument needs. Update to iPadOS / Safari 14.5 or later, or use Chrome, Edge or Firefox.';
+  }
+  return null;
+}
+
+const processorErrorListeners = new Set<(processor: string) => void>();
+
+/** An AudioWorklet processor threw (its node is silent from then on) */
+export function onProcessorError(l: (processor: string) => void): () => void {
+  processorErrorListeners.add(l);
+  return () => processorErrorListeners.delete(l);
+}
+
+/** Every AudioWorkletNode created from here on reports 'processorerror' to onProcessorError */
+function watchProcessorErrors() {
+  const w = window as unknown as { AudioWorkletNode?: typeof AudioWorkletNode & { __watched?: boolean } };
+  const Orig = w.AudioWorkletNode;
+  if (!Orig || Orig.__watched) return;
+  class Watched extends Orig {
+    constructor(context: BaseAudioContext, name: string, options?: AudioWorkletNodeOptions) {
+      super(context, name, options);
+      this.addEventListener('processorerror', () => {
+        console.error(`[audio] processor '${name}' failed`);
+        processorErrorListeners.forEach(l => l(name));
+      });
+    }
+  }
+  (Watched as unknown as { __watched: boolean }).__watched = true;
+  w.AudioWorkletNode = Watched;
+}
+
 function createContext(): AudioContext {
   const AC: typeof AudioContext =
     window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   usedHint = getLatencyPreference();
+  watchProcessorErrors();
   let c: AudioContext;
   try {
     c = new AC({ latencyHint: usedHint });
@@ -349,9 +393,12 @@ export function loadExtraWorklet(url: string): Promise<void> {
 export function resumeAudio(): Promise<void> {
   const c = getAudioContext();
   try {
-    // iOS 16.4+: play through the ringer/silent switch like a music app
+    // iOS 16.4+: play through the ringer/silent switch like a music app. WebKit treats the
+    // session type as process-wide, so never force 'playback' while something captures
+    // audio (Audio input sets 'play-and-record' and counts its streams in __synthCaptureCount).
     const nav = navigator as unknown as { audioSession?: { type: string } };
-    if (nav.audioSession && nav.audioSession.type !== 'playback') nav.audioSession.type = 'playback';
+    const capturing = ((globalThis as unknown as { __synthCaptureCount?: number }).__synthCaptureCount ?? 0) > 0;
+    if (nav.audioSession && !capturing && nav.audioSession.type !== 'playback') nav.audioSession.type = 'playback';
   } catch {
     // not supported - ignore
   }

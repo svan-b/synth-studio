@@ -9,6 +9,7 @@ import { getAudioContext, getLatencyInfo } from '@/lib/audio/context';
 import { arranger } from '@/lib/studio/arranger';
 import { isRecording, recordingElapsed, startRecording, stopRecording } from '@/lib/studio/bounce';
 import { MasterMeterCompact } from './MasterMeter';
+import { onFrame } from './controls';
 import { useTransportPlaying } from './hooks';
 import BounceDialog from './BounceDialog';
 import AudioSettings from './AudioSettings';
@@ -66,14 +67,14 @@ export default function TransportBar() {
 
   const on = status === 'on';
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 bg-[#161616] border border-[#2e2e2e] rounded-xl px-2.5 py-1.5">
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 bg-[#161616] border border-[#2e2e2e] rounded-xl px-2 py-1.5">
       <button
         onClick={() => hub.ensureAudio()}
         title={error ?? (on ? 'Audio engine running · master meter: level, short-term loudness and the limiter light' : 'Browsers only allow sound after you touch the page')}
         className={`flex items-center gap-1.5 px-2.5 h-9 text-xs rounded-full border ${on ? 'border-green-900 text-green-400' : status === 'error' ? 'border-red-900 text-red-400' : 'border-orange-700 text-orange-300 animate-pulse motion-reduce:animate-none'}`}
       >
-        <span className="w-2 h-2 rounded-full" style={{ background: on ? '#22c55e' : status === 'error' ? '#ef4444' : '#f97316' }} />
-        {on ? 'Audio' : status === 'starting' ? 'Starting…' : status === 'error' ? 'Audio error' : 'Tap for sound'}
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: on ? '#22c55e' : status === 'error' ? '#ef4444' : '#f97316' }} />
+        {on ? <span className="sr-only">Audio</span> : status === 'starting' ? 'Starting…' : status === 'error' ? 'Audio error' : 'Tap for sound'}
         {on && <MasterMeterCompact />}
       </button>
 
@@ -105,12 +106,12 @@ export default function TransportBar() {
         <button className="px-2 h-9 rounded bg-[#242424] text-gray-300 text-[11px]" onClick={tap} title="Tap at least three times">TAP</button>
       </div>
 
-      <label className="flex items-center gap-1 text-[11px] text-gray-400" title="Swing delays every second 16th note - the shuffle in house and hip-hop">
-        Swing
+      <label className="relative flex items-center" title="Swing delays every second 16th note - the shuffle in house and hip-hop">
+        <span className="absolute left-1.5 top-[3px] text-[8px] leading-none uppercase tracking-wide text-gray-500 pointer-events-none">swing</span>
         <select
           value={String(Math.round(50 + swing * 50))}
           onChange={e => setSwing((Number(e.target.value) - 50) / 50)}
-          className="bg-black/60 text-white rounded px-1 h-9 text-[11px]"
+          className="bg-black/60 text-white rounded pl-1 pr-0.5 pt-2.5 h-9 text-[11px]"
           aria-label="Swing"
         >
           {[50, 54, 58, 62, 66, 70, 75].map(v => <option key={v} value={v}>{v}%</option>)}
@@ -182,11 +183,11 @@ function Position({ songOn }: { songOn: boolean }) {
   const [sub, setSub] = useState('');
   const [counting, setCounting] = useState(false);
   useEffect(() => {
-    let raf = 0;
     let last = '';
     let lastSub = '';
     let lastCount = false;
-    const loop = () => {
+    // on the shared animation loop with the meters
+    return onFrame(() => {
       const ctx = getAudioContext();
       const lat = getLatencyInfo();
       const now = ctx.currentTime - (lat ? lat.base + lat.output : 0);
@@ -214,10 +215,7 @@ function Position({ songOn }: { songOn: boolean }) {
       if (l !== last) { last = l; setLabel(l); }
       if (s !== lastSub) { lastSub = s; setSub(s); }
       if (c !== lastCount) { lastCount = c; setCounting(c); }
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    });
   }, [songOn]);
   return (
     <div className="flex flex-col items-center justify-center bg-black/60 rounded px-2 h-9 min-w-[84px]" title="Position: bar . beat . sixteenth (what you hear now)">
