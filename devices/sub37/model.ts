@@ -311,8 +311,16 @@ export const LADDER_DRIVE = 0.45;
 export const LADDER_MAKEUP = 2.1;
 /** MULTIDRIVE: post gain so the knob adds grit more than level (0-100 %) */
 export const mdPostGain = (pct: number) => 1 / (1 + 0.009 * Math.max(0, Math.min(100, pct)));
+/**
+ * Output level of the twin (dB), after the VCA: with VOLUME at its default 7 a fresh panel (one
+ * saw, the filter open) plays the standard phrase at about -15 LUFS, and the presets are levelled
+ * to the studio's -18 LUFS with PRESET VOL (scripts/audio-qa.cjs --target -18). The studio's
+ * channel trims are unity, so an instrument has to arrive at that level.
+ */
+export const OUTPUT_TRIM_DB = -6;
+const OUTPUT_TRIM = Math.pow(10, OUTPUT_TRIM_DB / 20);
 /** VOLUME / HEADPHONES (0-100) -> gain */
-export const volumeGain = (pct: number) => Math.pow(Math.max(0, pct) / 100, 2) * 0.9;
+export const volumeGain = (pct: number) => Math.pow(Math.max(0, pct) / 100, 2) * 0.9 * OUTPUT_TRIM;
 /** HEADPHONES balances against VOLUME (p.34): unity at 7 on its dial */
 export const phonesGain = (pct: number) => Math.pow(Math.max(0, pct) / 70, 2);
 

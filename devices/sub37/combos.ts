@@ -111,7 +111,7 @@ export function interceptSub37(id: string, value: ControlValue, api: DeviceUiApi
       if (a.pgm !== undefined) api.setValue(`mod${bus}_pgm_dst`, a.pgm);
       api.setUi({ destAssigned: true, ...release, ...flash(`MOD ${bus} DEST: ${a.label}`) });
     } else {
-      api.setUi({ destAssigned: true, ...release, ...flash('NOT A TWIN MOD DEST') });
+      api.setUi({ destAssigned: true, ...release, ...flash(`MOD ${bus} DEST: NOT IN TWIN`) });
     }
     return true;
   }
@@ -130,7 +130,7 @@ export function interceptSub37(id: string, value: ControlValue, api: DeviceUiApi
         if (held) {
           const s = readSeq(v);
           applySeq(api.setValue, s, v.arp_on ? blankSteps(s) : { ...s, ...blankSeq() });
-          api.setUi({ ...usedBank(ui), ...flash('SEQUENCE ERASED') });
+          api.setUi({ ...usedBank(ui), ...flash('SEQUENCE: ERASED') });
         }
         api.setUi({ recPos: 0, recTie: false });
       }
@@ -145,7 +145,7 @@ export function interceptSub37(id: string, value: ControlValue, api: DeviceUiApi
         const on = !ui.stepEdit;
         api.setUi({
           ...usedBank(ui), stepEdit: on, stepSel: null, stepHeld: null, stepLatched: false, seqPage: 0, pageChase: true,
-          bankMode: false, menu: null, ...flash(on ? 'STEP EDIT' : 'STEP EDIT OFF'),
+          bankMode: false, menu: null, ...flash(on ? 'STEP EDIT: ON' : 'STEP EDIT: OFF'),
         });
         return true;
       }
@@ -153,7 +153,7 @@ export function interceptSub37(id: string, value: ControlValue, api: DeviceUiApi
         // hold a step + LATCH: RATCHET on / off (p.20)
         const s = readSeq(v);
         applySeq(api.setValue, s, toggleRatchet(s, step));
-        api.setUi({ ...usedStep(ui), ...flash(`STEP ${step + 1} RATCHET`) });
+        api.setUi({ ...usedStep(ui), ...flash(`STEP ${step + 1}: RATCHET`) });
         return true;
       }
       if (stepEdit && sel !== null) {
@@ -166,7 +166,7 @@ export function interceptSub37(id: string, value: ControlValue, api: DeviceUiApi
         // step record: TIE the last note to the next one (pp.16-17)
         const pos = Number(ui.recPos ?? 0);
         const r = recTie({ pos, tie: !!ui.recTie });
-        api.setUi({ recTie: r.tie, ...flash(pos ? 'TIE' : 'TIE: PLAY A NOTE FIRST') });
+        api.setUi({ recTie: r.tie, ...flash(pos ? 'STEP RECORD: TIE' : 'TIE: NOTE FIRST') });
         return true;
       }
       return false;
@@ -177,7 +177,7 @@ export function interceptSub37(id: string, value: ControlValue, api: DeviceUiApi
         // hold a step + ON: SKIP on / off (p.19)
         const s = readSeq(v);
         applySeq(api.setValue, s, toggleSkip(s, step));
-        api.setUi({ ...usedStep(ui), ...flash(`STEP ${step + 1} SKIP`) });
+        api.setUi({ ...usedStep(ui), ...flash(`STEP ${step + 1}: SKIP`) });
         return true;
       }
       if (stepEdit && sel !== null) {
@@ -204,7 +204,7 @@ export function interceptSub37(id: string, value: ControlValue, api: DeviceUiApi
       const cur = Math.max(1, Math.min(8, Math.round(Number(v.seq_ratchet ?? 2))));
       const next = Math.max(1, Math.min(8, cur + (id === 'arp_invert' ? 1 : -1)));
       api.setValue('seq_ratchet', next);
-      api.setUi({ ...usedBank(ui), ...flash(`RATCHET CNT ${next}x`) });
+      api.setUi({ ...usedBank(ui), ...flash(`RATCHET CNT: ${next}x`) });
       return true;
     }
 

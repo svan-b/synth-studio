@@ -1,259 +1,317 @@
-# Moog Sub 37 / Subsequent 37 - hardware reference for the digital twin
+# Moog Sub 37 / Subsequent 37: hardware reference for the digital twin
 
-Ground truth for `devices/sub37`. The twin is the **Sub 37 panel with the Subsequent 37 sound
-engine** (2017: doubled mixer headroom, revised MultiDrive, same panel and menus). Every control,
-button, LED, the LCD, the preset and bank buttons, the wheels and the keyboard are listed with
-the printed label, section, position, knob class, range and switch positions, plus a source and
-a confidence level.
+Ground truth for `devices/sub37`. The twin is the Sub 37 panel with the Subsequent 37 engine. Both
+instruments share one panel, one parameter set and one manual text, so the twin treats them as one
+control set (see Sources).
 
-- **verified**: quoted from a Moog manual page, or two independent sources agree.
-- **likely**: one good secondary source, or a direct consequence of verified facts.
-- **guess**: nothing reachable documents it. The value was chosen to match the documented
-  behaviour and is listed again under "Model choices" so it can be checked against a unit.
+**Citations.** "(Subsequent 37 manual, p.N)" is the *Subsequent 37 Owner's Manual* (Moog, 2017),
+printed page N. The *Sub 37 Owner's Manual v1.1* (2015) has the same text on the same pages: a
+word-level comparison found only the product name, the copyright year, one extra CC row and a few
+typos (docs/research/sub37/sources.md). So every page number here is valid for both.
 
-`docs/reference/sub37/` does not exist, so there were no photos to read. The network blocks the
-manufacturer's site, the manual mirrors and the image hosts, so manual text comes from
-search-engine excerpts and from an open-source project that cites the Subsequent 37 manual page by
-page (source **PS** below).
+**Confidence.**
+- **verified**: stated in the manual, with the page given.
+- **likely**: follows directly from the manual or the MIDI tables, or from one good secondary source.
+- **guess**: not documented. The value was chosen to match the documented behaviour. Each guess is
+  listed again under "Model choices", so it can be checked against a unit.
 
 ## Sources
 
-| Id | Source |
-|----|--------|
-| M37 | Moog *Sub 37 User Manual v1.1* (2014, 62 pp., `cdn.inmusicbrands.com/Moog/BackOffice/SUB_37_MANUAL_v1.1_0.pdf`), quoted through search excerpts of the manual and its manualslib copy |
-| MS | Moog *Subsequent 37 User's Manual* (2017, 61 pp.). Page-cited quotes as collected in **PS** |
-| QS | Moog *Subsequent 37 Quickstart Guide*, the two-page poster whose lower half is a flat, to-scale legend of the whole control surface. Read through **PS**, which rendered it at 150 dpi and measured every section divider and knob centre |
-| PS | `patchscore` (open source), `lib/devices/moog-subsequent-37/{panel,index}.ts`: the QS panel decode (40 knobs found, in the per-section counts the manual's drawings show: 1·2·1·5·5·6·5·5·8·2) and MS ranges cited per page |
-| MG | midi.guide *Subsequent 37* parameter list (CC BY-SA 4.0), `public/midi-guide/devices/moog-subsequent-37.json`: 157 parameters with section, CC/NRPN and usage ranges |
-| FL | Subsequent 37 factory program names, 16 banks, from a Cubase MIDI device file (GitHub gist "Moog Sub 37 MIDI Device Configuration for Cubase"). PS read 20 of these names at their addresses off a unit at firmware 1.2.0 and all 20 match FL's bank and slot |
-| FT | Moog forum transcription of the *Sub 37 Tribute* v1.1 factory list ("Moog Sub 37 patch list?"), via search excerpts; garbled, used only for names and categories |
-| R | Reviews: Sound On Sound (2014), MusicRadar, MusicTech, Bedroom Producers Blog, Synthtopia |
-| F | Moog forum, Gearspace and ModWiggler threads, via search excerpts |
-| LNX | LNX Studio `LNX_MoogSub37.sc` (GitHub): an editor whose sections run Arpeggiator, Glide, Mod 1, Mod 2, Oscillators, Mixer, Filter, Envelope Generators |
+| Id | Source | Used for |
+|---|---|---|
+| M | Moog *Subsequent 37 Owner's Manual* (63 pp.), and the *Sub 37 Owner's Manual v1.1* (62 pp., same pages) | **primary**: every label, range, list and behaviour below |
+| F1 | Moog *Sub 37 Factory Presets* lists (by bank, by name, by category) | the factory bank's names and categories: 134 presets in banks 1-9 |
+| S1 | midi.guide dataset *Moog Subsequent 37* (CC BY-SA 4.0), in the app as `public/midi-guide/devices/moog-subsequent-37.json` | CC and NRPN numbers; it matches the manual's MIDI tables (pp.53-59) |
+| S2 | `patchscore` Subsequent 37 manifest (facts only): 20 factory presets read off a unit at firmware 1.2.0, and the Quickstart poster's panel legend measured to scale | panel positions; the Subsequent 37 factory bank's slots |
+| S3 | Cubase device files listing the Subsequent 37's 144 program names | the Subsequent 37 factory bank |
+| S6 | Retail and press copy on the Subsequent 37 (doubled mixer headroom, re-voiced MultiDrive, new keybed) | how the two models sound different (**likely**; the manuals do not discuss it) |
+
+The manuals themselves are not in the repository (docs/research/COPYRIGHT-RULES.md). The research
+notes in `docs/research/sub37/` (sources, signal flow, presets, lessons) carry the full parameter
+tables in our own words.
+
+## Instrument
+
+- A 2-note paraphonic analog synthesizer: 37 keys with velocity and aftertouch, 40 knobs and 74
+  switches, every control on MIDI. **verified** (Subsequent 37 manual, p.9).
+- Two mod busses, two looping DAHDSR envelopes, an arpeggiator with a paraphonic 64-note step
+  sequencer; each of those sections has its own SYNC switch. **verified** (Subsequent 37 manual, p.9).
+- 256 presets, 16 banks of 16. **verified** (Subsequent 37 manual, pp.12, 61).
+- Size 6.75" H × 26.375" W × 14.75" D (17 × 68 × 37.5 cm), 22 lb. **verified** (Subsequent 37
+  manual, p.61); the inch width is a misprint for 26.75". The twin's `spec.dimensions` use 670 × 375 ×
+  171 mm.
+
+### Signal flow (block diagram, Subsequent 37 manual, p.11)
+
+```
+OSC 1 (+ SUB, one octave below) ─┐
+OSC 2 (HARD SYNC to OSC 1) ──────┤
+PINK NOISE ──────────────────────┼─► MIXER ─► LADDER FILTER ─► MULTIDRIVE ─► VCA ─┬─► AUDIO OUT (MUTE)
+FDBK / EXT IN ◄── mixer output ──┘     (6/12/18/24 dB)  (OTA + FET)         ▲     └─► HEADPHONES
+   (EXT IN audio replaces the feedback while a cable is in)                AMP EG
+FILTER EG × EG AMT, KB TRACK, MOD 1/2 FILTER AMT, FILTER CV ──► cutoff
+MOD 1 / MOD 2: LFO or F.EG/PGM ──► PITCH AMT (OSC 1, 2 or both), FILTER AMT, MOD AMT ──► MOD DEST
+```
+
+- Sources into the mixer: VCO 1 with its sub, VCO 2, noise, and the EXT IN / feedback channel; then
+  the ladder with slope select, MultiDrive, the VCA, and the audio and headphone outputs. VCO 1
+  hard-syncs VCO 2. **verified** (Subsequent 37 manual, p.11).
+- The twin builds it the same way: two band-limited VCOs (`Vco`, OSC 1 with its sub tap), a mixer
+  worklet with a one-sample FDBK loop, the 2× oversampled ladder, a 2× oversampled MULTIDRIVE shaper,
+  then the VCA, PRESET VOL, VOLUME, MUTE and HEADPHONES. A control worklet (`sub37-ctl`) runs both
+  envelopes, both LFOs, glide, the mod busses and the waveshape morph at audio rate. See `engine.ts`.
 
 ## Panel
 
-- Footprint 6.75" H × 26.375" W × 14.75" D (MS p.61; the metric line says 68 cm W, PS argues the
-  imperial width is the typo). Wooden end cheeks left and right; the left cheek carries every jack
-  (R). **verified**.
-- 37-key semi-weighted keybed with velocity and aftertouch, **MIDI 36-72** (C1-C4 in Moog's
-  naming, where MIDI 48 is "C3"/Middle C: MS pp.14, 29, 50). Pitch and MOD wheels to the left of the
-  keys. **verified** (key range derived by PS from three cited pages).
-- **One row of ten sections** across the control surface, three knob rows (centres at 27.5, 79.3
-  and 132.2 mm on the QS legend scaled to 680 mm), and a bottom strip carrying KB OCTAVE, BANK and
-  PRESET 1-16. Left to right: PROGRAMMING · ARPEGGIATOR · GLIDE · MOD 1 · MOD 2 · OSCILLATORS ·
-  MIXER · FILTER · ENVELOPE GENERATORS · OUTPUT. **verified** (QS via PS; the manual's chapter
-  order is the same; LNX's editor uses the same order).
-- **40 knobs and 74 switches** (MS p.9, R). Every knob is one size except CUTOFF, which is about
-  half as large again (QS: 17 mm and 24 mm). **likely** (one decode). Knob style: black Moog caps
-  with a white index line, knurled skirt; drawn with the `moog-large` variant. **guess** on the
-  exact cap colour.
-- The twin draws the faceplate 660 mm wide between 15 mm cheeks: PROGRAMMING is widened from 41 to
-  50 mm so the LCD is readable on an iPad, and the other nine sections keep the QS proportions
-  (scaled by 0.957). The keyboard band below the controls is our own simplification, as in PS.
+One row of ten sections, three knob rows, and a strip with KB OCTAVE, BANK and PRESET 1-16:
+PROGRAMMING · ARPEGGIATOR · GLIDE · MOD 1 · MOD 2 · OSCILLATORS · MIXER · FILTER · ENVELOPE
+GENERATORS · OUTPUT. **verified** for the sections and their contents (Subsequent 37 manual,
+pp.12-34); positions are from the Quickstart legend (S2, **likely**). The twin draws a 660 mm face
+at 2 px/mm. PROGRAMMING is widened from 41 to 50 mm so the LCD can be read on an iPad, and the top
+knob row sits 4 mm lower than on the hardware, so the legible-size legends above the stepped knobs
+have room. The jacks of the left cheek sit beside the wheels.
 
-Positions below are QS-legend millimetres (x across, y down from the top of the control surface).
+### PROGRAMMING (Subsequent 37 manual, pp.12-14)
 
-### PROGRAMMING (x 0.5-41.9)
-
-| Printed label | Kind | Position | Range / positions | Twin control | Source | Confidence |
-|---|---|---|---|---|---|---|
-| (LCD) | 128 × 64 blue backlit display, ~1.5 × 1 in | top (4-39, 6-27) | shows bank, preset, name, category (CAT) and the parameter being edited | `Lcd` custom element | M37 p.12, R (MusicRadar "1.5x1in") | **verified** |
-| ◄ / ► (DEC / INC), CURSOR | 3 buttons in a row | under the LCD (y 34-41) | change the highlighted value; move the cursor | LCD buttons | M37 (Programming), QS | **verified** (labels as glyphs: likely) |
-| COMPARE / SAVE, MIDI / GLOBAL, PRESET / PANEL-INIT | 6 buttons, 2 columns × 3 | y 47-102 | menus; PRESET held = PRESET EDIT; PANEL/INIT held = init panel | LCD buttons: PRESET, SAVE, GLOBAL (menu pages), PANEL/INIT (hold = init) | M37, QS | **likely** (pairing of the six labels: likely) |
-| FINE TUNE | knob | (21.2, 130) | overall reference pitch, no centre detent | `fine_tune` ±100 cents | M37 (Global menu), F, QS | range **guess** |
-
-### ARPEGGIATOR (x 42.9-95.6)
-
-| Printed label | Kind | Position | Range / positions | Twin control | Source | Confidence |
-|---|---|---|---|---|---|---|
-| RATE | knob | (61.2, 27.5) | 2-280 BPM; with SYNC lit, clock divisions of the internal or MIDI clock | `arp_rate` (BPM) and `arp_div` (division) on one knob | M37 p.15, MS p.15 | **verified** |
-| SYNC / TAP | button | (85.5, 27.5) | lit: lock to MIDI clock; hold 1 s: tap tempo | `arp_sync` | M37 p.15 | **verified** |
-| RANGE (−2 −1 0 +1 +2 LEDs) | 2 buttons + 5 LEDs | LEDs y 47, buttons (60, 57) (78, 57) | 7 states: 0&−2, −2, −1, 0, +1, +2, 0&+2 (one press past either end lights two LEDs and spans three octaves) | `arp_oct_range` | MS p.15 via PS, M37 | **verified** |
-| BACK / FORTH | button | (60, 73) | plays the pattern forwards then back (C-E-G-E-C); no effect on RND | `arp_back_fwd` | MS pp.16, 40 | **verified** |
-| INVERT | button | (78, 73) | interleaves octave passes; no effect at RANGE 0 | `arp_invert` | M37 | **verified** (exact order: guess) |
-| PATTERN | 6-position knob | (69.1, 116.1) | UP · DWN · ORDR · RND · SEQ · REC | `arp_pattern` | MS p.16, F ("SEQ 01/01") | **verified** |
-| ON / REST | button | (56, 143) | arp on; enters a rest while recording | `arp_on` | QS, M37 | **verified** |
-| LATCH / TIE | button | (82, 143) | keeps playing after release; enters a tie while recording | `arp_latch` | M37 p.15, MS p.17 | **verified** |
-| (menu) GATE LENGTH, CLOCK DIV, SWING, STEP 1 RESET, END NOTES | PRESET EDIT 1.1 | LCD | gate OFF-100 % (default 50 %), swing 0-100 % (50 = straight) | `arp_gate`, `arp_swing` | MS p.40 | **verified** |
-| Step sequencer | 1-64 steps per preset, rests, ties, ratchets | PRESET buttons = steps | REC records from the keys, SEQ plays; a key transposes | `arp_seq` (64-char pattern), `seq_len` | M37 pp.17-20, MS p.17 | **verified** (ratchets not modelled) |
-
-### GLIDE (x 96.6-130.4)
-
-| Printed label | Kind | Position | Range / positions | Twin control | Source | Confidence |
-|---|---|---|---|---|---|---|
-| TIME | knob | (113.5, 27.5) | 0-10 calibration; no seconds printed anywhere | `glide_time` 0-10 | MS p.21 via PS, QS, R | **verified** (scale); seconds **guess** |
-| OSC (LEDs 1, 2) | button + 2 LEDs | LEDs y 47, button y 57 | 1+2 / 1 / 2 | `glide_osc` | M37, MS p.21 | **verified** |
-| TYPE (LEDs LCR, LCT, EXP) | button + 3 LEDs | LEDs y 70, button y 80 | LCR constant rate, LCT constant time, EXP fast then slowing | `glide_type` | M37, MS p.21, R (SOS) | **verified** |
-| GATED | button | y 96 | glide only while a key is held | `glide_gated` | M37 | **verified** |
-| LEGATO | button | y 112 | glide only between overlapping notes (with ON) | `glide_legato` | M37, MS p.21 | **verified** |
-| ON | button | y 130 | glide on/off without changing TIME | `glide_on` | M37 | **verified** |
-
-### MOD 1 (x 131.4-210.1) and MOD 2 (x 211.1-290.1)
-
-Two identical busses side by side. MOD 1's depth follows the mod wheel by default; MOD 2 is always
-on (M37 p.22, F: "MOD 1 menu's MOD WHEEL is set to 100 %" on the init patch). **verified**.
-
-| Printed label | Kind | Position (MOD 1; MOD 2 is +79.8 mm) | Range / positions | Twin control | Source | Confidence |
-|---|---|---|---|---|---|---|
-| RATE (LFO RATE) | knob | (152.4, 27.5) | 0.1-100 Hz; HI RANGE ×10 = 1-1000 Hz; SYNC: clock divisions (21, 4 whole notes to 1/64T) | `mod1_rate` Hz, `mod1_div` division | M37 p.22, F (Moog staff on HI RANGE), MS pp.22-23, 52 | **verified** |
-| SOURCE | 6-position knob | (190.1, 27.5) | TRI · SQR · SAW · RAMP · S&H · F.EG/PGM | `mod1_source` | M37 (fully CCW = triangle), MS p.61, MG | **verified** |
-| HI RANGE, SYNC, KB RESET | 3 buttons | y 55.9 at x 152.4, 171.0, 190.1 | ×10 rate; lock to clock; LFO restarts on every key | `mod1_hi_range`, `mod1_sync`, `mod1_kb_reset` | M37, MS p.23, MG (CC 76, 93) | **verified** |
-| PITCH AMT | bipolar knob | (152.4, 79.3) | −5 … 0 … +5 | `mod1_pitch_amt` | M37 p.23 ("bipolar"), MS p.22 | **verified** (octaves: guess) |
-| FILTER AMT | bipolar knob | (190.3, 79.3) | −5 … +5 | `mod1_filter_amt` | M37, MS p.22 | **verified** |
-| OSC (LEDs 1, 2) | button | (152.4, 100) | OSC 1+2 / OSC 1 / OSC 2 for PITCH AMT | `mod1_pitch_dest` | M37, MG CC 70 | **verified** |
-| CONTROLLERS | button | (190.3, 100) | opens MOD CONTROL: MOD WHEEL, VELOCITY, AFTERTOUCH, CTRL4 amounts, PGM SRC, PGM DEST | LCD page; `mod1_wheel`, `mod1_vel`, `mod1_pgm_src`, `mod1_pgm_dest` | M37, F | **verified** (aftertouch, CTRL4 not modelled) |
-| DEST (6 LEDs) | button | (152.4, 132.2) | LFO RATE (of the *other* LFO) · VCA LEVEL · OSC 1 WAVE · OSC 1+2 WAVE (both LEDs) · OSC 2 WAVE · NOISE LEVEL · EG TIME/PGM; hold DEST and move a control to make it the PGM destination | `mod1_dest` | MS p.23, MG CC 91, F | **verified** |
-| MOD AMT | bipolar knob | (190.3, 132.2) | −5 … +5 | `mod1_mod_amt` | M37, MS p.22 | **verified** |
-| PGM SRC (menu) | option | LCD | FILT EG (default), AMP EG, CONST ON, SINE LFO, NOISE LFO, VELOCITY, OSC 1 PITCH, SEQ NOTE | `mod1_pgm_src` | Moog spec text (retailers), M37 older list, F | **likely** |
-
-### OSCILLATORS (x 291.1-366.7)
-
-| Printed label | Kind | Position | Range / positions | Twin control | Source | Confidence |
-|---|---|---|---|---|---|---|
-| OCTAVE (OSC 1) | 4-position knob | (309.6, 27.5) | 16' 8' 4' 2' | `osc1_octave` | MS p.25, MG | **verified** |
-| WAVE (OSC 1) | knob | (347.9, 27.5) | continuous: triangle → sawtooth → square → narrow pulse, no steps | `osc1_wave` 0-100 | M37, MS p.25, R | **verified** |
-| HARD SYNC | button | (309.6, 47.9) | OSC 2 restarts with OSC 1; little output if OSC 2 is below OSC 1 | `hard_sync` | MS p.26 | **verified** |
-| KB RESET | button | (340, 47.9) | both oscillators restart their cycle on each new note | `kb_reset` | MS p.26, MG CC 81 | **verified** |
-| OCTAVE (OSC 2) | 4-position knob | (309.6, 79.3) | 16' 8' 4' 2' | `osc2_octave` | MS p.25 | **verified** |
-| WAVE (OSC 2) | knob | (347.9, 79.3) | as OSC 1 | `osc2_wave` | MS p.25 | **verified** |
-| KB CTRL (LEDs LO, HI) | button + 2 LEDs | LEDs (303, 100), button (316, 100) | HI: OSC 2 top key, OSC 1 bottom · LO: swapped · OFF (no LED): OSC 2 drones | `kb_ctrl` | MS p.26, MG CC 111 | **verified** |
-| DUO MODE | button | (345, 100) | two independent pitches through one filter and VCA (paraphonic) | `duo_mode` | MS pp.9, 26 | **verified** |
-| FREQUENCY | knob | (309.6, 132.2) | ±7 semitones (fully CW = a fifth); ±3 octaves while KB CTRL is OFF | `osc2_frequency` | M37, MS p.26 | **verified** |
-| BEAT FREQ | knob | (347.9, 132.2) | ±3.5 Hz, constant beat rate at every pitch | `beat_freq` | M37 p.26, MS p.26 | **verified** |
-| (sub oscillator) | — | — | square, exactly one octave below OSC 1; WAVE never affects it | — | M37 p.27 | **verified** |
-
-### MIXER (x 367.7-429.8)
-
-Five levels staggered in a zig-zag against five on/off buttons (QS). Levels are calibrated 0-10:
-*"Mixer settings higher than 5 will overdrive the input of the filter … 5 or below delivers a clean
-signal"* (MS p.27). **verified**.
-
-| Printed label | Kind | Position (knob / button) | Range | Twin control | Source | Confidence |
-|---|---|---|---|---|---|---|
-| OSC 1 | knob + on button | (386.8, 27.6) / (412, 27.6) | 0-10 | `mix_osc1`, `mix_osc1_on` | MS p.27, MG | **verified** (button: likely) |
-| SUB OSC | knob + on button | (412, 52.8) / (386.8, 52.8) | 0-10 | `mix_sub`, `mix_sub_on` | M37, MS p.27 | **verified** |
-| OSC 2 | knob + on button | (386.8, 79.5) / (412, 79.5) | 0-10 | `mix_osc2`, `mix_osc2_on` | MS p.27 | **verified** |
-| NOISE | knob + on button | (412, 105.1) / (386.8, 105.1) | 0-10, **pink** noise | `mix_noise`, `mix_noise_on` | M37 p.27, MS | **verified** |
-| FDBK / EXT IN | knob + on button | (386.8, 130.9) / (412, 130.9) | 0-10; with nothing in EXT IN, *"takes the output of the mixer and feeds it back into this mixer channel"*: distorted, sometimes chaotic, sometimes mellow | `mix_feedback`, `mix_fb_on` | M37 p.27, MS p.27 | **verified** |
-
-### FILTER (x 430.8-497.6)
-
-| Printed label | Kind | Position | Range / positions | Twin control | Source | Confidence |
-|---|---|---|---|---|---|---|
-| CUTOFF | **large** knob | (464.1, 29.8), 24 mm | 20 Hz - 20 kHz Moog ladder | `cutoff` | M37, MS p.28, QS | **verified** |
-| RESONANCE | knob | (446.9, 79.3) | 0-10; *"Settings above 7 cause the filter to self-oscillate"* | `resonance` | MS p.28 | **verified** |
-| MULTIDRIVE | knob | (481.5, 79.3) | 0-10; drives the OTA and FET stages between filter and VCA: asymmetric tube-like warmth to hard clipping | `multidrive` | M37, MS p.28 | **verified** |
-| SLOPE (LEDs 6 12 18 24) | button + 4 LEDs | LEDs y 103, button (464.1, 112) | −6, −12, −18, −24 dB/oct (1-4 poles); cycles, changeable while playing | `filter_slope` | M37, MS p.29, MG | **verified** |
-| EG AMT | bipolar knob | (446.9, 132.2) | −5 … +5; below centre the envelope pulls the cutoff down | `filter_eg_amt` | M37, MS p.28 | **verified** (octaves: guess) |
-| KB TRACK | knob | (481.5, 132.2) | 0 (off) … 1 (1:1 at the halfway point) … 2 (2:1), centred on C3 = MIDI 48 | `filter_kb_track` | M37, MS pp.29, 50 | **verified** |
-
-### ENVELOPE GENERATORS (x 498.6-640.3)
-
-Two DAHDSR rows, FILTER EG above AMP EG. *"When the KNOB SHIFT button (between the filter and
-amplitude attack knobs) is pressed and blinking, the first two envelope knobs become DELAY and HOLD
-while the third and fourth adjust the amount that keyboard velocity and keyboard tracking affect the
-envelope"* (M37). The strip is silkscreened `DELAY  HOLD  VEL AMT  KB TRACK` (QS). **verified**.
-
-| Printed label | Kind | Position | Range | Twin control | Source | Confidence |
-|---|---|---|---|---|---|---|
-| ATTACK / DELAY | knob | FILTER (522, 27.4), AMP (522, 105.1) | attack 0.1 ms-10 s (legend `M-SEC .1` … `10 SEC`; the prose says 1 ms); delay 0-10 s | `feg_attack` / `feg_delay` | MS pp.30-33, M37 | **verified** |
-| DECAY / HOLD | knob | x 554.2 | decay 0.1 ms-10 s; hold 0-10 s | `*_decay` / `*_hold` | MS, M37 | **verified** |
-| SUSTAIN / VEL AMT | knob | x 586.2 | sustain 0-100 % (calibrated 1-10); velocity → envelope amount | `*_sustain` / `*_vel_amt` | MS pp.31-32, M37 | **verified** |
-| RELEASE / KB TRACK | knob | x 618.4 | release 0.1 ms-10 s; key tracking of the envelope times (including attack, R: SOS) | `*_release` / `*_kb_amt` | MS, M37, R | **verified** |
-| MULTI TRIG, RESET, SYNC, LOOP, LATCH | 5 buttons per row | y ≈ 49.5 (filter) and 127.5 (amp), x 507-633 | MULTI TRIG: every key re-gates (else legato single-trigger); RESET: attack starts from zero (else from the current level); SYNC: restart every clock division; LOOP: repeats while held (multistage LFO); LATCH: stays at SUSTAIN as if the gate were on | `*_multi_trig`, `*_reset`, `*_sync`, `*_loop`, `*_latch` | M37 pp.29-33, MS pp.31-33, MG | **verified** (left-to-right order: guess) |
-| KNOB SHIFT | button | (506, 68.6) | blinks while the 8 knobs are shifted | `knob_shift` | M37, QS | **verified** |
-| (menu) ATTACK EXP | per envelope | LCD | linear or exponential attack | `feg_attack_exp`, `aeg_attack_exp` | R (SOS), MG NRPN 520 | **verified** |
-| (quirk) AMP EG DELAY | — | — | *"only works when envelope LOOP is ON"* | modelled | M37 | **likely** (one excerpt) |
-
-### OUTPUT (x 640.8-679.5)
-
-| Printed label | Kind | Position | Range | Twin control | Source | Confidence |
-|---|---|---|---|---|---|---|
-| VOLUME (MASTER VOLUME) | knob | (660, 27.4) | main output level | `master_volume` | M37 p.34, QS | **verified** |
-| MUTE | button | (660, 52) | silences the main output | `output_mute` | QS | **likely** |
-| HEADPHONES (HEADPHONE VOLUME) | knob | (660, 79.3) | headphone level; mono, same signal as AUDIO OUT (MS p.34) | `phones_volume` (level of the PHONES output jack) | M37, MS p.34 | **verified** |
-| PHONES | ¼" TRS jack | (660, 108), front | — | `out_phones` | M37 ("bottom-right corner"), QS | **verified** |
-
-### Bottom strip, wheels and keyboard
-
-| Printed label | Kind | Position | Range | Twin control | Source | Confidence |
-|---|---|---|---|---|---|---|
-| KB OCTAVE ▼ ▲ | 2 buttons | (5-31, 143-152) | ±2 octaves; dim LED = 1, bright = 2; both = reset; hold both + key = transpose ±12 | `kb_octave` (UI) | M37 p.14, MS p.14 | **verified** |
-| BANK | button | (37-53, 143-152) | BANK then a PRESET button selects bank 1-16 | `preset_bank` (UI) | M37 p.12 | **verified** |
-| PRESET 1-16 | 16 buttons with LEDs | one row along the bottom (x ≈ 100-672) | 16 banks × 16 = 256 presets; the LEDs double as the sequencer step display | `preset_number` (UI) | M37 p.12, R (BPB "sixteen LED diodes running along the bottom row") | **verified** (left edge of the row: likely) |
-| PITCH wheel | spring-loaded wheel | front left | default +2 / −2 semitones, each 0-24 (PRESET EDIT) | `pitch_bend` (UI), `bend_up`, `bend_down` | M37 (Preset Edit), MG CC 107/108 | **verified** |
-| MOD wheel | wheel | right of PITCH | scales MOD 1 by default | `mod_wheel` (UI) | M37 p.22 | **verified** |
-| Keyboard | 37 keys C-C | front | MIDI 36-72, velocity + aftertouch | on-screen keys (velocity by touch height) | MS p.61 | **verified** |
-
-### Left side panel (jacks)
-
-| Label | Dir | Twin jack | Source | Confidence |
+| Label | Kind | Twin | Notes | Confidence |
 |---|---|---|---|---|
-| AUDIO OUT (¼" TS, mono) | out | the main output (studio routing) | MS p.61 | **verified** |
-| EXT IN (¼" TS) | in | `in_ext`: replaces FEEDBACK in the FDBK / EXT IN mixer channel | M37 p.27, MS p.8 | **verified** |
-| PITCH, FILTER, VOLUME, KB GATE (CV inputs) | in | `in_pitch` (1 V/oct), `in_filter` (1 V/oct of cutoff), `in_volume` (0-5 V), `in_gate` (gate ≥ 1 V) | MS p.61 ("four CV/gate inputs") | **verified** (scalings: likely) |
-| MIDI IN / OUT, USB | — | studio transport and the app's MIDI input | MS pp.7-8 | **verified** |
+| LCD | 128 × 64 display | `Lcd` | Shows the bank, the preset number, the name (one or two lines) and the category. The twin also shows the control just moved for 2.5 s, the menus and the sequencer status | **verified** contents (Subsequent 37 manual, p.12); the edit display is the twin's |
+| ▼ (DEC), ▲ (INC), CURSOR | 3 buttons under the LCD | `ProgButtons` | Step through presets; in a menu, move or (with CURSOR) edit the value | **verified** (Subsequent 37 manual, p.13) |
+| COMPARE / SAVE, MIDI / GLOBAL, PRESET (EDIT) / PANEL ▶ (INIT) | 2 columns × 3 | `ProgButtons` | Hold PRESET: PRESET EDIT menu. Hold PANEL: initialise the panel. COMPARE, SAVE and MIDI show a note (the studio project saves) | **verified** layout and holds (Subsequent 37 manual, pp.13-14) |
+| FINE TUNE | knob | `fine_tune` ±100 cents | Both oscillators, up to a semitone either way | **verified** (Subsequent 37 manual, p.14) |
 
-The original Sub 37 has no CV outputs (the Subsequent 37 *CV* edition adds four). **verified**.
+### ARPEGGIATOR (Subsequent 37 manual, pp.15-16, 40)
 
-## Signal flow
+| Label | Twin | Range / behaviour | Confidence |
+|---|---|---|---|
+| RATE | `arp_rate` 2-280 BPM; with SYNC lit `arp_div` (21 divisions) | Internal clock 2-280 BPM; with SYNC it picks divisions of the clock, 4 whole notes to a 1/64 triplet | **verified** (Subsequent 37 manual, pp.15, 52) |
+| SYNC [TAP] | `arp_sync` | Lit: follow MIDI clock (the studio transport). With SYNC lit and no clock, nothing plays. Hold 1 s: TAP mode; the third tap sets the tempo, a running average follows, 5 s without taps starts over | **verified** (Subsequent 37 manual, p.15) |
+| RANGE ◀ ▶, LEDs -2 -1 0 +1 +2 | `arp_oct_range` 0-6 (3 = 0) | 7 states: one press past either end lights 0 and ±2 and plays the original, 2nd, 3rd and 2nd octaves | **verified** (Subsequent 37 manual, p.15) |
+| BACK / FORTH | `arp_back_fwd` | UP plays up then down, DWN down then up, ORDR forwards then back; no effect on RND | **verified** (Subsequent 37 manual, p.16) |
+| INVERT | `arp_invert` | Each note in every octave of the range before the next note; no effect at RANGE 0 | **verified** (Subsequent 37 manual, p.16) |
+| PATTERN | `arp_pattern` | UP · DWN · ORDR · RND · SEQ · REC | **verified** (Subsequent 37 manual, p.16) |
+| ON [REST] | `arp_on` | Arpeggiator on; in step record it enters a rest | **verified** (Subsequent 37 manual, p.16) |
+| LATCH [TIE] | `arp_latch` | Keeps playing after release; keys added while others are held join; after all are released the next key starts a new list. In step record it is TIE | **verified** (Subsequent 37 manual, pp.15-16) |
+| GATE LENGTH (menu) | `arp_gate` | OFF-100 %, default 50 %; 100 % is legato | **verified** (Subsequent 37 manual, p.40) |
+| CLOCK DIV (menu) | `arp_div` | 21 divisions, 384 clocks to 1 clock | **verified** (Subsequent 37 manual, pp.40, 52) |
+| SWING (menu) | `arp_swing` | 50 % straight; below moves the off-beats earlier, above later; 0 % only off-beats, 100 % only on-beats | **verified** (Subsequent 37 manual, p.40) |
+| STEP 1 RESET (menu) | `arp_step1_reset` | ON: the KB RESETs act only on the pattern's first note | **verified** (Subsequent 37 manual, p.40) |
+| END NOTES (menu) | `arp_end_notes` | ONCE: C-E-G-E-C; TWICE: C-E-G-G-E-C-C | **verified** (Subsequent 37 manual, pp.16, 40) |
 
-```
-OSC 1 (WAVE morph) ──┬──────────────► MIXER ─► FDBK loop ─► LADDER ─► MULTIDRIVE ─► VCA ─► VOLUME ─► AUDIO OUT
-  └ SUB OSC (−1 oct) ─┤   ▲ HARD SYNC   │ ▲          (6/12/18/24)  (OTA/FET)      ▲     └ HEADPHONES ─► PHONES
-OSC 2 (WAVE morph) ──┤   │             │ └─ mixer output fed back       ▲        AMP EG (DAHDSR)
-PINK NOISE ──────────┘   │             EXT IN replaces the feedback      │ FILTER EG × EG AMT, KB TRACK
-                                                                         │ MOD 1/2 FILTER AMT, FILTER CV
-MOD 1 / MOD 2: LFO (TRI SQR SAW RAMP S&H) or F.EG/PGM → PITCH AMT (OSC 1/2/both), FILTER AMT,
-MOD AMT → DEST (other LFO's RATE, VCA LEVEL, OSC 1/2/1+2 WAVE, NOISE LEVEL, EG TIME/PGM).
-MOD 1 depth × mod wheel (default), MOD 2 always on.
-```
+### Step sequencer and STEP EDIT (Subsequent 37 manual, pp.16-20, 46-47)
 
-- **Paraphony.** DUO MODE off: one note, both oscillators on it, last-note priority (LOW and HIGH
-  in PRESET EDIT; GLOBAL can override). DUO MODE on: OSC 1 and OSC 2 take the lowest and highest
-  held keys (KB CTRL HI; LO swaps them; OFF makes OSC 2 a drone). One filter, one VCA, one pair of
-  envelopes for both. **verified** (MS pp.9, 26; M37 key priority).
-- **Envelope gating.** Legato playing does not retrigger (single trigger) unless MULTI TRIG is lit.
-  RESET makes the attack start from zero. **verified** (M37).
-- **Sequencer.** PATTERN at REC: the next key starts a new sequence at step 1; ON [REST] and
-  LATCH [TIE] enter rests and ties. PATTERN at SEQ + ON: a key transposes and starts it; LATCH
-  keeps it running. **verified** (M37 pp.17-18, MS p.17).
+- **Recording.** With the arpeggiator off, PATTERN to REC: the next key erases the sequence and
+  becomes step 1, and the LCD counts the steps. Each key or REST advances, up to 64 steps. TIE then
+  a different note changes pitch without retriggering the envelopes; TIE then the same note doubles
+  its length. Overlapping keys also tie, except in DUO MODE. **verified** (Subsequent 37 manual,
+  pp.16-17). Twin: the LCD writes keys into `arp_seq` / `arp_seq2` / `arp_seq_flags` (`seq.ts`),
+  and `combos.ts` turns ON into REST and LATCH into TIE while PATTERN is at REC.
+- **Playback.** PATTERN to SEQ, then ON; the key pressed transposes. GLOBAL REF NOTE FIRST (default):
+  that key becomes the first note; MID C: MIDI 48 plays as recorded. **verified** (Subsequent 37
+  manual, pp.17, 46). With GLIDE ON and LEGATO, only tied notes glide. **verified** (Subsequent 37
+  manual, p.17).
+- **DUO steps.** In DUO MODE a step can hold two notes; single-note steps play both oscillators,
+  and follow two held keys during playback. **verified** (Subsequent 37 manual, p.17).
+- **STEP EDIT** (PATTERN at SEQ or REC, hold BANK + press LATCH; leave the same way, or turn PATTERN
+  away). PRESET 1-16 show the steps, four pages (BANK + KB OCTAVE); LEDs dim for active steps, dark
+  for rests and after the last step, bright for the playing step. **verified** (Subsequent 37 manual,
+  p.18). Per step **verified** (Subsequent 37 manual, pp.19-20), each in the twin:
+  - BANK + a step: select it. ON / LATCH toggle its REST / TIE; a key sets pitch 1 (clearing rest,
+    tie and ratchet), a legato key pitch 2.
+  - A step held + another step: tie the group (again: untie). A single tap: toggle rest.
+  - A step held + KB OCTAVE ▼ / ▲: FIRST / LAST step. BANK + RANGE ◀ / ▶: rotate.
+  - A step held + ON: SKIP. A step held + LATCH: RATCHET; RATCHET CNT 1-8 (default 2), one count for
+    the sequence, BANK + BACK / FORTH (down) or INVERT (up).
+  - Quick erase: BANK held while turning PATTERN to REC; stopped, the whole sequence goes; running,
+    the steps go blank and the length stays.
+- **GLOBAL: LATCH RSTRT** (default OFF): ON makes a new press with nothing held restart from the first
+  step. **verified** (Subsequent 37 manual, p.47). Twin: `latch_restart`.
+- **Holds with a mouse.** On a touch screen the combinations work with two fingers. With a mouse,
+  a long press (half a second) and release keeps BANK, a step or MOD DEST held, blinking, for the next
+  press (`combos.ts`). This is a twin convenience, not a hardware feature.
 
-## Factory presets
+### GLIDE (Subsequent 37 manual, p.21)
 
-The Subsequent 37 ships 144 presets in banks 1-9 (banks 10-16 hold "Init Preset"). FL gives every
-name by bank and slot; PS read 20 of them on a unit at firmware 1.2.0 (BRASH B@SS 1.04, LOW BASS
-1.13, Terror Bass 2.08, UBER_SUB 2.11, FUNK ORGAN 3.01, 5TH IN LINE 3.09, Acid Wiggler 3.13,
-CELESTIAL 4.11, DRONE 5.09, DUO ORG 5.10, Duotronic Moogtrons 5.12, Harp C Chord 6.05, Octavia
-7.05, SAW LEAD 8.07, SAWTEETH DUO DANCER 8.08, SYNTH GONG 9.01, Triangle Lead 9.08, TRIPLET 5THS
-9.11, …) and all match FL. **verified** for names and slots. No parameter data is public: every
-twin preset is a recreation designed from its name and category, and says so. FT (Sub 37 Tribute)
-adds names such as Rhythmic 5th Filtration, Bomb Bass Tick, Lyrical Theremin and Zaxxor's Revenge,
-which also appear in FL's banks 3-9.
+| Label | Twin | Range / behaviour | Confidence |
+|---|---|---|---|
+| TIME | `glide_time` (ms, shown 0-10) | No unit is printed | **verified** scale (Subsequent 37 manual, p.21); the time map is a **guess** |
+| OSC (LEDs 1, 2) | `glide_osc` | Both, OSC 1 or OSC 2 | **verified** (Subsequent 37 manual, p.21) |
+| TYPE (LCR, LCT, EXP) | `glide_type` | LCR: bigger intervals take longer; LCT: the same time for any interval; EXP: fast, then slowing | **verified** (Subsequent 37 manual, p.21) |
+| GATED | `glide_gated` | Glides only while a key is held | **verified** (Subsequent 37 manual, p.21) |
+| LEGATO | `glide_legato` | Glides only when a key goes down while another is held (needs ON) | **verified** (Subsequent 37 manual, p.21) |
+| ON | `glide_on` | Glide on or off | **verified** (Subsequent 37 manual, p.21) |
 
-## Model choices (guesses to check against hardware)
+### MOD 1 and MOD 2 (Subsequent 37 manual, pp.22-24, 50-52)
+
+| Label | Twin (n = 1, 2) | Range / behaviour | Confidence |
+|---|---|---|---|
+| RATE | `modN_rate` 0.1-100 Hz; with SYNC `modN_div` | ×10 with HI RANGE (1-1000 Hz); with SYNC, clock divisions | **verified** (Subsequent 37 manual, pp.22-23) |
+| SOURCE | `modN_source` | TRI (fully left) · SQR · SAW · RAMP (reverse saw) · S&H · F.EG/PGM (the LFO bypassed: the filter EG, or the PGM SRC) | **verified** (Subsequent 37 manual, p.22) |
+| HI RANGE, SYNC, KB RESET | `modN_hi_range`, `modN_sync`, `modN_kb_reset` | ×10 rate; lock to the clock; restart at zero on each new note | **verified** (Subsequent 37 manual, p.23) |
+| PITCH AMT, OSC (LEDs 1, 2) | `modN_pitch_amt` (bipolar), `modN_pitch_dest` | Pitch of OSC 1, OSC 2 or both | **verified** (Subsequent 37 manual, p.23) |
+| FILTER AMT | `modN_filter_amt` (bipolar) | Cutoff | **verified** (Subsequent 37 manual, p.23) |
+| MOD AMT, DEST (6 LEDs) | `modN_mod_amt` (bipolar), `modN_dest` | 7 destinations: the other LFO's rate, VCA LEVEL, OSC 1 WAVE, OSC 1+2 WAVE (both LEDs), OSC 2 WAVE, NOISE LEVEL, EG TIME/PGM. Hold DEST and move a control to make it the destination | **verified** (Subsequent 37 manual, pp.23-24) |
+| CONTROLLERS | `ControllersButton` → menu | MOD WHEEL, VELOCITY (`modN_wheel`, `modN_vel`, -100..+100 %), PGM SRC, PGM DST, LFO KBTRACK (0-200 %) | **verified** (Subsequent 37 manual, pp.50-52) |
+
+- By default the MOD wheel sets MOD 1's overall depth. **verified** (Subsequent 37 manual, p.22).
+  MOD 2 runs at full depth by default (all CONTROLLERS amounts OFF): **likely**.
+- LFO RATE as a destination: MOD 1 moves LFO 2, MOD 2 moves LFO 1. WAVE destinations never touch the
+  sub. NOISE LEVEL adds to the mixer setting. EG TIME scales every envelope time (negative shorter,
+  positive longer). **verified** (Subsequent 37 manual, p.24).
+- PGM SRC: FILTER EG (default), AMP EG, CONST ON, SINE LFO, NOISE LFO, OSC1 PCH, OSC2 PCH, SEQ NOTE,
+  SEQ VEL, SEQ MOD, PRESSURE, KB TRACK (bipolar around MIDI 48), VELOCITY. **verified** (Subsequent 37
+  manual, p.50). PGM DST has about 90 targets (p.51); the twin implements the 22 continuous ones that
+  live in its engine (`PGM_DESTS` in `model.ts`).
+
+### OSCILLATORS (Subsequent 37 manual, pp.25-26)
+
+| Label | Twin | Range / behaviour | Confidence |
+|---|---|---|---|
+| OCTAVE (×2) | `osc1_octave`, `osc2_octave` | 16' · 8' · 4' · 2' | **verified** (Subsequent 37 manual, p.25) |
+| WAVE (×2) | `osc1_wave`, `osc2_wave` | Continuous: triangle → sawtooth → square → narrow pulse | **verified** (Subsequent 37 manual, p.25) |
+| HARD SYNC | `hard_sync` | OSC 2 restarts with OSC 1; with OSC 1 higher, little or no OSC 2 | **verified** (Subsequent 37 manual, p.26) |
+| KB RESET | `kb_reset` | Both oscillators restart on a new note (may click; a short AMP release helps) | **verified** (Subsequent 37 manual, p.26) |
+| DUO MODE | `duo_mode` | OSC 1 and OSC 2 play separate keys | **verified** (Subsequent 37 manual, p.26) |
+| KB CTRL (LEDs LO, HI) | `kb_ctrl` (0 OFF, 1 LO, 2 HI) | In DUO MODE. HI: OSC 2 the highest key, OSC 1 the lowest; LO: swapped; OFF: OSC 2 drones and FREQUENCY spans ±3 octaves | **verified** (Subsequent 37 manual, p.26) |
+| FREQUENCY | `osc2_frequency` | ±7 semitones; fully clockwise is a fifth | **verified** (Subsequent 37 manual, p.26) |
+| BEAT FREQ | `beat_freq` | ±3.5 Hz: the same beat rate on every note | **verified** (Subsequent 37 manual, p.26) |
+
+### MIXER (Subsequent 37 manual, p.27)
+
+Five channels, each a 0-10 level knob and an ON button: OSC 1, SUB OSC, OSC 2, NOISE, FDBK / EXT IN
+(`mix_*`, `mix_*_on`). Above 5 a channel goes past unity and overdrives the filter input; 5 or below
+is clean. The sub is always a square, one octave below OSC 1. The noise is pink. With EXT IN empty,
+FDBK / EXT IN feeds the mixer's output back into itself, from mellow to chaotic, and can raise the
+level a lot. **verified** (Subsequent 37 manual, p.27).
+
+### FILTER (Subsequent 37 manual, pp.28-29)
+
+| Label | Twin | Range / behaviour | Confidence |
+|---|---|---|---|
+| CUTOFF | `cutoff` 20 Hz-20 kHz | 20 Hz closes it, 20 kHz opens it; the legend reads 20, 80, 320, 500 (top), 1.2k, 5k, 20k Hz | **verified** (Subsequent 37 manual, p.28) |
+| RESONANCE | `resonance` 0-10 | Above 7 the filter self-oscillates | **verified** (Subsequent 37 manual, p.28) |
+| MULTIDRIVE | `multidrive` 0-10 | Drives OTA and FET stages between the filter and the VCA: tube-like warmth to hard clipping | **verified** (Subsequent 37 manual, p.28) |
+| SLOPE (LEDs 6 12 18 24) | `filter_slope` | 1-4 poles, -6 / -12 / -18 / -24 dB per octave, changeable while playing | **verified** (Subsequent 37 manual, p.29) |
+| EG AMT | `filter_eg_amt` (bipolar) | Clockwise from centre raises the cutoff, counter-clockwise lowers it | **verified** (Subsequent 37 manual, p.29) |
+| KB TRACK | `filter_kb_amt` 0-200 % | 0, 1:1 at halfway (centred on C3, MIDI 48), 2:1 fully right | **verified** (Subsequent 37 manual, p.29) |
+
+### ENVELOPE GENERATORS (Subsequent 37 manual, pp.30-33, 41)
+
+| Label (KNOB SHIFT) | Twin (`feg_`, `aeg_`) | Range | Confidence |
+|---|---|---|---|
+| ATTACK (DELAY) | `*_attack` 1 ms-10 s (`*_delay` 0-10 s) | The AMP EG's DELAY works only with LOOP on | **verified** (Subsequent 37 manual, pp.30-33) |
+| DECAY (HOLD) | `*_decay` 1 ms-10 s (`*_hold` 0-10 s) | | **verified** (Subsequent 37 manual, pp.30-33) |
+| SUSTAIN (VEL AMT) | `*_sustain` 0-100 % (`*_vel_amt` 0-100 %) | Full velocity always gives the full amount; higher settings lower soft notes | **verified** (Subsequent 37 manual, pp.31-32) |
+| RELEASE (KB TRACK) | `*_release` 1 ms-10 s (`*_kb_amt` 0-200 %) | KB TRACK shortens DECAY and RELEASE up the keyboard, 1:1 at noon | **verified** (Subsequent 37 manual, pp.31-33) |
+| MULTI TRIG | `*_multi_trig` | Lit: every key gates, even legato; unlit: single trigger | **verified** (Subsequent 37 manual, p.31) |
+| RESET | `*_reset` | Lit: the attack starts from zero; unlit: from the current level | **verified** (Subsequent 37 manual, p.31) |
+| SYNC | `*_sync`, `*_sync_div` (menu CLOCK DIV) | Retriggers every clock division | **verified** (Subsequent 37 manual, p.31) |
+| LOOP | `*_loop` | Delay, attack, hold, decay and release repeat while the gate is on | **verified** (Subsequent 37 manual, p.31) |
+| LATCH ON | `*_latch` | Stays at SUSTAIN as if the gate were on | **verified** (Subsequent 37 manual, p.31) |
+| KNOB SHIFT | `knob_shift` | Blinks while the knobs are shifted | **verified** (Subsequent 37 manual, p.30) |
+| GATE SRC, EXP. ATTACK (menu) | `*_gate_src`, `*_attack_exp` | BOTH / NOTES / EXT; linear (default) or exponential attack | **verified** (Subsequent 37 manual, p.41) |
+
+### OUTPUT (Subsequent 37 manual, p.34)
+
+VOLUME (`master_volume`) sets AUDIO OUT; PRESET VOL (`preset_volume`, PRESET EDIT) scales each preset
+independently of it. MUTE (`output_mute`) silences AUDIO OUT only, not the headphones. HEADPHONES
+(`phones_volume`) balances against VOLUME, so moving VOLUME moves the phones too; the jack is TRS,
+mono on both sides. **verified** (Subsequent 37 manual, p.34).
+
+### Bottom strip, wheels, keyboard and jacks
+
+| Control | Twin | Behaviour | Confidence |
+|---|---|---|---|
+| KB OCTAVE ▼ ▲ | `kb_octave` -2..+2 | Dim LED one octave, bright two; both together: back to 0; both held 1 s: MIDI panic | **verified** (Subsequent 37 manual, p.14) |
+| BANK, PRESET 1-16 | `preset_bank`, `preset_number` | BANK then a PRESET button picks the bank, then a PRESET button the preset | **verified** (Subsequent 37 manual, p.12) |
+| PITCH wheel | `pitch_bend`; `bend_up`, `bend_down`, `bend_dest` | Springs back; BEND UP / DOWN 0-24 semitones, default 2; BEND DEST NONE / OSC1 / OSC2 / BOTH | **verified** (Subsequent 37 manual, p.42) |
+| MOD wheel | `mod_wheel` | MOD 1 depth by default | **verified** (Subsequent 37 manual, p.22) |
+| KB PRIORITY (menu) | `key_priority` | LOW / HIGH / LAST (default) | **verified** (Subsequent 37 manual, p.42) |
+| KB TRANSPOSE (menu) | `kb_transpose` | -12..+12, stored with the preset | **verified** (Subsequent 37 manual, pp.14, 39) |
+| Keyboard | on-screen keys MIDI 36-72 | 37 keys, velocity and aftertouch; MIDI 48 is the instrument's C3 | **verified** (Subsequent 37 manual, pp.9, 29) |
+| EXT IN | `in_ext` | Line level into FDBK / EXT IN; a key (or AMP EG LATCH ON) must open the VCA | **verified** (Subsequent 37 manual, pp.7-8) |
+| PITCH, FILTER, VOL CV | `in_pitch`, `in_filter`, `in_volume` | 0 to +5 V or an expression pedal; PITCH 1 V/oct | **verified** (Subsequent 37 manual, p.8) |
+| KB GATE | `in_gate` | +5 V gate: triggers the envelopes (per GATE SRC) | **verified** (Subsequent 37 manual, pp.8, 41) |
+| AUDIO OUT, HEADPHONES | `out_audio`, `out_phones` | Mono out; TRS phones | **verified** (Subsequent 37 manual, pp.8, 34) |
+
+## Studio integration
+
+- The studio transport is the Sub 37's MIDI clock (`studio.midiSync`). With ARP SYNC lit, the
+  arpeggiator, the sequencer, LFO SYNC and envelope SYNC follow the studio tempo, start with ▶ and
+  stop with ■. Without a running clock a synced arpeggio stays silent and the LCD says it waits, as
+  the manual warns. **verified** behaviour (Subsequent 37 manual, p.15). With SYNC off the arpeggiator
+  runs on its own RATE.
+- A latched, synced sequence with no key held plays as recorded when ▶ starts (a studio convenience).
+- Lesson auditions with the studio stopped run a synced pattern at the studio tempo so it can be
+  heard; a pattern the player already has running keeps running.
+
+## Model choices (guesses to check against a unit)
 
 | Quantity | Twin value |
 |---|---|
-| WAVE morph | crossfade tri→saw (0-33), saw→square (33-67), then the pulse narrows from 50 % to 10 % (67-100); modulation past the end narrows it to almost nothing (owners report a dropout there, F) |
-| Square level against the saw | 0.85 of the saw's peak |
-| Mixer gain | (level / 5)^1.5: unity at 5, +9 dB at 10, into the ladder's input tanh |
-| FEEDBACK | positive feedback of the mixer output through an AC-coupled (25 Hz), band-limited (5 kHz) path with soft saturation; loop gain 1.25 × (level/10)^1.3, so the top of the knob becomes unstable and chaotic |
-| RESONANCE | ladder feedback k = 4 (self-oscillation) at 7.0 on the dial, rising to k = 4.7 at 10 |
-| MULTIDRIVE | 1 to 40 × pre-gain into an asymmetric soft clipper that hardens at high gain, 2× oversampled |
+| WAVE morph | Crossfades tri → saw (0-33 %), saw → square (33-67 %), then the pulse narrows from 50 % to 10 % (67-100 %); the square, pulse and sub sit at 0.85 of the saw's peak |
+| Mixer law | (level / 5)^1.5: unity at 5, +9 dB at 10, into the ladder's saturating input |
+| FDBK | The mixer output fed back through an AC-coupled (25 Hz), 5 kHz band-limited path; loop gain 1.25 × (level / 10)^1.3, so the top of the knob turns unstable |
+| RESONANCE | The ladder self-oscillates from 7.0 on the dial (feedback 0.985 of the core's threshold), up to 1.16 at 10 |
+| CUTOFF taper | 20 Hz × 1000^travel: the knob's centre is 632 Hz (the legend prints 500 Hz there) |
 | FILTER EG AMT | ±6 octaves at ±5 |
-| MOD PITCH AMT | ±2 octaves at ±5, squared taper (fine vibrato at low settings) |
-| MOD FILTER AMT | ±5 octaves at ±5 |
-| MOD AMT → LFO RATE / VCA / WAVE / NOISE / EG TIME | ±4 octaves of rate · gain 0-2 · ±100 % of WAVE travel · ±10 on the NOISE dial · ±3 octaves of envelope time |
-| GLIDE TIME (0-10) | 15 ms × e^(0.6 × dial): 2 ≈ 50 ms (Moog's acid setting), 5 ≈ 300 ms, 10 ≈ 6 s; LCR = that time per octave |
-| Envelope VEL AMT | peak = 1 − amt + amt × velocity |
-| Envelope KB TRACK | times × 2^(−amt × (note − 48)/12) |
-| Envelope curves | attack linear (ATTACK EXP off) or RC; decay and release exponential to −60 dB over the stage time |
-| LFO SAW / RAMP | SAW falls, RAMP rises (F) |
-| ARP RATE without SYNC | steps at the selected clock division of RATE BPM (default 1/16 at 120 BPM) |
-| ARP SYNC with the studio stopped | hardware: silent until MIDI clock arrives; the twin plays at the studio tempo so the arp never goes silent, and locks to the studio transport (from the bar) while it runs. ■ stops it |
-| FINE TUNE | ±100 cents |
-| Oscillator drift / tolerance | 1.5 cents drift at 0.2 Hz; OSC 2 tolerance ±2 cents (Moog: "highly stable oscillators") |
-| Pink noise level | −8 dB against a full-scale saw at the same mixer setting |
-| Not modelled | aftertouch and CTRL4 routing, ratchets, COMPARE, user preset SAVE, the GLOBAL menu beyond the twin's pages, MIDI clock output |
+| MULTIDRIVE | Pre-gain 1 to 40 (square law) into an asymmetric soft clipper, 2× oversampled, with a post gain of 1 / (1 + 0.009 × %) |
+| MOD amounts | PITCH AMT ±2 octaves at ±5 (squared taper, for fine vibrato); FILTER AMT ±5 octaves; MOD AMT: the other LFO's rate ±4 octaves, VCA gain 0-2, WAVE ±100 % of travel, NOISE ±10 on the dial, EG TIME ±3 octaves |
+| CONTROLLERS | Depth = wheel × MOD WHEEL + velocity × VELOCITY, clamped to ±1; with both OFF, full depth |
+| LFO | SAW falls, RAMP rises; S&H takes a new value each cycle; the SINE and NOISE LFO sources follow the bus's LFO clock; LFO KBTRACK doubles the rate per octave at 100 % around MIDI 48 |
+| Envelopes | Linear attack (EXP. ATTACK: exponential); decay and release fall 60 dB in the stage time; VEL AMT: peak = 1 − amount + amount × velocity; KB TRACK: decay and release × 2^(−amount × (note − 48) / 12) |
+| GLIDE TIME | 15 ms at 0 to 6 s at 10, logarithmic: 2 ≈ 50 ms (the acid setting), 5 ≈ 300 ms; LCR is that time per octave |
+| ARP without SYNC | Steps at CLOCK DIV (default 1/16) of RATE |
+| Oscillators | 1.5 cents of slow drift (about 0.2 Hz); OSC 2 tolerance ±2 cents |
+| Output | −6 dB output trim after the VCA (`OUTPUT_TRIM_DB`); VOLUME law (dial / 10)^2 × 0.9; HEADPHONES unity at 7 against VOLUME. A fresh panel plays about −15 LUFS at VOLUME 7; the presets are levelled to −18 LUFS with PRESET VOL |
+| Sound of the two models | The twin has one voicing: the Subsequent 37's cleaner mixer headroom is the 5-is-unity law above |
+
+## Where the twin differed from the hardware, and how it was resolved
+
+The fix list from `docs/research/sub37/sources.md` §6, checked against the rebuilt twin.
+
+| # | Difference found | Resolution |
+|---|---|---|
+| 1 | Labels: KB AMT, PGM DEST, PGM AMT, MODE, BACK/FWD, LATCH, MASTER VOL | Now KB TRACK, MOD DEST (printed DEST), MOD AMT, PATTERN, BACK / FORTH, LATCH ON and VOLUME (Subsequent 37 manual, pp.16, 23, 28, 31, 34) |
+| 2 | Noise was white | Pink noise (a Kellet pink filter, peak-normalised) (Subsequent 37 manual, p.27) |
+| 3 | MOD DEST had 4 made-up targets | The 7 panel destinations, with RES and others reachable through PGM DST (Subsequent 37 manual, pp.23-24, 51) |
+| 4 | PITCH, FILTER and MOD AMT were unipolar | All three are bipolar, -5..+5 (Subsequent 37 manual, p.23) |
+| 5 | BEAT FREQ was ±3 Hz | ±3.5 Hz (Subsequent 37 manual, p.26) |
+| 6 | KB CTRL was on / off | HI / LO / OFF; OFF makes OSC 2 drone with FREQUENCY at ±3 octaves, in DUO MODE (Subsequent 37 manual, p.26) |
+| 7 | Filter KB AMT 0-100 % around MIDI 60 | KB TRACK 0-2:1, 1:1 at halfway, pivoting at MIDI 48 (Subsequent 37 manual, p.29) |
+| 8 | No mixer overdrive, no mixer mutes | Unity at 5 and overdrive above it; an ON button per channel (Subsequent 37 manual, p.27) |
+| 9 | Note priority was fixed at LAST | KB PRIORITY LAST (default), LOW, HIGH (Subsequent 37 manual, p.42) |
+| 10 | Bend was fixed at ±2 | BEND UP / DOWN 0-24 (default 2) and BEND DEST (Subsequent 37 manual, p.42) |
+| 11 | Envelope gaps | SYNC retriggers on its CLOCK DIV; the AMP DELAY needs LOOP; KB TRACK shortens decay and release only, 0-2:1; VEL AMT keeps full strikes at full; EXP. ATTACK off by default; LOOP skips sustain (Subsequent 37 manual, pp.31-33, 41) |
+| 12 | Arpeggiator gaps | SYNC / TAP, INVERT, the SEQ and REC positions, the 7-state RANGE, GATE LENGTH (50 %), SWING, END NOTES, STEP 1 RESET; synced, it waits for the clock (Subsequent 37 manual, pp.15-16, 40) |
+| 13 | No sequencer | 64 steps with REST, TIE, DUO steps, STEP EDIT, ratchet, rotate, skip, first / last step and quick erase. SEQ MOD (the per-step mod-wheel value) is not modelled (Subsequent 37 manual, pp.16-20) |
+| 14 | Keys were mapped from MIDI 48 | The 37 keys are MIDI 36-72 and the computer keys start at 36; MIDI 48 is the reference for KB TRACK and REF NOTE MID C (Subsequent 37 manual, pp.29, 46) |
+| 15 | CV inputs were not specified | PITCH, FILTER and VOL CV take 0 to +5 V (1.0 = 5 V); KB GATE gates the envelopes. Mapping KB GATE to STEP ADV (CV MAPPING) is not modelled (Subsequent 37 manual, pp.8, 45-46) |
+| 16 | GLIDE TIME showed milliseconds | The panel's 0-10 scale; the time map is a guess (Subsequent 37 manual, p.21) |
+| 17 | Page references ran about one page early | Every `manualReference` in `spec.ts` and every citation here uses the manual's printed pages |
+
+## Not modelled
+
+- Aftertouch and CTRL4 as modulation sources (PRESSURE reads zero), and on-screen velocity: the
+  on-screen keys play at full velocity; a MIDI keyboard sends velocity.
+- SEQ MOD recording and its MOD DST / SEQ MOD AMT; per-step velocity (steps play at the key's
+  velocity).
+- COMPARE, SAVE and naming (the studio project stores presets and edits), the MIDI menu, CV MAPPING,
+  POT MODE, GLOBAL VARIANCE and the global KB PRIORITY override, PHASE RESET, DLAY PGM CHG and MIDI
+  OUT, LFO SWING, the MIDI-only middle LFO range.
+- The hold-both-KB OCTAVE-and-press-a-key transpose shortcut (set KB TRANSPOSE in PRESET EDIT), and
+  holding DUO MODE to enter pitch 2 in STEP EDIT (play a legato key instead).
+
+## Presets
+
+The hardware holds 16 banks of 16 (Subsequent 37 manual, p.12). The twin fills banks 1-4 with 64
+presets (`presets.ts`):
+- recreations of Sub 37 factory presets (F1 gives names and categories, not settings, so every
+  recreation is our own programming of the character its name and category describe, and says so in
+  its description);
+- Synth Studio originals of classic Moog techniques;
+- two built from the manual itself (One-Finger Fifths, p.26; the acid tip of the Quickstart).
+
+Names are "Category / Name" in the factory categories. Every preset is levelled to −18 LUFS (FX
+−22, drones −21) with PRESET VOL, measured by `scripts/audio-qa.cjs --target -18`, with true peaks
+at or below −1 dBTP and nothing still sounding 2 s after release (except the drones).

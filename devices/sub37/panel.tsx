@@ -20,7 +20,7 @@
 // it: it stays held for the next press (combos.ts).
 // ============================================================================
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ControlSpec, ControlValue, PresetSpec } from '@/types';
 import type { CustomRenderContext } from '@/types/panel';
 import { describeValue } from '@/lib/controls/mapping';
@@ -169,7 +169,7 @@ export function Wheel({ label, control, value, min, max, spring, onChange, onEnd
         />
         <div style={{ position: 'absolute', left: '12%', right: '12%', pointerEvents: 'none', top: `${50 - offset * 38}%`, height: 3, background: '#e5e5e5', boxShadow: '0 0 3px rgba(255,255,255,0.6)' }} />
       </div>
-      <div style={{ fontWeight: 700, marginTop: 4, fontSize: 9, color: '#d4d4d4', letterSpacing: '0.6px' }}>{label}</div>
+      <div style={{ fontWeight: 700, marginTop: 4, fontSize: 10.5, color: '#dcdcdc', letterSpacing: '0.6px' }}>{label}</div>
     </div>
   );
 }
@@ -221,7 +221,7 @@ function Cap({ lit, blink, label, control, preset, title, aria, onDown, onUp, w 
         background: on ? `linear-gradient(${RED}, #b3201b)` : 'linear-gradient(#2c2c2c, #151515)',
         opacity: on ? 0.45 + 0.55 * Math.min(1, lit) : 1,
         boxShadow: on ? `0 0 ${3 + 5 * lit}px ${RED}` : 'inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 3px rgba(0,0,0,0.6)',
-        color: on ? '#160303' : '#cfcfcf', fontSize: 7.5, fontWeight: 800, lineHeight: 1,
+        color: on ? '#160303' : '#d8d8d8', fontSize: 9, fontWeight: 800, lineHeight: 1,
       }}
     >
       {label}
@@ -268,7 +268,7 @@ export function DestButton({ ctx, bus }: { ctx: Ctx; bus: 1 | 2 }) {
     if (ui.destCancel) { ctx.setUi({ destCancel: false }); return; }
     if (ui.destAssigned) { ctx.setUi({ destHeld: 0, destArmed: 0 }); return; }
     if (Number(ui.destArmed ?? 0) === bus) {
-      ctx.setUi({ destLatched: bus, destArmed: 0, note: `MOD ${bus} DEST: MOVE A CONTROL`, noteAt: Date.now() });
+      ctx.setUi({ destLatched: bus, destArmed: 0, note: `MOD ${bus} DEST: MOVE CONTROL`, noteAt: Date.now() });
       return;
     }
     ctx.setUi({ destHeld: 0 });
@@ -300,7 +300,7 @@ export function RangeButton({ ctx, dir }: { ctx: Ctx; dir: -1 | 1 }) {
     if (bankHeld(ui)) {
       const s = readSeq(ctx.values);
       applySeq(ctx.setValue, s, rotate(s, dir));
-      ctx.setUi({ ...usedBank(ui), note: `ROTATE ${dir < 0 ? 'LEFT' : 'RIGHT'}`, noteAt: Date.now() });
+      ctx.setUi({ ...usedBank(ui), note: `ROTATE: ${dir < 0 ? 'LEFT' : 'RIGHT'}`, noteAt: Date.now() });
       return;
     }
     const cur = Math.round(Number(ctx.values.arp_oct_range ?? 3));
@@ -422,9 +422,9 @@ export function ProgButtons({ ctx }: { ctx: Ctx }) {
     if (id === 'inc') return menuMove(ctx, 1);
     if (id === 'cursor') { if (menu) ctx.setUi({ menuEdit: !uiOf(ctx.instance).menuEdit }); return; }
     if (id === 'global') return ctx.setUi(menu === 'global' ? { menu: null } : { menu: 'global', menuRow: 0, menuEdit: false });
-    if (id === 'compare') return flash('COMPARE: not in the twin');
-    if (id === 'save') return flash('SAVE: use the studio project');
-    if (id === 'midi') return flash('MIDI: set in the studio');
+    if (id === 'compare') return flash('COMPARE: NOT MODELLED');
+    if (id === 'save') return flash('SAVE: USE A PROJECT');
+    if (id === 'midi') return flash('MIDI: IN THE STUDIO');
   };
   const holdable = (id: string, onHold: () => void, onTap: () => void) => ({
     onDown: () => {
@@ -444,27 +444,36 @@ export function ProgButtons({ ctx }: { ctx: Ctx }) {
     () => ctx.setUi({ menu: 'preset', menuRow: 0, menuEdit: false }),
     () => ctx.setUi({ menu: null, bankMode: false }),
   );
-  const panelBtn = holdable('panel', () => { initPanel(ctx.instance); flash('PANEL INITIALIZED'); }, () => flash('PANEL: hold to initialize'));
-  const cell = (id: string, label: string, lit: boolean, h?: ReturnType<typeof holdable>) => (
-    <div key={id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-      <span style={{ fontSize: 8, fontWeight: 800, color: '#e5e5e5', letterSpacing: '0.4px', whiteSpace: 'nowrap' }}>{label}</span>
-      <Cap lit={lit ? 1 : 0} control={`prog_${id}`} aria={label} onDown={h ? h.onDown : () => press(id)} onUp={h?.onUp} />
+  const panelBtn = holdable('panel', () => { initPanel(ctx.instance); flash('PANEL: INITIALIZED'); }, () => flash('PANEL: HOLD TO INIT'));
+  // As the manual draws it (p.13): ▼ ▲ CURSOR in a row under the LCD, then COMPARE / SAVE,
+  // MIDI / GLOBAL and PRESET (EDIT) / PANEL (INIT) in two columns; names under the buttons.
+  // Positions are mm from this block's top-left corner (2 px per mm).
+  const cell = (id: string, name: string, xMm: number, yMm: number, lit: boolean, h?: ReturnType<typeof holdable>, extra: { above?: string; invert?: boolean; aria?: string } = {}) => (
+    <div key={id} style={{ position: 'absolute', left: xMm * 2, top: yMm * 2, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {extra.above && <span style={{ ...PROG_TAG, position: 'absolute', bottom: '100%', marginBottom: 1 }}>{extra.above}</span>}
+      <Cap lit={lit ? 1 : 0} control={`prog_${id}`} aria={extra.aria ?? name} onDown={h ? h.onDown : () => press(id)} onUp={h?.onUp} w={20} h={12} />
+      <span style={{ ...PROG_NAME, ...(extra.invert ? PROG_INVERT : {}) }}>{name}</span>
     </div>
   );
   return (
-    <div style={{ ...noSelect, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', rowGap: 6, columnGap: 2, width: '100%', justifyItems: 'center' }}>
-      {cell('dec', '◀', false)}
-      {cell('inc', '▶', false)}
-      {cell('cursor', 'CURSOR', !!ctx.ui.menuEdit)}
-      {cell('compare', 'COMPARE', false)}
-      {cell('midi', 'MIDI', false)}
-      {cell('preset', 'PRESET', !menu || menu === 'preset', presetBtn)}
-      {cell('save', 'SAVE', false)}
-      {cell('global', 'GLOBAL', menu === 'global')}
-      {cell('panel', 'PANEL', false, panelBtn)}
+    <div style={{ ...noSelect, position: 'relative', width: '100%', height: '100%' }}>
+      {cell('dec', '▼', 10.5, 1, false, undefined, { aria: 'DEC ▼' })}
+      {cell('inc', '▲', 24.5, 1, false, undefined, { aria: 'INC ▲' })}
+      {cell('cursor', 'CURSOR', 38.5, 1, !!ctx.ui.menuEdit)}
+      {cell('compare', 'COMPARE', 12.5, 14, false)}
+      {cell('save', 'SAVE', 36.5, 14, false, undefined, { invert: true })}
+      {cell('midi', 'MIDI', 12.5, 27, false)}
+      {cell('global', 'GLOBAL', 36.5, 27, menu === 'global')}
+      {cell('preset', 'PRESET', 12.5, 46, !menu || menu === 'preset', presetBtn, { above: 'EDIT' })}
+      {cell('panel', 'PANEL ▶', 36.5, 46, false, panelBtn, { above: 'INIT', aria: 'PANEL' })}
     </div>
   );
 }
+
+const PROG_FONT = '"Arial Narrow", "Roboto Condensed", Arial, sans-serif';
+const PROG_NAME: React.CSSProperties = { fontFamily: PROG_FONT, fontSize: 10.5, lineHeight: 1.1, fontWeight: 700, color: '#e8e8e8', letterSpacing: '0.3px', whiteSpace: 'nowrap', marginTop: 2, padding: '0 2px' };
+const PROG_INVERT: React.CSSProperties = { background: '#e8e8e8', color: '#111', borderRadius: 2 };
+const PROG_TAG: React.CSSProperties = { fontFamily: PROG_FONT, fontSize: 9.5, lineHeight: 1, fontStyle: 'italic', fontWeight: 700, color: '#bdbdbd', whiteSpace: 'nowrap' };
 
 // ---------------------------------------------------------------------------
 // LCD (128 x 64, blue backlight)
@@ -503,20 +512,26 @@ function useNoteWriter(ctx: Ctx) {
   }, [id]);
 }
 
+/** LCD text: a condensed face, so a 45 mm screen holds its lines at a legible size on an iPad */
+const LCD_FONT = '"Arial Narrow", "Roboto Condensed", Arial, sans-serif';
+const LCD_SMALL = 10.5;
+const LCD_BIG = 12.5;
+const LCD_ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 4, fontSize: LCD_SMALL, lineHeight: 1.15, whiteSpace: 'nowrap' };
+
 function MenuView({ ctx, menu }: { ctx: Ctx; menu: string }) {
   const m = MENUS[menu];
   const rows = menuRows(menu);
   const row = Math.max(0, Math.min(rows.length - 1, Number(ctx.ui.menuRow ?? 0)));
   const edit = !!ctx.ui.menuEdit;
-  // show four lines around the selection
-  const start = Math.max(0, Math.min(rows.length - 4, row - 1));
+  // three lines around the selection
+  const start = Math.max(0, Math.min(rows.length - 3, row - 1));
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, opacity: 0.9 }}>
-        <span>{m.title}</span>
+      <div style={{ ...LCD_ROW, fontWeight: 700, borderBottom: '1px solid rgba(232,240,255,0.35)' }}>
+        <span style={TRUNC}>{m.title}</span>
         <span>{row + 1}/{rows.length}</span>
       </div>
-      {rows.slice(start, start + 4).map((id, k) => {
+      {rows.slice(start, start + 3).map((id, k) => {
         const i = start + k;
         const s = SUB37.controls[id];
         const sel = i === row;
@@ -524,7 +539,7 @@ function MenuView({ ctx, menu }: { ctx: Ctx; menu: string }) {
           <div
             key={id}
             onPointerDown={e => { e.preventDefault(); ctx.setUi({ menuRow: i, menuEdit: sel ? !edit : true }); }}
-            style={{ ...TRUNC, display: 'flex', justifyContent: 'space-between', gap: 4, fontSize: 9, lineHeight: 1.3, padding: '0 2px', cursor: 'pointer',
+            style={{ ...LCD_ROW, lineHeight: 1.22, padding: '0 2px', cursor: 'pointer',
               background: sel ? (edit ? '#e8f0ff' : 'rgba(232,240,255,0.25)') : undefined, color: sel && edit ? '#13307a' : undefined }}
           >
             <span style={TRUNC}>{s?.label ?? id}</span>
@@ -534,6 +549,27 @@ function MenuView({ ctx, menu }: { ctx: Ctx; menu: string }) {
       })}
     </>
   );
+}
+
+/** Seconds a touched control (or a message) stays on the LCD before the preset screen returns */
+const LCD_HOLD_MS = 2500;
+
+/** True while `stamp` (a new object or time) is younger than LCD_HOLD_MS; re-renders when it expires */
+function useFresh(stamp: unknown, at: number | null): boolean {
+  const [until, setUntil] = useState(0);
+  const last = useRef<unknown>(stamp);
+  useEffect(() => {
+    if (stamp && stamp !== last.current) setUntil((at ?? Date.now()) + LCD_HOLD_MS);
+    last.current = stamp;
+  }, [stamp, at]);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const wait = until - Date.now();
+    if (wait <= 0) return;
+    const t = setTimeout(() => tick(x => x + 1), wait + 20);
+    return () => clearTimeout(t);
+  }, [until]);
+  return !!stamp && Date.now() < until;
 }
 
 /**
@@ -567,16 +603,18 @@ export function Lcd({ ctx }: { ctx: Ctx }) {
   const lcd = ctx.engine.lcd as { title: string; value: string } | null | undefined;
   const menu = ctx.ui.menu as string | null | undefined;
   const note = ctx.ui.note as string | undefined;
-  const noteFresh = note && Date.now() - Number(ctx.ui.noteAt ?? 0) < 2500;
+  const noteAt = Number(ctx.ui.noteAt ?? 0) || null;
+  const noteFresh = useFresh(note ? noteAt : null, noteAt) && !!note;
+  const lcdFresh = useFresh(lcd ?? null, null);
   const s = readSeq(v);
   const latchedStep = ctx.ui.stepLatched ? heldStep(ctx.ui) : null;
   let status = '';
   if (Number(ctx.ui.destLatched ?? 0)) {
-    status = `MOD ${ctx.ui.destLatched} DEST: MOVE A CONTROL`;
+    status = `MOD ${ctx.ui.destLatched} DEST: ASSIGN`;
   } else if (ctx.ui.bankLatched) {
-    status = 'BANK HELD: PRESS A BUTTON';
+    status = 'BANK HELD';
   } else if (latchedStep !== null) {
-    status = `STEP ${latchedStep + 1} HELD: PRESS A BUTTON`;
+    status = `STEP ${latchedStep + 1} HELD`;
   } else if (ctx.ui.stepEdit) {
     const cur = Number(ctx.engine.seqStep ?? -1);
     const sel = ctx.ui.stepSel as number | null | undefined;
@@ -584,11 +622,11 @@ export function Lcd({ ctx }: { ctx: Ctx }) {
     status = `${ctx.engine.gate ? '▶' : '■'} EDIT ${String((sel ?? Math.max(0, cur)) + 1).padStart(2, '0')}/${s.seq_len} P${page}`;
   } else if (pattern === PATTERN_REC) {
     const pos = Number(ctx.ui.recPos ?? 0);
-    status = pos ? `REC ${String(pos).padStart(2, '0')} / ${String(s.seq_len).padStart(2, '0')}${ctx.ui.recTie ? ' TIE' : ''}` : 'REC: PLAY A KEY TO START';
+    status = pos ? `REC ${String(pos).padStart(2, '0')} / ${String(s.seq_len).padStart(2, '0')}${ctx.ui.recTie ? ' TIE' : ''}` : 'REC: PLAY A KEY';
   } else if (ctx.engine.clockWait) {
-    status = 'SYNC: WAITING FOR ▶ CLOCK';
+    status = 'SYNC: WAIT FOR ▶';
   } else if (ctx.ui.tapMode) {
-    status = `TAP TEMPO ${Math.round(Number(v.arp_rate ?? 120))} BPM`;
+    status = `TAP ${Math.round(Number(v.arp_rate ?? 120))} BPM`;
   } else if (ctx.ui.bankMode) {
     status = 'BANK: PRESS 1-16';
   }
@@ -596,13 +634,18 @@ export function Lcd({ ctx }: { ctx: Ctx }) {
   if (v.knob_shift) flags.push('SHIFT');
   if (v.arp_on && pattern !== PATTERN_REC) flags.push(pattern === PATTERN_SEQ ? 'SEQ' : 'ARP');
   if (v.duo_mode) flags.push('DUO');
+  // The middle of the screen: a message, else the control just touched (as the hardware shows
+  // an edit), else the preset name on up to two lines
+  const [noteTitle, noteValue] = note && note.includes(': ') ? [note.slice(0, note.indexOf(': ')), note.slice(note.indexOf(': ') + 2)] : ['', note ?? ''];
+  const mid = noteFresh ? { title: noteTitle, value: noteValue } : lcdFresh && lcd ? lcd : null;
+  const warn = status.startsWith('SYNC') || status.includes('HELD') || status.includes('ASSIGN');
   return (
     <div
       style={{
         ...noSelect,
         position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        fontFamily: 'ui-monospace, Menlo, monospace', background: 'linear-gradient(180deg, #1b3d8f 0%, #13307a 100%)',
-        color: '#e8f0ff', padding: '4px 6px', textShadow: '0 0 3px rgba(190,215,255,0.55)', boxShadow: 'inset 0 0 10px rgba(0,0,20,0.7)',
+        fontFamily: LCD_FONT, letterSpacing: '0.2px', background: 'linear-gradient(180deg, #1b3d8f 0%, #13307a 100%)',
+        color: '#e8f0ff', padding: '3px 4px', textShadow: '0 0 3px rgba(190,215,255,0.55)', boxShadow: 'inset 0 0 10px rgba(0,0,20,0.7)',
         border: '2px solid #111', borderRadius: 3,
       }}
       data-control="lcd"
@@ -611,17 +654,32 @@ export function Lcd({ ctx }: { ctx: Ctx }) {
         <MenuView ctx={ctx} menu={menu} />
       ) : (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, opacity: 0.9 }}>
-            <span>BNK {String(bank).padStart(2, '0')} PRESET {slot ? String(slot).padStart(2, '0') : '--'}</span>
-            <span>{flags.join(' ')}</span>
+          <div style={{ ...LCD_ROW, opacity: 0.92 }}>
+            <span>BNK {String(bank).padStart(2, '0')}</span>
+            <span>PRESET {slot ? String(slot).padStart(2, '0') : '--'}</span>
           </div>
-          <div style={{ ...TRUNC, fontWeight: 700, fontSize: 11, lineHeight: 1.2, marginTop: 1 }}>{name.toUpperCase()}</div>
-          <div style={{ ...TRUNC, fontSize: 8, opacity: 0.9, borderBottom: '1px solid rgba(232,240,255,0.35)', paddingBottom: 2 }}>CAT: {cat}</div>
-          <div style={{ ...TRUNC, fontSize: 8, marginTop: 2, opacity: 0.9 }}>{noteFresh ? '' : lcd ? lcd.title : 'READY'}</div>
-          <div style={{ ...TRUNC, fontWeight: 700, fontSize: 11, lineHeight: 1.15 }}>{noteFresh ? note : lcd ? lcd.value : ''}</div>
+          <div style={{ height: LCD_BIG * 2.1, display: 'flex', flexDirection: 'column', justifyContent: 'center', borderTop: '1px solid rgba(232,240,255,0.3)', borderBottom: '1px solid rgba(232,240,255,0.3)' }}>
+            {mid ? (
+              <>
+                {mid.title && <div style={{ ...TRUNC, fontSize: LCD_SMALL, lineHeight: 1.1, opacity: 0.92 }}>{mid.title}</div>}
+                <div style={{ ...TRUNC, fontSize: LCD_BIG + 0.5, lineHeight: 1.1, fontWeight: 700 }}>{mid.value}</div>
+              </>
+            ) : (
+              <div style={{ fontSize: LCD_BIG, lineHeight: 1.05, fontWeight: 700, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word' }}>
+                {name.toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div style={{ ...LCD_ROW, marginTop: 'auto', fontWeight: status ? 700 : 400, color: warn ? '#ffd27a' : undefined }}>
+            {status ? <span style={TRUNC}>{status}</span> : (
+              <>
+                <span style={TRUNC}>CAT: {cat}</span>
+                <span>{flags.join(' ')}</span>
+              </>
+            )}
+          </div>
         </>
       )}
-      <div style={{ ...TRUNC, marginTop: 'auto', fontSize: 8, fontWeight: 700, color: status.startsWith('SYNC') || status.includes('HELD') || status.includes('MOVE') ? '#ffd27a' : undefined }}>{status}</div>
     </div>
   );
 }
@@ -640,7 +698,7 @@ export function KbOctave({ ctx }: { ctx: Ctx }) {
       // both together: back to the standard octave; held for a second: MIDI panic (p.14)
       both.current.used = true;
       ctx.setValue('kb_octave', 0);
-      both.current.timer = setTimeout(() => { ctx.sendEvent('panic'); ctx.setUi({ note: 'MIDI PANIC', noteAt: Date.now() }); }, HOLD_MS);
+      both.current.timer = setTimeout(() => { ctx.sendEvent('panic'); ctx.setUi({ note: 'MIDI: PANIC', noteAt: Date.now() }); }, HOLD_MS);
     }
   };
   const release = (dir: -1 | 1) => {
@@ -654,13 +712,13 @@ export function KbOctave({ ctx }: { ctx: Ctx }) {
       // hold a step + KB OCTAVE down / up: FIRST / LAST step (p.19)
       const s = readSeq(ctx.values);
       applySeq(ctx.setValue, s, dir < 0 ? setFirstStep(s, held) : setLastStep(s, held));
-      ctx.setUi({ ...usedStep(ui), note: `${dir < 0 ? 'FIRST' : 'LAST'} STEP ${held + 1}`, noteAt: Date.now() });
+      ctx.setUi({ ...usedStep(ui), note: `${dir < 0 ? 'FIRST' : 'LAST'} STEP: ${held + 1}`, noteAt: Date.now() });
       return;
     }
     if (bankHeld(ui) && ui.stepEdit) {
       // BANK + KB OCTAVE: sequence page (p.18)
       const page = Math.max(0, Math.min(3, Number(ui.seqPage ?? 0) + dir));
-      ctx.setUi({ ...usedBank(ui), seqPage: page, pageChase: false, note: `PAGE P${page + 1}`, noteAt: Date.now() });
+      ctx.setUi({ ...usedBank(ui), seqPage: page, pageChase: false, note: `PAGE: P${page + 1}`, noteAt: Date.now() });
       return;
     }
     ctx.setValue('kb_octave', Math.max(-2, Math.min(2, oct + dir)));
@@ -698,7 +756,7 @@ export function BankButton({ ctx }: { ctx: Ctx }) {
     ctx.setUi({ bankDown: false, bankArmed: false });
     if (ui.bankCancel) { ctx.setUi({ bankCancel: false }); return; }
     if (ui.bankUsed) return;
-    if (ui.bankArmed) { ctx.setUi({ bankLatched: true, bankMode: false, note: 'BANK HELD: PRESS A BUTTON', noteAt: Date.now() }); return; }
+    if (ui.bankArmed) { ctx.setUi({ bankLatched: true, bankMode: false, note: 'BANK: HELD', noteAt: Date.now() }); return; }
     if (ui.stepEdit) { ctx.setUi({ stepSel: null }); return; }   // deselect the step (p.18)
     ctx.setUi({ bankMode: !ui.bankMode, menu: null });
   };
@@ -729,17 +787,17 @@ export function PresetRow({ ctx }: { ctx: Ctx }) {
     const step = page * 16 + i;
     if (bankHeld(ui)) {
       // BANK + a step: select it for editing (p.18)
-      ctx.setUi({ ...usedBank(ui), stepSel: step, stepHeld: null, stepLatched: false, note: `EDIT STEP ${step + 1}`, noteAt: Date.now() });
+      ctx.setUi({ ...usedBank(ui), stepSel: step, stepHeld: null, stepLatched: false, note: `EDIT STEP: ${step + 1}`, noteAt: Date.now() });
       return;
     }
     const held = heldStep(ui);
     if (held !== null && held !== step) {
       // hold one step and press another: tie them and the steps between (p.19)
       applySeq(ctx.setValue, s, tieGroup(s, held, step));
-      ctx.setUi({ ...usedStep(ui), note: `TIE ${Math.min(held, step) + 1}-${Math.max(held, step) + 1}`, noteAt: Date.now() });
+      ctx.setUi({ ...usedStep(ui), note: `TIE: ${Math.min(held, step) + 1}-${Math.max(held, step) + 1}`, noteAt: Date.now() });
       return;
     }
-    if (selectedStep(ui) !== null) { ctx.setUi({ stepSel: step, note: `EDIT STEP ${step + 1}`, noteAt: Date.now() }); return; }
+    if (selectedStep(ui) !== null) { ctx.setUi({ stepSel: step, note: `EDIT STEP: ${step + 1}`, noteAt: Date.now() }); return; }
     if (held === step && ui.stepLatched) { ctx.setUi({ stepCancel: true }); return; }   // a press lets a latched step go
     ctx.setUi({ stepHeld: step, stepHeldUsed: false, stepLatched: false, stepArmed: null, stepCancel: false });
     if (timer.current) clearTimeout(timer.current);
@@ -756,7 +814,7 @@ export function PresetRow({ ctx }: { ctx: Ctx }) {
     if (ui.stepHeldUsed) { ctx.setUi({ stepHeld: null, stepHeldUsed: false, stepArmed: null }); return; }
     if (ui.stepArmed === step) {
       // long press and release: the step stays held for the next press (mouse)
-      ctx.setUi({ stepLatched: true, stepArmed: null, note: `STEP ${step + 1} HELD`, noteAt: Date.now() });
+      ctx.setUi({ stepLatched: true, stepArmed: null, note: `STEP ${step + 1}: HELD`, noteAt: Date.now() });
       return;
     }
     applySeq(ctx.setValue, s, toggleRest(s, step));   // a tap toggles the rest (p.19)
@@ -790,7 +848,7 @@ export function PresetRow({ ctx }: { ctx: Ctx }) {
               w={26}
               h={12}
             />
-            <span style={{ fontSize: 6.5, color: '#9a9a9a', height: 7, lineHeight: 1, ...TRUNC, maxWidth: 34 }}>
+            <span style={{ fontFamily: LCD_FONT, fontSize: 8.5, color: '#b0b0b0', height: 9, lineHeight: 1, ...TRUNC, maxWidth: 34 }}>
               {stepEdit && stepNote ? stepLabel(s, step) : ''}
             </span>
           </div>
