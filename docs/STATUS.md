@@ -11,7 +11,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Studio v2 | Rack, cables, routing, sync, arranger, recorder, projects, Review, lesson coach v2 |
 | Producer-grade studio | Clean unity master, −1 dBTP true-peak limiter, BS.1770 LUFS meters, mixer strips with sends to a tempo delay and Reverb2, undo/redo, stems, bounce, count-in, loop |
 | All seven instruments rebuilt to their manuals | DFAM, Xone:96, Sub 37, Analog Four MKII, Mother-32, Subharmonicon, Analog Rytm MKII. Each passes audio QA at −18 LUFS with 0 flagged presets and plays all its lessons |
-| Independent expert reviews | A second agent re-checked each instrument against its manual and fixed what it found. Merged: DFAM, Subharmonicon, Xone:96, Analog Four, Mother-32, Sub 37. Each writes `devices/<id>/REVIEW.md` |
+| Independent expert reviews | A second agent re-checked each instrument against its manual and fixed what it found. All seven are merged: DFAM, Subharmonicon, Xone:96, Analog Four, Mother-32, Sub 37, Analog Rytm. Each writes `devices/<id>/REVIEW.md` |
 | Producer path | Lesson API v3 studio state (whole-studio starts, saved learner studios, loudness-matched A/B, master/channel meters, bounces, mixer and arranger checks) and the first 8 Producer path lessons. See "Lesson API v3" in `docs/PEDAGOGY.md` |
 | Clock chip | Every instrument that can follow the studio clock shows **Clock: studio / own tempo** above its panel. One tap lets a patch sheet play at its drawn TEMPO |
 | Stale-module fix | `useDeviceModule` reads the hub cache on every render, so switching never pairs one instrument's layout with another's data |
@@ -73,6 +73,13 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 - 80c283a: an instrument's own studio lessons are headed "<name> in the studio", no longer a second "Studio & full tracks".
 - Full suite on 22b412c (`run.cjs --full`): **87/87**, covering smoke for every instrument, every lesson of every instrument and the 37 core checks.
   - Lessons: DFAM 20, Mother-32 19, Subharmonicon 20, Sub 37 20, A4 20, Rytm 20, Xone 18, Your synth 7, Audio input 5, Web Audio plugin 4.
+- 620e02a: merged the **Analog Rytm review**.
+  - Closed hats sat 20–27 LU under the mix in 17 of 20 kits. They now have per-machine trims, and every kit is rebalanced.
+  - Retriggers no longer dip, one-shot samples fade over their last 3 ms, and the output saturates softly at full scale (was +31.3 dBFS).
+  - Lesson s3's comparisons are now audible, and the iPad legends are 9 px.
+  - Audio QA 0/20 in both modes (median −18.8 / −18.9 LUFS); lessons 20, 0 failed, 1 manual (t2, the arranger; the producer-path agent is adding its solution).
+  - No ids or defaults changed. Saved projects keep their old copies of the factory kits, which the user can reload from the kit menu.
+  - **All seven independent reviews are now merged.**
 - **Vercel build rate limit.** Previews from 49f3469 on failed with `build-rate-limit`, not a code error (local builds pass). Every push to any branch, the agents' `wip/*` included, starts a preview build. Pushes are now batched. Option for the user: disable preview builds for scratch branches with `vercel.json` → `"git": { "deploymentEnabled": { "wip/*": false } }`.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
@@ -110,7 +117,6 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 
 | Branch | What | Checkpoint |
 |---|---|---|
-| `wip/review-analog-rytm` | Independent Analog Rytm MKII review against the manual | a0c2d10 |
 | `wip/demo-tracks` | The three designed songs ("Low Tide Lights", "Three Clocks", "Copper Wire") as one-click studios | 0876305 |
 | `wip/producer-path-2` | The remaining Producer path lessons (Elektron and Sub 37 tracks), Elektron pattern swing, and lesson solutions for routes, the arranger and rack counts (0 manual steps left on the Xone, A4 and audio-in; 1 on Your synth, where MIDI learn needs a real controller) | 867e6fc |
 | `wip/perf-analog-four` | Analog Four DSP performance pass, null-tested against the current sound | — |
