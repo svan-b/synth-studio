@@ -59,7 +59,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
 
   // ---------------------------------------------------------------- Kicks
   kick_analog: preset('Kick / Analog kick',
-    'The kick from the manual\'s first walkthrough (p.8-9): VCO 1 FRE\'UENCY near 10:30, VCO 1 EG AMOUNT at 3 o\'clock and VCO DECAY at 9 o\'clock - a low triangle with a fast pitch drop. Kicks on every beat.',
+    'The kick from the manual\'s first walkthrough (p.8-9): VCO 1 FREQUENCY near 10:30, VCO 1 EG AMOUNT at 3 o\'clock and VCO DECAY at 9 o\'clock - a low triangle with a fast pitch drop. Kicks on every beat.',
     'manual', {
       vco1_frequency: -1.5, vco1_eg_amount: 60, vco_decay: 40, vco1_level: 90,
       vcf_cutoff: 900, vcf_resonance: 10, vcf_eg_amount: 25, vcf_decay: 50, vca_decay: 420, volume: 100,
@@ -122,7 +122,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
 
   // ---------------------------------------------------------------- Hats and shakers
   hats_quick: preset('Hats / Hat lengths per step',
-    'Settings read from the manual\'s "\'uick Hats" patch sheet (p.33): noise through the high-pass filter, PITCH patched into VCA DECAY. Each PITCH knob sets how long its hat rings: low = closed, step 7 high = open. The negative VCF EG gives each hit a soft body.',
+    'Settings read from the manual\'s "Quick Hats" patch sheet (p.33): noise through the high-pass filter, PITCH patched into VCA DECAY. Each PITCH knob sets how long its hat rings: low = closed, step 7 high = open. The negative VCF EG gives each hit a soft body.',
     'manual', {
       vco1_frequency: -2.5, vco1_eg_amount: 40, vco_decay: 270, vco1_level: 10, vco2_level: 10, noise_level: 90,
       vcf_mode: 0, vcf_cutoff: 1550, vcf_resonance: 5, vcf_eg_amount: -90, vcf_decay: 320, vca_decay: 320, volume: 66, tempo: 117,
@@ -209,7 +209,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
 
   // ---------------------------------------------------------------- Metal and FM
   metal_fm_toys: preset('Metal / Clanky FM sequence',
-    'Based on the manual\'s "FM Toys" patch notes (p.34): 1→2 FM AMOUNT well up with sync off, the sequencer on VCO 2 only, and VCO 2 also patched into VCF MOD so it moves the cutoff. Toy-like metal that changes every step; try VCO 2 FRE\'UENCY, and the filter in HP.',
+    'Based on the manual\'s "FM Toys" patch notes (p.34): 1→2 FM AMOUNT well up with sync off, the sequencer on VCO 2 only, and VCO 2 also patched into VCF MOD so it moves the cutoff. Toy-like metal that changes every step; try VCO 2 FREQUENCY, and the filter in HP.',
     'manual', {
       vco1_frequency: 0.3, vco1_wave: 1, vco1_level: 60, vco2_frequency: 0.9, vco2_wave: 0, vco2_level: 60,
       fm_amount: 70, seq_pitch_mod: 2, vco_decay: 60, vco2_eg_amount: 12,
@@ -217,7 +217,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
       ...steps([0, st(5), st(-3), st(9), 0, st(14), st(2), st(7)], [100, 70, 85, 70, 100, 60, 90, 75]),
     }, [{ from: 'out_vco2', to: 'in_vcf_mod' }]),
   metal_chimes: preset('Metal / FM chime melody',
-    'Settings read from the manual\'s "Music Box" patch sheet (p.33): PITCH patched into VCO 1 CV plays VCO 1, which frequency-modulates the high VCO 2 you hear at almost full 1→2 FM AMOUNT. Small PITCH changes alter the bell tone a lot; try VCO 2 FRE\'UENCY.',
+    'Settings read from the manual\'s "Music Box" patch sheet (p.33): PITCH patched into VCO 1 CV plays VCO 1, which frequency-modulates the high VCO 2 you hear at almost full 1→2 FM AMOUNT. Small PITCH changes alter the bell tone a lot; try VCO 2 FREQUENCY.',
     'manual', {
       vco1_frequency: 2.5, vco1_level: 10, vco2_frequency: 3.5, vco2_level: 80, fm_amount: 93, vco_decay: 15,
       vcf_cutoff: 1770, vcf_resonance: 5, vcf_eg_amount: 47, vcf_decay: 110, vca_decay: 320, volume: 100, tempo: 83,
@@ -309,7 +309,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
       ...steps([0, st(12), st(7), st(19), st(5), st(24), st(3), st(15)], [100, 0, 80, 60, 0, 90, 0, 70]),
     }),
   fx_seq_osc: preset('FX / Audio-rate sequencer',
-    'Based on the manual\'s "Sequencer As An Oscillator" patch notes (p.37): VCO 1 clocks ADV / CLOCK, so the sequencer steps at audio rate and repeats its 8 steps 65 times a second, and PITCH patched into EXT AUDIO is the sound - the PITCH knobs draw the waveform. VCO 1 FRE\'UENCY sets rate and pitch; add VCO 2 LEVEL for wild sounds. Press RUN / STOP to start it.',
+    'Based on the manual\'s "Sequencer As An Oscillator" patch notes (p.37): VCO 1 clocks ADV / CLOCK, so the sequencer steps at audio rate and repeats its 8 steps 65 times a second, and PITCH patched into EXT AUDIO is the sound - the PITCH knobs draw the waveform. VCO 1 FREQUENCY sets rate and pitch; add VCO 2 LEVEL for wild sounds. Press RUN / STOP to start it.',
     'manual', {
       vco1_frequency: 2, vco1_wave: 0, vco1_level: 0, vco2_level: 0, noise_level: 70,
       vcf_cutoff: 4000, vcf_resonance: 10, vca_decay: 300, volume: 63,
@@ -365,7 +365,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
       ...steps([0, -2, 1.5, -2, 0, -1, 2, -2], [100, 50, 85, 50, 100, 55, 90, 60]),
     }, [{ from: 'out_pitch', to: 'in_vco_decay' }]),
   loop_shuffle: preset('Loop / Shuffle',
-    'Based on the manual\'s "Swing Time" patch notes (p.36): PITCH patched into TEMPO, with SE\' PITCH MOD off, so the PITCH knobs set how long each step lasts - lower is longer. Alternating long and short steps gives a swung, shuffling groove.',
+    'Based on the manual\'s "Swing Time" patch notes (p.36): PITCH patched into TEMPO, with SEQ PITCH MOD off, so the PITCH knobs set how long each step lasts - lower is longer. Alternating long and short steps gives a swung, shuffling groove.',
     'manual', {
       vco1_level: 30, vco1_frequency: 1, vco1_eg_amount: 30, vco_decay: 20, noise_level: 80, seq_pitch_mod: 1,
       vcf_mode: 0, vcf_cutoff: 3000, vcf_resonance: 30, vca_decay: 70, volume: 92, tempo: 110,
