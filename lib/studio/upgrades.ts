@@ -150,6 +150,36 @@ const UPGRADES: Upgrade[] = [
   },
 ];
 
+/** Lessons replaced by a rebuild: completing the old one counts for its successor */
+const LESSON_RENAMES: { store: number; map: Record<string, string> }[] = [
+  {
+    store: 7,
+    map: {
+      'sub37-waveforms': 'sub37-f1-oscillators',
+      'sub37-octaves-beating': 'sub37-f2-osc2-tuning',
+      'sub37-sub-mixer-noise': 'sub37-f3-mixer',
+      'sub37-filter': 'sub37-f4-filter',
+      'sub37-kb-tracking': 'sub37-f4-filter',
+      'sub37-envelopes': 'sub37-f5-envelopes',
+      'sub37-mod-busses': 'sub37-f7-modulation',
+      'sub37-duo-loop': 'sub37-f8-duo',
+      'sub37-arpeggiator': 'sub37-sq1-arpeggiator',
+      'sub37-glide': 'sub37-p1-wheels-glide-latch',
+      'sub37-hard-sync': 'sub37-sd2-sync-lead',
+      'sub37-multidrive': 'sub37-sd3-grit',
+    },
+  },
+];
+
+/** Carry lesson completions over to the lessons that replaced them */
+export function upgradeCompletedLessons(done: string[], from: number): string[] {
+  const pending = LESSON_RENAMES.filter(r => r.store > from);
+  if (!pending.length) return done;
+  const out = new Set(done);
+  pending.forEach(r => done.forEach(id => { if (r.map[id]) out.add(r.map[id]); }));
+  return [...out];
+}
+
 export const STORE_VERSION = 7;
 export const PROJECT_VERSION = 4;
 

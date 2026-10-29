@@ -17,13 +17,13 @@ const { chromium } = require('playwright');
     if (sessionStorage.getItem('seeded')) return;
     sessionStorage.setItem('seeded', '1');
     localStorage.setItem('synth-studio-welcomed', '1');
-    localStorage.setItem('synth-studio-storage', JSON.stringify({ version: 4, state: { currentDevice: 'dfam', completedLessons: [], review: {}, focusMode: true,
+    localStorage.setItem('synth-studio-storage', JSON.stringify({ version: 4, state: { currentDevice: 'dfam', completedLessons: ['sub37-waveforms'], review: {}, focusMode: true,
       devices: { dfam: { controlValues: { tempo: 120, vco1_freq: 220 }, patchConnections: [] }, mother32: { controlValues: { tempo: 120 }, patchConnections: [] } },
       studio: { rack: [{ id: 'dfam', device: 'dfam' }], cables: [], routes: {}, sync: {}, bpm: 120, swing: 0, arrangement: { enabled: false, loop: true, sections: [] } } } }));
   });
   const read = () => p.evaluate(() => {
     const s = JSON.parse(localStorage.getItem('synth-studio-storage'));
-    return { version: s.version, dfamTempo: s.state.devices.dfam?.controlValues.tempo, vco1: s.state.devices.dfam?.controlValues.vco1_freq, m32Tempo: s.state.devices.mother32?.controlValues.tempo };
+    return { version: s.version, dfamTempo: s.state.devices.dfam?.controlValues.tempo, vco1: s.state.devices.dfam?.controlValues.vco1_freq, m32Tempo: s.state.devices.mother32?.controlValues.tempo, lessonCarried: (s.state.completedLessons || []).includes('sub37-f1-oscillators') };
   });
   let first = null;
   let afterReload = null;

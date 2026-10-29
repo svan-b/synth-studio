@@ -79,6 +79,7 @@ check('upgrade: no errors', !u.__error && (u.errs ?? []).length === 0, u.__error
 check('upgrade: old DFAM TEMPO keeps its speed (120 -> 30)', u.first?.dfamTempo === 30 && u.first?.version >= 5, u.first);
 check('upgrade: other values and instruments untouched', u.first?.vco1 === 220 && u.first?.m32Tempo === 120, u.first);
 check('upgrade: runs only once', u.afterReload?.dfamTempo === 30, u.afterReload);
+check('upgrade: completed lessons carry over to their rebuilt successors', u.first?.lessonCarried === true, u.first?.lessonCarried);
 
 // ---- Touch gestures (iPad) -----------------------------------------------------
 const t = run(path.join(__dirname, 'touch.cjs'), [base, path.join(outDir, 'touch')]);
