@@ -12,28 +12,38 @@
 //                       while it is open the steps stay held, so mouse users
 //                       can lock with the encoders too
 //   editor open         keys pick the step(s) it edits (shift-click: a range)
-//   mode 'accent' | 'slide' | 'pslide'   taps toggle that trig flag
-//   mode 'mute'         keys 1..N mute / unmute tracks (the pattern's mutes, or
-//                       the sequencer's live mutes with muteTarget 'live')
+//   mode 'accent' | 'slide' | 'pslide'   taps toggle that trig flag (an empty
+//                       step gets a note trig with the flag)
+//   mode 'trigmute'     taps mute / unmute trigs (TRIG MUTE menu; empty steps
+//                       have nothing to mute)
+//   mode 'swing'        taps place / remove the pattern's swing trigs (SWING menu)
+//   mode 'mute'         keys 1..N mute / unmute tracks: the project's global
+//                       track mutes (muteTarget 'project', as on the hardware),
+//                       the pattern's (default 'pattern') or the sequencer's live
+//                       mutes ('live')
+//   mode 'solo'         keys 1..N solo tracks ('seq:solo'; several at once)
 //   editable false      (REC off) keys audition steps: 'seq:preview' / 'seq:preview:up'
 //
+// Without a `mode` prop the keys follow ui.seqTrigMode (TrigModeKey).
 // LEDs: red note trig, amber lock trig, white ring = playhead, dim when the
 // track is muted; markers for locks, condition, micro timing, retrig, slide,
-// accent. Lesson steps light keys with focus ids 'seq:trig:<n>' or 'seq:trigs'.
+// accent, parameter slide and trig mute. Lesson steps light keys with focus ids
+// 'seq:trig:<n>' or 'seq:trigs'.
 // ============================================================================
 
 import { useEffect, useRef, useState } from 'react';
 import type { CustomRenderContext } from '@/types/panel';
 import {
-  getPattern, setStep, setTrackMute, stepHasLocks, trackLength, updateSteps,
-  type PatternId, type Step,
+  getPattern, isSwingStep, setMasterMute, setStep, setTrackMute, setTrigMute, stepHasLocks, toggleSwingTrig, trackLength,
+  trackTrigDefaults, updateSteps,
+  type PatternId, type Project, type Step,
 } from '@/lib/sequencer/elektron';
 import {
-  C, FONT, SeqStyles, UI, editProject, lessonFocus, pageOf, projectOf, seqStateOf, trackOf, useLatest, viewPattern,
-  type TrigEditorTarget,
+  C, FONT, SeqStyles, UI, editProject, lessonFocus, pageOf, projectOf, seqStateOf, trackOf, trigModeOf, useLatest, viewPattern,
+  type TrigEditorTarget, type TrigKeysMode,
 } from './shared';
 
-export type TrigKeysMode = 'trig' | 'accent' | 'slide' | 'pslide' | 'mute';
+export type { TrigKeysMode } from './shared';
 
 export interface TrigKeysProps {
   ctx: CustomRenderContext;
@@ -43,6 +53,7 @@ export interface TrigKeysProps {
   pattern?: PatternId;
   /** Step page 0..3 (default: ui.stepPage, set by PagePicker) */
   page?: number;
+  /** What a tap does (default: ui.seqTrigMode, set by TrigModeKey, else 'trig') */
   mode?: TrigKeysMode;
   /** false = REC off: keys audition steps instead of editing */
   editable?: boolean;
@@ -52,7 +63,7 @@ export interface TrigKeysProps {
   color?: string;
   /** Track count when the data is missing */
   tracks?: number;
-  /** Labels for mute mode */
+  /** Labels for mute and solo mode */
   trackNames?: string[];
   /** Long hold that opens the editor (ms, default 600) */
   longPressMs?: number;
@@ -60,8 +71,18 @@ export interface TrigKeysProps {
   /** Open the TrigEditor on long hold / double tap (default true) */
   editor?: boolean;
   numbered?: boolean;
-  /** Mute mode writes the pattern's track mutes (saved) or the sequencer's live mutes ('seq:mute') */
-  muteTarget?: 'pattern' | 'live';
+  /**
+   * Mute mode writes the pattern's track mutes ('pattern', the default), the
+   * project's global track mutes ('project': kept through pattern changes, as
+   * on the hardware) or the sequencer's live mutes ('live', 'seq:mute')
+   */
+  muteTarget?: 'pattern' | 'project' | 'live';
+  /**
+   * New note trigs copy the track's NOTE / VEL / LEN (trackTrigDefaults), as
+   * the Analog Four's NOTE menu does. Default false: empty trigs that follow the
+   * track defaults live, as on the Rytm's TRIG page.
+   */
+  stampDefaults?: boolean;
 }
 
 interface Hold {
@@ -76,12 +97,23 @@ interface Hold {
   timer: ReturnType<typeof setTimeout> | null;
 }
 
+type FlagMode = 'accent' | 'slide' | 'pslide' | 'trigmute' | 'swing';
+
 const NO_STEPS: Readonly<Record<number, Step>> = Object.freeze({});
-const MODE_COLOR: Record<TrigKeysMode, string> = { trig: C.red, accent: C.pink, slide: C.yellow, pslide: C.cyan, mute: C.green };
+const MODE_COLOR: Record<TrigKeysMode, string> = {
+  trig: C.red, accent: C.pink, slide: C.yellow, pslide: C.cyan, mute: C.green, trigmute: C.green, swing: C.yellow, solo: C.cyan,
+};
+/** Unlit key holding a trig, per mode (the hardware shows trigs in a pale version of the menu colour) */
+const MODE_DIM: Partial<Record<TrigKeysMode, string>> = {
+  accent: '#4a2a3a', slide: '#4a4224', pslide: '#21404d', trigmute: '#1f4a2c', swing: '#4a4224',
+};
+const FLAG_NAME: Record<FlagMode, string> = { accent: 'accent', slide: 'note slide', pslide: 'parameter slide', trigmute: 'trig mute', swing: 'swing trig' };
 const range = (a: number, b: number) => Array.from({ length: Math.abs(b - a) + 1 }, (_, i) => Math.min(a, b) + i);
+const isFlagMode = (m: TrigKeysMode): m is FlagMode => m === 'accent' || m === 'slide' || m === 'pslide' || m === 'trigmute' || m === 'swing';
 
 export default function TrigKeys(props: TrigKeysProps) {
-  const { ctx, mode = 'trig', editable = true, rows = 1, numbered = true, editor = true } = props;
+  const { ctx, editable = true, rows = 1, numbered = true, editor = true } = props;
+  const mode: TrigKeysMode = props.mode ?? trigModeOf(ctx);
   const tracks = props.tracks ?? 4;
   const project = projectOf(ctx, tracks);
   const track = trackOf(ctx, project, props.track);
@@ -97,6 +129,8 @@ export default function TrigKeys(props: TrigKeysProps) {
   const focus = lessonFocus(ctx);
   const longPressMs = props.longPressMs ?? 600;
   const doubleTapMs = props.doubleTapMs ?? 320;
+  const muteTarget = props.muteTarget ?? 'pattern';
+  const stamp = !!props.stampDefaults;
 
   const ui = ctx.ui;
   const heldSet = new Set<number>(
@@ -105,17 +139,19 @@ export default function TrigKeys(props: TrigKeysProps) {
   const editorOpen = !!ui[UI.trigEditor];
 
   // Latest values for pointer handlers (they outlive renders)
-  const live = useLatest({ ctx, project, track, pattern, steps, mode, editable, editorOpen, tracks });
+  const live = useLatest({ ctx, project, track, pattern, steps, mode, editable, editorOpen, tracks, muteTarget, stamp });
   const hold = useRef<Hold | null>(null);
   const extra = useRef(new Map<number, number>()); // other pointers in a range gesture -> step
   const lastTap = useRef<{ step: number; time: number; before: Step | undefined; wasOn: boolean } | null>(null);
   const preview = useRef(-1);
   /** Step whose long hold is armed (release opens the editor) - drawn with a pulsing ring */
   const [armed, setArmed] = useState(-1);
-  const muteLive = props.muteTarget === 'live';
 
   // Unmount / page or track change: drop a pending hold
   useEffect(() => () => { if (hold.current?.timer) clearTimeout(hold.current.timer); }, []);
+
+  /** A new note trig: the track's NOTE / VEL / LEN copied in (stampDefaults), else empty (live defaults) */
+  const newTrig = (p: Project, l: typeof live.current): Step => (l.stamp ? trackTrigDefaults(p, l.pattern, l.track) : {});
 
   const release = () => {
     const l = live.current;
@@ -128,6 +164,13 @@ export default function TrigKeys(props: TrigKeysProps) {
     });
   };
 
+  /** Mute mode: is track `t` muted in the target the keys edit? */
+  const trackIsMuted = (t: number, l: typeof live.current = live.current): boolean => {
+    if (l.muteTarget === 'live') return !!seqStateOf(l.ctx.engine)?.mutes?.[t];
+    if (l.muteTarget === 'project') return !!l.project.mutes?.includes(t);
+    return !!getPattern(l.project, l.pattern).tracks[t]?.mute;
+  };
+
   const down = (i: number, e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     e.preventDefault();
@@ -136,14 +179,15 @@ export default function TrigKeys(props: TrigKeysProps) {
     const l = live.current;
     const step = page * 16 + i;
 
-    if (l.mode === 'mute') {
-      if (i < l.project.tracks) {
-        if (muteLive) {
-          l.ctx.sendEvent('seq:mute', { track: i });
-        } else {
-          const muted = !!getPattern(l.project, l.pattern).tracks[i]?.mute;
-          editProject(l.ctx, l.tracks, p => setTrackMute(p, l.pattern, i, !muted));
-        }
+    if (l.mode === 'mute' || l.mode === 'solo') {
+      if (i >= l.project.tracks) return;
+      if (l.mode === 'solo') {
+        l.ctx.sendEvent('seq:solo', { track: i });
+      } else if (l.muteTarget === 'live') {
+        l.ctx.sendEvent('seq:mute', { track: i });
+      } else {
+        const muted = trackIsMuted(i, l);
+        editProject(l.ctx, l.tracks, p => (l.muteTarget === 'project' ? setMasterMute(p, i, !muted) : setTrackMute(p, l.pattern, i, !muted)));
       }
       return;
     }
@@ -153,10 +197,23 @@ export default function TrigKeys(props: TrigKeysProps) {
       l.ctx.sendEvent('seq:preview', { track: l.track, step, pattern: l.pattern });
       return;
     }
+    if (l.mode === 'swing') {
+      editProject(l.ctx, l.tracks, p => toggleSwingTrig(p, l.pattern, step));
+      return;
+    }
+    if (l.mode === 'trigmute') {
+      const s = l.steps[step] as Step | undefined;
+      if (s) editProject(l.ctx, l.tracks, p => setTrigMute(p, l.pattern, l.track, [step], !s.mute));
+      return;
+    }
     if (l.mode !== 'trig') {
-      const flag = l.mode;
-      const on = !!(l.steps[step] as Step | undefined)?.[flag];
-      editProject(l.ctx, l.tracks, p => updateSteps(p, l.pattern, l.track, [step], { [flag]: on ? null : true }, { create: 'note' }));
+      const flag = l.mode as 'accent' | 'slide' | 'pslide';
+      const s = l.steps[step] as Step | undefined;
+      const on = !!s?.[flag];
+      editProject(l.ctx, l.tracks, p => {
+        const base = !s && l.stamp ? setStep(p, l.pattern, l.track, step, newTrig(p, l)) : p;
+        return updateSteps(base, l.pattern, l.track, [step], { [flag]: on ? null : true }, { create: 'note' });
+      });
       return;
     }
 
@@ -228,13 +285,14 @@ export default function TrigKeys(props: TrigKeysProps) {
     const lt = lastTap.current;
     if (editor && lt && lt.step === h.step && now - lt.time < doubleTapMs) {
       lastTap.current = null;
-      const restore = lt.wasOn ? lt.before : (l.steps[h.step] as Step | undefined) ?? {};
-      editProject(l.ctx, l.tracks, p => setStep(p, l.pattern, l.track, h.step, restore));
+      // The double tap edits the trig that was there before the first tap (or the one it placed)
+      const restore = lt.wasOn ? lt.before : (l.steps[h.step] as Step | undefined);
+      editProject(l.ctx, l.tracks, p => setStep(p, l.pattern, l.track, h.step, restore ?? newTrig(p, l)));
       openEditor({ track: l.track, pattern: l.pattern, steps: [h.step] });
       return;
     }
     lastTap.current = { step: h.step, time: now, before: h.before, wasOn: h.wasOn };
-    editProject(l.ctx, l.tracks, p => setStep(p, l.pattern, l.track, h.step, h.wasOn ? null : {}));
+    editProject(l.ctx, l.tracks, p => setStep(p, l.pattern, l.track, h.step, h.wasOn ? null : newTrig(p, l)));
     release();
   };
 
@@ -242,47 +300,71 @@ export default function TrigKeys(props: TrigKeysProps) {
   const trigColor = props.color ?? C.red;
   const perRow = rows === 2 ? 8 : 16;
   const keys = Array.from({ length: 16 }, (_, i) => i);
-  const trackMuted = !!trk?.mute || !!st?.mutes?.[track];
+  const anySolo = !!st?.solos?.some(Boolean);
+  // Silent tracks dim their keys: pattern, live and project (master) mutes, and solo
+  const trackMuted = !!trk?.mute || !!st?.mutes?.[track] || !!project.mutes?.includes(track) || (anySolo && !st?.solos?.[track]);
+  const liveL = live.current;
 
   const renderKey = (i: number) => {
     const step = page * 16 + i;
     const s = steps[step] as Step | undefined;
     const inLen = step < len;
     const isHead = playStep === step;
-    const held = mode !== 'mute' && heldSet.has(step);
+    const trackKeys = mode === 'mute' || mode === 'solo';
+    const held = !trackKeys && heldSet.has(step);
     const target = !!focus && (focus.has(`seq:trig:${step + 1}`) || focus.has('seq:trigs'));
     let fill = C.key;
     let lit = 0;
     let text = C.dim;
     let label: string = numbered ? String(step + 1) : '';
+    let flagOn = false;
+    let aria = `Trig key ${step + 1}${s ? (s.trigless ? ' lock trig' : ' trig on') : ''}${s?.mute ? ' muted' : ''}`;
+    /** Mute / solo keys: pressed = muted / soloed */
+    let pressed: boolean | undefined;
 
-    if (mode === 'mute') {
+    if (trackKeys) {
       const exists = i < project.tracks;
-      const muted = exists && (muteLive ? !!st?.mutes?.[i] : !!pat.tracks[i]?.mute);
-      fill = !exists ? '#17181a' : muted ? '#26282b' : C.green;
-      lit = exists && !muted ? 1 : 0;
+      const name = props.trackNames?.[i] ?? `T${i + 1}`;
+      if (mode === 'solo') {
+        const soloed = exists && !!st?.solos?.[i];
+        fill = !exists ? '#17181a' : soloed ? C.cyan : anySolo ? '#26282b' : C.green;
+        lit = exists && (soloed || !anySolo) ? 1 : 0;
+        aria = `Solo track ${i + 1}${soloed ? ' (soloed)' : ''}`;
+        pressed = exists ? soloed : undefined;
+      } else {
+        const muted = exists && trackIsMuted(i, liveL);
+        fill = !exists ? '#17181a' : muted ? '#26282b' : C.green;
+        lit = exists && !muted ? 1 : 0;
+        aria = `Mute track ${i + 1}`;
+        pressed = exists ? muted : undefined;
+      }
       text = lit ? '#0d1a10' : C.dim;
-      label = exists ? props.trackNames?.[i] ?? `T${i + 1}` : '';
+      label = exists ? name : '';
     } else if (!inLen) {
       fill = '#17181a';
       text = C.faint;
-    } else if (mode !== 'trig') {
-      const on = !!s?.[mode as 'accent' | 'slide' | 'pslide'];
-      if (on) { fill = color; lit = 1; text = '#111'; } else if (s) { fill = '#4a2a28'; text = C.text; }
+    } else if (isFlagMode(mode)) {
+      flagOn = mode === 'swing' ? isSwingStep(pat, step) : mode === 'trigmute' ? !!s?.mute : !!s?.[mode];
+      if (flagOn) { fill = color; lit = 1; text = '#111'; } else if (s) { fill = MODE_DIM[mode] ?? '#4a2a28'; text = C.text; }
+      aria = `Trig key ${step + 1}${s ? (s.trigless ? ' lock trig' : ' trig') : ''}, ${FLAG_NAME[mode]} ${flagOn ? 'on' : 'off'}`;
     } else if (s) {
-      if (s.trigless) { fill = C.amber; lit = 0.6; text = '#1a1206'; } else { fill = trigColor; lit = 1; text = '#1a0605'; }
+      if (s.trigless) { fill = s.mute ? '#5a3e1c' : C.amber; lit = s.mute ? 0.25 : 0.6; text = '#1a1206'; } else { fill = s.mute ? '#5e2622' : trigColor; lit = s.mute ? 0.25 : 1; text = s.mute ? C.text : '#1a0605'; }
     }
-    const dimmed = mode !== 'mute' && trackMuted && lit > 0;
+    const dimmed = !trackKeys && trackMuted && lit > 0;
     const markers = mode === 'trig' && s && inLen;
+    const flags = markers ? `${s.micro ? (s.micro < 0 ? '◂' : '▸') : ''}${s.retrig ? 'R' : ''}${s.slide ? 'S' : ''}${s.pslide ? 'P' : ''}${s.accent ? 'A' : ''}${s.mute ? 'M' : ''}` : '';
     return (
       <button
         key={i}
         type="button"
-        aria-label={mode === 'mute' ? `Mute track ${i + 1}` : `Trig key ${step + 1}${s ? (s.trigless ? ' lock trig' : ' trig on') : ''}`}
+        aria-label={aria}
+        aria-pressed={pressed}
         data-step={step}
         data-trig={s ? (s.trigless ? 'lock' : 'note') : 'none'}
         data-playhead={isHead ? '1' : undefined}
         data-held={held ? '1' : undefined}
+        data-flag={flagOn ? '1' : undefined}
+        data-tmute={s?.mute ? '1' : undefined}
         onPointerDown={e => down(i, e)}
         onPointerUp={e => up(e)}
         onPointerCancel={e => up(e, true)}
@@ -291,7 +373,7 @@ export default function TrigKeys(props: TrigKeysProps) {
         className={armed === step && mode === 'trig' ? 'seq-armed' : target ? 'seq-target' : undefined}
         style={{
           position: 'relative', flex: 1, minWidth: 0, minHeight: 28, borderRadius: 3, border: `1px solid ${held ? C.amber : C.border}`,
-          background: fill, opacity: dimmed ? 0.42 : 1, touchAction: 'none', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: inLen || mode === 'mute' ? 'pointer' : 'default',
+          background: fill, opacity: dimmed ? 0.42 : 1, touchAction: 'none', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: inLen || trackKeys ? 'pointer' : 'default',
           boxShadow: [
             lit ? `0 0 ${8 * lit}px ${fill}` : 'inset 0 2px 3px rgba(0,0,0,0.6)',
             isHead ? `inset 0 0 0 2px ${C.white}` : '',
@@ -310,9 +392,9 @@ export default function TrigKeys(props: TrigKeysProps) {
             {s.cond}
           </span>
         )}
-        {markers && (s.micro || s.retrig || s.slide || s.accent) && (
-          <span style={{ position: 'absolute', right: 3, bottom: s.cond ? 13 : 2, fontSize: 9, fontWeight: 800, lineHeight: '10px', color: text }}>
-            {s.micro ? (s.micro < 0 ? '◂' : '▸') : ''}{s.retrig ? 'R' : ''}{s.slide ? 'S' : ''}{s.accent ? 'A' : ''}
+        {flags && (
+          <span style={{ position: 'absolute', right: 3, bottom: s?.cond ? 13 : 2, fontSize: 9, fontWeight: 800, lineHeight: '10px', color: text }}>
+            {flags}
           </span>
         )}
       </button>
