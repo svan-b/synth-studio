@@ -120,6 +120,11 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Each output becomes its own channel `<instance>/<id>`: fader, pan, sends, mute, solo, meter, route, stem and a map arrow. Arranger mutes follow the instrument.
   - Checked with a stand-in output (`scripts/e2e/outputs.cjs`; e2e 47/47).
   - The Rytm's eight TRACK OUTs and the A4's four stereo track outputs come after their feature branches merge. Each will act as "cable in the TRACK OUT, route-to-main off" (manuals: Rytm ROUTE TO MAIN, A4 VOICE ROUTING).
+- Panel fidelity, Moog toggles. A new opt-in `legends: 'ends'` on the shared switch puts the first position above the lever and the last below, as Moog prints them.
+  - 3223ae2: on the Mother-32 (p.9).
+  - 819f38c: on the DFAM (p.7), including the three-way SEQ PITCH MOD with OFF beside.
+  - The Subharmonicon keeps its own glyph layout: its VCO WAVE middle legends are mirrored, left on VCO 1 and right on VCO 2.
+- baa7ed1: the Mother-32's TEMPO stays TEMPO when a SINGLE CLOCK ADVANCE clock ignores it (p.55); only an ANALOG CLOCK or the studio's MIDI clock make it the clock division.
 - **Monkey tests** (`scripts/e2e/monkey.cjs`, `studio-monkey.cjs`, `run.cjs --monkey`): seeded random use.
   - Every instrument, mouse and touch: about 6,700 actions, 0 page errors.
   - The studio (tabs, instruments, sets, transport, mixer, routes, undo, lessons): about 900 actions, 0 page errors.
@@ -195,9 +200,7 @@ Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Su
 
 ## 4. Follow-ups (owner: integrator)
 
-- **Shared controls**, raised by several reviews:
-  - a cap variant in `components/controls/Knob.tsx` (the A4 restyles its caps with a scoped stylesheet)
-  - a legend-above/below option in `components/controls/Switch.tsx` (Mother-32)
+- **Shared controls**: a cap variant in `components/controls/Knob.tsx` (the A4 restyles its caps with a scoped stylesheet).
 - **Full-track gaps on the A4**: POLY, a kit per pattern, separate track outputs, live recording of knob moves, TRANSPOSABLE, and trig/page/sound copy.
 - StudioView: hide "Output" for Your synth when it has no audio. `hub.push()` should apply data before values.
 - Optional "Hardware synth" studio set (Your synth + Audio input + Xone:96).
