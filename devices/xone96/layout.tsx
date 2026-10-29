@@ -342,6 +342,17 @@ const curveIcons = (type: 'fader' | 'xfader', x: number, y: number, pitch: numbe
   kind: 'custom', x: x - pitch - 2.5, y: y - 1.5, w: pitch * 2 + 5, h: 3, render: () => <CurveIcons type={type} pitch={pitch} />,
 });
 
+/**
+ * A curve switch as on the panel (guide p.12): three positions marked only by their icons. The
+ * twin draws one small radio button under each icon; each is named after its curve.
+ */
+const curveSwitch = (control: string, type: 'fader' | 'xfader', x: number, iconY: number, pitch: number, w: number, gap: number): PanelElement[] => [
+  curveIcons(type, x, iconY, pitch),
+  ...[0, 1, 2].map((i): PanelElement => ({
+    kind: 'button', control, setValue: i, x: x + (i - 1) * pitch, y: iconY + gap, shape: 'round', w, color: CAP, ledColor: AMBER, label: 'none',
+  })),
+];
+
 // ---------------------------------------------------------------------------
 // Studio routing: which instruments feed each channel
 // ---------------------------------------------------------------------------
@@ -540,7 +551,7 @@ function ViewToggle({ c, compact }: { c: Ctx; compact: boolean }) {
         border: `1px solid ${compact ? '#38bdf8' : '#3b4652'}`, background: compact ? '#0c4a6e' : '#1a222b', color: compact ? '#e0f2fe' : '#b9c8d6',
       }}
     >
-      {compact ? '▣ COMPACT VIEW' : '▢ COMPACT VIEW'}
+      {compact ? '▣ COMPACT' : '▢ COMPACT VIEW'}
     </button>
   );
 }
@@ -568,16 +579,20 @@ const cueActiveLed = (x: number, y: number, size = 2.8): PanelElement => ({
   on: ({ values }) => CHANNELS.some(c => !!values[`ch${c}_cue`]) || !!values.rtnc_cue || !!values.rtnd_cue,
 });
 
-/** PHONES 2: the 9-way selector with its positions around the knob */
+/**
+ * PHONES 2: the 9-way selector with a position button for each source around the knob. One
+ * character fits on a button; MST is printed outside the ring at its position, as on the panel.
+ */
 function phones2Selector(x: number, y: number, d: number, r: number, bw: number): PanelElement[] {
   const angles = PHONES2_SOURCES.map((_, i) => -135 + (i * 270) / (PHONES2_SOURCES.length - 1));
-  return [
-    selectorKnob('phones2_src', x, y, d, angles),
-    ...PHONES2_SOURCES.map((s, i): PanelElement => {
-      const a = (angles[i] * Math.PI) / 180;
-      return { kind: 'button', control: 'phones2_src', setValue: i, x: x + Math.sin(a) * r, y: y - Math.cos(a) * r, shape: 'round', w: bw, color: CAP, ledColor: AMBER, capText: s, label: 'none' };
-    }),
-  ];
+  const els = [selectorKnob('phones2_src', x, y, d, angles)];
+  PHONES2_SOURCES.forEach((s, i) => {
+    const a = (angles[i] * Math.PI) / 180;
+    const cap = s.length === 1 ? s : undefined;
+    els.push({ kind: 'button', control: 'phones2_src', setValue: i, x: x + Math.sin(a) * r, y: y - Math.cos(a) * r, shape: 'round', w: bw, color: CAP, ledColor: AMBER, capText: cap, label: 'none' });
+    if (!cap) els.push(small(s, x + Math.sin(a) * (r + bw / 2 + 3.4), y - Math.cos(a) * (r + bw / 2 + 3.4) + 0.4, { color: INK, size: 4.4 }));
+  });
+  return els;
 }
 
 // ============================================================================
@@ -644,7 +659,9 @@ function fullStrip(ch: ChannelId): PanelElement[] {
       label('FREQ', x - 11.5, y(136.5), 5.5, { align: 'left', invert: true }),
       small('650Hz', x, y(135.4)),
       knob(`${p}midf`, x, y(143.3), 11),
-      ...ends(x, y(143.3), 11, '190Hz', '2.75k', 4.2),
+      // the sweep ends, under the knob's 7 and 5 o'clock (clear of the strip line on the left)
+      small('190Hz', x - 7.2, y(151.2), { size: 4.2 }),
+      small('2.75k', x + 7.2, y(151.2), { size: 4.2 }),
       label('MID', x - 11.5, y(161.8), 5.5, { align: 'left', invert: true }),
       knob(`${p}mid`, x, y(168.3), 14),
       ...ends(x, y(168.3), 14, '-24', '+10'),
@@ -757,13 +774,11 @@ function fullRight(): PanelElement[] {
     round('booth_mute', x, y(193.5), 11.5, RED),
     small('MUTE', x + 8.4, y(198.2), { align: 'left', color: INK }),
     label('BOOTH', x + 19.4, y(145), 5.5, { rotate: 90 }),
-    // fader curve switches (icons as on the panel)
-    curveIcons('fader', x, y(205.5), 11.5),
-    buttons('fader_curve', x, y(210.7), 0.62),
-    small('CHANNEL FADER', x, y(215.6), { color: INK, size: 4.4 }),
-    curveIcons('xfader', x, y(220.2), 11.5),
-    buttons('xf_curve', x, y(225.4), 0.62),
-    small('XFADER', x, y(230.3), { color: INK, size: 4.4 }),
+    // fader curve switches: three positions under their icons, as on the panel
+    ...curveSwitch('fader_curve', 'fader', x, y(205), 7, 3.6, 4.8),
+    small('CHANNEL FADER', x, y(214.6), { color: INK, size: 4.4 }),
+    ...curveSwitch('xf_curve', 'xfader', x, y(219.6), 7, 3.6, 4.8),
+    small('XFADER', x, y(229.2), { color: INK, size: 4.4 }),
     // MONITOR
     cueActiveLed(x - 10, y(239.8)),
     small('ACTIVE', x - 10, y(244.2), { color: INK, size: 4.4 }),
@@ -790,11 +805,11 @@ function fullBottom(): PanelElement[] {
     small('CROSSFADER · innoFADER', XF_X, y(380.5), { italic: true }),
     // PHONES 2 under channels A and B
     label('ALLEN & HEATH · XONE', 40, y(348.6), 8.5, { weight: 800, letterSpacing: 0.8 }),
-    ...phones2Selector(22.5, y(369.5), 8, 8.6, 4.4),
-    knob('phones2_mix', 46.5, y(369.5), 10.5), ...ends(46.5, y(369.5), 10.5, 'CUE', 'MST', 4.2),
-    knob('phones2', 69, y(369.5), 10.5), ...ends(69, y(369.5), 10.5, '0', '11'),
-    label('PHONES 2', 46.5, y(386.6), 6),
-    deco('mini', 60, y(391.5), 3.4),
+    ...phones2Selector(22, y(369.5), 8, 9, 4.6),
+    knob('phones2_mix', 47.5, y(369.5), 10.5), ...ends(47.5, y(369.5), 10.5, 'CUE', 'MST', 4.2),
+    knob('phones2', 72, y(369.5), 10.5), ...ends(72, y(369.5), 10.5, '0', '11'),
+    label('PHONES 2', 47.5, y(386.6), 6),
+    deco('mini', 61, y(391.5), 3.4),
   ];
 }
 
@@ -843,7 +858,7 @@ function buildFull(): PanelLayout {
     label('XFADER', (KX['1'] + KX['2']) / 2 + 1.5, MY + 222.9, 5.2, { color: MUTED }),
     label('XFADER', (KX['3'] + KX['4']) / 2 + 1.5, MY + 222.9, 5.2, { color: MUTED }),
   ];
-  fullMarks.lines.push([F2 + 13.5, MY + 24, F2 + 13.5, MY + 362], [RX - 13, MY + 87, RX - 13, MY + 233]);
+  fullMarks.lines.push([F2 + 13.5, MY + 24, F2 + 13.5, MY + 362], [RX - 13, MY + 99, RX - 13, MY + 233]);
   return {
     width: W,
     height: H,
@@ -922,7 +937,9 @@ function compactFilterColumn(f: 1 | 2, x: number): PanelElement[] {
     small('HPF', x - 10, y(t + 37.2)), small('BPF', x, y(t + 37.2)), small('LPF', x + 10, y(t + 37.2)),
     round(`${p}on`, x + 10, y(t + 56), 10, BLUE),
     small('ON', x + 10, y(t + 62.6), { color: INK }),
-    knob(`${p}freq`, x - 2, y(t + 79), 12, { label: 'above', labelText: 'FREQ' }),
+    // FREQ: the legend goes under the knob, clear of its dot scale
+    knob(`${p}freq`, x - 2, y(t + 79), 12),
+    label('FREQ', x - 2, y(t + 93.5), 5.5),
   ];
 }
 
@@ -966,13 +983,11 @@ function compactRight(): PanelElement[] {
     knob('booth_mid', RB, y(34), 9, { label: 'above', labelText: 'MID' }),
     knob('booth_lo', RC, y(37), 9, { label: 'above', labelText: 'LO' }),
     knob('booth', RB, y(51), 9, { label: 'above', labelText: 'BOOTH' }),
-    // curves
-    curveIcons('fader', RB, y(64.5), 11.5),
-    buttons('fader_curve', RB, y(69.2), 0.56),
-    small('CHANNEL FADER', RB, y(73.6), { size: 4.2, color: INK }),
-    curveIcons('xfader', RB, y(78.5), 11.5),
-    buttons('xf_curve', RB, y(83.2), 0.56),
-    small('XFADER', RB, y(87.6), { size: 4.2, color: INK }),
+    // curves: three positions under their icons
+    ...curveSwitch('fader_curve', 'fader', RB, y(64), 7, 3.4, 4.4),
+    small('CHANNEL FADER', RB, y(72.6), { size: 4.2, color: INK }),
+    ...curveSwitch('xf_curve', 'xfader', RB, y(77.2), 7, 3.4, 4.4),
+    small('XFADER', RB, y(85.8), { size: 4.2, color: INK }),
     // MONITOR
     small('MONITOR', RA - 1, y(93), { color: INK, size: 5.5 }),
     cueActiveLed(RA + 9, y(93)), small('ACTIVE', RA + 11.5, y(93), { align: 'left', color: INK, size: 4.2 }),
@@ -983,7 +998,7 @@ function compactRight(): PanelElement[] {
     deco('jack', RC, y(110), 6),
     // PHONES 2
     small('PHONES 2', RB, y(123), { color: INK, size: 5.5 }),
-    ...phones2Selector(RA, y(139), 7, 7.6, 4.2),
+    ...phones2Selector(RA + 3, y(139), 7, 8.6, 4.4),
     knob('phones2_mix', RB + 1, y(139), 8.5, { label: 'above', labelText: 'CUE/MST' }),
     knob('phones2', RC, y(139), 8.5, { label: 'above', labelText: 'LEVEL' }),
     small('ALLEN & HEATH', RB, y(160), { color: INK, size: 6 }),
@@ -1001,17 +1016,18 @@ function deckStripCompact(): PanelElement[] {
     ...CHANNELS.map(deckCol),
     { kind: 'custom', x: CCD - 17, y: 4, w: 34, h: 18, render: c => <ReturnsStatus c={c} compact /> },
     { kind: 'button', control: 'play', x: 262, y: 12.5, shape: 'round', w: 9.5, color: '#13261a', ledColor: '#22c55e', capText: 'PLAY', label: 'none', lit: ({ engine, values }) => (engine.synced ? !!engine.playing : !!values.play) },
-    knob('bpm', 274, 14, 6.5, { value: 'always' }),
+    // the tempo is on the display, so the BPM knob shows its value only while touched
+    knob('bpm', 274, 14, 6.5, { value: 'hover' }),
     label('BPM', 274, 8, 5, { color: TWIN_INK }),
     { kind: 'custom', x: 280, y: 4, w: 36, h: 12, render: c => <DeckDisplay c={c} compact /> },
-    label('YOU HEAR', 281, 20.5, 5, { color: TWIN_INK, align: 'right' }),
-    buttons('monitor_out', 305, 20.5, 0.62),
+    label('YOU HEAR', 274.5, 20.6, 5, { color: TWIN_INK, align: 'right' }),
+    buttons('monitor_out', 303, 20.6, 0.62),
     label('FX', 333, 5.5, 5, { color: TWIN_INK }),
     buttons('fx_time', 333, 10.5, 0.62),
     knob('fx_fdbk', 350, 13, 6, { label: 'above', labelText: 'FDBK' }),
     knob('fx_size', 363, 13, 6, { label: 'above', labelText: 'REVERB' }),
-    { kind: 'button', control: 'cue_latch', x: 339, y: 20.5, shape: 'rect', w: 12, h: 4.5, color: '#26292c', ledColor: RED, capText: 'LATCH CUE', label: 'none' },
-    { kind: 'custom', x: 347, y: 17.6, w: 23, h: 6, render: c => <ViewToggle c={c} compact /> },
+    { kind: 'button', control: 'cue_latch', x: 338.6, y: 20.6, shape: 'rect', w: 14, h: 4.5, color: '#26292c', ledColor: RED, capText: 'LATCH CUE', label: 'none' },
+    { kind: 'custom', x: 346.5, y: 17.9, w: 24, h: 5.5, render: c => <ViewToggle c={c} compact /> },
   ];
 }
 

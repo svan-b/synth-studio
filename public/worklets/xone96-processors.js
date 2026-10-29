@@ -927,10 +927,11 @@ class XoneStripsProcessor extends AudioWorkletProcessor {
       // AUX 1: PRE (post-EQ, pre-VCA) or post-VCA; AUX 2 post-VCA. Both before FILTER SELECT.
       route(oS1, yL, yR, c0[P_S1PRE] + v0 * c0[P_S1POST], c1[P_S1PRE] + v1 * c1[P_S1POST]);
       route(oS2, yL, yR, v0 * c0[P_S2], v1 * c1[P_S2]);
-      // CUE 1 (pre- or post-EQ, pre-fader) and the PHONES 2 source (post-EQ, pre-fader)
+      // CUE 1 and the PHONES 2 source, pre-fader; both follow the global POST EQ switch (block diagram)
       route(oC, yL, yR, c0[P_CUE] * c0[P_CUEPOST], c1[P_CUE] * c1[P_CUEPOST]);
       route(oC, xL, xR, c0[P_CUE] * (1 - c0[P_CUEPOST]), c1[P_CUE] * (1 - c1[P_CUEPOST]));
-      route(oC2, yL, yR, c0[P_CUE2], c1[P_CUE2]);
+      route(oC2, yL, yR, c0[P_CUE2] * c0[P_CUEPOST], c1[P_CUE2] * c1[P_CUEPOST]);
+      route(oC2, xL, xR, c0[P_CUE2] * (1 - c0[P_CUEPOST]), c1[P_CUE2] * (1 - c1[P_CUEPOST]));
     }
 
     if (++this.blocks % METER_EVERY === 0) {

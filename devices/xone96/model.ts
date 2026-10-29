@@ -174,7 +174,7 @@ export const addMixLaw = (v: number) => Math.pow(Math.max(0, Math.min(10, v)) / 
 /** RTN C/D LEVEL: -40 (off) .. +10 dB, like GAIN */
 export const returnLevelLin = gainLin;
 
-/** PHONES 2 9-way source select (guide p.7, p.16): the LR MIX or one channel's post-EQ, pre-fader signal */
+/** PHONES 2 9-way source select (guide p.7, p.16): the LR MIX or one channel's pre-fader signal (pre/post EQ as CUE) */
 export const PHONES2_SOURCES = ['MST', '1', '2', '3', '4', 'A', 'B', 'C', 'D'];
 
 // ---------------------------------------------------------------------------
