@@ -35,6 +35,7 @@ Status: **complete** (finished on `finish/dfam-review`, merged with the integrat
 | 21 | Medium | dfam-st1 pressed RUN / STOP before parking on step 8 with ADVANCE; the manual describes ADVANCE with playback stopped, and Moog's sync order arms the follower last | M p.23, pp.30-31 | ADVANCE now comes before RUN / STOP |
 | 22 | Low | The lesson runner could not do the five cross-instrument studio steps (cables between instruments, the studio ▶, CLOCK DIV) | lesson runner: 5 manual steps | lesson API v3 solutions (`studioCables`, `transport`, `values`): 0 manual steps |
 | 23 | Low | Six preset descriptions had lost the letter Q ("FRE'UENCY", "'uick Hats", "SE' PITCH MOD") | the preset menu text | fixed |
+| 24 | Medium | Noise on the cutoff (NOISE / VCF MOD) makes the resonant ladder crackle, and a crackle at a hit's onset is occasionally isolated enough for the audio-QA click detector to flag it (one "mid" click, -20 to -40 dBFS). Rates: about 3 % of renders for Lo-fi crunch (38 %), 1.7 % for Techno percussion (10 %), 0 of 120 for Techno rumble (12 %) | offline renders with the QA detector: no clicks in 120 renders without the noise modulation; a dump shows the cutoff jumping between 0.5 and 6.5 kHz from sample to sample; band-limiting the noise to 1-8 kHz (same RMS) made it worse (larger, coherent swoops); resonance, cutoff, decay and depth changes moved it between 0 and 7 % with no clearly safe setting | none: this is the distorted, lo-fi sound the manual describes for NOISE / VCF MOD (M p.12, p.20). See "Open" |
 
 ## Measurements against the hardware
 
@@ -119,9 +120,13 @@ Status: **complete** (finished on `finish/dfam-review`, merged with the integrat
 - The Default patch image (M p.8) and the patch sheets of pp.34-37 are not legible enough to read
   knob positions from; those presets follow the sheet notes.
 - The clap's 0.4 LU app/offline difference (see "Preset loudness").
+- Finding #24 can make the audio-QA gate flake about once in 20 full DFAM runs (it did once in
+  six full runs after the preset changes). If the gate must never flake, either the integrator sets
+  `thresholds.clicksMin: 2` for `dfam` in the audio-QA config, or Lo-fi crunch and Techno
+  percussion drop NOISE / VCF MOD (and lose their crackle).
 - The model choices in REFERENCE.md need a hardware unit to confirm.
 
-## Gate (final build: finish/dfam-review, integration branch 5878311 merged)
+## Gate (final build: finish/dfam-review, integration branch ee54efe merged)
 
 | Check | Result |
 |---|---|
@@ -130,5 +135,5 @@ Status: **complete** (finished on `finish/dfam-review`, merged with the integrat
 | `scripts/smoke.cjs` | no console errors; transport peak 0.31, button peak 0.30; no horizontal scroll on desktop or iPad |
 | `scripts/e2e/run.cjs` | 23/23 |
 | `scripts/lesson-runner.cjs dfam` | 20 lessons, 0 failed, 0 manual steps |
-| `scripts/audio-qa.cjs dfam --target -18 --suggest` | exit 0, 0 of 40 flagged; also 0 of 40 with `--excite dfam=transport` |
+| `scripts/audio-qa.cjs dfam --target -18 --suggest` | last run: exit 0, `[dfam] median -19.2 LUFS, spread 5.2 LU, 0 of 40 flagged (none)`, max true peak -2.1 dBTP; with `--excite dfam=transport`: exit 0, `[dfam] median -19.0 LUFS, spread 4.9 LU, 0 of 40 flagged (none)`. Of the six full runs after the preset changes (four on the final preset set), five had 0 flags; one audition run flagged a single -32.7 dBFS crackle in Lo-fi crunch (finding #24) |
 | screenshots (desktop 1440 x 900, iPad 1180 x 820) | read against M p.7: layout, legends and patch bay match; no truncated text |
