@@ -529,6 +529,15 @@ export function RouteRecord(ctx: CustomRenderContext) {
     return () => clearInterval(id);
   }, [recording]);
 
+  // Mixer modules load asynchronously: list their channels as soon as they arrive
+  useEffect(() => {
+    let alive = true;
+    rack.forEach(r => {
+      if (!hub.getModule(r.device)) hub.loadModule(r.device).then(() => alive && force(n => n + 1)).catch(() => undefined);
+    });
+    return () => { alive = false; };
+  }, [rack]);
+
   // Mixer channels in this studio (any instrument with mixer inputs)
   const targets: { value: string; label: string }[] = [];
   rack.forEach(r => {
