@@ -1459,6 +1459,8 @@ class ChorusProcessor extends AudioWorkletProcessor {
     this.a1 = 0; this.a2 = 0; this.b1 = 0; this.b2 = 0;
     this.hxA = 0; this.hyA = 0; this.hxB = 0; this.hyB = 0;
     this.d0 = -1;
+    // samples since a non-zero value was last written to either line (>= size: both all zero)
+    this.zrun = size;
   }
 
   /** Apply settings from processorOptions or a { type: 'set' } message */
@@ -1507,6 +1509,21 @@ class ChorusProcessor extends AudioWorkletProcessor {
     let fbA = this.fbA, fbB = this.fbB;
     let a1 = this.a1, a2 = this.a2, b1 = this.b1, b2 = this.b2;
     let hxA = this.hxA, hyA = this.hyA, hxB = this.hxB, hyB = this.hyB;
+    let silent = true;
+    if (iL) for (let i = 0; i < n; i++) if (iL[i] !== 0 || iR[i] !== 0) { silent = false; break; }
+    // Idle: both lines hold only zeros, every filter and the feedback are at rest and the input is
+    // silent. The loop below would then read, filter and write nothing but zeros: the output is
+    // exactly zero, so only the LFO phase (sample by sample, as below) and the write position move.
+    if (silent && this.zrun >= this.size && fbA === 0 && fbB === 0 && a1 === 0 && a2 === 0 && b1 === 0 && b2 === 0 &&
+        hxA === 0 && hyA === 0 && hxB === 0 && hyB === 0) {
+      for (let i = 0; i < n; i++) { ph += inc; if (ph >= 1) ph -= 1; }
+      this.w = (w + n) & mask;
+      this.phase = ph;
+      oL.fill(0);
+      if (oR !== oL) oR.fill(0);
+      return true;
+    }
+    const w0 = w;
     const ws = 0.5 * width;
     for (let i = 0; i < n; i++) {
       const xl = iL ? iL[i] : 0, xr = iR ? iR[i] : 0;
@@ -1559,7 +1576,14 @@ class ChorusProcessor extends AudioWorkletProcessor {
       if (oR !== oL) oR[i] = mid - side;
     }
     this.w = w; this.phase = ph; this.fbA = fbA; this.fbB = fbB;
-    if (!Number.isFinite(a1 + a2 + b1 + b2 + hyA + hyB)) { a1 = a2 = b1 = b2 = hxA = hyA = hxB = hyB = 0; this.fbA = this.fbB = 0; bA.fill(0); bB.fill(0); }
+    // how long the lines have held only zeros: with a silent input, count the zeros this quantum
+    // wrote at its end (any input sample may have written a non-zero value, so: none)
+    if (silent) {
+      let last = -1;
+      for (let j = 0; j < n; j++) { const k = (w0 + j) & mask; if (bA[k] !== 0 || bB[k] !== 0) last = j; }
+      this.zrun = last < 0 ? Math.min(this.size, this.zrun + n) : n - 1 - last;
+    } else this.zrun = 0;
+    if (!Number.isFinite(a1 + a2 + b1 + b2 + hyA + hyB)) { a1 = a2 = b1 = b2 = hxA = hyA = hxB = hyB = 0; this.fbA = this.fbB = 0; bA.fill(0); bB.fill(0); this.zrun = this.size; }
     this.a1 = flush(a1); this.a2 = flush(a2); this.b1 = flush(b1); this.b2 = flush(b2);
     this.hxA = hxA; this.hyA = flush(hyA); this.hxB = hxB; this.hyB = flush(hyB);
     this.fbA = flush(this.fbA); this.fbB = flush(this.fbB);
