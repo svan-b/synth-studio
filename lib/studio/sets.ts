@@ -61,6 +61,20 @@ const LINE_UP = { 'analog-rytm': -6, 'analog-four': -4, sub37: -4.5, dfam: -2.5 
  */
 const SET_TRIM = { live: -4.5, bassDrums: -2.5, full: -5, everything: -6.5 } as const;
 
+/**
+ * Make-up on the Xone:96's own studio strip, the mixer's output into the studio master. It sits
+ * after the LR MIX meters, like the MASTER knob or an interface's input trim, so a set through the
+ * mixer plays at the studio's nominal -18 LUFS, as an instrument does on its own. The levels
+ * above keep the LR MIX under its PK! LED, and that cost the master 1-7 dB; this restores it
+ * without touching the LR MIX. Measured: integrated LUFS over 20 s of ▶ with the default sounds,
+ * at 0 dB → with the make-up: + Mixer -23.2 → -18.5, + Bass & chords -25.2 → -19.2 (the strip
+ * stops at +6), Full set -21.7 → -18.3, Moog + Mixer -20.4 → -17.9, + Bassline -18.7 → -18.0,
+ * Moog Sound Studio -20.5 → -18.2, Moog Sound Studio + mixer -20.3 → -18.0, Bass & drums
+ * -22.4 → -17.8, The whole studio -22.0 → -18.2. The master limiter touches only the Rytm's
+ * sharpest transients in the first two Elektron stages (at most 2.2 dB).
+ */
+const XONE_MAKEUP = { e3: 5, live: 6, full: 3.5, m3: 2.5, m4: 0.5, m5: 2.5, moogMix: 2.5, bassDrums: 4.5, everything: 4 } as const;
+
 // ---- Elektron track: drums, clock, mixer, bass & chords, full set -----------------
 
 const ELEKTRON: StudioSet[] = [
@@ -99,7 +113,7 @@ const ELEKTRON: StudioSet[] = [
     rack: [slot('studio-clock'), slot('analog-rytm'), slot('xone96')],
     routes: { 'analog-rytm': 'xone96:studio_1' },
     sync: { 'analog-rytm': true, xone96: true },
-    channels: { 'analog-rytm': ch(LINE_UP['analog-rytm'], 0, MIN_DB, -24) },
+    channels: { 'analog-rytm': ch(LINE_UP['analog-rytm'], 0, MIN_DB, -24), xone96: ch(XONE_MAKEUP.e3) },
     bpm: 124,
     focus: 'xone96',
   },
@@ -116,6 +130,7 @@ const ELEKTRON: StudioSet[] = [
     channels: {
       'analog-rytm': ch(LINE_UP['analog-rytm'] + SET_TRIM.live, 0, MIN_DB, -24),
       'analog-four': ch(LINE_UP['analog-four'] + SET_TRIM.live, 0, -20, -14),
+      xone96: ch(XONE_MAKEUP.live),
     },
     bpm: 124,
     focus: 'analog-four',
@@ -136,6 +151,7 @@ const ELEKTRON: StudioSet[] = [
       'analog-four': ch(LINE_UP['analog-four'] + SET_TRIM.full, 0, -20, -14),
       sub37: ch(LINE_UP.sub37 + SET_TRIM.full, 0),
       dfam: ch(LINE_UP.dfam + SET_TRIM.full, -0.3, MIN_DB, -18),
+      xone96: ch(XONE_MAKEUP.full),
     },
     bpm: 124,
     focus: 'analog-rytm',
@@ -196,7 +212,7 @@ const MOOG: StudioSet[] = [
     routes: { dfam: 'xone96:studio_1' },
     sync: { xone96: true },
     cables: [CLOCK_TO_DFAM],
-    channels: { dfam: ch(0, 0, MIN_DB, -22) },
+    channels: { dfam: ch(0, 0, MIN_DB, -22), xone96: ch(XONE_MAKEUP.m3) },
     bpm: 110,
     focus: 'xone96',
   },
@@ -211,7 +227,7 @@ const MOOG: StudioSet[] = [
     routes: { dfam: 'xone96:studio_1', mother32: 'xone96:studio_2' },
     sync: { mother32: true, xone96: true },
     cables: [CLOCK_TO_DFAM],
-    channels: { dfam: ch(0, 0, MIN_DB, -22), mother32: ch(MOOG_LINE_UP.mother32, 0.15, -18, MIN_DB) },
+    channels: { dfam: ch(0, 0, MIN_DB, -22), mother32: ch(MOOG_LINE_UP.mother32, 0.15, -18, MIN_DB), xone96: ch(XONE_MAKEUP.m4) },
     bpm: 110,
     focus: 'mother32',
   },
@@ -230,6 +246,7 @@ const MOOG: StudioSet[] = [
       dfam: ch(MOOG_TRIO, 0, MIN_DB, -22),
       mother32: ch(MOOG_LINE_UP.mother32 + MOOG_TRIO, 0.15, -18, MIN_DB),
       subharmonicon: ch(MOOG_LINE_UP.subharmonicon + MOOG_TRIO, -0.25, MIN_DB, -12),
+      xone96: ch(XONE_MAKEUP.m5),
     },
     bpm: 110,
     focus: 'dfam',
@@ -249,7 +266,7 @@ const MORE: StudioSet[] = [
     routes: { dfam: 'xone96:studio_1', mother32: 'xone96:studio_2', subharmonicon: 'xone96:studio_3' },
     sync: { mother32: true, subharmonicon: true, xone96: true },
     cables: [CLOCK_TO_DFAM],
-    channels: { dfam: ch(MOOG_TRIO), mother32: ch(MOOG_LINE_UP.mother32 + MOOG_TRIO), subharmonicon: ch(MOOG_LINE_UP.subharmonicon + MOOG_TRIO), xone96: ch(0) },
+    channels: { dfam: ch(MOOG_TRIO), mother32: ch(MOOG_LINE_UP.mother32 + MOOG_TRIO), subharmonicon: ch(MOOG_LINE_UP.subharmonicon + MOOG_TRIO), xone96: ch(XONE_MAKEUP.moogMix) },
     bpm: 110,
     focus: 'xone96',
   },
@@ -261,7 +278,7 @@ const MORE: StudioSet[] = [
     rack: [slot('analog-rytm'), slot('sub37'), slot('xone96')],
     routes: { 'analog-rytm': 'xone96:studio_1', sub37: 'xone96:studio_2' },
     sync: { 'analog-rytm': true, sub37: true, xone96: true },
-    channels: { 'analog-rytm': ch(LINE_UP['analog-rytm'] + SET_TRIM.bassDrums), sub37: ch(LINE_UP.sub37 + SET_TRIM.bassDrums) },
+    channels: { 'analog-rytm': ch(LINE_UP['analog-rytm'] + SET_TRIM.bassDrums), sub37: ch(LINE_UP.sub37 + SET_TRIM.bassDrums), xone96: ch(XONE_MAKEUP.bassDrums) },
     bpm: 122,
     focus: 'sub37',
   },
@@ -288,6 +305,7 @@ const MORE: StudioSet[] = [
       dfam: ch(LINE_UP.dfam + SET_TRIM.everything, -0.3, MIN_DB, -18),
       mother32: ch(MOOG_LINE_UP.mother32 + SET_TRIM.everything, 0.3, -18, MIN_DB),
       subharmonicon: ch(MOOG_LINE_UP.subharmonicon + SET_TRIM.everything, -0.25, MIN_DB, -12),
+      xone96: ch(XONE_MAKEUP.everything),
     },
     bpm: 120,
     focus: 'analog-rytm',

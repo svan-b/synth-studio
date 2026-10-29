@@ -97,6 +97,13 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 - b27e315: merged the **Analog Four performance pass**: 8.3× → 13.9× realtime on /bench (1.68×), bit-identical output in 163 of 163 null-test renders.
   - The idle-voice FREE-LFO bug it found (the LFOs of a silent voice stood still) is fixed in its own commit.
   - The shared reverb and chorus are now a large share of the A4's cost, and the chorus runs with nothing sending to it: a follow-up.
+- d09fdd6: merged the **studio set line-up**.
+  - Since its review, the Rytm arrived at the Xone about +6 average / +10 peak, so every Elektron set lit the LR MIX PK! nearly all the time.
+  - Measured per-instrument `LINE_UP` levels plus a per-set `SET_TRIM` keep it dark: 0 lit polls in about 1000 over 64 s, for every set.
+- Xone make-up (`XONE_MAKEUP` in `lib/studio/sets.ts`).
+  - The line-up cost the studio master 1–7 dB: the welcome's "Build a full track" fell to −25.2 LUFS.
+  - Each mixer set now sets the Xone's own studio strip, which sits after the LR MIX meters like its MASTER. Measured, all nine sets play at −17.8 to −19.2 LUFS, like an instrument on its own.
+  - The limiter touches only the Rytm's sharpest transients in Elektron stages 3–4 (at most 2.2 dB).
 - **Vercel build rate limit.** Previews from 49f3469 on failed with `build-rate-limit`, not a code error (local builds pass). Every push to any branch, the agents' `wip/*` included, starts a preview build. Pushes are now batched. Option for the user: disable preview builds for scratch branches with `vercel.json` → `"git": { "deploymentEnabled": { "wip/*": false } }`.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
@@ -134,7 +141,6 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 
 | Branch | What | Checkpoint |
 |---|---|---|
-| `wip/demo-tracks` | Follow-up: line up the Elektron sets and "The whole studio" on the Xone's meters | 3329d65 (demos merged) |
 | `wip/demo-excerpts` | The Producer path's `info.play` and `listen.demo` on pre-rendered AAC excerpts of the demos (no studio swap mid-lesson), plus Listen on the demo cards | — |
 | `wip/perf-shared-fx` | Idle the shared chorus (bit-identical) and FDN reverb (below −120 dBFS) when nothing feeds them | — |
 
@@ -172,7 +178,6 @@ Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Su
 - **Shared controls**, raised by several reviews:
   - a cap variant in `components/controls/Knob.tsx` (the A4 restyles its caps with a scoped stylesheet)
   - a legend-above/below option in `components/controls/Switch.tsx` (Mother-32)
-- **Studio sets** (`lib/studio/sets.ts`): the Moog sets would start at the guide's level with the Mother-32 and Subharmonicon about 5 dB down.
 - **Full-track gaps on the A4**: POLY, a kit per pattern, separate track outputs, live recording of knob moves, TRANSPOSABLE, and trig/page/sound copy.
 - Mother-32: with a clock in TEMPO the knob shows CLOCK DIV; the engine already ignores it, so only the display is off.
 - Regenerate `docs/audio-qa-baseline/` for every instrument.
