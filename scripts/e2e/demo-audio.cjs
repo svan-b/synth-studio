@@ -199,15 +199,18 @@ const L7 = 'studio-producer-07-frequency-slots';
     await cards.scrollIntoViewIfNeeded();
     await wait(600);
     await p.screenshot({ path: `${out}-04-cards.png` });
-    const listen = cards.getByRole('button', { name: /Listen to a recording of the demo track/ });
+    const listen = cards.getByRole('button', { name: /^Listen to the demo track .* without loading it$/ });
     log.cards = { listen: await listen.count(), sizes: [] };
     for (let k = 0; k < log.cards.listen; k++) log.cards.sizes.push(await size(listen.nth(k)));
     log.cards.load = await size(cards.getByRole('button', { name: /^Load the demo track/ }));
     log.cards.note = await cards.getByText(/Listen plays a recording/).count();
     check('cards: every demo has a Listen button (44 px) and says it is a recording, Load the real instruments',
       log.cards.listen === 3 && log.cards.sizes.every(big) && big(log.cards.load) && log.cards.note === 3, log.cards);
+    // other tests find the studio's buttons by name: the cards' names must not catch them
+    log.cards.sameNames = { rec: await p.getByRole('button', { name: 'REC' }).count(), play: await p.getByRole('button', { name: 'Play studio' }).count() };
+    check('cards: their buttons\' names don\'t match the studio\'s REC or Play studio', log.cards.sameNames.rec === 1 && log.cards.sameNames.play === 1, log.cards.sameNames);
     const before = await S(() => { const st = window.__synthStudio.store.getState().studio; return { rack: st.rack.map(r => r.id).join(), sections: st.arrangement.sections.length }; });
-    await tap(cards.getByRole('button', { name: 'Listen to a recording of the demo track Low Tide Lights' }));
+    await tap(cards.getByRole('button', { name: 'Listen to the demo track Low Tide Lights without loading it' }));
     check('cards: Listen plays the whole song', await waitFor(async () => (await playback())?.status === 'playing', 30000), await playback());
     await S(() => window.__demoTap.start(['demo']));
     await wait(2500);
@@ -218,7 +221,7 @@ const L7 = 'studio-producer-07-frequency-slots';
     log.listen = { file: pbC?.clips[0].file, seconds: pbC?.seconds, peak: Math.round(tc.peak(cap.started.time, cap.started.time + 2.4) * 1000) / 1000 };
     const after = await S(() => { const st = window.__synthStudio.store.getState().studio; return { rack: st.rack.map(r => r.id).join(), sections: st.arrangement.sections.length, playing: window.__synthStudio.transport.playing }; });
     check('cards: it sounds, and the studio is not loaded or started', log.listen.peak > 0.01 && after.rack === before.rack && after.sections === before.sections && !after.playing, { listen: log.listen, before, after });
-    await tap(cards.getByRole('button', { name: /Stop the recording of Low Tide Lights/ }));
+    await tap(cards.getByRole('button', { name: 'Stop listening to Low Tide Lights' }));
     await wait(300);
     check('cards: ■ Stop stops it', (await playback()) === null);
   } catch (e) {

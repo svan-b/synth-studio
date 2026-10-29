@@ -136,7 +136,7 @@ function ListenButton({ demo }: { demo: DemoMeta }) {
       aria-pressed={status === 'playing' || status === 'loading'}
       className="px-3.5 h-11 rounded-lg text-xs font-bold text-black"
       style={{ background: demo.accent }}
-      aria-label={status === 'playing' ? `Stop the recording of ${demo.title}` : `Listen to a recording of the demo track ${demo.title}`}
+      aria-label={status === 'playing' ? `Stop listening to ${demo.title}` : `Listen to the demo track ${demo.title} without loading it`}
     >
       {status === 'loading' ? 'Loading…' : status === 'playing' ? '■ Stop' : '▶ Listen'}
     </button>
