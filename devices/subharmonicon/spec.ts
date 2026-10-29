@@ -31,8 +31,8 @@ const divFormat = (v: number) => `÷${Math.round(-v)}`;
 const freqFormat = (v: number) => `${v >= 1000 ? `${(v / 1000).toFixed(2)}k` : Math.round(v)} ${noteOf(v)}`;
 
 export const EG_OPTIONS = ['OFF', 'ON', 'HELD'];
-/** Wave switch, top to bottom: UP square, MIDDLE square VCO + saw subs (PWM), DOWN saw */
-export const WAVE_OPTIONS = ['SQR', 'SQ/SAW', 'SAW'];
+/** Wave switch, top to bottom: UP square, MIDDLE pulse VCO with PWM from the SUB 1 saw (saw subs), DOWN saw */
+export const WAVE_OPTIONS = ['SQR', 'PWM', 'SAW'];
 
 const controls: Record<string, ControlSpec> = {};
 

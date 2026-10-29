@@ -1,304 +1,343 @@
 # Moog Subharmonicon - hardware reference for the digital twin
 
-Ground truth used to build `devices/subharmonicon`. Every control, LED and patch point is listed
-with its printed label, section, position, cap, range and (for jacks) its normal, plus a source and
-a confidence level.
+Ground truth used to build `devices/subharmonicon`: every control, LED and patch point with its
+printed label, position, cap, range and (for jacks) its normal, the behaviour behind them, the
+twin's model choices, and where every preset came from.
 
-- **verified**: quoted from the Moog manual (by its *printed* page number) or two independent
-  sources agree.
-- **likely**: one good secondary source, or a direct consequence of verified facts.
-- **guess**: not documented anywhere we could reach. Chosen by ear to match the documented
-  behaviour, and listed again in "Model choices" so it can be checked against a unit.
+**Page numbers.** All three of Moog's documents were read in full (scratchpad `manuals/subharmonicon/`,
+never committed). Cites use the page number **printed on the page**:
 
-`docs/reference/subharmonicon/` does not exist, so there were no photos to read. The network blocks
-Moog's site, the inMusic CDN and the manual mirrors. Manual text therefore comes from (a) the
-patchscore project, which quotes the manual by printed page and measured the panel from the
-manual's own vector drawing, and (b) search-engine excerpts of the manual PDF.
+| Document | Cited as | Printed page vs PDF page |
+|---|---|---|
+| *Subharmonicon Owner's Manual* (58 pp) | (Subharmonicon manual, p.N) | printed = PDF + 1 (the folio on PDF page 30 reads "31") |
+| *Subharmonicon: Patching with Intention* (16 pp) | (Patching with Intention, p.N) | printed = PDF |
+| *Subharmonicon Exploration Patchbook* (10 patch sheets) | (Exploration Patchbook, p.N) | printed = PDF − 2 (patch n is printed p.n) |
 
-This is the **2020 production Subharmonicon** (firmware 1.1.x). The 2018 Moogfest kit is a different
-instrument: saw-only VCOs, SUB 2 pitch inputs and a TEMPO input instead of PWM inputs and MIDI IN (KM).
+The research notes in `docs/research/subharmonicon/` cite **PDF** pages, so their manual pages are one
+lower than the ones here ("MAN p.32" there is p.33 here).
+
+**Confidence.**
+- **verified**: stated in one of Moog's documents (page cited), or read off its drawings.
+- **likely**: a direct consequence of verified facts, or one good secondary source.
+- **guess**: not documented; chosen by ear to fit the documented behaviour and listed again under
+  "Model choices" so it can be checked against a unit.
+
+This is the **2020 production Subharmonicon** (firmware 1.1.x). The 2018 Moogfest kit differs: saw-only
+VCOs, SUB 2 pitch inputs and a TEMPO input instead of PWM inputs and MIDI IN.
 
 ## Sources
 
 | Id | Source |
-|----|--------|
-| M | Moog *Subharmonicon Manual*, 58 pp (`cdn.inmusicbrands.com/Moog/Subharmonicon/Subharmonicon_Manual AMZ.pdf`, also manualslib 1818971). Printed page numbers (PDF page + 1 for pp.7-54). Quoted through PS and search excerpts |
-| PS | patchscore (`github.com/miclip/patchscore`, `lib/devices/moog-subharmonicon/{index,panel}.ts`). Quotes M by printed page for all 32 jacks and every printed range, and measured every control from the vector paths of the blank patch sheet on printed p.50 (circle fits, residual < 0.01 pt). Its unit coordinates (319.3 x 133 mm, cheeks included) are converted here to the 304.8 x 128.5 mm faceplate |
-| TE | Tallent Edition firmware (`github.com/brandon-tallent/subharmonicon-extended-firmware`): an extension of stock firmware 1.1.1 by someone who reverse-engineered it. Its `features_rhythm.c` re-implements Moog's divider logic, its tests carry the 12-JI table, and `manual.html` / `cheatsheet.html` draw panel sections |
-| MG | midi.guide / pencilresearch MIDI CSV (CC BY-SA 4.0), `public/midi-guide/devices/moog-subharmonicon.json` |
-| FW | Moog firmware v1.1.0 release notes (March 2022) as reprinted by MusicTech, Sonicstate, Rubadub, Gearspace |
-| KM | Kraft Music, *Moog Subharmonicon: What's New, What's Changed?* (Moogfest kit vs production) |
-| SOS | Sound On Sound review (Gordon Reid, June 2020) |
-| IS | inMusic / Moog support articles: clocking with analog clocks, clocking DFAM, MIDI channel, fine tune |
-| PWI | Moog *Subharmonicon: Patching with Intention* (2022), via search excerpts |
-| PP | 0VRLNDR *Moog Subharmonicon Patch Project* (moogsubharmoniconpatches.com), which reproduces the manual patches with notes; via search excerpts |
-| RV | Reverb, *20 Patches With Moog's Sound Studios* (names from Moog's DFAM & Subharmonicon Exploration Patchbook) |
-| AD | Sara Adkins, *Digital Subharmonicon* (QMUL 2022, `github.com/Satrat/digital-subharmonicon`), a replica built from M |
-| F | Forums (Moog forum, ModWiggler, Elektronauts, Gearspace, ModularGrid) via search excerpts |
+|---|---|
+| M | Moog, *Subharmonicon Owner's Manual*. Panel tour pp.12-16, every control pp.18-30, every jack pp.31-37, sync recipes pp.38-39, Eurorack p.40, Fine Tune p.41, MIDI pp.42-44, ten patch sheets pp.45-49, blank sheets with the panel drawing pp.50-55, signal-flow diagram p.56, specifications p.57 |
+| PWI | Moog, *Subharmonicon: Patching with Intention*. Initialized patch p.3, exercises pp.4-10, jack-by-jack patch ideas pp.12-15 |
+| XPB | Moog, *Subharmonicon Exploration Patchbook*. Ten patch sheets, pp.1-10 (image only) |
+| PS | patchscore (`github.com/miclip/patchscore`): measured every knob, button, switch and jack of the panel drawing (M p.50) from its vector paths; the twin's control positions are PS's, converted to the 304.8 x 128.5 mm faceplate |
+| TE | Tallent Edition firmware (`github.com/brandon-tallent/subharmonicon-extended-firmware`), an extension of stock firmware 1.1.1: stock divider logic, its 12-JI test table, MIDI-note gate calls (`trigger_both_envelopes` / `release_both_envelopes`) |
+| FW | Firmware 1.1.0 release coverage (March 2022: Synthtopia, MusicTech, Sonicstate): SEQ CLK in phase with the clock, MIDI notes transpose a running sequence, note priority, pitch bend |
+| MG | Pencil Research / midi.guide MIDI CSV (CC BY-SA 4.0), cross-checks M pp.42-44 |
+| SOS | *Sound On Sound* review (2020): resonance starts to sing near 2 o'clock |
+
+## Corrections confirmed against the manual
+
+| Claim | Verdict | Twin |
+|---|---|---|
+| CUTOFF IN and VCA IN **add** to their envelopes, they do not replace them | **verified**: the VCA input "is summed with the output control signal of the VCA EG" (Subharmonicon manual, p.33); the signal-flow diagram draws both as summing nodes (Subharmonicon manual, p.56); CUTOFF IN sweeps ±5 octaves "with the CUTOFF knob centered" (Subharmonicon manual, p.34) | `cutOct = knob + EG AMT × VCF EG + CUTOFF jack`; `VCA = VCA EG + VCA jack / 8 V` |
+| QUANTIZE snaps the VCO FREQ knobs too | **verified** (Subharmonicon manual, pp.18, 19, 21) | the knob, the step and MIDI notes are quantized as one sum |
+| NEXT never retriggers the envelopes | **verified**: "Pressing the NEXT button will not cause the VCF EG or the VCA EG to re-trigger" (Subharmonicon manual, p.29); the only exception is a held RESET, where the rhythm generators keep firing them | NEXT steps without firing anything |
+| PLAY IN is gate-level | **verified**: "Rising edge = PLAY begins; Falling edge = PLAY stops"; the PLAY button still works and overrides it (Subharmonicon manual, p.34) | rising edge = play, falling = stop; a press of PLAY (or the studio's ■) holds the jack off until PLAY is pressed again |
+| Decay minimum is 5 ms, and triggers are ignored during the attack | **verified**: decays run 5 ms to 10 s, attacks 1 ms to 10 s, and neither envelope restarts during its attack (Subharmonicon manual, pp.24-25) | DECAY knobs 5 ms - 10 s; a trigger during an attack is ignored |
+| MIDI clock runs the master pulse at 16ths | **verified**: "When MIDI clock is present, the PPQ is 4 (16th notes)" (Subharmonicon manual, p.25) | the studio clock counts one master pulse per 16th |
+| CLOCK OUT is 0-10 V and only while playing | **verified**: it follows the current clock source and is present only while the sequencers play with PLAY lit, 0 to +10 V (Subharmonicon manual, p.37) | 10 V pulses (2.0 in the twin's 1.0 = 5 V units) only from counts while running |
 
 ## Panel
 
-- **Format.** 60 HP Eurorack panel (304.8 x 128.5 mm) between aluminium rails and finished wood side
-  pieces; the unit is 319.3 x 133 mm (p.58 SIZE 12.57" x 4.21" x 5.24"; p.9 "As with Mother-32 and
-  DFAM, Subharmonicon conforms to the 60HP Eurorack format; features aluminum rails, finished wood
-  side pieces"). **verified** (M, PS). The twin draws the faceplate at 304.8 x 128.5 mm with 7.25 mm
-  wooden cheeks.
+Faceplate positions are millimetres from its top-left corner (x, y = centre).
+
+- **Format.** A 60 HP Eurorack panel (304.8 x 128.5 mm) on aluminium rails between finished wood
+  side pieces; the unit is 12.57 x 4.21 x 5.24 in (Subharmonicon manual, pp.9, 57). It comes out of
+  its case as a module held by **eight black M3 screws**, and draws at most 360 mA from +12 V and
+  nothing from -12 V (Subharmonicon manual, p.40). **verified**. The twin draws 7.25 mm wooden cheeks.
 - **Arrangement.** Left: SEQUENCER 1, SEQUENCER 2, POLYRHYTHM, then TEMPO and the five transport
   buttons. Centre: OSCILLATORS (VCO 1 and VCO 2 halves, SEQ OCT and QUANTIZE on the divider between
   them). Right: two columns of four large knobs (filter, envelopes, VCA). Far right: the 4 x 8
-  patchbay. **verified** (PS; SOS, Engadget and Future Music describe the same order).
-- **Section graphics.** The panel prints **no boxes**. It prints headings: `SEQUENCER 1`,
-  `SEQUENCER 2`, `POLYRHYTHM`, `TEMPO`, `OSCILLATORS` (centred over the divider, with a rule out to
-  each side ending in a boxed `1` and `2`), `SEQ 1 ASSIGN` / `SEQ 2 ASSIGN` (a word on a bracket that
-  drops around its three buttons) and `IN / OUT` over the patchbay. The filter/VCA columns have no
-  heading, only per-knob labels. **verified** (PS, read off the vector paths of p.50; TE's drawings
-  agree).
-- **Colours.** Black panel, white legends; outputs are "reversed-color text over an inverse
-  background" (p.31). **verified** for the jack legend, **likely** for the rest (photos not reachable).
+  patchbay. **verified** (the panel drawing, Subharmonicon manual, p.50).
+- **Section graphics.** The panel prints no boxes, only: the headings `SEQUENCER 1` (y 6.4),
+  `SEQUENCER 2` (31.4) and `POLYRHYTHM` (56.2), centred at x 40.8; `OSCILLATORS` (135.0, 3.4) with a
+  rule out to each side ending at a boxed `1` (x 81.6-87.0) and `2` (182.8-188.4) that hang below
+  it; `SEQ 1 ASSIGN` / `SEQ 2 ASSIGN` (y 63.2), each a word on a bracket from x 88.0 to 125.9
+  (144.1 to 182.0) that drops beside its three buttons to their middle; a short vertical line from
+  each RHYTHM knob to its SEQ 1 button and on to its SEQ 2 button; a vertical divider at x 135.0
+  broken by the SEQ OCT and QUANTIZE groups (6.4-14.1, 40.7-58.6, 91.1-117.5 mm); `IN / OUT` over
+  the patchbay (y 4.1). **verified** (measured off a 400 dpi render of the drawing, Subharmonicon
+  manual, p.50).
+- **Nameplate and logo.** `SUBHARMONICON` bold condensed from x 31.5 to 73.7 (cap height 4.7 mm,
+  y 124.0), a vertical bar at x 75.5, then two lines `SEMI-MODULAR ANALOG` / `POLYRHYTHMIC
+  SYNTHESIZER` from x 77.1 to 109.9; the moog logo centred at x 152.6, y 123.5, about 25 mm wide.
+  **verified** (Subharmonicon manual, p.50). The twin sets the logo as plain text in its own type
+  (no copied artwork).
+- **Screws.** Eight, about 5 mm heads: top row x 5.0 / 75.9 / 218.9 / 300.0, bottom row x 5.0 /
+  117.0 / 218.9 / 300.0, 3 mm from the top and bottom edges. **verified** (drawing, p.50; count and
+  colour p.40).
+- **Colours.** Black panel, white legends; outputs are "indicated by reversed-color text over an
+  inverse background" (Subharmonicon manual, p.31). **verified** for the jacks, **likely** for the rest.
 - **Knobs.** 33: 11 large (19 mm: TEMPO, both VCO FREQ, the eight right-hand knobs), 10 medium
-  (15 mm: four SUB FREQ, six LEVEL), 12 small (6.3 mm bodies: eight STEP with 8 radiating ticks, four
-  RHYTHM with a ring of 16 ticks, one per integer). **verified** (PS; "33 knobs" also AD). Black caps
-  with a white line: **likely**. The twin draws the small knobs at 9 mm so they can be turned on an
-  iPad (twin choice).
-- **Buttons.** 21 rectangular backlit buttons (lit = on): 6 SEQ ASSIGN, 8 rhythm SEQ 1/SEQ 2, SEQ OCT,
-  QUANTIZE, PLAY, RESET, NEXT, TRIGGER, EG. **verified** (PS sizes; AD count; TE draws lit caps).
-  Lit colour: **guess** (red, as on the DFAM and Mother-32).
-- **Switches.** Two 3-position WAVE toggles in hex collars, with waveform glyphs (not words) printed
-  beside the positions. **verified** (PS; M pp.19-20 name the positions UP, MIDDLE, DOWN).
-- **LEDs.** 16: eight step LEDs, four beside QUANTIZE, three beside SEQ OCT, one beside the MIDI IN
-  jack. **verified** (PS). Their exact places: **likely** (TE draws step LEDs under the STEP knobs and
-  the SEQ OCT LEDs stacked above their button, ±5 on top).
-- **Nameplate.** `SUBHARMONICON` at the bottom left (PS). The Moog logo position: **guess** (bottom
-  right, under the patchbay).
+  (15 mm: four SUB FREQ, six LEVEL), 12 small (eight STEP with 8 ticks, four RHYTHM with a ring of 16
+  ticks, one per divisor). **verified** (drawing, p.50; PS). The twin draws the small ones at 9 mm
+  (hardware 6.3 mm bodies) so they can be turned on an iPad.
+- **Buttons.** 21 rectangular backlit buttons: 6 SEQ ASSIGN, 8 rhythm SEQ 1 / SEQ 2, SEQ OCT,
+  QUANTIZE, PLAY, RESET, NEXT, TRIGGER, EG. **verified** (p.50). Lit colour red: **guess**.
+- **Switches.** Two 3-position WAVE toggles in hex collars, labelled `VCO 1 WAVE` / `VCO 2 WAVE`,
+  with glyphs instead of words: a square above the switch, a pulse fed by a saw (the PWM position)
+  on its outer side, a saw below. **verified** (p.50; positions UP / MIDDLE / DOWN, pp.19-20).
+- **LEDs.** 16. Eight step LEDs 10.3 mm below the STEP knobs (y 27.0 and 52.0); three SEQ OCT LEDs
+  at x 134.8, y 16.9 / 22.0 / 27.0 (±5, ±2, ±1, legends to the right) above the SEQ OCT button
+  (135.0, 35.9); four QUANTIZE LEDs at x 134.8, y 62.0 / 67.1 / 72.1 / 77.1 (12-ET, 8-ET, 12-JI, 8-JI)
+  above the QUANTIZE button (135.0, 86.1); the MIDI LED at (248.4, 105.6), just left of the `MIDI IN`
+  legend. **verified** (measured off p.50).
 
 ## Controls
 
-Positions are the twin's faceplate coordinates in mm (x, y = centre), converted from PS. "Twin" gives
-the value stored in `spec.ts`.
+"Twin" is the id and stored value in `spec.ts`.
 
 ### Sequencers and polyrhythm (left)
 
-| Printed label | Section | Position | Cap | Range / positions | Twin | Source | Confidence |
-|---|---|---|---|---|---|---|---|
-| SEQUENCER 1 | heading | (40.8, 7.4) | - | - | label | PS | verified |
-| STEP 1-4 | Sequencer 1 | row 1: x 12.1 / 31.2 / 50.3 / 69.3, y 16.6 | small, 8 ticks | pitch offset; 12 o'clock = 0 V; fully CW = +SEQ OCT range (±1/±2/±5 octaves = volts); quantized by QUANTIZE | `seq1_step1..4` -100..+100 % of the range | M p.26, p.28; PWI ("at precisely 12 o'clock it is set to 0 volts; fully clockwise sets it to +5 volts") | verified |
-| (step LED) x4 | Sequencer 1 | under each STEP knob | red LED | current step | engine `steps.seq1` | PS (8 LEDs), TE drawing | position likely |
-| SEQUENCER 2 | heading | (40.8, 32.4) | - | - | label | PS | verified |
-| STEP 1-4 | Sequencer 2 | row 2: same x, y 41.6 | small, 8 ticks | as Sequencer 1 | `seq2_step1..4` | M, PS | verified |
-| POLYRHYTHM | heading | (40.8, 56.9) | - | - | label | PS | verified |
-| RHYTHM 1-4 | Polyrhythm | same x, y 66.7 | small, 16 ticks | divides the clock by an integer "from 1 (fully clockwise) to 16 (fully counter-clockwise)" | `rhythm1..4` = -divisor (-16..-1) | M p.30 (quoted) | verified |
-| SEQ 1 (x4) | Polyrhythm | under each RHYTHM, y 79.4 | button 10.1 x 6.2 | lit: this generator clocks Sequencer 1 | `rhythmN_seq1` | M p.30, PS | verified |
-| SEQ 2 (x4) | Polyrhythm | y 88.4 | button 10.1 x 6.2 | lit: clocks Sequencer 2; one generator may drive both | `rhythmN_seq2` | M p.30, PS | verified |
+| Printed label | Position | Cap | Range / behaviour | Twin | Source | Confidence |
+|---|---|---|---|---|---|---|
+| STEP 1-4 (Sequencer 1) | x 12.1 / 31.2 / 50.3 / 69.3, y 16.6 | small, 8 ticks | an offset from the VCO FREQ setting: 12 o'clock no change, clockwise up, counter-clockwise down; range set by SEQ OCT, result quantized by QUANTIZE | `seq1_step1..4` -100..+100 % of the SEQ OCT range | (Subharmonicon manual, p.26); 12 o'clock = 0 V, fully CW +5 V at ±5 (Patching with Intention, p.4) | verified |
+| (step LED) x 8 | under each STEP knob, y 27.0 / 52.0 | red LED | the current step | engine `steps.seq1/seq2` | (Subharmonicon manual, pp.14, 26); drawing p.50 | verified |
+| STEP 1-4 (Sequencer 2) | same x, y 41.6 | small | as Sequencer 1 | `seq2_step1..4` | (Subharmonicon manual, p.27) | verified |
+| RHYTHM 1-4 | same x, y 66.7 | small, 16 ticks | divides the clock by a whole number, 1 fully clockwise to 16 fully counter-clockwise | `rhythm1..4` = -divisor | (Subharmonicon manual, p.30) | verified |
+| SEQ 1 (x 4) | under each RHYTHM, y 79.4 | button 9.4 x 6.2 | lit: this generator advances Sequencer 1 | `rhythmN_seq1` | (Subharmonicon manual, p.30) | verified |
+| SEQ 2 (x 4) | y 88.4 | button 9.4 x 6.2 | lit: advances Sequencer 2; one generator may drive both | `rhythmN_seq2` | (Subharmonicon manual, p.30) | verified |
 
 ### Tempo and transport (bottom left)
 
-| Printed label | Section | Position | Cap | Range / behaviour | Twin | Source | Confidence |
-|---|---|---|---|---|---|---|---|
-| TEMPO | Tempo | knob (21.7, 109.7), label (21.7, 96.6) | large | .333 Hz - 50 Hz = 20 - 3000 BPM at 1 PPQ; overridden by CLOCK in and by MIDI clock | `tempo` 20-3000 BPM, log | M (quoted ".333 Hz to 50 Hz"), TE ("20..2999 BPM, Moog's law") | verified |
-| RESET | Transport | (44.5, 101.4) | button 8 x 7.9 | press: both sequencers to step 1 and the rhythm generators to their starting phase; while PLAY is lit they begin again on the next clock pulse. Hold: sequencers stay on step 1 while the rhythm generators keep firing the EGs; NEXT while holding moves the held step | `reset` (momentary, event) | M (quoted), TE | verified (NEXT-while-held: likely) |
-| EG | Transport | (57.5, 101.4) | button 8 x 7.9 | lit: sequencer steps fire both EGs; unlit: they do not (only TRIGGER and the TRIGGER jack); press and hold until it blinks: both EGs held open at maximum | `eg_mode` OFF / ON / HELD | M (quoted), KM | verified |
-| NEXT | Transport | (70.6, 101.4) | button 8 x 7.9 | with PLAY unlit, moves to the next step so it can be tuned. Stock firmware forces rhythm-divider counts until Sequencer 1 steps; it does not fire the EGs | `next` (momentary, event) | M (quoted), TE | verified (count semantics: likely) |
-| PLAY | Transport | (47.6, 111.7) | button 14 x 8.2 | starts / stops the sequencers, the rhythm generators and the CLOCK output | `play` (toggle, transport control) | M (quoted) | verified |
-| TRIGGER | Transport | (67.4, 111.7) | button 14 x 8.2 | EG lit: "will instantly restart the envelope generators without waiting for the next step"; EG unlit: a gate - envelopes held at maximum while pressed; EG blinking: ignored (fw 1.1) | `trigger` (momentary, event) | M p.28-29 (quoted), FW | verified |
+| Printed label | Position | Range / behaviour | Twin | Source | Confidence |
+|---|---|---|---|---|---|
+| TEMPO | (21.7, 109.7), large | .333 Hz to 50 Hz = 20 to 3000 BPM at 1 PPQ; CLOCK IN overrides it, MIDI clock overrides both | `tempo` 20-3000 BPM, **linear** (12 o'clock ≈ 1510 BPM), default 480 | (Subharmonicon manual, p.25); taper: see Model choices | range verified, taper likely |
+| RESET | (44.5, 101.4) | both sequencers to step 1 and the rhythm generators to their starting phase; playing: starts again on the next clock pulse; stopped: waits for PLAY. Held: the sequencers stay on step 1 (NEXT moves the held step) while the assigned generators keep firing the envelopes. Combined with the RESET jack | `reset` (momentary + event) | (Subharmonicon manual, p.29) | verified |
+| EG | (57.5, 101.4) | quick press: OFF (unlit) / ON (lit); hold until it blinks: HELD. OFF: steps do not fire the envelopes, TRIGGER and external triggers still do; ON: every step does; HELD: both envelopes held open at maximum until EG is pressed again, entering runs both attacks, leaving runs both decays | `eg_mode` OFF / ON / HELD | (Subharmonicon manual, pp.29-30) | verified |
+| NEXT | (70.6, 101.4) | moves to the next step at once, without firing the envelopes; with PLAY off and EG held, tune each step by ear | `next` (momentary + event) | (Subharmonicon manual, pp.29-30) | verified |
+| PLAY | (47.6, 111.7) | starts and stops the sequencers and the rhythm generators; unlit also stops CLOCK OUT | `play` (toggle, transport control) | (Subharmonicon manual, p.28) | verified |
+| TRIGGER | (67.4, 111.7) | EG lit: restarts both envelopes at once (not during an attack); EG unlit: a gate, held at maximum while pressed; EG held: no effect. Its presses also reach TRIGGER OUT | `trigger` (momentary + event) | (Subharmonicon manual, pp.28-29) | verified |
 
 ### Oscillators (centre)
 
-| Printed label | Section | Position | Cap | Range / positions | Twin | Source | Confidence |
-|---|---|---|---|---|---|---|---|
-| OSCILLATORS, boxed 1 and 2 | heading | (135.0, 4.5), rules to the corners | - | - | labels | PS, TE | verified |
-| (wave) VCO 1 | VCO 1 | (87.9, 25.6) | 3-way toggle, hex collar 6.4 x 5.5 | UP: square on VCO, SUB 1 and SUB 2. MIDDLE: square VCO, saw subs, SUB 1 saw normalled to the VCO's pulse width. DOWN: saw on all three | `vco1_wave` SQR / SQ/SAW / SAW (index 0 = up) | M pp.19-20, KM, PS ("Square up, saw down, PWM centre"), SOS | verified |
-| VCO 1 FREQ | VCO 1 | (106.8, 25.6) | large | "four octaves... fully counter-clockwise ... Middle C (262 Hz) ... fully clockwise ... the highest C (4186 Hz)"; with QUANTIZE on it steps through the scale | `vco1_freq` 261.63-4186 Hz, log | M p.18 (quoted) | verified |
-| VCO 2 FREQ | VCO 2 | (163.0, 25.6) | large | as VCO 1 (p.19 repeats it word for word) | `vco2_freq` | M p.19 | verified |
-| (wave) VCO 2 | VCO 2 | (182.0, 25.6) | 3-way toggle | as VCO 1 | `vco2_wave` | M p.20 | verified |
-| SEQ OCT | shared | button (134.9, 35.6), 10.1 x 6.2 | button | cycles the STEP range: ±5, ±2, ±1 octaves, shared by both sequencers | `seq_oct` ±1 / ±2 / ±5 | M p.28 (quoted) | verified |
-| ±5 ±2 ±1 | shared | 3 LEDs above the SEQ OCT button | red LEDs | current range | radio LEDs | PS, TE | likely |
-| SUB 1 FREQ | VCO 1 | (92.9, 51.6) | medium | "the initial pitch of VCO 1, divided by a whole number integer value from 1 to 16"; ÷1 fully clockwise | `vco1_sub1_freq` = -divisor | M p.18 (quoted), MG (8 CC values per integer, CC 0 = 16) | verified |
-| SUB 2 FREQ | VCO 1 | (120.9, 51.6) | medium | as SUB 1 | `vco1_sub2_freq` | M p.19 | verified |
-| SUB 1 FREQ, SUB 2 FREQ | VCO 2 | (148.9, 51.6), (177.1, 51.6) | medium | divide VCO 2 | `vco2_sub1_freq`, `vco2_sub2_freq` | M p.20 | verified |
-| SEQ 1 ASSIGN: OSC 1, SUB 1, SUB 2 | VCO 1 | y 69.2; x 93.9 / 106.8 / 119.9; bracket and title above | button 8 x 7.9 | lit: Sequencer 1's step voltage moves VCO 1's pitch (subs follow, they divide it) / "will modify the integer value of the SUB n FREQ knob"; any combination | `seq1_osc`, `seq1_sub1`, `seq1_sub2` | M p.26 (quoted), PS | verified |
-| SEQ 2 ASSIGN: OSC 2, SUB 1, SUB 2 | VCO 2 | y 69.2; x 149.9 / 163.0 / 176.0 | button 8 x 7.9 | as SEQ 1 for VCO 2 | `seq2_osc`, `seq2_sub1`, `seq2_sub2` | M p.27, PS | verified |
-| QUANTIZE | shared | button (134.9, 85.7), 10.8 x 6.2 | button | 12-ET, 8-ET, 12-JI, 8-JI; "With all LEDs off ... the Quantize function is off" | `quantize` OFF / 12-ET / 8-ET / 12-JI / 8-JI | M p.21 (quoted) | verified (cycle order: guess) |
-| 12-ET 8-ET 12-JI 8-JI | shared | 4 LEDs above the QUANTIZE button | red LEDs | current scale | radio LEDs | PS | likely |
-| VCO 1 LEVEL | mixer | (106.8, 86.7) | medium | off - full; "The mixer can be pushed into a warm distortion by setting the sound sources near their maximum levels" | `vco1_level` 0-100 % | M p.21 (quoted) | verified |
-| SUB 1 LEVEL, SUB 2 LEVEL | mixer, VCO 1 | (92.9, 109.7), (120.9, 109.7) | medium | off - full | `vco1_sub1_level`, `vco1_sub2_level` | M p.21, PS | verified |
-| VCO 2 LEVEL | mixer | (163.0, 86.7) | medium | off - full | `vco2_level` | M p.21 | verified |
-| SUB 1 LEVEL, SUB 2 LEVEL | mixer, VCO 2 | (148.9, 109.7), (177.1, 109.7) | medium | off - full | `vco2_sub1_level`, `vco2_sub2_level` | M p.21 | verified |
+| Printed label | Position | Range / positions | Twin | Source | Confidence |
+|---|---|---|---|---|---|
+| VCO 1 WAVE | switch (87.9, 25.9), legend (87.9, 17.0) | UP: square on VCO 1, SUB 1 and SUB 2. MIDDLE: a pulse VCO with saw subs, the SUB 1 saw normalled to the VCO's pulse width - it can add a second pitch even with SUB 1 LEVEL at minimum. DOWN: saw on all three | `vco1_wave` SQR / SQ/SAW / SAW | (Subharmonicon manual, p.19) | verified |
+| VCO 1 FREQ | (106.8, 25.6), large | four octaves: fully counter-clockwise Middle C (262 Hz), fully clockwise the top C of a piano (4186 Hz); with QUANTIZE on it steps through the scale | `vco1_freq` 261.63-4186 Hz, log | (Subharmonicon manual, p.18) | verified |
+| VCO 2 FREQ, VCO 2 WAVE | (163.0, 25.6), switch (182.0, 26.0) | as VCO 1 | `vco2_freq`, `vco2_wave` | (Subharmonicon manual, pp.19-20) | verified |
+| SUB 1 FREQ, SUB 2 FREQ (VCO 1) | (92.9, 51.6), (120.9, 51.6), medium | the VCO's frequency divided by a whole number, 1 fully clockwise (unison) to 16 | `vco1_sub1_freq`, `vco1_sub2_freq` = -divisor | (Subharmonicon manual, pp.18-19) | verified |
+| SUB 1 FREQ, SUB 2 FREQ (VCO 2) | (148.9, 51.6), (177.1, 51.6) | divide VCO 2 | `vco2_sub1_freq`, `vco2_sub2_freq` | (Subharmonicon manual, p.20) | verified |
+| SEQ 1 ASSIGN: OSC 1, SUB 1, SUB 2 | y 69.2; x 93.9 / 106.8 / 119.9 | OSC 1: Sequencer 1 moves VCO 1's pitch, the subs follow; SUB 1 / SUB 2: it changes that sub's whole number; any combination | `seq1_osc`, `seq1_sub1`, `seq1_sub2` | (Subharmonicon manual, pp.26-27) | verified |
+| SEQ 2 ASSIGN: OSC 2, SUB 1, SUB 2 | y 69.2; x 149.9 / 163.0 / 176.0 | as SEQ 1, for VCO 2 | `seq2_*` | (Subharmonicon manual, p.27) | verified |
+| SEQ OCT | button (135.0, 35.9) | cycles ±5, ±2, ±1 octaves per STEP knob, shared; the full ±5 needs both VCO FREQ knobs fully counter-clockwise. **Held** until the LED flashes: the SEQ jacks always put out ±5 V while the oscillators keep the selected range; hold again to return | `seq_oct` ±1 / ±2 / ±5; `seq_oct_held` | (Subharmonicon manual, p.28) | verified |
+| QUANTIZE | button (135.0, 86.1) | 12-ET (chromatic), 8-ET (diatonic), 12-JI, 8-JI, shared; all LEDs dark = off. **Held** until the LED flashes: the SEQ jacks are unquantized while the oscillators stay quantized | `quantize` OFF / 12-ET / 8-ET / 12-JI / 8-JI; `quantize_held` | (Subharmonicon manual, p.21) | verified (cycle order: guess) |
+| VCO 1 LEVEL, VCO 2 LEVEL | (106.8, 86.7), (163.0, 86.7), medium | mixer levels; several sources near maximum push the mixer into a warm distortion, moderate levels stay clean | `vco1_level`, `vco2_level` | (Subharmonicon manual, p.21) | verified |
+| SUB 1 LEVEL, SUB 2 LEVEL (x 2) | (92.9 / 120.9 / 148.9 / 177.1, 109.7) | mixer levels of the four subs | `vcoN_subM_level` | (Subharmonicon manual, p.22) | verified |
 
-### Filter, envelopes and VCA (right; two columns, no heading)
+### Filter, envelopes and VCA (right; no heading)
 
-| Printed label | Position | Cap | Range | Twin | Source | Confidence |
-|---|---|---|---|---|---|---|
-| CUTOFF | (205.1, 16.6) | large | "from 20 Hz to 20k Hz"; 4-pole low-pass ladder, 24 dB/oct | `cutoff` 20-20000 Hz, log | M p.23 (quoted) | verified |
-| VOLUME | (235.2, 16.6) | large | output level | `volume` 0-100 % | M p.25, PS | verified |
-| RESONANCE | (205.1, 47.6) | large | feedback; the filter "chirps" toward self-oscillation near maximum, sings above about 2 o'clock; bass thins as it rises | `resonance` 0-100 % | M p.23, SOS, F | verified (2 o'clock: likely) |
-| VCF EG AMT | (235.2, 47.6) | large, `(–)` and `(+)` printed at the ends | "In the center position, the VCF EG has no effect. Positive (+) values ... open the filter on the Attack stage ... Inverse (–) values will close the filter during the Attack stage" | `vcf_eg_amt` -100..+100 % | M p.24 (quoted) | verified (full-scale octaves: guess) |
-| VCF ATTACK | (205.1, 78.7) | large | 1 ms - 10 s | `vcf_attack` 1-10000 ms, log | M p.24 (quoted) | verified |
-| VCF DECAY | (235.2, 78.7) | large | 5 ms - 10 s | `vcf_decay` 5-10000 ms, log | M p.24 (quoted) | verified |
-| VCA ATTACK | (205.1, 109.7) | large | 1 ms - 10 s | `vca_attack` 1-10000 ms, log | M p.24 (quoted) | verified |
-| VCA DECAY | (235.2, 109.7) | large | 5 ms - 10 s | `vca_decay` 5-10000 ms, log | M p.25 (quoted) | verified |
+| Printed label | Position | Range | Twin | Source | Confidence |
+|---|---|---|---|---|---|
+| CUTOFF | (205.1, 16.6) | 20 Hz to 20 kHz; a 4-pole (24 dB/oct) Moog ladder low-pass | `cutoff` log | (Subharmonicon manual, p.23) | verified |
+| VOLUME | (235.2, 16.6) | output level; the VCA envelope rises to it | `volume` 0-100 % | (Subharmonicon manual, pp.23-24) | verified |
+| RESONANCE | (205.1, 47.6) | resonant peak at the cutoff; at maximum with a low cutoff the filter can self-oscillate | `resonance` 0-100 % | (Subharmonicon manual, p.23) | verified |
+| VCF EG AMT, `(–)` `(+)` | (235.2, 47.6) | bipolar: centre no effect; + opens on the attack and closes on the decay, - the reverse | `vcf_eg_amt` -100..+100 % | (Subharmonicon manual, p.24) | verified (depth: guess) |
+| VCF ATTACK, VCF DECAY | (205.1, 78.7), (235.2, 78.7) | 1 ms - 10 s, 5 ms - 10 s, from the CUTOFF setting to the peak set by EG AMT and back | `vcf_attack`, `vcf_decay` log | (Subharmonicon manual, p.24) | verified |
+| VCA ATTACK, VCA DECAY | (205.1, 109.7), (235.2, 109.7) | 1 ms - 10 s, 5 ms - 10 s, from zero to the VOLUME level and back | `vca_attack`, `vca_decay` log | (Subharmonicon manual, pp.24-25) | verified |
 
-### Global parameters (no panel control)
+### Global parameters (no panel control on the hardware)
 
-| Parameter | How it is set on the hardware | Twin | Source | Confidence |
-|---|---|---|---|---|
-| Rhythm generator logic | MIDI CC 113: 0-63 OR ("advance the sequencer on either or both clocks"), 64-127 XOR ("on exactly one clock") | `rhythm_logic` OR / XOR, a small switch marked "MIDI CC 113" in the panel margin (twin convenience) | M, MG, TE ("exclusive-one (not parity XOR)") | verified |
-| Fine tune | hold OSC 1 + OSC 2 until the QUANTIZE LEDs flash, TEMPO = ±50 cents, QUANTIZE exits; stored | not modelled | M p.40, IS | verified |
-| SEQ output decoupling | hold QUANTIZE or SEQ OCT until it flashes: SEQ 1/2 outputs stop following that setting | not modelled (outputs always follow) | M p.36 | verified |
-| MIDI channel, MIDI transport | SysEx files; transport ON by default | the twin follows the studio transport (see below) | IS, M | verified |
-| Note priority | MIDI CC 91 low / high / last | last note | FW | verified |
+| Parameter | On the hardware | Twin | Source |
+|---|---|---|---|
+| Rhythm generator logic | MIDI CC 113: 0-63 OR, 64-127 XOR ("if both Rhythm Generators are true, the sequencer will not advance") | `rhythm_logic`, a small LOGIC switch marked CC 113 (twin aid) | (Subharmonicon manual, p.44) - verified |
+| Fine Tune | hold OSC 1 + OSC 2 until the QUANTIZE LEDs flash, set ±50 cents with TEMPO, exit with QUANTIZE; stored | not modelled | (Subharmonicon manual, p.41) - verified |
+| MIDI channel, Play (MIDI transport) | SysEx files; channel 1 and transport ON by default | the twin always follows the studio transport while synced | (Subharmonicon manual, p.44) - verified |
+| Note priority, pitch bend | firmware 1.1 | last note; no pitch bend | FW - verified |
+
+### Twin aids (not on the hardware)
+
+- `EG` OFF / ON / HELD radio row under PLAY and TRIGGER: chooses the EG state by touch and shows it in words.
+- `SEQ OUT ±5` and `SEQ OUT UNQ` keys beside the SEQ OCT and QUANTIZE buttons: the two hold modes without the long
+  press. While a hold mode is on, the lit LED of its button flashes (as on the hardware).
+- `LOGIC` switch: the CC 113 global setting.
+- The lit rhythm SEQ buttons brighten when their generator fires.
+- Long presses: EG, SEQ OCT and QUANTIZE react after 0.6 s; the cycle happens on release.
 
 ## Patch bay (32 points)
 
-Four columns by eight rows at a 13.54 x 13.51 mm pitch (x 255.2 / 268.7 / 282.3 / 295.8, y 16.6 ... 111.2).
-17 inputs "identified by normal text", 15 outputs "indicated by reversed-color text over an inverse
-background" (p.31). Row contents and order **verified** (PS reads them off p.50 and cross-checks the
-manual's `ROW ONE`..`ROW EIGHT` headings: one output in rows 1, 3, 5; three in rows 2 and 4; none in
-row 6; four in row 7; two in row 8). Twin signal convention: **1.0 = 5 V**.
+Four columns by eight rows at a 13.54 x 13.51 mm pitch (x 255.2 / 268.7 / 282.3 / 295.8, y 16.6 ...
+111.2). 17 inputs "identified by normal text", 15 outputs in reversed lettering, 3.5 mm, five cables in
+the box (Subharmonicon manual, p.31). Row and column order: **verified** (p.50; Patching with Intention,
+pp.12-15). Twin convention: **1.0 = 5 V**.
 
-| Row/col | Label | Dir | Level | Normal / behaviour | Source | Confidence |
-|---|---|---|---|---|---|---|
-| 1/1 | VCO 1 | in | ±5 V, 1 V/oct | summed with VCO 1 FREQ and Sequencer 1; **normalled to VCO 2's input** until a cable is in VCO 2 | M p.31, F (block diagram) | verified |
-| 1/2 | VCO 1 SUB | in | ±5 V | "Chooses the 1-16 divider for both of VCO 1's subharmonics. Centre both SUB FREQ knobs first, for bipolar control" | M p.31 | verified (V per division: guess) |
-| 1/3 | VCO 1 PWM | in | ±5 V | pulse width of VCO 1 and of its SUB 1 and SUB 2 (audible on square); **replaces the SUB 1 saw normal** | M p.32 (quoted) | verified |
-| 1/4 | VCA | out | 10 V p-p | the whole instrument after the VCA (main out) | M p.32 | verified |
-| 2/1 | VCO 1 | out | 10 V p-p | VCO 1 before the mixer ("AUDIO/CV OUTPUT") | M p.32 | verified |
-| 2/2 | VCO 1 SUB 1 | out | 10 V p-p | SUB 1 before the mixer | M p.32 | verified |
-| 2/3 | VCO 1 SUB 2 | out | 10 V p-p | SUB 2 before the mixer | M p.32 | verified |
-| 2/4 | VCA | in | 0 to +8 V | "summed with the output control signal of the VCA EG" (not a normal) | M p.33 (quoted) | verified |
-| 3/1 | VCO 2 | in | ±5 V, 1 V/oct | summed with VCO 2 FREQ and Sequencer 2; breaks the normal from VCO 1 | M p.33 | verified |
-| 3/2 | VCO 2 SUB | in | ±5 V | divider CV for both of VCO 2's subs | M p.33 | verified |
-| 3/3 | VCO 2 PWM | in | ±5 V | replaces the SUB 1 saw normal of VCO 2 | M p.33 | verified |
-| 3/4 | VCA EG | out | 0 to +8 V | the amplitude envelope | M p.33 | verified |
-| 4/1 | VCO 2 | out | 10 V p-p | VCO 2 before the mixer | M p.34 | verified |
-| 4/2 | VCO 2 SUB 1 | out | 10 V p-p | | M p.34 | verified |
-| 4/3 | VCO 2 SUB 2 | out | 10 V p-p | | M p.34 | verified |
-| 4/4 | CUTOFF | in | ±5 V | "With the CUTOFF knob centered, the signal received here can sweep the Cutoff Frequency through" ±5 octaves; summed, no normal | M p.34 (quoted) | verified (no normal: likely, see conflicts) |
-| 5/1 | PLAY | in | 0 to +10 V gate | "Rising edge = PLAY begins; Falling edge = PLAY stops"; the button still works by hand | M p.34 (quoted) | verified |
-| 5/2 | RESET | in | 0 to +10 V | trigger: steps to 1, rhythm phase reset; held gate = Hold (EGs keep firing) | M p.35 (quoted) | verified |
-| 5/3 | TRIGGER | in | 0 to +10 V | fires both EGs ("Continuous high voltage = GATE"); they will not restart during Attack | M p.35 | verified |
-| 5/4 | VCF EG | out | 0 to +8 V | the filter envelope | M p.35 | verified |
-| 6/1-4 | RHYTHM 1 ... RHYTHM 4 | in | ±5 V | "sets the timing of Rhythm Generator N by controlling the value of the RHYTHM N knob"; centre the knob for the widest range | M pp.35-36 (quoted) | verified (V per division: guess) |
-| 7/1 | SEQ 1 | out | ±5 V | Sequencer 1's step voltage, following QUANTIZE and SEQ OCT | M p.36 | verified |
-| 7/2 | SEQ 1 CLK | out | 0 to +5 V | a pulse each time Sequencer 1 advances (its polyrhythm); in phase with the internal clock since fw 1.1 | M p.36, FW, TE | verified |
-| 7/3 | SEQ 2 | out | ±5 V | Sequencer 2's step voltage | M p.36 | verified |
-| 7/4 | SEQ 2 CLK | out | 0 to +5 V | a pulse each time Sequencer 2 advances | M p.37 | verified |
-| 8/1 | MIDI IN | in | 3.5 mm TRS (type A), MIDI LED beside it | clock, notes, CCs; MIDI clock overrides internal and CLOCK | M p.37 | verified |
-| 8/2 | CLOCK | in | 0 to +10 V | "A clock signal received via this jack will override the internal clock setting"; one count per rising edge | M p.37 (quoted), TE | verified |
-| 8/3 | CLOCK | out | 0 to +10 V | "reflects the current clock source, be it internal, external, or MIDI"; "only present while ... the PLAY button is lit" | M p.37 (quoted) | verified |
-| 8/4 | TRIGGER | out | 0 to +5 V, 1 ms | every time the envelopes fire: sequencer steps, TRIGGER button, TRIGGER jack | M p.37 | verified |
+| Row/col | Label | Dir | Level | Normal / behaviour | Source |
+|---|---|---|---|---|---|
+| 1/1 | VCO 1 | in | ±5 V, 1 V/oct | summed with VCO 1 FREQ and Sequencer 1; **normalled to VCO 2** until VCO 2 has a cable | (Subharmonicon manual, p.31) |
+| 1/2 | VCO 1 SUB | in | ±5 V | sets the whole number of both VCO 1 subs; centre both SUB FREQ knobs for bipolar CV | (Subharmonicon manual, p.31) |
+| 1/3 | VCO 1 PWM | in | ±5 V = 1 % to 99 % duty | pulse width of VCO 1 and its two subs (square selected); **replaces** the SUB 1 saw normal of the middle WAVE position | (Subharmonicon manual, p.32) |
+| 1/4 | VCA | out | 10 V p-p | Eurorack-level output, after VOLUME | (Subharmonicon manual, pp.32, 56) |
+| 2/1-2/3 | VCO 1, VCO 1 SUB 1, VCO 1 SUB 2 | out | 10 V p-p | each source before the mixer | (Subharmonicon manual, p.32) |
+| 2/4 | VCA | in | 0 to +8 V | **summed** with the VCA EG | (Subharmonicon manual, p.33) |
+| 3/1 | VCO 2 | in | ±5 V, 1 V/oct | summed with VCO 2 FREQ and Sequencer 2; breaks the normal from VCO 1 | (Subharmonicon manual, pp.31, 33) |
+| 3/2 | VCO 2 SUB | in | ±5 V | both VCO 2 subs | (Subharmonicon manual, p.33) |
+| 3/3 | VCO 2 PWM | in | ±5 V = 1-99 % | VCO 2 and its subs; replaces the SUB 1 normal | (Subharmonicon manual, p.33) |
+| 3/4 | VCA EG | out | 0 to +8 V | | (Subharmonicon manual, p.33) |
+| 4/1-4/3 | VCO 2, VCO 2 SUB 1, VCO 2 SUB 2 | out | 10 V p-p | | (Subharmonicon manual, p.34) |
+| 4/4 | CUTOFF | in | ±5 V, up to ±5 octaves | **summed** with the knob and the VCF EG | (Subharmonicon manual, pp.34, 56) |
+| 5/1 | PLAY | in | 0 to +10 V | gate level: rising edge plays, falling edge stops; the PLAY button overrides | (Subharmonicon manual, p.34) |
+| 5/2 | RESET | in | 0 to +10 V | a trigger resets; a held gate is the RESET hold (NEXT still works) | (Subharmonicon manual, p.35) |
+| 5/3 | TRIGGER | in | 0 to +10 V | the rising edge fires both envelopes (not during an attack) | (Subharmonicon manual, p.35) |
+| 5/4 | VCF EG | out | 0 to +8 V | | (Subharmonicon manual, p.35) |
+| 6/1-6/4 | RHYTHM 1-4 | in | ±5 V | sets that generator's whole number by moving its knob's value; centre the knob for the widest range | (Subharmonicon manual, pp.35-36) |
+| 7/1, 7/3 | SEQ 1, SEQ 2 | out | ±5 V | the current step's voltage, following QUANTIZE and SEQ OCT unless their hold modes are on | (Subharmonicon manual, p.36) |
+| 7/2, 7/4 | SEQ 1 CLK, SEQ 2 CLK | out | 0 to +5 V | a pulse each time that sequencer moves | (Subharmonicon manual, pp.36-37) |
+| 8/1 | MIDI IN | in | TRS type A | clock, notes, CCs; MIDI clock overrides the internal clock and CLOCK IN; the LED shows MIDI arriving | (Subharmonicon manual, p.37) |
+| 8/2 | CLOCK | in | 0 to +10 V | each rising edge is a master pulse; overrides TEMPO | (Subharmonicon manual, p.37) |
+| 8/3 | CLOCK | out | 0 to +10 V | follows the current clock source; only while playing | (Subharmonicon manual, p.37) |
+| 8/4 | TRIGGER | out | 0 to +5 V, 1 ms | every time the envelopes are triggered - by the sequencers or the TRIGGER button | (Subharmonicon manual, p.37) |
 
-## Behaviour notes
+## Behaviour
 
-- **Clock sources.** Internal TEMPO clock at **1 PPQ** (one count per beat); an analog clock at CLOCK
-  overrides it; MIDI clock overrides both and counts **sixteenth notes** ("Internal clock is 1 PPQ until a
-  MIDI clock is detected. When MIDI clock is present, the PPQ is 4"). TE: "Moog's dividers count the
-  clock's own events: quarter notes from TEMPO, sixteenths from MIDI clock, every edge at CLOCK".
-  **verified** (M, TE).
-- **Rhythm generators.** Each keeps a counter; a generator *fires* on the count where its counter is 0,
-  then the counter advances and wraps at its divisor (a counter past a shrunken divisor wraps at the next
-  count). RESET sets every counter to 0, so all four fire together on the next count. **likely** (TE
-  `stock_divide`).
-- **Rhythm logic.** Per sequencer, OR advances when one or more assigned generators fire (once, never
-  twice); XOR advances only when exactly one fires - "if both Rhythm Generators are true, the sequencer
-  will not advance" - and with three firing it does not advance either (exclusive-one, not parity).
-  **verified** (M, MG, TE).
-- **Sequencer steps.** Four steps; "In order for a sequencer to play, it must receive clock information
-  from at least one of the rhythm generators" (p.26). After RESET the first count plays step 1, later
-  counts advance. **verified** (M) / **likely** (TE `rhythm_advance`).
-- **Envelope triggering.** With EG lit, a step on *either* sequencer fires both envelopes (one shared
-  filter and VCA; "every step of sequencer 2 also triggered VCO 1"). **likely** (F, two threads). TE's
-  stock emulation fires them on Sequencer 1 steps only - see conflicts.
-- **Envelopes.** Attack/decay. "When a trigger is received, the VCA EG will complete the Attack stage,
-  and then proceed to the Decay stage. When a gate is received, the VCA will complete the Attack stage
-  and hold at the maximum level until the gate ends" (p.25). "While in the Attack phase, the VCF EG
-  will not restart even when a new trigger or gate is received" (p.24, same for the VCA EG). A
-  retrigger in the Decay stage restarts from the current level (F). Stock firmware smooths both EG
-  outputs by "a few milliseconds" (TE). **verified** (M) / **likely** (F, TE).
-- **Gates.** Gates come from the TRIGGER button with EG unlit, a held high at the TRIGGER jack, and
-  held MIDI notes. Triggers come from sequencer steps, the TRIGGER button with EG lit and note-ons.
-  **verified** (M p.25, p.29, p.35).
-- **Quantizer.** The digital pitch (VCO FREQ knob + step + MIDI note) snaps to semitones; 8-ET and
-  8-JI then fold each semitone down to the white key below it (C♯→C, D♯→D, F♯→F, G♯→G, A♯→A); JI
-  modes take each note as C of its octave times a ratio. All scales are rooted on C ("locked to a root
-  note of C", F). **likely** (TE `note_frequency`, `white_key`).
-- **JI tables.** 8-JI is the manual's just C major: C 1/1, D 9/8, E 5/4, F 4/3, G 3/2, A 5/3, B 15/8
-  (**verified**, M p.17 example). 12-JI: 1/1, 16/15, 9/8, 6/5, 5/4, 4/3, **7/5**, 3/2, 8/5, 5/3,
-  **16/9**, 15/8 (**likely**: TE's test table, written against the stock table; the manual's p.17
-  only explains the idea).
-- **Sequencer reach.** "The sequencers cannot internally modulate the frequency of the VCOs any higher
-  than 10k Hz (approximately)"; for the full ±5 range "set the VCO 1 FREQ and VCO 2 FREQ knobs fully
-  counter-clockwise". **verified** (M).
-- **Subharmonics.** True integer dividers: the processor measures each VCO, sets each sub's analog
-  core and resets it every N cycles of its parent, so a sub stays phase-locked to its VCO (TE stock ABI:
-  sub-oscillator reset pulses, parent capture/division). **verified** (M p.18 "divided by a whole number";
-  TE).
-- **MIDI.** "MIDI note data received by Subharmonicon is referenced as an offset from the note C4";
-  with the FREQ knobs fully counter-clockwise notes play at pitch. While the sequencers run, notes
-  transpose the sequence (fw 1.1). Notes trigger both envelopes. No pitch bend or MIDI out (SOS).
-  **verified** (M, FW, TE).
-- **Syncing.** p.38: patch Subharmonicon CLOCK out into the DFAM's ADV/CLOCK; TRIGGER, SEQ 1 CLK or
-  SEQ 2 CLK clock the DFAM with a polyrhythm. p.39: a Mother-32 ASSIGN (clock) into CLOCK in - press
-  PLAY on the Subharmonicon first. **verified** (M, IS).
-- **No noise source, no audio input, no LFO.** **verified** (M p.31, p.58, via PS).
+- **Signal flow.** Six sources into one mixer, a 4-pole ladder low-pass, a VCA, VOLUME, then the
+  line/headphone output and the VCA jack. The sequencer clocks are OR'd into TRIGGER OUT and, through
+  the EG switch, into a second OR with the TRIGGER button and TRIGGER IN that fires both envelopes.
+  VCO 1 CV IN is normalled to VCO 2 CV IN; PWM IN is normalled from SUB 1 through the WAVE switch.
+  **verified** (Subharmonicon manual, p.56).
+- **Clock sources.** Internal TEMPO at 1 pulse per beat; CLOCK IN overrides it; MIDI clock overrides
+  both and counts 16ths (Subharmonicon manual, p.25). **verified**. The rhythm generators run from
+  any of the three (Subharmonicon manual, p.30).
+- **Rhythm generators.** Each counts master pulses and fires when its count is 0, then wraps at its
+  divisor; RESET zeroes all four, so they fire together on the next pulse. **likely** (TE's stock
+  divider). They re-align on a common downbeat after the least common multiple of their divisors
+  (Subharmonicon manual, p.11).
+- **Rhythm logic.** OR advances a sequencer when one or more of its generators fire (once); XOR only
+  when exactly one fires - also with three firing it does not advance. **verified** (Subharmonicon
+  manual, p.44; TE "exclusive-one").
+- **Sequencers.** A sequencer plays only with at least one rhythm generator assigned (Subharmonicon
+  manual, p.26). After RESET the first pulse plays step 1. Either sequencer's move fires both envelopes
+  with EG lit and always reaches TRIGGER OUT (diagram, p.56; Patching with Intention, p.15).
+- **Envelopes.** A trigger runs the attack then the decay; a gate runs the attack, holds at maximum
+  until it ends, then decays; neither envelope restarts during its attack (Subharmonicon manual,
+  pp.24-25). **verified**.
+- **Gates and triggers.** Gates: TRIGGER with EG unlit, a RESET gate (hold), HELD itself. Triggers:
+  sequencer steps with EG lit, TRIGGER with EG lit, the rising edge at TRIGGER IN (Subharmonicon
+  manual, pp.29, 35).
+- **Quantizer.** The VCO FREQ knob, the step and MIDI notes are snapped as one sum to a scale on C.
+  8-ET and 8-JI fold each chromatic note to the white key below; JI notes are ratios of C of their
+  octave. **likely** (TE `note_frequency`; the manual's examples are all on C, p.17).
+- **JI tables.** 8-JI is the manual's just C major: 1/1, 9/8, 5/4, 4/3, 3/2, 5/3, 15/8 (Subharmonicon
+  manual, p.17) - **verified**. 12-JI: 1/1, 16/15, 9/8, 6/5, 5/4, 4/3, 7/5, 3/2, 8/5, 5/3, 16/9,
+  15/8 - **likely** (TE's test table of the stock firmware).
+- **Sequencer reach.** The sequencers cannot push a VCO much above 10 kHz, and the subs are not
+  accurate above 10 kHz; the CV inputs can drive the VCOs far higher (Subharmonicon manual, p.28).
+  **verified**.
+- **Subharmonics.** True whole-number dividers of their VCO, so they track it and cannot beat against
+  it (Subharmonicon manual, pp.18, 26). **verified**; phase-locked resets: **likely** (TE).
+- **MIDI.** Notes are offsets from C4; with the VCO FREQ knobs fully counter-clockwise they play at
+  pitch (Subharmonicon manual, p.42). The stock firmware gates both envelopes on a note and releases
+  them on its note-off (TE); while the sequencers run, notes transpose them (FW 1.1). CCs: 4/36 and
+  12/44 VCO frequency (±2.5 octaves added to the knob), 103-106 the sub whole numbers (eight values
+  per divisor, replacing the knob until it moves), 23/55, 24/56, 28/60, 29/61 the envelope times
+  (Subharmonicon manual, pp.42-43). **verified**.
+- **Syncing.** CLOCK OUT into the DFAM's ADV/CLOCK, pressing the DFAM's RUN/STOP first; TRIGGER, SEQ 1
+  CLK or SEQ 2 CLK clock it with a polyrhythm (Subharmonicon manual, p.38). A Mother-32 ASSIGN output
+  set to clock into CLOCK IN, pressing the Subharmonicon's PLAY first (Subharmonicon manual, p.39).
+  **verified**.
+- **No noise source, audio input or LFO** (Subharmonicon manual, pp.31, 57). **verified**.
 
 ## Conflicts and how the twin resolves them
 
 | Topic | Claims | Twin |
 |---|---|---|
-| VCO FREQ range | M: four octaves, 262-4186 Hz. MG: "-2.5 to +2.5 octaves" | Both right: MG's range is the MIDI CC, which M says is "added to the VCO 1 FREQ knob setting". The knob is 4 octaves. |
-| Who fires the EGs | F (two threads): either sequencer's step. TE stock emulation: Sequencer 1 steps only | Either sequencer (hardware users' reports). |
-| CUTOFF normal | One search summary: "the VCF EG is normalled to the CUTOFF input". M p.34 describes the jack with the knob centred and no EG; PS lists no normal; VCA in is explicitly summed | Summed, no normal. |
-| Sub / rhythm CV scaling | The previous twin: 1.5 divisions per volt; salvaged `theory.ts`: 3 per volt | M: centre the knob for bipolar control, ±5 V. Twin: 10 V spans the whole knob (1.6 divisions per volt). |
-| Tempo range | AD: 0.333-3000 Hz | M: .333-50 Hz (20-3000 BPM); AD confused BPM and Hz. |
-| Studio sync vs CLOCK cable | M: MIDI clock overrides CLOCK | The studio's MIDI-style sync is always connected, so the twin lets a cable in CLOCK take over the clock; the studio transport still starts and stops PLAY. Turn studio sync off to get the hardware's "no MIDI" behaviour. |
+| VCA and CUTOFF inputs | Patching with Intention calls the envelopes "normalled" to them (pp.12-15) | summed, per the manual's text (p.33) and diagram (p.56); the guide means wired inside |
+| VCO 2 PWM normal | p.33 names "subharmonic oscillator sawtooth 2"; p.20 names SUB 1 | SUB 1 of VCO 2 (p.20, and the diagram's structure) |
+| VCA DECAY text | p.25 calls the VCA's knob "VCF DECAY" | a typo; the VCA DECAY knob is meant |
+| TRIGGER OUT with EG off | p.29 lists the button and external triggers; the diagram takes TRIGGER OUT before the EG switch | sequencer moves always reach it, plus TRIGGER and TRIGGER IN |
+| Studio sync vs a CLOCK cable | MIDI clock overrides CLOCK IN (p.25) | the studio's MIDI-style sync is always plugged in, so the twin lets a cable in CLOCK take over the clock while the studio still starts and stops PLAY; untick "Sync to studio clock" for the free-running TEMPO |
+| SEQ ASSIGN SUB tap point | research suggested after SEQ OCT; the diagram branches the SUB assigns before SEQ RANGE and QUANTIZE (p.56) | the raw step (before SEQ OCT and QUANTIZE) |
+| Three silent sheets | Spiral Ways, Star-Gate and Cloud Path draw EG and PLAY unlit with nothing patched to TRIGGER, which is silent (pp.48-49) | recreated with EG lit; their descriptions say so |
+| Tempo range | a replica quotes 0.333-3000 Hz | .333-50 Hz (p.25): it confused BPM and Hz |
 
-## Model choices (guesses to check against hardware)
+## Model choices (guesses to check against a unit)
 
-| Quantity | Twin value |
-|---|---|
-| Sub and rhythm CV (jacks, and SEQ ASSIGN SUB) | 10 V = the knob's whole travel = 16 divisions; + voltage moves toward ÷1 |
-| SEQ ASSIGN SUB uses | the sequencer's (quantized) step voltage on that scale |
-| VCF EG AMT full scale | ±6 octaves for the full 8 V envelope |
-| CUTOFF jack | 1 V/oct |
-| EG peak | +8 V; RC attack toward 1.5 x peak; exponential decay that falls 60 dB over DECAY; 1 ms output smoothing |
-| RESONANCE | self-oscillation from ~78 % of travel (about 2 o'clock) |
-| Mixer | level² taper per source, then a soft tanh bus: one full source is nearly clean, three or more saturate warmly |
-| MIDDLE wave PWM depth | the SUB 1 saw moves the width ±30 % (e.g. 20/70 % duty on alternate cycles at ÷2) |
-| PWM jack | ±5 V = ±45 % width |
-| Analog drift | ±1.5 cents, slow, per VCO (subs follow their VCO) |
-| CLOCK / SEQ CLK pulse width | 5 ms (TE stock constant `RHYTHM_OUTPUT_PULSE_MS = 5`) |
-| Cycle order of QUANTIZE | 12-ET → 8-ET → 12-JI → 8-JI → off → 12-ET |
-| EG from HELD | a press returns to ON |
-| Small knob size | 9 mm (hardware 6.3 mm bodies) for touch |
+| Quantity | Twin value | Why |
+|---|---|---|
+| TEMPO taper | linear in Hz: BPM = 20 + 2980 × travel (12 o'clock 1510 BPM) | under a log taper nearly all 20 Moog sheets would step at 5-30 BPM (Bateria's ÷4 kick at 11 BPM); linear puts every one at a musical rate (Bateria's ÷4 at about 129 BPM) |
+| CUTOFF, ATTACK, DECAY tapers | log (20·1000^p Hz; 1 ms·10^(4p); 5 ms·2000^p) | Bateria needs an 80 Hz cutoff and a 20 ms filter decay at its knob positions |
+| VCO FREQ taper | exponential (C6 at 12 o'clock) | a quantizable pitch knob; the sheets' "a fourth apart" fits |
+| Decay law | DECAY = time to fall 60 dB ("to zero", p.25) | the manual's wording; keeps tails clean |
+| VCF EG AMT full scale | ±8 octaves (the 8 V envelope at 1 V/oct) | Star-Gate's high clusters need it at its drawn settings |
+| CUTOFF jack | 1 V/oct | ±5 V sweeps ±5 octaves (p.34) |
+| VCA and CUTOFF jack inputs | a 0.2 ms RC (about 800 Hz) | a pulse into VCA IN snaps instead of stepping; audio-rate AM still passes |
+| EG curves | RC attack toward 1.5 × peak reaching it at ATTACK; exponential decay; 1 ms output smoothing | TE: the stock firmware smooths the EG outputs |
+| EG peak | +8 V (p.33) | |
+| Sub and rhythm CV | 10 V = the knob's 16 positions (1.6 per volt), + toward ÷1 | centre the knob for bipolar control (pp.31, 35) |
+| SEQ ASSIGN SUB depth | the raw step at ±5 V full scale, on that scale | the diagram's tap point |
+| PWM jack | duty = 50 % + 9.8 % per volt (1-99 % over ±5 V) | p.32 |
+| MIDDLE-position PWM depth | the SUB 1 saw moves the width ±30 % | |
+| Resonance | self-oscillation from about 78 % (2:20 o'clock) | SOS: about 2 o'clock |
+| Mixer | level² taper per source, then a soft bus saturation: one full source nearly clean, three or more warmly driven | p.21 |
+| Output stage | make-up so the median Moog sheet reads about -18 LUFS at full VOLUME, a DC blocker, and a soft shoulder from -4.4 dBFS that keeps peaks under -1.5 dBFS | the studio's -18 LUFS reference with -1 dBTP |
+| Keys / MIDI notes while stopped | like the TRIGGER button with a pitch: EG lit a trigger, EG unlit a gate while held, HELD nothing; running: transpose only | TE's stock gate calls; FW 1.1 transpose |
+| PLAY override | a press of PLAY, the studio's ■ or the end of an audition holds a gate in PLAY IN off until PLAY is pressed again | "Pressing the PLAY button will override the status" (p.34) |
+| CLOCK / SEQ CLK pulse width | 5 ms (TRIGGER OUT 1 ms, p.37) | TE stock constant |
+| QUANTIZE cycle order | 12-ET → 8-ET → 12-JI → 8-JI → off | panel order |
+| Analog drift | ±1.5 cents, slow, per VCO; none between a VCO and its subs | |
+| NEXT | forces divider counts until Sequencer 1 steps, so Sequencer 2 keeps its place | TE stock emulation |
 
 ## Presets
 
-The manual's Presets section (printed pp.45-49) has **ten patch sheets**: AQUATIC CHORDS, MELLOW
-HARMONIES, SLIP & FALL, POINT ZERO, THREE HANDS ON THE WHEEL, BATERIA, SPIRAL WAYS, STAR-GATE, POLY ROCK
-and CLOUD PATH (PS, verified). What could be read of them:
+36 presets, named "Category / Name" (the menu groups by category). Moog's titles appear only in the
+descriptions. Every preset lists every setting; VOLUME is calibrated per preset so the audition and
+the studio-transport playback both sit on the category target (-18 LUFS; FX and texture -22, drone and
+ambient -21). Patches whose sound keeps going after stop by design (held envelopes, a sub patched into
+VCA IN, long ambient decays) are in Drone / Ambient.
 
-- **BATERIA** (p.47): all six levels down, RESONANCE fully up, VOLUME full; cables SEQ 2 CLK → VCA,
-  SEQ 1 CLK → CUTOFF, SEQ 1 → RHYTHM 1, SEQ 2 → RHYTHM 2. NOTES: "Kick drum tuning is controlled via
-  filter CUTOFF. Adjust VCF DECAY and EG AMT knobs for different kick drum flavors" (PS read it off
-  the drawing).
-- **SPIRAL WAYS** (p.48): levels 60/60/60 and 64/100/100, VCF EG → RHYTHM 1; NOTES: "Tune sequencers
-  to desired pitches. Tune SUB VCO 1 FREQ 1 to a Fifth. Tune SUB VCO 2 SUB 2 to a Major 3rd. Adjust VCF
-  ATTACK for crescendo depth" (PS).
-- **AQUATIC CHORDS** and **MELLOW HARMONIES** (p.45) both draw SEQ 1 → CUTOFF (PS); Aquatic Chords also
-  CLOCK → TRIGGER with EG off (JonDent blog, via search).
-- **SLIP & FALL** (p.46) shares SPIRAL WAYS' filter-envelope-into-a-divider trick (PS); "Blippy,
-  Unusual, ModRhythm, ±1" (PP).
-- **POLY ROCK**: "Chords, Plucky Percussion, ±1, 8-ET ... Tune SUB OSC 1, 2, 3, and 4 to desired chord
-  shapes", CLOCK → VCA for the drum sounds (PP).
-- **CLOUD PATH**: "Arpeggiated, Blippy, Chords, ModRhythm, Melodic, ±1, 12-ET"; "Press RHYTHM 3 SEQ 1
-  for double-time feels" (PP).
-- POINT ZERO, THREE HANDS ON THE WHEEL, STAR-GATE: names only.
+**How the sheets were read.** Knob positions were read as clock positions of the pointer (7 o'clock =
+fully counter-clockwise, 5 o'clock = fully clockwise; travel p = (angle + 150°) / 300°) and stepped
+knobs to the nearest of 16 detents (divider index = floor(p × 16)). The Exploration Patchbook's
+coloured pointers were measured from 250 dpi renders (±2 % of travel); the manual's black-and-white
+sheets were read by eye at 300 dpi (±3-5 %); `docs/research/subharmonicon/presets.md` has the full
+per-sheet tables. Where a pointer sits between detents the description or the notes below say so.
 
-Exact knob positions are drawings we could not see, so every twin preset is a **recreation** from these
-notes and says so. *Patching with Intention* (PWI) contributes its exercise chain (Initialized Patch,
-First Steps: SEQ 1 → VCO 1 by cable; Intertwining Sequencers: SEQ 2 → VCO 1; From Melody to Rhythm:
-resonance near maximum makes the sequence percussive; Fun with Envelopes; Intermingled Drum Machine:
-VCO 1 SUB 1 → RHYTHM 2, "sub-oscillators ... can function in much the same way" as LFOs). Moog's DFAM &
-Subharmonicon Exploration Patchbook titles (RV: Plush Leather, Ali's Bubblin', Arcade Blasts, Stack 'Em Up,
-Subfunkicon, Grapefruit and Honey) are two-instrument patches; the twin's Subharmonicon halves carry our
-own names and credit the original in their descriptions.
+| Preset | Sheet | Cables | Reading notes |
+|---|---|---|---|
+| Chords / Bubbling sub chords | "Aquatic Chords" (Subharmonicon manual, p.45) | SEQ 1 → CUTOFF, CLOCK → TRIGGER | EG drawn off, PLAY on; VCO 2 SUB 2 between ÷3 and ÷4 (÷3) |
+| Arp / Hand-faded harmony arp | "Mellow Harmonies" (p.45) | SEQ 1 → CUTOFF, SEQ 1 CLK → TRIGGER | the four SUB LEVELs are drawn as performance arcs without pointers: set to 80 % |
+| Rhythm / Self-tripping cross-sequence | "Slip & Fall" (p.46) | five: SEQ 2 → VCO 1, SEQ 1 → VCO 2, VCA EG → RHYTHM 2, VCF EG → RHYTHM 1, SEQ 1 CLK → TRIGGER | RHYTHM 1 between ÷7 and ÷8 (÷8) |
+| Ambient / Driven pulse swell | "Point Zero" (p.46) | SEQ 1 → VCO 1 PWM, SEQ 2 → CUTOFF | the sheet's note: VCF ATTACK sets the sweep length |
+| Texture / Winding two-sequencer line | "Three Hands on the Wheel" (p.47) | SEQ 1 → VCO 2, SEQ 2 → CUTOFF | VCO 2 SUB 2 LEVEL and +VCF EG AMT are performance arcs: SUB 2 at 75 %, EG AMT mid-arc +65 %; VCA DECAY at the top of its reading (42 ms) |
+| Drums / Filter-ping kit | "Bateria" (p.47) | SEQ 1 → RHYTHM 1, SEQ 2 → RHYTHM 2, SEQ 1 CLK → CUTOFF, SEQ 2 CLK → VCA | all six levels down; the sheet's note: CUTOFF tunes the kick, VCF DECAY and EG AMT shape it |
+| Ambient / Accelerating spiral | "Spiral Ways" (p.48) | VCF EG → RHYTHM 1 | **silent as printed** (EG and PLAY unlit, nothing into TRIGGER): EG lit; VCO 1 SUB 1 between ÷6 and ÷7, ÷6 for the sheet's "fifth" |
+| Ambient / Percolating high clusters | "Star-Gate" (p.48) | SEQ 1 → CUTOFF, SEQ 2 → VCO 1 PWM | **silent as printed**: EG lit; the five other mixer knobs are drawn at 0 as performance arcs: partly brought in |
+| Groove / Polyrhythm chord stabs | "Poly Rock" (p.49) | VCA EG → CUTOFF (optional CLOCK → VCA for drums) | VCO 1 SUB 1 ÷8 or ÷7; RHYTHM 2 ÷12 or ÷11 |
+| Pad / Slow-bloom duet | "Cloud Path" (p.49) | VCA EG → CUTOFF, VCF EG → RHYTHM 3 | **silent as printed**: EG lit; VCO 2 and the subs are drawn at 0 to be faded in: half way up |
+| FX / Clinking sub clatter | "Music for Washing Dishes" (Exploration Patchbook, p.1) | SEQ 2 → CUTOFF | RHYTHM 2 and 4 between detents (÷11, ÷15) |
+| Bass / Shuffled sub bassline | "Shuffled Subs" (p.2) | SEQ 1 → VCO 2, SEQ 2 → CUTOFF | RHYTHM 2 between ÷8 and ÷7 |
+| Ambient / Eerie fourths in pulse | "Nosferatu's Flotation Tank" (p.3) | SEQ 1 → VCA, VCF EG → RHYTHM 1, SEQ 2 → RHYTHM 3 | positive SEQ 1 steps hold the VCA open: it drones between notes |
+| FX / Buzzing cross-mod swarm | "Transistor Insects" (p.4) | VCO 2 SUB 2 → VCO 1, VCO 1 SUB 2 → VCO 2, VCO 1 → RHYTHM 4 | |
+| Melody / Undertone step dance | "Neon Cactus Tips Their Cap" (p.5) | SEQ 1 → RHYTHM 1, SEQ 2 → VCO 2 PWM, SEQ 2 CLK → TRIGGER | |
+| FX / Tone and breath duet | "Duet for Tone and Wind" (p.6) | SEQ 1 → VCO 2 PWM, VCO 2 → CLOCK | an audio-rate master clock; TEMPO is irrelevant |
+| Rhythm / Sub-gated dial tones | "Touchtone Wiretap" (p.7) | VCO 1 SUB 1 → PLAY, VCA EG → VCO 2, VCO 1 SUB 2 → CUTOFF, SEQ 2 → VCO 1 PWM | PLAY drawn unlit: PLAY IN runs it |
+| Rhythm / Marching sub clicks | "Ant Parade" (p.8) | CLOCK → VCO 1, SEQ 2 → VCO 1 SUB | |
+| Drone / Octave-shifting fuzz bass | "Octave Fuzz" (p.9) | SEQ 2 → VCO 1, VCO 1 SUB 1 → VCA | the sub in VCA IN keeps a fuzz drone going between and after notes |
+| FX / Folded high chimes | "Aliased Wind Chimes" (p.10) | VCA EG → RHYTHM 3, VCO 2 SUB 1 → RHYTHM 4, SEQ 1 CLK → CUTOFF | |
+| Drone / Initialized patch (EG held) | the initialized patch (Patching with Intention, p.3) | - | EG held so VCO 1 sounds, as the manual's tour starts (Subharmonicon manual, p.12) |
+| Tutorial / First sequence … Envelope-accelerated clock (5) | the exercises (Patching with Intention, pp.4-10) | as the guide patches them | step values, resonance and some divisors are ours; the PLAY-gating sub is ÷9 (12 o'clock) so its edges drift against the ÷16 clock |
+| Tutorial / First polyrhythm | the tour (Subharmonicon manual, pp.12-16) | - | step and divisor values ours |
+| Init / Default patch, Drone (3), Polyrhythm (3), Bass / Square sub bass, Lead / Envelope PWM | our designs (just C major, p.17; undertones, p.11; rhythm logic, p.44) | Envelope PWM: VCF EG → VCO 1 PWM | |
+
+The initialized patch's values are exported as `INITIALIZED_PATCH` (presets.ts) and are the start state
+of most lessons.
+
+## Lessons
+
+20 v2 lessons (`lessons.ts`), from the outlines in `docs/research/subharmonicon/lessons.md`:
+foundations 6, sound design 3, ear training 5, sequencing 3, performance 1, studio 2. Every match step
+that grades a divisor uses tolerance 0.03. RESET, NEXT and TRIGGER steps count presses (lesson API v3).
+Synced to the studio, PLAY runs on the studio's 16th notes, so the TEMPO comparisons are Listen steps
+(auditions run on the internal clock).

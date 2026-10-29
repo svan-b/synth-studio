@@ -15,7 +15,7 @@
 // at 9 mm (hardware 6.3 mm) so they can be turned on an iPad.
 //
 // Twin aids (not on the hardware, marked in REFERENCE.md): the OFF / ON / HELD
-// keys under EG, the SEQ OUT ±5 / SEQ OUT UNQ keys under SEQ OCT and QUANTIZE
+// keys under EG, the SEQ OUT ±5 / SEQ OUT UNQ keys beside the SEQ OCT and QUANTIZE buttons
 // (their hold modes), and the rhythm LOGIC switch (MIDI CC 113 on the hardware).
 // ============================================================================
 
@@ -129,7 +129,8 @@ const OSC_Y = 25.62, SUB_Y = 51.64, ASSIGN_ROW = 69.15, LEVEL_Y = 86.67, SUBLEVE
 const MID_X = 135.0;
 const LED_X = 134.8;
 const SEQ_OCT_Y = 35.9, QUANT_Y = 86.1;
-const HELD_W = 12.6, HELD_H = 3.1;
+// The SEQ OUT keys sit just left of their buttons, clear of the printed divider, LEDs and legends
+const HELD_W = 11, HELD_H = 3.0, HELD_X = 122.3;
 
 const oscSection: PanelElement[] = [
   // OSCILLATORS: rules out to a boxed 1 and 2 hanging from them
@@ -139,20 +140,21 @@ const oscSection: PanelElement[] = [
   label('1', 84.3, 5.7, 8.5),
   { kind: 'section', x: 182.8, y: 3.2, w: 5.6, h: 5.0, border: `1px solid ${RULE}`, radius: 0.4 },
   label('2', 185.6, 5.7, 8.5),
-  // Centre divider, broken by the SEQ OCT and QUANTIZE groups
+  // Centre divider, broken by the SEQ OCT and QUANTIZE groups (as drawn, p.50)
   vrule(MID_X, 6.4, 14.1),
-  vrule(MID_X, SEQ_OCT_Y + 3.1 + HELD_H + 2.6, 58.6),
-  vrule(MID_X, QUANT_Y + 3.2 + HELD_H + 2.6, 117.5),
+  vrule(MID_X, 40.7, 58.6),
+  vrule(MID_X, 91.1, 117.5),
   ...[0, 1].flatMap((b): PanelElement[] => {
     const v = b + 1;
     const [bx0, bx1] = BRACKET[b];
-    const side = b ? 1 : -1; // the pulse-width glyph sits on the outer side of the switch
+    // The pulse-width glyph sits on the outer side of the switch; VCO 2's clears the position legends
+    const pwmX = b ? WAVE_X[b] + 10.4 : WAVE_X[b] - 8.6;
     return [
       knob(`vco${v}_freq`, FREQ_X[b], OSC_Y, LARGE, { labelText: `VCO ${v} FREQ` }),
       label(`VCO ${v} WAVE`, WAVE_X[b], 17.0, 7),
-      { kind: 'switch', control: `vco${v}_wave`, x: WAVE_X[b] + (b ? 1.6 : -1.6), y: OSC_Y + 1.2, scale: 1.35, label: 'none' },
+      { kind: 'switch', control: `vco${v}_wave`, x: WAVE_X[b] + (b ? 1.2 : -1.6), y: OSC_Y + 1.2, scale: 1.35, label: 'none' },
       glyph('square', WAVE_X[b], 20.3, 3.0),
-      glyph('pwm', WAVE_X[b] + side * 8.6, OSC_Y + 0.4, 6.2),
+      glyph('pwm', pwmX, OSC_Y + 0.4, 6.2),
       glyph('saw', WAVE_X[b], 31.9, 3.0),
       knob(`vco${v}_sub1_freq`, SUB_X[b][0], SUB_Y, MEDIUM),
       knob(`vco${v}_sub2_freq`, SUB_X[b][1], SUB_Y, MEDIUM),
@@ -185,7 +187,7 @@ const oscSection: PanelElement[] = [
         description="SEQ OCT: press to step ±5 → ±2 → ±1 octaves. Press and hold until the LED flashes to keep the SEQ jacks at ±5 V (or tap SEQ OUT ±5)." />
     ),
   },
-  btn('seq_oct_held', MID_X, SEQ_OCT_Y + 3.1 + 0.9 + HELD_H / 2, HELD_W, HELD_H, { capText: 'SEQ OUT ±5', color: '#161616' }),
+  btn('seq_oct_held', HELD_X, SEQ_OCT_Y, HELD_W, HELD_H, { capText: 'SEQ OUT ±5', color: '#161616' }),
 
   // QUANTIZE: four LEDs over one button; all dark = off; held = the lit LED flashes
   ...([[1, '12-ET'], [2, '8-ET'], [3, '12-JI'], [4, '8-JI']] as const).map(([v, t], i): PanelElement => (
@@ -203,7 +205,7 @@ const oscSection: PanelElement[] = [
         description="QUANTIZE: press to step 12-ET → 8-ET → 12-JI → 8-JI → off (all LEDs dark). Press and hold until the LED flashes to unquantize the SEQ jacks (or tap SEQ OUT UNQ)." />
     ),
   },
-  btn('quantize_held', MID_X, QUANT_Y + 3.2 + 0.9 + HELD_H / 2, HELD_W, HELD_H, { capText: 'SEQ OUT UNQ', color: '#161616' }),
+  btn('quantize_held', HELD_X, QUANT_Y, HELD_W, HELD_H, { capText: 'SEQ OUT UNQ', color: '#161616' }),
 ];
 
 // ---------------------------------------------------------------------------
@@ -229,16 +231,12 @@ const filterSection: PanelElement[] = [
 // ---------------------------------------------------------------------------
 const PB_X = (c: number) => 255.17 + c * 13.54;
 const PB_Y = (r: number) => 16.61 + r * 13.51;
-const SHORT: Record<string, string> = {
-  out_vco1_sub1: 'SUB 1', out_vco1_sub2: 'SUB 2', out_vco2_sub1: 'SUB 1', out_vco2_sub2: 'SUB 2',
-};
 const patchbay: PanelElement[] = [
   label('IN', 271.6, 4.1, 7.5, { color: MUTED }),
   label('/', 274.9, 4.1, 7.5, { color: MUTED }),
   label('OUT', 279.0, 4.1, 7.5, { invert: true }),
-  ...PATCH_GRID.map(({ id, col, row }): PanelElement => ({
-    kind: 'jack', jack: id, x: PB_X(col), y: PB_Y(row), ...(SHORT[id] ? { labelText: SHORT[id] } : {}),
-  })),
+  // The printed legends, in full (VCO 1 SUB 1 ...): the panel condenses them to fit the column
+  ...PATCH_GRID.map(({ id, col, row }): PanelElement => ({ kind: 'jack', jack: id, x: PB_X(col), y: PB_Y(row) })),
   // MIDI activity LED, printed just left of the MIDI IN legend (studio clock and keys light it)
   { kind: 'led', x: 248.4, y: PB_Y(7) - 5.6, size: 2.4, color: LED, on: ({ engine }) => ledsOf(engine).midi ?? 0 },
 ];
