@@ -22,7 +22,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Elektron sequencer library + UI kit | `docs/ELEKTRON_SEQUENCER.md` (233 tests) |
 | Bring your own gear | Web MIDI, Practice synth (works on iPad without hardware), audio input, Web Audio plugins, 16 lessons, Safari guidance. See `docs/EXTERNAL_GEAR.md` |
 | Audio QA tool | `scripts/audio-qa.cjs`, see `docs/AUDIO_QA.md`: LUFS, true peak, DC, clicks, stuck tails per preset. The baseline in `docs/audio-qa-baseline/` predates the rebuilds and needs regenerating |
-| E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs), 36 checks including the iPad producer walkthrough. `--full` adds smoke and lessons for every instrument |
+| E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs), 37 checks including the iPad producer walkthrough. `--full` adds smoke and lessons for every instrument: 87/87 at the last full run |
 | iPad | Home-screen install, floating lesson coach, 44 px touch targets, fine-adjust gestures, value bubble. Fit may shrink a panel up to 20 % so it ends above the bottom of the screen (the whole Xone:96 at 87 %, the A4 at 90 %), and the control readout shares the toolbar row. First-load JS 198 kB (MIDI, studio view and coach load on demand) |
 | Research notes | `docs/research/<device>/` (sources, signal-flow, presets, lessons) from the official manuals, in our own words. See `docs/research/COPYRIGHT-RULES.md` |
 
@@ -71,6 +71,8 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - 22b412c: its knobs turn 280°, as measured on the p.28 drawing, with the legends and CUTOFF marks at their measured angles.
 - 2603002: on iPad the lesson coach moves off the control a step points at (checked on six lessons: no step leaves its target covered).
 - 80c283a: an instrument's own studio lessons are headed "<name> in the studio", no longer a second "Studio & full tracks".
+- Full suite on 22b412c (`run.cjs --full`): **87/87**, covering smoke for every instrument, every lesson of every instrument and the 37 core checks.
+  - Lessons: DFAM 20, Mother-32 19, Subharmonicon 20, Sub 37 20, A4 20, Rytm 20, Xone 18, Your synth 7, Audio input 5, Web Audio plugin 4.
 - **Vercel build rate limit.** Previews from 49f3469 on failed with `build-rate-limit`, not a code error (local builds pass). Every push to any branch, the agents' `wip/*` included, starts a preview build. Pushes are now batched. Option for the user: disable preview builds for scratch branches with `vercel.json` → `"git": { "deploymentEnabled": { "wip/*": false } }`.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
