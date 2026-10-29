@@ -2017,6 +2017,16 @@ const t2: Lesson = {
         { text: 'Three or more sections', check: s => s.arrangement.sections.length >= 3 },
       ],
       hints: ['Use phrases of 8 bars.', 'Use A02 for the intro and the breakdown.', 'Intro 8 (A02), build 8 (A01), drop 8 (A03), break 8 (A02).'],
+      solution: {
+        arrangement: {
+          sections: [
+            { name: 'Intro', bars: 8, parts: { 'analog-rytm': { pattern: 'A02' } } },
+            { name: 'Build', bars: 8, parts: { 'analog-rytm': { pattern: 'A01' } } },
+            { name: 'Drop', bars: 8, parts: { 'analog-rytm': { pattern: 'A03' } } },
+            { name: 'Break', bars: 8, parts: { 'analog-rytm': { pattern: 'A02' } } },
+          ],
+        },
+      },
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',

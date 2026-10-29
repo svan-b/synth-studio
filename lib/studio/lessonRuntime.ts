@@ -21,8 +21,11 @@
 // It must stay out of the store's static imports (it imports the hub).
 // ============================================================================
 
-import type { ControlValue, Lesson, LessonChannelMeter, LessonHistory, LessonMasterMeters, LessonMasterPatch, LessonSolution, LessonStep, LessonTake } from '@/types';
+import type {
+  ControlValue, Lesson, LessonChannelMeter, LessonHistory, LessonMasterMeters, LessonMasterPatch, LessonPatternPatch, LessonSolution, LessonStep, LessonTake,
+} from '@/types';
 import { useStudioStore, stepInstance, getSpec, specDefaults } from '@/store/studio';
+import { STAMPS_TRIGS, withPatternPatch, withSequenceEdit } from './elektronEdits';
 import { hub } from './hub';
 import { arranger } from './arranger';
 import { history as undoHistory } from './history';
@@ -40,10 +43,16 @@ const lufsOf = (meanEnergy: number) => (meanEnergy > 0 ? -0.691 + 10 * Math.log1
 const energyOf = (lufs: number) => Math.pow(10, (lufs + 0.691) / 10);
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
-/** The instance a lesson names: an instance id, or the first instance of a device */
+/**
+ * The instance a lesson names: an instance id, the first instance of a device, or
+ * '<device>#<n>', the n-th instance of a device in rack order (a second one is added
+ * as '<device>#2', so that is usually its id too)
+ */
 export function resolveInstance(idOrDevice: string): string | undefined {
   const rack = useStudioStore.getState().studio.rack;
   if (rack.some(r => r.id === idOrDevice)) return idOrDevice;
+  const nth = /^(.+)#(\d+)$/.exec(idOrDevice);
+  if (nth) return rack.filter(r => r.device === nth[1])[Number(nth[2]) - 1]?.id;
   return rack.find(r => r.device === idOrDevice)?.id;
 }
 
@@ -377,16 +386,18 @@ export interface AbInfo {
   matching: boolean;
 }
 
-/** Does this listen step play the whole studio (several instruments, the master, swing)? */
+/** Does this listen step play the whole studio (several instruments, the master, swing, pattern settings)? */
 export function isStudioListen(step: LessonStep | undefined): boolean {
   const l = step?.listen;
-  return !!l && (!!l.parts || !!l.master || !!l.studio);
+  return !!l && (!!l.parts || !!l.master || !!l.studio || !!l.patterns);
 }
 
 class StudioAB {
   private key = '';
   private side: Side | null = null;
   private overrides = new Map<string, Record<string, ControlValue>>();
+  /** Instruments playing other pattern settings (an Elektron project override) */
+  private dataOverrides = new Set<string>();
   private masterOn = false;
   private swingOn = false;
   private est: Record<Side, { e: number; n: number }> = { a: { e: 0, n: 0 }, b: { e: 0, n: 0 } };
@@ -436,6 +447,14 @@ class StudioAB {
       Object.entries(values).forEach(([k, v]) => { eng.setParam(k, v); prev[k] = v; });
       this.overrides.set(inst, prev);
     });
+    // Elektron pattern settings (SWING): every pattern of the instrument, so the song's too
+    Object.entries(listen.patterns?.[side] ?? {}).forEach(([k, patch]) => {
+      const inst = resolveInstance(k);
+      const eng = inst ? hub.getEngine(inst) : undefined;
+      if (!inst || !eng) return;
+      eng.setData(withPatternPatch(s.devices[inst]?.data, patch, { all: true }));
+      this.dataOverrides.add(inst);
+    });
     const mp = listen.master?.[side];
     if (mp) { this.applyMaster(mp); this.masterOn = true; }
     const sw = listen.studio?.[side]?.swing;
@@ -479,6 +498,9 @@ class StudioAB {
       Object.keys(vals).forEach(k => eng.setParam(k, real[k]));
     });
     this.overrides.clear();
+    // The real patterns back, as the store holds them now
+    this.dataOverrides.forEach(inst => hub.getEngine(inst)?.setData(useStudioStore.getState().devices[inst]?.data));
+    this.dataOverrides.clear();
     if (this.masterOn) {
       const m = masterOf(useStudioStore.getState().studio.mixer);
       setMasterSettings({ gain: dbToGain(m.gain), eq: m.eq, glue: m.glue });
@@ -563,12 +585,26 @@ function sectionIndex(name: string): number {
   return useStudioStore.getState().studio.arrangement.sections.findIndex(s => norm(s.name) === norm(name));
 }
 
+/** A route target with its mixer named by device or instance ('xone96:studio_1'), as the studio stores it */
+function resolveRoute(target: string): string {
+  if (target === 'master') return target;
+  const [mixer, input] = target.split(':');
+  return input ? `${resolveInstance(mixer) ?? mixer}:${input}` : target;
+}
+
+/** Set an Elektron pattern setting (SWING, LENGTH) on an instrument's active pattern */
+export function setPatternSettings(instanceOrDevice: string, patch: LessonPatternPatch) {
+  const inst = resolveInstance(instanceOrDevice);
+  if (inst) useStudioStore.getState().updateDeviceData(inst, d => withPatternPatch(d, patch));
+}
+
 /**
  * Apply the studio parts of a solution: other instruments' values, the mixer, the master,
- * tempo / swing / routing, the song, arranger snapshots and the transport. Values,
- * patches and data on the step's instrument are the caller's (as before v3).
+ * tempo / swing / routing, the song, arranger snapshots, Elektron pattern settings and
+ * trigs, and the transport. Values, patches and data on the step's instrument are the
+ * caller's (as before v3); `instance` is that instrument, for sequence edits that name none.
  */
-export function applyStudioSolution(sol: LessonSolution) {
+export function applyStudioSolution(sol: LessonSolution, instance?: string) {
   const st = useStudioStore.getState();
   sol.studioCables?.forEach(c => {
     const a = resolveInstance(c.from.instance ?? c.from.device ?? '');
@@ -587,14 +623,31 @@ export function applyStudioSolution(sol: LessonSolution) {
       ...(sol.master.glue ? { glue: sol.master.glue } : {}),
     });
   }
+  // Instruments the step needs in the rack (Instruments… → Add another)
+  sol.studio?.rack?.forEach(r => {
+    const count = () => useStudioStore.getState().studio.rack.filter(x => x.device === r.device).length;
+    for (let k = 0; k < 8 && count() < (r.count ?? 1); k++) st.addToRack(r.device, { duplicate: true });
+  });
   if (sol.studio?.bpm !== undefined) st.setBpm(sol.studio.bpm);
   if (sol.studio?.swing !== undefined) st.setSwing(sol.studio.swing);
-  Object.entries(sol.studio?.routes ?? {}).forEach(([k, r]) => { const inst = resolveInstance(k); if (inst) st.setRoute(inst, r); });
+  Object.entries(sol.studio?.routes ?? {}).forEach(([k, r]) => { const inst = resolveInstance(k); if (inst) st.setRoute(inst, resolveRoute(r)); });
   Object.entries(sol.studio?.sync ?? {}).forEach(([k, on]) => { const inst = resolveInstance(k); if (inst) st.setSync(inst, on); });
   if (sol.arrangement) {
     const arr = sol.arrangement;
-    st.setArrangement(a => ({ enabled: arr.enabled ?? a.enabled, loop: arr.loop ?? a.loop, sections: sectionsFromStart(arr.sections) }));
+    // Parts may name a device: they belong to its instance in this studio
+    const sections = arr.sections?.map(x => ({
+      ...x,
+      parts: x.parts ? Object.fromEntries(Object.entries(x.parts).map(([k, p]) => [resolveInstance(k) ?? k, p])) : undefined,
+    }));
+    st.setArrangement(a => ({ enabled: arr.enabled ?? a.enabled, loop: arr.loop ?? a.loop, sections: sections ? sectionsFromStart(sections) : a.sections }));
   }
+  Object.entries(sol.patterns ?? {}).forEach(([k, patch]) => setPatternSettings(k, patch));
+  sol.sequence?.forEach(e => {
+    const inst = resolveInstance(e.instance ?? instance ?? '');
+    if (!inst) return;
+    const stamp = STAMPS_TRIGS.has(st.deviceOf(inst));
+    useStudioStore.getState().updateDeviceData(inst, d => withSequenceEdit(d, e, { stamp }));
+  });
   sol.capture?.forEach(c => {
     const i = sectionIndex(c.section);
     if (i >= 0) captureInto(i, c.instance, c.controls, c.values);
@@ -767,6 +820,7 @@ function tick() {
 /** The lesson runner's handle (window.__synthLesson) */
 export const lessonRuntimeApi = {
   applyStudioSolution,
+  setPatternSettings,
   runTimedSolution,
   isTimedSolution,
   resolveInstance,

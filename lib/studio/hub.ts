@@ -683,19 +683,22 @@ class EngineHub {
   // --------------------------------------------------------------------------
 
   /**
-   * Temporarily play `values` (and optionally `patches`) on an instrument without
-   * changing what the store - and therefore the panel - says. Restores afterwards.
+   * Temporarily play `values` (and optionally `patches`, or `data`: an Elektron project
+   * with other pattern settings) on an instrument without changing what the store - and
+   * therefore the panel - says. Restores afterwards.
    */
-  audition(instance: string, values: Record<string, ControlValue> | null, opts: { patches?: PatchConnection[]; ms?: number } = {}) {
+  audition(instance: string, values: Record<string, ControlValue> | null, opts: { patches?: PatchConnection[]; ms?: number; data?: unknown } = {}) {
     this.stopAudition();
     const slot = this.slots.get(instance);
     if (!slot) return;
     this.ensureAudio();
     const ms = opts.ms ?? 2600;
-    if (values) {
+    const dataOverride = opts.data !== undefined;
+    if (values || dataOverride) {
       slot.auditioning = true;
-      Object.entries(values).forEach(([k, v]) => slot.engine.setParam(k, v));
+      Object.entries(values ?? {}).forEach(([k, v]) => slot.engine.setParam(k, v));
       if (opts.patches) slot.engine.setPatches(opts.patches);
+      if (dataOverride) slot.engine.setData(opts.data);
     }
     const timers = this.auditionTimers;
     const api = {
@@ -707,13 +710,19 @@ class EngineHub {
     const stopPhrase = (slot.module.audition ?? defaultAudition(slot.module, slot.instance))(api) || undefined;
     const restore = () => {
       stopPhrase?.();
-      if (values) {
+      if (values || dataOverride) {
         slot.auditioning = false;
         // Push the real values back
         const real = this.valuesFor(instance);
-        Object.keys(values).forEach(k => slot.engine.setParam(k, real[k]));
+        Object.keys(values ?? {}).forEach(k => slot.engine.setParam(k, real[k]));
         slot.values = real;
         if (opts.patches) slot.engine.setPatches(slot.patches);
+        if (dataOverride) {
+          // The real data, as the store holds it now (edits during the audition were held back)
+          const d = useStudioStore.getState().devices[instance]?.data;
+          slot.data = d;
+          slot.engine.setData(d);
+        }
       }
     };
     this.auditionStop = restore;

@@ -271,6 +271,12 @@ export interface LessonStep {
     master?: { a: LessonMasterPatch; b: LessonMasterPatch };
     /** Studio-wide settings per side (swing 0..0.75) */
     studio?: { a: { swing?: number }; b: { swing?: number } };
+    /**
+     * Elektron pattern settings per side: { [instance or device]: { swing } }. Every pattern of
+     * the instrument plays with them while the side plays (whichever pattern the song is on);
+     * the learner's patterns are not changed.
+     */
+    patterns?: { a: Record<string, LessonPatternPatch>; b: Record<string, LessonPatternPatch> };
     /** Start the A/B from this song section (by name), so both sides play the same part of the song */
     from?: string;
   };
@@ -281,6 +287,12 @@ export interface LessonStep {
     patches?: PatchConnection[];
     /** Allowed knob-travel error 0..1 (default 0.08) */
     tolerance?: number;
+    /**
+     * v3: an Elektron pattern setting to match by ear on the step's instrument (its active
+     * pattern), next to or instead of `controls`. `start` is set when the step begins. The
+     * tolerance is knob travel too: SWING's travel is 50..80 %, so 0.1 is ±3 %.
+     */
+    pattern?: { target: { swing: number }; start?: { swing: number } };
   };
   quiz?: MultipleChoice;
   reflect?: { prompt: string; model: string };
@@ -338,6 +350,56 @@ export interface LessonStep {
    * snapshot, merged with what the snapshot already holds.
    */
   capture?: { instance: string; controls: string[]; label?: string };
+}
+
+/**
+ * Settings of an Elektron sequencer pattern (Analog Rytm, Analog Four) that lessons can A/B,
+ * match and set like controls (Lesson API v3). On the hardware they live in the pattern, not
+ * in a knob: SWING in the SWING menu, LENGTH in the SCALE menu.
+ */
+export interface LessonPatternPatch {
+  /** SWING, 50 (straight) .. 80 %: every swing trig (by default every second 16th) plays (swing - 50) / 50 of a step late */
+  swing?: number;
+  /** LENGTH in steps, 1..64. A longer length copies the existing pages into the new ones, as the SCALE menu does */
+  length?: number;
+}
+
+/** A trig on an Elektron sequencer, as a lesson solution writes it (the shared sequencer's Step) */
+export interface LessonTrig {
+  /** MIDI note (60 = C4) */
+  note?: number;
+  vel?: number;
+  /** Note length: an index into NOTE_LENGTHS (14 = one step, 1/16) */
+  len?: number;
+  /** Micro timing, -23..23 (1/384 of a whole note) */
+  micro?: number;
+  /** Trig condition: '1:2' … '8:8', 'X%', FILL, !FILL, PRE, !PRE, NEI, !NEI, 1ST, !1ST */
+  cond?: string;
+  /** Parameter locks: lock key (the control id without the track prefix) -> value */
+  locks?: Record<string, number>;
+  /** A lock trig: parameters only, no note */
+  trigless?: boolean;
+  accent?: boolean;
+  slide?: boolean;
+  pslide?: boolean;
+  retrig?: { rate: number; len: number; vel: number };
+}
+
+/**
+ * Elektron sequencer edits in a lesson solution: set or clear trigs on one track. Trigs are
+ * numbered 1..64 like the trig keys (and the lesson text): trig 17 is page 2's first key.
+ */
+export interface LessonSequenceEdit {
+  /** Instance or device (default: the step's instrument) */
+  instance?: string;
+  /** Pattern id (default: the instrument's active pattern) */
+  pattern?: string;
+  /** Track index, 0-based (Analog Rytm BD 0 … CB 11, FX 12; Analog Four T1 0 … T4 3) */
+  track: number;
+  /** Remove every trig of the track first */
+  clear?: boolean;
+  /** Trig number (1-based) -> its fields (merged into what is there, locks too) or null to remove it */
+  trigs: Record<number, LessonTrig | null>;
 }
 
 /** A studio master section patch (lesson A/B, solutions) */
@@ -430,10 +492,19 @@ export interface LessonSolution {
   master?: LessonMasterPatch;
   /** Studio mixer channel strips: { [instance or device]: fader dB, pan, sends... } */
   channels?: Record<string, { gain?: number; pan?: number; mute?: boolean; solo?: boolean; sendA?: number; sendB?: number }>;
-  /** Studio tempo, swing and routing */
-  studio?: { bpm?: number; swing?: number; routes?: Record<string, string>; sync?: Record<string, boolean> };
-  /** Replace the song (same shape as a start state's arrangement) */
-  arrangement?: LessonStudioStart['arrangement'];
+  /**
+   * Studio tempo, swing, routing and rack. `routes`: { [instance or device]: 'master' or
+   * '<mixer instance or device>:<input>' } - an instrument's Output, e.g. 'xone96:studio_1'.
+   * `rack`: the rack holds at least `count` (default 1) instruments of each device, adding
+   * them as Instruments… → Add another does. A second instance is '<device>#2', and solutions
+   * can name it that way.
+   */
+  studio?: { bpm?: number; swing?: number; routes?: Record<string, string>; sync?: Record<string, boolean>; rack?: { device: string; count?: number }[] };
+  /**
+   * The song arranger: `sections` replace the song (same shape as a start state's, parts by
+   * instance or device); `enabled` and `loop` switch it, keeping the sections when none are given
+   */
+  arrangement?: { enabled?: boolean; loop?: boolean; sections?: NonNullable<LessonStudioStart['arrangement']>['sections'] };
   /**
    * Arranger snapshots to capture, in order: the instrument's current knobs (or only
    * `controls`) become the snapshot of that section (by name, case-insensitive)
@@ -450,6 +521,13 @@ export interface LessonSolution {
   pressUntilDone?: string;
   /** Record with REC for `seconds` (optionally with stems) */
   record?: { seconds: number; stems?: boolean };
+  /** Elektron pattern settings on an instrument's active pattern: { [instance or device]: { swing, length } } */
+  patterns?: Record<string, LessonPatternPatch>;
+  /**
+   * Elektron sequencer edits, in order: trigs set or cleared on the learner's pattern (not a
+   * replacement of the whole project, so they also work in the learner's own studio)
+   */
+  sequence?: LessonSequenceEdit[];
 }
 
 export interface MultipleChoice {

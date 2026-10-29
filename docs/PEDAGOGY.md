@@ -154,9 +154,10 @@ well as quiz steps and `review` questions.
 Studio lessons (`device: 'studio'`) teach the whole studio: the mix, the master, the song and
 the bounce. These fields are additive; every earlier lesson keeps working. The Producer path
 (`path: 'producer'`, ids `studio-producer-…`, `docs/research/producer-path/curriculum.md`) is
-built on them. Its lessons live in `lib/studio/producerLessons.ts` and load on demand
-(`lib/studio/producerIndex.ts` lists their ids up front, so Daily Review keeps their questions
-while they load).
+built on them: all 15 lessons, L1 First beat to L15 the Capstone. They live in
+`lib/studio/producerLessons.ts` (which also takes in `producerElektronLessons.ts`) and load on
+demand (`lib/studio/producerIndex.ts` lists their ids up front, so Daily Review keeps their
+questions while they load).
 
 ### A whole studio to start from
 
@@ -181,11 +182,21 @@ dialog lists every saved studio. Bringing one back swaps: the studio you have th
 its place. `restoreStudioBackup(id)`, `deleteStudioBackup(id)` and `useOwnStudio()` are the
 store actions.
 
-`lib/studio/producerStudio.ts` builds the Producer path's studio, "Tide Pool": the Studio
-Clock, a DFAM percussion loop clocked by cable, and the Xone:96, whose built-in decks play the
-stems (drums, bass, stabs, pad, perc) and follow the studio clock like MIDI-synced machines.
-Each lesson's checkpoint is that studio plus its changes (`CP_MUDDY`, `CP_SPACED`, `CP_ROUGH`,
-`CP_MIXED`, `songSections()`...).
+The Producer path has two studios. `lib/studio/producerElektron.ts` builds the learner's own
+track, "Low Tide" (L1-L3, L5, L6, L8 and the Capstone, `producerElektronLessons.ts`): the
+Studio Clock, an Analog Rytm on Xone:96 channel 1 and an Analog Four on channel 2, both synced,
+with Demo 1's sounds (the Rytm kit and the A4 kit PRODUCER) and, from L6, the Sub 37 on
+channel 3. Its checkpoints (`CP_00` … `CP_08`, `CP_CAPSTONE`) are written in the instruments'
+own data formats: Elektron patterns from `rytmPattern` / `a4Pattern` with trigs numbered like
+the trig keys. `lib/studio/producerStudio.ts` builds "Tide Pool" for the studio lessons (L4,
+L7, L9-L14): the Studio Clock, a DFAM percussion loop clocked by cable, and the Xone:96, whose
+built-in decks play the stems (drums, bass, stabs, pad, perc) and follow the studio clock like
+MIDI-synced machines (`CP_MUDDY`, `CP_SPACED`, `CP_ROUGH`, `CP_MIXED`, `songSections()`...).
+
+In the Producer path the app follows the steps: when a step begins, a step with an `instance`
+shows that instrument and a step with an `area` shows the studio. On a touch screen the coach
+floats over the panel; when a step begins it moves to the corner that hides the least of what
+the step highlights (its `focus`), so a trig key or pad the learner must tap is never under it.
 
 ### What checks can read
 
@@ -230,6 +241,8 @@ store re-evaluates the step a few times a second; live checklists refresh on the
 | `listen.master`, `listen.studio` | A/B the master section (`{ gain, glue, eq }`) or studio settings (`{ swing }`) |
 | `listen.matchLoudness` | both sides play at the same loudness: each side is measured on the master meter (momentary LUFS) and the louder one is turned down after the meter, so "louder" never wins by default. The coach shows the gain it applied |
 | `listen.from` | start the A/B at a song section, so both sides play the same part |
+| `listen.patterns` | A/B Elektron pattern settings: `{ a: { [instance or device]: { swing } }, b: … }`. While a side plays, every pattern of that Analog Rytm or Analog Four plays with that SWING (so does the song); the learner's patterns don't change |
+| `match.pattern` | match an Elektron pattern setting by ear on the step's instrument, next to or instead of `controls`: `{ target: { swing: 64 }, start?: { swing: 50 } }`. `start` is set when the step begins; A · Target plays the target SWING, Check compares the active pattern's SWING in knob travel (50..80 %, so `tolerance: 0.1` is ±3 %) |
 | `readout` | live numbers under the step: `'loudness'`, `'peaks'`, `'limiter'`, `'channels'` |
 | `area` | where the step happens (`'mixer'`, `'master'`, `'arranger'`, `'transport'`, `'rack'`): the coach offers to take the learner there. A step with an `instance` gets "Open <instrument>" |
 | `capture` | arranger snapshots of chosen controls: `{ instance, controls, label? }` gives one button per section that stores just those controls (merged into the section's snapshot), so a section can switch what plays without freezing the rest of the mix |
@@ -246,3 +259,37 @@ for timed solutions, plays, bounces or records for real and waits for the meters
 would. `npm run validate` checks every start studio against the real instruments (devices,
 values, routes, cables, jacks) and every step's instance, controls, A/B values, match targets
 and solutions, and runs every check on an empty studio and on the start studio.
+
+Routes and the song work in **device lessons too** (the runner and "show me" apply them
+wherever a lesson runs): `studio.routes: { 'analog-rytm': 'xone96:studio_1', dfam: 'master' }`
+names the instrument and the mixer by instance or device, and `arrangement` replaces the song
+(`sections`, parts by instance or device) or only switches it (`{ enabled: true }`).
+
+**Elektron sequencers** (Analog Rytm, Analog Four) keep their patterns as device data
+(`docs/ELEKTRON_SEQUENCER.md`), so solutions edit that data instead of replacing it - they then
+also work in the learner's own studio:
+
+| Field | What it does |
+|---|---|
+| `patterns` | pattern settings on an instrument's active pattern: `{ 'analog-rytm': { swing: 56 }, 'analog-four': { length: 64 } }`. A longer LENGTH copies the existing pages into the new ones, like the SCALE menu |
+| `sequence` | trig edits, in order: `[{ instance?, pattern?, track, clear?, trigs: { 1: {}, 5: { vel: 45 }, 13: { cond: '1:2' }, 3: null } }]`. Tracks are indices (Rytm BD 0 … CB 11, FX 12; Analog Four T1 0 … T4 3); **trigs are numbered 1..64 like the trig keys** and the lesson text. A trig's fields (`note`, `vel`, `len` as a NOTE_LENGTHS index, `micro`, `cond`, `locks`, `trigless`, `accent`, `slide`, `pslide`, `retrig`) merge into what is there; `null` removes it. New Analog Four trigs take the track's NOTE, VEL and LEN, as the hardware stamps them |
+
+The check helpers for them number trigs the same way: `proj(s, dev)`, `pat(s, dev, pattern?)`,
+`trigs(s, dev, track)` (trig numbers holding note trigs), `hasTrigs(s, dev, track, [1, 5, 9, 13])`,
+`trig(s, dev, track, n)` (the step), `noteOf`, `velOf`, `lenOf` (in steps), `lockedTrigs(s, dev,
+track, 'flt1_frq')`, `conditions(s, dev)`, `lockCount`, `busyTracks`, `pswing` and `plen` (the
+pattern's SWING and LENGTH), `barOf(n)`, and for pitch `pc`, `A_MINOR`, `A_MINOR_PENTA`, `oneKey`.
+
+```ts
+{ kind: 'predict', instance: 'analog-rytm', focus: ['key:func', 'key:bank:G'],
+  instruction: 'Set the pattern\'s SWING to 58 %: [FUNC] + [BANK G], then [UP].',
+  check: s => between(pswing(s, 'analog-rytm'), 55, 62),
+  solution: { patterns: { 'analog-rytm': { swing: 58 } } }, … }
+{ kind: 'match', instance: 'analog-rytm',
+  instruction: 'Recreate the target groove by ear: set the SWING.',
+  match: { target: {}, controls: [], pattern: { target: { swing: 64 }, start: { swing: 50 } }, tolerance: 0.1 } }
+```
+
+**Demo excerpts** (`info.play`, `listen.demo` in the curriculum) wait for the demo tracks
+(`lib/studio/demos`, built on `wip/demo-tracks`): until they merge, hooks are info steps with
+the Rytm or Analog Four's own audition, and the A/B hooks compare the learner's own track.
