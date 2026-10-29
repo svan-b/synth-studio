@@ -901,7 +901,12 @@ function Readout({ c, w }: { c: C; w: number }) {
   } else if (isStepMode(v)) text = `STEP · ${loc} · ${len} steps · page ${['1-8', '9-16', '17-24', '25-32'][shownPage(c)]}${u.pagePinned ? ' (held)' : ''} · step = on/off · SHIFT + step = edit${c.engine.playing ? ` · ▶ ${String(pos + 1).padStart(2, '0')}` : ''}`;
   else {
     const tr = typeof c.engine.transpose === 'number' && c.engine.transpose !== 0 ? ` · TRANSPOSE ${(c.engine.transpose as number) > 0 ? '+' : ''}${c.engine.transpose}` : '';
-    const clock = c.engine.extClock ? `TEMPO CLOCK ${dv}` : c.engine.synced ? `STUDIO CLOCK ${dv}` : dv;
+    // A TEMPO-jack clock: each pulse is a step (SINGLE CLOCK ADVANCE), the division applies to an
+    // ANALOG CLOCK at the Setup page 4 PPQN, and STEP ADDRESS CV picks steps by voltage (manual p.55)
+    const tmode = Math.round(num(v.tempo_mode, 1));
+    const clock = c.engine.extClock
+      ? (tmode === 1 ? 'TEMPO CLOCK · ONE STEP PER PULSE' : tmode === 2 ? `TEMPO CLOCK ${dv} · ${PPQN_VALUES[Math.max(0, Math.min(15, Math.round(num(v.clock_in_ppqn, 3))))]} PPQN` : 'TEMPO CV · STEP ADDRESS')
+      : c.engine.synced ? `STUDIO CLOCK ${dv}` : dv;
     const extras = `${dir ? ` · ${DIRECTIONS[dir]}` : ''}${num(v.swing, 50) !== 50 ? ` · SWING ${Math.round(num(v.swing, 50))}%` : ''}`;
     const pend = u.pendingLoc !== undefined ? ` · NEXT ${locName(u.pendingLoc)}` : '';
     text = c.engine.armed ? `ARMED · waiting for a clock at TEMPO · ${loc}`
