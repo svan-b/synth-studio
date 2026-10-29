@@ -257,7 +257,7 @@ export const SUB37_PRESETS: Record<string, PresetSpec> = {
   boom_bah_arp: preset("Arp / Boom-Bah Arp", "An arpeggio that alternates low \"boom\" and high \"bah\": RANGE +1 with INVERT plays each note and then its octave before moving on (C, C', E, E'…). Recreation of the Sub 37 factory preset “BOOM BAH” (bank 3, preset 13, ARP); Moog's own settings are not published, so these are ours. Play: Hold a two- or three-note chord low on the keyboard; it bounces between octaves.", 3, 4, {
     preset_volume: 100, osc1_octave: 0, osc2_octave: 0, osc2_wave: 67, mix_osc1: 60, mix_sub: 30, mix_osc2: 40,
     cutoff: 450,
-    resonance: 30, multidrive: 30, filter_eg_amt: 60, feg_decay: 180, feg_sustain: 0, feg_release: 120,
+    resonance: 30, multidrive: 20, filter_eg_amt: 60, feg_attack: 3, feg_decay: 180, feg_sustain: 0, feg_release: 120,
     feg_multi_trig: true, aeg_sustain: 30, aeg_release: 150, aeg_multi_trig: true, arp_on: true, arp_sync: true,
     arp_div: 13, arp_oct_range: 4, arp_invert: true,
   }),

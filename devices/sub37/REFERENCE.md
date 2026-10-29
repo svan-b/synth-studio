@@ -69,7 +69,9 @@ GENERATORS · OUTPUT. **verified** for the sections and their contents (Subseque
 pp.12-34); positions are from the Quickstart legend (S2, **likely**). The twin draws a 660 mm face
 at 2 px/mm. PROGRAMMING is widened from 41 to 50 mm so the LCD can be read on an iPad, and the top
 knob row sits 4 mm lower than on the hardware, so the legible-size legends above the stepped knobs
-have room. The jacks of the left cheek sit beside the wheels.
+have room. The jacks of the left side panel sit beside the wheels: the PITCH, FILTER and VOLUME CV
+inputs in one column, KB GATE, EXT IN and AUDIO OUT in the other, EXT IN just above AUDIO OUT as on
+the hardware (p.8).
 
 ### PROGRAMMING (Subsequent 37 manual, pp.12-14)
 

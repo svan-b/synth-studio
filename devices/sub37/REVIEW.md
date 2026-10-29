@@ -26,7 +26,10 @@ on the iPad by hit-testing (`elementFromPoint`): SLOPE 67 × 30 px, KNOB SHIFT 6
 CONTROLLERS 52 × 27, PRESET 1-16 52 × 32, glide OSC / TYPE 48 × 31 / 39, KB CTRL 44 × 34, BANK
 33 × 33, MOD DEST 30 × 25, the PROGRAMMING buttons 22-38 × 19-32 (▼ ▲ CURSOR are 14 mm apart), RANGE
 39 × 17 (boxed in by BACK / FORTH). No built-in control lost touch area (checked before / after). Two-finger
-BANK + LATCH, three-finger KB OCTAVE + key and hold-DEST-and-turn work by touch.
+BANK + LATCH, three-finger KB OCTAVE + key and hold-DEST-and-turn work by touch. So do the keys and
+wheels (checked with multi-touch events): with the arpeggiator's LATCH lit, a three-finger chord keeps
+running after release, the next chord replaces it and a key added while another is held joins; LATCH
+off stops it; the MOD wheel stays where it is left and the PITCH wheel springs back to 0.
 
 ### P1. "5 or below delivers a clean signal to the filter" (p.27) was not true
 
@@ -49,8 +52,9 @@ it, and it was mostly a volume knob: a saw gained 6 dB at 2 and 11 dB at 4.
 **Fix**: drive 0.5 at 0 (clean) to 40 at 10 into the same asymmetric curve; its make-up now rides on
 the VCA gain (so a PGM DST FILT DRV modulation keeps its level too) and falls as the stages saturate.
 Measured at the mixer's 5: 1.8 % THD at 1 and 5 % at 2 with even ≈ odd harmonics (the warmth), 12 %
-at 3, 27 % at 5, 42 % odd hard clipping at 10. A full-scale tone gains about 5 dB by 2 and never more
-than 6 dB (was 9); quiet signals still gain as before at low settings, so presets keep their balance.
+at 3, 27 % at 5, 42 % odd hard clipping at 10. A saw at the mixer's 5 (cutoff 1.5 kHz) now gains
+5 dB by 2 and 7 dB by 4, then levels off at 8.5 dB as the clipping squares it off (was 6, 11 and 10 dB
+at 2, 4 and 10); quiet signals gain as before at low settings, so presets keep their balance.
 
 ### P2. Four "clock-synced" presets ignored the studio tempo
 
@@ -96,6 +100,23 @@ section titles moved 1 mm so they reach 9.5 px; glide LCR / LCT / EXP are spaced
 the LCD and PROGRAMMING names use the iPadOS condensed faces when Arial Narrow is missing, and the
 PRESET / step labels are larger. What is left is structural (below).
 
+### P3. Side-panel jacks out of order
+
+The manual puts EXT IN "just above the AUDIO OUT jack" (p.8); the twin had it at the opposite corner,
+and KB GATE beside AUDIO OUT, so the two longest names shared a row and both shrank to 6.1 px on the
+iPad. **Fix**: PITCH, FILTER and VOLUME in one column; KB GATE, EXT IN and AUDIO OUT in the other
+(EXT IN above AUDIO OUT). KB GATE now fits at 7.3 px, the smallest jack name at 6.5 px. Jack ids are
+unchanged, so saved cables still connect.
+
+### P3. Boom-Bah Arp: a clipped edge read as a click
+
+The audio QA flagged one "mid" click in Boom-Bah Arp in most runs. Captured with the control
+processor's channels alongside: no control value steps; the flagged sample is the first oscillator edge
+after the filter envelope snaps open (1 ms attack, EG AMT 6), clipped by MULTIDRIVE 3 into a step 8×
+steeper than anything in the 50 ms around it. That is what the circuit does, but it is a tick rather
+than a "bah". **Fix**: MULTIDRIVE back to 2 (its value before this review) and a 3 ms filter attack:
+0 flags in 10 captures (2 in 4 before).
+
 ## Left as they are (P3)
 
 - **CUTOFF legend vs taper.** The printed legend (500 Hz at 12 o'clock, 1.2 kHz and 320 Hz at ±45°)
@@ -104,8 +125,9 @@ PRESET / step labels are larger. What is left is structural (below).
   readout show the true value and no lesson relies on the marks. Fixing it needs a custom taper in
   `lib/controls/mapping.ts` (outside this device).
 - **Dense legends on iPad.** The MOD DEST LED names (6.9 px), the MOD SOURCE and WAVE positions
-  (6-8 px) and the jack names stay small: the iPad fit (0.82) is below the 0.85 the panel's text
-  floors assume, and the panel is as dense as the hardware's. The LCD shows any control you touch.
+  (6-8 px) and the jack names (6.5-8.5 px) stay small: the iPad fit (0.82) is below the 0.85 the
+  panel's text floors assume, and the panel is as dense as the hardware's. The LCD shows any control
+  you touch.
 - **Envelope times** reach −60 dB at the knob's time (the audible decay is about a third of it); the
   manual gives no definition (model choice, REFERENCE.md).
 - **VCA LEVEL** as a MOD DEST swings the VCA from 0 to 2× at MOD AMT 5 (+6 dB peaks); real VCAs have a
@@ -116,8 +138,8 @@ PRESET / step labels are larger. What is left is structural (below).
   HIGH, LAST. Changing it would change saved values.
 - **Arpeggiator DWN with RANGE** reverses the whole up cycle (a falling run over the range); the manual
   does not say how DWN orders octaves.
-- One Boom-Bah Arp capture in the baseline audio QA showed a single −2.7 dBFS step (a capture dropout
-  under the shared CPU load, not reproducible in five later runs).
+- **Everything up** (all five mixer channels, RESONANCE, MULTIDRIVE and VOLUME at 10) peaks at
+  +0.1 dBFS on the instrument output (was +2.3); the studio's master limiter (−1 dBTP) catches it.
 
 ## The 17 differences in `docs/research/sub37/sources.md` §6
 

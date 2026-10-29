@@ -290,11 +290,13 @@ const elements: PanelElement[] = [
   // ===== left side panel (jacks), wheels, keyboard ===========================================
   { kind: 'section', x: 1.5, y: KEYS_Y, w: 39, h: H - KEYS_Y - 3, border: '1px solid #2e2e2e', background: '#0d0d0d', radius: 1.2 },
   small('LEFT SIDE PANEL', 21, KEYS_Y + 4, { size: 6, letterSpacing: 1 }),
-  { kind: 'jack', jack: 'in_ext', x: 11, y: 183 },
-  { kind: 'jack', jack: 'in_pitch', x: 31, y: 183 },
+  // The three CV inputs in one column; EXT IN sits just above AUDIO OUT (p.8). Each long legend
+  // shares its row with a short one, so neither has to shrink much
+  { kind: 'jack', jack: 'in_pitch', x: 11, y: 183 },
+  { kind: 'jack', jack: 'in_gate', x: 31, y: 183 },
   { kind: 'jack', jack: 'in_filter', x: 11, y: 204 },
-  { kind: 'jack', jack: 'in_volume', x: 31, y: 204 },
-  { kind: 'jack', jack: 'in_gate', x: 11, y: 225 },
+  { kind: 'jack', jack: 'in_ext', x: 31, y: 204 },
+  { kind: 'jack', jack: 'in_volume', x: 11, y: 225 },
   { kind: 'jack', jack: 'out_audio', x: 31, y: 225 },
   // The PITCH wheel springs back, so lessons count "pushed all the way" as the events
   // pitch_wheel_up / pitch_wheel_down
