@@ -46,7 +46,7 @@ const RYTM_KIT = kitValues({
   cp: { machine: 'CP CLASSIC', ton: 72, num: 2, rat: 50, nod: 48, nol: 80, rnd: 25, cpd: 50, lev: 118, flt_typ: 4, flt_frq: 41, amp_rev: 45, amp_pan: 0, amp_vol: 127 },
   // XT CLASSIC tunes half a semitone a step from 36.7 Hz: +28 is E2 (82.4 Hz), the fifth
   lt: { machine: 'XT CLASSIC', tun: 28, dec: 40, swd: 30, swt: 50, nol: 20, nod: 30, flt_typ: 0, flt_frq: 127, amp_del: 25, amp_pan: -12, amp_vol: 85 },
-  ch: { machine: 'CH CLASSIC', tun: 0, col: 10, dec: 24, lev: 115, trk_lev: 104, flt_typ: 4, flt_frq: 58, amp_pan: 8, amp_vol: 127 },
+  ch: { machine: 'CH CLASSIC', tun: 0, col: 10, dec: 24, lev: 115, trk_lev: 104, flt_typ: 4, flt_frq: 58, amp_pan: 8, amp_vol: 85 },
   oh: { machine: 'OH CLASSIC', tun: 0, col: 10, dec: 55, lev: 100, flt_typ: 4, flt_frq: 58, amp_rev: 10, amp_pan: 8, amp_vol: 79 },
   cy: { machine: 'CY RIDE', tun: 0, typ: 1, hit: 30, dec: 60, c1: 90, c2: 64, c3: 64, lev: 90, flt_typ: 4, flt_frq: 64, amp_rev: 15, amp_pan: 25, amp_vol: 66 },
 }, {

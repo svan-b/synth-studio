@@ -51,7 +51,7 @@ const RYTM_KIT = kitValues({
   // tuned toms: XT CLASSIC is half a semitone a step from 36.7 Hz - +34 is G2, +48 is D3
   lt: { machine: 'XT CLASSIC', tun: 34, dec: 50, swd: 30, swt: 50, nol: 25, nod: 30, flt_typ: 0, flt_frq: 127, amp_del: 40, amp_pan: -15, amp_vol: 58 },
   mt: { machine: 'XT CLASSIC', tun: 48, dec: 50, swd: 30, swt: 50, nol: 25, nod: 30, flt_typ: 0, flt_frq: 127, amp_del: 40, amp_pan: 15, amp_vol: 55 },
-  ch: { machine: 'CH CLASSIC', tun: 0, dec: 22, col: 10, lev: 100, flt_typ: 4, flt_frq: 62, amp_pan: 10, amp_vol: 89 },
+  ch: { machine: 'CH CLASSIC', tun: 0, dec: 22, col: 10, lev: 100, flt_typ: 4, flt_frq: 62, amp_pan: 10, amp_vol: 60 },
   oh: { machine: 'OH CLASSIC', tun: 0, dec: 55, col: 10, lev: 100, flt_typ: 4, flt_frq: 62, amp_pan: 10, amp_vol: 82 },
   // the 808 cowbell's 540 / 800 Hz pair: DET 54 is +6.8 semitones on this twin
   cb: { machine: 'CB CLASSIC', tun: 0, cdet: 54, dec: 30, lev: 90, flt_typ: 4, flt_frq: 60, amp_del: 40, amp_pan: -20, amp_vol: 97 },
