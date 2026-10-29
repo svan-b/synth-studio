@@ -51,13 +51,14 @@ its own `wip/*` branch on GitHub, committed but **not yet merged or browser-veri
 - 2a41240: merged **Mother-32** (QA 0/43 for keys and transport, lessons 19/19, check 18/18). Upgrade store v8 covers the flipped switches, VCF MOD amount and polarity, ranges, per-step gates and the old default sequence.
 - 9e75bfa: merged the **DFAM review** (QA 0/40, lessons 20/20, 0 manual). Upgrade store v9: untouched SEQ PITCH MOD keeps VCO 1&2. The audio-QA click threshold for the DFAM is 2, for its lo-fi crackle.
 - 7a606eb: merged **Subharmonicon** (QA 0/36 for audition and transport, lessons 20/20, in-app check passing). Upgrade store v10 covers TEMPO 240, EG AMT ×0.625 and the 5 ms decay floor.
+- c05786b: merged **Analog Rytm MKII** (QA 0/20 for audition and transport, lessons 20/20, in-app check 29/29). 391 of 421 ids were replaced, so **old Rytm settings start fresh** by design; completed rytm-* lessons carry over. Upgrade store v11. **All seven instrument rebuilds are now merged.**
+- Smoke test fix: buttons that a paged panel removed are skipped after 1 s; the Rytm smoke went from 498 s to 34 s (the app was never slow, at 67–125 ms per press).
 - Still running:
-  - the **Analog Rytm** finisher (kit loudness and lessons)
   - the **producer-path** agent (lesson-engine hooks and first studio lessons)
   - **independent expert reviews** against the manuals, as was done for the DFAM, for the Analog Four, Sub 37, Mother-32, Subharmonicon and Xone:96, each pushing to `wip/review-<id>`
 - Next:
   - merge each review through the gate, with upgrade entries for any changed defaults
-  - merge the Rytm, then review it
+  - review the Rytm
   - add the producer-path lessons for the Elektrons and Sub 37
   - build the three demo tracks
   - regenerate the audio-QA baseline for every instrument
