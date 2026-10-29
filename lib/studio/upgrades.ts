@@ -72,10 +72,75 @@ const UPGRADES: Upgrade[] = [
       return out;
     },
   },
+  {
+    // Sub 37 rebuild to the Subsequent 37 manual (pages in devices/sub37/REFERENCE.md):
+    // the arpeggiator and OSC 2 keyboard control were redesigned, key tracking is
+    // centred on MIDI 48 (was 60) and only shortens decay/release, the mod busses
+    // got the real destination lists, and glide covers 15.1 ms - 6 s.
+    store: 7,
+    project: 4,
+    device: 'sub37',
+    oldDefaults: {
+      mix_osc1: 80, cutoff: 1200, filter_kb_amt: 50, filter_eg_amt: 40,
+      feg_attack: 5, feg_decay: 400, feg_sustain: 30, feg_release: 300, feg_vel_amt: 50,
+      aeg_attack: 2, aeg_sustain: 80, aeg_release: 200, aeg_vel_amt: 50,
+      glide_time: 150, glide_type: 1,
+      arp_mode: 0, arp_range: 2, osc2_kb_ctrl: true, duo_mode: false,
+      mod1_pgm_dest: 0, mod1_pgm_amt: 0, mod2_pgm_dest: 0, mod2_pgm_amt: 0,
+    },
+    apply: v => {
+      const o: Values = { ...v };
+      const num = (k: string, d = 0) => (typeof o[k] === 'number' ? (o[k] as number) : d);
+      // Arpeggiator: same patterns at new indices; range gains two states (0 moves from index 2 to 3).
+      // The old arp stepped once per beat with a 55 % gate.
+      o.arp_pattern = num('arp_mode');
+      o.arp_oct_range = num('arp_range', 2) + 1;
+      o.arp_div = 10;
+      o.arp_gate = 55;
+      delete o.arp_mode;
+      delete o.arp_range;
+      // OSC 2 keyboard control: a bool became OFF/LO/HI, which only acts in DUO MODE
+      const wasDuo = o.duo_mode === true;
+      if (o.osc2_kb_ctrl === false) {
+        // OSC 2 droned: keep that with KB CTRL OFF in DUO, at the same pitch (FREQUENCY spans ±3 oct there)
+        o.kb_ctrl = 0;
+        o.duo_mode = true;
+        o.osc2_frequency = num('osc2_frequency') * 7 / 36;
+      } else {
+        o.kb_ctrl = 2;
+      }
+      if (wasDuo) o.key_priority = 1; // the old OSC 1 took the lowest key
+      delete o.osc2_kb_ctrl;
+      // Key tracking now pivots on MIDI 48: shift the base so every key keeps its cutoff and times
+      const fkb = num('filter_kb_amt', 50);
+      o.cutoff = Math.min(20000, Math.max(20, num('cutoff', 1200) * Math.pow(2, -fkb / 100)));
+      for (const eg of ['feg', 'aeg']) {
+        const amt = num(`${eg}_kb_amt`);
+        if (!amt) continue;
+        for (const stage of ['decay', 'release']) {
+          const k = `${eg}_${stage}`;
+          if (typeof o[k] === 'number') o[k] = Math.min(10000, (o[k] as number) * Math.pow(2, amt / 100));
+        }
+      }
+      // Mod busses: the PGM destination (WAVE, RES, EG TIME, AMP) maps onto MOD DEST / PGM DEST
+      for (const n of [1, 2]) {
+        const dest = num(`mod${n}_pgm_dest`);
+        if (dest === 0) o[`mod${n}_dest`] = 3;
+        else if (dest === 1) { o[`mod${n}_dest`] = 6; o[`mod${n}_pgm_dst`] = 1; }
+        else if (dest === 2) { o[`mod${n}_dest`] = 6; o[`mod${n}_pgm_dst`] = 0; }
+        else if (dest === 3) o[`mod${n}_dest`] = 1;
+        o[`mod${n}_mod_amt`] = num(`mod${n}_pgm_amt`);
+        delete o[`mod${n}_pgm_dest`];
+        delete o[`mod${n}_pgm_amt`];
+      }
+      if (typeof o.glide_time === 'number') o.glide_time = Math.min(6000, Math.max(15.1, o.glide_time));
+      return o;
+    },
+  },
 ];
 
-export const STORE_VERSION = 6;
-export const PROJECT_VERSION = 3;
+export const STORE_VERSION = 7;
+export const PROJECT_VERSION = 4;
 
 /**
  * Upgrade the control values of every instance saved before version `from`
