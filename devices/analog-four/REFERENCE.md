@@ -125,10 +125,14 @@ NOISE (digital)┘                                                     │      
 | PW per wave | SAW: a second, phase-shifted saw, single again at the centre or the extremes. TRP and PUL: the width, muted at the extremes. TRI: towards a reversed saw | (A4 MKII manual, p.72) |
 | Sub oscillators | 1OCT: square at 1/2 f. 2OCT: square at 1/4 f. 2PUL: 25 % pulse two octaves down. **5TH: 33 % pulse a perfect fifth below, at 2/3 f.** PW and PWM leave the sub alone; WAV OFF leaves the sub on | (A4 MKII manual, p.72-73) |
 | LEV | The oscillator and its sub together; 100 is the normal level | (A4 MKII manual, p.73, p.87) |
-| FDB (OSC 1) | The ladder output becomes OSC 1's source at LEV1; high levels self-oscillate | (A4 MKII manual, p.73) |
+| FDB (OSC 1) | The ladder output becomes OSC 1's source at LEV1; moderate levels overload what OSC 2 feeds in, high levels self-oscillate (the twin: AC-coupled at 25 Hz, loop gain 1.3 at LEV 127, so it oscillates from about LEV 100 with low resonance, its pitch set by the cutoff) | (A4 MKII manual, p.73) |
 | NEI (OSC 2) | The multimode output of the track before (1 → 2, 2 → 3, 3 → 4); nothing on track 1. The twin keeps the feeding voice's oscillators and filters running while its VCA is closed, like the analog original, so the next track always hears it | (A4 MKII manual, p.73, p.88) |
 | AM | Osc 1 switched by osc 2's pulse (AM1), or the reverse (AM2); it still works on FDB, NEI and inputs | (A4 MKII manual, p.73, p.88) |
 | Sync | SMD: OFF, 1>2, 2>1, metal; SNC 127 = hard, lower = soft | (A4 MKII manual, p.88) |
+| Auto bend (BND) | Every trigged note starts offset by BND and glides to its pitch in the SLI time; with sync on only the synced oscillator bends (the twin: 0.5 semitone a step, both oscillators for metal sync) | (A4 MKII manual, p.88) |
+| Accent | An accent trig raises the level and deepens the filter envelope (the twin: VCA x (1 + ACC/127), ENV F depth on both filters x (1 + 0.8 ACC/127)); ACC is set in the ACCENT menu with TRACK LEVEL | (A4 MKII manual, p.51-52) |
+| Portamento, legato mode | SOUND SETTINGS PORTAMENTO (OFF, ON, LEGATO) and LEGATO MODE act only on notes played on the keyboard or from MIDI, never on sequencer notes; LEGATO portamento needs LEGATO MODE on. Slide trigs always glide | (A4 MKII manual, p.35, p.52) |
+| ARP LEG | Overlapping notes play legato (no envelope retrigger), and this also applies to the track's note trigs with the arpeggiator OFF | (A4 MKII manual, p.44) |
 | Ladder | 24 dB/oct; cannot be bypassed (open it); about 25 RES is the flattest (and the default) | (A4 MKII manual, p.36, p.73) |
 | **Overdrive (bipolar)** | 0 clean; positive = clipping after filter 1; negative = a softer drive inside filter 1 | (A4 MKII manual, p.89) |
 | Multimode | LP2, LP1, BP, HP1, HP2, BS, PK; all 2-pole with resonance, the "1-pole" types with a flatter slope | (A4 MKII manual, p.74, p.89) |
@@ -180,6 +184,7 @@ The keyboard is not velocity sensitive: trigs take VEL (A4 MKII manual, p.47).
 | Delay feedback can swell; OVR adds to it | (A4 MKII manual, p.95) |
 | Reverb FRQ and GAI: a shelf that darkens the tail; GAI at its maximum keeps the treble | (A4 MKII manual, p.96) |
 | **[STOP]** cuts the sound while the delay repeats ring out; **[STOP][STOP]** while stopped also fades the send effects | (A4 MKII manual, p.38) |
+| A stop from the studio (its stop, Space, the end of the arranger) is a full stop for the rack: the voices are cut and the send effects fade out in 1.5 s. The A4's own [STOP] key and the end of its own song let them ring | not in the manual (twin) |
 | **[PLAY]** while playing pauses; [PLAY] again resumes | (A4 MKII manual, p.39) |
 | Synced to the studio (like MIDI clock) PLAY and STOP drive the studio transport and there is no pause | not in the manual (twin) |
 
@@ -216,7 +221,8 @@ The shared Elektron sequencer (`lib/sequencer/elektron`, see
 - **LFO multiplier**: the × and · groups (24 values); the tuning-fork group that syncs to an oscillator is left out (A4 MKII manual, p.92).
 - **Modulation destinations**: continuous parameters only (55 synth, 22 FX); discrete targets such as waveforms are left out.
 - **Sends** are taken after the VCA in mono; the manual's diagram does not show where they sit relative to PAN (A4 MKII manual, p.110).
-- **Menus** are overlays rather than OLED pages; MIDI, the +Drive, projects and the Click Track are the studio's job.
+- **Menus** are overlays rather than OLED pages; MIDI, the +Drive, projects and the Click Track are the studio's job. [SONG] opens the song editor directly (on the hardware it opens the SONG menu, whose EDIT is the same as [FUNC] + [SONG MODE], p.57).
+- **Also absent:** VELOCITY TO VOL curves and the pitch bend, mod wheel, breath and aftertouch routings (p.35-36; velocity always shapes the level), the Control In macros (p.25-26), trig preview ([TRIG] + [YES], p.40), trig shift and destructive transpose ([FUNC] + LEFT/RIGHT, [TRACK] + UP/DOWN, p.40, p.54), copy / paste of single trigs, pages and sounds (p.54), the delay WID as a pan placement (the twin spreads the echo by a time offset; X 1 always swings fully, p.95), and the VOICE ROUTING to-main / to-FX switches (p.29).
 
 ## The twin's own curves (not in the manual)
 
@@ -232,17 +238,21 @@ The shared Elektron sequencer (`lib/sequencer/elektron`, see
 | Fastest envelope rise | 1.5 ms, also at ATK 0 (the original's envelopes run at about 1.5 kHz and reach the circuits through smoothed control voltages); the FULL shapes jump within that time |
 | VCA control | Smoothed with a 0.5 ms time constant, so a square LFO on VOL gates without a click |
 | Output noise floor | About -100 dBFS, never digital silence (the manual gives 102 dB S/N, p.85) |
+| Output stage | After the dry + FX mix, ahead of MAIN VOLUME: unity to 0 dBFS, then a soft knee to +3.5 dBFS, so with every source, accent, VOL and TRACK LEVEL up the A4 stays below about +0.2 dBFS at the default MAIN VOLUME |
+| Auto bend | BND 0.5 semitone a step (+-64 is about +-2.7 octaves), falling fast at first, over the SLI time (8 ms at 0 ... 4 s at 127) |
 
 ## DSP implementation
 
 - `public/worklets/analog-four-processors.js`, `a4-voice`: one worklet node per track holds the whole voice (oscillators with 4-point polyBLEP/polyBLAMP band-limiting, subs, sync, AM, noise, TPT ladder, overdrive, SVF multimode, VCA, envelopes, LFOs, the modulation matrix). Control rate 3 kHz (16-sample blocks) with per-sample interpolation.
 - `a4-fxmod` maps the FX track's values, locks and FX LFOs to channels; the shared `chorus` and `fdn-reverb` processors do the chorus and reverb; `a4-fx` holds the tempo-synced delay (feedback filters and saturation in the loop), the effect-to-effect sends and the dry + wet mix.
-- [STOP] sends `cut` (a 6 ms fade, nothing queued survives); [STOP][STOP] fades the send returns in 0.3 s and empties the delay and reverb.
+- [STOP] sends `cut` (a 6 ms fade, nothing queued survives); [STOP][STOP] fades the send returns in 0.3 s and empties the delay and reverb; a studio stop fades them in 1.5 s.
+- An `off` followed at the same instant by an `on` flagged `leg` (ARP LEG) keeps the gate open, so overlapping note trigs play legato.
+- The output stage is a native WaveShaper (no oversampling, so its curve is an exact bound) between the FX mix and MAIN VOLUME.
 - Previews (lessons, the preset browser, audio QA) play the selected pattern, or a riff on the keyboard's track when it is empty, and end like [STOP][STOP].
 - A voice that feeds the next track (NEI) gets `feed`: it never sleeps, so its multimode output is always there.
 
 ## Presets
 
-- **Kits** (6) load four sounds, the FX track and a project; each kit sets its track levels so its demo plays at about -18 LUFS (audio QA `--target -18`).
+- **Kits** (6) load four sounds, the FX track and a project; each kit sets its track levels so its demo plays at about -18 LUFS (audio QA `--target -18`). **Kit / Init sounds** loads the init sound on every track and a blank pattern memory with one trig on each beat of T1, so PLAY sounds at once.
 - **Sounds** (40) load on T1 with a one-bar phrase in pattern A01 that shows the sound off: riffs for basses, a line for leads, held chords for pads, 8th-note lines for plucks, a 16th funk figure for keys, a held note for the arpeggios, grooves for drums (a 3-2 clave for the rim, a fill for the tom). VEL varies inside the phrase. Short percussive sounds carry a T1 level so every preset plays at about -18 LUFS (FX about -22); levels were set from the audio-QA suggestions.
 - Every preset is our own recreation by character, with a descriptive name (`sounds.ts`, `kits.ts`).

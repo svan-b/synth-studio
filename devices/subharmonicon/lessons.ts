@@ -264,7 +264,7 @@ const f3: Lesson = {
     },
     {
       kind: 'do', control: 'vcf_eg_amt', targetValue: 60, concept: 'modulation-depth', setup: { resonance: 20 },
-      instruction: 'RESONANCE is back at 20%. Turn VCF EG AMT to about +60% (2 o\'clock).',
+      instruction: 'RESONANCE is back at 20%. Turn VCF EG AMT to about +60% (3 o\'clock).',
       principle: 'A positive envelope amount opens the filter at each note, then lets it close.',
       manualReference: 'p.24 – VCF EG AMT',
     },
@@ -338,9 +338,9 @@ const f4: Lesson = {
     },
     {
       kind: 'do', control: 'trigger', targetValue: true, concept: 'envelope-shape',
-      instruction: 'Press and hold TRIGGER for a moment, then let go. With EG off it works like a key.',
+      instruction: 'Press and hold TRIGGER for a moment, then let go. With EG off it is a gate.',
       principle: 'A gate holds an envelope at its peak for as long as it lasts, then lets it decay.',
-      explanation: 'With EG off the TRIGGER button is a gate: Attack, hold at maximum while pressed, Decay on release (manual p.29).',
+      explanation: 'With EG off the TRIGGER button is a gate: Attack, hold at maximum while pressed, Decay on release (manual p.29). The keys do the same while the sequencers are stopped: on an EG-off patch a held key keeps the sound at full VOLUME, much louder than the short steps, until you let go. Tap for short notes.',
       manualReference: 'p.29 – TRIGGER',
     },
     {
@@ -381,6 +381,8 @@ const f4: Lesson = {
     mc('EG blinking means…', ['HELD: both envelopes held at maximum', 'OFF', 'An error'], 0, 'Hold the EG button to enter HELD.'),
     mc('With EG off, the TRIGGER button…', ['Acts as a gate', 'Does nothing', 'Resets the sequence'], 0, 'It holds the envelopes while pressed.'),
     mc('A trigger that arrives during the attack…', ['Is ignored', 'Restarts it', 'Inverts it'], 0, 'The attack cannot be retriggered on this instrument.'),
+    mc('EG is off and the sequencers are stopped. You hold a key down. You hear…', ['The note rise and stay at full VOLUME until you let go', 'One short pluck', 'Nothing: keys need EG lit'], 0,
+      'With EG off a key is a gate, like TRIGGER, so the envelopes hold at their peak while it is down. With EG lit a key plays a pluck.'),
   ],
 };
 
@@ -449,7 +451,7 @@ const f5: Lesson = {
         'On the Subharmonicon the VCO FREQ knobs snap to the selected scale too (manual pp.18, 21). Many synths quantize only the sequencer, which makes the last option tempting.'),
     },
     {
-      kind: 'listen', concept: 'oscillator-pitch', focus: ['quantize'], setup: { seq1_step2: 21, seq1_step3: 50 },
+      kind: 'listen', concept: 'oscillator-pitch', focus: ['quantize'], setup: { seq1_step2: 21, seq1_step3: 46 },
       instruction: 'The same STEP knobs, unquantized and then in the 8-ET major scale.',
       listen: {
         a: { quantize: 0 }, b: { quantize: 2 }, labels: ['QUANTIZE off', '8-ET'],

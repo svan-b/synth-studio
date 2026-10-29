@@ -214,7 +214,7 @@ const f2: Lesson = {
     },
     {
       kind: 'do', control: 'ch2_gain', targetValue: 0, concept: 'gain-staging',
-      instruction: 'Bring channel 2 GAIN back to 0 dB. Its meter averages around 0, with peaks near +6.',
+      instruction: 'Bring channel 2 GAIN back to 0 dB. Its meter works around 0 to +3, the loudest hits touching +6.',
       principle: 'Decibels are logarithmic: +6 dB roughly doubles the amplitude, -6 dB halves it.',
       explanation: 'That is the level the manual asks for: average around 0 and peaks around +6, leaving room above for EQ boosts and loud moments.',
       manualReference: REF.meters,
@@ -1504,14 +1504,14 @@ const e4: Lesson = {
     },
     {
       kind: 'challenge', concept: 'gain-staging',
-      instruction: 'Set channel 1 hot but clean: GAIN up for more level, no boosts, and PK! never lit.',
+      instruction: 'Now set channel 1 the way the guide asks: clean, the meter averaging around 0 with the loudest peaks near +6, and no boosts.',
       checklist: [
-        { text: 'GAIN between 0 and +6 dB', check: s => num(s, 'ch1_gain') >= 0 && num(s, 'ch1_gain') <= 6 },
+        { text: 'GAIN between 0 and +4 dB', check: s => num(s, 'ch1_gain') >= 0 && num(s, 'ch1_gain') <= 4 },
         { text: 'No EQ boosts', check: s => ['ch1_hi', 'ch1_himid', 'ch1_lomid', 'ch1_lo'].every(c => num(s, c) <= 0.05) },
         { text: 'MASTER 1 back at unity (8)', check: s => Math.abs(num(s, 'master') - 8) <= 0.3 },
       ],
-      hints: ['Start with the EQ flat.', 'At 0 dB the FULL MIX peaks around +7; the twin\'s PK! lights from +15.', 'GAIN about +3 dB, all EQ centred, MASTER 1 at 8.'],
-      solution: { values: { ch1_gain: 3, ch1_hi: 0, ch1_himid: 0, ch1_lomid: 0, ch1_lo: 0, master: 8 } },
+      hints: ['Start with the EQ flat and MASTER 1 at 8.', 'At 0 dB the FULL MIX peaks around +4: a little more GAIN brings its loudest hits to the +6 LED.', 'GAIN about +2 dB, all EQ centred, MASTER 1 at 8.'],
+      solution: { values: { ch1_gain: 2, ch1_hi: 0, ch1_himid: 0, ch1_lomid: 0, ch1_lo: 0, master: 8 } },
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',

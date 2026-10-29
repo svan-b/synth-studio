@@ -129,8 +129,8 @@ KITS.forEach((kit, i) => {
   };
 });
 presets.init = {
-  name: 'Kit / Empty project (init sounds)',
-  description: 'Init sound on every track and an empty pattern memory: start a track from scratch.',
+  name: 'Kit / Init sounds (blank pattern)',
+  description: 'Init sound on every track and a blank pattern memory, except one trig on each beat of T1 so PLAY sounds at once: start a track from scratch ([FUNC] + [PLAY] clears the pattern).',
   source: 'community',
   author: 'Synth Studio',
   settings: { kit_project: 1, track: 0, page: V.NOTE },

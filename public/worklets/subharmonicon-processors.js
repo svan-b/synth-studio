@@ -199,10 +199,14 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
     this.m0 = 0; this.m1 = 0;              // presence FIR history (mix)
     this.seed = (Math.random() * 0xffffffff) >>> 0 || 1; // noise floor PRNG (xorshift32)
 
-    // Ladder (2x) and halfband states, DC blocker
+    // Ladder (2x) and halfband states. DC: an 8 Hz blocker before the output stage (asymmetric
+    // pulses under an envelope), and a slow servo around the stage that removes the little DC
+    // its shoulder makes from asymmetric waves when driven hard - inside the loop, so the
+    // stage's ceiling still holds
     this.z = new Float64Array(4);
     this.hb = new Float64Array(24);
     this.dcX = 0; this.dcY = 0; this.dcR = 1 - (2 * Math.PI * 8) / sr;
+    this.servo = 0; this.servoK = (2 * Math.PI * 1) / sr;
 
     // Envelopes: [0] VCF, [1] VCA
     this.ev = new Float64Array(2); this.eo = new Float64Array(2); this.est = new Uint8Array(2);
@@ -942,10 +946,12 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
         const vol = this.sVol;
         main = filt * gv * vol * vol * OUT_GAIN;
       }
-      // DC blocker (asymmetric pulse widths under an envelope), then the output stage
+      // DC blocker (asymmetric pulse widths under an envelope), then the output stage with its
+      // DC servo (a hard-driven shoulder turns asymmetric waves into a little DC)
       const dc = main - this.dcX + this.dcR * this.dcY;
       this.dcX = main; this.dcY = dc;
-      main = outStage(dc);
+      main = outStage(dc - this.servo);
+      this.servo += main * this.servoK;
       oMain[i] = main;
 
       // ---- pulses ----
@@ -986,6 +992,7 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
     for (let j = 0; j < 24; j++) if (!Number.isFinite(bb[j])) { bb.fill(0); break; }
     if (Math.abs(this.dcY) < 1e-20) this.dcY = 0;
     if (!Number.isFinite(this.dcY)) { this.dcX = 0; this.dcY = 0; }
+    if (Math.abs(this.servo) < 1e-20 || !Number.isFinite(this.servo)) this.servo = 0;
     this.vcaCv = Math.abs(vcaCv) < 1e-12 || !Number.isFinite(vcaCv) ? 0 : vcaCv;
     this.cutCv = Math.abs(cutCv) < 1e-12 || !Number.isFinite(cutCv) ? 0 : cutCv;
 

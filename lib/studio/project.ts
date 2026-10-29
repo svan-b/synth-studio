@@ -5,6 +5,7 @@
 
 import { useStudioStore, type InstanceState, type StudioDoc } from '@/store/studio';
 import { PROJECT_VERSION, upgradeDevices } from './upgrades';
+import { announceProjectReset } from './legacy';
 import { history } from './history';
 import { requestPersistentStorage, saveFilesOrOffer } from './platform';
 
@@ -60,8 +61,10 @@ export async function importProject(file: File): Promise<string> {
     throw new Error('That file is not a Synth Studio project');
   }
   // Projects saved by an older version: controls whose meaning changed keep sounding the same
-  const devices = upgradeDevices(parsed.devices, parsed.studio.rack ?? [], 'project', parsed.version ?? 1);
+  const reset: string[] = [];
+  const devices = upgradeDevices(parsed.devices, parsed.studio.rack ?? [], 'project', parsed.version ?? 1, (_i, device) => reset.push(device));
   useStudioStore.getState().loadProject({ devices, studio: parsed.studio, currentDevice: parsed.currentDevice });
+  announceProjectReset(reset);
   // A different project: nothing to undo into
   history.clear();
   return parsed.name ?? 'Project';

@@ -5,6 +5,7 @@
 // ============================================================================
 
 import type { ControlSpec, ControlValue, Lesson, LessonCheckState, MultipleChoice } from '../types';
+import { LESSON_PATHS } from '../types';
 import type { PanelElement } from '../types/panel';
 import { DEVICES } from '../devices';
 import type { DeviceModule } from '../devices/types';
@@ -268,9 +269,10 @@ function validate(id: string, mod: DeviceModule): Issue[] {
     });
     // Pedagogy shape (docs/PEDAGOGY.md) - warnings only
     if (!l.id.startsWith(`${id}-`)) warn(`${where}: id should start with "${id}-"`);
+    if (l.path && !(LESSON_PATHS as readonly string[]).includes(l.path)) err(`${where}: unknown path "${l.path}" (${LESSON_PATHS.join(', ')})`);
     if (lessonV2(l)) {
       if (!l.objective) warn(`${where}: no objective`);
-      if (!l.path) warn(`${where}: no path (foundations, sound-design, ear-training, sequencing, performance or studio)`);
+      if (!l.path) warn(`${where}: no path (${LESSON_PATHS.join(', ')})`);
       if (!kinds.has('predict') && !kinds.has('listen')) warn(`${where}: no predict or listen step`);
       if (!kinds.has('quiz')) warn(`${where}: no quiz step`);
       if (!kinds.has('match') && !kinds.has('challenge')) warn(`${where}: no match or challenge step`);
@@ -281,41 +283,240 @@ function validate(id: string, mod: DeviceModule): Issue[] {
   return out;
 }
 
-function validateStudioLessons(lessons: Lesson[]): Issue[] {
+/**
+ * Studio lessons (device 'studio'), the Producer path included. Beyond the shape checks, a
+ * lesson with a whole-studio start state (Lesson API v3) is checked against the real
+ * instruments: rack devices, every value, routes to real mixer inputs, cables between real
+ * jacks, and each step's instrument, controls, A/B values, match targets and solutions.
+ * Every check runs twice: on an empty studio and on the lesson's start studio.
+ */
+async function validateStudioLessons(lessons: Lesson[]): Promise<Issue[]> {
   const out: Issue[] = [];
-  const st: LessonCheckState = {
+  const err = (m: string) => out.push({ level: 'error', msg: m });
+  const warn = (m: string) => out.push({ level: 'warn', msg: m });
+  const empty: LessonCheckState = {
     values: {}, patches: [], data: undefined, engine: {}, instances: {}, studioCables: [], routes: {}, sync: {},
-    transport: { playing: false, bpm: 120 }, arrangement: { enabled: false, loop: true, sections: [] },
+    transport: { playing: false, bpm: 120, swing: 0 }, arrangement: { enabled: false, loop: true, sections: [] },
     events: {}, notesPlayed: [], eventsByInstance: {},
   };
-  const ids = new Set<string>();
-  lessons.forEach(l => {
-    if (ids.has(l.id)) out.push({ level: 'error', msg: `lesson ${l.id}: duplicate id` });
-    ids.add(l.id);
-    if (l.device !== 'studio') out.push({ level: 'error', msg: `lesson ${l.id}: device should be 'studio'` });
-    l.steps.forEach((s, i) => {
-      const w = `lesson ${l.id} step ${i + 1}`;
-      [s.predict, s.quiz, s.listen?.question].forEach(mc => {
-        if (mc && (mc.answer < 0 || mc.answer >= mc.options.length)) out.push({ level: 'error', msg: `${w}: answer out of range` });
-      });
-      try { s.check?.(st); } catch (e) { out.push({ level: 'error', msg: `${w}: check() throws: ${e}` }); }
-      s.checklist?.forEach((c, ci) => { try { c.check?.(st); } catch (e) { out.push({ level: 'error', msg: `${w}: checklist[${ci}] throws: ${e}` }); } });
-      if (s.kind === 'reflect' && (!s.reflect?.prompt || !s.reflect?.model)) out.push({ level: 'error', msg: `${w}: reflect needs prompt and model` });
+  // Device modules the lessons use, loaded once
+  const mods = new Map<string, DeviceModule>();
+  const modOf = async (device: string) => {
+    if (mods.has(device)) return mods.get(device)!;
+    const entry = DEVICES.find(d => d.id === device);
+    if (!entry) return undefined;
+    const m = (await entry.load()).default;
+    mods.set(device, m);
+    return m;
+  };
+  const defaultsOf = (m: DeviceModule) => {
+    const d: Record<string, ControlValue> = {};
+    Object.entries(m.spec.controls).forEach(([cid, c]) => { if ('default' in c && c.default !== undefined) d[cid] = c.default as ControlValue; });
+    return d;
+  };
+  const checkVals = (m: DeviceModule | undefined, vals: Record<string, ControlValue> | undefined, where: string) => {
+    if (!m || !vals) return;
+    Object.entries(vals).forEach(([cid, v]) => {
+      const c = m.spec.controls[cid];
+      if (!c) err(`${where}: ${m.spec.id} has no control "${cid}"`);
+      else checkValue(c, v, `${where}.${cid}`, out);
     });
-    l.requires?.forEach(d => { if (!DEVICES.some(x => x.id === d)) out.push({ level: 'error', msg: `lesson ${l.id}: requires unknown device ${d}` }); });
-  });
+  };
+  const checkMC = (mc: MultipleChoice | undefined, where: string) => {
+    if (!mc) return;
+    if (!mc.question) err(`${where}: question missing`);
+    if (!Array.isArray(mc.options) || mc.options.length < 2) err(`${where}: needs at least 2 options`);
+    else if (!Number.isInteger(mc.answer) || mc.answer < 0 || mc.answer >= mc.options.length) err(`${where}: answer out of range`);
+    if (!mc.explain) warn(`${where}: no explain (say why the answer is right)`);
+  };
+  const ids = new Set<string>();
+  for (const l of lessons) {
+    const where = `lesson ${l.id}`;
+    if (ids.has(l.id)) err(`${where}: duplicate id`);
+    ids.add(l.id);
+    if (l.device !== 'studio') err(`${where}: device should be 'studio'`);
+    if (l.path && !(LESSON_PATHS as readonly string[]).includes(l.path)) err(`${where}: unknown path "${l.path}" (${LESSON_PATHS.join(', ')})`);
+    if (l.path === 'producer' && !l.id.startsWith('studio-producer-')) warn(`${where}: Producer path ids start with "studio-producer-"`);
+    l.requires?.forEach(d => { if (!DEVICES.some(x => x.id === d)) err(`${where}: requires unknown device ${d}`); });
+    l.prerequisites?.forEach(p => { if (!lessons.some(x => x.id === p)) warn(`${where}: prerequisite "${p}" is not a studio lesson`); });
+    l.review?.forEach((mc, i) => checkMC(mc, `${where} review[${i}]`));
+
+    // ---- the start studio ------------------------------------------------------
+    const start = l.start?.studio;
+    const rackMods = new Map<string, DeviceModule>();
+    let startState: LessonCheckState | null = null;
+    if (start) {
+      const seen = new Set<string>();
+      for (const r of start.rack) {
+        if (seen.has(r.id)) err(`${where} start: instance "${r.id}" twice in the rack`);
+        seen.add(r.id);
+        const m = await modOf(r.device);
+        if (!m) { err(`${where} start: unknown device "${r.device}"`); continue; }
+        rackMods.set(r.id, m);
+        checkVals(m, r.values, `${where} start ${r.id}`);
+        const jacks = new Set([...(m.spec.patchBay?.inputs ?? []), ...(m.spec.patchBay?.outputs ?? [])].map(j => j.id));
+        r.patches?.forEach(p => { if (!jacks.has(p.from) || !jacks.has(p.to)) err(`${where} start ${r.id}: unknown jack in ${p.from} -> ${p.to}`); });
+      }
+      const jackOf = (instId: string, jack: string, dir: 'input' | 'output') => {
+        const m = rackMods.get(instId);
+        const list = dir === 'input' ? m?.spec.patchBay?.inputs : m?.spec.patchBay?.outputs;
+        return !!list?.some(j => j.id === jack);
+      };
+      start.cables?.forEach(c => {
+        if (!rackMods.has(c.from.instance) || !rackMods.has(c.to.instance)) { err(`${where} start: cable between instruments not in the rack (${c.from.instance} -> ${c.to.instance})`); return; }
+        const ok = (jackOf(c.from.instance, c.from.jack, 'output') && jackOf(c.to.instance, c.to.jack, 'input')) ||
+          (jackOf(c.to.instance, c.to.jack, 'output') && jackOf(c.from.instance, c.from.jack, 'input'));
+        if (!ok) err(`${where} start: cable ${c.from.instance}.${c.from.jack} -> ${c.to.instance}.${c.to.jack} doesn't join an output to an input`);
+      });
+      Object.entries(start.routes ?? {}).forEach(([instId, route]) => {
+        if (!rackMods.has(instId)) err(`${where} start: route for "${instId}", which is not in the rack`);
+        if (route === 'master') return;
+        const [mixer, input] = route.split(':');
+        const mm = rackMods.get(mixer);
+        if (!mm) err(`${where} start: ${instId} routed to "${mixer}", which is not in the rack`);
+        else if (!mm.studio?.mixerInputs?.some(i => i.id === input)) err(`${where} start: ${mixer} has no mixer input "${input}"`);
+      });
+      Object.keys(start.sync ?? {}).forEach(k => { if (!rackMods.has(k)) err(`${where} start: sync for "${k}", which is not in the rack`); });
+      Object.keys(start.mixer?.channels ?? {}).forEach(k => { if (!rackMods.has(k)) err(`${where} start: mixer channel for "${k}", which is not in the rack`); });
+      if (start.focus && !rackMods.has(start.focus)) err(`${where} start: focus "${start.focus}" is not in the rack`);
+      start.arrangement?.sections.forEach((sec, si) => {
+        if (!(sec.bars >= 1)) err(`${where} start: section ${si + 1} needs at least 1 bar`);
+        Object.entries(sec.parts ?? {}).forEach(([k, p]) => {
+          if (!rackMods.has(k)) { err(`${where} start: section "${sec.name}" has a part for "${k}", which is not in the rack`); return; }
+          checkVals(rackMods.get(k), p.snapshot, `${where} start section "${sec.name}" ${k} snapshot`);
+        });
+      });
+      // A check state of the start studio: every instrument at its defaults plus the start values
+      const instances: LessonCheckState['instances'] = {};
+      start.rack.forEach(r => {
+        const m = rackMods.get(r.id);
+        if (!m) return;
+        const values = { ...defaultsOf(m), ...(r.values ?? {}) };
+        instances[r.id] = { device: r.device, values, patches: r.patches ?? [], data: r.data ?? m.data?.initial() };
+      });
+      startState = {
+        ...empty,
+        instances,
+        studioCables: (start.cables ?? []).map(c => ({ from: c.from, to: c.to })),
+        routes: start.routes ?? {},
+        sync: start.sync ?? {},
+        transport: { playing: false, bpm: start.bpm ?? 120, swing: start.swing ?? 0 },
+        arrangement: { enabled: !!start.arrangement?.enabled, loop: start.arrangement?.loop ?? true, sections: (start.arrangement?.sections ?? []).map(x => ({ name: x.name, bars: x.bars, parts: x.parts ?? {} })) },
+      };
+    }
+    /** The module behind a step's instance (an instance id or a device name) */
+    const stepMod = (instOrDev: string | undefined): DeviceModule | undefined => {
+      if (!instOrDev) return undefined;
+      if (rackMods.has(instOrDev)) return rackMods.get(instOrDev);
+      return [...rackMods.values()].find(m => m.spec.id === instOrDev) ?? mods.get(instOrDev);
+    };
+
+    // ---- steps ------------------------------------------------------------------
+    const kinds = new Set<string>();
+    for (const [i, s] of l.steps.entries()) {
+      const w = `${where} step ${i + 1}`;
+      const kind = s.kind ?? (s.patchFrom && s.patchTo ? 'patch' : s.control ? 'do' : s.checklist?.length ? 'challenge' : 'info');
+      kinds.add(kind);
+      [s.predict, s.quiz, s.listen?.question].forEach((mc, k) => checkMC(mc, `${w} ${['predict', 'quiz', 'listen.question'][k]}`));
+      if (kind === 'predict' && !s.predict) err(`${w}: predict step without predict`);
+      if (kind === 'quiz' && !s.quiz) err(`${w}: quiz step without quiz`);
+      if (kind === 'listen' && !s.listen) err(`${w}: listen step without listen`);
+      if (kind === 'match' && !s.match) err(`${w}: match step without match`);
+      if (kind === 'reflect' && (!s.reflect?.prompt || !s.reflect?.model)) err(`${w}: reflect needs prompt and model`);
+      if (start) {
+        // Steps act on the start studio's instruments
+        if (s.instance && !stepMod(s.instance)) err(`${w}: instance "${s.instance}" is not in the start studio`);
+        const m = stepMod(s.instance ?? start.focus ?? start.rack[0]?.id);
+        if (s.control) {
+          const c = m?.spec.controls[s.control];
+          if (!c) err(`${w}: ${m?.spec.id ?? 'instrument'} has no control "${s.control}"`);
+          else if (s.targetValue === undefined) err(`${w}: control step without targetValue`);
+          else checkValue(c, s.targetValue, w, out);
+        }
+        checkVals(m, s.setup, `${w} setup`);
+        if (s.listen) {
+          checkVals(m, s.listen.a, `${w} listen.a`);
+          checkVals(m, s.listen.b, `${w} listen.b`);
+          (['a', 'b'] as const).forEach(side => Object.entries(s.listen!.parts?.[side] ?? {}).forEach(([k, v]) => {
+            const pm = stepMod(k);
+            if (!pm) err(`${w}: listen.parts.${side} names "${k}", which is not in the start studio`);
+            checkVals(pm, v, `${w} listen.parts.${side}.${k}`);
+          }));
+        }
+        if (s.match) {
+          checkVals(m, s.match.target, `${w} match.target`);
+          if (!s.match.controls.length) err(`${w}: match needs at least one control`);
+          s.match.controls.forEach(cid => { if (s.match!.target[cid] === undefined) err(`${w}: match control "${cid}" has no target value`); });
+          if (s.match.controls.length > 3) warn(`${w}: more than 3 controls in one ear challenge is very hard`);
+        }
+        if (s.solution) {
+          const sm = stepMod(s.solution.instance ?? s.instance ?? start.focus);
+          checkVals(sm, s.solution.values, `${w} solution.values`);
+          Object.entries(s.solution.parts ?? {}).forEach(([k, v]) => {
+            const pm = stepMod(k);
+            if (!pm) err(`${w}: solution.parts names "${k}", which is not in the start studio`);
+            checkVals(pm, v, `${w} solution.parts.${k}`);
+          });
+          s.solution.capture?.forEach(c => { if (!stepMod(c.instance)) err(`${w}: solution.capture names "${c.instance}", which is not in the start studio`); });
+        }
+      }
+      if (kind === 'challenge') {
+        if (!s.solution) warn(`${w}: challenge without solution`);
+        if (!s.hints?.length) warn(`${w}: challenge without hints`);
+      }
+      if (!s.principle && (kind === 'do' || kind === 'patch' || kind === 'predict')) warn(`${w}: no principle`);
+      if (s.instruction && s.instruction.split(/\s+/).length > 32) warn(`${w}: instruction is long (${s.instruction.split(/\s+/).length} words)`);
+      // Every check must survive an empty studio and the start studio
+      for (const [label, st] of [['an empty studio', empty], ['the start studio', startState]] as const) {
+        if (!st) continue;
+        try { s.check?.(st); } catch (e) { err(`${w}: check() throws on ${label}: ${e}`); }
+        s.checklist?.forEach((c, ci) => { try { c.check?.(st); } catch (e) { err(`${w}: checklist[${ci}] throws on ${label}: ${e}`); } });
+      }
+      // An open challenge already done in the start studio teaches nothing (earlier steps
+      // change the studio, so this only says something about challenges)
+      if (startState && kind === 'challenge' && (s.check || s.checklist?.length)) {
+        let done = true;
+        try {
+          if (s.check && !s.check(startState)) done = false;
+          if (s.checklist?.some(c => c.check && !c.check(startState!))) done = false;
+        } catch { done = false; }
+        if (done) warn(`${w}: already satisfied by the start studio`);
+      }
+    }
+    // Pedagogy shape (docs/PEDAGOGY.md) - warnings only
+    if (l.objective || l.steps.some(s => !!s.kind)) {
+      if (!l.objective) warn(`${where}: no objective`);
+      if (!l.path) warn(`${where}: no path`);
+      if (!kinds.has('predict') && !kinds.has('listen')) warn(`${where}: no predict or listen step`);
+      if (!kinds.has('quiz')) warn(`${where}: no quiz step`);
+      if (!kinds.has('match') && !kinds.has('challenge')) warn(`${where}: no match or challenge step`);
+      if ((l.review?.length ?? 0) < 3) warn(`${where}: fewer than 3 review questions`);
+    }
+  }
   return out;
 }
+
 
 (async () => {
   const only = process.argv.slice(2);
   let errors = 0;
-  if (!only.length || only.includes('studio')) {
+  if (!only.length || only.includes('studio') || only.includes('producer')) {
     const { STUDIO_LESSONS } = await import('../lib/studio/lessons');
-    const issues = validateStudioLessons(STUDIO_LESSONS);
+    const { PRODUCER_LESSONS } = await import('../lib/studio/producerLessons');
+    const { PRODUCER_LESSON_IDS } = await import('../lib/studio/producerIndex');
+    const all = [...STUDIO_LESSONS, ...PRODUCER_LESSONS];
+    const issues = await validateStudioLessons(all);
+    // The id list the app knows up front must match the lessons that load on demand
+    const listed = [...PRODUCER_LESSON_IDS].sort().join(',');
+    const actual = PRODUCER_LESSONS.map(l => l.id).sort().join(',');
+    if (listed !== actual) issues.push({ level: 'error', msg: `producerIndex.ts PRODUCER_LESSON_IDS (${listed}) differ from producerLessons.ts (${actual})` });
+    PRODUCER_LESSONS.forEach(l => { if (l.path !== 'producer') issues.push({ level: 'error', msg: `lesson ${l.id}: Producer path lessons need path 'producer'` }); });
+    STUDIO_LESSONS.forEach(l => { if (l.path === 'producer') issues.push({ level: 'error', msg: `lesson ${l.id}: Producer path lessons belong in producerLessons.ts (they load on demand)` }); });
     const e = issues.filter(i => i.level === 'error');
     errors += e.length;
-    console.log(`\nstudio lessons: ${STUDIO_LESSONS.length} lessons — ${e.length} errors, ${issues.length - e.length} warnings`);
+    console.log(`\nstudio lessons: ${STUDIO_LESSONS.length} studio + ${PRODUCER_LESSONS.length} Producer path — ${e.length} errors, ${issues.length - e.length} warnings`);
+    const byPath = all.reduce((m: Record<string, number>, l) => ({ ...m, [l.path ?? 'none']: (m[l.path ?? 'none'] ?? 0) + 1 }), {});
+    console.log(`  lessons by path: ${Object.entries(byPath).map(([k, n]) => `${k} ${n}`).join(', ')}`);
     issues.forEach(i => console.log(`  ${i.level === 'error' ? 'ERROR' : 'warn '} ${i.msg}`));
   }
   for (const entry of DEVICES) {

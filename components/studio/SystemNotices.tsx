@@ -34,7 +34,7 @@ export default function SystemNotices() {
           <span className="flex-1 min-w-[240px] leading-snug">{n.text}</span>
           {n.action && (
             <button
-              onClick={() => { n.action!.run(); if (n.id === 'save-file' || n.id === 'home-import' || n.id === 'export') dismiss(n.id); }}
+              onClick={() => { n.action!.run(); if (n.id === 'save-file' || n.id === 'home-import' || n.id === 'export' || n.id === 'old-settings') dismiss(n.id); }}
               className="px-2.5 py-1 rounded bg-white/15 text-white text-xs font-bold"
             >
               {n.action.label}
