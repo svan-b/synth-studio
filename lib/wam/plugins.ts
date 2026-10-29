@@ -13,6 +13,8 @@
 // URL to try them).
 // ============================================================================
 
+import { BUILTINS } from './builtin';
+
 export interface KnownPlugin {
   name: string;
   vendor: string;
@@ -23,7 +25,14 @@ export interface KnownPlugin {
   verified: boolean;
   /** The identical files (npm wam-community@0.4.9) loaded in this host in testing */
   testedCopy?: boolean;
+  /** Ships with Synth Studio: works offline, nothing to trust */
+  builtin?: boolean;
 }
+
+/** The two built-in plugins (lib/wam/builtin.ts) */
+export const BUILTIN_PLUGINS: KnownPlugin[] = BUILTINS.map(b => ({
+  name: b.name, vendor: 'Synth Studio', kind: b.kind, description: b.description, url: b.url, verified: true, builtin: true,
+}));
 
 export const WAM_COMMUNITY = 'https://www.webaudiomodules.com/community/plugins/';
 /** The collection's own index, for people who want the full list */
@@ -45,4 +54,4 @@ export const KNOWN_PLUGINS: KnownPlugin[] = [
   p('Spectrogram', 'Wimmics', 'effect', 'wimmics/SRVisualizers/dist/spectrogram/index.js', 'See the frequencies of whatever you patch into IN'),
 ];
 
-export const findKnownPlugin = (url: string | null | undefined) => (url ? KNOWN_PLUGINS.find(k => k.url === url) : undefined);
+export const findKnownPlugin = (url: string | null | undefined) => (url ? [...BUILTIN_PLUGINS, ...KNOWN_PLUGINS].find(k => k.url === url) : undefined);

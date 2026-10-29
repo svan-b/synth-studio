@@ -1,0 +1,119 @@
+{
+ "device": "dfam",
+ "sampleRate": 44100,
+ "tests": [
+  {
+   "id": "reference",
+   "name": "1 kHz sine at -20 dBFS in one channel (BS.1770 reference)",
+   "measured": "sample peak -20.00 dBFS, integrated -23.00 LUFS",
+   "expected": "-20 dBFS +-0.05, -23.01 LUFS +-0.3",
+   "ok": true,
+   "values": [
+    {
+     "what": "sample peak",
+     "value": -20
+    },
+    {
+     "what": "integrated",
+     "value": -23.0008
+    }
+   ]
+  },
+  {
+   "id": "dual-mono",
+   "name": "1 kHz sine at -20 dBFS from a mono node (heard on L and R)",
+   "measured": "sample peak -20.00 dBFS, integrated -19.99 LUFS",
+   "expected": "-20 dBFS +-0.05, -19.99 LUFS +-0.3",
+   "ok": true,
+   "values": [
+    {
+     "what": "sample peak",
+     "value": -20
+    },
+    {
+     "what": "integrated",
+     "value": -19.9905
+    }
+   ]
+  },
+  {
+   "id": "true-peak",
+   "name": "fs/4 sine at 45 deg, amplitude -6.02 dBFS (inter-sample peaks)",
+   "measured": "sample peak -9.03 dBFS, true peak -5.94 dBTP",
+   "expected": "-9.03 dBFS +-0.05, -6.02 dBTP +0.2/-0.4",
+   "ok": true,
+   "values": [
+    {
+     "what": "sample peak",
+     "value": -9.0309
+    },
+    {
+     "what": "true peak",
+     "value": -5.938
+    }
+   ]
+  },
+  {
+   "id": "dc",
+   "name": "constant +0.01 (DC offset)",
+   "measured": "DC 0.0100",
+   "expected": "0.0100 +-0.0002",
+   "ok": true,
+   "values": [
+    {
+     "what": "DC",
+     "value": 0.01
+    }
+   ]
+  },
+  {
+   "id": "click",
+   "name": "1 kHz sine at -20 dBFS with a 90 deg phase jump",
+   "measured": "clicks 1, mid-sound clicks 1",
+   "expected": "1 exactly, 1 exactly",
+   "ok": true,
+   "values": [
+    {
+     "what": "clicks",
+     "value": 1
+    },
+    {
+     "what": "mid-sound clicks",
+     "value": 1
+    }
+   ]
+  },
+  {
+   "id": "silence",
+   "name": "nothing connected (the idle instrument)",
+   "measured": "peak -inf dBFS, silent flag 1 (1 = raised)",
+   "expected": "peak below -70 dBFS, 1 (1 = raised) exactly",
+   "ok": true,
+   "values": [
+    {
+     "what": "peak",
+     "value": null
+    },
+    {
+     "what": "silent flag",
+     "value": 1
+    }
+   ]
+  },
+  {
+   "id": "stuck",
+   "name": "1 kHz sine at -20 dBFS left on after stop",
+   "measured": "tail peak 2 s after stop -20.00 dBFS",
+   "expected": "-20 dBFS +-0.1",
+   "ok": true,
+   "values": [
+    {
+     "what": "tail peak 2 s after stop",
+     "value": -20
+    }
+   ]
+  }
+ ],
+ "ok": true,
+ "master": "-22.81 LUFS, sample peak -19.81 dBFS (+0.19 LU through the master bus)"
+}

@@ -34,12 +34,17 @@ export interface LoadedWam {
   url: string;
   instance: WebAudioModule;
   node: WamNode;
+  /** Where audio goes in / comes out when that is not `node` itself (built-in plugins) */
+  input?: AudioNode;
+  output?: AudioNode;
   name: string;
   vendor: string;
   description: string;
   isInstrument: boolean;
   hasAudioInput: boolean;
   hasMidiInput: boolean;
+  /** Ships with Synth Studio (lib/wam/builtin.ts): no network, nothing to trust */
+  builtin?: boolean;
 }
 
 const hostGroups = new WeakMap<BaseAudioContext, Promise<string>>();
@@ -176,6 +181,7 @@ export async function loadWam(rawUrl: string, ctx: BaseAudioContext, opts: LoadO
 /** Free a plugin instance */
 export function destroyWam(w: LoadedWam) {
   try { w.node.disconnect(); } catch { /* */ }
+  try { w.output?.disconnect(); } catch { /* */ }
   try { w.node.destroy?.(); } catch { /* */ }
 }
 
