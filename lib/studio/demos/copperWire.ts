@@ -34,30 +34,36 @@ const STRAIGHT = 50;
 // Analog Rytm kit "COPPER"
 // ----------------------------------------------------------------------------
 
+// Levels are the design's, measured at the Xone's output with each part soloed over its busiest
+// 4 bars against the kick (short-term loudness): snare + clap -4, closed hats -15, open hat -12,
+// cowbell -14, zaps -11, toms -8; the Sub 37's bass -1. The volumes below are what gets there on
+// this twin (VOL, LEV and TRACK LEVEL each square their value).
 const RYTM_KIT = kitValues({
   // BD CLASSIC tuned to G1 (55 Hz x 2^(-2/12) = 49 Hz): an 808-style kick, medium length
   bd: { machine: 'BD CLASSIC', tun: -2, swt: 45, swd: 45, dec: 58, hld: 15, wav: 0, tra: 17, lev: 115, flt_typ: 0, flt_frq: 127, amp_dec: 127, amp_ovr: 25, amp_pan: 0, amp_vol: 115 },
-  sd: { machine: 'SD HARD', tun: 3, swd: 45, swt: 30, dec: 38, tic: 55, nod: 45, nol: 90, lev: 100, flt_typ: 4, flt_frq: 36, amp_dec: 127, amp_rev: 25, amp_vol: 100 },
+  sd: { machine: 'SD HARD', tun: 3, swd: 45, swt: 30, dec: 38, tic: 55, nod: 45, nol: 90, lev: 100, flt_typ: 4, flt_frq: 36, amp_dec: 127, amp_rev: 25, amp_vol: 79 },
   // NUM 3 = four claps
-  cp: { machine: 'CP CLASSIC', ton: 80, num: 3, rat: 45, nod: 40, nol: 75, rnd: 30, cpd: 45, lev: 100, flt_typ: 4, flt_frq: 44, amp_rev: 40, amp_vol: 90 },
+  cp: { machine: 'CP CLASSIC', ton: 80, num: 3, rat: 45, nod: 40, nol: 75, rnd: 30, cpd: 45, lev: 100, flt_typ: 4, flt_frq: 44, amp_rev: 40, amp_vol: 72 },
   // the zap: SY DUAL VCO on the RS track. TUN +31 puts NOTE 0 on G4 (65.4 Hz x 2^(31/12) = 392 Hz),
   // DET +7 a fifth, BND +48 (24 steps an octave) drops each hit two octaves into pitch,
   // CFG SSW+SIN_ a sinesaw plus sine mix, restarted on every trig
-  rs: { machine: 'SY DUAL VCO', tun: 31, vdet: 7, bnd: 48, dec: 25, dec2: 20, bal: 0, cfg: 40, lev: 90, flt_typ: 0, flt_frq: 100, amp_del: 55, amp_rev: 10, amp_vol: 78 },
+  rs: { machine: 'SY DUAL VCO', tun: 31, vdet: 7, bnd: 48, dec: 25, dec2: 20, bal: 0, cfg: 40, lev: 90, flt_typ: 0, flt_frq: 100, amp_del: 55, amp_rev: 10, amp_vol: 117 },
   // tuned toms: XT CLASSIC is half a semitone a step from 36.7 Hz - +34 is G2, +48 is D3
-  lt: { machine: 'XT CLASSIC', tun: 34, dec: 50, swd: 30, swt: 50, nol: 25, nod: 30, flt_typ: 0, flt_frq: 127, amp_del: 40, amp_pan: -15, amp_vol: 86 },
-  mt: { machine: 'XT CLASSIC', tun: 48, dec: 50, swd: 30, swt: 50, nol: 25, nod: 30, flt_typ: 0, flt_frq: 127, amp_del: 40, amp_pan: 15, amp_vol: 82 },
-  ch: { machine: 'CH CLASSIC', tun: 0, dec: 22, col: 10, lev: 100, flt_typ: 4, flt_frq: 62, amp_pan: 10, amp_vol: 80 },
-  oh: { machine: 'OH CLASSIC', tun: 0, dec: 55, col: 10, lev: 100, flt_typ: 4, flt_frq: 62, amp_pan: 10, amp_vol: 76 },
+  lt: { machine: 'XT CLASSIC', tun: 34, dec: 50, swd: 30, swt: 50, nol: 25, nod: 30, flt_typ: 0, flt_frq: 127, amp_del: 40, amp_pan: -15, amp_vol: 58 },
+  mt: { machine: 'XT CLASSIC', tun: 48, dec: 50, swd: 30, swt: 50, nol: 25, nod: 30, flt_typ: 0, flt_frq: 127, amp_del: 40, amp_pan: 15, amp_vol: 55 },
+  ch: { machine: 'CH CLASSIC', tun: 0, dec: 22, col: 10, lev: 100, flt_typ: 4, flt_frq: 62, amp_pan: 10, amp_vol: 89 },
+  oh: { machine: 'OH CLASSIC', tun: 0, dec: 55, col: 10, lev: 100, flt_typ: 4, flt_frq: 62, amp_pan: 10, amp_vol: 82 },
   // the 808 cowbell's 540 / 800 Hz pair: DET 54 is +6.8 semitones on this twin
-  cb: { machine: 'CB CLASSIC', tun: 0, cdet: 54, dec: 30, lev: 90, flt_typ: 4, flt_frq: 60, amp_del: 40, amp_pan: -20, amp_vol: 70 },
+  cb: { machine: 'CB CLASSIC', tun: 0, cdet: 54, dec: 30, lev: 90, flt_typ: 4, flt_frq: 60, amp_del: 40, amp_pan: -20, amp_vol: 97 },
 }, {
   // DELAY an 8th (246 ms), ping-pong, above the bass; a short plate-like room
   del_tim: 16, del_x: 1, del_wid: 63, del_fdb: 64, del_hpf: 50, del_lpf: 80, del_rev: 20, del_vol: 92,
   rev_pre: 8, rev_dec: 40, rev_frq: 90, rev_gai: 90, rev_hpf: 50, rev_lpf: 90, rev_vol: 80,
-  dis_amt: 20, dis_sym: 6, dis_dov: 0, dis_del: 0, dis_rev: 1,
-  // the whole kit punches together: 1 ms, A1, 1:4, no sidechain filter
-  cmp_thr: 92, cmp_atk: 3, cmp_rel: 6, cmp_mup: 14, cmp_rat: 1, cmp_seq: 0, cmp_mix: 127, cmp_vol: 100,
+  // DISTORTION a little more than the design's 20: a denser drum bus to master at -11 LUFS
+  dis_amt: 30, dis_sym: 6, dis_dov: 0, dis_del: 0, dis_rev: 1,
+  // the whole kit punches together: 0.3 ms, A1, 1:4, no sidechain filter. The twin's threshold
+  // scale differs from the hardware's: at the design's THR 92 it would take 8 dB off the kit
+  cmp_thr: 108, cmp_atk: 2, cmp_rel: 6, cmp_mup: 10, cmp_rat: 1, cmp_seq: 0, cmp_mix: 127, cmp_vol: 100,
 });
 
 // ---- Rytm patterns (A01-A06, 32 steps = 2 bars). Extras use 1-based steps ----
@@ -159,6 +165,9 @@ function sub37Preset(which: 1 | 2, over: { cutoff?: number; egAmt?: number; driv
     glide_time: p1 ? 45 : 90,
     // MOD 2: a triangle LFO synced to 8ths (about 4.07 Hz at 122 BPM) on the cutoff - the wobble
     mod2_source: 0, mod2_sync: true, mod2_div: DIV_EIGHTH, mod2_filter_amt: p1 ? 0 : 45, mod2_pitch_amt: 0, mod2_mod_amt: 0,
+    // PRESET VOL levels each preset as the factory ones are: the bass 1 dB under the kick, and the
+    // sustained wobble (AMP SUSTAIN 100 %) at the same short-term level as the bassline
+    preset_volume: p1 ? 30 : 19,
   };
 }
 
@@ -185,11 +194,14 @@ const SUB37: Values = {
 const XONE: Values = {
   ch1_src: XDECK_NONE, ch2_src: XDECK_NONE, ch3_src: XDECK_NONE, ch4_src: XDECK_NONE, cha_src: XDECK_NONE, chb_src: XDECK_NONE,
   ch1_input: 2, ch2_input: 2, cha_input: 2, chb_input: 2,
-  ch1_gain: 1, ch1_hi: 0, ch1_himid: xoneMid(1), ch1_lomid: xoneMid(-2), ch1_lo: 0, ch1_fader: 8, ch1_snd1: 0, ch1_snd2: 0.5, ch1_filter: XFILTER.off,
+  // GAIN lines both channels up (meter peaks near +6); the faders set the bass 1 dB under the kick.
+  // The twin's faders follow the hardware's constant-power curve (8.0 on the dial is -10 dB), so
+  // they sit higher than the design's 8.0 / 7.5; SEND 2 and channel B are up for an audible room
+  ch1_gain: 5, ch1_hi: 0, ch1_himid: xoneMid(1), ch1_lomid: xoneMid(-2), ch1_lo: 0, ch1_fader: 10, ch1_snd1: 0, ch1_snd2: 2, ch1_filter: XFILTER.off,
   // HI MID +1.5 dB at 1.1 kHz: the bass's harmonics for small speakers
-  ch2_gain: 0, ch2_hi: xoneKill(-2), ch2_himid: xoneMid(1.5), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 7.5, ch2_snd1: 0, ch2_snd2: 0, ch2_filter: XFILTER.off,
+  ch2_gain: 3, ch2_hi: xoneKill(-2), ch2_himid: xoneMid(1.5), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 9.5, ch2_snd1: 0, ch2_snd2: 0, ch2_filter: XFILTER.off,
   cha_hi: xoneKill(-3), cha_mid: 0, cha_lo: xoneKill(-12), cha_fader: 4, cha_filter: XFILTER.off,
-  chb_hi: xoneKill(-2), chb_mid: xoneMid(-2, true), chb_midf: 500, chb_lo: xoneKill(-12), chb_fader: 4, chb_filter: XFILTER.off,
+  chb_hi: xoneKill(-2), chb_mid: xoneMid(-2, true), chb_midf: 500, chb_lo: xoneKill(-12), chb_fader: 8, chb_filter: XFILTER.off,
   // FX unit: DELAY 1/8, FDBK 3.5, REVERB 1.6 s; FILTER 2 LPF 2.5 kHz RES 3 (BREAKDOWN)
   fx_time: 0, fx_fdbk: 3.5, fx_size: 1.6,
   f1_on: false, f2_on: true, f2_type: XTYPE.lpf, f2_freq: 2500, f2_res: 3, f2_crunch: 0,
@@ -240,7 +252,8 @@ export function build(): { devices: Record<string, InstanceState>; studio: Studi
     swing: 0,
     arrangement: { enabled: true, loop: false, sections },
     off: {},
-    mixer: mixer({ 'analog-rytm': strip(0), sub37: strip(0), xone96: strip(0) }, 5),
+    // the Xone's own channel +6 dB and the master DRIVE +5 dB into the -1 dBTP limiter: about -11 LUFS
+    mixer: mixer({ 'analog-rytm': strip(0), sub37: strip(0), xone96: strip(6) }, 5),
   };
   return { devices, studio, currentDevice: 'analog-rytm' };
 }

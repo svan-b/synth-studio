@@ -64,7 +64,10 @@ const MOTHER32: Values = {
   // the step written D2 sounds at 73.4 Hz (FREQUENCY at the centre, 0 V = C4)
   frequency: 0, vco_wave: 1, pulse_width: 50, vco_mod_source: 0, vco_mod_amount: 0, vco_mod_dest: 1, glide: 35,
   mix: 0, vcf_mode: 1, cutoff: 380, resonance: 40, vcf_mod_source: 0, vcf_mod_amount: 45, vcf_mod_polarity: 0,
-  attack: 1.25, decay: 260, sustain: 1, vca_mode: 1, volume: 70,
+  // DECAY 360 rather than 260 ms: the same pluck with more body, 1.3 dB less crest. VOLUME 52
+  // (the design's 70 % drives the twin's output stage into its rail on the accents); the Xone's
+  // GAIN makes up the level
+  attack: 1.25, decay: 360, sustain: 1, vca_mode: 1, volume: 52,
   // ASSIGN = ACCENT, patched into VCF CUTOFF: accented steps open the filter
   assign_source: 0,
   step_div: 5, div_type: 0, swing: 50, swing_div: 5, swing_type: 0, seq_direction: 0, tempo: BPM, run_stop: false,
@@ -102,15 +105,21 @@ const SUBH: Values = {
 // All three are mono and the Xone has no pans: width comes from the returns.
 // ----------------------------------------------------------------------------
 
+// Gain staging, measured: GAIN lines each channel up to the guide's level (meter peaks near +6),
+// the faders set the design's balance against the DFAM's kick steps - the Mother-32 -3 dB, the
+// Subharmonicon -8 dB (short-term loudness at the Xone's output). The twin's channel faders follow
+// the hardware's constant-power curve (6.5 on the dial is -16 dB), and its sends rise with the
+// square of the dial, so faders and sends sit higher than the design's numbers; the returns then
+// come in about where the design puts them (delay -14, reverb -15 against the kick).
 const XONE: Values = {
   ch1_src: XDECK_NONE, ch2_src: XDECK_NONE, ch3_src: XDECK_NONE, ch4_src: XDECK_NONE, cha_src: XDECK_NONE, chb_src: XDECK_NONE,
   ch1_input: 2, ch2_input: 2, ch3_input: 2, cha_input: 2, chb_input: 2,
-  ch1_gain: 2, ch1_hi: xoneKill(-2), ch1_himid: 0, ch1_lomid: xoneMid(-2), ch1_lo: xoneKill(1), ch1_fader: 8, ch1_snd1: 0, ch1_snd2: 1, ch1_filter: XFILTER.off,
-  ch2_gain: 0, ch2_hi: 0, ch2_himid: xoneMid(2), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 7, ch2_snd1: 0, ch2_snd2: 0.5, ch2_filter: XFILTER.off,
-  // the Subharmonicon's LO shelf at -6 dB hands 87-147 Hz to the bass
-  ch3_gain: -2, ch3_hi: xoneKill(-1), ch3_himid: 0, ch3_lomid: xoneMid(-2), ch3_lo: xoneKill(-6), ch3_fader: 6.5, ch3_snd1: 3.5, ch3_snd2: 4, ch3_filter: XFILTER.off,
-  cha_hi: xoneKill(-3), cha_mid: 0, cha_lo: xoneKill(-12), cha_fader: 6, cha_filter: XFILTER.off,
-  chb_hi: xoneKill(-2), chb_mid: xoneMid(-3, true), chb_midf: 400, chb_lo: xoneKill(-12), chb_fader: 6, chb_filter: XFILTER.off,
+  ch1_gain: 4, ch1_hi: xoneKill(-2), ch1_himid: 0, ch1_lomid: xoneMid(-2), ch1_lo: xoneKill(1), ch1_fader: 10, ch1_snd1: 0, ch1_snd2: 5, ch1_filter: XFILTER.off,
+  ch2_gain: 2, ch2_hi: 0, ch2_himid: xoneMid(2), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 9.3, ch2_snd1: 0, ch2_snd2: 3.5, ch2_filter: XFILTER.off,
+  // the Subharmonicon's LO shelf at -6 dB hands 87-147 Hz to the bass; it sends the most
+  ch3_gain: 4, ch3_hi: xoneKill(-1), ch3_himid: 0, ch3_lomid: xoneMid(-2), ch3_lo: xoneKill(-6), ch3_fader: 8.5, ch3_snd1: 7, ch3_snd2: 7.5, ch3_filter: XFILTER.off,
+  cha_hi: xoneKill(-3), cha_mid: 0, cha_lo: xoneKill(-12), cha_fader: 10, cha_filter: XFILTER.off,
+  chb_hi: xoneKill(-2), chb_mid: xoneMid(-3, true), chb_midf: 400, chb_lo: xoneKill(-12), chb_fader: 10, chb_filter: XFILTER.off,
   // FX unit: DELAY 3/16 (409 ms), FDBK 4.5, REVERB 3.0 s, SEND 1 post-fader
   fx_time: 1, fx_fdbk: 4.5, fx_size: 3,
   f1_on: false, f2_on: false,
@@ -126,25 +135,30 @@ const dfam = (noise: number, vco2: number, fm: number, kick = 100, kick2 = 94) =
   snapshot: { noise_level: noise, vco2_level: vco2, fm_amount: fm, velocity_1: kick, velocity_5: kick2 },
 });
 const m32 = (cutoff: number, mod: number) => ({ snapshot: { cutoff, vcf_mod_amount: mod } });
-const subh = (cutoff: number, resonance: number, eg: 1 | 2, r3: boolean) => ({
-  snapshot: { cutoff, resonance, eg_mode: eg, rhythm3_seq1: r3 },
+/**
+ * The Subharmonicon's snapshot. `volume` is a fader ride on its VOLUME: up when it plays alone in
+ * CLOCKWORK (an intro that isn't 8 dB under the track), down for the held drone of UNDERTOW,
+ * which sustains where the sequence plucks.
+ */
+const subh = (cutoff: number, resonance: number, eg: 1 | 2, r3: boolean, volume = 65) => ({
+  snapshot: { cutoff, resonance, eg_mode: eg, rhythm3_seq1: r3, volume },
 });
 
 export function build(): { devices: Record<string, InstanceState>; studio: StudioDoc; currentDevice: string } {
   const [clockwork, pulse, lowEnd, lift, undertow, ret, drift] = META.sections;
   const S = (m: typeof clockwork, parts: Parameters<typeof section>[4]) => section(m.id, m.name, m.bars, m.color, parts);
   const sections = [
-    S(clockwork, { dfam: { ...dfam(12, 0, 0), muted: true }, mother32: { ...m32(380, 45), muted: true }, subharmonicon: subh(450, 35, 1, false) }),
+    S(clockwork, { dfam: { ...dfam(12, 0, 0), muted: true }, mother32: { ...m32(380, 45), muted: true }, subharmonicon: subh(450, 35, 1, false, 85) }),
     S(pulse, { dfam: dfam(12, 0, 0), mother32: { ...m32(380, 45), muted: true }, subharmonicon: subh(650, 35, 1, false) }),
     S(lowEnd, { dfam: dfam(12, 0, 0), mother32: m32(380, 45), subharmonicon: subh(800, 35, 1, false) }),
     // LIFT: energy without new notes - noise and FM on the DFAM, the bass and the Subharmonicon brighter
     S(lift, { dfam: dfam(30, 30, 25), mother32: m32(520, 55), subharmonicon: subh(1300, 45, 1, false) }),
     // UNDERTOW: EG HELD makes the sequencers a drone chord; RHYTHM 3 ÷5 joins SEQ 1
-    S(undertow, { dfam: { ...dfam(12, 0, 0), muted: true }, mother32: { ...m32(380, 55), muted: true }, subharmonicon: subh(900, 55, 2, true) }),
+    S(undertow, { dfam: { ...dfam(12, 0, 0), muted: true }, mother32: { ...m32(380, 55), muted: true }, subharmonicon: subh(900, 55, 2, true, 58) }),
     // RETURN: the PULSE settings with a little metal (VCO 2 at 15 %), the ÷5 rhythm kept
     S(ret, { dfam: dfam(12, 15, 0), mother32: m32(380, 55), subharmonicon: subh(1000, 40, 1, true) }),
     // DRIFT: the kick loses its bloom (softer steps 1 and 5 decay sooner through the VELOCITY cable)
-    S(drift, { dfam: dfam(12, 15, 0, 78, 72), mother32: { ...m32(380, 45), muted: true }, subharmonicon: subh(500, 35, 1, true) }),
+    S(drift, { dfam: dfam(12, 15, 0, 78, 72), mother32: { ...m32(380, 45), muted: true }, subharmonicon: subh(500, 35, 1, true, 70) }),
   ];
 
   const devices: Record<string, InstanceState> = {
@@ -173,9 +187,10 @@ export function build(): { devices: Record<string, InstanceState>; studio: Studi
     swing: 0,
     arrangement: { enabled: true, loop: false, sections },
     off: {},
+    // the Xone's own channel +6 dB and the master DRIVE +5 dB into the -1 dBTP limiter: about -13 LUFS
     mixer: mixer({
-      'studio-clock': strip(0), dfam: strip(0), mother32: strip(0), subharmonicon: strip(0), xone96: strip(0),
-    }, 4),
+      'studio-clock': strip(0), dfam: strip(0), mother32: strip(0), subharmonicon: strip(0), xone96: strip(6),
+    }, 5),
   };
   return { devices, studio, currentDevice: 'dfam' };
 }

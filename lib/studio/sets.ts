@@ -121,6 +121,15 @@ const ELEKTRON: StudioSet[] = [
 
 // ---- Moog studio: patchable clock, cables, semi-modulars ----------------------------
 
+/**
+ * Starting levels of the Moogs routed into the Xone:96, measured on its channel meters with
+ * the instruments' default sounds (scripts: the Xone's meterSnapshot while the set plays):
+ * each channel then averages about 0 with peaks near +4, the guide's line-up (Xone:96 guide
+ * p.39), and the LR MIX of all three stays under its PK! LED. The DFAM arrives there at unity;
+ * the Mother-32 arrives hot (about +4 average at -3 dB), the Subharmonicon about 2 dB hot.
+ */
+const MOOG_LINE_UP = { mother32: -6.5, subharmonicon: -8 } as const;
+
 const MOOG: StudioSet[] = [
   {
     id: 'moog-1-dfam',
@@ -173,7 +182,7 @@ const MOOG: StudioSet[] = [
     routes: { dfam: 'xone96:studio_1', mother32: 'xone96:studio_2' },
     sync: { mother32: true, xone96: true },
     cables: [CLOCK_TO_DFAM],
-    channels: { dfam: ch(0, 0, MIN_DB, -22), mother32: ch(-3, 0.15, -18, MIN_DB) },
+    channels: { dfam: ch(0, 0, MIN_DB, -22), mother32: ch(MOOG_LINE_UP.mother32, 0.15, -18, MIN_DB) },
     bpm: 110,
     focus: 'mother32',
   },
@@ -190,8 +199,8 @@ const MOOG: StudioSet[] = [
     cables: [CLOCK_TO_DFAM],
     channels: {
       dfam: ch(0, 0, MIN_DB, -22),
-      mother32: ch(-3, 0.15, -18, MIN_DB),
-      subharmonicon: ch(-6, -0.25, MIN_DB, -12),
+      mother32: ch(MOOG_LINE_UP.mother32, 0.15, -18, MIN_DB),
+      subharmonicon: ch(MOOG_LINE_UP.subharmonicon, -0.25, MIN_DB, -12),
     },
     bpm: 110,
     focus: 'dfam',
@@ -211,7 +220,7 @@ const MORE: StudioSet[] = [
     routes: { dfam: 'xone96:studio_1', mother32: 'xone96:studio_2', subharmonicon: 'xone96:studio_3' },
     sync: { mother32: true, subharmonicon: true, xone96: true },
     cables: [CLOCK_TO_DFAM],
-    channels: { dfam: ch(0), mother32: ch(0), subharmonicon: ch(0), xone96: ch(0) },
+    channels: { dfam: ch(0), mother32: ch(MOOG_LINE_UP.mother32), subharmonicon: ch(MOOG_LINE_UP.subharmonicon), xone96: ch(0) },
     bpm: 110,
     focus: 'xone96',
   },

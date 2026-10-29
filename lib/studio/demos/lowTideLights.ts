@@ -32,25 +32,33 @@ const SWING = 54;
 // Analog Rytm kit "LOW TIDE"
 // ----------------------------------------------------------------------------
 
+// Levels are the design's, measured: each part soloed over its busiest 4 bars against the kick
+// (short-term loudness, through the kit's master section) - clap -6, open hat -12, closed hats -15,
+// rim -13, tom -13, ride -15, the Build B snare roll -7. The track volumes below are what gets there
+// on this twin (its VOL, LEV and TRACK LEVEL each square their value).
 const RYTM_KIT = kitValues({
-  bd: { machine: 'BD HARD', tun: 0, swt: 38, snp: 52, dec: 50, hld: 12, wav: 0, tic: 30, lev: 110, flt_typ: 0, flt_frq: 127, amp_atk: 0, amp_dec: 127, amp_ovr: 18, amp_pan: 0, amp_vol: 112 },
-  sd: { machine: 'SD HARD', tun: 2, swd: 40, swt: 30, dec: 30, tic: 50, nod: 38, nol: 80, lev: 100, flt_typ: 4, flt_frq: 30, amp_dec: 127, amp_rev: 40, amp_vol: 92 },
-  rs: { machine: 'RS HARD', tun: 5, swd: 20, swt: 10, dec: 20, sym: 10, nol: 20, tic: 60, lev: 100, flt_typ: 4, flt_frq: 50, amp_del: 70, amp_rev: 20, amp_pan: -20, amp_vol: 80 },
+  // the kick a little longer (DEC 62, HLD 18) than the design's 50 / 12: more body per peak, so the
+  // drum bus reaches club loudness with less limiting
+  bd: { machine: 'BD HARD', tun: 0, swt: 38, snp: 52, dec: 62, hld: 18, wav: 0, tic: 30, lev: 110, flt_typ: 0, flt_frq: 127, amp_atk: 0, amp_dec: 127, amp_ovr: 18, amp_pan: 0, amp_vol: 95 },
+  sd: { machine: 'SD HARD', tun: 2, swd: 40, swt: 30, dec: 30, tic: 50, nod: 38, nol: 80, lev: 100, flt_typ: 4, flt_frq: 30, amp_dec: 127, amp_rev: 40, amp_vol: 71 },
+  rs: { machine: 'RS HARD', tun: 5, swd: 20, swt: 10, dec: 20, sym: 10, nol: 20, tic: 60, lev: 127, trk_lev: 108, flt_typ: 4, flt_frq: 50, amp_del: 70, amp_rev: 20, amp_pan: -20, amp_vol: 127 },
   // NUM 2 = three claps (the first plus NUM)
-  cp: { machine: 'CP CLASSIC', ton: 72, num: 2, rat: 50, nod: 48, nol: 80, rnd: 25, cpd: 50, lev: 100, flt_typ: 4, flt_frq: 41, amp_rev: 45, amp_pan: 0, amp_vol: 96 },
+  cp: { machine: 'CP CLASSIC', ton: 72, num: 2, rat: 50, nod: 48, nol: 80, rnd: 25, cpd: 50, lev: 118, flt_typ: 4, flt_frq: 41, amp_rev: 45, amp_pan: 0, amp_vol: 127 },
   // XT CLASSIC tunes half a semitone a step from 36.7 Hz: +28 is E2 (82.4 Hz), the fifth
-  lt: { machine: 'XT CLASSIC', tun: 28, dec: 40, swd: 30, swt: 50, nol: 20, nod: 30, flt_typ: 0, flt_frq: 127, amp_del: 25, amp_pan: -12, amp_vol: 84 },
-  ch: { machine: 'CH CLASSIC', tun: 0, col: 10, dec: 24, lev: 100, flt_typ: 4, flt_frq: 58, amp_pan: 8, amp_vol: 80 },
-  oh: { machine: 'OH CLASSIC', tun: 0, col: 10, dec: 55, lev: 100, flt_typ: 4, flt_frq: 58, amp_rev: 10, amp_pan: 8, amp_vol: 84 },
-  cy: { machine: 'CY RIDE', tun: 0, typ: 1, hit: 30, dec: 60, c1: 90, c2: 64, c3: 64, lev: 90, flt_typ: 4, flt_frq: 64, amp_rev: 15, amp_pan: 25, amp_vol: 78 },
+  lt: { machine: 'XT CLASSIC', tun: 28, dec: 40, swd: 30, swt: 50, nol: 20, nod: 30, flt_typ: 0, flt_frq: 127, amp_del: 25, amp_pan: -12, amp_vol: 85 },
+  ch: { machine: 'CH CLASSIC', tun: 0, col: 10, dec: 24, lev: 115, trk_lev: 104, flt_typ: 4, flt_frq: 58, amp_pan: 8, amp_vol: 127 },
+  oh: { machine: 'OH CLASSIC', tun: 0, col: 10, dec: 55, lev: 100, flt_typ: 4, flt_frq: 58, amp_rev: 10, amp_pan: 8, amp_vol: 79 },
+  cy: { machine: 'CY RIDE', tun: 0, typ: 1, hit: 30, dec: 60, c1: 90, c2: 64, c3: 64, lev: 90, flt_typ: 4, flt_frq: 64, amp_rev: 15, amp_pan: 25, amp_vol: 66 },
 }, {
   // DELAY: dotted 8th, ping-pong, kept above the bass
   del_tim: 24, del_x: 1, del_wid: 63, del_fdb: 72, del_hpf: 48, del_lpf: 88, del_rev: 24, del_vol: 96,
   rev_pre: 10, rev_dec: 58, rev_frq: 90, rev_gai: 84, rev_hpf: 40, rev_lpf: 86, rev_vol: 90,
-  // DISTORTION a touch; the returns before it (PRE)
-  dis_amt: 8, dis_sym: 0, dis_dov: 0, dis_del: 0, dis_rev: 0,
-  // COMPRESSOR: 1 ms, A1, 1:4, sidechain HPF (the kick doesn't pump the hats), fully wet
-  cmp_thr: 98, cmp_atk: 3, cmp_rel: 6, cmp_mup: 12, cmp_rat: 1, cmp_seq: 2, cmp_mix: 127, cmp_vol: 100,
+  // DISTORTION: the kit drives the master clipper like the factory techno kits (the design's AMT 8
+  // left the drum bus too peaky to master at -10.5 LUFS); the returns go in before it (PRE)
+  dis_amt: 36, dis_sym: 0, dis_dov: 0, dis_del: 0, dis_rev: 0,
+  // COMPRESSOR: 0.3 ms, A1, 1:4, sidechain HPF (the kick doesn't pump the hats), fully wet. The
+  // twin's threshold scale differs from the hardware's: THR 108 gives the design's couple of dB of glue
+  cmp_thr: 108, cmp_atk: 2, cmp_rel: 6, cmp_mup: 10, cmp_rat: 1, cmp_seq: 2, cmp_mix: 127, cmp_vol: 100,
 });
 
 // ---- Rytm patterns (A01-A07). Steps in the extras are 1-based, as in the design ----
@@ -170,36 +178,42 @@ function a4Fx(p: Record<string, number>): Values {
 
 // Filter 1 keytracking (TRK) is relative to C4 here: 32 tracks 1:1, 16 half. The base values
 // put the cutoff where the design wants it at the notes each track plays.
+//
+// Envelope times: the twin's run 1 ms x 2^(v x 14 / 127), so the design's stab envelope (DEC 46,
+// REL 36) would last about 60 ms - a click. The stabs and the bass get longer envelopes, chosen for
+// the sound the design describes (chord stabs with body, a plucked bass that holds its note).
+// Levels are measured against the kick like the drums: bass -2, stabs -9, hook -7, break pad -8.
 const STAB = {
-  osc1_wav: 0, osc2_wav: 0, flt1_res: 30, flt1_trk: 16, flt1_dep: 26, flt2_typ: 4, flt2_frq: 38,
-  envf_atk: 0, envf_dec: 38, envf_sus: 0, envf_rel: 30,
-  amp_atk: 0, amp_dec: 46, amp_sus: 0, amp_rel: 36, amp_cho: 40, amp_del: 60, amp_rev: 45, amp_vol: 88,
+  osc1_wav: 0, osc2_wav: 0, flt1_res: 30, flt1_trk: 16, flt1_dep: 12, flt2_typ: 4, flt2_frq: 38,
+  envf_atk: 0, envf_dec: 50, envf_sus: 0, envf_rel: 30,
+  amp_atk: 12, amp_dec: 72, amp_sus: 0, amp_rel: 72, amp_cho: 40, amp_del: 60, amp_rev: 45, amp_vol: 120, level: 59,
   // the slow filter LFO: SPD 8 x MUL 1 = one cycle every 16 bars
   lfo1_spd: 8, lfo1_mul: 0, lfo1_wav: 0, lfo1_mod: 0, lfo1_dsta: dest('F1 FRQ'), lfo1_depa: 8,
 };
 
 const A4_SOUND: Values = {
-  // T1 bass: saw + the sub an octave down, ladder at about 175 Hz on A2, a plucked envelope
+  // T1 bass: saw + the sub an octave down, ladder at about 175 Hz on A2, a plucked envelope that
+  // settles on a full sustain
   ...a4Track(0, {
     osc1_wav: 0, osc1_sub: 1, osc1_lev: 100, osc2_lev: 0,
-    flt1_frq: 60, flt1_res: 22, flt1_ovr: 8, flt1_trk: 32, flt1_dep: 20, flt2_typ: 4, flt2_frq: 15,
-    envf_atk: 0, envf_dec: 34, envf_sus: 0, envf_rel: 20,
-    amp_atk: 0, amp_dec: 40, amp_sus: 70, amp_rel: 12, amp_pan: 0, amp_vol: 110,
+    flt1_frq: 60, flt1_res: 22, flt1_ovr: 8, flt1_trk: 32, flt1_dep: 18, flt2_typ: 4, flt2_frq: 15,
+    envf_atk: 0, envf_dec: 46, envf_sus: 20, envf_rel: 20,
+    amp_atk: 0, amp_dec: 60, amp_sus: 127, amp_rel: 12, amp_pan: 0, amp_vol: 110, level: 46,
   }, { note: nn('A2'), len: lenIndex(1) }),
   // T2 stab A: root and fifth; T3 stab B: minor third and minor seventh - one NOTE, a m7 chord
-  ...a4Track(1, { ...STAB, osc1_lev: 85, osc1_tun: 0, osc2_lev: 75, osc2_tun: 7, osc2_det: 6, flt1_frq: 65, amp_pan: -12 }, { note: nn('A3'), len: lenIndex(0.5) }),
-  ...a4Track(2, { ...STAB, osc1_lev: 80, osc1_tun: 3, osc2_lev: 75, osc2_tun: 10, osc2_det: -6, flt1_frq: 65, amp_pan: 12 }, { note: nn('A3'), len: lenIndex(0.5) }),
+  ...a4Track(1, { ...STAB, osc1_lev: 85, osc1_tun: 0, osc2_lev: 75, osc2_tun: 7, osc2_det: 6, flt1_frq: 72, amp_pan: -12 }, { note: nn('A3'), len: lenIndex(0.5) }),
+  ...a4Track(2, { ...STAB, osc1_lev: 80, osc1_tun: 3, osc2_lev: 75, osc2_tun: 10, osc2_det: -6, flt1_frq: 72, amp_pan: 12 }, { note: nn('A3'), len: lenIndex(0.5) }),
   // T4 hook / riser: a pulse and a triangle an octave up, about 1 kHz at the hook's notes
   ...a4Track(3, {
     osc1_wav: 2, osc1_pw: -20, osc1_lev: 90, osc2_wav: 3, osc2_tun: 12, osc2_lev: 50,
     flt1_frq: 67, flt1_res: 40, flt1_trk: 16, flt1_dep: 30, flt2_typ: 3, flt2_frq: 54,
     envf_atk: 0, envf_dec: 30, envf_sus: 10, envf_rel: 30,
-    amp_atk: 0, amp_dec: 52, amp_sus: 40, amp_rel: 44, amp_cho: 30, amp_del: 70, amp_rev: 50, amp_pan: 0, amp_vol: 90,
+    amp_atk: 0, amp_dec: 52, amp_sus: 40, amp_rel: 44, amp_cho: 30, amp_del: 70, amp_rev: 50, amp_pan: 0, amp_vol: 107, level: 62,
   }, { note: nn('E5'), len: lenIndex(1) }),
   ...a4Fx({
     cho_pre: 20, cho_spd: 28, cho_dep: 56, cho_wid: 110, cho_fb: 8, cho_hpf: 40, cho_lpf: 120, cho_vol: 90,
     del_tim: 24, del_x: 1, del_fb: 52, del_ovr: 8, del_hpf: 40, del_lpf: 80, del_rev: 30, del_vol: 95,
-    rev_pre: 14, rev_dec: 82, rev_gai: 70, rev_hpf: 36, rev_lpf: 76, rev_vol: 92,
+    rev_pre: 14, rev_dec: 82, rev_gai: 70, rev_hpf: 36, rev_lpf: 76, rev_vol: 110,
   }),
 };
 
@@ -243,7 +257,7 @@ const PAD = withLocks(melodic([
   null,
   b('E3 · · · · · · · · · · · · · · ·', '90 · · · · · · · · · · · · · · ·', '32 · · · · · · · · · · · · · · ·'),
   null,
-]), { amp_atk: 72, amp_sus: 110, amp_rel: 96, flt1_frq: 58, amp_rev: 100 });
+]), { amp_atk: 72, amp_sus: 110, amp_rel: 96, flt1_frq: 58, amp_rev: 100, amp_vol: 84 });
 
 /** E3 on 3, 7, 11 and 15 of each bar: the pedal on the fifth */
 function pedalBars(bars: number, vel: number): MelodicBar[] {
@@ -294,19 +308,23 @@ function a4Patterns(): Record<string, Pattern> {
 // Xone:96 (channel 1 Rytm, 2 Analog Four, A delay return, B reverb return)
 // ----------------------------------------------------------------------------
 
+// Gain staging: GAIN sets each channel's meter (peaks around +6), the faders the balance - the
+// bass 2 dB under the kick at the Xone's output. The twin's faders follow the hardware's
+// constant-power curve (8.0 on the dial is -10 dB), so they sit higher than the design's 8.0 / 7.2,
+// and SEND 2 / channel B are up from 1.0 / 5.5 for the shared room to be audible at all.
 const XONE: Values = {
   // the built-in decks stay silent: every channel hears its studio input or FX return
   ch1_src: XDECK_NONE, ch2_src: XDECK_NONE, ch3_src: XDECK_NONE, ch4_src: XDECK_NONE, cha_src: XDECK_NONE, chb_src: XDECK_NONE,
   ch1_input: 2, ch2_input: 2, cha_input: 2, chb_input: 2,
-  ch1_gain: 1, ch1_hi: xoneKill(-1), ch1_himid: 0, ch1_lomid: xoneMid(-2), ch1_lo: 0, ch1_fader: 8, ch1_snd1: 0, ch1_snd2: 0, ch1_filter: XFILTER.off,
-  ch2_gain: 0, ch2_hi: xoneKill(-1.5), ch2_himid: xoneMid(1.5), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 7.2, ch2_snd1: 0, ch2_snd2: 1, ch2_filter: XFILTER.off,
+  ch1_gain: 1, ch1_hi: xoneKill(-1), ch1_himid: 0, ch1_lomid: xoneMid(-2), ch1_lo: 0, ch1_fader: 9, ch1_snd1: 0, ch1_snd2: 0, ch1_filter: XFILTER.off,
+  ch2_gain: 1, ch2_hi: xoneKill(-1.5), ch2_himid: xoneMid(1.5), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 10, ch2_snd1: 0, ch2_snd2: 4, ch2_filter: XFILTER.off,
   cha_hi: xoneKill(-3), cha_mid: 0, cha_lo: xoneKill(-12), cha_fader: 5, cha_filter: XFILTER.off,
-  chb_hi: xoneKill(-2), chb_mid: xoneMid(-2, true), chb_midf: 400, chb_lo: xoneKill(-12), chb_fader: 5.5, chb_filter: XFILTER.off,
+  chb_hi: xoneKill(-2), chb_mid: xoneMid(-2, true), chb_midf: 400, chb_lo: xoneKill(-12), chb_fader: 9, chb_filter: XFILTER.off,
   // FX unit: DELAY 3/16, FDBK 4.0, REVERB 2.2 s; FILTER 1 HPF RES 4 (Build B), FILTER 2 LPF RES 2 (Groove)
   fx_time: 1, fx_fdbk: 4, fx_size: 2.2,
   f1_on: true, f1_type: XTYPE.hpf, f1_freq: 140, f1_res: 4, f1_crunch: 0,
   f2_on: true, f2_type: XTYPE.lpf, f2_freq: 900, f2_res: 2, f2_crunch: 0,
-  master: 7.5, monitor_out: 0, bpm: BPM, play: false,
+  master: 8, monitor_out: 0, bpm: BPM, play: false,
 };
 
 /** Xone snapshot: which channels are on a filter in this section */
@@ -375,12 +393,14 @@ export function build(): { devices: Record<string, InstanceState>; studio: Studi
     swing: 0,
     arrangement: { enabled: true, loop: false, sections },
     off: {},
+    // the Xone's own channel +6 dB and the master DRIVE +6 dB into the -1 dBTP limiter:
+    // about -10.5 LUFS integrated
     mixer: mixer({
       'studio-clock': strip(0),
       'analog-rytm': strip(0),
       'analog-four': strip(0),
-      xone96: strip(0),
-    }, 5),
+      xone96: strip(6),
+    }, 6),
   };
   return { devices, studio, currentDevice: 'analog-rytm' };
 }
