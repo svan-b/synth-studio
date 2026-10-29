@@ -59,11 +59,12 @@ const ST_IDLE = 0, ST_ATTACK = 1, ST_DECAY = 2, ST_HOLD = 3;
 const C4 = 261.6256;
 const MAX_DIGITAL_OCT = Math.log2(10000 / C4); // the sequencers cannot push a VCO past ~10 kHz
 const EG_VOLTS = 8;            // envelopes peak at +8 V
-const VCF_EG_OCT = 6;          // VCF EG AMT fully clockwise: the full envelope moves the cutoff 6 octaves
+const VCF_EG_OCT = 8;          // VCF EG AMT fully clockwise = the 8 V envelope into the 1 V/oct cutoff: 8 octaves
+const CV_SMOOTH = 0.0002;      // VCA and CUTOFF jacks: the analog CV inputs' own RC (about 800 Hz)
 const RES_SCALE = 1.25;        // RESONANCE travel -> ladder feedback (self-oscillation from ~78 %)
 const DRIVE = 0.8;             // mixer bus -> ladder input
-const OUT_GAIN = 1.5;          // VCA output make-up: a full patch peaks near 10 V p-p at full VOLUME
-const OUT_KNEE = 0.62, OUT_CEIL = 0.86; // output stage: clean below the knee, rounds peaks off below -1.3 dBFS
+const OUT_GAIN = 3.0;          // VCA output make-up: the median Moog patch sheet reads about -18 LUFS at full VOLUME
+const OUT_KNEE = 0.6, OUT_CEIL = 0.84;  // output stage: clean below the knee, rounds peaks off below -1.5 dBFS
 const BUS_SAT = 1.4;           // mixer bus soft-saturation knee
 const PWM_PER_VOLT = 0.098;    // PWM jack: -5..+5 V = 1..99 % duty cycle (manual p.32)
 const PWM_NORMAL = 0.3;        // SUB 1 saw normalled to the VCO's pulse width (MIDDLE position)
@@ -208,6 +209,9 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
     this.eAtk = new Float64Array(2); this.eDec = new Float64Array(2); this.eKey = new Float64Array([-1, -1, -1, -1]);
     this.envSmooth = 1 - Math.exp(-1 / (ENV_SMOOTH * sr));
     this.lastEg = EG_ON;
+    // VCA and CUTOFF jack CV after the inputs' RC (a pulse into VCA IN snaps, it does not step)
+    this.cvA = 1 - Math.exp(-1 / (CV_SMOOTH * sr));
+    this.vcaCv = 0; this.cutCv = 0;
 
     // Sequencers, rhythm generators, clock
     this.pos = new Int32Array(2);          // current step 0..3
@@ -217,6 +221,9 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
     this.seqRaw = new Float64Array(2);     // raw step volts (knob x 5 V): SEQ ASSIGN SUB 1 / SUB 2
     this.seqOut = new Float64Array(2);     // SEQ jack volts (SEQ OCT and QUANTIZE unless held)
     this.run = false; this.playKnob = false; this.midiRun = false; this.audition = false;
+    // PLAY button / studio stop override the PLAY jack until PLAY is pressed again (manual p.34)
+    this.playOverride = false;
+    this.lastClockEdge = -1; this.audCable = false; // an audition keeps a running CLOCK cable
     this.phase = 0;                        // internal clock phase
     this.resetHeld = false; this.resetBtn = false; this.resetJack = false; this.holdPos = 0;
     this.clockHigh = false; this.trigHigh = false; this.resetHigh = false; this.playHigh = false;
@@ -463,10 +470,17 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 
   handleEvent(ev, t) {
     switch (ev.ch) {
-      case 'play-knob': this.playKnob = ev.v > 0.5; this.setRun(this.playKnob || this.midiRun); break;
+      case 'play-knob': {
+        // A press overrides the PLAY jack: off holds it stopped until PLAY is pressed on again
+        const on = ev.v > 0.5;
+        if (on !== this.playKnob) this.playOverride = !on;
+        this.playKnob = on;
+        this.setRun(this.playKnob || this.midiRun);
+        break;
+      }
       case 'midi-start': {
         // MIDI start: from step 1, counting 16ths on the studio grid from the start tick
-        this.midiRun = true; this.uiMidi = 1;
+        this.midiRun = true; this.uiMidi = 1; this.playOverride = false;
         this.reset(); this.setRun(true); this.lastCountAt = t;
         const st = Math.max(0, Math.ceil((ev.v || 0) / SYNC_TICKS) * SYNC_TICKS);
         this.lastSyncAt = -1;
@@ -474,11 +488,15 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
         if (this.syncNextTime < t - 0.003) this.syncRealign(t);
         break;
       }
-      case 'midi-stop': this.midiRun = false; this.syncNextTime = Infinity; this.setRun(this.playKnob && !this.midiRun); this.uiDirty = true; break;
+      case 'midi-stop':
+        // The studio's stop is a press of PLAY: it also holds off a gate in the PLAY jack
+        this.midiRun = false; this.syncNextTime = Infinity; this.playOverride = true;
+        this.setRun(this.playKnob && !this.midiRun); this.uiDirty = true;
+        break;
       case 'clock':
         if (Math.abs(ev.time - this.lastClockAudio) < DEDUPE) break;
-        this.lastClockEvent = ev.time;
-        if (this.run && this.patched[I_CLOCK] && !this.audition) { this.lastCountAt = t; this.count(false); }
+        this.lastClockEvent = ev.time; this.lastClockEdge = t;
+        if (this.run && this.patched[I_CLOCK] && (!this.audition || this.audCable)) { this.lastCountAt = t; this.count(false); }
         break;
       case 'trig':
         if (Math.abs(ev.time - this.lastTrigAudio) < DEDUPE) break;
@@ -493,7 +511,7 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
       case 'play':
         if (Math.abs(ev.time - this.lastPlayAudio) < DEDUPE) break;
         this.lastPlayEvent = ev.time;
-        this.setRun(ev.v > 0.5);
+        if (!this.playOverride) this.setRun(ev.v > 0.5);
         break;
       case 'trigger-down':
         // EG lit: an instant trigger. EG unlit: a gate (envelopes held at maximum while
@@ -512,7 +530,14 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
         this.notes.push(n);
         this.midiSemis = n - 60;
         this.pitchDirty[0] = 1; this.pitchDirty[1] = 1;
-        this.trigEnvs(); this.pulseTrig();
+        // Stopped, a note plays like the TRIGGER button with a pitch: EG lit = a trigger,
+        // EG unlit = a gate for as long as the key is held (see `gate` in process), EG held
+        // = nothing more. While the sequencers run it only transposes them (firmware 1.1).
+        if (!this.run) {
+          const eg = this.k[K_EG] | 0;
+          if (eg === EG_ON) { this.trigEnvs(); this.pulseTrig(); }
+          else if (eg === EG_OFF) this.pulseTrig();
+        }
         this.uiMidi = 1;
         break;
       }
@@ -529,6 +554,8 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
         if (!this.audition && (!this.run || idle)) {
           this.saved = { pos: [this.pos[0], this.pos[1]], armed: [this.armed[0], this.armed[1]], cnt: Array.from(this.cnt), run: this.run };
           this.audition = true;
+          // A self-patched clock (a VCO or sub in CLOCK) keeps running: the audition uses it
+          this.audCable = !!this.patched[I_CLOCK] && currentTime - this.lastClockEdge < 0.25;
           this.reset();
           this.run = true; this.phase = 1;
           // Nothing would sound if no rhythm generator steps a sequencer, or EG is off with
@@ -540,8 +567,10 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
         break;
       }
       case 'aud-off':
+        // The audition ends like a press of PLAY off: a gate in the PLAY jack is held off too
+        if (this.patched[I_PLAY]) { this.playOverride = true; if (!this.playKnob && !this.midiRun) this.run = false; }
         if (this.audition) {
-          this.audition = false; this.audGate = false;
+          this.audition = false; this.audGate = false; this.audCable = false;
           const sv = this.saved;
           if (sv) {
             this.pos[0] = sv.pos[0]; this.pos[1] = sv.pos[1]; this.armed[0] = sv.armed[0]; this.armed[1] = sv.armed[1];
@@ -643,6 +672,8 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 
     const ev = this.ev, eo = this.eo, est = this.est, eAtk = this.eAtk, eDec = this.eDec;
     const envSmooth = this.envSmooth;
+    const cvA = this.cvA;
+    let vcaCv = this.vcaCv, cutCv = this.cutCv;
     const bb = this.bb, src = this.src, sLv = this.sLv;
     const vp = this.vp, vinc = this.vinc, sq = this.sq, sc = this.sc, sn = this.sn;
     const queue = this.queue;
@@ -674,15 +705,17 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
 
       // ---- gate / trigger / clock jacks (edge detected, deduped against events) ----
       if (patched[I_PLAY]) {
+        // gate level: rising edge = PLAY on, falling edge = off (manual p.34), unless a press
+        // of PLAY (or the studio's stop) is holding it
         const g = inV[I_PLAY];
         if (!this.playHigh && g > EDGE_ON) {
           this.playHigh = true;
           const t = t0 + i / sr;
-          if (Math.abs(t - this.lastPlayEvent) >= DEDUPE) { this.lastPlayAudio = t; this.setRun(true); }
+          if (Math.abs(t - this.lastPlayEvent) >= DEDUPE) { this.lastPlayAudio = t; if (!this.playOverride) this.setRun(true); }
         } else if (this.playHigh && g < EDGE_OFF) {
           this.playHigh = false;
           const t = t0 + i / sr;
-          if (Math.abs(t - this.lastPlayEvent) >= DEDUPE) { this.lastPlayAudio = t; this.setRun(false); }
+          if (Math.abs(t - this.lastPlayEvent) >= DEDUPE) { this.lastPlayAudio = t; if (!this.playOverride) this.setRun(false); }
         }
       }
       if (patched[I_RESET]) {
@@ -707,24 +740,25 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
           this.clockHigh = true;
           const t = t0 + i / sr;
           if (Math.abs(t - this.lastClockEvent) >= DEDUPE) {
-            this.lastClockAudio = t;
-            if (this.run && !this.audition) { this.lastCountAt = t; this.count(false); }
+            this.lastClockAudio = t; this.lastClockEdge = t;
+            if (this.run && (!this.audition || this.audCable)) { this.lastCountAt = t; this.count(false); }
           }
         } else if (this.clockHigh && g < EDGE_OFF) this.clockHigh = false;
       }
 
-      // ---- studio clock (MIDI sync): one master count per 16th, unless a CLOCK cable is in ----
-      if (this.midiRun && this.run && !this.audition && t0 + i / sr >= this.syncNextTime) {
+      // ---- studio clock (MIDI sync): one master count per 16th, unless a CLOCK cable is in.
+      // The grid keeps moving while PLAY is held off (PLAY jack) or an audition plays ----
+      if (this.midiRun && t0 + i / sr >= this.syncNextTime) {
         const at = this.syncNextTime;
         this.syncNextTick += SYNC_TICKS;
         this.syncNextTime = this.syncTimeOf(this.syncNextTick);
         this.lastSyncAt = at;
         this.uiMidi = 1;
-        if (!patched[I_CLOCK]) { this.lastCountAt = at; this.count(false); }
+        if (this.run && !this.audition && !patched[I_CLOCK]) { this.lastCountAt = at; this.count(false); }
       }
 
       // ---- internal clock (TEMPO, 1 PPQ): when nothing external is in charge ----
-      if (this.run && (this.audition || (!patched[I_CLOCK] && !this.midiRun))) {
+      if (this.run && ((this.audition && !this.audCable) || (!patched[I_CLOCK] && !this.midiRun))) {
         this.phase += tempoHz / sr;
         if (this.phase >= 1) {
           this.phase -= 1;
@@ -735,8 +769,9 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
       }
 
       // ---- envelopes: [0] VCF, [1] VCA ----
-      // gates: TRIGGER held with EG unlit, held keys, an audition, and the HELD mode itself
-      const gate = held || this.btnGate || this.notes.length > 0 || this.audGate;
+      // gates: TRIGGER held with EG unlit, held keys with EG unlit (while stopped), an
+      // audition, and the HELD mode itself
+      const gate = held || this.btnGate || this.audGate || (egMode === EG_OFF && !this.run && this.notes.length > 0);
       if (gate && !this.gate) this.startEnvs(); // a new gate starts the envelopes
       this.gate = gate;
       for (let e = 0; e < 2; e++) {
@@ -849,8 +884,10 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
       const mix = 1.24 * this.m1 - 0.12 * (this.m0 + m2) + (this.seed / 4294967296 - 0.5) * 2e-5;
       this.m0 = this.m1; this.m1 = m2;
 
-      // ---- VCF: cutoff = knob + VCF EG x AMT + CUTOFF jack (1 V/oct) ----
-      let cutOct = this.sCut + this.sEgAmt * VCF_EG_OCT * vcfEg + (patched[I_CUT] ? inV[I_CUT] : 0);
+      // ---- VCF: cutoff = knob + VCF EG x AMT + CUTOFF jack (1 V/oct), summed ----
+      cutCv += ((patched[I_CUT] ? inV[I_CUT] : 0) - cutCv) * cvA;
+      vcaCv += ((patched[I_VCA] ? inV[I_VCA] : 0) - vcaCv) * cvA;
+      let cutOct = this.sCut + this.sEgAmt * VCF_EG_OCT * vcfEg + cutCv;
       if (cutOct !== lastCut) {
         lastCut = cutOct;
         let fc = exp2(cutOct);
@@ -898,7 +935,7 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
       const filt = 0.5 * (ya + yb);
 
       // ---- VCA: VCA EG + VCA jack (summed, so it can push past the envelope) -> VOLUME ----
-      let gv = vcaEg + (patched[I_VCA] ? inV[I_VCA] / EG_VOLTS : 0);
+      let gv = vcaEg + vcaCv / EG_VOLTS;
       let main = 0;
       if (gv > 0) {
         if (gv > 1) gv = 1 + 0.3 * tanhF((gv - 1) / 0.3);
@@ -949,6 +986,8 @@ class SubharmoniconProcessor extends AudioWorkletProcessor {
     for (let j = 0; j < 24; j++) if (!Number.isFinite(bb[j])) { bb.fill(0); break; }
     if (Math.abs(this.dcY) < 1e-20) this.dcY = 0;
     if (!Number.isFinite(this.dcY)) { this.dcX = 0; this.dcY = 0; }
+    this.vcaCv = Math.abs(vcaCv) < 1e-12 || !Number.isFinite(vcaCv) ? 0 : vcaCv;
+    this.cutCv = Math.abs(cutCv) < 1e-12 || !Number.isFinite(cutCv) ? 0 : cutCv;
 
     // UI: steps, running, trigger / rhythm / MIDI flashes - at most every 25 ms
     const now = t0 + n / sr;

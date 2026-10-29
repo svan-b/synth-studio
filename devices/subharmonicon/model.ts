@@ -20,6 +20,8 @@ export const SLOT = {
   logic: 42, tempo: 43, play: 44, egMode: 45,
   cutoff: 46, resonance: 47, egAmt: 48, volume: 49,
   vcfAttack: 50, vcfDecay: 51, vcaAttack: 52, vcaDecay: 53,
+  // SEQ OCT / QUANTIZE held until the LED flashes: the SEQ jacks stop following them (manual pp.21, 28)
+  seqOctHeld: 54, quantizeHeld: 55,
 } as const;
 
 const num = (v: ControlValue) => (typeof v === 'number' ? v : v ? 1 : 0);
@@ -55,6 +57,8 @@ export function knobMessage(id: string, value: ControlValue): [number, number] |
     case 'seq2_sub2': return [SLOT.assign + 5, num(value)];
     case 'seq_oct': return [SLOT.seqOct, SEQ_RANGE[num(value)] ?? 1];   // octaves
     case 'quantize': return [SLOT.quantize, num(value)];               // 0 off, 1 12-ET, 2 8-ET, 3 12-JI, 4 8-JI
+    case 'seq_oct_held': return [SLOT.seqOctHeld, value ? 1 : 0];      // SEQ jacks always ±5 V
+    case 'quantize_held': return [SLOT.quantizeHeld, value ? 1 : 0];   // SEQ jacks unquantized
     case 'rhythm_logic': return [SLOT.logic, num(value)];              // 0 OR, 1 XOR
     case 'tempo': return [SLOT.tempo, bpmToHz(num(value))];
     case 'play': return [SLOT.play, value ? 1 : 0];
