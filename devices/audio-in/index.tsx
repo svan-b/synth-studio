@@ -23,8 +23,8 @@ const spec: DeviceSpec = {
   name: 'Audio input',
   manufacturer: 'Bring your own',
   description: 'An audio interface input (or microphone) as a studio instrument',
-  dimensions: { width: 200, height: 128 },
-  display: { width: 800, height: 512, scale: 4 },
+  dimensions: { width: 200, height: 131 },
+  display: { width: 800, height: 524, scale: 4 },
   signalFlow: [],
   controls: {
     gain: {
@@ -59,7 +59,7 @@ const spec: DeviceSpec = {
 
 const layout: PanelLayout = {
   width: 200,
-  height: 128,
+  height: 131,
   pxPerMm: 4,
   theme: {
     background: 'linear-gradient(180deg, #2a241a 0%, #17130d 100%)',
@@ -70,18 +70,18 @@ const layout: PanelLayout = {
   },
   elements: [
     { kind: 'custom', x: 5, y: 3, w: 190, h: 14, render: ctx => createElement(InputHeader, ctx) },
-    { kind: 'custom', x: 5, y: 19.5, w: 123, h: 24, render: ctx => createElement(SourcePicker, ctx) },
-    { kind: 'custom', x: 130.5, y: 19.5, w: 64.5, h: 24, render: ctx => createElement(LatencyBox, ctx) },
-    { kind: 'custom', x: 5, y: 46, w: 190, h: 17, render: ctx => createElement(MeterBox, ctx) },
-    { kind: 'section', x: 5, y: 66, w: 93, h: 41, border: '1px solid #3b3326', radius: 2 },
-    { kind: 'knob', control: 'gain', x: 17, y: 88, diameter: 14, variant: 'moog-black', capColor: '#f59e0b' },
+    { kind: 'custom', x: 5, y: 19.5, w: 123, h: 26.5, render: ctx => createElement(SourcePicker, ctx) },
+    { kind: 'custom', x: 130.5, y: 19.5, w: 64.5, h: 26.5, render: ctx => createElement(LatencyBox, ctx) },
+    { kind: 'custom', x: 5, y: 48.5, w: 190, h: 17, render: ctx => createElement(MeterBox, ctx) },
+    { kind: 'section', x: 5, y: 68.5, w: 93, h: 41, border: '1px solid #3b3326', radius: 2 },
+    { kind: 'knob', control: 'gain', x: 17, y: 90.5, diameter: 14, variant: 'moog-black', capColor: '#f59e0b' },
     // MODE is how your synth is cabled to the interface: a big 2 x 2 selector (uiControls below)
-    { kind: 'custom', x: 28, y: 69, w: 47, h: 36, render: ctx => createElement(ModeSelector, ctx) },
-    { kind: 'button', control: 'mute', x: 86, y: 88, shape: 'rect', w: 15, h: 11, color: '#2b251b', ledColor: '#ef4444' },
-    { kind: 'custom', x: 100.5, y: 66, w: 94.5, h: 41, render: ctx => createElement(LevelCheck, ctx) },
-    { kind: 'custom', x: 5, y: 110, w: 147, h: 14, render: ctx => createElement(RouteRecord, ctx) },
-    { kind: 'jack', jack: 'out_l', x: 163, y: 119 },
-    { kind: 'jack', jack: 'out_r', x: 183, y: 119 },
+    { kind: 'custom', x: 28, y: 71.5, w: 47, h: 36, render: ctx => createElement(ModeSelector, ctx) },
+    { kind: 'button', control: 'mute', x: 86, y: 90.5, shape: 'rect', w: 15, h: 11.5, color: '#2b251b', ledColor: '#ef4444' },
+    { kind: 'custom', x: 100.5, y: 68.5, w: 94.5, h: 41, render: ctx => createElement(LevelCheck, ctx) },
+    { kind: 'custom', x: 5, y: 112.5, w: 147, h: 15, render: ctx => createElement(RouteRecord, ctx) },
+    { kind: 'jack', jack: 'out_l', x: 163, y: 122 },
+    { kind: 'jack', jack: 'out_r', x: 183, y: 122 },
   ],
 };
 

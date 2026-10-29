@@ -627,7 +627,8 @@ export class PracticeSynth implements MidiOutputLike {
     const ctx = getAudioContext();
     this.ctx = ctx;
     this.bus = ctx.createGain();
-    this.bus.gain.value = 0.9;
+    // Calibrated so its phrase peaks around -12 dBFS at an Audio input (and sits level with the twins)
+    this.bus.gain.value = 0.35;
     this.direct = ctx.createGain();
     this.direct.gain.value = this.listeners ? 0 : 1;
     this.bus.connect(this.direct).connect(getMasterBus());

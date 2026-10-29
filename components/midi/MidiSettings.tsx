@@ -22,7 +22,7 @@ interface Props {
 }
 
 const card = 'rounded-lg border border-[#3a3a3a] bg-[#1d1d1d] p-3';
-const select = 'bg-[#141414] border border-[#3a3a3a] rounded px-1.5 py-1 text-xs text-white';
+const select = 'bg-[#141414] border border-[#3a3a3a] rounded px-1.5 py-1 text-xs text-white min-h-[44px]';
 
 export default function MidiSettings({ open, onOpenChange }: Props) {
   const snap = useMidiSnapshot();
@@ -34,7 +34,7 @@ export default function MidiSettings({ open, onOpenChange }: Props) {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
         <Dialog.Content
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 sm:p-5 w-[calc(100%-1.5rem)] max-w-2xl shadow-2xl z-50 max-h-[92vh] overflow-y-auto text-white"
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 sm:p-5 w-[calc(100%-1.5rem)] max-w-2xl shadow-2xl z-50 max-h-[92vh] supports-[height:100dvh]:max-h-[92dvh] overflow-y-auto text-white"
           aria-describedby="midi-settings-desc"
         >
           <div className="flex items-center gap-2 mb-1">
@@ -217,9 +217,18 @@ function ClockOutSection({ outputs }: { outputs: MidiPortInfo[] }) {
     if (e.type === 'start') setPlaying(true);
     if (e.type === 'stop') setPlaying(false);
   }), []);
-  const [lat, setLat] = useState({ out: 0, base: 0 });
+  // null = the browser does not report it (outputLatency: Safari before 18.4)
+  const [lat, setLat] = useState<{ out: number | null; base: number | null }>({ out: null, base: null });
   useEffect(() => {
-    const read = () => { try { const c = getAudioContext(); setLat({ out: outputLatency(c) * 1000, base: baseLatency(c) * 1000 }); } catch { /* */ } };
+    const read = () => {
+      try {
+        const c = getAudioContext() as AudioContext & { outputLatency?: number };
+        setLat({
+          out: typeof c.outputLatency === 'number' ? outputLatency(c) * 1000 : null,
+          base: typeof c.baseLatency === 'number' ? baseLatency(c) * 1000 : null,
+        });
+      } catch { /* */ }
+    };
     read();
     const id = setInterval(read, 1000);
     return () => clearInterval(id);
@@ -286,11 +295,16 @@ function ClockOutSection({ outputs }: { outputs: MidiPortInfo[] }) {
       )}
       <div className="grid sm:grid-cols-2 gap-2 text-xs text-gray-300">
         <label className="flex items-start gap-2">
-          <input type="checkbox" checked={clock.compensate} onChange={e => setClock({ compensate: e.target.checked })} className="accent-green-500 mt-0.5" />
-          <span>Line hardware up with what you hear <span className="text-gray-500">(+{lat.out.toFixed(0)} ms output latency{lat.base ? `; base ${lat.base.toFixed(0)} ms not added` : ''})</span></span>
+          <input type="checkbox" checked={clock.compensate} onChange={e => setClock({ compensate: e.target.checked })} className="accent-green-500 mt-0.5 w-5 h-5 shrink-0" />
+          <span>
+            Line hardware up with what you hear{' '}
+            <span className="text-gray-500">
+              ({lat.out !== null ? `+${lat.out.toFixed(0)} ms output latency` : 'output latency n/a in this browser'}{lat.base ? `; base ${lat.base.toFixed(0)} ms not added` : ''})
+            </span>
+          </span>
         </label>
         <label className="flex items-start gap-2">
-          <input type="checkbox" checked={clock.spp} onChange={e => setClock({ spp: e.target.checked })} className="accent-green-500 mt-0.5" />
+          <input type="checkbox" checked={clock.spp} onChange={e => setClock({ spp: e.target.checked })} className="accent-green-500 mt-0.5 w-5 h-5 shrink-0" />
           <span>Song Position + Continue when starting mid-song</span>
         </label>
         <label className="flex items-center gap-2">
@@ -298,7 +312,7 @@ function ClockOutSection({ outputs }: { outputs: MidiPortInfo[] }) {
           <input
             type="number" value={clock.offsetMs} min={-200} max={200} step={1}
             onChange={e => setClock({ offsetMs: Math.max(-200, Math.min(200, Number(e.target.value) || 0)) })}
-            className="w-20 bg-[#141414] border border-[#3a3a3a] rounded px-1.5 py-1 text-xs text-white" aria-label="MIDI offset in milliseconds"
+            className="w-20 min-h-[44px] bg-[#141414] border border-[#3a3a3a] rounded px-1.5 py-1 text-xs text-white" aria-label="MIDI offset in milliseconds"
           />
           <span className="text-gray-500 text-[11px]">ms (+ later, − earlier)</span>
         </label>

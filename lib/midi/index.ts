@@ -21,6 +21,9 @@ import { MidiClockIn } from './clock-in';
 import { ControlWriter, applyControlValues } from './apply';
 import { audioClock } from './time';
 import { practiceSynth, type PracticeStatus } from './practice-synth';
+import {
+  asData as asSynthData, channelClashes, freeChannel, initialData as initialSynthData, type SynthUse,
+} from '@/devices/midi-synth/config';
 
 export { midi } from './access';
 export type { MidiSnapshot, MidiPortInfo, IncomingMidi } from './access';
@@ -69,6 +72,38 @@ export function clockTargets(): PortRef[] {
 
 /** Does this port get MIDI clock? */
 export const isClockTarget = (port: PortRef | null | undefined) => !!port && clockTargets().some(t => samePort(t, port));
+
+// ----------------------------------------------------------------------------
+// A second "Your synth" that nobody has set up yet starts on the next free
+// channel, so two new ones never play the same part (on the Practice synth the
+// second lands on channel 2, its keys part). Set-up instances are never touched.
+// ----------------------------------------------------------------------------
+
+const PRISTINE = JSON.stringify(initialSynthData());
+let spreadSeen: unknown[] = [];
+
+function spreadNewSynths() {
+  const st = useStudioStore.getState();
+  const synths = st.studio.rack.filter(r => r.device === 'midi-synth');
+  const refs = synths.map(r => st.devices[r.id]?.data);
+  if (synths.length < 2 || (refs.length === spreadSeen.length && refs.every((d, i) => d === spreadSeen[i]))) return;
+  spreadSeen = refs;
+  const uses: SynthUse[] = synths.map((r, i) => {
+    const d = refs[i] === undefined ? null : asSynthData(refs[i]);
+    return { instance: r.id, name: d?.name ?? '', port: d?.port ?? null, channel: d?.channel ?? 0 };
+  });
+  synths.forEach((r, i) => {
+    const raw = refs[i];
+    if (raw === undefined || JSON.stringify(raw) !== PRISTINE) return;
+    const d = asSynthData(raw);
+    // Only the later one moves: the first instance keeps channel 1
+    const earlier = uses.slice(0, i);
+    if (!channelClashes(r.id, d.port, d.channel, earlier).length) return;
+    const channel = freeChannel(r.id, d.port, uses);
+    uses[i] = { ...uses[i], channel };
+    st.setDeviceData(r.id, { ...d, channel });
+  });
+}
 
 const inRack = (instance: string) => useStudioStore.getState().studio.rack.some(r => r.id === instance);
 const specOf = (instance: string, control: string) => getSpec(useStudioStore.getState().deviceOf(instance))?.controls[control];
@@ -152,6 +187,10 @@ export function initMidi() {
     if (s.mappings !== prev.mappings || s.clockOut !== prev.clockOut) relessen();
   });
   midi.subscribe(relessen);
+  useStudioStore.subscribe((s, prev) => {
+    if (s.studio.rack !== prev.studio.rack || s.devices !== prev.devices) spreadNewSynths();
+  });
+  spreadNewSynths();
   midi.onGranted(() => {
     useMidiStore.getState().setAutoConnect(true);
     // Keep the audio -> MIDI clock mapping settled, so the first beat after Play is exact

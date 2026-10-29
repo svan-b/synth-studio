@@ -240,7 +240,7 @@ export class WamPluginEngine extends BaseEngine implements MidiReceiver {
         const g = ctx.createGain();
         o.frequency.setValueAtTime(140, t);
         o.frequency.exponentialRampToValueAtTime(48, t + 0.1);
-        g.gain.setValueAtTime(0.7, t);
+        g.gain.setValueAtTime(0.32, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
         o.connect(g).connect(this.input);
         o.start(t);
@@ -253,7 +253,7 @@ export class WamPluginEngine extends BaseEngine implements MidiReceiver {
         hp.type = 'highpass';
         hp.frequency.value = 7500;
         const g = ctx.createGain();
-        g.gain.setValueAtTime(0.18, t);
+        g.gain.setValueAtTime(0.08, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
         s.connect(hp).connect(g).connect(this.input);
         s.start(t, Math.random(), 0.08);
@@ -267,7 +267,7 @@ export class WamPluginEngine extends BaseEngine implements MidiReceiver {
           lp.frequency.setValueAtTime(3200, t);
           lp.frequency.exponentialRampToValueAtTime(500, t + 0.2);
           const g = ctx.createGain();
-          g.gain.setValueAtTime(0.09, t);
+          g.gain.setValueAtTime(0.04, t);
           g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
           o.connect(lp).connect(g).connect(this.input);
           o.start(t);

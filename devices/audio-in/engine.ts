@@ -37,6 +37,49 @@ const recorderModules = new WeakMap<BaseAudioContext, Promise<void>>();
 /** Full scale: a sample this close to 1.0 means the converter (or the studio gain) ran out of room */
 const CLIP = 0.999;
 
+// ----------------------------------------------------------------------------
+// iPad / Safari audio session while capturing. WebKit's 'playback' session has
+// no microphone input, and lib/audio/context.ts sets 'playback' on every tap so
+// music plays through the silent switch. While any input captures we ask for
+// 'play-and-record' (WebKit keeps the output on the iPad speakers), and count
+// open inputs in globalThis.__synthCaptureCount so resumeAudio() leaves the
+// session alone until the last one closes.
+// ----------------------------------------------------------------------------
+
+type SessionNavigator = Navigator & { audioSession?: { type: string } };
+type CaptureGlobal = typeof globalThis & { __synthCaptureCount?: number };
+
+function setSession(type: 'play-and-record' | 'playback') {
+  try {
+    const s = typeof navigator !== 'undefined' ? (navigator as SessionNavigator).audioSession : undefined;
+    if (s && s.type !== type) s.type = type;
+  } catch { /* not supported */ }
+}
+
+/** Call before getUserMedia */
+function captureStarted() {
+  const g = globalThis as CaptureGlobal;
+  g.__synthCaptureCount = (g.__synthCaptureCount ?? 0) + 1;
+  setSession('play-and-record');
+}
+
+/** Call when an input that called captureStarted() closes */
+function captureEnded() {
+  const g = globalThis as CaptureGlobal;
+  g.__synthCaptureCount = Math.max(0, (g.__synthCaptureCount ?? 0) - 1);
+  if (g.__synthCaptureCount === 0) setSession('playback');
+}
+
+/** Channels of a captured track. Safari reports no channelCount and ignores the constraint: assume mono there. */
+function trackChannels(settings: MediaTrackSettings): number {
+  if (typeof settings.channelCount === 'number' && settings.channelCount > 0) return settings.channelCount;
+  try {
+    return (navigator.mediaDevices.getSupportedConstraints?.() as MediaTrackSupportedConstraints | undefined)?.channelCount ? 2 : 1;
+  } catch {
+    return 1;
+  }
+}
+
 export interface InputLevels {
   /** After GAIN, 0..1+ linear */
   l: number;
@@ -71,6 +114,9 @@ export class AudioInEngine extends BaseEngine {
   private clipped = false;
   private inputClipped = false;
   private take: { node: AudioWorkletNode; chunks: { l: Float32Array; r: Float32Array }[]; startedAt: number } | null = null;
+  /** This input counts towards __synthCaptureCount (getUserMedia asked or open) */
+  private capturing = false;
+  private monoProbe: ReturnType<typeof setInterval> | null = null;
   private onDeviceChange = () => { if (this.cfg.enabled && this.cfg.source === 'device' && !this.stream) void this.connect(true); };
 
   protected build(): void {
@@ -315,6 +361,10 @@ export class AudioInEngine extends BaseEngine {
       }
     }
     this.emit({ status: 'connecting' as InputStatus, error: null, source: 'device' });
+    // iPad: the audio session must allow recording before the input opens
+    this.beginCapture();
+    // A newer request (seq moved on) owns the capture now: only the latest one may end it
+    const gaveUp = () => { if (!this.stream && seq === this.connectSeq) this.endCapture(); };
     let stream: MediaStream | null = null;
     try {
       stream = await md.getUserMedia({ audio: constraints(this.cfg.deviceId), video: false });
@@ -326,32 +376,38 @@ export class AudioInEngine extends BaseEngine {
           const id = await findByLabel(this.cfg.label);
           stream = await md.getUserMedia({ audio: constraints(id), video: false });
         } catch (e2) {
+          gaveUp();
           if (seq === this.connectSeq) this.fail(e2);
           return;
         }
       } else {
+        gaveUp();
         if (seq === this.connectSeq) this.fail(e);
         return;
       }
     }
     if (seq !== this.connectSeq || !this.started || !this.cfg.enabled || this.cfg.source !== 'device') {
       stream.getTracks().forEach(t => t.stop());
+      gaveUp();
       return;
     }
-    this.release();
+    this.releaseSources();
     try {
       this.source = this.ctx.createMediaStreamSource(stream);
     } catch (e) {
       stream.getTracks().forEach(t => t.stop());
+      gaveUp();
       this.fail(e);
       return;
     }
     this.stream = stream;
     const track = stream.getAudioTracks()[0];
     const settings = (track?.getSettings?.() ?? {}) as MediaTrackSettings & { latency?: number };
-    this.channels = settings.channelCount ?? this.source.channelCount ?? 2;
+    // Not source.channelCount: that is the node's mixing count (2), not the track's
+    this.channels = trackChannels(settings);
     this.source.connect(this.splitIn);
     this.applyMode();
+    if (typeof settings.channelCount !== 'number' && this.channels > 1) this.probeMono(stream);
     track?.addEventListener('ended', () => {
       if (this.stream !== stream) return;
       this.release();
@@ -379,7 +435,9 @@ export class AudioInEngine extends BaseEngine {
     this.emit({ status: 'error' as InputStatus, error: friendlyError(e) });
   }
 
-  private release() {
+  /** Close whatever feeds the input (keeps the capture count: connect() reuses it) */
+  private releaseSources() {
+    if (this.monoProbe) { clearInterval(this.monoProbe); this.monoProbe = null; }
     try { this.source?.disconnect(); } catch { /* */ }
     this.source = null;
     this.stream?.getTracks().forEach(t => t.stop());
@@ -390,6 +448,52 @@ export class AudioInEngine extends BaseEngine {
       try { this.tone.stop(); this.tone.disconnect(); } catch { /* */ }
       this.tone = null;
     }
+  }
+
+  private release() {
+    this.releaseSources();
+    this.endCapture();
+  }
+
+  private beginCapture() {
+    if (this.capturing) return;
+    this.capturing = true;
+    captureStarted();
+  }
+
+  private endCapture() {
+    if (!this.capturing) return;
+    this.capturing = false;
+    captureEnded();
+  }
+
+  /**
+   * A track that claims two channels but sends digital silence on the second
+   * (a mono mic, or Safari, which ignores channelCount) is mono: IN 2 and
+   * STEREO would play nothing on one side. Only used when the browser did not
+   * report the channel count itself.
+   */
+  private probeMono(stream: MediaStream) {
+    let tries = 0;
+    let silentR = 0;
+    this.monoProbe = setInterval(() => {
+      if (this.stream !== stream || ++tries > 60) {
+        if (this.monoProbe) clearInterval(this.monoProbe);
+        this.monoProbe = null;
+        return;
+      }
+      const l = this.peak(this.preL);
+      const r = this.peak(this.preR);
+      if (l > 1e-4 && r === 0) silentR++;
+      else if (r > 0) silentR = -1000;
+      if (silentR >= 15) {
+        if (this.monoProbe) clearInterval(this.monoProbe);
+        this.monoProbe = null;
+        this.channels = 1;
+        this.applyMode();
+        this.emit({ channels: 1 });
+      }
+    }, 50);
   }
 }
 

@@ -282,7 +282,8 @@ export function PanelButton({ children, onClick, title, accent, small, style }: 
       className="shrink-0 rounded font-bold whitespace-nowrap"
       style={{
         fontSize: small ? 11 : 13,
-        minHeight: small ? 26 : 44,
+        // 46 px: still 44+ when the panel is scaled to fit an iPad
+        minHeight: small ? 26 : 46,
         padding: small ? '2px 8px' : '0 14px',
         color: accent ? '#06201d' : '#e6f2f0',
         background: accent ? ACCENT : '#22302f',
@@ -326,7 +327,7 @@ function SquareButton({ children, onClick, label }: { children: React.ReactNode;
       aria-label={label}
       title={label}
       className="rounded font-bold shrink-0 flex items-center justify-center"
-      style={{ width: 44, height: 44, fontSize: 20, color: '#e6f2f0', background: '#22302f', border: '1px solid #3c5552' }}
+      style={{ width: 46, height: 46, fontSize: 20, color: '#e6f2f0', background: '#22302f', border: '1px solid #3c5552' }}
     >
       {children}
     </button>
@@ -420,7 +421,7 @@ export function StepEditor(ctx: CustomRenderContext) {
                 className="rounded font-mono leading-none truncate"
                 style={{
                   fontSize: 11,
-                  height: 40,
+                  height: 46,
                   color: s.on ? '#e6f2f0' : '#6f8583',
                   background: isSel ? '#0f4f48' : 'rgba(0,0,0,0.45)',
                   border: `1px solid ${isSel ? ACCENT : '#2c403e'}`,
@@ -457,7 +458,7 @@ export function StepEditor(ctx: CustomRenderContext) {
           );
         })}
       </div>
-      <div className="flex items-center gap-1.5 rounded px-1.5" style={{ height: 46, background: 'rgba(0,0,0,0.35)', fontSize: 12, color: '#c9d6d4' }}>
+      <div className="flex items-center gap-1.5 rounded px-1.5" style={{ height: 50, background: 'rgba(0,0,0,0.35)', fontSize: 12, color: '#c9d6d4' }}>
         {selected && sel !== null ? (
           <>
             <span className="font-bold text-white whitespace-nowrap">Step {sel + 1}</span>
@@ -497,7 +498,7 @@ function MiniButton({ children, onClick, label }: { children: React.ReactNode; o
       aria-label={label}
       title={label}
       className="rounded font-bold shrink-0"
-      style={{ fontSize: 12, minWidth: 40, height: 40, padding: '0 6px', color: '#e6f2f0', background: '#22302f', border: '1px solid #3c5552' }}
+      style={{ fontSize: 12, minWidth: 46, height: 46, padding: '0 6px', color: '#e6f2f0', background: '#22302f', border: '1px solid #3c5552' }}
     >
       {children}
     </button>

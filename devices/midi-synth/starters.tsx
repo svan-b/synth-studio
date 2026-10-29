@@ -32,7 +32,7 @@ export default function StartersDialog({ data, onApply, onClose }: Props) {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
         <Dialog.Content
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 sm:p-5 w-[calc(100%-1.5rem)] max-w-3xl shadow-2xl z-50 max-h-[92vh] overflow-y-auto text-white"
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 sm:p-5 w-[calc(100%-1.5rem)] max-w-3xl shadow-2xl z-50 max-h-[92vh] supports-[height:100dvh]:max-h-[92dvh] overflow-y-auto text-white"
           aria-describedby="midi-starters-desc"
           onOpenAutoFocus={e => { e.preventDefault(); (e.currentTarget as HTMLElement | null)?.focus?.(); }}
         >

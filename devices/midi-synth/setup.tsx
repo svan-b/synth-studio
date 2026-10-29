@@ -34,7 +34,7 @@ interface Props {
 }
 
 const input = 'bg-[#141414] border border-[#3a3a3a] rounded px-2.5 text-sm text-white min-w-0 min-h-[44px]';
-const small = 'bg-[#141414] border border-[#3a3a3a] rounded px-1.5 text-xs text-white w-full min-w-0 font-mono min-h-[40px]';
+const small = 'bg-[#141414] border border-[#3a3a3a] rounded px-1.5 text-xs text-white w-full min-w-0 font-mono min-h-[44px]';
 const button = 'px-3 min-h-[44px] rounded bg-[#333] text-xs font-bold disabled:opacity-40';
 const NONE = '';
 const SAVED = '__saved';
@@ -69,7 +69,7 @@ export default function SetupDialog({ instance, data, uses, onSave, onClose }: P
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
         <Dialog.Content
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 sm:p-5 w-[calc(100%-1.5rem)] max-w-3xl shadow-2xl z-50 max-h-[92vh] overflow-y-auto text-white"
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 sm:p-5 w-[calc(100%-1.5rem)] max-w-3xl shadow-2xl z-50 max-h-[92vh] supports-[height:100dvh]:max-h-[92dvh] overflow-y-auto text-white"
           aria-describedby="midi-synth-setup-desc"
           // Don't jump into the Name field: on iPad that pops up the keyboard over the dialog
           onOpenAutoFocus={e => { e.preventDefault(); (e.currentTarget as HTMLElement | null)?.focus?.(); }}
@@ -211,7 +211,7 @@ export default function SetupDialog({ instance, data, uses, onSave, onClose }: P
                   ) : <span />}
                   <button
                     onClick={() => set({ knobs: draft.knobs.filter((_, j) => j !== i) })}
-                    className="h-10 rounded bg-[#3a2323] text-red-300 text-xs" aria-label={`Remove knob ${i + 1}`}
+                    className="h-11 rounded bg-[#3a2323] text-red-300 text-xs" aria-label={`Remove knob ${i + 1}`}
                   >
                     ✕
                   </button>
@@ -271,8 +271,7 @@ function OutputHelp({ snap, practice, midiReady, realCount }: { snap: ReturnType
       <div className="text-[11px] leading-snug rounded border border-amber-800/60 bg-amber-950/30 p-2 text-amber-100" role="note">
         <p>{snap.support.message || 'This browser has no Web MIDI.'}</p>
         <p className="mt-1 text-amber-200/80">
-          The <b>Practice synth</b> works here, so you can learn every step. Your own synth: play it by hand and record it with <b>Audio input</b>,
-          or use Chrome or Edge on a computer for MIDI.
+          The <b>Practice synth</b> works here, so you can learn every step. Play your own synth by hand and record it with <b>Audio input</b>.
         </p>
       </div>
     );
@@ -364,7 +363,7 @@ function LearnButton({ active, onToggle, onLearn, label }: { active: boolean; on
   return (
     <button
       onClick={onToggle}
-      className={`h-10 px-2 rounded text-[11px] font-bold ${active ? 'bg-sky-500 text-black animate-pulse motion-reduce:animate-none' : 'bg-[#1e3a50] text-sky-200'}`}
+      className={`h-11 px-2 rounded text-[11px] font-bold ${active ? 'bg-sky-500 text-black animate-pulse motion-reduce:animate-none' : 'bg-[#1e3a50] text-sky-200'}`}
       aria-pressed={active}
       aria-label={label}
       title={active ? 'Turn a knob on your synth now (press again to cancel)' : label}
@@ -411,7 +410,7 @@ function TemplatePicker({ draft, onApply }: { draft: MidiSynthData; onApply: (d:
   const tab = (b: Browse['mode'], label: string) => (
     <button
       onClick={() => setBrowse(b === 'maker' ? browse : ({ mode: b } as Browse))}
-      className={`px-3 min-h-[40px] rounded text-xs font-bold ${browse.mode === b || (b === 'makers' && browse.mode === 'maker') ? 'bg-teal-400 text-black' : 'bg-[#262626] text-gray-300'}`}
+      className={`px-3 min-h-[44px] rounded text-xs font-bold ${browse.mode === b || (b === 'makers' && browse.mode === 'maker') ? 'bg-teal-400 text-black' : 'bg-[#262626] text-gray-300'}`}
       aria-pressed={browse.mode === b}
     >
       {label}
@@ -489,7 +488,7 @@ function TemplatePicker({ draft, onApply }: { draft: MidiSynthData; onApply: (d:
               const p = device.params[i];
               const on = picked.has(i);
               return (
-                <label key={i} className={`flex items-center gap-2 px-1.5 min-h-[40px] rounded text-xs ${on ? 'bg-[#123330]' : 'hover:bg-[#262626]'}`}>
+                <label key={i} className={`flex items-center gap-2 px-1.5 min-h-[44px] rounded text-xs ${on ? 'bg-[#123330]' : 'hover:bg-[#262626]'}`}>
                   <input
                     type="checkbox"
                     checked={on}

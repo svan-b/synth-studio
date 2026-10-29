@@ -57,7 +57,7 @@ const layout: PanelLayout = {
     { kind: 'label', text: 'WAM 2 host · built-in or web plugins', x: 12, y: 44, size: 7.5, weight: 500, color: '#a99fc4', align: 'left' },
     { kind: 'label', text: 'web plugins run third-party code', x: 12, y: 49, size: 7.5, weight: 500, color: '#a99fc4', align: 'left' },
     { kind: 'knob', control: 'level', x: 118, y: 47, diameter: 12, variant: 'moog-black', capColor: '#a78bfa' },
-    { kind: 'button', control: 'bypass', x: 146, y: 47, shape: 'rect', w: 15, h: 11, color: '#2a2440', ledColor: '#f59e0b' },
+    { kind: 'button', control: 'bypass', x: 146, y: 47, shape: 'rect', w: 15, h: 11.5, color: '#2a2440', ledColor: '#f59e0b' },
     { kind: 'custom', x: 164, y: 33, w: 8, h: 25, render: ctx => createElement(PluginMeterBox, ctx) },
     { kind: 'jack', jack: 'in', x: 190, y: 48 },
     { kind: 'jack', jack: 'out', x: 216, y: 48 },

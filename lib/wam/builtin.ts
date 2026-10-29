@@ -191,7 +191,7 @@ class StudioMono extends Builtin<MonoState> {
     this.osc.type = (['sawtooth', 'square', 'triangle'].includes(this.state.wave) ? this.state.wave : 'sawtooth') as OscillatorType;
     this.filter.frequency.setTargetAtTime(this.state.cutoff, t, 0.01);
     this.filter.Q.setTargetAtTime(this.state.resonance, t, 0.01);
-    this.out.gain.setTargetAtTime(this.state.level * 0.5, t, 0.01);
+    this.out.gain.setTargetAtTime(this.state.level * 0.28, t, 0.01);
   }
 
   scheduleEvents(...events: WamEvent[]) {

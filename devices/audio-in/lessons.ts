@@ -103,9 +103,9 @@ const l1: Lesson = {
       checklist: [
         { text: 'MODE is IN 1', check: s => num(s, 'mode') === 0 },
         { text: 'MUTE off', check: s => !s.values.mute },
-        { text: 'Named (tap the name at the top)', check: s => !!d(s).name },
+        { text: 'Named (✎ next to the name at the top)', check: s => !!d(s).name },
       ],
-      hints: ['One cable is mono.', 'The cable goes into input 1, so IN 1.', 'Tap the name at the top left to rename it: the rack and routing menus use it.'],
+      hints: ['One cable is mono.', 'The cable goes into input 1, so IN 1.', 'Press ✎ next to the name at the top to rename it: the rack and routing menus use it.'],
       solution: { values: { mode: 0, mute: false }, data: input({ name: 'Mono synth' }) },
     },
     {

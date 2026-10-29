@@ -146,7 +146,7 @@ function HeaderButton({ children, onClick, accent, title, style }: { children: R
       onClick={onClick}
       title={title}
       className="shrink-0 rounded font-bold whitespace-nowrap"
-      style={{ fontSize: 13, minHeight: 44, padding: '0 14px', color: accent ? '#160f2a' : '#ece8f7', background: accent ? ACCENT : '#2a2440', border: `1px solid ${accent ? ACCENT : '#4b4170'}`, ...style }}
+      style={{ fontSize: 13, minHeight: 46, padding: '0 14px', color: accent ? '#160f2a' : '#ece8f7', background: accent ? ACCENT : '#2a2440', border: `1px solid ${accent ? ACCENT : '#4b4170'}`, ...style }}
     >
       {children}
     </button>
@@ -164,8 +164,10 @@ export function PluginMeter({ instance }: { instance: string }) {
       held = Math.max(v, held * 0.9);
       const db = held > 0 ? 20 * Math.log10(held) : -96;
       if (bar.current) {
-        bar.current.style.height = `${Math.max(0, Math.min(100, ((db + 60) / 60) * 100))}%`;
-        bar.current.style.background = db > -1 ? '#ef4444' : db > -6 ? '#eab308' : '#a78bfa';
+        // transform and colour only: no layout work per frame (iPad)
+        bar.current.style.transform = `scaleY(${Math.max(0, Math.min(1, (db + 60) / 60)).toFixed(4)})`;
+        const c = db > -1 ? '#ef4444' : db > -6 ? '#eab308' : '#a78bfa';
+        if (bar.current.dataset.colour !== c) { bar.current.dataset.colour = c; bar.current.style.background = c; }
       }
       raf = requestAnimationFrame(tick);
     };
@@ -175,7 +177,7 @@ export function PluginMeter({ instance }: { instance: string }) {
   return (
     <div className="w-full h-full flex flex-col items-center gap-0.5 select-none" aria-label="Plugin output level" role="img">
       <div className="relative flex-1 w-full rounded-sm overflow-hidden" style={{ background: '#0c0a12', border: '1px solid #3a3150' }}>
-        <div ref={bar} className="absolute bottom-0 left-0 right-0" style={{ height: 0 }} data-plugin-meter />
+        <div ref={bar} className="absolute inset-0" style={{ transform: 'scaleY(0)', transformOrigin: 'center bottom', willChange: 'transform' }} data-plugin-meter />
       </div>
       <span className="font-bold" style={{ fontSize: 8, color: '#a99fc4' }}>OUT</span>
     </div>
@@ -229,7 +231,7 @@ function PluginChooser({ current, onChoose, onClose, onRemove }: {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
         <Dialog.Content
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 sm:p-5 w-[calc(100%-1.5rem)] max-w-2xl shadow-2xl z-50 max-h-[92vh] overflow-y-auto text-white"
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 sm:p-5 w-[calc(100%-1.5rem)] max-w-2xl shadow-2xl z-50 max-h-[92vh] supports-[height:100dvh]:max-h-[92dvh] overflow-y-auto text-white"
           aria-describedby="wam-chooser-desc"
         >
           <Dialog.Title className="text-lg font-bold">Web Audio plugin</Dialog.Title>

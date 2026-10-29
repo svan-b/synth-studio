@@ -108,6 +108,13 @@ export function InputHeader(ctx: CustomRenderContext) {
   const mode = modeLabel(ctx);
   useRackLabel(ctx.instance, data, mode);
   const [editing, setEditing] = useState(false);
+  // Remember the interface's real name (the "Default input" has none in the data), so the rack names it
+  const liveLabel = live && data.source === 'device' ? String(ctx.engine.deviceLabel ?? '') : '';
+  useEffect(() => {
+    if (!liveLabel || data.label === liveLabel) return;
+    ctx.updateData(d => ({ ...asInputData(d), label: liveLabel }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveLabel]);
   const title = data.name ?? inputLabel(data, mode) ?? 'Audio input';
 
   const dot = live ? '#22c55e' : status === 'error' ? '#ef4444' : status === 'connecting' ? ACCENT : '#6b6b6b';
@@ -138,12 +145,11 @@ export function InputHeader(ctx: CustomRenderContext) {
             onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEditing(false); }}
           />
         ) : (
-          <button className="font-bold truncate max-w-full text-left" style={{ fontSize: 16 }} onClick={() => setEditing(true)} title="Rename this input (its name in the rack and in routing menus)">
-            {title} <span style={{ fontSize: 10, color: '#a89f8c' }}>✎</span>
-          </button>
+          <div className="font-bold truncate max-w-full" style={{ fontSize: 16 }}>{title}</div>
         )}
         <div className="truncate leading-tight" style={{ fontSize: 11, color: status === 'error' ? '#fca5a5' : '#c9bfa9' }} title={line} data-testid="audio-in-status">{line}</div>
       </div>
+      <HeaderButton onClick={() => setEditing(e => !e)} label="Rename this input (its name in the rack and in routing menus)">✎</HeaderButton>
       {live || status === 'connecting' ? (
         <HeaderButton onClick={() => ctx.updateData(d => ({ ...asInputData(d), enabled: false }))}>Disconnect</HeaderButton>
       ) : (
@@ -160,7 +166,7 @@ function HeaderButton({ children, onClick, accent, style, disabled, label }: { c
       disabled={disabled}
       aria-label={label}
       className="shrink-0 rounded font-bold whitespace-nowrap disabled:opacity-40"
-      style={{ fontSize: 13, minHeight: 44, padding: '0 14px', color: accent ? '#1b1306' : '#f3ead8', background: accent ? ACCENT : '#2b251b', border: `1px solid ${accent ? ACCENT : '#4a3f2c'}`, ...style }}
+      style={{ fontSize: 13, minHeight: 46, minWidth: 46, padding: '0 14px', color: accent ? '#1b1306' : '#f3ead8', background: accent ? ACCENT : '#2b251b', border: `1px solid ${accent ? ACCENT : '#4a3f2c'}`, ...style }}
     >
       {children}
     </button>
@@ -200,7 +206,7 @@ export function SourcePicker(ctx: CustomRenderContext) {
               disabled={s.id === 'device' && !canDevice}
               onClick={() => connectTo(ctx, s.id)}
               className="flex-1 rounded font-bold disabled:opacity-40"
-              style={{ minHeight: 44, fontSize: 12, color: on ? '#1b1306' : '#f3ead8', background: on ? ACCENT : '#2b251b', border: `1px solid ${on ? ACCENT : '#4a3f2c'}` }}
+              style={{ minHeight: 46, fontSize: 12, color: on ? '#1b1306' : '#f3ead8', background: on ? ACCENT : '#2b251b', border: `1px solid ${on ? ACCENT : '#4a3f2c'}` }}
             >
               {s.label}
             </button>
@@ -217,7 +223,7 @@ export function SourcePicker(ctx: CustomRenderContext) {
                 connectTo(ctx, 'device', d?.deviceId || null, d?.label || null);
               }}
               className="min-w-0 flex-1 rounded px-1.5"
-              style={{ fontSize: 12, height: 36, background: '#16130e', color: '#f3ead8', border: '1px solid #4a3f2c' }}
+              style={{ fontSize: 12, height: 46, background: '#16130e', color: '#f3ead8', border: '1px solid #4a3f2c' }}
               aria-label="Audio input device"
             >
               <option value="">Default input</option>
@@ -269,7 +275,7 @@ export function ModeSelector(ctx: CustomRenderContext) {
               onClick={() => ctx.setValue('mode', i)}
               className="rounded font-bold"
               style={{
-                minHeight: 44, fontSize: 12,
+                minHeight: 46, fontSize: 12,
                 color: on ? '#1b1306' : mono && i > 0 ? '#6f6656' : '#f3ead8',
                 background: on ? '#e8dcc2' : '#2b251b',
                 border: `1px solid ${target === i && !on ? '#facc15' : on ? '#e8dcc2' : '#4a3f2c'}`,
@@ -299,23 +305,26 @@ export function LatencyBox(ctx: CustomRenderContext) {
   const builtIn = data.source !== 'device';
   const inLat = builtIn ? 0 : ms(ctx.engine.inputLatency as number | null | undefined);
   const muted = !!ctx.values.mute;
+  // Parts a browser does not report are "n/a" (Safari before 18.4 has no outputLatency; only Chrome reports input latency)
   const parts = [inLat, lat.base, lat.out];
   const round = parts.every(v => v !== null) ? parts.reduce<number>((a, b) => a + (b ?? 0), 0) : null;
   const known = (inLat ?? 0) + (lat.base ?? 0) + (lat.out ?? 0);
+  const na = (v: number | null) => (v === null ? 'n/a' : String(v));
+  const missing = [inLat === null && live ? 'input' : '', lat.out === null ? 'output' : ''].filter(Boolean).join(' and ');
   const verdict = round === null
-    ? (inLat === null && live ? 'This browser does not report input latency (Chrome does), so the total is at least what is shown.' : '')
+    ? (missing ? `This browser does not report ${missing} latency, so the real total is at least what is shown.` : '')
     : round <= 10 ? 'Feels instant.' : round <= 20 ? 'Fine for most playing.' : 'You may feel it: lower your interface\'s buffer size, or use direct monitoring.';
 
   return (
     <div className="w-full h-full rounded px-1.5 py-1 flex flex-col justify-between" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid #3b3326', color: '#e8e2d6', ...glow(lit(ctx, 'latency')) }}>
       <div className="flex items-baseline justify-between">
         <span className="font-bold" style={{ fontSize: 10, color: '#b3a585' }}>LATENCY</span>
-        <span className="font-mono font-bold" style={{ fontSize: 15 }} title="Round trip: from the synth's output, through the interface and the studio, back to your ears">
-          {round !== null ? `≈${round} ms` : known ? `≥${known} ms` : '- ms'}
+        <span className="font-mono font-bold" style={{ fontSize: 15 }} title="Round trip: from the synth's output, through the interface and the studio, back to your ears" data-testid="latency-total">
+          {round !== null ? `≈${round} ms` : known ? `≥${known} ms` : 'n/a'}
         </span>
       </div>
-      <div className="font-mono leading-snug" style={{ fontSize: 10, color: '#c9bfa9' }} title="Input latency is reported by Chrome; base and output latency by every browser that supports them">
-        in {builtIn ? '0 (built in)' : inLat ?? '?'} · base {lat.base ?? '?'} · out {lat.out ?? '?'} ms
+      <div className="font-mono leading-snug" style={{ fontSize: 10, color: '#c9bfa9' }} title="Input latency is reported by Chrome; base and output latency by browsers that support them (Safari from 18.4 for output)">
+        in {builtIn ? '0 (built in)' : na(inLat)} · base {na(lat.base)} · out {na(lat.out)} ms
       </div>
       <div className="leading-snug" style={{ fontSize: 10, color: muted ? '#86efac' : '#a89f8c' }}>
         {muted ? 'MUTE is on: you monitor directly from your interface (no studio delay); it still meters and records.' : verdict}
@@ -340,11 +349,14 @@ export function Meter({ instance, ctx }: { instance: string; ctx?: CustomRenderC
     const held = { l: 0, r: 0 };
     let hold = { db: -96, at: 0 };
     let lastText = 0;
+    const colours = new WeakMap<HTMLElement, string>();
+    // transform and colour only: no layout work per frame (iPad)
     const bar = (el: HTMLDivElement | null, v: number) => {
       if (!el) return;
       const db = toDb(v);
-      el.style.width = `${pctOf(db)}%`;
-      el.style.background = db > -1 ? '#ef4444' : db > TARGET_ZONE[1] ? '#eab308' : '#22c55e';
+      el.style.transform = `scaleX(${(pctOf(db) / 100).toFixed(4)})`;
+      const c = db > -1 ? '#ef4444' : db > TARGET_ZONE[1] ? '#eab308' : '#22c55e';
+      if (colours.get(el) !== c) { colours.set(el, c); el.style.background = c; }
     };
     const tick = () => {
       const engine = engineOf(instance);
@@ -360,8 +372,10 @@ export function Meter({ instance, ctx }: { instance: string; ctx?: CustomRenderC
         lastText = now;
         peakRef.current.textContent = hold.db <= -90 ? '-∞' : hold.db.toFixed(1);
       }
-      if (clipRef.current) clipRef.current.style.background = lv.clip ? '#ef4444' : '#3a1414';
-      if (inClipRef.current) inClipRef.current.style.background = lv.inputClip ? '#ef4444' : '#3a1414';
+      const clipBg = lv.clip ? '#ef4444' : '#3a1414';
+      const inBg = lv.inputClip ? '#ef4444' : '#3a1414';
+      if (clipRef.current && clipRef.current.style.background !== clipBg) clipRef.current.style.background = clipBg;
+      if (inClipRef.current && inClipRef.current.style.background !== inBg) inClipRef.current.style.background = inBg;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -378,7 +392,7 @@ export function Meter({ instance, ctx }: { instance: string; ctx?: CustomRenderC
             <div className="relative flex-1 rounded-sm overflow-hidden" style={{ height: 14, background: '#0d0b08', border: '1px solid #3b3326' }}>
               {/* Target zone: peaks around -12 dBFS */}
               <div className="absolute inset-y-0" style={{ left: `${pctOf(TARGET_ZONE[0])}%`, width: `${pctOf(TARGET_ZONE[1]) - pctOf(TARGET_ZONE[0])}%`, background: 'rgba(34,197,94,0.16)' }} />
-              <div ref={ch === 'L' ? lRef : rRef} className="absolute inset-y-0 left-0" style={{ width: 0 }} data-meter={ch} />
+              <div ref={ch === 'L' ? lRef : rRef} className="absolute inset-0" style={{ transform: 'scaleX(0)', transformOrigin: 'left center', willChange: 'transform' }} data-meter={ch} />
               {ticks.map(db => (
                 <div key={db} className="absolute inset-y-0" style={{ left: `${pctOf(db)}%`, width: 1, background: db === TARGET_DBFS ? 'rgba(134,239,172,0.7)' : 'rgba(255,255,255,0.18)' }} />
               ))}
@@ -567,7 +581,7 @@ export function RouteRecord(ctx: CustomRenderContext) {
           value={known ? route : 'master'}
           onChange={e => setRoute(ctx.instance, e.target.value)}
           className="min-w-0 rounded px-1.5"
-          style={{ fontSize: 12, height: 40, maxWidth: 190, background: '#16130e', color: '#f3ead8', border: '1px solid #4a3f2c' }}
+          style={{ fontSize: 12, height: 46, maxWidth: 190, background: '#16130e', color: '#f3ead8', border: '1px solid #4a3f2c' }}
           aria-label="Output: where this input goes"
           title={targets.length ? 'Master, or a mixer channel (gain, EQ, filter and fader for this input)' : 'Add a mixer (Xone:96) to the studio to route this input to its own channel'}
         >
@@ -579,7 +593,7 @@ export function RouteRecord(ctx: CustomRenderContext) {
         onClick={() => void toggleTake()}
         disabled={!live || busy}
         className="shrink-0 rounded font-bold flex items-center gap-1.5 disabled:opacity-40"
-        style={{ minHeight: 44, padding: '0 12px', fontSize: 13, color: recording ? '#fff' : '#fee2e2', background: recording ? '#dc2626' : '#3a1d1d', border: '1px solid #7f1d1d', ...glow(lit(ctx, 'record')) }}
+        style={{ minHeight: 46, padding: '0 12px', fontSize: 13, color: recording ? '#fff' : '#fee2e2', background: recording ? '#dc2626' : '#3a1d1d', border: '1px solid #7f1d1d', ...glow(lit(ctx, 'record')) }}
         aria-pressed={recording}
         title="Record this input alone to a WAV file (after GAIN). Starts the studio too, so the sequencer plays along."
       >

@@ -44,18 +44,18 @@ export const MIDI_SYNTH_LAYOUT: PanelLayout = {
     ...knobs,
 
     { kind: 'section', x: 205, y: 25, w: 79, h: 22, title: 'PROGRAM CHANGE', border: '1px solid #2c403e', radius: 2 },
-    { kind: 'knob', control: 'program', x: 214.5, y: 38, diameter: 10, variant: 'moog-black', capColor: '#2dd4bf', label: 'none', value: 'never' },
-    { kind: 'custom', x: 222, y: 29, w: 60, h: 17, render: ctx => createElement(ProgramBox, ctx) },
+    { kind: 'knob', control: 'program', x: 213.5, y: 38, diameter: 11.5, variant: 'moog-black', capColor: '#2dd4bf', label: 'none', value: 'never' },
+    { kind: 'custom', x: 222.5, y: 28.5, w: 60, h: 17.5, render: ctx => createElement(ProgramBox, ctx) },
 
     { kind: 'section', x: 205, y: 50, w: 79, h: 37, title: 'MIDI MONITOR · WHAT THIS PANEL SENDS', border: '1px solid #2c403e', radius: 2 },
     { kind: 'custom', x: 206.5, y: 54.5, w: 76, h: 31, render: ctx => createElement(MonitorBox, ctx) },
 
     { kind: 'section', x: 6, y: 90, w: 278, h: 50, title: 'STEP SEQUENCER · FOLLOWS THE STUDIO TRANSPORT', border: '1px solid #2c403e', radius: 2 },
-    { kind: 'button', control: 'play', x: 16, y: 103, shape: 'rect', w: 14, h: 11, color: '#1b2726', ledColor: '#4ade80', lit: ({ engine, values }) => !!engine.playing || !!values.play },
-    { kind: 'button', control: 'seq', x: 34, y: 103, shape: 'rect', w: 14, h: 11, color: '#1b2726', ledColor: '#2dd4bf' },
-    { kind: 'knob', control: 'gate', x: 13, y: 128, diameter: 10, variant: 'moog-black', capColor: '#2dd4bf' },
-    { kind: 'knob', control: 'length', x: 29, y: 128, diameter: 10, variant: 'moog-black', capColor: '#2dd4bf' },
-    { kind: 'knob', control: 'transpose', x: 45, y: 128, diameter: 10, variant: 'moog-black', capColor: '#2dd4bf' },
+    { kind: 'button', control: 'play', x: 16, y: 103, shape: 'rect', w: 14, h: 11.5, color: '#1b2726', ledColor: '#4ade80', lit: ({ engine, values }) => !!engine.playing || !!values.play },
+    { kind: 'button', control: 'seq', x: 34, y: 103, shape: 'rect', w: 14, h: 11.5, color: '#1b2726', ledColor: '#2dd4bf' },
+    { kind: 'knob', control: 'gate', x: 13, y: 128, diameter: 11.5, variant: 'moog-black', capColor: '#2dd4bf' },
+    { kind: 'knob', control: 'length', x: 29, y: 128, diameter: 11.5, variant: 'moog-black', capColor: '#2dd4bf' },
+    { kind: 'knob', control: 'transpose', x: 45, y: 128, diameter: 11.5, variant: 'moog-black', capColor: '#2dd4bf' },
     { kind: 'custom', x: 56, y: 94, w: 226, h: 43, render: ctx => createElement(StepEditor, ctx) },
 
     { kind: 'keyboard', x: 6, y: 143, w: 278, h: 35, lowNote: 36, numKeys: 37 },
