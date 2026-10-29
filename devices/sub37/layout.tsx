@@ -61,9 +61,14 @@ const led = (x: number, y: number, on: (ctx: PanelContext) => boolean | number):
 const custom = (x: number, y: number, w: number, h: number, render: Extract<PanelElement, { kind: 'custom' }>['render']): PanelElement => ({
   kind: 'custom', x, y, w, h, render,
 });
-/** A button cap drawn by a custom element, centred at x / y like the built-in buttons */
+/**
+ * A button cap drawn by a custom element, centred at x / y like the built-in buttons (a flex box,
+ * so the cap does not sit on a text baseline below its place)
+ */
 const capAt = (x: number, y: number, render: Extract<PanelElement, { kind: 'custom' }>['render'], w = 10, h = 6): PanelElement =>
-  custom(x - w / 2, y - h / 2, w, h, render);
+  custom(x - w / 2, y - h / 2, w, h, ctx => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>{render(ctx)}</div>
+  ));
 const box = (x0: number, x1: number, title: string): PanelElement[] => [
   { kind: 'section', x: x0, y: BOX_TOP, w: x1 - x0, h: BOX_BOTTOM - BOX_TOP, border: '1px solid #3a3a3a', background: '#121212', radius: 1.2 },
   label(title, (x0 + x1) / 2, BOX_TOP + 5, 9, { letterSpacing: 1.4 }),
