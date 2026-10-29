@@ -1639,7 +1639,7 @@ const p2: Lesson = {
     },
     {
       kind: 'challenge', concept: 'effects',
-      instruction: 'Record a second take: in LIVE RECORDING, open AMP and turn knob G (DEL) right up as the playhead reaches trig 13, so the last beat throws echoes.',
+      instruction: 'Record a second take: in LIVE RECORDING, press AMP and turn knob G (DEL) up as the playhead reaches trig 13.',
       checklist: [
         { text: 'A delay-send (DEL) lock of 60 or more on trigs 13-16', check: s => lockedT1(s, 'amp_del').some(([k, st]) => Number(k) >= 12 && st.locks!.amp_del >= 60) },
         { text: 'The filter sweep is still there (FRQ locks on 4 trigs or more)', check: s => lockedT1(s, 'flt1_frq').length >= 4 },
