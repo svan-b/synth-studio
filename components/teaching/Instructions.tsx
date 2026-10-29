@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ControlValue, DeviceSpec, Lesson, LessonStep, MultipleChoice } from '@/types';
 import { useStudioStore, stepKind, buildCheckState, getSpec, type StepSession } from '@/store/studio';
 import { describeValue, pressTargetOf, pressesNeeded } from '@/lib/controls/mapping';
 import { hub } from '@/lib/studio/hub';
+import { getLessonLive, onLessonLive } from '@/lib/studio/lessonLive';
+import { captureInto, goTo, isStudioListen, studioAB } from '@/lib/studio/lessonRuntime';
+import { onProducerLessons, producerLessonsNow } from '@/lib/studio/producerIndex';
 import Scope from './Scope';
 import { canShowMe, cancelShowMe, showMe } from './coachActions';
 import { conceptLabel } from './concepts';
@@ -36,7 +39,20 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
   const focusMode = useStudioStore(s => s.focusMode);
   const snapshot = useStudioStore(s => s.lessonSnapshot);
   const instance = useStudioStore(s => s.lessonInstance);
+  const lessonStudio = useStudioStore(s => s.lessonStudio);
+  const backups = useStudioStore(s => s.lessonBackups);
   const store = useStudioStore.getState();
+  // The Producer path's next lesson (its lessons load on demand, so the page doesn't know them)
+  const [producer, setProducer] = useState(producerLessonsNow());
+  useEffect(() => onProducerLessons(setProducer), []);
+  const producerNext = useMemo(() => {
+    if (!lesson || lesson.path !== 'producer' || !producer) return undefined;
+    const sorted = [...producer].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    const i = sorted.findIndex(l => l.id === lesson.id);
+    return i >= 0 ? sorted[i + 1] : undefined;
+  }, [lesson, producer]);
+  const nextLesson = onNextLesson ?? (producerNext ? () => useStudioStore.getState().startLesson(producerNext) : undefined);
+  const studioSaved = !!lessonStudio?.backupId && backups.some(b => b.id === lessonStudio.backupId);
   const [collapsed, setCollapsed] = useState(false);
   // Touch screens: the coach floats over the panel, on the side the learner picks
   const [side, setSide] = useState<'right' | 'left'>('right');
@@ -109,6 +125,10 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
         </div>
       </div>
 
+      {lesson.start?.studio && lessonStudio?.lesson === lesson.id && !finished && (
+        <StudioBanner lesson={lesson} own={lessonStudio.own} saved={studioSaved} first={currentStep === 0} />
+      )}
+
       <StepProgress lesson={lesson} current={currentStep} finished={finished} session={sessionAll} onJump={i => store.goToStep(i)} />
 
       <div className="flex items-center justify-between mt-1.5">
@@ -135,15 +155,18 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
         <LessonSummary
           lesson={lesson}
           session={sessionAll}
-          snapshot={!!snapshot && !restored}
+          snapshot={lesson.start?.studio ? studioSaved && !restored : !!snapshot && !restored}
+          studio={!!lesson.start?.studio}
           onFinish={() => store.completeLesson()}
-          onNext={onNextLesson ? () => { store.completeLesson(); onNextLesson(); } : undefined}
+          onNext={nextLesson ? () => { store.completeLesson(); nextLesson(); } : undefined}
           onRestore={() => { store.restoreLessonSnapshot(); setRestored(true); }}
         />
       ) : (
         step && (
           <StepCard
             key={`${lesson.id}:${currentStep}`}
+            lesson={lesson}
+            stepIndex={currentStep}
             step={step}
             spec={spec && spec.id === store.deviceOf(target) ? spec : getSpec(store.deviceOf(target)) ?? spec}
             satisfied={satisfied}
@@ -237,7 +260,9 @@ function StepProgress({ lesson, current, finished, session, onJump }: { lesson: 
 
 // ---- a step ------------------------------------------------------------------------
 
-function StepCard({ step, spec, satisfied, session, instance, announce }: {
+function StepCard({ lesson, stepIndex, step, spec, satisfied, session, instance, announce }: {
+  lesson: Lesson;
+  stepIndex: number;
   step: LessonStep;
   spec: DeviceSpec | null;
   satisfied: boolean;
@@ -338,14 +363,26 @@ function StepCard({ step, spec, satisfied, session, instance, announce }: {
 
       {kind === 'listen' && step.listen && (
         <div className="mt-2 space-y-2">
-          <ABToggle
-            instance={instance}
-            a={step.listen.a}
-            b={step.listen.b}
-            labels={[step.listen.labels?.[0] ?? 'A', step.listen.labels?.[1] ?? 'B']}
-          />
+          {isStudioListen(step) || step.listen.matchLoudness || lesson.start?.studio ? (
+            <StudioABToggle lesson={lesson} stepIndex={stepIndex} labels={[step.listen.labels?.[0] ?? 'A', step.listen.labels?.[1] ?? 'B']} match={!!step.listen.matchLoudness} />
+          ) : (
+            <ABToggle
+              instance={instance}
+              a={step.listen.a}
+              b={step.listen.b}
+              labels={[step.listen.labels?.[0] ?? 'A', step.listen.labels?.[1] ?? 'B']}
+            />
+          )}
           {step.listen.question && <MultipleChoiceView mc={step.listen.question} answer={session?.answer} onAnswer={store.answerStep} reveal={session?.answer !== undefined} />}
         </div>
+      )}
+
+      {step.readout?.length ? <LiveReadout items={step.readout} /> : null}
+
+      {step.capture && !needsPrediction && <CaptureRow capture={step.capture} />}
+
+      {lesson.device === 'studio' && !needsPrediction && (step.area || (step.instance && step.instance !== 'studio')) && (
+        <WhereButton step={step} />
       )}
 
       {kind === 'match' && step.match && (
@@ -501,6 +538,186 @@ function ABToggle({ instance, a, b, labels, patchesA }: {
   );
 }
 
+/** Re-render on every live publish (meters, takes): a version counter for useSyncExternalStore */
+let liveVersion = 0;
+const subscribeLive = (cb: () => void) => onLessonLive(() => { liveVersion++; cb(); });
+function useLessonLive() {
+  useSyncExternalStore(subscribeLive, () => liveVersion, () => 0);
+  return getLessonLive();
+}
+
+/**
+ * Studio A/B (Lesson API v3): the whole studio plays while you switch sides - several
+ * instruments, the master section or swing can differ. With loudness matching the louder
+ * side is turned down after the meter, so you judge the sound, not the level.
+ */
+function StudioABToggle({ lesson, stepIndex, labels, match }: { lesson: Lesson; stepIndex: number; labels: [string, string]; match: boolean }) {
+  const key = `${lesson.id}:${stepIndex}`;
+  const info = useSyncExternalStore(
+    cb => studioAB.subscribe(cb),
+    () => JSON.stringify(studioAB.info(key)),
+    () => '',
+  );
+  useEffect(() => () => studioAB.reset(), [key]);
+  const parsed = info ? (JSON.parse(info) as ReturnType<typeof studioAB.info>) : null;
+  const side = parsed?.side ?? null;
+  const fmt = (g: number) => (Math.abs(g) < 0.05 ? '0.0' : g.toFixed(1));
+  return (
+    <div className="space-y-1">
+      <div className="flex rounded overflow-hidden border border-[#2c3a48]" role="group" aria-label="Compare by ear">
+        {(['a', 'b'] as const).map((k, i) => (
+          <button
+            key={k}
+            onClick={() => studioAB.play(lesson, stepIndex, k)}
+            aria-pressed={side === k}
+            className={`flex-1 py-2.5 font-bold text-sm transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 ${
+              side === k ? (k === 'a' ? 'bg-purple-600 text-white' : 'bg-sky-600 text-white') : k === 'a' ? 'bg-[#2a1e36] text-purple-100 hover:bg-[#35264a]' : 'bg-[#1e2a36] text-sky-100 hover:bg-[#263646]'
+            } ${i === 1 ? 'border-l border-[#2c3a48]' : ''}`}
+          >
+            {side === k ? '■' : '▶'} {labels[i]}
+          </button>
+        ))}
+      </div>
+      <p className="text-[10px] text-gray-400 leading-snug" aria-live="polite">
+        {side ? 'The whole studio plays. Switch sides on the same phrase; press the lit side again to stop.' : 'Press A or B: the studio starts playing, and you can switch sides without stopping.'}
+        {match && parsed && (parsed.lufs.a !== null || parsed.lufs.b !== null) && (
+          <> Loudness matched: A {fmt(parsed.gainDb.a)} dB, B {fmt(parsed.gainDb.b)} dB.</>
+        )}
+        {match && parsed && parsed.lufs.a === null && parsed.lufs.b === null && <> Both sides will play at the same loudness.</>}
+      </p>
+    </div>
+  );
+}
+
+const fmtNum = (v: number | null | undefined, d = 1) => (v === null || v === undefined || !Number.isFinite(v) ? '–' : v.toFixed(d));
+
+/** Live numbers for meter steps: the same ones the checks read */
+function LiveReadout({ items }: { items: NonNullable<LessonStep['readout']> }) {
+  const live = useLessonLive();
+  const m = live.meters?.master;
+  const rows: { k: string; v: string; title: string }[] = [];
+  if (!live.meters?.live || !m) {
+    return <p className="mt-2 text-[11px] text-gray-400">Meters start when the audio does: press ▶.</p>;
+  }
+  if (items.includes('loudness')) {
+    rows.push({ k: 'M / S', v: `${fmtNum(m.lufsM)} / ${fmtNum(m.lufsS)}`, title: 'Momentary (0.4 s) and short-term (3 s) loudness, LUFS' });
+    rows.push({ k: 'I', v: `${fmtNum(m.lufsI)} LUFS`, title: 'Integrated loudness since Play (gated, BS.1770-4)' });
+    rows.push({ k: 'measured', v: `${Math.floor(m.measuredSec / 60)}:${String(Math.floor(m.measuredSec % 60)).padStart(2, '0')}${m.fromStart ? ' from bar 1' : ''}`, title: 'Time measured since Play' });
+  }
+  if (items.includes('peaks')) {
+    rows.push({ k: 'peak', v: `${fmtNum(m.peakDb)} dBFS`, title: 'Sample peak into the limiter, the last 3 s' });
+    rows.push({ k: 'true peak', v: `${fmtNum(m.maxTruePeakDb)} dBTP`, title: 'Highest true peak since Play' });
+  }
+  if (items.includes('limiter')) {
+    rows.push({ k: 'limiter', v: `${fmtNum(m.grDb)} dB now, ${fmtNum(m.maxGrDb)} max`, title: 'Limiter gain reduction: the last second, and the most since Play' });
+  }
+  const channels = items.includes('channels')
+    ? Object.entries(live.meters.channels).filter(([k]) => /:[1-4ab]$/.test(k) && Number.isFinite(live.meters!.channels[k].peak) && live.meters!.channels[k].peak > -60)
+    : [];
+  return (
+    <div className="mt-2 rounded bg-black/40 border border-[#2a2a2a] px-2 py-1.5" role="status" aria-label="Live meters">
+      {rows.length > 0 && (
+        <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-[11px] tabular-nums font-mono">
+          {rows.map(r => (
+            <div key={r.k} className="contents" title={r.title}>
+              <dt className="text-gray-400">{r.k}</dt>
+              <dd className="text-gray-100">{r.v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {channels.length > 0 && (
+        <p className="text-[11px] tabular-nums font-mono text-gray-200 mt-0.5">
+          {channels.map(([k, c]) => `ch ${k.split(':')[1].toUpperCase()} ${c.peak >= 0 ? '+' : ''}${fmtNum(c.peak)}${c.pk ? ' PK' : ''}`).join(' · ')}
+          <span className="text-gray-500"> dBu</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Take the learner to the instrument or the part of the studio a step is about */
+function WhereButton({ step }: { step: LessonStep }) {
+  const rack = useStudioStore(s => s.studio.rack);
+  const area = step.area;
+  let label = '';
+  if (area === 'mixer') label = 'Show the mixer';
+  else if (area === 'master') label = 'Show the master';
+  else if (area === 'arranger') label = 'Show the song arranger';
+  else if (area === 'rack') label = 'Show the rack';
+  else if (area === 'transport') label = '';
+  else if (step.instance) {
+    const r = rack.find(x => x.id === step.instance || x.device === step.instance);
+    const name = r ? r.label ?? getSpec(r.device)?.name ?? r.id : step.instance;
+    label = `Open ${name}`;
+  }
+  if (!label) return null;
+  return (
+    <button onClick={() => goTo({ instance: area ? undefined : step.instance, area })} className="mt-2 text-[11px] text-sky-300 hover:text-sky-100 underline-offset-2 hover:underline">
+      {label} ↗
+    </button>
+  );
+}
+
+/**
+ * Arranger snapshots of chosen controls (Lesson API v3): one button per song section. A tap
+ * stores the instrument's current values of just these controls in that section, so a
+ * section can change what plays without freezing the rest of the mix.
+ */
+function CaptureRow({ capture }: { capture: NonNullable<LessonStep['capture']> }) {
+  const sections = useStudioStore(s => s.studio.arrangement.sections);
+  const rack = useStudioStore(s => s.studio.rack);
+  const [flash, setFlash] = useState<string | null>(null);
+  const r = rack.find(x => x.id === capture.instance || x.device === capture.instance);
+  const name = r ? r.label ?? getSpec(r.device)?.name ?? r.id : capture.instance;
+  if (!sections.length) return <p className="mt-2 text-[11px] text-gray-400">Add song sections in the arranger first: then capture into each one here.</p>;
+  const holds = (sec: (typeof sections)[number]) => {
+    const snap = r ? (sec.parts[r.id]?.snapshot as Record<string, ControlValue> | undefined) : undefined;
+    return !!snap && capture.controls.every(c => snap[c] !== undefined);
+  };
+  return (
+    <div className="mt-2">
+      <p className="text-[11px] text-gray-300 mb-1">Capture {capture.label ?? `${name}'s settings`} into:</p>
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Capture into a section">
+        {sections.map((sec, i) => (
+          <button
+            key={sec.id}
+            onClick={() => {
+              captureInto(i, capture.instance, capture.controls);
+              setFlash(sec.id);
+              setTimeout(() => setFlash(f => (f === sec.id ? null : f)), 900);
+            }}
+            className={`px-2 py-1 rounded text-[11px] border ${flash === sec.id ? 'bg-teaching-current text-black border-teaching-current' : holds(sec) ? 'bg-sky-950/60 text-sky-100 border-sky-700' : 'bg-[#1b1b1b] text-gray-200 border-[#333]'}`}
+            aria-label={`Capture into ${sec.name}${holds(sec) ? ' (has a snapshot)' : ''}`}
+          >
+            {holds(sec) ? '✓ ' : ''}{sec.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A lesson that loaded its own studio: say so, and that the learner's studio is safe */
+function StudioBanner({ lesson, own, saved, first }: { lesson: Lesson; own: boolean; saved: boolean; first: boolean }) {
+  const ownText = lesson.start?.studio?.ownStudio;
+  if (own) {
+    return <p className="mt-2 text-[11px] text-sky-200 bg-sky-950/40 rounded px-2 py-1">You are doing this lesson in your own studio.</p>;
+  }
+  return (
+    <div className="mt-2 text-[11px] text-gray-300 bg-[#151d24] border border-[#24313d] rounded px-2 py-1.5 leading-snug">
+      <p>
+        This lesson set up its own studio.{saved ? ' Yours is saved: bring it back at the end, or any time from Lessons.' : ''}
+      </p>
+      {first && ownText && (
+        <button onClick={() => useStudioStore.getState().useOwnStudio()} className="mt-1 text-sky-300 hover:text-sky-100 underline underline-offset-2">
+          Use my own studio instead ({ownText})
+        </button>
+      )}
+    </div>
+  );
+}
+
 function MatchView({ step, session, instance, labelOf, announce }: {
   step: LessonStep;
   session: StepSession | undefined;
@@ -610,6 +827,8 @@ function ChecklistView({ step, instance }: { step: LessonStep; instance: string 
   const devices = useStudioStore(s => s.devices);
   const studio = useStudioStore(s => s.studio);
   const session = useStudioStore(s => s.session[s.currentStep]);
+  // Meters, takes and the song position change without a store change
+  const live = useLessonLive();
   const status = useMemo(() => {
     const st = buildCheckState(instance, hub.getState(instance));
     return (step.checklist ?? []).map(c => {
@@ -617,7 +836,7 @@ function ChecklistView({ step, instance }: { step: LessonStep; instance: string 
       try { return c.check(st); } catch { return false; }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devices, studio, session, step, instance]);
+  }, [devices, studio, session, step, instance, live]);
   return (
     <ul className="mt-2 space-y-1">
       {(step.checklist ?? []).map((c, i) => (
@@ -658,10 +877,12 @@ export function lessonStats(lesson: Lesson, session: Record<number, StepSession>
   return { predicted, predictedRight, quizzed, quizzedRight, matched, matches, matchTries, challenges, challengesDone, shown, hints, skipped, ratings, reviewCount, missed };
 }
 
-function LessonSummary({ lesson, session, snapshot, onFinish, onNext, onRestore }: {
+function LessonSummary({ lesson, session, snapshot, studio, onFinish, onNext, onRestore }: {
   lesson: Lesson;
   session: Record<number, StepSession>;
   snapshot: boolean;
+  /** The lesson replaced the whole studio: restoring brings back the learner's studio */
+  studio?: boolean;
   onFinish: () => void;
   onNext?: () => void;
   onRestore: () => void;
@@ -721,8 +942,11 @@ function LessonSummary({ lesson, session, snapshot, onFinish, onNext, onRestore 
         </div>
         {snapshot && (
           <button onClick={onRestore} className="py-1.5 rounded text-[11px] bg-[#222] text-gray-200 hover:bg-[#2c2c2c]">
-            Restore the patch I had before this lesson
+            {studio ? 'Bring back the studio I had before this lesson' : 'Restore the patch I had before this lesson'}
           </button>
+        )}
+        {snapshot && studio && (
+          <p className="text-[10px] text-gray-400 leading-snug">This lesson&apos;s studio is kept as a copy too, under Lessons, so you can come back to it.</p>
         )}
       </div>
     </div>

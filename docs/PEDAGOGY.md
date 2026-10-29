@@ -148,3 +148,101 @@ the same phrase) and feedback that fades in: a count, then which control, then d
 challenges, self-ratings and help used, and says how many questions come back in Daily
 Review and when (missed ones first). Predictions now join the review queue (`p` items) as
 well as quiz steps and `review` questions.
+
+## Lesson API v3 – studio state
+
+Studio lessons (`device: 'studio'`) teach the whole studio: the mix, the master, the song and
+the bounce. These fields are additive; every earlier lesson keeps working. The Producer path
+(`path: 'producer'`, ids `studio-producer-…`, `docs/research/producer-path/curriculum.md`) is
+built on them. Its lessons live in `lib/studio/producerLessons.ts` and load on demand
+(`lib/studio/producerIndex.ts` lists their ids up front, so Daily Review keeps their questions
+while they load).
+
+### A whole studio to start from
+
+`start.studio` (a `LessonStudioStart`) describes a complete studio, a curriculum "checkpoint":
+
+| Field | What it sets |
+|---|---|
+| `rack` | instruments in order: `{ id, device, label?, values?, patches?, data?, keep? }`. Each starts from its defaults plus `values`; `keep` keeps an instrument's current settings |
+| `routes`, `sync`, `cables` | routing (`'master'` or `'<mixer>:<input>'`), MIDI-style sync, cables between instruments |
+| `bpm`, `swing` | tempo, and studio swing 0..0.75 of a 16th (0.08 = 54 %) |
+| `mixer` | studio mixer strips, the returns and the master section (anything left out is at its default) |
+| `arrangement` | the song: `{ enabled, loop, sections: [{ name, bars, parts: { [instance]: { pattern?, snapshot?, muted? } } }] }` |
+| `focus` | the instrument shown first, and the default `instance` of steps |
+| `ownStudio` | the lesson also works in the learner's own studio: the coach offers "Use my own studio instead (…this sentence…)" |
+| `alignClocked` | default true: ▶ parks clock-stepped DFAMs (clocked from the Studio Clock) so step 1 lands on the bar the song starts from, the way a reset input would. The clock lesson sets it false to teach parking by hand |
+
+**Checkpoints never cost the learner their track.** Starting the lesson saves the learner's
+studio first (`lessonBackups`, saved in the browser, so it survives a reload). The first
+backup is pinned: it is never dropped to make room. The coach says the studio is saved, the
+end-of-lesson summary offers "Bring back the studio I had before this lesson", and the Lessons
+dialog lists every saved studio. Bringing one back swaps: the studio you have then is saved in
+its place. `restoreStudioBackup(id)`, `deleteStudioBackup(id)` and `useOwnStudio()` are the
+store actions.
+
+`lib/studio/producerStudio.ts` builds the Producer path's studio, "Tide Pool": the Studio
+Clock, a DFAM percussion loop clocked by cable, and the Xone:96, whose built-in decks play the
+stems (drums, bass, stabs, pad, perc) and follow the studio clock like MIDI-synced machines.
+Each lesson's checkpoint is that studio plus its changes (`CP_MUDDY`, `CP_SPACED`, `CP_ROUGH`,
+`CP_MIXED`, `songSections()`...).
+
+### What checks can read
+
+The store adds these to `LessonCheckState` while a lesson runs (all optional in the type):
+
+| Field | Contents |
+|---|---|
+| `transport.swing` | studio swing, 0..0.75 |
+| `mixer` | the studio mixer with defaults: `channels[instance]`, `delay`, `reverb`, `master` |
+| `master` | `{ gainDb, limiterOn, ceilingDbTP, glueOn, eqOn }`: the master fader is the gain into the limiter, which is always on at −1 dBTP |
+| `meters.master` | `lufsM`, `lufsS`, `lufsI` (null below the gate; `lufsI` holds after Stop), `lufsSMax`, `peakDb` (into the limiter, the last 3 s) and `maxPeakDb`, `truePeakDb` (the last 3 s) and `maxTruePeakDb`, `grDb` (limiter, the last second) and `maxGrDb`, `glueGrDb`, `overs`, `measuredSec`, `fromStart` (measured from bar 1), `steady` (nothing in the mix or the master changed since Play; song automation excluded). Everything "max" and "since" resets when the transport starts |
+| `meters.channels` | every mixer-device channel meter by input (`'xone96:1'` … `'xone96:4'`, `'xone96:a'` … `'xone96:d'`, in dBu) and every studio strip (`'strip:<instance>'`, dBFS): `{ peak (last 2 s), now, pk (PK lit in the last 2 s), maxSincePlay, unit }` |
+| `bounce` | `{ recording, bouncing, count, last? }`; `last` is the latest finished REC take or Bounce, measured on the master meter: `{ kind, seconds, lufsI, truePeakDb, maxGrDb, stems, fromStart, complete, songSeconds, at }`. `complete` means a bounce reached the end of the song |
+| `history` | since the lesson started: `changed(inst, control)`, `wasOn(inst, control)`, `min(…)`, `max(…)`. Name an instance or a device; `'master'`, `'gain'` is the master fader |
+| `arranger` | the song position: `{ section, bar, name }` (`section` −1 when stopped) |
+
+Write checks with the helpers in `lib/studio/checks.ts`; they return `undefined` or `NaN`
+instead of throwing when an instrument is missing, so a missing part reads as "not done":
+`inst`, `val`, `num`, `between`, `cable`, `synced`, `xch` (the Xone channel a device is routed
+to), `xv(s, '2', 'LO MID')` (a Xone control by its printed name), `xdb` (an EQ band in dB),
+`killKnob(-6)` / `midKnob(-3)` (dB to knob values, for lesson values), `xfilter`, `xHighPassed`,
+`xmeter`, `master`, `swingPct`, `songSeconds`, `songBars`, and for the song `sec`, `part`,
+`snap` (a value in a section's snapshot), `sectionValue` (what a control is set to while a
+section plays: snapshots hold until another one changes them), `sectionFader`, `sectionMuted`.
+
+Meter checks need audio, so they only pass while (or after) the studio plays. The lesson
+runtime (`lib/studio/lessonRuntime.ts`, loaded when a studio lesson starts) measures, and the
+store re-evaluates the step a few times a second; live checklists refresh on their own.
+
+```ts
+{ kind: 'do', instance: 'xone96', readout: ['peaks', 'limiter'],
+  instruction: 'Lower the Xone\'s MASTER 1 until the studio master peaks around −6 dBFS and the limiter rests.',
+  check: s => { const m = master(s); return !!m && s.transport.playing && between(m.peakDb, -8, -4) && m.grDb < 0.05; },
+  solution: { parts: { xone96: { master: 7.5 } }, play: { seconds: 5 } } }
+```
+
+### Steps
+
+| Field | What it does |
+|---|---|
+| `listen.parts` | A/B values on several instruments: `{ a: { [instance or device]: values }, b: … }`. The whole studio plays while you switch sides |
+| `listen.master`, `listen.studio` | A/B the master section (`{ gain, glue, eq }`) or studio settings (`{ swing }`) |
+| `listen.matchLoudness` | both sides play at the same loudness: each side is measured on the master meter (momentary LUFS) and the louder one is turned down after the meter, so "louder" never wins by default. The coach shows the gain it applied |
+| `listen.from` | start the A/B at a song section, so both sides play the same part |
+| `readout` | live numbers under the step: `'loudness'`, `'peaks'`, `'limiter'`, `'channels'` |
+| `area` | where the step happens (`'mixer'`, `'master'`, `'arranger'`, `'transport'`, `'rack'`): the coach offers to take the learner there. A step with an `instance` gets "Open <instrument>" |
+| `capture` | arranger snapshots of chosen controls: `{ instance, controls, label? }` gives one button per section that stores just those controls (merged into the section's snapshot), so a section can switch what plays without freezing the rest of the mix |
+
+### Solutions ("show me one way" and the lesson runner)
+
+`solution.parts` (other instruments' values), `channels` (studio strips), `master`, `studio`
+(`bpm`, `swing`, `routes`, `sync`), `arrangement`, `capture` (`[{ section, instance, controls?,
+values? }]`), `studioCables`, `pressUntilDone` (press a button until the step's check passes:
+parking a sequencer), and the timed ones: `play` (`{ seconds, fromStart, song, from }`),
+`bounce` (`{ stems }`) and `record` (`{ seconds, stems }`). "Show me one way" sweeps the knobs
+and sets the studio; `node scripts/lesson-runner.cjs <url> studio` applies the solution and,
+for timed solutions, plays, bounces or records for real and waits for the meters, as a learner
+would. `npm run validate` checks every start studio against the real instruments (devices,
+values, routes, cables, jacks) and every step's instance, controls, A/B values, match targets
+and solutions, and runs every check on an empty studio and on the start studio.

@@ -52,6 +52,7 @@ export const STUDIO_LESSONS: Lesson[] = [
           explain: 'Beats (quarter notes) per minute. 120 BPM is two beats every second.',
         },
         check: s => s.transport.playing,
+        solution: { transport: 'play' },
         principle: 'Tempo is the rate of the beat, measured in beats per minute.',
       },
       {
@@ -59,6 +60,7 @@ export const STUDIO_LESSONS: Lesson[] = [
         instruction: 'Turn on Click to hear every beat, then set the tempo to 90 BPM.',
         check: s => Math.abs(s.transport.bpm - 90) < 1,
         hints: ['Use the − button next to the BPM number, or type 90.'],
+        solution: { studio: { bpm: 90 } },
         principle: 'Lower BPM means a longer gap between beats; everything that follows the clock slows down together.',
       },
       {
@@ -118,12 +120,14 @@ export const STUDIO_LESSONS: Lesson[] = [
           explain: '120 BPM is 2 beats per second, and 1/16 gives 4 pulses per beat: 2 × 4 = 8 steps per second.',
         },
         check: s => cable(s, 'studio-clock', 'out_clock', 'dfam', 'in_adv_clock'),
+        solution: { studioCables: [{ from: { device: 'studio-clock', jack: 'out_clock' }, to: { device: 'dfam', jack: 'in_adv_clock' } }] },
         principle: 'A patch cable carries the clock: whatever pulses arrive, the sequencer follows.',
       },
       {
         kind: 'do',
         instruction: 'Press ▶ in the top bar. It presses the DFAM\'s RUN / STOP for you, and the DFAM now steps in time with the studio instead of its own TEMPO knob.',
         check: s => s.transport.playing,
+        solution: { transport: 'play' },
         principle: 'An external clock replaces the instrument\'s own tempo knob. RUN still starts and stops it: on the hardware you press RUN first, then it waits for pulses.',
       },
       {
@@ -201,6 +205,7 @@ export const STUDIO_LESSONS: Lesson[] = [
           explain: 'They follow the studio clock, so every tempo change reaches both at once.',
         },
         check: s => s.transport.playing,
+        solution: { transport: 'play' },
       },
       {
         kind: 'quiz',
@@ -251,6 +256,7 @@ export const STUDIO_LESSONS: Lesson[] = [
         kind: 'do',
         instruction: 'In the Studio tab, set the Analog Rytm\'s Output to a Xone:96 channel.',
         check: s => routedToMixer(s, 'analog-rytm'),
+        solution: { studio: { routes: { 'analog-rytm': 'xone96:studio_1' } } },
         principle: 'Routing sends an instrument\'s audio somewhere else; the mixer channel now controls it.',
       },
       {
@@ -263,6 +269,7 @@ export const STUDIO_LESSONS: Lesson[] = [
           explain: 'Gain staging comes first: set each channel\'s input level, then balance with faders. Starting at the right level leaves headroom and keeps noise low.',
         },
         check: s => s.transport.playing,
+        solution: { transport: 'play' },
       },
       {
         kind: 'quiz',
