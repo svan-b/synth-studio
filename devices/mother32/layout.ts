@@ -239,6 +239,8 @@ export const MOTHER32_LAYOUT: PanelLayout = {
   width: 304.8,
   height: 128.5,
   pxPerMm: K,
+  // The manual's clock positions and the preset readings use Moog's 300° sweep (7 to 5 o'clock)
+  knobTravel: 300,
   theme: {
     background: 'linear-gradient(180deg, #161616 0%, #0e0e0e 100%)',
     text: '#f2f2f2',

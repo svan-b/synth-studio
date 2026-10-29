@@ -343,9 +343,9 @@ Sweetwater / Moog patch-sheet series; their descriptions say which.
   position (the positions above are the printed ones). The legends are the tap targets and the
   lit one shows the position, so nothing is lost in use; matching the print needs a legend
   option in the shared switch component.
-- **Knob travel**: the twin's knobs turn through 270°, the drawn Moog knobs through about 300°
-  (7 o'clock to 5 o'clock). The values follow the drawn angles (the presets were read on a 300°
-  sweep); only the pointer's end stops differ (shared knob component).
+- **Knob travel**: the twin's knobs turn through the drawn Moog knobs' 300°, 7 o'clock to 5 o'clock
+  (`knobTravel` in layout.ts). The presets were read on the same 300° sweep, so a sheet's
+  pointer angles show as drawn.
 - **Scale legends**: 200Hz, 2KHz, 20Hz, 20KHz, VCO and NOISE / EXT sit where the default-panel
   drawing prints them (the lower four 1.3 mm higher, clear of the value boxes); LO / MIX 1 and
   HI / MIX 2 sit beside the VC MIX value box instead of under it, where the teaching readout is.

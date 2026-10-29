@@ -58,6 +58,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - A copy stays in the browser (`synth-studio-old-settings`), and a one-time notice offers it as a file.
   - Old project files get a notice too; the file itself is the copy.
   - Checked in e2e (37 checks).
+- Moog knobs turn 300°, as drawn: `PanelLayout.knobTravel` (default 270) is set to 300 on the DFAM, Mother-32 and Subharmonicon, whose manuals' clock positions and preset readings use the 7-to-5 o'clock sweep. Values are unchanged; the pointers and scale marks now line up with the printed legends. The Sub 37 reviewer decides for its panel.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
 ## Live log (session 2, 2026-10-29)
@@ -134,7 +135,6 @@ Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Su
 - **Lesson solution API**: add `route` and `arranger` fields, so the lesson runner can solve the Xone routing challenges (st1–st3, 4 manual steps) and the Analog Four song step (st2, 2 manual steps) by itself.
 - **Shared controls**, raised by several reviews:
   - a cap variant in `components/controls/Knob.tsx` (the A4 restyles its caps with a scoped stylesheet)
-  - knob travel to match the hardware (about 300°, against 270° now)
   - a legend-above/below option in `components/controls/Switch.tsx` (Mother-32)
 - **Studio sets** (`lib/studio/sets.ts`): the Moog sets would start at the guide's level with the Mother-32 and Subharmonicon about 5 dB down.
 - **Full-track gaps on the A4**: POLY, a kit per pattern, separate track outputs, live recording of knob moves, TRANSPOSABLE, and trig/page/sound copy.

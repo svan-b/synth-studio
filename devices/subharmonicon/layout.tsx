@@ -262,6 +262,8 @@ export const SUBHARMONICON_LAYOUT: PanelLayout = {
   width: 304.8,
   height: 128.5,
   pxPerMm: PX_PER_MM,
+  // The manual's clock positions and the preset readings use Moog's 300° sweep (7 to 5 o'clock)
+  knobTravel: 300,
   theme: {
     background: 'linear-gradient(180deg, #121212 0%, #0b0b0b 100%)',
     text: TEXT,
