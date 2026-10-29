@@ -50,7 +50,7 @@ export function nn(name: string): number {
 }
 
 /** Note lengths: NOTE_LENGTHS indices (0.5 step = 1/32, 1 step = 1/16, 1.5, 2 = 1/8, 4, 16 = a bar) */
-export const LEN = { half: 6, one: 14, oneHalf: 22, two: 30, four: 46, bar: 78 } as const;
+export const LEN = { half: 6, one: 14, oneHalf: 22, two: 30, three: 38, four: 46, bar: 78 } as const;
 
 // ---- the Analog Rytm kit PRODUCER (Demo 1's "LOW TIDE" sounds) -----------------------------
 
@@ -175,12 +175,15 @@ export const a4Panel = (track = T1): Values => ({ tempo: BPM, kit_project: 0, ki
  * An A4 pattern: trigs per track by trig number, with the NOTE page's defaults on each track.
  * Note trigs carry their NOTE, VEL and LEN, as the A4 stamps them when they are placed.
  */
-export function a4Pattern(name: string, tracks: Partial<Record<number, Trigs>>, opts: { length?: number; swing?: number } = {}): Pattern {
+export function a4Pattern(
+  name: string, tracks: Partial<Record<number, Trigs>>,
+  opts: { length?: number; swing?: number; defaults?: Partial<Record<number, { note?: number; vel?: number; len?: number }>> } = {},
+): Pattern {
   const p = createPattern(A4_TRACKS, { name, length: opts.length ?? 16, swing: opts.swing ?? 50 });
-  A4_DEFAULTS.forEach((d, t) => Object.assign(p.tracks[t], d));
+  A4_DEFAULTS.forEach((d, t) => Object.assign(p.tracks[t], d, opts.defaults?.[t] ?? {}));
   for (const [t, trigs] of Object.entries(tracks)) {
     const ti = Number(t);
-    const d = A4_DEFAULTS[ti];
+    const d = ti < A4_DEFAULTS.length ? p.tracks[ti] : undefined;
     for (const [n, x] of Object.entries(trigs ?? {})) {
       const s = toStep(x);
       p.tracks[ti].steps[Number(n) - 1] = s.trigless || !d ? s : { note: d.note, vel: d.vel, len: d.len, ...s };
@@ -292,8 +295,10 @@ export function elektronXone(extra: Values = {}): Values {
     ...XONE96_PRESETS.init.settings,
     ch1_src: SRC.NONE, ch2_src: SRC.NONE, ch3_src: SRC.NONE, ch4_src: SRC.NONE,
     ch1_input: 2, ch2_input: 2, ch3_input: 2, ch4_input: 2, cha_input: 2, chb_input: 2,
-    ch1_gain: 0, ch2_gain: 0, ch3_gain: 0,
-    ch1_fader: 9, ch2_fader: 8.5, ch3_fader: 8, ch4_fader: 0, cha_fader: 5, chb_fader: 5,
+    // measured: the Rytm peaks about +4 dBu on channel 1, the A4 about +5 on channel 2 (the
+    // guide's healthy range), the studio master about -4 dBFS with the whole loop playing
+    ch1_gain: 4, ch2_gain: -5, ch3_gain: -2,
+    ch1_fader: 10, ch2_fader: 9.5, ch3_fader: 9, ch4_fader: 0, cha_fader: 5, chb_fader: 5,
     master: 8,
     bpm: BPM, play: false,
     ...extra,
@@ -360,11 +365,15 @@ export const CP_01: ElektronCheckpoint = {
   rytmTrack: CH,
 };
 
-/** CP-02, Bass locked to the kick: the groove at 56 % swing; the kick a little under the key */
+/**
+ * CP-02, Bass locked to the kick: the groove at 56 % swing; the kick a little under the key, and
+ * the NOTE page's LEN at 3 steps, so the first bass notes ring into the next kick
+ */
 export const CP_02: ElektronCheckpoint = {
   rytm: { A01: rytmPattern('LOW TIDE', GROOVE, { swing: SWING }) },
-  a4: EMPTY_A4(SWING),
+  a4: { A01: a4Pattern('LOW TIDE', {}, { swing: SWING, defaults: { [T1]: { len: LEN.three } } }) },
   rytmValues: { bd_tun: KICK_OFF_KEY },
+  a4Values: { [tid(T1, 'trig_len')]: LEN.three },
   focus: A4,
 };
 
@@ -391,3 +400,105 @@ export const CP_08: ElektronCheckpoint = {
   a4: { A01: a4Pattern('LOW TIDE', { [T1]: BASS_4, [T2]: STABS_4, [T3]: STABS_4, [T4]: HOOK_2 }, { swing: SWING, length: 64 }) },
   a4Track: T2,
 };
+
+// ---- the capstone: the course track as a bank of patterns --------------------------------------
+
+/** The groove after Movement: a hat lock and a chance ghost, the 1:2 hat, a fill every four bars */
+const GROOVE_MOVING = {
+  ...GROOVE,
+  [CH]: merge(HATS_GROOVE, { 6: { cond: '50%' }, 8: { locks: { dec: 40 } }, 16: { cond: '1:2' } }),
+  [SD]: { 14: { vel: 70, cond: '4:4' }, 15: { vel: 86, cond: '4:4' }, 16: { vel: 104, cond: '4:4' } },
+};
+
+/** The chords with their bar-1 lock (Movement) */
+const STABS_MOVING: Trigs = merge(STABS_4, { 11: { locks: { flt1_frq: 85 } } });
+
+/**
+ * The Capstone's studio: the course track, plus the patterns an arrangement needs.
+ *   Rytm  A01 GROOVE · A02 BREAK (no kick) · A03 FILL (a snare roll) · A04 INTRO (kick and hats)
+ *   A4    A01 FULL · A02 BASS (the bass alone) · A03 BREAK (the chords and the hook, no bass)
+ * The chords have their slow filter LFO; the Sub 37 sits on channel 3 as a guest, its
+ * sequencer off. The arranger is empty.
+ */
+export const CP_CAPSTONE: ElektronCheckpoint = {
+  rytm: {
+    A01: rytmPattern('GROOVE', GROOVE_MOVING, { swing: SWING }),
+    A02: rytmPattern('BREAK', {
+      [CH]: on([3, 7, 11, 15], { vel: 80 }),
+      [RS]: merge(on([4, 12], { vel: 78 }), { 7: { vel: 58, cond: '1:2' } }),
+      [CP]: on([13], { vel: 90 }),
+    }, { swing: SWING }),
+    A03: rytmPattern('FILL', {
+      [BD]: on([1, 5, 9]),
+      [SD]: merge(on([9, 10, 11, 12], { vel: 70 }), on([13, 14], { vel: 88 }), on([15, 16], { vel: 106 })),
+      [CH]: on([3, 7], { vel: 80 }),
+    }, { swing: SWING }),
+    A04: rytmPattern('INTRO', { [BD]: on([1, 5, 9, 13]), [CH]: merge(on([3, 7, 11, 15], { vel: 90 }), on([2, 6, 10, 14], { vel: 44 })) }, { swing: SWING }),
+  },
+  a4: {
+    A01: a4Pattern('FULL', { [T1]: BASS_4, [T2]: STABS_MOVING, [T3]: STABS_MOVING, [T4]: HOOK_2 }, { swing: SWING, length: 64 }),
+    A02: a4Pattern('BASS', { [T1]: BASS_4 }, { swing: SWING, length: 64 }),
+    A03: a4Pattern('BREAK', { [T2]: STABS_4, [T3]: STABS_4, [T4]: HOOK_2 }, { swing: SWING, length: 64 }),
+  },
+  a4Values: {
+    ...Object.fromEntries(Object.entries(T1_PLUCK).map(([k, v]) => [tid(T1, k), v])),
+    ...Object.fromEntries(Object.entries(STAB_LFO).flatMap(([k, v]) => [[tid(T2, k), v], [tid(T3, k), v]])),
+  },
+  sub: true,
+  focus: XONE,
+  // the desk as the loop was built: every GAIN at 0 dB and every fader up, the A4 hot, MASTER 1
+  // fully up, so the studio limiter works hard: the mixdown milestone starts from here
+  xone: { ch1_gain: 0, ch2_gain: 3, ch3_gain: 0, ch1_fader: 10, ch2_fader: 10, ch3_fader: 10, master: 10 },
+};
+
+type SongSection = NonNullable<LessonStudioStart['arrangement']>['sections'][number];
+const parts = (rytm: string, a4: string | null): NonNullable<SongSection['parts']> => ({
+  [RYTM]: { pattern: rytm },
+  [A4]: a4 ? { pattern: a4 } : { muted: true },
+});
+
+/** The capstone's song without transitions: 72 bars, 2:19 at 124 BPM */
+export function capstoneSong(): SongSection[] {
+  return [
+    { name: 'Intro', bars: 8, parts: parts('A04', null) },
+    { name: 'Groove', bars: 8, parts: parts('A01', 'A02') },
+    { name: 'Drop', bars: 16, parts: parts('A01', 'A01') },
+    { name: 'Break', bars: 8, parts: parts('A02', 'A03') },
+    { name: 'Build', bars: 8, parts: parts('A01', 'A02') },
+    { name: 'Drop 2', bars: 16, parts: parts('A01', 'A01') },
+    { name: 'Outro', bars: 8, parts: parts('A04', null) },
+  ];
+}
+
+/** Xone:96 snapshot that puts the filters back off */
+const XFILTERS_OFF: Values = { ch1_filter: 1, ch2_filter: 1, f1_on: false, f2_on: false };
+
+/**
+ * The song with transitions: the bass and chords open out of FILTER 2's low-pass in the Groove,
+ * the Build high-passes the drums through FILTER 1, a one-bar Fill (the Rytm's FILL pattern)
+ * lands on Drop 2, and every drop puts the filters back.
+ */
+export function capstoneTransitions(): SongSection[] {
+  const s = capstoneSong();
+  const snap = (name: string, snapshot: Values) => {
+    const sec = s.find(v => v.name === name)!;
+    sec.parts = { ...sec.parts, [XONE]: { snapshot } };
+  };
+  snap('Intro', XFILTERS_OFF);
+  snap('Groove', { ch2_filter: 2, f2_on: true, f2_type: 2, f2_freq: 900, f2_res: 2 });
+  snap('Drop', XFILTERS_OFF);
+  snap('Break', XFILTERS_OFF);
+  const build = s.find(v => v.name === 'Build')!;
+  build.bars = 7;
+  snap('Build', { ch1_filter: 0, f1_on: true, f1_type: 0, f1_freq: 300, f1_res: 5 });
+  s.splice(s.indexOf(build) + 1, 0, { name: 'Fill', bars: 1, parts: parts('A03', 'A02') });
+  snap('Drop 2', XFILTERS_OFF);
+  return s;
+}
+
+/** The capstone's mixdown (measured): channel GAIN and faders, and MASTER 1 for headroom at the studio master */
+export const CAPSTONE_MIX: Values = { ch1_gain: 1, ch2_gain: -5, ch3_gain: -2, ch1_fader: 10, ch2_fader: 9.5, ch3_fader: 9, master: 8.5 };
+/** The master fader (DRIVE into the limiter) for a streaming master, measured on the bounce */
+export const CAPSTONE_DRIVE = 6.5;
+/** The master's GLUE compressor: 2:1 with a slow attack, so the kick's click passes and the mix sits together */
+export const CAPSTONE_GLUE = { on: true, threshold: -20, ratio: 2, attack: 0.01, release: 0.3, auto: true, makeup: 2, mix: 1 };

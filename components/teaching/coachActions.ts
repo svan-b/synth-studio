@@ -126,6 +126,18 @@ export async function showMe(step: LessonStep, instance: string, labelOf: (id: s
       }
       // The studio itself: the mix, the master, the song, snapshots, the transport
       applyStudioSolution({ ...sol, parts: undefined }, target);
+      // Notes, played on the instrument so they are heard (and counted, like the keys)
+      if (sol.notes?.length) {
+        hub.ensureAudio();
+        for (const n of sol.notes) {
+          if (useStudioStore.getState().lessonDemo === null) break;
+          hub.noteOn(target, n, 0.85);
+          await sleep(260);
+          hub.noteOff(target, n);
+          useStudioStore.getState().lessonNote(target, n);
+          await sleep(90);
+        }
+      }
       if (sol.transport === 'play') hub.startAll();
       // A button pressed until the step is done (parking a sequencer), slowly enough to follow
       if (sol.pressUntilDone) {

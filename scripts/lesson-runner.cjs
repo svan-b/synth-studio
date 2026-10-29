@@ -112,8 +112,9 @@ const { chromium } = require('playwright');
       if (pressCount(inst, id) === before) S().lessonPress(inst, [id]);
       return el ? 'ui' : 'store';
     };
+    // Like the keys: the instrument plays the note and the lesson counts it
     const playNotes = async (inst, notes) => {
-      for (const n of notes) { S().lessonNote(inst, n); await wait(5); }
+      for (const n of notes) { hub.noteOn(inst, n, 0.8); await wait(40); hub.noteOff(inst, n); S().lessonNote(inst, n); await wait(5); }
     };
     const resolveEnd = end => {
       if (end.instance) return end.instance;

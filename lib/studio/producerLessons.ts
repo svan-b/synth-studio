@@ -1,9 +1,10 @@
 // ============================================================================
-// The Producer path (docs/research/producer-path/curriculum.md), the lessons that
-// run on instruments already in Synth Studio: the Studio Clock, the DFAM, the
+// The Producer path (docs/research/producer-path/curriculum.md). This file holds
+// the studio lessons (L4, L7, L9-L14) on the Studio Clock, the DFAM and the
 // Xone:96 (its built-in decks play the stems of the session "Tide Pool"), the
-// studio mixer, the master and Bounce. The lessons that need the Elektrons or
-// the Sub 37 come once those instruments are rebuilt.
+// studio mixer, the master and Bounce; producerElektronLessons.ts holds the ones
+// on the Analog Rytm, the Analog Four and the Sub 37 (L1-L3, L5, L6, L8, L15).
+// PRODUCER_LESSONS is the whole path, in order.
 //
 // Every lesson starts from a checkpoint of the Tide Pool studio
 // (lib/studio/producerStudio.ts). The learner's own studio is saved first and
@@ -22,6 +23,7 @@ import {
 import {
   CP_DRY, CP_MIXED, CP_MUDDY, CP_ROUGH, CP_SLOTTED, CP_SPACED, DFAM_KNOCK, producerStudio, songSections, songWithTransitions,
 } from './producerStudio';
+import { PRODUCER_ELEKTRON_LESSONS } from './producerElektronLessons';
 
 const XONE = 'xone96';
 const CLOCK = 'studio-clock';
@@ -41,7 +43,7 @@ const oneClock: Lesson = {
   objective: 'Run every instrument from one clock: synced gear by MIDI-style sync, the DFAM by clock pulses, so a percussion layer plays in time.',
   source: 'Synth Studio · Producer path (curriculum L4)',
   estimatedMinutes: 15,
-  prerequisites: ['studio-1-one-clock'],
+  prerequisites: ['studio-producer-03-bass-kick'],
   concepts: ['timing-tempo', 'signal-routing', 'polyrhythm'],
   start: { studio: producerStudio({ noCable: true, alignClocked: false, dfam: DFAM_KNOCK }) },
   steps: [
@@ -222,7 +224,7 @@ const frequencySlots: Lesson = {
   objective: 'Give every part its own frequency slot: kick and bass keep the deep lows, and everything else is high-passed or cut out of their way.',
   source: 'Synth Studio · Producer path (curriculum L7)',
   estimatedMinutes: 16,
-  prerequisites: ['studio-producer-04-one-clock'],
+  prerequisites: ['studio-producer-06-hook'],
   concepts: ['equalization', 'filter-cutoff', 'mixing'],
   start: { studio: producerStudio({ xone: CP_MUDDY.xone, dfam: CP_MUDDY.dfam }) },
   steps: [
@@ -706,7 +708,7 @@ const arrangement: Lesson = {
   objective: 'Turn the loop into a two-minute arrangement (intro, drop, break, build, drop, outro) in 8- and 16-bar phrases, with energy that rises and falls.',
   source: 'Synth Studio · Producer path (curriculum L11)',
   estimatedMinutes: 22,
-  prerequisites: ['studio-producer-10-ear-lab'],
+  prerequisites: ['studio-producer-08-movement'],
   concepts: ['sequencer-pattern', 'mixing'],
   start: { studio: producerStudio({ xone: CP_MIXED.xone, dfam: CP_MIXED.dfam }) },
   steps: [
@@ -1443,5 +1445,8 @@ const masterBounce: Lesson = {
   ],
 };
 
-export const PRODUCER_LESSONS: Lesson[] = [oneClock, frequencySlots, spaceDepth, earLab, arrangement, transitions, mixdown, masterBounce];
+/** The whole path in order: the Elektron lessons (L1-L3, L5, L6, L8, L15) and the studio ones */
+export const PRODUCER_LESSONS: Lesson[] = [
+  ...PRODUCER_ELEKTRON_LESSONS, oneClock, frequencySlots, spaceDepth, earLab, arrangement, transitions, mixdown, masterBounce,
+].sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
 
