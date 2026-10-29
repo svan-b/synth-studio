@@ -182,10 +182,13 @@ function validate(id: string, mod: DeviceModule): Issue[] {
   const ids = new Set<string>();
   const defaults: Record<string, ControlValue> = {};
   Object.entries(controls).forEach(([cid, c]) => { if ('default' in c && c.default !== undefined) defaults[cid] = c.default as ControlValue; });
+  // Mirrors the store's check state at the start of a step: nothing pressed, no notes played
+  // yet (a check that reads `s.events.trigger` or `s.notesPlayed.length` must not throw here)
   const fakeState = (values: Record<string, ControlValue>): LessonCheckState => ({
     values, patches: [], data: mod.data?.initial(), engine: {},
     instances: { [id]: { device: id, values, patches: [], data: mod.data?.initial() } },
     studioCables: [], routes: {}, sync: {}, transport: { playing: false, bpm: 120 }, arrangement: { enabled: false, loop: true, sections: [] },
+    events: {}, notesPlayed: [], eventsByInstance: {},
   });
   const checkValues = (vals: Record<string, ControlValue> | undefined, where: string) => {
     Object.entries(vals ?? {}).forEach(([cid, v]) => {
@@ -283,6 +286,7 @@ function validateStudioLessons(lessons: Lesson[]): Issue[] {
   const st: LessonCheckState = {
     values: {}, patches: [], data: undefined, engine: {}, instances: {}, studioCables: [], routes: {}, sync: {},
     transport: { playing: false, bpm: 120 }, arrangement: { enabled: false, loop: true, sections: [] },
+    events: {}, notesPlayed: [], eventsByInstance: {},
   };
   const ids = new Set<string>();
   lessons.forEach(l => {
