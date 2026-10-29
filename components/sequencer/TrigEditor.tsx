@@ -4,8 +4,9 @@
 // a TrigKey; ui.trigEditor = { track, pattern, steps }).
 //
 //   NOTE · VEL · LEN · micro timing · trig condition · retrig (rate, length,
-//   velocity curve) · slide / param slide / accent · note or lock trig ·
-//   the trig's parameter locks with a clear button each.
+//   velocity curve) · slide / param slide / accent · trig mute · note or lock
+//   trig · the trig's parameter locks with a clear button each, and the
+//   pattern's lock budget (`lockLimit`).
 //
 // Edits apply to every selected step. While it is open the steps stay held
 // (ui.heldSteps), so turning an encoder on the panel locks it on them too.
@@ -18,8 +19,8 @@ import type { CustomRenderContext } from '@/types/panel';
 import {
   LEN_INF, PROBABILITIES, RETRIG_DEFAULT, RETRIG_RATES, RETRIG_VEL_MAX, RETRIG_VEL_MIN,
   abCode, abOf, clearLocks, compileCondition, conditionString, describeCondition, formatLength, formatMicro,
-  formatNote, formatRetrigRate, formatSigned, getPattern, isAB, isProbability, probabilityOf, setLock, setStep,
-  updateSteps, type Step, type StepPatch,
+  formatNote, formatRetrigRate, formatSigned, getPattern, isAB, isProbability, lockedParamCount, probabilityOf, setLock,
+  setStep, setTrigMute, trackTrigDefaults, updateSteps, type PatternId, type Project, type Step, type StepPatch,
 } from '@/lib/sequencer/elektron';
 import {
   C, FONT, MONO, Overlay, OverlayRoot, SeqButton, SeqStyles, Stepper, UI, clampN, editProject, lessonFocus, projectOf,
@@ -29,8 +30,15 @@ import {
 export interface TrigEditorProps {
   ctx: CustomRenderContext;
   tracks?: number;
-  /** Which hardware features to show (Analog Four: slide, pslide, accent; Analog Rytm: retrig, accent) */
-  features?: { slide?: boolean; pslide?: boolean; accent?: boolean; retrig?: boolean };
+  /**
+   * Which hardware features to show (Analog Four: slide, pslide, accent; Analog
+   * Rytm: retrig, accent, pslide). `trigMute` (default on): the MUTE key, on both.
+   */
+  features?: { slide?: boolean; pslide?: boolean; accent?: boolean; retrig?: boolean; trigMute?: boolean };
+  /** A note trig placed here copies the track's NOTE / VEL / LEN (the Analog Four, like TrigKeys `stampDefaults`) */
+  stampDefaults?: boolean;
+  /** Most different parameters a pattern can lock (LOCK_LIMIT_A4 / LOCK_LIMIT_RYTM): shows the pattern's budget */
+  lockLimit?: number;
   /** Readable name of a lock key */
   lockLabel?: (key: string) => string;
   /** Readable value of a lock */
@@ -68,17 +76,28 @@ export default function TrigEditor(props: TrigEditorProps) {
   const project = projectOf(ctx, tracks);
   const { track, pattern } = target;
   const steps = target.steps;
-  const trk = getPattern(project, pattern).tracks[track];
+  const pat = getPattern(project, pattern);
+  const trk = pat.tracks[track];
   const first = trk?.steps[steps[0]] as Step | undefined;
   const any = steps.some(s => trk?.steps[s]);
   const focus = lessonFocus(ctx);
   const hi = (k: string) => !!focus?.has(`seq:edit:${k}`);
-  const f = { slide: true, pslide: false, accent: true, retrig: true, ...props.features };
+  const f = { slide: true, pslide: false, accent: true, retrig: true, trigMute: true, ...props.features };
   const fmtNote = props.noteFormat ?? formatNote;
   const [nLo, nHi] = props.noteRange ?? [0, 127];
+  const stamp = !!props.stampDefaults;
 
-  const patch = (p: StepPatch) => editProject(ctx, tracks, pr => updateSteps(pr, pattern, track, steps, p, { create: 'note' }));
+  /** Empty steps among the selection get a note trig first (with the track's NOTE / VEL / LEN when stamping) */
+  const withNoteTrigs = (pr: Project, id: PatternId): Project => {
+    if (!stamp) return pr;
+    const t = getPattern(pr, id).tracks[track];
+    const init = trackTrigDefaults(pr, id, track);
+    return steps.reduce((acc, s) => (t?.steps[s] ? acc : setStep(acc, id, track, s, init)), pr);
+  };
+  const patch = (p: StepPatch) => editProject(ctx, tracks, pr => updateSteps(withNoteTrigs(pr, pattern), pattern, track, steps, p, { create: 'note' }));
   const close = () => ctx.setUi({ [UI.trigEditor]: null, [UI.heldSteps]: [], [UI.heldEdited]: false });
+  const muted = !!first?.mute;
+  const budget = props.lockLimit !== undefined ? lockedParamCount(pat) : -1;
 
   const note = first?.note ?? trk?.note ?? 60;
   const vel = first?.vel ?? trk?.vel ?? 100;
@@ -112,6 +131,17 @@ export default function TrigEditor(props: TrigEditorProps) {
           <>
             <SeqButton active={!first?.trigless} color={C.red} onPress={() => patch({ trigless: null })} title="Note trig: plays a note">NOTE</SeqButton>
             <SeqButton active={!!first?.trigless} color={C.amber} onPress={() => patch({ trigless: true })} title="Lock trig: applies its locks without a note">LOCK</SeqButton>
+            {f.trigMute && (
+              <SeqButton
+                active={muted}
+                color={C.green}
+                highlight={hi('mute')}
+                onPress={() => editProject(ctx, tracks, pr => setTrigMute(pr, pattern, track, steps, !muted))}
+                title={muted ? 'Trig mute on: the trig is silent (its condition still counts). Tap to unmute' : 'Trig mute: silence the trig, keep it and its locks'}
+              >
+                MUTE
+              </SeqButton>
+            )}
             <SeqButton onPress={() => { editProject(ctx, tracks, pr => steps.reduce((acc, s) => setStep(acc, pattern, track, s, null), pr)); }} title="Remove the trig(s) and their locks">CLEAR</SeqButton>
           </>
         ) : (
@@ -125,6 +155,7 @@ export default function TrigEditor(props: TrigEditorProps) {
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 8, touchAction: 'pan-y' }}>
         {!any && <div style={{ fontSize: 11, color: C.dim, marginBottom: 6 }}>Empty step - editing a value places a note trig. Turning an encoder places a lock trig.</div>}
+        {muted && <div style={{ fontSize: 11, color: C.green, marginBottom: 6 }}>Trig mute: this trig is silent - no note, no locks - but its condition still counts for PRE and NEI.</div>}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           <Cell label="NOTE" highlight={hi('note')}>
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -197,7 +228,13 @@ export default function TrigEditor(props: TrigEditorProps) {
         )}
 
         <div style={{ marginTop: 6 }}>
-          <Cell label={`PARAMETER LOCKS (${lockKeys.length})`} highlight={hi('locks')}>
+          <Cell
+            label={`PARAMETER LOCKS (${lockKeys.length})${budget >= 0 ? ` · PATTERN ${budget}/${props.lockLimit} PARAMETERS` : ''}`}
+            highlight={hi('locks')}
+          >
+            {budget >= 0 && budget >= props.lockLimit! && (
+              <span style={{ fontSize: 10, color: C.amber }}>The pattern locks {props.lockLimit} different parameters, its limit: lock one of those, or clear a lock first.</span>
+            )}
             {lockKeys.length === 0 ? (
               <span style={{ fontSize: 10, color: C.dim }}>Turn an encoder while this editor is open (or while holding the trig) to lock it here.</span>
             ) : (

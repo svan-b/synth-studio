@@ -8,7 +8,8 @@ export { default as PatternPicker, type PatternPickerProps } from './PatternPick
 export { default as ChainBuilder, type ChainBuilderProps } from './ChainBuilder';
 export { default as SongEditor, type SongEditorProps } from './SongEditor';
 export { default as ScaleMenu, type ScaleMenuProps } from './ScaleMenu';
+export { default as TransportKeys, pressPlay, pressStop, type TransportKeysProps } from './TransportKeys';
 export {
-  C as SEQ_COLORS, UI as SEQ_UI, MenuKey, PatternGrid, SeqButton, Stepper, closeMenu, menuOpen, projectOf, seqStateOf,
-  viewPattern, type SeqMenu, type TrigEditorTarget, type OverlayProps,
+  C as SEQ_COLORS, UI as SEQ_UI, MenuKey, PatternGrid, SeqButton, Stepper, TrigModeKey, closeMenu, menuOpen, projectOf,
+  seqStateOf, trigModeOf, viewPattern, type SeqMenu, type TrigEditorTarget, type OverlayProps,
 } from './shared';

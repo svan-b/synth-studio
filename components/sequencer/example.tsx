@@ -9,11 +9,11 @@ import type { ControlValue } from '@/types';
 import type { DeviceModule } from '@/devices/types';
 import type { CustomElement } from '@/types/panel';
 import {
-  ElektronSequencer, LockTracker, arrangerPatterns, asProject, displayWithLocks, interceptForLocks, projectData,
-  trigSteps, type LockOptions, type TrigEvent,
+  ElektronSequencer, LOCK_LIMIT_RYTM, LockTracker, arrangerPatterns, asProject, displayWithLocks, interceptForLocks,
+  projectData, trigSteps, type LockOptions, type TrigEvent,
 } from '@/lib/sequencer/elektron';
 import {
-  ChainBuilder, MenuKey, PagePicker, PatternPicker, ScaleMenu, SongEditor, TrigEditor, TrigKeys,
+  ChainBuilder, MenuKey, PagePicker, PatternPicker, ScaleMenu, SongEditor, TransportKeys, TrigEditor, TrigKeys, TrigModeKey,
 } from '@/components/sequencer';
 
 const TRACKS = 12;
@@ -38,13 +38,16 @@ export class ExampleEngine extends BaseEngine {
       bpm: this.num('tempo', 120),
       onTrig: e => this.trig(e),
       onNoteOff: (track, _note, time) => this.voices[track]?.release(time),
+      // Stopped or paused: put locked parameters back to the kit values
+      onPlay: playing => { if (!playing) this.locks.releaseAll((track, key) => this.voices[track]?.set(key, this.trackValue(track, key), this.ctx.currentTime)); },
     });
-    // The UI kit reads engine.seq (playheads, cued pattern, fill, song row...)
+    // The UI kit reads engine.seq (playheads, cued pattern, fill, song row, paused, TEMP JUMP...)
     this.seq.subscribe(s => this.emit({ seq: s, playing: s.playing, step: s.steps[this.num('track')] }));
     this.onDispose(() => this.seq.dispose());
   }
 
   protected onData(data: unknown): void {
+    // Track mutes (Project.mutes), the change mode and the patterns all arrive here
     this.seq.setProject(data);
   }
 
@@ -54,7 +57,10 @@ export class ExampleEngine extends BaseEngine {
 
   protected onParam(id: string, value: ControlValue): void {
     if (id === 'play') {
-      // While synced the hub turns PLAY into the studio transport: never start the internal clock then
+      // The transport control: on = play from the top, off = stop (also ends a pause). PLAY while
+      // playing arrives as 'seq:pause' / 'seq:resume' from the kit's pressPlay (TransportKeys), so the
+      // control stays on while paused. Synced, the hub turns PLAY into the studio transport: never
+      // start the internal clock then.
       if (!this.transport) value ? this.seq.start() : this.seq.stop();
       return;
     }
@@ -64,8 +70,9 @@ export class ExampleEngine extends BaseEngine {
   }
 
   event(name: string, payload?: unknown): void {
-    // seq:fill(:up), seq:fill-latch, seq:fill-cue, seq:queue, seq:mute, seq:song-row, seq:chain-index,
-    // seq:preview(:up), seq:audition(:stop) and the arranger's arranger:pattern
+    // seq:fill(:up), seq:fill-latch, seq:fill-cue, seq:queue, seq:program, seq:temp-jump, seq:mute(s),
+    // seq:solo, seq:song-row, seq:chain-index, seq:start / stop / pause / resume, seq:preview(:up),
+    // seq:audition(:stop) and the arranger's arranger:pattern
     if (this.seq.handleEvent(name, payload)) return;
     // ... pads, other keys ...
   }
@@ -111,6 +118,8 @@ const LOCKS: LockOptions = {
   currentPattern: data => asProject(data, TRACKS).active,
   trackDefaults: true,
   tracks: TRACKS,
+  // The Rytm locks 72 different parameters per pattern, the Analog Four 128 (LOCK_LIMIT_A4)
+  lockLimit: LOCK_LIMIT_RYTM,
 };
 
 export const exampleModule: Pick<DeviceModule, 'data' | 'interceptChange' | 'displayValues' | 'studio' | 'transportControl' | 'audition'> = {
@@ -125,21 +134,43 @@ export const exampleModule: Pick<DeviceModule, 'data' | 'interceptChange' | 'dis
   },
 };
 
+/** The trig-key modes behind [FUNC] + [BANK E-H] (and MUTE / solo), as kit keys */
+const MODE_KEYS = [
+  { mode: 'trigmute', label: 'TRIG MUTE' },
+  { mode: 'accent', label: 'ACCENT' },
+  { mode: 'swing', label: 'SWING' },
+  { mode: 'pslide', label: 'P.SLIDE' },
+  { mode: 'mute', label: 'MUTE' },
+  { mode: 'solo', label: 'SOLO' },
+] as const;
+
 export const exampleElements: CustomElement[] = [
-  // The 16 trig keys (x/y/w/h in mm, top-left), the page keys and the menu keys
-  { kind: 'custom', x: 40, y: 150, w: 300, h: 14, render: ctx => <TrigKeys ctx={ctx} tracks={TRACKS} /> },
+  // The 16 trig keys (x/y/w/h in mm, top-left), the page keys and the menu keys. Without a `mode` prop the
+  // keys follow the mode keys below; mute mode edits the project's global track mutes, as on the hardware.
+  // An Analog Four adds `stampDefaults` (new trigs copy the NOTE menu values) to TrigKeys and TrigEditor.
+  { kind: 'custom', x: 40, y: 150, w: 300, h: 14, render: ctx => <TrigKeys ctx={ctx} tracks={TRACKS} muteTarget="project" /> },
   { kind: 'custom', x: 345, y: 150, w: 40, h: 8, render: ctx => <PagePicker ctx={ctx} tracks={TRACKS} /> },
+  ...MODE_KEYS.map(({ mode, label }, i): CustomElement => ({
+    kind: 'custom', x: 40 + i * 22, y: 138, w: 20, h: 8, render: ctx => <TrigModeKey ctx={ctx} mode={mode} label={label} />,
+  })),
   { kind: 'custom', x: 10, y: 120, w: 18, h: 8, render: ctx => <MenuKey ctx={ctx} menu="pattern" label="PTN" /> },
   { kind: 'custom', x: 30, y: 120, w: 18, h: 8, render: ctx => <MenuKey ctx={ctx} menu="song" label="SONG" /> },
+  { kind: 'custom', x: 50, y: 120, w: 18, h: 8, render: ctx => <MenuKey ctx={ctx} menu="scale" label="SCALE" /> },
+  // PLAY (pauses while playing, resumes while paused) and STOP on the `play` transport control
+  { kind: 'custom', x: 345, y: 120, w: 30, h: 10, render: ctx => <TransportKeys ctx={ctx} /> },
   // Overlays float over the page (portal), so this element's box can be tiny
   {
     kind: 'custom', x: 0, y: 0, w: 1, h: 1,
     render: ctx => (
       <>
-        <TrigEditor ctx={ctx} tracks={TRACKS} portal features={{ retrig: true, accent: true, slide: false }} />
+        {/* Trig mute, retrigs, accent and parameter slides; the pattern's lock budget */}
+        <TrigEditor ctx={ctx} tracks={TRACKS} portal features={{ retrig: true, accent: true, slide: false, pslide: true }} lockLimit={LOCK_LIMIT_RYTM} />
+        {/* SAVE / RELOAD, UNDO for PASTE and CLEAR, TEMP JUMP arming */}
         <PatternPicker ctx={ctx} tracks={TRACKS} portal />
         <ChainBuilder ctx={ctx} tracks={TRACKS} portal />
-        <SongEditor ctx={ctx} tracks={TRACKS} portal />
+        {/* Rows with chains of patterns, song mutes per pattern; hardware-style: no row tempo, length or loop */}
+        <SongEditor ctx={ctx} tracks={TRACKS} portal tempo={false} length={false} loop={false} />
+        {/* A longer length copies the existing pages (copyPages, on by default) */}
         <ScaleMenu ctx={ctx} tracks={TRACKS} portal />
       </>
     ),

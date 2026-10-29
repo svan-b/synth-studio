@@ -781,5 +781,28 @@ export function songToggleEntryMute(p: Project, row: number, pos: number, track:
   return songUpdateEntry(p, row, pos, { mutes: m.size ? Array.from(m) : null });
 }
 
+/**
+ * Move a pattern position within a song row, with its song mutes and transpose
+ * ([FUNC] + [LEFT] / [RIGHT] in the SONG EDIT menu, A4 MKII manual p.56, Rytm
+ * MKII manual p.54). Positions count from the row's own pattern (0).
+ */
+export function songMoveEntry(p: Project, row: number, from: number, to: number): Project {
+  return withRow(p, row, r => {
+    const own: SongEntry = { pattern: r.pattern };
+    if (r.mutes) own.mutes = r.mutes;
+    if (r.transpose) own.transpose = r.transpose;
+    const list: SongEntry[] = [own, ...(r.chain ?? [])];
+    if (!(from >= 0 && from < list.length) || !(to >= 0 && to < list.length) || from === to) return r;
+    const [x] = list.splice(from, 1);
+    list.splice(to, 0, x);
+    const [first, ...rest] = list;
+    const n: SongRow = { ...r, pattern: first.pattern };
+    if (first.mutes) n.mutes = first.mutes; else delete n.mutes;
+    if (first.transpose) n.transpose = first.transpose; else delete n.transpose;
+    if (rest.length) n.chain = rest; else delete n.chain;
+    return n;
+  });
+}
+
 /** Number of pattern positions in a song row (0 when there is no such row) */
 export const songRowSize = (p: Project, row: number): number => (p.song.rows[row] ? rowSize(p.song.rows[row]) : 0);
