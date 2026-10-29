@@ -18,8 +18,8 @@ import {
   pasteTrigs, patternFromProgram, programOfPattern, reloadPattern, reloadTrack, savePattern, saveTrack, setActive,
   setMasterMute, setMasterMutes, setSongLoop, setSwingTrigs, setTempoMode, setTrackQuantize, setTrigMute, shiftTrigs,
   songAddEntry, songRemoveEntry, songToggleEntryMute, songUpdateEntry, toggleSwingTrig, trackTrigDefaults,
-  type LockOptions, type Pattern, type PatternId, type Project, type SequencerOptions, type Speed, type Step,
-  type TimerApi, type TransportLike, type TrigEvent, type VisibilitySource,
+  type ChangeMode, type LockOptions, type Pattern, type PatternId, type Project, type SequencerOptions, type Speed,
+  type Step, type TimerApi, type TransportLike, type TrigEvent, type VisibilitySource,
 } from '../lib/sequencer/elektron';
 import { Transport, type TransportEvent, type TransportTick } from '../lib/audio/transport';
 import type { DeviceUiApi } from '../devices/types';
