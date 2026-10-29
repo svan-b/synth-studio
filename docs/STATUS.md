@@ -59,6 +59,10 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Old project files get a notice too; the file itself is the copy.
   - Checked in e2e (37 checks).
 - Moog knobs turn 300°, as drawn: `PanelLayout.knobTravel` (default 270) is set to 300 on the DFAM, Mother-32 and Subharmonicon, whose manuals' clock positions and preset readings use the 7-to-5 o'clock sweep. Values are unchanged; the pointers and scale marks now line up with the printed legends. The Sub 37 reviewer decides for its panel.
+- New-user walkthrough on iPad (welcome → first lesson → both studio sets playing):
+  - 66fe408: "Start the first lesson" now starts it.
+  - 6ebf36d: the add-instrument button is pinned in a full tab row, the map names each instrument's mixer channel in its box (labels overlapped on converging arrows), and the silent Studio Clock has no mixer strip. Cable names are drawn on top with a halo.
+  - Measured with ▶: the Elektron set at −17.1 LUFS / −1.0 dBTP and the Moog trio at −16.3 LUFS / −2.2 dBTP, with no limiting and no console errors.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
 ## Live log (session 2, 2026-10-29)
