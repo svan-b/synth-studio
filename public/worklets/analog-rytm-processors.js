@@ -187,6 +187,8 @@ const CLICK = new Float32Array(Math.max(8, Math.round(0.0005 * SR)));
 const BUMP = new Float32Array(Math.max(6, Math.round(0.00035 * SR)));
 (() => { const n = BUMP.length; for (let i = 0; i < n; i++) { const u = (i + 0.5) / n; BUMP[i] = Math.pow(Math.sin(Math.PI * u), 2); } })();
 const CLICK_N = CLICK.length, BUMP_N = BUMP.length;
+/** Sample-layer fade before a one-shot's end point (in buffer samples) */
+const SMP_FADE_N = Math.max(32, Math.round(0.003 * SR));
 
 // ---------------------------------------------------------------------------
 // Sample layer: synthesized one-shots (generated on first use)
@@ -1506,14 +1508,18 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     const genAlive = this.generate(v, G, i0, i1);
     // sample layer
     if (v.sOn && v.sBuf) {
-      const buf = v.sBuf, inc = v.sInc, end = v.sEnd, g = v.sGain, q = v.sQ;
+      const buf = v.sBuf, inc = v.sInc, end = v.sEnd, g = v.sGain, q = v.sQ, loop = v.sLoop;
       let pos = v.sPos;
       const rev = inc < 0;
       for (let i = i0; i < i1; i++) {
-        if (rev ? pos <= end : pos >= end) { if (v.sLoop) pos = v.sStart + (pos - end); else { v.sOn = false; break; } }
+        if (rev ? pos <= end : pos >= end) { if (loop) pos = v.sStart + (pos - end); else { v.sOn = false; break; } }
         const ip = pos | 0, fr = pos - ip;
         let x = buf[ip] + (buf[ip + 1 < buf.length ? ip + 1 : ip] - buf[ip]) * fr;
         if (q) x = Math.round(x * q) / q;
+        // Without a loop the last 3 ms before the end point fade out (a raised cosine). Most
+        // one-shots are still ringing at their end (KICK 909 at -20 dB, CRASH at -36 dB re their
+        // peak), and an END set inside a sample stops it mid-wave: both used to stop dead, a click.
+        if (!loop) { const d = rev ? pos - end : end - pos; if (d < SMP_FADE_N) x *= d > 0 ? 0.5 - 0.5 * Math.cos(Math.PI * d / SMP_FADE_N) : 0; }
         G[i] += x * g;
         pos += inc;
       }
@@ -1805,6 +1811,18 @@ function sat12(u) {
   const a2 = a * a, a4 = a2 * a2, a12 = a4 * a4 * a4;
   return u * Math.pow(1 + a12, -1 / 12);
 }
+/**
+ * The main outputs' headroom: their maximum level is +15 dBu (manual p.76), taken as full scale,
+ * so the output stage saturates there instead of passing the compressor's makeup (up to +40 dB)
+ * and the delay's build-up unbounded. The same order-12 curve: unchanged below -6 dBFS, about
+ * -0.16 dB at -1 dBFS.
+ */
+function satOut(u) {
+  const a = u < 0 ? -u : u;
+  if (a < 0.5) return u;
+  const a2 = a * a, a4 = a2 * a2, a12 = a4 * a4 * a4;
+  return u * Math.pow(1 + a12, -1 / 12);
+}
 
 /** First-order section y = k x - k r x[-1] + P y[-1] with peak gain 1 */
 function scSection(fp, fz, fs) {
@@ -1941,7 +1959,8 @@ class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
       l *= g; r *= g;
       if (delPost) { l += del; r += delR; }
       if (revPost) { l += rev; r += revR; }
-      // AC-coupled output
+      // the output stage's headroom, then the AC-coupled output
+      l = satOut(l); r = satOut(r);
       dyl = l - dxl + dcR * dyl; dxl = l;
       dyr = r - dxr + dcR * dyr; dxr = r;
       oL[i] = dyl; if (oR !== oL) oR[i] = dyr;

@@ -197,7 +197,12 @@ section is the FX defaults (`KIT01_MASTER` in `model.ts`).
   order-12 soft clipper at about 0.68 / 0.72 of full scale, and it is there even
   at AMT 0. It holds the peaks. Dub Chords, Deep Garage and Jungle Roller keep
   their drive at 18: there, bright hats ride on a big kick, and deeper clipping
-  notches them on the kick's flattened crest, which crackles.
+  notches them on the kick's flattened crest, which crackles. For the same
+  reason Warehouse (20), Big Beat (12) and Lo-Fi (26) were turned down once the
+  closed hats got louder: dense downbeats drove them three to four times past
+  the knee, where the output flattens into a plateau right after a fast rise.
+  The audio-QA click detector flagged that now and then; it sounds like crunch,
+  but it is an artefact of driving the whole mix that far.
 - **COMP** keeps each kit's character (threshold, attack, release, ratio, SEQ).
   MIX is parallel compression, with MUP matched to the wet path's fixed loss
   plus the average gain reduction.
@@ -250,15 +255,16 @@ Two runs at 44.1 kHz on the instrument output: `audition` plays each kit's demo 
 |---|---|
 | Machine DSP | Each machine is modelled on the firmware's machine functions (rytm-mods): the two-oscillator circuit on BD, SD, RS and CP; the tuned resonator on the toms; the six-square hat bank (TR-808 ratios); and the cymbal and cowbell bank. Where no source gives absolute curves (Hz, ms), they are tuned by ear |
 | Hat metal | The six squares feed a ringing band-pass (Q about 3.3) and a high-pass, so their edges blend into a sizzle rather than single-sample spikes |
+| Hat levels | An output trim per hat machine: CH CLASSIC and HH BASIC +7 dB, CH METALLIC +5 dB, the others 0 dB. Without it the closed machines' init hits sat 10-17 LU under every other voice (momentary loudness -41.8 LUFS for CH CLASSIC against -24 to -30 for the kicks, snares and toms), so closed hats vanished in a groove. Each hat machine's init hit is now within about 3 LU of the others on the voice |
 | Digital clicks | TIC, TRA and the snare and rim ticks use one smooth 0.5 ms tick (CLICK) and a 0.35 ms push (BUMP). Both are defined in time, so they sound the same at 44.1 and 48 kHz |
 | Attack | AMP ATK 0 is a 0.4 ms linear ramp |
-| Retrigger | A trig on a sounding voice crossfades: the old sound's offset fades out over 1.3 ms and the new sound fades in over 0.3 ms (raised cosines). The amp carries on from its current level |
+| Retrigger | A trig on a sounding voice crossfades: the old sound's offset fades out over 1.3 ms and the new sound fades in over 0.3 ms (raised cosines), at both the filter input and the voice output. The amp carries on from its current level. The input side keeps the filter from ringing on the step between the two sounds |
 | STOP | Every voice fades out over about 5 ms; the delay and reverb ring on |
-| Output | AC coupled: a 5 Hz high-pass after the returns, so asymmetric kicks leave no DC |
+| Output | The main outputs' maximum level is +15 dBu (Rytm MKII manual, p.76), taken as full scale: an order-12 soft saturation there (unchanged below -6 dBFS), then AC coupling (a 5 Hz high-pass), so asymmetric kicks leave no DC. With every level, the makeup and the delay feedback at maximum the output stays near 0 dBFS instead of reaching +31 dBFS |
 | Filter | A Simper state-variable filter. FRQ moves one semitone per step, with 440 Hz at 60. A moving cutoff glides sample by sample |
 | Compressor | The rytm-mods calibrated model: a SEQ-filtered peak detector, a softplus curve per RAT, and ballistics from ATK and REL. Makeup is about 0.6 dB per step up to 48, and VOL follows a measured table. The output gain is smoothed by two one-pole stages |
 | Reverb | The studio's Reverb2 (FDN), not the Rytm's algorithm |
-| Samples | 32 synthesized one-shots (kick, snare, hats, percussion, noise) stand in for the +Drive sample library |
+| Samples | 32 synthesized one-shots (kick, snare, hats, percussion, noise) stand in for the +Drive sample library. Without a loop, the last 3 ms before the end point fade out (a raised cosine): most one-shots are still ringing when their buffer ends (KICK 909 at -20 dB re its peak, CRASH at -36 dB), and an END set inside a sample stops it mid-wave, so both used to click |
 | Trig LEN with AMP HLD AUTO | The amp holds for the trig's length. The manual describes AUTO only for pads |
 
 ## Simplified or not modelled

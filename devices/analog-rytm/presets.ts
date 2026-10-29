@@ -170,7 +170,7 @@ export const KIT_PRESETS: KitDef[] = [
       oh: { dec: 58, col: 8, amp_vol: 92 },
       cy: { machine: 'CY RIDE', typ: 1, dec: 78, c1: 70, amp_vol: 74 },
     },
-    { del_tim: 24, del_fdb: 54, del_hpf: 30, del_lpf: 92, rev_dec: 72, dis_amt: 30, dis_del: 1, cmp_thr: 108, cmp_atk: 2, cmp_rel: 1, cmp_mup: 21, cmp_rat: 1, cmp_seq: 1, cmp_mix: 80, cmp_vol: 105 },
+    { del_tim: 24, del_fdb: 54, del_hpf: 30, del_lpf: 92, rev_dec: 72, dis_amt: 20, dis_del: 1, cmp_thr: 108, cmp_atk: 2, cmp_rel: 1, cmp_mup: 21, cmp_rat: 1, cmp_seq: 1, cmp_mix: 80, cmp_vol: 105 },
     {
       name: 'WAREHOUSE',
       rows: {
@@ -248,11 +248,11 @@ export const KIT_PRESETS: KitDef[] = [
       rs: { machine: 'RS CLASSIC', dec: 30, amp_del: 40, amp_pan: -24 },
       lt: { tun: 34, dec: 40, swd: 30, amp_pan: 30 },
       mt: { tun: 58, dec: 36, swd: 30, amp_pan: -30 },
-      ch: { dec: 28, col: -6, amp_vol: 92 },
+      ch: { dec: 28, col: -6, amp_vol: 84 },
       oh: { dec: 46, col: -4, amp_vol: 88 },
       cb: { machine: 'CB CLASSIC', cdet: 54, dec: 30, amp_vol: 70, amp_del: 50 },
     },
-    { del_tim: 24, del_fdb: 60, del_lpf: 90, rev_dec: 66, rev_gai: 84, dis_amt: 18, dis_del: 1, cmp_thr: 114, cmp_atk: 3, cmp_rel: 1, cmp_mup: 17, cmp_rat: 2, cmp_seq: 1, cmp_mix: 70, cmp_vol: 119 },
+    { del_tim: 24, del_fdb: 60, del_lpf: 90, rev_dec: 66, rev_gai: 84, dis_amt: 18, dis_del: 1, cmp_thr: 114, cmp_atk: 3, cmp_rel: 1, cmp_mup: 17, cmp_rat: 2, cmp_seq: 1, cmp_mix: 70, cmp_vol: 115 },
     {
       name: 'GARAGE',
       rows: {
@@ -452,12 +452,12 @@ export const KIT_PRESETS: KitDef[] = [
     {
       bd: { machine: 'BD ACOUSTIC', tun: -1, dec: 50, hld: 10, swt: 50, swd: 40, wavx: 0, imp: 70 },
       sd: { machine: 'SD ACOUSTIC', tun: 4, bdy: 40, nod: 50, nol: 80, hld: 4, swd: 30, imp: 80 },
-      ch: { dec: 22, lev: 80, smp_slot: 9, smp_lev: 70 },
+      ch: { dec: 22, lev: 88, smp_slot: 9, smp_lev: 70 },
       oh: { dec: 44 },
       cy: { machine: 'CY RIDE', typ: 0, dec: 84, hit: 30, c1: 80, c2: 70, c3: 60, amp_vol: 76 },
-      mt: { tun: 60, dec: 50, amp_vol: 80 },
+      mt: { tun: 60, dec: 50, amp_vol: 88 },
     },
-    { rev_dec: 40, dis_amt: 18, cmp_thr: 106, cmp_atk: 2, cmp_rel: 1, cmp_mup: 19, cmp_rat: 1, cmp_seq: 3, cmp_mix: 90, cmp_vol: 127 },
+    { rev_dec: 40, dis_amt: 18, cmp_thr: 106, cmp_atk: 2, cmp_rel: 1, cmp_mup: 17, cmp_rat: 1, cmp_seq: 3, cmp_mix: 90, cmp_vol: 127 },
     {
       name: 'ROLLER',
       rows: {
@@ -473,17 +473,17 @@ export const KIT_PRESETS: KitDef[] = [
     }, 52),
 
   K('bigbeat', 'Breaks / Big Beat',
-    'A saw-wave kick and a driven snare through heavy master distortion: big beat breaks.',
+    'A saw-wave kick, an overdriven snare and clap and a fully wet master compressor: big beat breaks.',
     128,
     {
       bd: { machine: 'BD SHARP', tun: -2, dec: 52, hld: 14, swt: 34, swd: 76, wavx: 8, tic: 60, amp_ovr: 60, flt_frq: 96, flt_res: 30 },
-      sd: { machine: 'SD HARD', tun: 0, dec: 38, swd: 50, swt: 30, tic: 60, nod: 56, nol: 110, amp_ovr: 70 },
+      sd: { machine: 'SD HARD', tun: 0, dec: 38, swd: 50, swt: 30, tic: 60, nod: 56, nol: 110, amp_ovr: 70, amp_vol: 96 },
       cp: { machine: 'CP CLASSIC', num: 4, rat: 82, cpd: 81, ton: 54, nod: 50, nol: 80, amp_ovr: 40 },
-      ch: { machine: 'CH METALLIC', dec: 22, amp_vol: 120 },
+      ch: { machine: 'CH METALLIC', dec: 22 },
       oh: { machine: 'OH METALLIC', dec: 46 },
       cy: { machine: 'CY CLASSIC', dec: 96, smp_slot: 12, smp_lev: 80 },
     },
-    { rev_dec: 50, dis_amt: 30, dis_sym: -10, cmp_thr: 100, cmp_atk: 3, cmp_rel: 1, cmp_mup: 24, cmp_rat: 0, cmp_seq: 3, cmp_mix: 127, cmp_vol: 97 },
+    { rev_dec: 50, dis_amt: 12, dis_sym: -10, cmp_thr: 100, cmp_atk: 3, cmp_rel: 1, cmp_mup: 24, cmp_rat: 0, cmp_seq: 3, cmp_mix: 127, cmp_vol: 97 },
     {
       name: 'BIG BEAT',
       rows: {
@@ -641,7 +641,7 @@ export const KIT_PRESETS: KitDef[] = [
       cy: { machine: 'UT NOISE', dec: 127, lev: 30, lpf: 80, smp_slot: 22, smp_lop: 1, smp_lev: 90, amp_vol: 60, amp_dec: 50 },
       rs: { machine: 'RS CLASSIC', dec: 24, smp_slot: 18, smp_lev: 70, smp_br: 40 },
     },
-    { rev_dec: 48, rev_gai: 50, dis_amt: 44, dis_sym: 8, cmp_thr: 114, cmp_atk: 4, cmp_rel: 6, cmp_mup: 15, cmp_rat: 1, cmp_seq: 1, cmp_mix: 90, cmp_vol: 117 },
+    { rev_dec: 48, rev_gai: 50, dis_amt: 26, dis_sym: 8, cmp_thr: 114, cmp_atk: 4, cmp_rel: 6, cmp_mup: 15, cmp_rat: 1, cmp_seq: 1, cmp_mix: 90, cmp_vol: 122 },
     {
       name: 'TAPE',
       rows: {
