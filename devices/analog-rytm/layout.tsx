@@ -16,13 +16,13 @@
 
 import React, { type ReactNode } from 'react';
 import type { CustomElement, CustomRenderContext, PanelContext, PanelElement, PanelLayout } from '@/types/panel';
-import { ChainBuilder, PatternPicker, ScaleMenu, SongEditor, TrigEditor, TrigKeys } from '@/components/sequencer';
+import { ChainBuilder, PatternPicker, ScaleMenu, SongEditor, TrigEditor, TrigKeys, pressPlay, pressStop, seqStateOf, trigModeOf } from '@/components/sequencer';
 import {
-  CHANGE_MODES, asProject, getPattern, setChangeMode, setPlayMode, trackLength, type ChangeMode,
+  CHANGE_MODES, LOCK_LIMIT_RYTM, asProject, getPattern, reloadPattern, savePattern, setChangeMode, setPlayMode, trackLength, type ChangeMode,
 } from '@/lib/sequencer/elektron';
 import { FX_TRACK, PAGE, SEQ_TRACKS, TRACKS, pageControls, describe } from './model';
 import {
-  FlagTrigs, Key, Menus, PageLeds, Pads, PlayTrigs, RY, RytmStyles, Screen, applyMutePreselect, flash, funcOn, nudgeHeld, nudgeSwing, openMenu,
+  Key, Menus, PageLeds, Pads, PlayTrigs, RY, RytmStyles, Screen, applyMutePreselect, flash, funcOn, nudgeHeld, nudgeSwing, openMenu,
   pageReloadOrRandom, reloadKit, reloadSound, saveKit, shiftTrack, toggleHeldFlag, toggleHeldMute, trackClear, trackCopy, trackPaste, consumeFunc,
 } from './ui';
 import type { RytmProject } from './presets';
@@ -110,8 +110,13 @@ function quickSaveReload(ctx: CustomRenderContext, mode: number): boolean {
   ctx.setUi({ yesNoUsed: true });
   if (mode === 0) { if (yes) saveKit(ctx); else reloadKit(ctx); return true; }
   if (mode === 1) { if (yes) flash(ctx, 'THE SOUND IS KEPT IN THE KIT ([YES] + [PLAY] SAVES IT)'); else reloadSound(ctx); return true; }
-  const what = mode === 2 ? 'TRACKS' : mode === 3 ? 'PATTERNS' : 'SONGS';
-  flash(ctx, `${what} ARE SAVED AUTOMATICALLY IN THIS TWIN`);
+  if (mode === 3) {
+    // [YES] + [SCNE]: SAVE PATTERN (the restore point); [NO] + [SCNE]: RELOAD PATTERN (manual p.43)
+    ctx.updateData(d => (yes ? savePattern : reloadPattern)(asProject(d, SEQ_TRACKS)));
+    flash(ctx, yes ? `PATTERN ${projectOf(ctx).active} SAVED` : `PATTERN ${projectOf(ctx).active} RELOADED`);
+    return true;
+  }
+  flash(ctx, `${mode === 2 ? 'TRACKS' : 'SONGS'} ARE SAVED AUTOMATICALLY IN THIS TWIN`);
   return true;
 }
 
@@ -155,7 +160,7 @@ const BANK_SUB = ['', '', '', '', 'Trig Mute', 'Accent', 'Swing', 'Slide'];
 const MODE_LED_NAMES = ['Sequential', 'Direct Start', 'Direct Jump', 'Temp Jump'];
 
 /** The trig-key menu each of [FUNC] + [BANK E-H] opens (manual pp.49-50) */
-const BANK_TRIG_MODE: Record<number, string> = { 4: 'tmute', 5: 'accent', 6: 'swing', 7: 'pslide' };
+const BANK_TRIG_MODE: Record<number, string> = { 4: 'trigmute', 5: 'accent', 6: 'swing', 7: 'pslide' };
 
 function bankPress(ctx: CustomRenderContext, b: number) {
   // a held trig + [BANK E] / [BANK F] / [BANK H]: trig mute / accent / parameter slide on it (manual pp.49-51)
@@ -168,8 +173,8 @@ function bankPress(ctx: CustomRenderContext, b: number) {
     }
     // the same key again closes the menu: the trig keys place trigs again
     const mode = BANK_TRIG_MODE[b];
-    const on = ctx.ui.trigMode === mode;
-    ctx.setUi({ trigMode: on ? 'trig' : mode });
+    const on = trigModeOf(ctx) === mode;
+    ctx.setUi({ seqTrigMode: on ? 'trig' : mode });
     if (on) { flash(ctx, 'TRIG KEYS: TRIGS'); return; }
     const p = projectOf(ctx);
     flash(ctx, b === 4 ? 'TRIG MUTE: TRIG KEYS MUTE OR UNMUTE THE TRIGS'
@@ -202,7 +207,7 @@ function arrow(ctx: CustomRenderContext, dir: 'up' | 'down' | 'left' | 'right') 
     consumeFunc(ctx);
     if (horiz && Math.round(num(ctx.values.rec)) === 1) { shiftTrack(ctx, d); return; }
   }
-  if (ctx.ui.trigMode === 'swing' && !horiz) { nudgeSwing(ctx, d); return; }
+  if (trigModeOf(ctx) === 'swing' && !horiz) { nudgeSwing(ctx, d); return; }
   if ((ctx.ui.rtrgHeld || ctx.ui.rtrgLatch) && !horiz) {
     const t = Math.min(11, Math.round(num(ctx.values.track)));
     const id = `${TRACKS[t].id}_rtrg_rate`;
@@ -360,7 +365,7 @@ function keys(): PanelElement[] {
       const st = ctx.engine.seq as { pattern?: string | null; playing?: boolean } | undefined;
       const shown = (st?.playing && st.pattern) || p.active;
       const active = shown.charCodeAt(0) - 65 === b;
-      const menuOpen = !!BANK_TRIG_MODE[b] && ctx.ui.trigMode === BANK_TRIG_MODE[b];
+      const menuOpen = !!BANK_TRIG_MODE[b] && trigModeOf(ctx) === BANK_TRIG_MODE[b];
       return <Key ctx={ctx} id={`key:bank:${'ABCDEFGH'[b]}`} label={'ABCDEFGH'[b]} sub={BANK_SUB[b] || undefined} funcSub lit={menuOpen ? 1 : active ? 0.7 : 0}
         ledColor={menuOpen ? (b === 4 ? RY.green : b === 5 ? RY.purple : b === 6 ? RY.yellow : RY.blue) : undefined} focusIds={[`seq:bank:${'ABCDEFGH'[b]}`, 'seq:patterns']}
         onDown={() => bankPress(ctx, b)} />;
@@ -370,29 +375,32 @@ function keys(): PanelElement[] {
   out.push(key(282.7, 141.7, BIG, ctx => {
     const rec = Math.round(num(ctx.values.rec, 1));
     return <Key ctx={ctx} id="key:rec" big label={I.rec} sub="Copy" funcSub lit={rec > 0} blink={rec === 2} control="rec"
-      onDown={() => press(ctx, () => { ctx.setUi({ recHeld: true }); ctx.setValue('rec', rec === 0 ? 1 : 0); }, () => trackCopy(ctx))}
+      onDown={() => press(ctx, () => { ctx.setUi({ recHeld: true }); ctx.setValue('rec', rec === 1 ? 0 : 1); }, () => trackCopy(ctx))}
       onUp={() => ctx.setUi({ recHeld: false })} />;
   }, true));
   out.push(key(303.2, 141.7, BIG, ctx => {
     const st = ctx.engine.seq as { paused?: boolean; following?: boolean } | undefined;
     const playing = !!ctx.engine.playing;
     const paused = !!st?.paused;
-    return <Key ctx={ctx} id="key:play" big label={I.play} sub="Clear" funcSub lit={playing || paused} blink={paused} ledColor={RY.green} control="play"
+    return <Key ctx={ctx} id="key:play" big label={I.play} sub="Clear" funcSub lit={playing || paused} blink={paused} ledColor={RY.green} control="play" focusIds={['seq:play']}
       onDown={() => press(ctx, () => {
-        if (ctx.ui.recHeld) { ctx.setValue('rec', 2); flash(ctx, 'LIVE RECORDING: PLAY THE PADS'); }
-        // [PLAY] while playing pauses, [PLAY] again resumes (manual p.37). Synced, the studio transport runs the show.
-        if (paused) { ctx.sendEvent('seq:resume'); return; }
-        if (playing && !st?.following && !ctx.ui.recHeld) { ctx.sendEvent('seq:pause'); flash(ctx, 'PAUSED: [PLAY] RESUMES, [STOP] STOPS'); return; }
-        ctx.setValue('play', true);
+        // [RECORD] + [PLAY]: LIVE RECORDING (and play); [PLAY] during it leaves it and keeps playing (manual p.40)
+        if (ctx.ui.recHeld) { ctx.setValue('rec', 2); flash(ctx, 'LIVE RECORDING: PLAY THE PADS'); if (!playing) pressPlay(ctx); return; }
+        if (playing && Math.round(num(ctx.values.rec)) === 2) { ctx.setValue('rec', 0); flash(ctx, 'LIVE RECORDING OFF'); return; }
+        // stopped: play; playing: pause; paused: resume (manual p.37). Synced, it plays / stops the studio.
+        if (playing && !seqStateOf(ctx.engine)?.following) flash(ctx, 'PAUSED: [PLAY] RESUMES, [STOP] STOPS');
+        pressPlay(ctx);
       }, () => trackClear(ctx))} />;
   }, true));
-  out.push(key(323.8, 141.7, BIG, ctx => <Key ctx={ctx} id="key:stop" big label={I.stop} sub="Paste" funcSub control="play"
+  out.push(key(323.8, 141.7, BIG, ctx => <Key ctx={ctx} id="key:stop" big label={I.stop} sub="Paste" funcSub control="play" focusIds={['seq:stop']}
     onDown={() => press(ctx, () => {
       if (ctx.ui.recHeld) { flash(ctx, 'STEP RECORDING IS NOT IN THIS TWIN YET: USE GRID RECORDING'); return; }
-      const twice = doublePress(ctx, 'stopTap') && !ctx.engine.playing;
-      ctx.setValue('play', false);
-      if (Math.round(num(ctx.values.rec)) === 2) ctx.setValue('rec', 1);
-      // [STOP] twice: the delay and reverb fade out too
+      const st = seqStateOf(ctx.engine);
+      const twice = doublePress(ctx, 'stopTap') && !st?.playing && !st?.paused;
+      pressStop(ctx);
+      // [STOP] ends LIVE RECORDING as well as the playback (manual p.40)
+      if (Math.round(num(ctx.values.rec)) === 2) ctx.setValue('rec', 0);
+      // [STOP] twice: the delay and reverb fade out too (manual p.37)
       if (twice) { ctx.sendEvent('rytm:fx-off'); flash(ctx, 'SEND FX OFF'); }
     }, () => trackPaste(ctx))} />, true));
   out.push(key(353.8, 145.2, SMALL, ctx => {
@@ -428,13 +436,13 @@ const ENC_Y = [22.2, 50.4];
 const ENC_D = 13.6;
 
 /** Which control encoder i (0..7) edits right now */
-export const encoderBinding = (i: number) => ({ values }: PanelContext) =>
-  pageControls(Math.round(num(values.track)), Math.max(0, Math.min(5, Math.round(num(values.page, 1)))), values)[i] ?? null;
+export const encoderBinding = (i: number) => ({ values, ui }: PanelContext) =>
+  pageControls(Math.round(num(values.track)), Math.max(0, Math.min(5, Math.round(num(values.page, 1)))), values, ui)[i] ?? null;
 
 const levelBinding = ({ values, ui }: PanelContext) => {
   const t = Math.round(num(values.track));
   if (t === FX_TRACK) return 'fx_trk_lev';
-  return (ui as Record<string, unknown> | undefined)?.trigMode === 'accent' ? `${TRACKS[t].id}_acc_lev` : `${TRACKS[t].id}_trk_lev`;
+  return (ui as Record<string, unknown> | undefined)?.seqTrigMode === 'accent' ? `${TRACKS[t].id}_acc_lev` : `${TRACKS[t].id}_trk_lev`;
 };
 
 const knobs: PanelElement[] = [
@@ -466,16 +474,14 @@ const sequencer: PanelElement[] = [
     kind: 'custom', x: TRIG_X0 - TRIG_SIZE / 2, y: TRIG_Y - TRIG_SIZE / 2, w: TRIG_PITCH * 15 + TRIG_SIZE, h: TRIG_SIZE,
     render: ctx => {
       const rec = Math.round(num(ctx.values.rec, 0));
-      const mode = (ctx.ui.trigMode as 'trig' | 'accent' | 'pslide' | 'tmute' | 'swing' | undefined) ?? 'trig';
+      const mode = trigModeOf(ctx);
       const gap = { ['--rytm-trig-gap' as string]: `${(TRIG_PITCH - TRIG_SIZE) * PX}px` };
       const editing = rec > 0 || mode !== 'trig';
       return (
         <div className="rytm-trigs" style={{ position: 'absolute', inset: 0, ...gap }}>
-          {mode === 'tmute' || mode === 'swing'
-            ? <FlagTrigs ctx={ctx} mode={mode} />
-            : editing
-              ? <TrigKeys ctx={ctx} tracks={SEQ_TRACKS} trackNames={TRACK_NAMES} editable mode={mode} color="#ff3b2a" longPressMs={550} />
-              : <PlayTrigs ctx={ctx} />}
+          {editing
+            ? <TrigKeys ctx={ctx} tracks={SEQ_TRACKS} trackNames={TRACK_NAMES} editable color="#ff3b2a" longPressMs={550} />
+            : <PlayTrigs ctx={ctx} />}
         </div>
       );
     },
@@ -494,12 +500,12 @@ const sequencer: PanelElement[] = [
     render: ctx => (
       <>
         <RytmStyles />
-        <TrigEditor ctx={ctx} tracks={SEQ_TRACKS} portal portalPlacement="top" trackNames={TRACK_NAMES} features={{ retrig: true, accent: true, slide: false, pslide: true }}
+        <TrigEditor ctx={ctx} tracks={SEQ_TRACKS} portal portalPlacement="top" trackNames={TRACK_NAMES} features={{ retrig: true, accent: true, slide: false, pslide: true, trigMute: true }} lockLimit={LOCK_LIMIT_RYTM}
           lockLabel={k => describe(`bd_${k}`, 0)?.abbr ?? describe(`fx_${k}`, 0)?.abbr ?? k.toUpperCase()}
           noteFormat={n => `${n - 60 >= 0 ? '+' : ''}${n - 60}`} noteRange={[36, 84]} />
         <PatternPicker ctx={ctx} tracks={SEQ_TRACKS} portal />
         <ChainBuilder ctx={ctx} tracks={SEQ_TRACKS} portal />
-        <SongEditor ctx={ctx} tracks={SEQ_TRACKS} portal trackNames={TRACK_NAMES} />
+        <SongEditor ctx={ctx} tracks={SEQ_TRACKS} portal trackNames={TRACK_NAMES} loop={false} length={false} tempo={false} />
         <ScaleMenu ctx={ctx} tracks={SEQ_TRACKS} portal trackNames={TRACK_NAMES} />
         <Menus ctx={ctx} />
       </>

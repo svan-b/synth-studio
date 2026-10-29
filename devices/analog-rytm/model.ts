@@ -516,6 +516,13 @@ export const TRIG_PAGE: PageParam[] = [
   PP('trig_lfo', 'LFO', 'LFO Trig', 0, 1, 0, 'Trigs restart the LFO (in TRG, HLD, ONE and HLF modes).', { options: ['OFF', 'ON'], idx: IX.TRIG_LFO }),
 ];
 
+/**
+ * TRC (Trig Condition): while a trig is held it takes encoder D's place (PRB) on the TRIG page,
+ * and turning it sets that trig's condition (manual p.48). Not stored in the kit.
+ */
+export const TRIG_COND: PageParam = PP('trig_cond', 'TRC', 'Trig Condition', 0, TRIG_CONDITIONS.length - 1, 0,
+  'Condition of the held trig: a probability, FILL / !FILL, PRE / !PRE, NEI / !NEI, 1ST / !1ST, or A:B (play on loop A of every B).', { step: 1 });
+
 export const SMPL_PAGE: PageParam[] = [
   PP('smp_tun', 'TUN', 'Tune', -24, 24, 0, 'Sample pitch in semitones.', { bipolar: true, idx: IX.SMP_TUN, step: 1 }),
   PP('smp_fin', 'FIN', 'Fine Tune', -64, 63, 0, 'Fine tune of the sample: the whole range is one semitone down to one up.', { bipolar: true, idx: IX.SMP_FIN }),
@@ -627,7 +634,7 @@ const FXP = (key: string, abbr: string, name: string, min: number, max: number, 
  * calibrated master instead: a little drive into the master clipper, gentle parallel compression
  * keyed to the kick, and VOL for about -18 LUFS at the output with true peaks under -1 dBTP.
  */
-export const KIT01_MASTER = { dis_amt: 18, cmp_thr: 116, cmp_atk: 3, cmp_rel: 2, cmp_mup: 20, cmp_rat: 2, cmp_seq: 1, cmp_mix: 50, cmp_vol: 115 } as const;
+export const KIT01_MASTER = { dis_amt: 18, cmp_thr: 116, cmp_atk: 3, cmp_rel: 2, cmp_mup: 16, cmp_rat: 2, cmp_seq: 1, cmp_mix: 50, cmp_vol: 122 } as const;
 
 export const FX_PAGES: Record<number, (PageParam | null)[]> = {
   [PAGE.SRC]: [
@@ -715,6 +722,7 @@ export function formatPage(p: PageParam, v: number): string {
     case 'trig_note': return `${noteName(v)} ${signed(v - 60)}`;
     case 'trig_len': case 'rtrg_len': return LEN_TEXT(Math.round(v));
     case 'trig_prob': return `${Math.round(v)}%`;
+    case 'trig_cond': return CONDITION_TEXT(v);
     case 'flt_frq': return hzText(filterHz(v));
     case 'amp_pan': return panText(v);
     case 'amp_dec': return v >= 127 ? 'INF' : `${Math.round(v)}`;
@@ -765,13 +773,15 @@ export const machineOf = (values: Record<string, unknown>, track: number): numbe
 };
 
 /** Control ids under encoders A..H for a track and page (null = unused) */
-export function pageControls(track: number, page: number, values: Record<string, unknown>): (string | null)[] {
+export function pageControls(track: number, page: number, values: Record<string, unknown>, ui?: Record<string, unknown>): (string | null)[] {
+  // a held trig: encoder D on the TRIG page is TRC, the trig's condition (manual p.48)
+  const held = page === PAGE.TRIG && Array.isArray(ui?.heldSteps) && (ui!.heldSteps as unknown[]).length > 0;
   if (track === FX_TRACK) {
-    if (page === PAGE.TRIG) return FX_TRIG.map(k => (k ? `fx_${k}` : null));
+    if (page === PAGE.TRIG) return FX_TRIG.map((k, i) => (k ? `fx_${held && i === 3 ? TRIG_COND.key : k}` : null));
     return (FX_PAGES[page] ?? []).map(p => (p ? `fx_${p.key}` : null));
   }
   if (page === PAGE.SRC) return MACHINES[machineOf(values, track)].knobs.map(k => (k ? cid(track, k) : null));
-  return (TRACK_PAGES[page] ?? []).map(p => cid(track, p.key));
+  return (TRACK_PAGES[page] ?? []).map((p, i) => cid(track, held && i === 3 ? TRIG_COND.key : p.key));
 }
 
 /** Metadata for a control id: a machine parameter or a page parameter */
@@ -781,13 +791,14 @@ export function paramMeta(id: string): { kind: 'machine'; p: MParam; track: numb
   if (pi.track === FX_TRACK) {
     for (const page of Object.values(FX_PAGES)) for (const p of page) if (p && p.key === pi.key) return { kind: 'page', p, track: pi.track };
     if (pi.key === 'trig_prob') return { kind: 'page', p: TRIG_PAGE[3], track: pi.track };
+    if (pi.key === TRIG_COND.key) return { kind: 'page', p: TRIG_COND, track: pi.track };
     if (pi.key === 'trk_lev') return { kind: 'page', p: FX_TRACK_LEVEL, track: pi.track };
     return null;
   }
   const t = TRACKS[pi.track];
   const mp = PARAM_INDEX[t.type][pi.key];
   if (mp) return { kind: 'machine', p: mp, track: pi.track };
-  for (const page of [...Object.values(TRACK_PAGES), TRACK_EXTRA, RETRIG_MENU]) for (const p of page) if (p.key === pi.key) return { kind: 'page', p, track: pi.track };
+  for (const page of [...Object.values(TRACK_PAGES), TRACK_EXTRA, RETRIG_MENU, [TRIG_COND]]) for (const p of page) if (p.key === pi.key) return { kind: 'page', p, track: pi.track };
   return null;
 }
 

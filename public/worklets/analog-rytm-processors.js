@@ -126,6 +126,17 @@ const FX_LFO_DEST_RANGE = [0, 128, 2, 128, 198, 128, 128, 128, 128, 128, 128, 12
 const LFO_MULT = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048];
 /** Samples over which a retriggered voice blends out of its last output */
 const DECLICK_N = Math.max(16, Math.round(0.0013 * SR));
+/** Samples over which a retriggered voice's new sound fades in (a fresh voice has the amp's 0.4 ms attack) */
+const RETRIG_FADE_N = Math.max(8, Math.round(0.0003 * SR));
+/**
+ * Raised-cosine shapes for the retrigger crossfade: the old sound's offset fades out (DECLICK_W, 1 -> 0)
+ * and the new sound fades in (FADE_W, 0 -> 1) with zero slope at both ends, so even a smooth, near-sine
+ * sound (a chord stab, a kick's tail) gets no kink where a linear ramp would start or stop.
+ */
+const DECLICK_W = new Float32Array(DECLICK_N + 1);
+for (let k = 0; k <= DECLICK_N; k++) DECLICK_W[k] = 0.5 - 0.5 * Math.cos(Math.PI * k / DECLICK_N);
+const FADE_W = new Float32Array(RETRIG_FADE_N);
+for (let i = 0; i < RETRIG_FADE_N; i++) FADE_W[i] = 0.5 - 0.5 * Math.cos(Math.PI * (i + 1) / (RETRIG_FADE_N + 1));
 /** Right-hand track of each shared voice (it wins when both trig together; manual p.21) */
 const RIGHT_OF = [-1, -1, 3, -1, -1, -1, 7, -1, 9, -1, 11, -1];
 // Tables used by the generators (module level: nothing is allocated per block)
@@ -195,7 +206,7 @@ function genSample(slot) {
     case 6: { b = len(0.6); let lp = 0, hp = 0, pn = 0; for (let i = 0; i < b.length; i++) { const t = i * INV_SR; const n = N(); hp = 0.7 * (hp + n - pn); pn = n; lp += 0.3 * (hp - lp); b[i] = lp * 0.9 * env(t, 0.02, 0.18); } break; }
     case 7: { b = len(0.6); let bp1 = 0, bp2 = 0; const g = Math.tan(Math.PI * 1300 * INV_SR), k = 1.2; for (let i = 0; i < b.length; i++) { const t = i * INV_SR; let e = 0; for (let c = 0; c < 4; c++) { const tt = t - c * 0.011; if (tt >= 0) e += Math.exp(-tt / (c === 3 ? 0.2 : 0.006)) * (c === 3 ? 0.9 : 1); } const x = N() * e; const v1 = (bp1 + g * (x - bp2)) / (1 + g * (g + k)); const v2 = bp2 + g * v1; bp1 = 2 * v1 - bp1; bp2 = 2 * v2 - bp2; b[i] = v1 * 1.6; } break; }
     case 8: { b = len(0.12); let p = 0; for (let i = 0; i < b.length; i++) { const t = i * INV_SR; p += 1650 * INV_SR; b[i] = (Math.sin(TWO_PI * p) * 0.8 + Math.sin(TWO_PI * p * 0.55) * 0.3) * Math.exp(-t / 0.018); } break; }
-    case 9: case 10: { const open = slot === 10; b = len(open ? 0.8 : 0.12); let hp = 0, pn = 0; const ph = new Float64Array(6); for (let i = 0; i < b.length; i++) { const t = i * INV_SR; let s = 0; for (let k = 0; k < 6; k++) { ph[k] += BANK_808[k] * 1.6 * INV_SR; s += (ph[k] % 1) < 0.5 ? 1 : -1; } const x = s * 0.16 + N() * 0.35; hp = 0.75 * (hp + x - pn); pn = x; b[i] = hp * Math.exp(-t / (open ? 0.25 : 0.022)); } break; }
+    case 9: case 10: { const open = slot === 10; b = len(open ? 0.8 : 0.12); let hp = 0, pn = 0; const ph = new Float64Array(6); for (let i = 0; i < b.length; i++) { const t = i * INV_SR; let s = 0; for (let k = 0; k < 6; k++) { const dk = BANK_808[k] * 1.6 * INV_SR; ph[k] += dk; if (ph[k] >= 1) ph[k] -= 1; s += pulse(ph[k], 0.5, dk); } const x = s * 0.16 + N() * 0.35; hp = 0.75 * (hp + x - pn); pn = x; b[i] = hp * Math.exp(-t / (open ? 0.25 : 0.022)); } break; }
     case 11: { b = len(1.6); const ph = new Float64Array(5); const f = [530, 811, 1270, 1740, 2915]; for (let i = 0; i < b.length; i++) { const t = i * INV_SR; let s = 0; for (let k = 0; k < 5; k++) { ph[k] += f[k] * INV_SR; s += Math.sin(TWO_PI * ph[k]) / (k + 1); } b[i] = s * 0.45 * Math.exp(-t / 0.5) + N() * 0.08 * Math.exp(-t / 0.3); } break; }
     case 12: { b = len(2.2); let hp = 0, pn = 0, lp = 0; for (let i = 0; i < b.length; i++) { const t = i * INV_SR; const n = N(); hp = 0.6 * (hp + n - pn); pn = n; lp += 0.6 * (hp - lp); b[i] = lp * 0.8 * env(t, 0.003, 0.7); } break; }
     case 13: { b = len(0.18); let hp = 0, pn = 0; for (let i = 0; i < b.length; i++) { const t = i * INV_SR; const n = N(); hp = 0.5 * (hp + n - pn); pn = n; b[i] = hp * 0.9 * env(t, 0.03, 0.04); } break; }
@@ -294,6 +305,7 @@ class Voice {
     // amp
     this.amp = 0; this.ampStage = 0; this.ampAtk = 1; this.ampHold = 0; this.ampKd = 1; this.ampInf = true; this.gate = false;
     this.choke = 0; // > 0: fading out for a voice steal
+    this.fin = 1 << 30; // samples since a retrigger (the new sound fades in over RETRIG_FADE_N)
     // drive / output
     this.drv = 0; this.drvN = 1; this.gl = 1; this.gr = 1; this.dsend = 0; this.rsend = 0; this.gain = 0;
     this.peak = 0;
@@ -612,7 +624,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     v.ampStage = 1;
     v.ampHoldLeft = -1;
     if (!v.active) { v.ic1 = 0; v.ic2 = 0; v.lastY = 0; }
-    else v.dclArm = true;
+    else { v.dclArm = true; v.fin = 0; }
     v.active = true;
     v.quiet = 0;
     v.t = 0;
@@ -1083,7 +1095,8 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           if (ring) y = y * (1 - ring) + y * m2 * ring * 1.6;
           if (t >= hold) e[2] *= k[2];
           y *= e[2] * lev;
-          if (tic && t < 32) y += (t < 8 ? t / 8 : t < 24 ? 1 - (t - 8) / 8 : (t - 32) / 8 * 0) * tic * lev * 0.7;
+          // the tick: one triangle cycle, 0 -> 1 -> -1 -> 0 (it used to jump from -1 to 0 at t = 24)
+          if (tic && t < 32) y += (t < 8 ? t / 8 : t < 24 ? 1 - (t - 8) / 8 : (t - 32) / 8) * tic * lev * 0.7;
           G[i] = y;
         }
         alive = e[2] * lev;
@@ -1274,11 +1287,13 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
             x = (pulse(p[0], 0.5, dt0) + pulse(p[1], 0.5, dt1) + pulse(p[2], 0.5, dt2) + pulse(p[3], 0.5, dt3) + pulse(p[4], 0.5, dt4) + pulse(p[5], 0.5, dt5)) * 0.166;
           }
           if (m === HH_BASIC && fb[4]) x += v.noise() * fb[4] * e[3] * 0.8;
-          // band-pass then high-pass (the metal path), COL moves both
-          const kb = 1.6, a1 = 1 / (1 + gB * (gB + kb)), a2 = gB * a1, a3 = gB * a2;
+          // band-pass then high-pass (the metal path), COL ("Noise Color", manual pp.106-107) moves both.
+          // The band-pass rings (Q about 3.3) like the circuit's, so the six squares' edges blend into a
+          // sizzle instead of single-sample spikes; its gain keeps the power of a broad band-pass.
+          const kb = 0.3, a1 = 1 / (1 + gB * (gB + kb)), a2 = gB * a1, a3 = gB * a2;
           let v3 = x - s[1]; let v1 = a1 * s[0] + a2 * v3; let v2 = s[1] + a2 * s[0] + a3 * v3;
           s[0] = 2 * v1 - s[0]; s[1] = 2 * v2 - s[1];
-          const bp = v1;
+          const bp = v1 * 0.433;
           const kh = 1.3, b1 = 1 / (1 + gH * (gH + kh)), b2 = gH * b1, b3 = gH * b2;
           v3 = bp - s[3]; v1 = b1 * s[2] + b2 * v3; v2 = s[3] + b2 * s[2] + b3 * v3;
           s[2] = 2 * v1 - s[2]; s[3] = 2 * v2 - s[3];
@@ -1289,7 +1304,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           if (m === HH_BASIC) { env *= 0.6 + 0.4 * e[2]; e[2] *= k[2]; e[3] *= k[3]; }
           e[0] *= k[0];
           let y = hp * env * 4.6;
-          if (m === HH_BASIC && t < 16) y += (1 - t / 16) * 0.35;
+          if (m === HH_BASIC && t < BUMP_N) y += BUMP[t] * 0.34;
           G[i] = y * lev * (m === HH_LAB ? 1.6 : 1);
         }
         alive = e[0] * lev;
@@ -1501,7 +1516,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     const typ = v.fType, kk = v.kk, m0 = v.m0, m1 = v.m1, m2 = v.m2;
     const envOct = v.fEnvOct;
     const modulated = envOct !== 0;
-    let g = svfG(440 * exp2(v.fBaseOct + envOct * v.fe));
+    let g = svfG(440 * exp2(v.fBaseOct + envOct * v.fe)), gStep = 0;
     let a1 = 1 / (1 + g * (g + kk)), a2 = g * a1, a3 = g * a2;
     let ic1 = v.ic1, ic2 = v.ic2;
     const drv = v.drv, drvG = v.drvG, drvN = v.drvN;
@@ -1516,9 +1531,14 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         case 2: fe = v.feSus + (fe - v.feSus) * v.feKd; if (!v.gate) v.feStage = 3; break;
         case 3: fe *= v.feKr; break;
       }
-      if (modulated && (i & 7) === 0) {
-        const w = clamp(440 * exp2(v.fBaseOct + envOct * fe), 5, SR * 0.47) * Math.PI * INV_SR;
-        g = w < 1.42 ? tanF(w) : 1.42 + (w - 1.42) * 8;
+      if (modulated) {
+        // the envelope's cutoff, every 8 samples; the coefficient glides there sample by sample, so a
+        // fast sweep leaves no zipper steps (kinks) in a smooth sound
+        if ((i & 7) === 0) {
+          const w = clamp(440 * exp2(v.fBaseOct + envOct * fe), 5, SR * 0.47) * Math.PI * INV_SR;
+          gStep = ((w < 1.42 ? tanF(w) : 1.42 + (w - 1.42) * 8) - g) * 0.125;
+        }
+        g += gStep;
         a1 = 1 / (1 + g * (g + kk)); a2 = g * a1; a3 = g * a2;
       }
       // amp envelope: attack (from the current level) -> hold (HLD or the gate) -> decay
@@ -1531,6 +1551,8 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         case 3: amp *= v.ampKd; break;
       }
       let x = G[i];
+      // a retrigger: the new sound fades in, so a bright onset over a ringing voice is no step
+      if (v.fin < RETRIG_FADE_N) { x *= FADE_W[v.fin]; v.fin++; }
       if (drv > 0) x = tanhF(x * drvG) * drvN;
       const v3 = x - ic2;
       const v1 = a1 * ic1 + a2 * v3;
@@ -1540,7 +1562,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       let y = (m0 * x + m1 * v1 + m2 * v2) * amp;
       if (v.choke > 0) { y *= v.choke; v.choke -= 0.004; if (v.choke <= 0) { v.choke = 0; amp = 0; } }
       if (v.dclArm) { v.dclArm = false; v.dcl = v.lastY - y; v.dclN = DECLICK_N; }
-      if (v.dclN > 0) { y += v.dcl * (v.dclN / DECLICK_N); v.dclN--; }
+      if (v.dclN > 0) { y += v.dcl * DECLICK_W[v.dclN]; v.dclN--; }
       v.lastY = y;
       const l = y * gl, r = y * gr;
       oL[i] += l; oR[i] += r;
@@ -1797,7 +1819,10 @@ class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
     this.blockN = Math.max(4, Math.round(8 * SR / 48000));
     this.cnt = 0;
     this.state = 0;      // gain reduction, dB
-    this.g = 1; this.gStep = 0; this.gTarget = 1;
+    // output gain: the block's target through two one-pole stages (continuous slope, so the gain
+    // changes leave no kinks in smooth material; about one block of delay)
+    this.g = 1; this.g1 = 1; this.gTarget = 1;
+    this.gA = 1 - Math.exp(-2 / this.blockN);
     this.idle = 0;
     // output coupling (DC blocker) state
     this.dcR = Math.exp(-TWO_PI * 5 / SR);
@@ -1872,7 +1897,8 @@ class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
     const z = this.dz;
     const pkFall = this.pkFall;
     let pk = this.pk, cnt = this.cnt;
-    let g = this.g, gStep = this.gStep;
+    let g = this.g, g1 = this.g1, gT = this.gTarget;
+    const gA = this.gA;
     const dcR = this.dcR;
     let dxl = this.dcxL, dyl = this.dcyL, dxr = this.dcxR, dyr = this.dcyR;
     for (let i = 0; i < n; i++) {
@@ -1895,10 +1921,9 @@ class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
       if (++cnt >= this.blockN) {
         cnt = 0;
         this.pk = pk;
-        const target = this.block(P);
-        gStep = (target - g) / this.blockN;
+        gT = this.block(P);
       }
-      g += gStep;
+      g1 += (gT - g1) * gA; g += (g1 - g) * gA;
       l *= g; r *= g;
       if (delPost) { l += del; r += delR; }
       if (revPost) { l += rev; r += revR; }
@@ -1909,7 +1934,7 @@ class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
     }
     this.dcxL = dxl; this.dcyL = Math.abs(dyl) < 1e-20 ? 0 : dyl; this.dcxR = dxr; this.dcyR = Math.abs(dyr) < 1e-20 ? 0 : dyr;
     for (let j = 0; j < 8; j++) if (Math.abs(z[j]) < 1e-20) z[j] = 0;
-    this.pk = pk; this.cnt = cnt; this.g = g; this.gStep = gStep;
+    this.pk = pk; this.cnt = cnt; this.g = g; this.g1 = g1; this.gTarget = gT;
     return true;
   }
 }

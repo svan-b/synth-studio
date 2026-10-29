@@ -19,6 +19,7 @@ export const LOCKS: LockOptions = {
       case 'trig_vel': return 'vel';
       case 'trig_len': return 'len';
       case 'trig_prob': return 'prob';
+      case 'trig_cond': return 'cond';
     }
     return pi.key;
   },

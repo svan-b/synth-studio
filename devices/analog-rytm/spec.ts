@@ -14,13 +14,14 @@
 
 import type { ControlSpec, DeviceSpec, KnobSpec } from '@/types';
 import {
-  FX_PAGES, FX_TRACK, FX_TRACK_LEVEL, MACHINES, PAGES, PARAM_INDEX, RETRIG_MENU, TRACKS, TRACK_EXTRA, TRACK_OPTIONS, TRACK_PAGES, TRIG_PAGE,
+  FX_PAGES, FX_TRACK, FX_TRACK_LEVEL, MACHINES, PAGES, PARAM_INDEX, RETRIG_MENU, TRACKS, TRACK_EXTRA, TRACK_OPTIONS, TRACK_PAGES, TRIG_COND, TRIG_PAGE,
   formatMachineParam, formatPage, machineParamDefault, trackParamKeys, type PageParam,
 } from './model';
 import { KIT_PRESETS } from './presets';
 
 const REF = {
   trig: 'Rytm MKII manual p.43: TRIG menu',
+  trc: 'Rytm MKII manual p.48: conditional locks (TRC)',
   src: 'Rytm MKII manual pp.96-109: Appendix D, machines',
   smpl: 'Rytm MKII manual pp.77-78: SMPL page',
   fltr: 'Rytm MKII manual pp.78-79: FLTR page',
@@ -43,7 +44,7 @@ const pageKnob = (prefix: string, p: PageParam, ref: string, def = p.def): KnobS
 
 /** Ids of the controls a kit stores (sounds, track levels, FX) - not the TRIG page's NOTE / VEL / LEN / PRB, which belong to the pattern */
 export const KIT_CONTROL_IDS: string[] = [];
-const SEQ_FIELDS = new Set(['trig_note', 'trig_vel', 'trig_len', 'trig_prob']);
+const SEQ_FIELDS = new Set(['trig_note', 'trig_vel', 'trig_len', 'trig_prob', 'trig_cond']);
 
 function buildControls(): Record<string, ControlSpec> {
   const c: Record<string, ControlSpec> = {};
@@ -64,7 +65,7 @@ function buildControls(): Record<string, ControlSpec> {
         bipolar: p.bipolar, units: p.semis ? 'semitones' : 'none', format: v => formatMachineParam(p, v),
       }));
     }
-    const pages: [PageParam[], string][] = [[TRIG_PAGE, REF.trig], [TRACK_PAGES[2], REF.smpl], [TRACK_PAGES[3], REF.fltr], [TRACK_PAGES[4], REF.amp], [TRACK_PAGES[5], REF.lfo], [TRACK_EXTRA, REF.amp], [RETRIG_MENU, REF.retrig]];
+    const pages: [PageParam[], string][] = [[TRIG_PAGE, REF.trig], [[TRIG_COND], REF.trc], [TRACK_PAGES[2], REF.smpl], [TRACK_PAGES[3], REF.fltr], [TRACK_PAGES[4], REF.amp], [TRACK_PAGES[5], REF.lfo], [TRACK_EXTRA, REF.amp], [RETRIG_MENU, REF.retrig]];
     for (const [page, ref] of pages) for (const p of page) add(`${t.id}_${p.key}`, pageKnob(pre, p, ref), !SEQ_FIELDS.has(p.key));
   });
 
@@ -72,6 +73,7 @@ function buildControls(): Record<string, ControlSpec> {
   for (const page of Object.values(FX_PAGES)) for (const p of page) if (p) add(`fx_${p.key}`, pageKnob('FX', p, REF.fx));
   add('fx_trk_lev', pageKnob('FX', FX_TRACK_LEVEL, 'Rytm MKII manual p.36: FX track level'));
   add('fx_trig_prob', pageKnob('FX', TRIG_PAGE[3], REF.trig), false);
+  add('fx_trig_cond', pageKnob('FX', TRIG_COND, REF.trc), false);
 
   // Globals (project settings, not part of a kit)
   c.bpm = knob('TEMPO', 'Project tempo in BPM ([TEMPO]). Synced to the studio, the studio clock sets it.', 'Manual: TEMPO menu', 30, 300, 124, {

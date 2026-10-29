@@ -15,8 +15,8 @@ import React, { useEffect, useRef, useState, type CSSProperties, type ReactNode 
 import type { ControlValue } from '@/types';
 import type { CustomRenderContext } from '@/types/panel';
 import {
-  CHANGE_MODES, asProject, clearTrack, getPattern, isSwingStep, setActive, setChangeMode, setMasterMute, setMasterMutes, setPlayMode, setStep,
-  setTrigMute, toggleSwingTrig, trackLength, updatePatternSettings, updateSteps, withTrack, type Project, type Step, type Track,
+  CHANGE_MODES, asProject, clearTrack, getPattern, setActive, setChangeMode, setMasterMute, setMasterMutes, setPlayMode, setStep,
+  setTrigMute, trackLength, updatePatternSettings, updateSteps, withTrack, type Project, type Step, type Track,
 } from '@/lib/sequencer/elektron';
 import { isLocked } from '@/lib/sequencer/elektron/locks';
 import { C, Frame, FONT, Group, MONO, Overlay, SeqButton, Stepper } from '@/components/sequencer/shared';
@@ -193,6 +193,7 @@ export function RytmStyles() {
 .rytm-target { animation: rytmPulse 1.1s ease-in-out infinite }
 @media (prefers-reduced-motion: reduce) { .rytm-blink { animation-duration: 1.6s } .rytm-target { animation: none; box-shadow: 0 0 0 3px #ff9f1c } }
 .rytm-trigs > div > div { gap: var(--rytm-trig-gap, 3px) !important }
+.rytm-trigs [data-tmute] { outline: 2px dashed ${RY.green}; outline-offset: -4px }
 `}</style>
   );
 }
@@ -322,6 +323,8 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
         held.current.set(e.pointerId, h);
         if (num(c.values.auto_trk) > 0) c.setValue('track', pad);   // AUTO TRK SWITCH (SEQUENCER CONFIG); off, [TRK] + pad selects
         c.sendEvent('pad', { track: pad, vel: func ? trackVel(c, pad) : velocityOf(e, pad), rtrg: rtrgOn(c), rec: recLive(c), quantize: num(c.values.quantize) > 0 });
+        // lessons count which pad was played ('pad:bd', 'pad:oh' ...)
+        if (c.teaching) c.sendEvent(`pad:${TRACKS[pad].id}`);
     }
   };
   const move = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -520,63 +523,6 @@ export function PlayTrigs({ ctx }: { ctx: CustomRenderContext }) {
   );
 }
 
-/**
- * TRIG MUTE ([FUNC] + [BANK E]) and SWING ([FUNC] + [BANK G]) menus (manual pp.49-50): the trig
- * keys place or remove trig mutes on the active track's trigs, or the pattern's swing trigs.
- * Trigs light pale, marked steps bright; the white ring is the playhead.
- */
-export function FlagTrigs({ ctx, mode }: { ctx: CustomRenderContext; mode: 'tmute' | 'swing' }) {
-  const p = projectOf(ctx);
-  const track = Math.round(num(ctx.values.track));
-  const st = ctx.engine.seq as { playing?: boolean; pattern?: string | null; steps?: number[] } | undefined;
-  const pid = (st?.playing && st.pattern) || p.active;
-  const pat = getPattern(p, pid);
-  const tr = pat.tracks[track];
-  const len = trackLength(pat, track);
-  const page = Math.round(num(ctx.ui.stepPage));
-  const play = st?.playing ? st.steps?.[track] ?? -1 : -1;
-  const color = mode === 'tmute' ? RY.green : RY.yellow;
-  const live = useRef(ctx);
-  live.current = ctx;
-  const down = (k: number, e: React.PointerEvent<HTMLButtonElement>) => {
-    if (e.button !== 0 && e.pointerType === 'mouse') return;
-    e.preventDefault();
-    const c = live.current;
-    const s = page * 16 + k;
-    if (mode === 'tmute') {
-      const q = projectOf(c);
-      const cur = getPattern(q, pid).tracks[track]?.steps[s];
-      if (!cur) { flash(c, 'TRIG MUTE GOES ON A TRIG'); return; }
-      c.updateData(d => setTrigMute(asProject(d, T), pid, track, [s], !cur.mute));
-    } else c.updateData(d => toggleSwingTrig(asProject(d, T), pid, s));
-  };
-  return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 'var(--rytm-trig-gap, 3px)' }}>
-      {Array.from({ length: 16 }, (_, k) => {
-        const s = page * 16 + k;
-        const inLen = s < len;
-        const trig = tr?.steps[s];
-        const marked = mode === 'tmute' ? !!trig?.mute : isSwingStep(pat, s);
-        const lv = marked ? 0.95 : trig && !trig.trigless ? 0.3 : 0;
-        return (
-          <button key={k} type="button" data-control={`trig:${k + 1}`}
-            aria-label={`Trig key ${k + 1}: ${mode === 'tmute' ? (marked ? 'trig muted' : trig ? 'trig' : 'empty') : (marked ? 'swing trig' : 'straight')}`}
-            aria-pressed={marked}
-            onPointerDown={e => down(k, e)} onContextMenu={e => e.preventDefault()}
-            style={{
-              flex: 1, minWidth: 0, height: '100%', padding: 0, borderRadius: '14%', cursor: inLen ? 'pointer' : 'default', touchAction: 'none',
-              userSelect: 'none', WebkitUserSelect: 'none', WebkitTapHighlightColor: 'transparent', opacity: inLen ? 1 : 0.35,
-              border: `${s === play ? 2 : k % 4 === 0 ? 2 : 1}px solid ${s === play ? '#ffffff' : k % 4 === 0 ? '#55585d' : RY.keyEdge}`,
-              background: lv > 0 ? `radial-gradient(circle at 50% 40%, ${mix(RY.keyHi, color, 0.25 + 0.65 * lv)} 0%, ${RY.key} 90%)` : `linear-gradient(180deg, ${RY.keyHi} 0%, ${RY.key} 60%)`,
-              boxShadow: lv > 0.5 ? `0 2px 0 #000, 0 0 ${4 + 8 * lv}px ${color}` : '0 2px 0 #000',
-              color: lv > 0.5 ? '#111' : RY.sub, fontFamily: FONT, fontSize: 'var(--rytm-sub-font, 8px)', fontWeight: 700,
-            }}>{s + 1}</button>
-        );
-      })}
-    </div>
-  );
-}
-
 /** Held trig + [BANK E]: trig mute on / off for the held trigs (manual p.49) */
 export function toggleHeldMute(ctx: CustomRenderContext) {
   const held = Array.isArray(ctx.ui.heldSteps) ? (ctx.ui.heldSteps as number[]) : [];
@@ -691,7 +637,7 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
   const track = Math.round(num(ctx.values.track));
   const page = Math.max(0, Math.min(5, Math.round(num(ctx.values.page, 1))));
   const isFx = track === FX_TRACK;
-  const ids = pageControls(track, page, ctx.values);
+  const ids = pageControls(track, page, ctx.values, ctx.ui);
   const st = ctx.engine.seq as { playing?: boolean; pattern?: string | null; bpm?: number; mode?: string; songRow?: number; queued?: string | null; fill?: boolean } | undefined;
   const project = projectOf(ctx);
   const bpm = st?.bpm ?? num(ctx.values.bpm, 120);
@@ -705,17 +651,19 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
   // The header shows the last turned parameter's long name for a moment (as the hardware does)
   const prev = useRef<Record<string, ControlValue>>({});
   const [touched, setTouched] = useState<{ name: string; text: string; at: number } | null>(null);
+  const shownIds = ids.filter((x): x is string => !!x).join(',');
+  const values = ctx.values;
   useEffect(() => {
-    for (const id of ids) {
+    for (const id of shownIds.split(',')) {
       if (!id) continue;
-      const v = ctx.values[id];
+      const v = values[id];
       if (prev.current[id] !== undefined && prev.current[id] !== v) {
         const d = describe(id, num(v), machine >= 0 ? machine : undefined);
         if (d) setTouched({ name: d.name.toUpperCase(), text: d.text, at: Date.now() });
       }
       prev.current[id] = v;
     }
-  });
+  }, [shownIds, values, machine]);
   useEffect(() => {
     if (!touched) return;
     const t = setTimeout(() => setTouched(null), 1400);
