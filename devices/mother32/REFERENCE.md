@@ -29,6 +29,7 @@ excerpts and from two open-source projects whose authors read the manual and cit
 | LM | Learning Modular (Chris Meyer), *Sequencing Tips for the Moog Mother-32* (2017), via search excerpts |
 | SOS | Sound On Sound, *Moog Mother-32* review (search excerpts) |
 | R | Moog spec text as published by retailers: 20 Hz-20 kHz switchable LP/HP 4-pole transistor ladder, 32 patch points, input and output lists in panel reading order |
+| DG | Cem Olcay, *Mother's Dice Game* (iOS patch generator for the Moog Sound Studio, `github.com/cemolcay/MothersDiceGame`): `pb-m32.png`, a drawing of the Mother-32 patch bay headed "MOTHER 32 - IN / OUT" with outputs reversed, and `Mother32.swift`, the 32 points in panel order |
 | F | Forum reports (Moog forum, ModWiggler, Gearspace), via search excerpts |
 | L0 | The first build of this twin |
 
@@ -126,9 +127,10 @@ the black keys, the eight lower-row step pads the white keys. **verified** (PD, 
 ## Patch bay (32 points: 18 inputs, 14 outputs)
 
 Four columns at x = 256.2, 270.0, 283.9, 297.8 and eight rows on a 13.4 mm pitch (PD). The jack
-order is the panel reading order of Moog's published input and output lists (R), which agrees with
-the manual's section order (M2 pp.47-56) except for LFO SQ / LFO TRI, which the manual describes
-square first. Twin signal convention: 1.0 = 5 V, as on the DFAM. **Order: likely.**
+order is drawn identically by DG and matches the panel reading order of Moog's published input and
+output lists (R), and the manual's section order (M2 pp.47-56); the manual only describes LFO SQ
+before LFO TRI, while DG and R both put LFO TRI on the left. Twin signal convention: 1.0 = 5 V, as on
+the DFAM. **Order: verified** (DG, R).
 
 | Row / col | Label | Dir | Level | Normal / behaviour | Source | Confidence |
 |---|---|---|---|---|---|---|
@@ -205,17 +207,19 @@ Circled (gate) inputs: GATE, TEMPO, RUN/STOP, RESET, HOLD. **likely** (M2 p.46 l
 | Quantity | Twin value |
 |---|---|
 | Pitch at FREQUENCY centre, KB 0 V | C4, 261.6 Hz (consistent with "+/-5 V = 8 Hz - 8 kHz" and MIDI 60 = 0 V) |
-| Keyboard octaves | 8 settings; octave n spans C(n-1) to C(n), so -4 V ... +4 V; power-up octave 4 (C3-C4) |
-| EG times | attack 1.25 ms - 3 s, decay 1.25 ms - 7 s (log), RC curves; peak +7.5 V |
-| GLIDE | 0 - 2 s, exponential (RC) slide |
-| VCO MOD AMOUNT full scale | EG: +4 octaves, LFO: +/-2 octaves (FREQ); +/-48 % pulse width (PW); audio taper |
-| VCF MOD AMOUNT full scale | EG: 7 octaves, LFO: +/-3.5 octaves; audio taper |
+| Keyboard octaves | 8 settings; octave n spans C(n-1) to C(n), so -4 V ... +4 V; power-up octave 4 (C3-C4). Patterns store C1-C8 |
+| EG | attack 1.25 ms - 3 s, decay 1.25 ms - 7 s (log); RC attack toward 1.5 x peak, exponential decay (-40 dB at the DECAY time); peak +7.5 V; retriggers from the current level |
+| GLIDE | 0 - 2 s, exponential (RC) slide, 95 % of the way at the knob's time |
+| VCO MOD AMOUNT | audio taper; full scale 0.5 oct per volt of source (EG 3.75 octaves, LFO +/-2.5 octaves), or +/-48 % pulse width for the LFO |
+| VCF MOD AMOUNT | audio taper; full scale 0.9 oct per volt (EG 6.75 octaves, LFO +/-4.5 octaves) |
 | LIN FM depth | +5 V doubles the frequency, -5 V stops it (not through-zero) |
-| Accent | +1 octave cutoff and +2.5 dB VCA level |
-| Self-oscillation | from about 3 o'clock (~75 % of RESONANCE) in LP |
-| HI PASS model | non-resonant 4-pole high-pass; RESONANCE blends the low band back in (k/(1+k)) |
-| MIX law | linear crossfade |
-| VCA | EG level (or 1 in ON mode) + VCA CV / 8 V; soft clips above full |
-| ASSIGN clock | one 50 % pulse per step |
-| Swing | 25-75 %, every second step delayed (the separate swing interval of firmware 2.0 is not modelled) |
-| Analog drift | about 2 cents, slow random |
+| Accent | +1 octave cutoff and +2.5 dB at the VCA, smoothed over a few ms |
+| Ladder | 2x-oversampled transistor core with per-stage tanh (the shared DSP v2 `ladder` quality 1, ported into the worklet); feedback 5.4 x RESONANCE, so self-oscillation starts at ~75 % (3 o'clock) and reaches ~4.5 V; classic Moog bass loss with a little make-up gain |
+| HI PASS model | input minus the ladder's low-pass, with RESONANCE fading the subtraction (bass returns, k/(1+k)-like); no resonant peak. This topology makes the manual's VCF -> EXT. AUDIO trick work: the loop gain at the cutoff is 1.25 x MIX, so it self-oscillates near MIX = 80 % |
+| MIX law | linear crossfade; EXT. AUDIO soft-limits above about 4.5 V like an op-amp input |
+| VCA | EG level (or ON) + VCA CV, full open at 5 V; above that it soft-clips, as Moog support describes |
+| ASSIGN clock | one pulse per step, high for the first half of the step |
+| Swing | 25-75 %, every second step delayed (firmware 2.0's separate swing interval is not modelled) |
+| Analog drift | about 2 cents, slow random wander |
+| GATE jack | OR'd with the internal gate (the manual lists only four normals) |
+| Pitch bend (MIDI) | +/-2 semitones |

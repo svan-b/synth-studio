@@ -15,7 +15,10 @@
 import type { ReactNode } from 'react';
 import type { CustomRenderContext, PanelElement, PanelLayout } from '@/types/panel';
 import { MOTHER32 } from './spec';
-import { BLACK, WHITE, editTarget, renderDin, renderFn, renderKey, renderOctLeds, renderReadout, renderSetup, renderStepLeds, ui } from './panelUi';
+import {
+  BLACK, WHITE, editTarget, renderDin, renderFn, renderKey, renderMidiLed, renderOctLeds, renderReadout, renderSetup, renderStepLeds,
+  renderTempoLed, ui,
+} from './panelUi';
 
 const K = 4.1; // px per mm -> 1250 px faceplate
 
@@ -38,13 +41,24 @@ const toggle = (control: string, title: string, x: number, y: number, legendW = 
   { kind: 'label', text: title, x, y: y - (title.includes('\n') ? 9.4 : 8.2), size: LEGEND, letterSpacing: 0.3 },
 ];
 
+/** The printed scale ring of FREQUENCY, PULSE WIDTH, TEMPO and LFO RATE (manual p.9, p.11, p.13) */
+const scaleRing = (x: number, y: number): PanelElement[] => [
+  { kind: 'section', x: x - 10.4, y: y - 10.4, w: 20.8, h: 20.8, radius: 10.4, border: '1px solid #d9d9d9' },
+  { kind: 'section', x: x - 9.0, y: y - 9.0, w: 18.0, h: 18.0, radius: 9.0, border: '1px solid #8a8a8a' },
+];
+
+/** The small holes beside some knobs (the panel drawing, manual p.9; four reach the VCO trimmers, p.61) */
+const hole = (x: number, y: number): PanelElement =>
+  ({ kind: 'section', x: x - 1.25, y: y - 1.25, w: 2.5, h: 2.5, radius: 1.25, border: '1px solid #9a9a9a', background: '#050505' });
+
 const screw = (x: number, y: number): PanelElement =>
   ({ kind: 'section', x: x - 1.6, y: y - 1.6, w: 3.2, h: 3.2, radius: 1.6, background: 'radial-gradient(circle at 40% 35%, #d0d0d0 0%, #808080 55%, #3a3a3a 100%)' });
 
 // --- Patch bay: 4 columns x 8 rows ---------------------------------------------
 const PB_X = [256.2, 270.0, 283.9, 297.8];
 const PB_Y = (row: number) => 19.6 + row * 13.4;
-const GATE_INPUTS = new Set(['in_gate', 'in_tempo', 'in_run_stop', 'in_reset', 'in_hold']);
+// The circled (gate) inputs of the patch bay drawing, manual p.46: GATE, RUN / STOP, RESET, HOLD
+const GATE_INPUTS = new Set(['in_gate', 'in_run_stop', 'in_reset', 'in_hold']);
 
 const patchBay: PanelElement[] = [
   { kind: 'section', x: 248.8, y: 7.9, w: 55, h: 111.6, border: '1px solid #8c8c8c', radius: 1.2 },
@@ -76,12 +90,14 @@ const pad = (x: number, y: number, w: number, hgt: number, render: (c: CustomRen
   ({ kind: 'custom', x: x - w / 2, y: y - hgt / 2, w, h: hgt, render });
 
 const keyLegend = (text: string, x: number, y: number): PanelElement =>
-  ({ kind: 'label', text, x, y, size: 6.4, color: '#e8e8e8', letterSpacing: 0.2 });
+  ({ kind: 'label', text, x, y, size: 7, color: '#e8e8e8', letterSpacing: 0.2 });
 
 const sequencer: PanelElement[] = [
   // upper row: HOLD / REST, PATTERN (BANK), OCTAVE / LOCATION LEDs, the five black keys
   keyLegend('HOLD / REST', 40.0, UP_Y - 6.1),
   pad(40.0, UP_Y, PAD_W, PAD_H, renderFn('hold', PAD_W, PAD_H, K)),
+  // the Tempo LED sits directly above (SHIFT) (manual p.18)
+  { kind: 'custom', x: 55.3 - 1.1, y: UP_Y - 1.1, w: 2.2, h: 2.2, render: renderTempoLed(2.2, K) },
   keyLegend('PATTERN\n(BANK)', 70.6, UP_Y - 6.9),
   pad(70.6, UP_Y, PAD_W, PAD_H, renderFn('pattern', PAD_W, PAD_H, K)),
   keyLegend('OCTAVE / LOCATION', 98.1, UP_Y - 4.4),
@@ -118,6 +134,8 @@ const elements: PanelElement[] = [
   screw(7.5, 3.0), screw(297.1, 3.0), screw(7.5, 125.5), screw(297.1, 125.5),
 
   // --- Row 1: FREQUENCY, VCO WAVE, PULSE WIDTH, MIX, CUTOFF, RESONANCE, VCA MODE, VOLUME --
+  ...scaleRing(21.7, ROW1), ...scaleRing(80.8, ROW1), ...scaleRing(41.0, ROW3), ...scaleRing(80.8, ROW3),
+  hole(36.5, ROW1), hole(65.9, ROW1), hole(95.6, ROW1), hole(95.6, ROW2), hole(95.6, ROW3),
   legend('FREQUENCY', 21.7, ROW1), knob('frequency', 21.7, ROW1),
   ...toggle('vco_wave', 'VCO WAVE', 51.3, ROW1, 7.5),
   legend('PULSE WIDTH', 80.8, ROW1), knob('pulse_width', 80.8, ROW1),
@@ -135,8 +153,21 @@ const elements: PanelElement[] = [
 
   // --- Row 2: GLIDE, VCO MOD SOURCE / AMOUNT / DEST, VCF MODE, VCF MOD SOURCE / AMOUNT / POLARITY --
   legend('GLIDE', 21.8, ROW2),
-  // While a step is edited GLIDE turns that step's glide on / off, with SHIFT its ratchet
-  { kind: 'knob', control: ({ values, ui: u }) => (editing(values, u) ? (values.shift ? 'step_ratchet' : 'step_glide') : 'glide'), x: 21.8, y: ROW2, diameter: KNOB, variant: 'moog-black', label: 'none' },
+  {
+    kind: 'knob',
+    // While a step is edited GLIDE turns that step's glide on / off, with SHIFT its ratchet. With
+    // KB / STEP held it picks the swing interval (both: straight, KB: dotted, STEP: triplet); with
+    // SHIFT during playback, live ratchets (manual pp.21, 29)
+    control: ({ values, ui: u }) => {
+      if (editing(values, u)) return values.shift ? 'step_ratchet' : 'step_glide';
+      const held = (u?.held ?? {}) as { kb?: boolean; step?: boolean };
+      if (held.kb && held.step) return 'swing_div';
+      if (held.kb) return 'swing_dotted';
+      if (held.step) return 'swing_triplet';
+      return values.shift ? 'live_ratchet' : 'glide';
+    },
+    x: 21.8, y: ROW2, diameter: KNOB, variant: 'moog-black', label: 'none',
+  },
   ...toggle('vco_mod_source', 'VCO MOD\nSOURCE', 51.3, ROW2, 5),
   legend('VCO MOD\nAMOUNT', 80.8, ROW2), knob('vco_mod_amount', 80.8, ROW2),
   ...toggle('vco_mod_dest', 'VCO MOD\nDEST', 110.5, ROW2, 6),
@@ -149,23 +180,33 @@ const elements: PanelElement[] = [
   legend('TEMPO / GATE LENGTH\n(SWING)', 41.0, ROW3, 7.2),
   {
     kind: 'knob',
-    // TEMPO is GATE LENGTH while a step is edited, SWING with SHIFT, and the step division when the
-    // studio clock drives the sequencer (as with MIDI or analog clock on the hardware)
-    control: ({ values, engine, ui: u }) => (editing(values, u) ? 'step_gate' : values.shift ? 'swing' : engine?.synced ? 'step_div' : 'tempo'),
+    // TEMPO is GATE LENGTH while a step is edited and SWING with SHIFT. Otherwise (firmware 2.0) it
+    // picks the clock division: a straight one when the studio (MIDI) clock or a TEMPO-jack clock
+    // drives the steps, or with KB + STEP held; a dotted one with KB held, a triplet with STEP held.
+    // On the internal clock it sets the tempo.
+    control: ({ values, engine, ui: u }) => {
+      if (editing(values, u)) return 'step_gate';
+      if (values.shift) return 'swing';
+      const held = (u?.held ?? {}) as { kb?: boolean; step?: boolean };
+      if (held.kb && held.step) return 'step_div';
+      if (held.kb) return 'div_dotted';
+      if (held.step) return 'div_triplet';
+      return engine?.synced || engine?.extClock ? 'step_div' : 'tempo';
+    },
     x: 41.0, y: ROW3, diameter: KNOB, variant: 'moog-black', label: 'none',
   },
-  { kind: 'led', x: 51.8, y: ROW3 - 8.6, size: 2.0, color: '#ff3b30', on: ({ engine }) => (engine.beat ? 1 : 0) },
   legend('LFO RATE', 80.8, ROW3), knob('lfo_rate', 80.8, ROW3),
   ...toggle('lfo_wave', 'LFO WAVE', 110.4, ROW3, 5),
   legend('ATTACK', 139.9, ROW3), knob('attack', 139.9, ROW3),
   ...toggle('sustain', 'SUSTAIN', 169.5, ROW3, 5),
   legend('DECAY', 199.2, ROW3), knob('decay', 199.2, ROW3),
   legend('VC MIX', 228.7, ROW3), knob('vc_mix', 228.7, ROW3),
-  { kind: 'label', text: 'MIX 1', x: 221.2, y: ROW3 + 8.4, size: 5.6, color: '#bdbdbd' },
-  { kind: 'label', text: 'MIX 2', x: 236.2, y: ROW3 + 8.4, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: 'LO / MIX 1', x: 219.6, y: ROW3 + 8.4, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: 'HI / MIX 2', x: 237.8, y: ROW3 + 8.4, size: 5.6, color: '#bdbdbd' },
 
-  // --- MIDI IN, name -----------------------------------------------------------------
-  { kind: 'label', text: 'MIDI IN', x: 13.8, y: 98.4, size: 6.4, color: '#e8e8e8' },
+  // --- MIDI IN: its LED left of TEMPO, the legend above the socket (manual p.9) ---------
+  { kind: 'custom', x: 14.3 - 1.4, y: 77.4 - 1.4, w: 2.8, h: 2.8, render: renderMidiLed(2.8, K) },
+  { kind: 'label', text: 'MIDI IN', x: 14.3, y: 89.0, size: 6.4, color: '#e8e8e8' },
   { kind: 'custom', x: 13.8 - 7.8, y: 107.8 - 7.8, w: 15.6, h: 15.6, render: renderDin(15.6, K) },
   { kind: 'label', text: 'moog', x: 6.4, y: 122.3, size: 17, font: 'serif', italic: true, weight: 400, align: 'left' },
   { kind: 'label', text: 'MOTHER-32', x: 26.6, y: 122.6, size: 10.5, weight: 800, align: 'left', letterSpacing: 1.4 },

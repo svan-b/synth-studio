@@ -11,15 +11,18 @@ export const SLOT = {
   freq: 0, wave: 1, pw: 2, mix: 3, cutoff: 4, res: 5, vcaMode: 6, volume: 7, glide: 8, vmodSrc: 9,
   vmodAmt: 10, vmodDest: 11, vcfMode: 12, fmodSrc: 13, fmodAmt: 14, fmodPol: 15, tempo: 16, lfoRate: 17,
   lfoWave: 18, attack: 19, sustain: 20, decay: 21, vcMix: 22, run: 23, swing: 24, div: 25, assign: 26,
-  tempoMode: 27, mode: 28, rec: 29, quality: 30,
+  tempoMode: 27, mode: 28, rec: 29, quality: 30, dir: 31, swingDiv: 32, ppqn: 33, tempoRange: 34, accentCvOnly: 35,
 } as const;
 
 const num = (v: ControlValue) => (typeof v === 'number' ? v : v ? 1 : 0);
 const pct = (v: ControlValue) => num(v) / 100;
 const sec = (v: ControlValue) => num(v) / 1000;
 
-/** control id -> [worklet slot, value in engine units] */
-export function knobMessage(id: string, value: ControlValue): [number, number] | null {
+/**
+ * control id -> [worklet slot, value in engine units]. `values` (all current control values)
+ * is needed for the clock division, which two controls share (note value and group).
+ */
+export function knobMessage(id: string, value: ControlValue, values: Record<string, ControlValue | undefined> = {}): [number, number] | null {
   switch (id) {
     case 'frequency': return [SLOT.freq, num(value)];                 // octaves from C4
     case 'vco_wave': return [SLOT.wave, num(value)];                  // ['PULSE', 'SAW']
@@ -46,7 +49,14 @@ export function knobMessage(id: string, value: ControlValue): [number, number] |
     case 'vc_mix': return [SLOT.vcMix, pct(value)];
     case 'run_stop': return [SLOT.run, value ? 1 : 0];
     case 'swing': return [SLOT.swing, pct(value)];
-    case 'step_div': return [SLOT.div, Math.round(num(value))];
+    case 'step_div': return [SLOT.div, divIndex(num(value), num(values.div_type ?? 0))];
+    case 'div_type': return [SLOT.div, divIndex(num(values.step_div ?? DIV_DEFAULT), num(value))];
+    case 'swing_div': return [SLOT.swingDiv, divIndex(num(value), num(values.swing_type ?? 0))];
+    case 'swing_type': return [SLOT.swingDiv, divIndex(num(values.swing_div ?? DIV_DEFAULT), num(value))];
+    case 'seq_direction': return [SLOT.dir, Math.round(num(value))];
+    case 'clock_in_ppqn': return [SLOT.ppqn, PPQN_VALUES[Math.max(0, Math.min(15, Math.round(num(value))))]];
+    case 'tempo_in_range': return [SLOT.tempoRange, num(value)];       // ['-5 TO +5 V', '0 TO +5 V']
+    case 'accent_cv_only': return [SLOT.accentCvOnly, num(value)];     // ['OFF', 'ON']
     case 'assign_source': return [SLOT.assign, Math.round(num(value))];
     case 'tempo_mode': return [SLOT.tempoMode, Math.round(num(value))];
     case 'seq_mode': return [SLOT.mode, num(value)];                  // ['KB', 'STEP']
@@ -69,7 +79,9 @@ export const OUTPUTS: Record<string, number> = {
 };
 
 export const NUM_INPUTS = 18;
-export const NUM_OUTPUTS = 13;
+/** 13 jack channels plus the main bus (channel 13: the VCA at studio level, DC blocked) */
+export const NUM_OUTPUTS = 14;
+export const MAIN_CHANNEL = 13;
 
 /** Inputs that also take timed events from EventBus cables (other instruments' clocks and gates) */
 export const EVENT_INPUTS: Record<string, string> = {
@@ -103,16 +115,28 @@ export function internalRoutes(connections: PatchConnection[]): { routes: [numbe
 // Sequencer tables
 // ----------------------------------------------------------------------------
 
-/** Step divisions (firmware 2.0's 24: straight, dotted, triplet), slow to fast; ticks at 24 PPQN */
+/**
+ * Step divisions, firmware 2.0: three groups of eight note values, two whole notes to 1/64.
+ * TEMPO alone picks a straight value (when clocked externally, or with KB + STEP held on the
+ * internal clock); held KB picks a dotted one, held STEP a triplet. Ticks at 24 PPQN.
+ * The worklet's DIV_TICKS uses the same order: index = group * 8 + value.
+ */
+const NOTE_VALUES = ['2/1', '1/1', '1/2', '1/4', '1/8', '1/16', '1/32', '1/64'];
+const STRAIGHT_TICKS = [192, 96, 48, 24, 12, 6, 3, 1.5];
+export const DIV_GROUPS = ['STRAIGHT', 'DOTTED', 'TRIPLET'] as const;
 export const DIVISIONS: { name: string; ticks: number }[] = [
-  { name: '4/1D', ticks: 576 }, { name: '4/1', ticks: 384 }, { name: '2/1D', ticks: 288 }, { name: '4/1T', ticks: 256 },
-  { name: '2/1', ticks: 192 }, { name: '1/1D', ticks: 144 }, { name: '2/1T', ticks: 128 }, { name: '1/1', ticks: 96 },
-  { name: '1/2D', ticks: 72 }, { name: '1/1T', ticks: 64 }, { name: '1/2', ticks: 48 }, { name: '1/4D', ticks: 36 },
-  { name: '1/2T', ticks: 32 }, { name: '1/4', ticks: 24 }, { name: '1/8D', ticks: 18 }, { name: '1/4T', ticks: 16 },
-  { name: '1/8', ticks: 12 }, { name: '1/16D', ticks: 9 }, { name: '1/8T', ticks: 8 }, { name: '1/16', ticks: 6 },
-  { name: '1/32D', ticks: 4.5 }, { name: '1/16T', ticks: 4 }, { name: '1/32', ticks: 3 }, { name: '1/32T', ticks: 2 },
+  ...NOTE_VALUES.map((name, i) => ({ name, ticks: STRAIGHT_TICKS[i] })),
+  ...NOTE_VALUES.map((name, i) => ({ name: `${name}D`, ticks: STRAIGHT_TICKS[i] * 1.5 })),
+  ...NOTE_VALUES.map((name, i) => ({ name: `${name}T`, ticks: (STRAIGHT_TICKS[i] * 2) / 3 })),
 ];
-export const DIV_DEFAULT = 19; // 1/16
+/** Note value within its group (0 = two whole notes ... 7 = 1/64); 5 = 1/16, the default */
+export const DIV_DEFAULT = 5;
+/** Index into DIVISIONS for a note value (0..7) in a group (0 straight, 1 dotted, 2 triplet) */
+export const divIndex = (value: number, group: number) =>
+  Math.max(0, Math.min(2, Math.round(group))) * 8 + Math.max(0, Math.min(7, Math.round(value)));
+/** Name of the division for `step_div` + `div_type` values */
+export const divName = (value: unknown, group: unknown) =>
+  DIVISIONS[divIndex(typeof value === 'number' ? value : DIV_DEFAULT, typeof group === 'number' ? group : 0)].name;
 
 /** ASSIGN output sources, Setup page 1, in the manual's order */
 export const ASSIGN_SOURCES = [
@@ -120,8 +144,14 @@ export const ASSIGN_SOURCES = [
   'STEP 1 TRIG', 'MIDI VELOCITY', 'MIDI PRESSURE', 'MIDI BEND', 'MIDI CC 1', 'MIDI CC 2', 'MIDI CC 4', 'MIDI CC 7',
 ];
 
-/** TEMPO input modes, Setup page 3 */
-export const TEMPO_MODES = ['TEMPO CV', 'CLOCK ADVANCE', 'CLOCK 4 PPQN', 'STEP ADDRESS'];
+/** TEMPO input modes, Setup page 3 (manual p.55, p.59) */
+export const TEMPO_MODES = ['CV INPUT', 'SINGLE CLOCK ADVANCE', 'ANALOG CLOCK', 'STEP ADDRESS CV'];
+
+/** Clock input PPQN, Setup page 4 (manual p.59): values 1-14, 24, 48; default 4 (sixteenth notes) */
+export const PPQN_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 24, 48];
+
+/** Playback order (manual p.40): KB + STEP + step 1-4 */
+export const DIRECTIONS = ['FORWARD', 'REVERSE', 'PENDULUM', 'RANDOM'];
 
 /** Panel keys: the lowest key's MIDI note for OCTAVE / LOCATION LED n (index 0..7): C0 .. C7 */
 export const octaveLow = (oct: number) => 12 * (Math.max(0, Math.min(7, Math.round(oct))) + 1);

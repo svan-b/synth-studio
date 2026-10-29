@@ -18,26 +18,36 @@ import type { ControlValue } from '@/types';
 export const STEPS = 32;
 /** MIDI note of the lowest key at the power-up octave (OCTAVE / LOCATION LED 4) */
 export const KB_LOW = 48;
-/** Lowest note a pattern can store */
+/** The core alphabet starts at C1 */
 const NOTE_BASE = 24;
-// '0' and '.' are reserved, so notes use letters then digits 1-9 (61 notes: C1..C6)
+// '0' and '.' are reserved, so notes use letters then digits 1-9 (61 notes: C1..C6). The keyboard's
+// eight octaves reach from C0 (OCTAVE / LOCATION LED 1) to C8 (the top key at LED 8), so twelve
+// Latin-1 letters below and twenty-four above extend it without changing stored patterns.
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
+const LOW = 'ÀÁÂÃÄÅÆÇÈÉÊË';                       // C0 .. B0
+const HIGH = 'ÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãä';          // C#6 .. C8
 
 export const REST = '0';
 export const END = '.';
-export const NOTE_MIN = NOTE_BASE;
-export const NOTE_MAX = NOTE_BASE + ALPHABET.length - 1;
+export const NOTE_MIN = NOTE_BASE - LOW.length;                 // 12 = C0
+export const NOTE_MAX = NOTE_BASE + ALPHABET.length - 1 + HIGH.length; // 108 = C8
 
 export function encodeNote(note: number): string {
-  const i = Math.max(0, Math.min(ALPHABET.length - 1, Math.round(note) - NOTE_BASE));
-  return ALPHABET[i];
+  const n = Math.max(NOTE_MIN, Math.min(NOTE_MAX, Math.round(note)));
+  if (n < NOTE_BASE) return LOW[n - NOTE_MIN];
+  if (n >= NOTE_BASE + ALPHABET.length) return HIGH[n - NOTE_BASE - ALPHABET.length];
+  return ALPHABET[n - NOTE_BASE];
 }
 
 /** MIDI note for a step char, or null for a rest / end */
 export function decodeNote(ch: string | undefined): number | null {
   if (!ch || ch === REST || ch === END) return null;
-  const i = ALPHABET.indexOf(ch);
-  return i < 0 ? null : NOTE_BASE + i;
+  let i = ALPHABET.indexOf(ch);
+  if (i >= 0) return NOTE_BASE + i;
+  i = LOW.indexOf(ch);
+  if (i >= 0) return NOTE_MIN + i;
+  i = HIGH.indexOf(ch);
+  return i < 0 ? null : NOTE_BASE + ALPHABET.length + i;
 }
 
 /** Number of steps before the first END marker */
@@ -206,10 +216,28 @@ export function samePattern(a: PatternValues, b: PatternValues): boolean {
   return a.seq_length === b.seq_length && LANES.every(l => a[l].slice(0, a.seq_length) === b[l].slice(0, b.seq_length));
 }
 
-/** An empty pattern for KB-mode recording */
-export function blankPattern(): PatternValues {
-  return { ...sequence([48]), seq_notes: EMPTY_PATTERN, seq_length: 1 };
+/**
+ * An initialized pattern (SHIFT + RESET + PATTERN, manual p.32): one step at the default note
+ * value (-1 V, C3) and gate length (50 %); the steps past the end hold the same defaults, so
+ * SET END reveals plain C3 steps.
+ */
+export function initPattern(): PatternValues {
+  return sequence(new Array(STEPS).fill(48), { length: 1 });
 }
+
+/** Timing stored with each pattern (manual p.37 "Load Saved Timing") */
+export const TIMING_IDS = ['step_div', 'div_type', 'swing', 'swing_div', 'swing_type'] as const;
+export type PatternTiming = Partial<Record<(typeof TIMING_IDS)[number], number>>;
+
+/** The timing controls in `values` */
+export function timingOf(values: Record<string, ControlValue | undefined>): PatternTiming {
+  const t: PatternTiming = {};
+  for (const id of TIMING_IDS) if (typeof values[id] === 'number') t[id] = values[id] as number;
+  return t;
+}
+
+/** A stored pattern: the lanes, the length and (optionally) its timing */
+export type StoredPattern = PatternValues & PatternTiming;
 
 /** Rotate the pattern one step left (-1) or right (+1) within its length */
 export function rotate(p: PatternValues, dir: -1 | 1): PatternValues {
@@ -232,7 +260,7 @@ export interface Mother32Data {
   v: 1;
   /** Selected location 0..63 (bank * 8 + pattern) */
   loc: number;
-  bank: (PatternValues | null)[];
+  bank: (StoredPattern | null)[];
 }
 
 export const LOCATIONS = 64;

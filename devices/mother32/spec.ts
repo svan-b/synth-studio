@@ -10,10 +10,10 @@
 
 import type { DeviceSpec, KnobSpec, PatchPoint } from '@/types';
 import { MOTHER32_PRESETS, DEFAULT_SEQUENCE } from './presets';
-import { ASSIGN_SOURCES, DIVISIONS, DIV_DEFAULT, TEMPO_MODES } from './model';
+import { ASSIGN_SOURCES, DIRECTIONS, DIVISIONS, DIV_DEFAULT, DIV_GROUPS, PPQN_VALUES, TEMPO_MODES, divIndex } from './model';
 import { STEPS } from './sequence';
 
-const M = 'Manual v2';
+const M = 'Mother-32 manual';
 const fmtGate = (v: number) => { const g = Math.round(v); return g >= 8 ? 'TIE' : `${g}/8`; };
 
 const lane = (label: string, def: string, ref: string) => ({ type: 'pattern' as const, label, steps: STEPS, default: def, manualReference: ref });
@@ -58,7 +58,7 @@ export const MOTHER32: DeviceSpec = {
     frequency: knob({
       label: 'FREQUENCY', min: -1, max: 1, default: 0, units: 'octaves', bipolar: true,
       description: 'Tunes the VCO up or down one octave from the centre. The keyboard, sequencer and 1V/OCT jack add their 1 V per octave on top: at the centre, 0 V is middle C (C4).',
-      manualReference: `${M} p.11 - VCO FREQUENCY`,
+      manualReference: `${M} p.11 - FREQUENCY`,
     }),
     vco_wave: {
       type: 'switch', label: 'VCO WAVE', options: ['PULSE', 'SAW'], default: 1,
@@ -72,16 +72,16 @@ export const MOTHER32: DeviceSpec = {
     }),
     mix: knob({
       label: 'MIX', min: 0, max: 100, default: 0, units: '%',
-      description: 'Crossfades the VCO wave (fully left) against NOISE (fully right). A cable in EXT. AUDIO replaces the noise; MIX CV moves the crossfade.',
-      manualReference: `${M} pp.47-48 - MIX`,
+      description: 'Crossfades the selected VCO wave (fully left, VCO) against NOISE (fully right, NOISE / EXT). A cable in EXT. AUDIO replaces the noise; MIX CV moves the crossfade (+/-5 V covers the whole travel). The mixer is AC coupled.',
+      manualReference: `${M} p.13 - MIX`,
     }),
     cutoff: knob({
-      label: 'CUTOFF', min: 20, max: 20000, default: 1200, units: 'Hz', curve: 'logarithmic',
+      label: 'CUTOFF', min: 20, max: 20000, default: 340, units: 'Hz', curve: 'logarithmic',
       description: 'Filter cutoff, 20 Hz to 20 kHz. VCF MOD, accents and the VCF CUTOFF jack (1 V per octave) add to it.',
       manualReference: `${M} p.14 - CUTOFF`,
     }),
     resonance: knob({
-      label: 'RESONANCE', min: 0, max: 100, default: 15, units: '%',
+      label: 'RESONANCE', min: 0, max: 100, default: 5, units: '%',
       description: 'Feedback around the ladder: a ringing peak at the cutoff. Past about 3 o\'clock the low-pass self-oscillates into a sine. In HI PASS mode there is no peak - turning it up brings the bass back instead.',
       manualReference: `${M} p.14 - RESONANCE`,
     }),
@@ -91,21 +91,21 @@ export const MOTHER32: DeviceSpec = {
       manualReference: `${M} p.16 - VCA MODE`,
     },
     volume: knob({
-      label: 'VOLUME', min: 0, max: 100, default: 70, units: '%',
-      description: 'Output level, for the main output and the VCA jack.',
-      manualReference: `${M} p.47 - VOLUME`,
+      label: 'VOLUME', min: 0, max: 100, default: 50, units: '%',
+      description: 'Output level, for both the VCA jack and the audio output. Fully counter-clockwise is silent.',
+      manualReference: `${M} p.16 - VOLUME`,
     }),
 
     // ---- Row 2 ----------------------------------------------------------------
     glide: knob({
       label: 'GLIDE', min: 0, max: 2000, default: 0, units: 'ms', curve: 'exponential',
-      description: 'Portamento: how long the pitch slides to a new note. Keyboard and MIDI notes always slide; sequencer steps slide only where glide is switched on for the step.',
-      manualReference: `${M} p.26 - GLIDE`,
+      description: 'Portamento: how long the pitch takes to move to a new note. Keyboard and MIDI notes always slide; sequencer steps slide only where glide is switched on for the step. While a step is edited it turns that step\'s glide on or off; SHIFT + GLIDE sets ratchets.',
+      manualReference: `${M} p.17 - GLIDE`,
     }),
     vco_mod_source: {
-      type: 'switch', label: 'VCO MOD SOURCE', options: ['EG', 'LFO'], default: 1,
-      description: 'EG (up): the envelope - or whatever is patched into VCO MOD, which replaces it. LFO (down): the wave picked by LFO WAVE.',
-      manualReference: `${M} p.12, p.49 - VCO MOD`,
+      type: 'switch', label: 'VCO MOD SOURCE', options: ['EG / VCO MOD', 'LFO'], default: 1,
+      description: 'EG / VCO MOD (up): the envelope - or whatever is patched into VCO MOD, which replaces it. LFO (down): the wave picked by LFO WAVE.',
+      manualReference: `${M} p.12, p.49 - VCO MOD SOURCE`,
     },
     vco_mod_amount: knob({
       label: 'VCO MOD AMOUNT', min: 0, max: 100, default: 0, units: '%',
@@ -113,13 +113,13 @@ export const MOTHER32: DeviceSpec = {
       manualReference: `${M} p.12 - VCO MOD AMOUNT`,
     }),
     vco_mod_dest: {
-      type: 'switch', label: 'VCO MOD DEST', options: ['PW', 'FREQ'], default: 1,
+      type: 'switch', label: 'VCO MOD DEST', options: ['PULSE WIDTH', 'FREQUENCY'], default: 1,
       description: 'Where VCO modulation goes: PULSE WIDTH (up) or FREQUENCY (down).',
       manualReference: `${M} p.12 - VCO MOD DEST`,
     },
     vcf_mode: {
-      type: 'switch', label: 'VCF MODE', options: ['HP', 'LP'], default: 1,
-      description: 'LOW PASS (down) removes highs and resonates; HI PASS (up) removes lows and does not resonate.',
+      type: 'switch', label: 'VCF MODE', options: ['HI PASS', 'LOW PASS'], default: 1,
+      description: 'LOW PASS (down): the resonant 24 dB/oct Moog ladder. HI PASS (up): the non-resonant high-pass - turning RESONANCE up brings the bass back. For a resonant high-pass, patch VCF into EXT. AUDIO and use MIX as the resonance.',
       manualReference: `${M} p.14 - VCF MODE`,
     },
     vcf_mod_source: {
@@ -128,7 +128,7 @@ export const MOTHER32: DeviceSpec = {
       manualReference: `${M} p.15 - VCF MOD SOURCE`,
     },
     vcf_mod_amount: knob({
-      label: 'VCF MOD AMOUNT', min: 0, max: 100, default: 40, units: '%',
+      label: 'VCF MOD AMOUNT', min: 0, max: 100, default: 50, units: '%',
       description: 'How far the source moves the cutoff. POLARITY sets the direction.',
       manualReference: `${M} p.15 - VCF MOD AMOUNT`,
     }),
@@ -141,21 +141,21 @@ export const MOTHER32: DeviceSpec = {
     // ---- Row 3 ----------------------------------------------------------------
     tempo: knob({
       label: 'TEMPO', min: 20, max: 300, default: 120, units: 'BPM', curve: 'logarithmic',
-      description: 'Sequencer tempo, 20-300 BPM (16th-note steps by default). While a step is edited it sets that step\'s GATE LENGTH; with SHIFT, SWING; when the studio clock drives the sequencer, the step division.',
-      manualReference: `${M} p.54 - TEMPO / GATE LENGTH`,
+      description: 'Internal clock tempo, 20-300 BPM (16th-note steps by default). While a step is edited it sets that step\'s GATE LENGTH; with SHIFT, SWING. Clocked by the studio (MIDI) or a TEMPO-jack clock, it selects the clock division.',
+      manualReference: `${M} p.18, p.54 - TEMPO / GATE LENGTH`,
     }),
     lfo_rate: knob({
-      label: 'LFO RATE', min: 0.1, max: 350, default: 4, units: 'Hz', curve: 'logarithmic',
+      label: 'LFO RATE', min: 0.1, max: 350, default: 5.9, units: 'Hz', curve: 'logarithmic',
       description: 'LFO speed, about 0.1 Hz to 350 Hz - the top end is audio rate. The LFO RATE jack adds 1 V per octave, up to 600 Hz.',
       manualReference: `${M} p.13 - LFO RATE`,
     }),
     lfo_wave: {
-      type: 'switch', label: 'LFO WAVE', options: ['SQ', 'TRI'], default: 1,
+      type: 'switch', label: 'LFO WAVE', options: ['SQUARE', 'TRIANGLE'], default: 1,
       description: 'Which LFO wave feeds both MOD SOURCE switches: square (up) or triangle (down). Both are always at the LFO SQ and LFO TRI jacks.',
       manualReference: `${M} p.13 - LFO WAVE`,
     },
     attack: knob({
-      label: 'ATTACK', min: 1.25, max: 3000, default: 2, units: 'ms', curve: 'logarithmic',
+      label: 'ATTACK', min: 1.25, max: 3000, default: 1.25, units: 'ms', curve: 'logarithmic',
       description: 'How long the envelope takes to rise to its peak after a gate starts.',
       manualReference: `${M} p.15 - ATTACK`,
     }),
@@ -165,73 +165,123 @@ export const MOTHER32: DeviceSpec = {
       manualReference: `${M} p.16 - SUSTAIN`,
     },
     decay: knob({
-      label: 'DECAY', min: 1.25, max: 7000, default: 400, units: 'ms', curve: 'logarithmic',
+      label: 'DECAY', min: 1.25, max: 7000, default: 60, units: 'ms', curve: 'logarithmic',
       description: 'How long the envelope takes to fall: after the attack (SUSTAIN OFF) or after the gate ends (SUSTAIN ON).',
       manualReference: `${M} p.16 - DECAY`,
     }),
     vc_mix: knob({
-      label: 'VC MIX', min: 0, max: 100, default: 50, units: '%',
-      description: 'Crossfades MIX 1 (left) and MIX 2 (right). With nothing patched, MIX 1 is 0 V and MIX 2 is +5 V, so VC MIX is a 0-5 V knob; patch one input and it is an attenuator.',
-      manualReference: `${M} pp.50-51 - VC MIX`,
+      label: 'VC MIX', min: 0, max: 100, default: 0, units: '%',
+      description: 'Crossfades MIX 1 (LO, left) and MIX 2 (HI, right). With nothing patched, MIX 1 is 0 V and MIX 2 is +5 V, so VC MIX is a 0-5 V source; patch MIX 2 and it is an attenuator, add a CV at VC MIX CTRL and it is a VCA. Not wired to the synth inside.',
+      manualReference: `${M} p.21, pp.50-51 - VC MIX`,
     }),
 
     // ---- Sequencer --------------------------------------------------------------
     run_stop: {
       type: 'button', label: 'RUN / STOP', default: false, ledColor: '#ff3b30',
-      description: 'Starts and stops the sequencer (Space bar). Synced to the studio, it starts and stops the studio. SHIFT + RUN / STOP = REC; SHIFT held on it for a second = save the pattern.',
-      manualReference: `${M} p.19 - RUN / STOP (REC)`,
+      description: 'Pauses and resumes the sequencer (Space bar); RESET returns to step 1. Synced to the studio, it starts and stops the studio (from step 1, like MIDI Start). SHIFT + RUN / STOP = REC (KB mode); SHIFT held on it for a second = save the pattern.',
+      manualReference: `${M} p.18, p.28 - RUN / STOP (REC)`,
     },
     shift: {
       type: 'button', label: 'SHIFT', default: false, ledColor: '#ffffff',
       description: 'Second functions (printed in brackets). Tap to latch it here; it lets go after the next button.',
-      manualReference: `${M} p.34 - (SHIFT)`,
+      manualReference: `${M} p.18 - (SHIFT)`,
     },
     rec: {
       type: 'button', label: 'REC', default: false, ledColor: '#ff3b30',
-      description: 'KB-mode recording (SHIFT + RUN / STOP): each key stores a note and moves on; HOLD / REST stores a rest.',
-      manualReference: `${M} p.19 - Creating a pattern in KB mode`,
+      description: 'KB-mode Record (SHIFT + RUN / STOP while paused): "step-write" from step 1 - each key or REST writes a step and moves on, the pattern grows as you go; RUN / STOP (or STEP mode) ends it.',
+      manualReference: `${M} pp.24-27, p.30 - Record function`,
     },
     seq_mode: {
       type: 'switch', label: 'MODE', options: ['KB', 'STEP'], default: 0,
-      description: 'KB mode (SHIFT + KB): the keys play, record and transpose. STEP mode (SHIFT + STEP): the pads switch steps on and off; SHIFT + a pad edits that step.',
-      manualReference: `${M} p.31 - Step mode`,
+      description: 'KB mode (SHIFT + KB, the power-up mode): the keys play, record and transpose. STEP mode (SHIFT + STEP): the step buttons switch steps on and off, SHIFT + a step edits it, the arrows rotate the pattern.',
+      manualReference: `${M} p.23, p.39 - Mode selection`,
     },
     kb_octave: {
       type: 'switch', label: 'OCTAVE', options: ['1', '2', '3', '4', '5', '6', '7', '8'], default: 3,
       description: 'Keyboard octave, shown by the OCTAVE / LOCATION LEDs. Change it with the KB and STEP arrows.',
-      manualReference: `${M} p.34 - (KB) / (STEP)`,
+      manualReference: `${M} p.17 - Keyboard`,
     },
     swing: knob({
-      label: 'SWING', min: 25, max: 75, default: 50, units: '%',
-      description: 'SHIFT + TEMPO: delays every second step. 50 % is straight; about 66 % is a triplet shuffle.',
-      manualReference: `${M} p.19 - (SWING)`,
+      label: 'SWING AMOUNT', min: 0, max: 100, default: 50, units: '%',
+      description: 'SHIFT + TEMPO: the on beat\'s share of every two swing intervals. 50 % (12:00) is straight, about 66 % a triplet shuffle; at 100 % only the on beats play, at 0 % only the off beats. Stored with the pattern.',
+      manualReference: `${M} pp.19-21, p.28 - Swing amount`,
     }),
+    swing_div: knob({
+      label: 'SWING INTERVAL', min: 0, max: 7, step: 1, default: DIV_DEFAULT, units: 'none',
+      format: v => DIVISIONS[divIndex(v, 0)].name,
+      description: 'The note length the swing alternates over (KB + STEP + GLIDE): straight values, two whole notes to 1/64; hold KB for dotted, STEP for triplets. Setting the clock division resets it to the same value.',
+      manualReference: `${M} pp.20-21 - Swing interval`,
+    }),
+    swing_type: {
+      type: 'switch', label: 'SWING INTERVAL TYPE', options: [...DIV_GROUPS], default: 0,
+      description: 'Straight, dotted (hold KB + turn GLIDE) or triplet (hold STEP + turn GLIDE) swing interval.',
+      manualReference: `${M} p.21 - Swing interval`,
+    },
+    swing_dotted: knob({
+      label: 'SWING INTERVAL (DOTTED)', min: 0, max: 7, step: 1, default: DIV_DEFAULT, units: 'none',
+      format: v => DIVISIONS[divIndex(v, 1)].name,
+      description: 'GLIDE while KB is held: a dotted swing interval.',
+      manualReference: `${M} p.21 - Swing interval`,
+    }),
+    swing_triplet: knob({
+      label: 'SWING INTERVAL (TRIPLET)', min: 0, max: 7, step: 1, default: DIV_DEFAULT, units: 'none',
+      format: v => DIVISIONS[divIndex(v, 2)].name,
+      description: 'GLIDE while STEP is held: a triplet swing interval.',
+      manualReference: `${M} p.21 - Swing interval`,
+    }),
+    live_ratchet: knob({
+      label: 'LIVE RATCHET', min: 1, max: 4, step: 1, default: 1, units: 'none', format: v => `${Math.round(v)}x`,
+      description: 'SHIFT + GLIDE during playback: 1-4 ratchets on every step while SHIFT is held. Not stored.',
+      manualReference: `${M} p.29 - Live ratchet`,
+    }),
+    seq_direction: {
+      type: 'switch', label: 'DIRECTION', options: DIRECTIONS, default: 0,
+      description: 'Playback order (hold KB + STEP and press step 1-4): forward, reverse, pendulum or random.',
+      manualReference: `${M} p.40 - Sequencer playback direction`,
+    },
     step_div: knob({
-      label: 'CLOCK DIV', min: 0, max: 23, default: DIV_DEFAULT, units: 'none',
-      format: v => DIVISIONS[Math.max(0, Math.min(23, Math.round(v)))].name,
-      description: 'How long each step is: 1/16 by default. When the studio clock drives the sequencer, the TEMPO knob selects it (24 straight, dotted and triplet values).',
-      manualReference: 'Firmware 2.0 addendum - clock divisions',
+      label: 'CLOCK DIV', min: 0, max: 7, step: 1, default: DIV_DEFAULT, units: 'none',
+      format: v => DIVISIONS[divIndex(v, 0)].name,
+      description: 'How long each step is (the note value): 1/16 by default. Clocked by the studio or a TEMPO-jack clock, TEMPO selects it - straight values, two whole notes to 1/64; hold KB for dotted, STEP for triplets. On the internal clock hold KB + STEP while turning TEMPO. Stored with the pattern.',
+      manualReference: `${M} p.54 - Clock division`,
+    }),
+    div_type: {
+      type: 'switch', label: 'DIV TYPE', options: [...DIV_GROUPS], default: 0,
+      description: 'Whether the clock division is a straight, dotted (hold KB + turn TEMPO) or triplet (hold STEP + turn TEMPO) note value.',
+      manualReference: `${M} p.54 - Clock division`,
+    },
+    div_dotted: knob({
+      label: 'CLOCK DIV (DOTTED)', min: 0, max: 7, step: 1, default: DIV_DEFAULT, units: 'none',
+      format: v => DIVISIONS[divIndex(v, 1)].name,
+      description: 'TEMPO while KB is held: a dotted clock division.',
+      manualReference: `${M} p.54 - Clock division`,
+    }),
+    div_triplet: knob({
+      label: 'CLOCK DIV (TRIPLET)', min: 0, max: 7, step: 1, default: DIV_DEFAULT, units: 'none',
+      format: v => DIVISIONS[divIndex(v, 2)].name,
+      description: 'TEMPO while STEP is held: a triplet clock division.',
+      manualReference: `${M} p.54 - Clock division`,
     }),
     seq_length: knob({
       label: 'LENGTH', min: 1, max: STEPS, default: DEFAULT_SEQUENCE.seq_length, units: 'steps',
       format: v => `${Math.round(v)} steps`,
-      description: 'Pattern length (STEP mode: SET END + a step).',
-      manualReference: `${M} p.31 - SET END`,
+      description: 'Pattern length: STEP mode SET END + a step; KB mode SHIFT + SET END, then SHIFT + a step.',
+      manualReference: `${M} p.33, p.43 - SET END`,
     }),
     step_gate: knob({
       label: 'GATE LENGTH', min: 1, max: 8, default: 4, units: 'none', format: fmtGate,
       description: 'The edited step\'s gate length, in eighths of a step; 8/8 ties into the next step. Needs SUSTAIN ON to be heard.',
-      manualReference: `${M} p.25 - Gate Length`,
+      manualReference: `${M} p.25 - Gate length`,
     }),
     step_glide: knob({
       label: 'GLIDE ON/OFF', min: 0, max: 100, default: 0, units: '%', format: v => (v > 0.5 ? 'GLIDE ON' : 'OFF'),
       description: 'While a step is edited, any clockwise GLIDE setting turns glide on for it; fully counter-clockwise turns it off.',
-      manualReference: `${M} p.26 - Glide`,
+      manualReference: `${M} p.26 - Glide on / off`,
     }),
     step_ratchet: knob({
       label: 'RATCHET', min: 1, max: 4, default: 1, units: 'none', format: v => `${Math.round(v)}x`,
       description: 'SHIFT + GLIDE while a step is edited: how many notes the step plays (1-4).',
-      manualReference: `${M} p.26 - Ratchet`,
+      manualReference: `${M} p.27 - Ratchet`,
     }),
 
     // ---- Setup mode (SHIFT + RESET + SET END + STEP 8 on the hardware) ------------
@@ -242,17 +292,47 @@ export const MOTHER32: DeviceSpec = {
     },
     tempo_mode: {
       type: 'switch', label: 'TEMPO IN', options: TEMPO_MODES, default: 1,
-      description: 'Setup page 3: what the TEMPO jack does. CLOCK ADVANCE (default): one step per rising edge.',
+      description: 'Setup page 3: what the TEMPO jack does. SINGLE CLOCK ADVANCE (default): one step per rising edge. ANALOG CLOCK: a clock at the page 4 PPQN, following the clock division. CV INPUT: bends the tempo. STEP ADDRESS CV: the voltage picks the step.',
       manualReference: `${M} p.55, p.59 - TEMPO input modes`,
+    },
+    clock_in_ppqn: {
+      type: 'switch', label: 'CLOCK IN PPQN', options: PPQN_VALUES.map(String), default: 3,
+      description: 'Setup page 4: how many TEMPO-jack pulses make a quarter note in ANALOG CLOCK mode (default 4 - sixteenths; 24 for DIN sync).',
+      manualReference: `${M} p.59 - Clock input PPQN`,
+    },
+    save_mode: {
+      type: 'switch', label: 'SAVE MODE', options: ['MANUAL', 'AUTO', 'WRITE PROTECT'], default: 0,
+      description: 'Setup page 6: MANUAL - edits are lost unless saved; AUTO - edits are saved when you change pattern (PATTERN + RESET still restores the original); WRITE PROTECT - nothing can be saved.',
+      manualReference: `${M} p.38, p.60 - Save mode`,
+    },
+    accent_cv_only: {
+      type: 'switch', label: 'ACCENT OUT CV ONLY', options: ['OFF', 'ON'], default: 0,
+      description: 'Setup page 8, option 4: ON turns the internal accent off while ASSIGN sends ACCENT, so accents can be used elsewhere.',
+      manualReference: `${M} p.60 - On / off settings`,
+    },
+    tempo_in_range: {
+      type: 'switch', label: 'TEMPO INPUT RANGE', options: ['-5 TO +5 V', '0 TO +5 V'], default: 0,
+      description: 'Setup page 8, option 5: the voltage range of the TEMPO jack in CV and step address modes.',
+      manualReference: `${M} p.55, p.60 - Tempo input range`,
+    },
+    delay_pattern: {
+      type: 'switch', label: 'DELAY PATTERN CHANGE', options: ['OFF', 'ON'], default: 1,
+      description: 'Setup page 8, option 6: ON - a pattern picked during playback starts when the current one finishes; OFF - at once.',
+      manualReference: `${M} p.37, p.60 - Delay pattern change`,
+    },
+    load_timing: {
+      type: 'switch', label: 'LOAD SAVED TIMING', options: ['OFF', 'ON'], default: 1,
+      description: 'Setup page 8, option 7: ON - loading a pattern also restores its clock division, swing amount and swing interval.',
+      manualReference: `${M} p.37, p.60 - Load saved timing`,
     },
 
     // ---- The pattern (hidden lanes, one character per step; see sequence.ts) ------
-    seq_notes: lane('Pattern notes', DEFAULT_SEQUENCE.seq_notes, `${M} p.19`),
-    seq_accent: lane('Pattern accents', DEFAULT_SEQUENCE.seq_accent, `${M} p.24`),
+    seq_notes: lane('Pattern notes', DEFAULT_SEQUENCE.seq_notes, `${M} p.24`),
+    seq_accent: lane('Pattern accents', DEFAULT_SEQUENCE.seq_accent, `${M} p.25`),
     seq_gate: lane('Pattern gate lengths', DEFAULT_SEQUENCE.seq_gate, `${M} p.25`),
     seq_glide: lane('Pattern glides', DEFAULT_SEQUENCE.seq_glide, `${M} p.26`),
-    seq_ratchet: lane('Pattern ratchets', DEFAULT_SEQUENCE.seq_ratchet, `${M} p.26`),
-    seq_rest: lane('Pattern rests', DEFAULT_SEQUENCE.seq_rest, `${M} p.24`),
+    seq_ratchet: lane('Pattern ratchets', DEFAULT_SEQUENCE.seq_ratchet, `${M} p.27`),
+    seq_rest: lane('Pattern rests', DEFAULT_SEQUENCE.seq_rest, `${M} p.26`),
   },
 
   // The patch bay: 4 columns x 8 rows, in Moog's reading order ([boxed] = output).
