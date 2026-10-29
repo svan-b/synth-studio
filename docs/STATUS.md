@@ -199,7 +199,6 @@ Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Su
   - a cap variant in `components/controls/Knob.tsx` (the A4 restyles its caps with a scoped stylesheet)
   - a legend-above/below option in `components/controls/Switch.tsx` (Mother-32)
 - **Full-track gaps on the A4**: POLY, a kit per pattern, separate track outputs, live recording of knob moves, TRANSPOSABLE, and trig/page/sound copy.
-- Mother-32: with a clock in TEMPO the knob shows CLOCK DIV; the engine already ignores it, so only the display is off.
 - StudioView: hide "Output" for Your synth when it has no audio. `hub.push()` should apply data before values.
 - Optional "Hardware synth" studio set (Your synth + Audio input + Xone:96).
 - Delete the `wip/*` branches after their work is merged (ask first).

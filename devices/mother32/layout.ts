@@ -207,6 +207,11 @@ const elements: PanelElement[] = [
       if (held.kb && held.step) return 'step_div';
       if (held.kb) return 'div_dotted';
       if (held.step) return 'div_triplet';
+      // A TEMPO-jack clock in SINGLE CLOCK ADVANCE (one step per pulse) or a STEP ADDRESS CV
+      // ignores the knob (manual p.55), so it stays on TEMPO: the internal tempo it returns to.
+      // Only an ANALOG CLOCK (or the studio's MIDI clock) uses the clock division.
+      const tempoMode = Math.round(Number(values.tempo_mode ?? 1));
+      if (engine?.extClock && tempoMode !== 2) return 'tempo';
       return engine?.synced || engine?.extClock ? 'step_div' : 'tempo';
     },
     x: 41.0, y: ROW3, diameter: KNOB, variant: 'moog-black', label: 'none',

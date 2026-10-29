@@ -157,8 +157,10 @@ same way) - left for the integrator.
    fast pulse-width sweep (Short Brass).
 7. Not modelled (documented in REFERENCE.md): MIDI velocity >= 96 setting accents while recording,
    Setup page 2 and 5 and page 8 options 1-3, the LED sweep animations.
-8. Under SINGLE CLOCK ADVANCE the TEMPO knob shows CLOCK DIV although the manual says the knob is
-   ignored in that mode; the engine does ignore it, so only the display is misleading.
+8. Under SINGLE CLOCK ADVANCE the TEMPO knob showed CLOCK DIV although the manual says the knob is
+   ignored in that mode (p.55). Fixed after the review: with a TEMPO-jack clock in SINGLE CLOCK
+   ADVANCE or STEP ADDRESS CV the knob stays on TEMPO (the internal tempo it returns to); only
+   an ANALOG CLOCK or the studio's MIDI clock make it the clock division.
 
 ## Gate
 
