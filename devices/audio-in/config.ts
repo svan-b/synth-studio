@@ -4,7 +4,7 @@
  * Where the sound comes from:
  *   device    an audio interface input or a microphone (getUserMedia)
  *   practice  the built-in Practice synth - the "cable" from a synth with no gear needed
- *   tone      a 1 kHz line-up tone at -18 dBFS, for setting levels
+ *   tone      a 1 kHz line-up tone at -20 dBFS, for setting levels
  */
 export type InputSource = 'device' | 'practice' | 'tone';
 
@@ -13,6 +13,8 @@ export interface LevelCheck {
   peakDb: number;
   /** GAIN when it was measured (dB) */
   gainDb: number;
+  /** What was measured */
+  source: InputSource;
   /** Date.now() */
   at: number;
 }
@@ -44,7 +46,8 @@ export interface AudioInData {
 /** MODE options: which interface inputs play, and how */
 export const MODES = ['IN 1', 'IN 2', 'L+R', 'STEREO'];
 
-export const TONE_DBFS = -18;
+/** The line-up tone's peak level (the SMPTE alignment level): 8 dB below the target */
+export const TONE_DBFS = -20;
 /** Peaks around here leave headroom (and it is the middle of the meter's target zone) */
 export const TARGET_DBFS = -12;
 export const TARGET_ZONE: [number, number] = [-18, -6];
@@ -66,7 +69,9 @@ export function asInputData(d: unknown): AudioInData {
     deviceId: typeof s.deviceId === 'string' && s.deviceId ? s.deviceId : null,
     label: typeof s.label === 'string' && s.label ? s.label : null,
     name: typeof s.name === 'string' && s.name.trim() ? s.name.trim().slice(0, 40) : null,
-    levelCheck: lc ? { peakDb: lc.peakDb, gainDb: finite(lc.gainDb) ? lc.gainDb : 0, at: finite(lc.at) ? lc.at : 0 } : null,
+    levelCheck: lc
+      ? { peakDb: lc.peakDb, gainDb: finite(lc.gainDb) ? lc.gainDb : 0, source: lc.source === 'practice' || lc.source === 'tone' ? lc.source : 'device', at: finite(lc.at) ? lc.at : 0 }
+      : null,
     takes: Array.isArray(s.takes)
       ? s.takes.filter(t => t && finite(t.n) && finite(t.seconds)).slice(-50).map(t => ({ n: t.n, seconds: t.seconds, peakDb: finite(t.peakDb) ? t.peakDb : -96, at: finite(t.at) ? t.at : 0 }))
       : [],
@@ -104,3 +109,7 @@ export function inputLabel(d: AudioInData, mode: string): string | undefined {
   const dev = (d.label ?? 'Audio input').replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '').replace(/^Default - /, '');
   return `${dev.length > 22 ? `${dev.slice(0, 21)}…` : dev} · ${mode}`;
 }
+
+/** A level check of this source that landed in the target zone */
+export const levelIsGood = (d: AudioInData, source?: InputSource) =>
+  !!d.levelCheck && (source === undefined || d.levelCheck.source === source) && judgeLevel(d.levelCheck.peakDb).verdict === 'good';

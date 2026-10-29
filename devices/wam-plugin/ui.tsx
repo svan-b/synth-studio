@@ -130,7 +130,7 @@ function StatusLine({ status, error, plugin, origin, url }: { status: PluginStat
       return <div style={{ ...style, color: '#fca5a5' }} className="leading-snug">{error ?? 'The plugin failed to load.'}</div>;
     case 'ready':
       return (
-        <div style={{ ...style, color: '#c9c2df' }} className="truncate">
+        <div style={{ ...style, color: '#c9c2df' }} className="line-clamp-2 leading-snug">
           {plugin?.isInstrument ? 'Instrument' : 'Effect'}
           {plugin?.hasMidiInput ? ' · plays from the keys and MIDI input' : ''}
           {plugin?.hasAudioInput ? ' · patch audio into IN' : ''}

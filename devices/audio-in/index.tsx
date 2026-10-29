@@ -13,7 +13,7 @@ import type { PanelLayout } from '@/types/panel';
 import type { DeviceModule } from '../types';
 import { AudioInEngine } from './engine';
 import { MODES, initialInputData, migrateInputData } from './config';
-import { InputHeader, LatencyBox, LevelCheck, MeterBox, RouteRecord, SourcePicker } from './ui';
+import { InputHeader, LatencyBox, LevelCheck, MeterBox, ModeSelector, RouteRecord, SourcePicker } from './ui';
 import { AUDIO_IN_LESSONS } from './lessons';
 
 export { MODES } from './config';
@@ -74,9 +74,10 @@ const layout: PanelLayout = {
     { kind: 'custom', x: 130.5, y: 19.5, w: 64.5, h: 24, render: ctx => createElement(LatencyBox, ctx) },
     { kind: 'custom', x: 5, y: 46, w: 190, h: 17, render: ctx => createElement(MeterBox, ctx) },
     { kind: 'section', x: 5, y: 66, w: 93, h: 41, border: '1px solid #3b3326', radius: 2 },
-    { kind: 'knob', control: 'gain', x: 22, y: 88, diameter: 14, variant: 'moog-black', capColor: '#f59e0b' },
-    { kind: 'switch', control: 'mode', x: 54, y: 88, style: 'rotary', scale: 1.25 },
-    { kind: 'button', control: 'mute', x: 84, y: 88, shape: 'rect', w: 15, h: 11, color: '#2b251b', ledColor: '#ef4444' },
+    { kind: 'knob', control: 'gain', x: 17, y: 88, diameter: 14, variant: 'moog-black', capColor: '#f59e0b' },
+    // MODE is how your synth is cabled to the interface: a big 2 x 2 selector (uiControls below)
+    { kind: 'custom', x: 28, y: 69, w: 47, h: 36, render: ctx => createElement(ModeSelector, ctx) },
+    { kind: 'button', control: 'mute', x: 86, y: 88, shape: 'rect', w: 15, h: 11, color: '#2b251b', ledColor: '#ef4444' },
     { kind: 'custom', x: 100.5, y: 66, w: 94.5, h: 41, render: ctx => createElement(LevelCheck, ctx) },
     { kind: 'custom', x: 5, y: 110, w: 147, h: 14, render: ctx => createElement(RouteRecord, ctx) },
     { kind: 'jack', jack: 'out_l', x: 163, y: 119 },
@@ -90,6 +91,8 @@ const audioIn: DeviceModule = {
   lessons: AUDIO_IN_LESSONS,
   createEngine: () => new AudioInEngine(),
   studio: { stereo: true },
+  // MODE describes the cabling (which interface inputs your synth uses), not the sound: Reset leaves it alone
+  uiControls: ['mode'],
   data: { initial: initialInputData, migrate: migrateInputData },
   // "Hear it" in lessons: a phrase from the Practice synth when this input plays it
   audition: api => { api.event('audition'); },

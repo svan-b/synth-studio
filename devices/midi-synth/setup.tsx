@@ -105,7 +105,7 @@ export default function SetupDialog({ instance, data, uses, onSave, onClose }: P
                 >
                   <option value={NONE}>- none (silent) -</option>
                   <optgroup label="Built in">
-                    <option value={PRACTICE_PORT.id}>Practice synth (built in, no gear needed)</option>
+                    <option value={PRACTICE_PORT.id}>Practice synth (built in)</option>
                   </optgroup>
                   {(real.length > 0 || portValue === SAVED) && (
                     <optgroup label="Your MIDI outputs">

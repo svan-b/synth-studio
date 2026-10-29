@@ -19,7 +19,7 @@ import { useStudioStore } from '@/store/studio';
 import { getAudioContext } from '@/lib/audio/context';
 import { transport } from '@/lib/audio/transport';
 import {
-  MODES, TARGET_DBFS, TARGET_ZONE, asInputData, inputLabel, judgeLevel, toDb,
+  MODES, TARGET_DBFS, TARGET_ZONE, TONE_DBFS, asInputData, inputLabel, judgeLevel, toDb,
   type AudioInData, type InputSource,
 } from './config';
 import type { AudioInEngine, InputStatus } from './engine';
@@ -174,7 +174,7 @@ function HeaderButton({ children, onClick, accent, style, disabled, label }: { c
 const SOURCES: { id: InputSource; label: string; hint: string }[] = [
   { id: 'device', label: 'Interface / mic', hint: 'Your audio interface (a synth plugged into its inputs) or a microphone' },
   { id: 'practice', label: 'Practice synth', hint: 'The built-in Practice synth: hardware-style audio with no gear' },
-  { id: 'tone', label: 'Test tone', hint: '1 kHz at -18 dBFS: a known level for setting GAIN' },
+  { id: 'tone', label: 'Test tone', hint: `1 kHz at ${TONE_DBFS} dBFS: a known level for setting GAIN` },
 ];
 
 export function SourcePicker(ctx: CustomRenderContext) {
@@ -236,9 +236,54 @@ export function SourcePicker(ctx: CustomRenderContext) {
         <div className="leading-snug" style={{ fontSize: 11, color: '#c9bfa9' }}>
           {data.source === 'practice'
             ? 'The Practice synth\'s audio, as if its output were cabled into your interface. Play it from Your synth (MIDI).'
-            : 'A steady 1 kHz sine peaking at -18 dBFS, like the line-up tone in a studio. Use it to see what GAIN does.'}
+            : `A steady 1 kHz sine peaking at ${TONE_DBFS} dBFS, like the line-up tone in a studio. Use it to see what GAIN does.`}
         </div>
       )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// MODE: how your synth is cabled to the interface
+// ----------------------------------------------------------------------------
+
+const MODE_HINTS = ['Input 1, in the middle (a mono synth)', 'Input 2, in the middle', 'Inputs 1 and 2 summed, in the middle', 'Input 1 left, input 2 right (a stereo synth)'];
+
+export function ModeSelector(ctx: CustomRenderContext) {
+  const mode = Math.round(Number(ctx.values.mode ?? 0));
+  const mono = Number(ctx.engine.channels) === 1;
+  const step = ctx.step;
+  const target = step?.control === 'mode' && typeof step.targetValue === 'number' ? step.targetValue : null;
+  return (
+    <div className="w-full h-full flex flex-col select-none rounded" style={glow(target !== null && mode !== target)}>
+      <div className="font-bold text-center leading-none mb-1" style={{ fontSize: 10, color: '#b3a585' }}>MODE</div>
+      <div className="grid grid-cols-2 gap-1 flex-1" role="radiogroup" aria-label="MODE: which inputs play">
+        {MODES.map((m, i) => {
+          const on = i === mode;
+          return (
+            <button
+              key={m}
+              role="radio"
+              aria-checked={on}
+              title={MODE_HINTS[i]}
+              onClick={() => ctx.setValue('mode', i)}
+              className="rounded font-bold"
+              style={{
+                minHeight: 44, fontSize: 12,
+                color: on ? '#1b1306' : mono && i > 0 ? '#6f6656' : '#f3ead8',
+                background: on ? '#e8dcc2' : '#2b251b',
+                border: `1px solid ${target === i && !on ? '#facc15' : on ? '#e8dcc2' : '#4a3f2c'}`,
+              }}
+              data-control-mode={i}
+            >
+              {m}
+            </button>
+          );
+        })}
+      </div>
+      <div className="text-center leading-tight mt-0.5 truncate" style={{ fontSize: 9, color: '#a89f8c' }}>
+        {mono ? 'mono source: every mode plays input 1' : MODE_HINTS[mode]}
+      </div>
     </div>
   );
 }
@@ -390,6 +435,9 @@ export function LevelCheck(ctx: CustomRenderContext) {
     let raf = 0;
     const acc = { peak: 0, clip: false, inClip: false };
     engineOf(ctx.instance)?.clearClip();
+    // The Practice synth only sounds when played: play its phrase through the check
+    const demos: ReturnType<typeof setTimeout>[] = [];
+    if (data.source === 'practice') [0, 1350, 2700, 4050].forEach(t => demos.push(setTimeout(() => ctx.sendEvent('audition'), t)));
     const tick = () => {
       const lv = engineOf(ctx.instance)?.levels();
       if (lv) {
@@ -399,7 +447,10 @@ export function LevelCheck(ctx: CustomRenderContext) {
       }
       if (performance.now() >= listening.until) {
         const peakDb = Math.round(toDb(acc.peak) * 10) / 10;
-        ctx.updateData(d => ({ ...asInputData(d), levelCheck: { peakDb, gainDb: Number(ctx.values.gain ?? 0), at: Date.now() } }));
+        ctx.updateData(d => {
+          const cur = asInputData(d);
+          return { ...cur, levelCheck: { peakDb, gainDb: Number(ctx.values.gain ?? 0), source: cur.source, at: Date.now() } };
+        });
         setListening(null);
         return;
       }
@@ -407,7 +458,7 @@ export function LevelCheck(ctx: CustomRenderContext) {
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); demos.forEach(t => clearTimeout(t)); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listening?.until]);
 
@@ -433,7 +484,7 @@ export function LevelCheck(ctx: CustomRenderContext) {
       </div>
       <div className="leading-snug" style={{ fontSize: 11, color: !judged ? '#a89f8c' : judged.verdict === 'good' ? '#86efac' : judged.verdict === 'clip' || judged.verdict === 'hot' ? '#fca5a5' : '#fcd34d' }} data-testid="level-verdict">
         {listening
-          ? 'Play the loudest part now (or let it run): the check keeps the highest peak.'
+          ? data.source === 'practice' ? 'The Practice synth plays its phrase while the check listens.' : 'Play the loudest part now (or let it run): the check keeps the highest peak.'
           : judged
             ? `${judged.text}${result ? ` (peak ${result.peakDb.toFixed(1)} dBFS at GAIN ${result.gainDb > 0 ? '+' : ''}${result.gainDb} dB)` : ''}`
             : live ? 'Aim for peaks around -12 dBFS: loud enough to stay clear of noise, with room for louder notes.' : 'Connect a source, then check its level.'}

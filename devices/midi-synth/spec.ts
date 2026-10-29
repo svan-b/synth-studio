@@ -21,8 +21,8 @@ export const MIDI_SYNTH: DeviceSpec = {
   name: 'Your synth (MIDI)',
   manufacturer: 'Bring your own',
   description: 'Plays and controls a hardware synth over MIDI: CC knobs, program changes, a 16-step sequencer locked to the studio and a keyboard',
-  dimensions: { width: 290, height: 180 },
-  display: { width: 1160, height: 720, scale: 4 },
+  dimensions: { width: 290, height: 181 },
+  display: { width: 1160, height: 724, scale: 4 },
   signalFlow: [],
   controls: {
     ...knobs,

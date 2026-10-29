@@ -43,16 +43,19 @@ const glow = (on: boolean) => (on ? { boxShadow: '0 0 0 3px #facc15, 0 0 18px rg
 // ----------------------------------------------------------------------------
 
 export function KnobCaption({ index, ctx }: { index: number; ctx: CustomRenderContext }) {
-  const k = asData(ctx.data).knobs[index];
+  const knobs = asData(ctx.data).knobs;
+  const k = knobs[index];
   const pos = Number(ctx.values[KNOB_IDS[index]] ?? 64);
+  // Empty slots stay quiet; the first one says how to fill them
+  const firstFree = !k && index === knobs.length;
   return (
     <div
       style={{ pointerEvents: 'none', width: '100%', height: '100%' }}
       className="flex flex-col items-center justify-between select-none"
       aria-hidden
     >
-      <div className="font-bold whitespace-nowrap overflow-hidden text-ellipsis max-w-full text-center leading-tight" style={{ fontSize: k ? 11 : 9, color: k ? '#e6f2f0' : '#4a5857' }}>
-        {k ? k.label : 'unused'}
+      <div className="font-bold whitespace-nowrap overflow-hidden text-ellipsis max-w-full text-center leading-tight" style={{ fontSize: k ? 11 : 9, color: k ? '#e6f2f0' : '#5d706e' }}>
+        {k ? k.label : firstFree ? '+ more in Setup' : ''}
       </div>
       {k ? (
         <div className="flex items-baseline gap-1 leading-none">
@@ -152,8 +155,8 @@ export function Header(ctx: CustomRenderContext) {
   } else if (!snap.support.supported && (snap.support.reason === 'ios' || snap.support.reason === 'safari')) {
     note = {
       text: snap.support.reason === 'ios'
-        ? 'iPad has no Web MIDI. The Practice synth works here; for your own synth use Chrome or Edge on a computer. Audio input brings any synth in.'
-        : 'Safari has no Web MIDI. The Practice synth works here; for your own synth use Chrome or Edge. Audio input works in Safari.',
+        ? 'iPad has no Web MIDI, so this plays the built-in Practice synth. For your own synth\'s MIDI, use Chrome or Edge on a computer.'
+        : 'Safari has no Web MIDI, so this plays the built-in Practice synth. For your own synth\'s MIDI, use Chrome or Edge.',
       color: '#c3d1cf',
     };
   } else if (snap.support.supported && snap.status === 'denied') {
