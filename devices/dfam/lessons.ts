@@ -530,7 +530,7 @@ const f6: Lesson = {
   source: 'Synth Studio · DFAM manual, Sequencer section', estimatedMinutes: 7,
   prerequisites: ['dfam-f5-envelopes'],
   concepts: ['sequencer-pattern', 'timing-tempo', 'velocity-dynamics'],
-  start: { reset: true, values: { vco1_frequency: -0.5, vco1_eg_amount: 30, vco_decay: 40, vca_decay: 200, tempo: 120 } },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -0.5, vco1_eg_amount: 30, vco_decay: 40, vca_decay: 200, tempo: 120 } },
   steps: [
     run(),
     {
@@ -889,7 +889,7 @@ const sd3: Lesson = {
   source: 'Synth Studio · DFAM manual preset "Quick Hats"', estimatedMinutes: 7,
   prerequisites: ['dfam-f3-filter', 'dfam-f4-vca'],
   concepts: ['filter-type', 'noise', 'envelope-decay', 'signal-routing'],
-  start: { reset: true, values: { vco1_level: 0, noise_level: 100, vcf_cutoff: 2000, vcf_resonance: 25, vca_decay: 45, tempo: 120, ...seq(undefined, [100, 55, 80, 55, 100, 55, 80, 55]) } },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_level: 0, noise_level: 100, vcf_cutoff: 2000, vcf_resonance: 25, vca_decay: 45, tempo: 120, ...seq(undefined, [100, 55, 80, 55, 100, 55, 80, 55]) } },
   steps: [
     run('Hats are short bursts of bright noise, usually on every 8th or 16th note.'),
     {
@@ -1350,7 +1350,7 @@ const sq1: Lesson = {
   source: 'Synth Studio · DFAM manual, Sequencer (and the acid-house tradition)', estimatedMinutes: 8,
   prerequisites: ['dfam-f6-sequencer', 'dfam-f3-filter'],
   concepts: ['sequencer-pattern', 'velocity-dynamics', 'filter-resonance', 'oscillator-pitch'],
-  start: { reset: true, values: { vco1_frequency: -1, vco1_wave: 0, vco1_level: 80, vco2_frequency: -0.985, vco2_wave: 0, vco2_level: 35, vcf_cutoff: 280, vcf_resonance: 72, vcf_eg_amount: 55, vcf_decay: 170, vca_decay: 260, tempo: 126 } },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -1, vco1_wave: 0, vco1_level: 80, vco2_frequency: -0.985, vco2_wave: 0, vco2_level: 35, vcf_cutoff: 280, vcf_resonance: 72, vcf_eg_amount: 55, vcf_decay: 170, vca_decay: 260, tempo: 126 } },
   steps: [
     run('A bassline is rhythm plus intervals; the same note repeated is the starting point.'),
     {
@@ -1432,7 +1432,7 @@ const sq2: Lesson = {
   source: 'Synth Studio · Moog support FAQ "Can I change DFAM\'s note length?" and community kit patches', estimatedMinutes: 9,
   prerequisites: ['dfam-f7-patching', 'dfam-sd1-kick'],
   concepts: ['signal-routing', 'sequencer-pattern', 'timing-tempo', 'noise'],
-  start: { reset: true, values: { vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, tempo: 110, ...seq(undefined, [100, 0, 55, 0, 100, 0, 70, 40]) } },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, tempo: 110, ...seq(undefined, [100, 0, 55, 0, 100, 0, 70, 40]) } },
   steps: [
     run('Eight steps of one drum voice can still be a whole beat, if every step is different.'),
     {
@@ -1521,7 +1521,7 @@ const p1: Lesson = {
   source: 'Synth Studio · performance techniques', estimatedMinutes: 7,
   prerequisites: ['dfam-f6-sequencer'],
   concepts: ['filter-cutoff', 'envelope-decay', 'velocity-dynamics', 'timing-tempo'],
-  start: { reset: true, values: { vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, tempo: 120, ...seq([0, 0, 0, 0, 30, 0, 0, 30], [100, 0, 55, 0, 100, 0, 70, 40]) }, patches: [{ from: 'out_pitch', to: 'in_noise_level' }] },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, tempo: 120, ...seq([0, 0, 0, 0, 30, 0, 0, 30], [100, 0, 55, 0, 100, 0, 70, 40]) }, patches: [{ from: 'out_pitch', to: 'in_noise_level' }] },
   steps: [
     run('Performing is changing the sound over time while the pattern keeps going.'),
     {
@@ -1606,7 +1606,7 @@ const st1: Lesson = {
   requires: ['studio-clock'],
   prerequisites: ['dfam-f6-sequencer'],
   concepts: ['timing-tempo', 'signal-routing', 'sequencer-pattern'],
-  start: { reset: true, values: { vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, ...seq([0, 0, 0, 0, 30, 0, 0, 30], [100, 0, 55, 0, 100, 0, 70, 40]) }, patches: [{ from: 'out_pitch', to: 'in_noise_level' }] },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, ...seq([0, 0, 0, 0, 30, 0, 0, 30], [100, 0, 55, 0, 100, 0, 70, 40]) }, patches: [{ from: 'out_pitch', to: 'in_noise_level' }] },
   steps: [
     {
       kind: 'info', concept: 'timing-tempo', focus: ['in_adv_clock'],
@@ -1681,7 +1681,7 @@ const st2: Lesson = {
   requires: ['mother32'],
   prerequisites: ['dfam-f7-patching'],
   concepts: ['signal-routing', 'sequencer-pattern', 'oscillator-pitch'],
-  start: { reset: true, values: { vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 1500, vca_decay: 300, tempo: 110, ...seq([0, 0, 12, 0, 7, 0, 10, 3], [100, 60, 80, 60, 100, 60, 80, 60]) } },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 1500, vca_decay: 300, tempo: 110, ...seq([0, 0, 12, 0, 7, 0, 10, 3], [100, 60, 80, 60, 100, 60, 80, 60]) } },
   steps: [
     run('A sequencer\'s outputs are just voltages: any synth with CV inputs can follow them.'),
     {

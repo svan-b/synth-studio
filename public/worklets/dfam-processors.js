@@ -35,6 +35,8 @@ const K_PITCH = 24, K_VEL = 32, NK = 40;
 const I_TRIG = 0, I_VCA_CV = 1, I_VEL = 2, I_VCA_DEC = 3, I_EXT = 4, I_VCF_DEC = 5, I_NOISE = 6, I_VCO_DEC = 7;
 const I_VCF_MOD = 8, I_VCO1_CV = 9, I_FM = 10, I_VCO2_CV = 11, I_TEMPO = 12, I_RUN = 13, I_ADV = 14, NIN = 15;
 const O_VCA = 0, O_VCA_EG = 1, O_VCF_EG = 2, O_VCO_EG = 3, O_VCO1 = 4, O_VCO2 = 5, O_TRIG = 6, O_VEL = 7, O_PITCH = 8, NOUT = 9;
+/** AudioParam names, built once: process() must not allocate (WebKit's 128-frame quanta) */
+const PARAM_NAMES = Array.from({ length: NIN }, (_, j) => 'in' + j);
 
 // Scaling
 const EG_PEAK = 8;            // envelopes peak at +8 V at full velocity
@@ -44,6 +46,7 @@ const BASE_HZ = 130.8128;     // VCO FREQUENCY at noon = C3
 const EDGE_ON = 1.5, EDGE_OFF = 1.0; // gate / trigger thresholds (volts)
 const DEDUPE = 0.0015;        // an event and an audio pulse closer than this are one pulse
 const FB_SAT = 2.4;           // ladder feedback saturation (lets self-oscillation reach ~VCO level)
+const HP_RES_HZ = 500;        // HP feedback roll-off: full RESONANCE oscillates from ~1 kHz up
 const TRIG_OUT_SEC = 0.001;   // TRIGGER output pulse width
 const EVENT_ORDER = { run: 0, 'aud-on': 0, 'aud-off': 0, adv: 1, 'button-adv': 1, trig: 2, 'button-trig': 2 };
 
@@ -171,7 +174,7 @@ class DfamProcessor extends AudioWorkletProcessor {
     const sr = sampleRate;
     this.sr = sr;
     const k = new Float64Array(NK);
-    k[K_VCO1_WAVE] = 1; k[K_VCO2_WAVE] = 1; k[K_SYNC] = 0;
+    k[K_VCO1_WAVE] = 1; k[K_VCO2_WAVE] = 1; k[K_SYNC] = 0; k[K_SEQ_MOD] = 1;
     k[K_VCO_DECAY] = 0.1; k[K_VCF_DECAY] = 0.3; k[K_VCA_DECAY] = 0.3;
     k[K_VCO1_LEVEL] = 0.75; k[K_CUTOFF] = 2000; k[K_VCF_MODE] = 1; k[K_VOLUME] = 0.75; k[K_TEMPO] = 8;
     for (let i = 0; i < NSTEP; i++) k[K_VEL + i] = 1;
@@ -186,7 +189,9 @@ class DfamProcessor extends AudioWorkletProcessor {
     this.routes = [];                      // internal self-patches [out, in, scale]
     this.prevOut = new Float64Array(NOUT); // last sample of every output (volts) for internal routes
     this.inV = new Float64Array(NIN);
-    this.active = [];                      // inputs with a live external signal this block
+    this.arrs = new Array(NIN).fill(null); // this block's param arrays
+    this.activeIdx = new Int32Array(NIN);  // inputs with a live external signal this block
+    this.isActive = new Uint8Array(NIN);
 
     // Envelopes
     this.egVco = new Envelope(); this.egVcf = new Envelope(); this.egVca = new Envelope();
@@ -214,7 +219,7 @@ class DfamProcessor extends AudioWorkletProcessor {
 
     // Ladder state and coefficient cache
     this.z0 = 0; this.z1 = 0; this.z2 = 0; this.z3 = 0;
-    this.cutLast = NaN; this.gCut = 0;
+    this.cutLast = NaN; this.gCut = 0; this.hpK = 1;
     // DC blocker (5 Hz) on the main output, ahead of the output rail
     this.dcX = 0; this.dcY = 0; this.dcR = 1 - (2 * Math.PI * 5) / sr;
 
@@ -353,16 +358,15 @@ class DfamProcessor extends AudioWorkletProcessor {
     const egVco = this.egVco, egVcf = this.egVcf, egVca = this.egVca;
     const o1s = this.osc1, o2s = this.osc2;
 
-    // External inputs with signal this block (most are silent)
-    const active = this.active; active.length = 0;
-    const arrs = [];
+    // External inputs with signal this block (most are silent). No allocation here.
+    const arrs = this.arrs, activeIdx = this.activeIdx, isActive = this.isActive;
+    let na = 0;
     for (let j = 0; j < NIN; j++) {
-      const arr = params['in' + j];
-      arrs.push(arr);
-      if (arr.length > 1 || arr[0] !== 0) active.push(j);
-      else inV[j] = 0;
+      const arr = params[PARAM_NAMES[j]];
+      arrs[j] = arr;
+      if (arr.length > 1 || arr[0] !== 0) { activeIdx[na++] = j; isActive[j] = 1; }
+      else { isActive[j] = 0; inV[j] = 0; }
     }
-    const na = active.length;
 
     // Smoothing needed this block?
     const a = this.smoothA;
@@ -401,12 +405,12 @@ class DfamProcessor extends AudioWorkletProcessor {
 
       // ---- inputs: cables from other instruments (1.0 = 5 V) + self-patches (last sample, volts) ----
       for (let q = 0; q < na; q++) {
-        const j = active[q], arr = arrs[j];
+        const j = activeIdx[q], arr = arrs[j];
         inV[j] = (arr.length > 1 ? arr[i] : arr[0]) * 5;
       }
       if (nr) {
         if (!na) for (let q = 0; q < nr; q++) inV[routes[q][1]] = 0;
-        else for (let q = 0; q < nr; q++) { const j = routes[q][1]; if (active.indexOf(j) < 0) inV[j] = 0; }
+        else for (let q = 0; q < nr; q++) { const j = routes[q][1]; if (!isActive[j]) inV[j] = 0; }
         for (let q = 0; q < nr; q++) { const rt = routes[q]; inV[rt[1]] += prev[rt[0]] * rt[2]; }
       }
 
@@ -547,14 +551,20 @@ class DfamProcessor extends AudioWorkletProcessor {
         let fc = Math.pow(2, cutOct);
         if (fc < 8) fc = 8; else if (fc > nyq) fc = nyq;
         this.gCut = Math.tan(fc * piOverSr);
+        // HP mode: RESONANCE scales differently - at maximum it only self-oscillates from a
+        // CUTOFF of about 1 kHz up (DFAM manual p.18). Less feedback at low cutoffs does that.
+        const f2 = fc * fc;
+        this.hpK = f2 / (f2 + HP_RES_HZ * HP_RES_HZ);
       }
       const g = this.gCut;
       const G = g / (1 + g), inv = 1 / (1 + g);
-      const kk = s[K_RES] * 5;            // self-oscillates past ~80% (about 3 o'clock)
+      // LP self-oscillates past ~80 % (3 o'clock, p.18): a 4-pole ladder oscillates at k = 4
+      const kk = s[K_RES] * 5 * (hp ? this.hpK : 1);
       const S1 = this.z0 * inv, S2 = this.z1 * inv, S3 = this.z2 * inv, S4 = this.z3 * inv;
       const G2 = G * G, G4 = G2 * G2;
       const sigma = G2 * G * S1 + G2 * S2 + G * S3 + S4;
-      const xd = 1.6 * tanhf((mix + 1e-6 * noise) * 0.625) * (1 + 0.45 * kk); // soft input drive + bass make-up
+      // soft input drive; in LP, part of the passband (bass) that resonance takes away is made up
+      const xd = 1.6 * tanhf((mix + 1e-6 * noise) * 0.625) * (hp ? 1 : 1 + 0.45 * kk);
       const y4e = (G4 * xd + sigma) / (1 + kk * G4);
       const u = FB_SAT * tanhf((xd - kk * y4e) / FB_SAT);
       let v = (u - this.z0) * G; const y1 = v + this.z0; this.z0 = y1 + v;
@@ -607,9 +617,9 @@ class DfamProcessor extends AudioWorkletProcessor {
     if (Math.abs(this.z3) < 1e-30) this.z3 = 0;
     if (Math.abs(this.dcY) < 1e-30) this.dcY = 0;
 
-    // UI: current step, running and trigger flash - at most every 25 ms
+    // UI: current step, running and trigger flash - at most 20 times a second (plenty for LEDs)
     const now = t0 + n / sr;
-    if (this.uiDirty && now - this.uiLast >= 0.025) {
+    if (this.uiDirty && now - this.uiLast >= 0.05) {
       // RUN LED: the button or the RUN/STOP gate - an audition does not light it
       const lit = this.runButton || (patched[I_RUN] && (this.runGate || this.runEvent));
       this.port.postMessage({ t: 's', step: this.step, run: lit ? 1 : 0, trig: this.uiTrig ? 1 : 0, time: now });

@@ -56,8 +56,9 @@ export const DFAM: DeviceSpec = {
   description: 'Drummer From Another Mother - semi-modular analog percussion synthesizer',
   manualUrl: 'https://www.moogmusic.com/synthesizers/dfam/',
 
-  // 60 HP Eurorack panel (304.8 x 128.5 mm) in wooden end cheeks
-  dimensions: { width: 319, height: 107, depth: 133, eurorackHP: 60 },
+  // 60 HP Eurorack panel (304.8 x 128.5 mm) in wooden end cheeks; the unit is
+  // 12.57" x 4.21" x 5.24" (W x D x H, DFAM manual p.40)
+  dimensions: { width: 319.3, height: 133.1, depth: 106.9, eurorackHP: 60 },
   display: { width: 960, height: 400, scale: 3.0 },
 
   signalFlow: [
@@ -85,8 +86,8 @@ export const DFAM: DeviceSpec = {
       manualReference: 'VCO EG - VCO DECAY',
     },
     seq_pitch_mod: {
-      type: 'switch', label: 'SEQ PITCH MOD', options: ['VCO 1&2', 'OFF', 'VCO 2'], default: 0,
-      description: 'Where the sequencer PITCH knobs go: both VCOs, nowhere (PITCH output only), or VCO 2 only - handy with FM or sync, so VCO 1 holds the root.',
+      type: 'switch', label: 'SEQ PITCH MOD', options: ['VCO 1&2', 'OFF', 'VCO 2'], default: 1,
+      description: 'Where the sequencer PITCH knobs go: both VCOs (melodies, bass lines), nowhere (OFF - the PITCH output still carries them; hats, drones) or VCO 2 only (with FM or sync, so VCO 1 holds the root). Starts on OFF, as in the manual\'s default patch.',
       manualReference: 'VCO EG - SEQ PITCH MOD',
     },
     vco1_eg_amount: {
