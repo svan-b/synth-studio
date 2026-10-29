@@ -5,7 +5,8 @@ import {
   setTrackScale, trackLength,
 } from '@/lib/sequencer/elektron';
 import { cleanPool, setSoundLock, soundChoices } from './pool';
-import { euclidSettings, euclidView, euclidWriteBack, setEuclid } from './euclid';
+import { cleanEuclid, euclidSettings, euclidView, euclidWriteBack, setEuclid } from './euclid';
+import { cleanSampleMap } from './samples';
 import { ANALOG_RYTM, KIT_CONTROL_IDS } from './spec';
 import { ANALOG_RYTM_LAYOUT } from './layout';
 import { ANALOG_RYTM_LESSONS } from './lessons';
@@ -29,13 +30,30 @@ function migrate(saved: unknown): unknown {
   const p = migrateProject({ ...(s as object), tracks: SEQ_TRACKS }, SEQ_TRACKS, { note: 60, vel: 100 }) as RytmProject;
   const hasPatterns = Object.keys(p.patterns).length > 0;
   const pool = cleanPool(s.pool);
+  const samples = cleanSampleMap(s.samples);
   return {
-    ...(hasPatterns ? p : base),
+    ...(hasPatterns ? restoreEuclid(p, s) : base),
     kits: s.kits && typeof s.kits === 'object' ? s.kits : base.kits,
     kit: typeof s.kit === 'string' ? s.kit : '01',
     ...(pool ? { pool } : {}),
+    ...(samples ? { samples } : {}),
     rv: PROJECT_RV,
   };
+}
+
+/** migrateProject keeps only the library's fields: put the tracks' Euclidean settings back */
+function restoreEuclid(p: RytmProject, saved: Partial<RytmProject>): RytmProject {
+  let patterns: RytmProject['patterns'] | null = null;
+  for (const id in p.patterns) {
+    const src = (saved.patterns as Record<string, { tracks?: unknown[] }> | undefined)?.[id]?.tracks;
+    if (!Array.isArray(src)) continue;
+    const tracks = p.patterns[id].tracks.map((t, i) => {
+      const euc = cleanEuclid((src[i] as { euc?: unknown } | undefined)?.euc);
+      return euc ? ({ ...t, euc } as typeof t) : t;
+    });
+    if (tracks.some((t, i) => t !== p.patterns[id].tracks[i])) (patterns ??= { ...p.patterns })[id] = { ...p.patterns[id], tracks };
+  }
+  return patterns ? { ...p, patterns } : p;
 }
 
 /** Scene / performance edit: while a macro editor is open, encoder turns are stored in the macro */
@@ -175,8 +193,12 @@ const analogRytm: DeviceModule = {
   lessons: ANALOG_RYTM_LESSONS,
   createEngine: () => new AnalogRytmEngine(),
   worklets: ['/worklets/analog-rytm-processors.js'],
+  // Keys and MIDI notes (manual p.22): 0-11 play tracks 1-12, 12-59 the active track chromatically;
+  // the computer keyboard's A starts at 36, the sound's own pitch (Z/X move it by octaves)
+  keyboard: { lowNote: 36 },
   transportControl: 'play',
-  uiControls: ['track', 'page', 'pad_mode', 'rec', 'fix', 'auto_trk'],
+  // the TRIG page 2 (Euclidean) encoders edit the pattern through interceptChange: their own values are never stored
+  uiControls: ['track', 'page', 'pad_mode', 'rec', 'fix', 'auto_trk', ...EUC_IDS],
   data: { initial: defaultProject, migrate },
   interceptChange: (id, value, api) => {
     const m = macroTarget(api.ui);
@@ -219,9 +241,12 @@ const analogRytm: DeviceModule = {
     'The PARAMETER keys (TRIG, SRC, SMPL, FLTR, AMP, LFO) pick the page; encoders A–H edit what the screen shows for the active track. [FX] selects the FX track: SRC = delay, SMPL = reverb, FLTR = distortion, AMP = compressor.',
     'Trig keys: tap to place a trig. Hold a trig and turn an encoder for a parameter lock (mouse: long-press a trig to open the trig editor, then turn encoders). [PAGE] steps through the 4 pages of a 64-step pattern; [FUNC] + [PAGE] opens SCALE.',
     'BANK A–H open the pattern grid. Each pattern can link a kit ([FUNC] + [PLAY] = KIT): bank A holds the demo song, bank B one demo pattern for every factory kit in the preset menu.',
-    'Pad modes: [MUTE] mutes tracks, [CHRO] plays the active track chromatically, [SCNE] switches scenes (long-press a pad to edit one), [PERF] morphs macros with how high you press. Hold [RTRG] and play a pad for a roll; hold [REC] and press [PLAY] to record the pads live.',
+    'Pad modes: [MUTE] mutes tracks, [CHRO] plays the active track chromatically, [SCNE] switches scenes (long-press a pad to edit one), [PERF] morphs macros with how high you press. Hold [RTRG] and play a pad for a roll.',
+    'Recording: hold [REC] and press [PLAY] for LIVE RECORDING: pads become trigs and encoder turns become parameter locks on the steps that play. Hold [REC] and press [STOP] for STEP RECORDING: tap a trig key, then pads place trigs and move on.',
+    'Keys A-K (and MIDI notes 12-59) play the active track chromatically; Z/X change the octave, and the lowest octave (MIDI 0-11) plays tracks 1-12. Press [TRIG] twice for TRIG page 2, the Euclidean sequencer.',
+    'Sound pool: [YES] + [MUTE] stores the active track\'s Sound; hold a trig and turn TRACK LEVEL to sound lock it to a pool Sound.',
     'FUNC: hold it with one finger and press a key with another, or tap it once (it lights) and then press the key. The secondary functions are printed under the keys.',
-    'Twelve tracks share eight voices: RS/CP, MT/HT, CH/OH and CY/CB (marked ||) cut each other off, just like the hardware. Sampling, the GLOBAL menu and MIDI are not modelled; the sample layer plays synthesized one-shots.',
+    'Twelve tracks share eight voices: RS/CP, MT/HT, CH/OH and CY/CB (marked ||) cut each other off, just like the hardware. Sampling, the GLOBAL menu and MIDI CCs are not modelled; the sample layer plays synthesized one-shots.',
   ],
 };
 

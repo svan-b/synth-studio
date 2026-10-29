@@ -44,7 +44,7 @@ export function captureSound(values: Record<string, unknown>, track: number, nam
   const defs = soundDefaults(track, machine);
   for (const k of MACHINES[machine].slots) if (k) out[k] = num(values[`${t.id}_${k}`], defs[k] ?? 0);
   for (const p of SOUND_PAGE_PARAMS) out[p.key] = num(values[`${t.id}_${p.key}`], p.def);
-  return { name: (name ?? `${t.name} ${MACHINES[machine].name}`).toUpperCase().slice(0, 15), machine, values: out };
+  return { name: (name ?? MACHINES[machine].name).toUpperCase().slice(0, 15), machine, values: out };
 }
 
 /** Can `track` play the Sound (its machine is in the track's MACHINE menu)? */

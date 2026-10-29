@@ -16,17 +16,18 @@
 
 import type { Lesson, LessonCheckState } from '@/types';
 import {
-  asProject, createPattern, getPattern, getStep, lockedSteps, setChain, setStep, trackLength, trigSteps,
-  updatePatternSettings, type Pattern, type Step,
+  asProject, createPattern, getPattern, getStep, lockedSteps, setChain, setLock, setStep, trackLength, trigSteps,
+  updatePatternSettings, type Pattern, type Project, type Step,
 } from '@/lib/sequencer/elektron';
 import { M, PAGE, SEQ_TRACKS, TRACKS, soundDefaults } from './model';
 import { KIT_PRESETS, buildPattern, defaultProject, kitIdOf, type PatDef, type RytmProject } from './presets';
+import { euclidOf, euclidOn, setEuclid } from './euclid';
 
 const O = (n: number) => n / 100;
 const REF = (page: string) => `Rytm MKII manual ${page}`;
 
 // Tracks (sequencer and pad order)
-const BD = 0, SD = 1, RS = 2, CP = 3, LT = 5, MT = 6, HT = 7, CH = 8, OH = 9, CY = 10, FX = 12;
+const BD = 0, SD = 1, RS = 2, CP = 3, LT = 5, MT = 6, HT = 7, CH = 8, OH = 9, CY = 10, CB = 11, FX = 12;
 
 // ---------------------------------------------------------------- helpers
 
@@ -1658,6 +1659,203 @@ const q4: Lesson = {
   ],
 };
 
+// q5: the Analog Toys kit's dual-VCO bassline on the BD track; record a filter sweep live
+const TOYS = kitDef('toys');
+const Q5_START = lessonData(buildPattern(TOYS.pattern), kitIdOfKey('toys'), TOYS.values);
+/** Locks `key` on every step of `track` (empty steps get lock trigs), as a live-recorded move does */
+function liveMove(p: RytmProject, track: number, key: string, at: (s: number) => number, steps = 16): RytmProject {
+  let q: Project = p;
+  for (let s = 0; s < steps; s++) q = setLock(q, 'A01', track, [s], key, at(s));
+  return q as RytmProject;
+}
+const Q5_SWEEP = liveMove(Q5_START, BD, 'flt_frq', s => Math.round(96 - 40 * Math.sin((Math.PI * s) / 16)));
+const Q5_TWO = liveMove(Q5_SWEEP, CH, 'dec', s => 18 + s * 4);
+const frqLocks = (s: LessonCheckState) => { const p = proj(s); return lockedSteps(p, p.active, BD, 'flt_frq'); };
+
+const q5: Lesson = {
+  id: 'analog-rytm-q5-live-locks', device: 'analog-rytm', path: 'sequencing', order: O(5), difficulty: 'intermediate',
+  name: 'Live recording: knob moves become locks',
+  description: 'Record a filter sweep on a synth bassline in LIVE RECORDING, then add a second recorded move on the hats.',
+  objective: 'Record encoder moves in live recording, so a filter sweep plays back as parameter locks every loop.',
+  source: 'Synth Studio · Rytm MKII manual, LIVE RECORDING and parameter locks (pp.40, 47)', estimatedMinutes: 8,
+  prerequisites: ['analog-rytm-q3-parameter-locks'],
+  concepts: ['parameter-locks', 'filter-cutoff'],
+  start: { reset: true, values: { ...TOYS.values, track: BD, page: PAGE.FLTR, rec: 0 }, data: Q5_START },
+  steps: [
+    {
+      kind: 'do', control: 'bd_flt_frq', targetValue: 96, focus: ['bd_flt_frq', 'key:play'], concept: 'filter-cutoff',
+      instruction: 'Press [PLAY]. Turn encoder E (FRQ) up to about 96 and hear the bassline open up.',
+      principle: 'A higher low-pass cutoff lets more harmonics through, so the bass gets brighter.',
+      manualReference: REF('p.78'),
+    },
+    {
+      kind: 'predict', focus: ['key:rec', 'key:play'], concept: 'parameter-locks',
+      instruction: 'Hold [RECORD] and press [PLAY]: LIVE RECORDING starts and [RECORD] blinks.',
+      check: s => num(s, 'rec') === 2 && playing(s),
+      solution: { values: { rec: 2, play: true } },
+      predict: {
+        question: 'While LIVE RECORDING, you turn FRQ for one bar. What does the sequencer keep?',
+        options: ['A FRQ lock on every step it passes while you turn', 'Only your last FRQ value, for the whole track', 'Nothing: only pad hits are recorded'], answer: 0,
+        explain: 'Each step the sequencer reaches while the encoder moves gets a lock, and steps without a trig get a lock trig (manual p.47). Keeping only the last value is what an ordinary knob edit does.',
+      },
+      principle: 'Recording a knob move on a sequencer turns your gesture into values that repeat every loop.',
+      manualReference: REF('p.40'),
+    },
+    {
+      kind: 'do', focus: ['bd_flt_frq'], concept: 'parameter-locks',
+      instruction: 'Turn FRQ slowly down and back up over one bar while the pattern plays.',
+      check: s => { const p = proj(s), tr = getPattern(p, p.active).tracks[BD], l = frqLocks(s); return l.length >= 6 && l.some(i => !!tr.steps[i]?.trigless); },
+      solution: { data: Q5_SWEEP },
+      principle: 'A recorded sweep repeats exactly, so the filter move becomes part of the groove.',
+      explanation: 'Watch the trig keys: the bass notes (red) now hold locks, and the steps between them got yellow lock trigs. The sound follows your hand while you turn, and the kit keeps the last value.',
+      manualReference: REF('p.47'),
+    },
+    {
+      kind: 'quiz', instruction: 'Quick check.', concept: 'parameter-locks',
+      quiz: {
+        question: 'Step 2 has no bass note, but your sweep passed it. What is on step 2 now?',
+        options: ['A lock trig: it changes FRQ without playing a note', 'A new bass note', 'Nothing'], answer: 0,
+        explain: 'A lock trig holds locks on a step with no note (manual pp.39, 47). The note still ringing from step 1 changes under it, which is why the sweep sounds smooth.',
+      },
+    },
+    {
+      kind: 'do', focus: ['key:play'], concept: 'parameter-locks',
+      instruction: 'Press [PLAY] once: LIVE RECORDING ends and the pattern keeps playing your sweep.',
+      check: s => num(s, 'rec') === 0 && frqLocks(s).length >= 6,
+      solution: { values: { rec: 0 } },
+      principle: 'Leaving record mode before you listen back keeps you from overwriting the take.',
+      explanation: '[STOP] would end the recording and the playback together (manual p.40). To undo part of a take, hold [NO] and turn the encoder while LIVE RECORDING runs: it erases that parameter\'s locks on the steps it passes. [FUNC] + [NO] erases them all.',
+      manualReference: REF('p.40'),
+    },
+    {
+      kind: 'challenge', concept: 'parameter-locks',
+      instruction: 'Add a second recorded move: make the closed hats open up over the bar with their DEC.',
+      checklist: [
+        { text: 'BD keeps its FRQ sweep (six or more locked steps)', check: s => frqLocks(s).length >= 6 },
+        { text: 'CH has DEC locks on four or more steps', check: s => { const p = proj(s); return lockedSteps(p, p.active, CH, 'dec').length >= 4; } },
+        { text: 'LIVE RECORDING is off again', check: s => num(s, 'rec') !== 2 },
+      ],
+      hints: ['Select CH with [TRK] and the CH pad, then press [SRC].', 'Hold [RECORD], press [PLAY], and turn encoder D (DEC) up during one bar.', 'Press [PLAY] when the bar is done.'],
+      solution: { values: { rec: 0, track: CH, page: PAGE.SRC }, data: Q5_TWO },
+    },
+    {
+      kind: 'reflect', instruction: 'Explain it in your own words.',
+      reflect: {
+        prompt: 'In one sentence: what does LIVE RECORDING do with an encoder turn?',
+        model: 'It stores the value as a parameter lock on each step the sequencer reaches while you turn, with lock trigs on empty steps.',
+      },
+    },
+  ],
+  review: [
+    { question: 'In LIVE RECORDING, turning an encoder over a step with no trig adds…', options: ['A lock trig holding the value', 'A note trig', 'Nothing'], answer: 0, explain: 'Lock trigs carry locks without notes (manual p.47).' },
+    { question: 'Holding [FUNC] + [NO] during LIVE RECORDING…', options: ['Erases the track\'s parameter locks on the steps it passes', 'Stops the sequencer', 'Saves the pattern'], answer: 0, explain: 'Sound locks stay (manual p.47).' },
+    { question: 'To end LIVE RECORDING but keep the pattern playing, press…', options: ['[PLAY]', '[STOP]', '[FUNC]'], answer: 0, explain: '[STOP] ends the recording and the playback (manual p.40).' },
+    { question: 'Live-recorded pad hits land exactly on the steps when…', options: ['Quantize is on ([RECORD] + [PLAY] twice)', 'The tempo is 120', 'FILL is held'], answer: 0, explain: 'Off, they keep their micro timing (manual pp.40, 67).' },
+  ],
+};
+
+// q6: the Afro-Latin kit with only a four-on-the-floor kick; grow the percussion from the Euclidean generators
+const AFRO = kitDef('afrolatin');
+const Q6_START = lessonData(rowsPattern({ bd: 'x...x...x...x...' }), kitIdOfKey('afrolatin'), AFRO.values);
+const Q6_ON = setEuclid(Q6_START, 'A01', RS, { on: true }) as RytmProject;
+const Q6_FIVE = setEuclid(Q6_ON, 'A01', RS, { pl1: 5 }) as RytmProject;
+const Q6_OR = setEuclid(Q6_FIVE, 'A01', RS, { pl2: 4 }) as RytmProject;
+const Q6_XOR = setEuclid(Q6_OR, 'A01', RS, { op: 1 }) as RytmProject;
+const Q6_GROOVE = setEuclid(setEuclid(Q6_XOR, 'A01', MT, { on: true, pl1: 3, ro1: 2 }), 'A01', CB, { on: true, pl1: 7 }) as RytmProject;
+const eucOf = (s: LessonCheckState, track: number) => { const p = proj(s); return euclidOf(getPattern(p, p.active).tracks[track]); };
+const eucTracks = (s: LessonCheckState) => { const p = proj(s); return getPattern(p, p.active).tracks.map((t, i) => (euclidOn(t) ? i : -1)).filter(i => i >= 0); };
+
+const q6: Lesson = {
+  id: 'analog-rytm-q6-euclidean', device: 'analog-rytm', path: 'sequencing', order: O(6), difficulty: 'intermediate',
+  name: 'Euclidean rhythms: spread the hits',
+  description: 'Use TRIG page 2\'s two pulse generators and the Boolean operator to grow a percussion groove over a kick.',
+  objective: 'Use the Euclidean pulse generators, their rotation and the Boolean operator to build percussion parts.',
+  source: 'Synth Studio · Rytm MKII manual, TRIG menu page 2 (p.44)', estimatedMinutes: 8,
+  prerequisites: ['analog-rytm-q1-rhythm-basics'],
+  concepts: ['sequencer-pattern'],
+  start: { reset: true, values: { ...AFRO.values, track: BD, page: PAGE.TRIG, rec: 0 }, data: Q6_START },
+  steps: [
+    {
+      kind: 'do', control: 'track', targetValue: RS, focus: ['key:trk', 'pad:rs'], concept: 'sequencer-pattern',
+      instruction: 'Hold [TRK] and tap the RS pad: the rim shot (a clave in this kit) is the active track.',
+      principle: 'A sequencer page edits only the track that is selected.',
+    },
+    {
+      kind: 'predict', focus: ['key:trig', 'euc_on', 'key:play'], concept: 'sequencer-pattern',
+      instruction: 'Press [TRIG] twice for TRIG page 2. Turn encoder D (EUC) to ON and press [PLAY].',
+      check: s => !!eucOf(s, RS)?.on && playing(s),
+      solution: { values: { play: true }, data: Q6_ON },
+      predict: {
+        question: 'PL1 is 4 and PL2 is 0. What will RS play when EUC is on?',
+        options: ['Four hits spread evenly: steps 1, 5, 9 and 13', 'Four hits in a row: steps 1 to 4', 'Four random steps, new every loop'], answer: 0,
+        explain: 'A pulse generator spreads its hits as evenly as it can over the track. Four over sixteen steps is every fourth step, and nothing about it is random.',
+      },
+      principle: 'Hits spread evenly over a bar give a steady pulse; fewer hits leave longer, equal gaps.',
+      manualReference: REF('p.44'),
+    },
+    {
+      kind: 'do', focus: ['euc_pl1'], concept: 'sequencer-pattern',
+      instruction: 'Turn encoder A (PL1) to 5. Listen: five hits cannot share sixteen steps evenly.',
+      check: s => eucOf(s, RS)?.pl1 === 5 && !!eucOf(s, RS)?.on,
+      solution: { data: Q6_FIVE },
+      principle: 'When the hits don\'t divide the bar, the gaps alternate, and that unevenness makes a groove.',
+      explanation: 'The gaps are now 3, 3, 3, 3 and 4 steps. Spreading hits as evenly as possible gives many traditional rhythms: 3 hits over 8 steps is the Cuban tresillo. The screen draws both generators and the result.',
+    },
+    {
+      kind: 'do', focus: ['euc_pl2'], concept: 'sequencer-pattern',
+      instruction: 'Turn encoder B (PL2) to 4: generator 2 adds four hits on the beats (OP is OR).',
+      check: s => eucOf(s, RS)?.pl2 === 4 && (eucOf(s, RS)?.op ?? 0) === 0,
+      solution: { data: Q6_OR },
+      principle: 'Layering two even patterns with different counts gives a pattern neither has alone.',
+    },
+    {
+      kind: 'predict', focus: ['euc_op'], concept: 'sequencer-pattern',
+      instruction: 'Turn encoder H (OP) to XOR.',
+      check: s => eucOf(s, RS)?.op === 1,
+      solution: { data: Q6_XOR },
+      predict: {
+        question: 'With XOR, what happens on the steps where both generators place a hit?',
+        options: ['They go silent', 'They play twice as loud', 'They play two hits in a row'], answer: 0,
+        explain: 'XOR keeps a step only when one generator hits it. Steps 1 and 13, where both hit, drop out, so RS now plays around the kick instead of with it.',
+      },
+      principle: 'Taking out the hits that line up with the beat moves a part off the beat: syncopation.',
+      manualReference: REF('p.44'),
+    },
+    {
+      kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
+      quiz: {
+        question: 'With OP set to SUB, RS plays…',
+        options: ['Generator 1\'s hits, except where generator 2 hits too', 'Only the steps both generators hit', 'Every step either generator hits'], answer: 0,
+        explain: 'SUB takes generator 2\'s steps out of generator 1\'s (manual p.44). Only the shared steps is AND; every step of either is OR.',
+      },
+    },
+    {
+      kind: 'challenge', concept: 'sequencer-pattern',
+      instruction: 'Build a percussion groove: two more tracks in Euclidean mode with different pulse counts, one of them rotated.',
+      checklist: [
+        { text: 'Three or more tracks in Euclidean mode', check: s => eucTracks(s).length >= 3 },
+        { text: 'At least two different PL1 values among them', check: s => new Set(eucTracks(s).map(t => eucOf(s, t)?.pl1)).size >= 2 },
+        { text: 'A rotation (RO1, RO2 or TRO) that is not 0', check: s => eucTracks(s).some(t => { const e = eucOf(s, t); return !!e && (e.ro1 !== 0 || e.ro2 !== 0 || e.tro !== 0); }) },
+      ],
+      hints: ['Select MT or CB with [TRK] and its pad; TRIG page 2 stays open.', 'Try 3, 5 and 7 hits: they line up differently every beat.', 'RO1 (encoder E) slides generator 1\'s hits later.'],
+      solution: { data: Q6_GROOVE },
+    },
+    {
+      kind: 'reflect', instruction: 'Explain it in your own words.',
+      reflect: {
+        prompt: 'In one sentence: how does a Euclidean generator place its hits?',
+        model: 'It spreads a number of hits as evenly as it can over the track\'s steps, so counts that don\'t divide the bar give alternating gaps.',
+      },
+    },
+  ],
+  review: [
+    { question: 'Five Euclidean hits over sixteen steps leave gaps of…', options: ['3, 3, 3, 3 and 4 steps', '4 steps each', 'Random lengths'], answer: 0, explain: 'The hits spread as evenly as the steps allow.' },
+    { question: 'While a track is in Euclidean mode, the trigs you placed before…', options: ['Are hidden and come back when EUC goes off', 'Are deleted', 'Play along with the generated ones'], answer: 0, explain: 'They come back when you turn it off; [FUNC] held while turning it off keeps the generated trigs instead (manual p.44).' },
+    { question: 'XOR between the two generators…', options: ['Drops the steps both of them hit', 'Keeps only those steps', 'Plays those steps twice'], answer: 0, explain: 'Exclusive OR (manual p.44).' },
+    { question: 'In Euclidean mode you can still…', options: ['Parameter lock the generated trigs', 'Add note trigs by hand', 'Add a third generator'], answer: 0, explain: 'Generated trigs take locks; trigs can\'t be added by hand (manual p.44).' },
+  ],
+};
+
 // ============================================================================
 // PERFORMANCE
 // ============================================================================
@@ -2043,5 +2241,5 @@ const t2: Lesson = {
   ],
 };
 
-export const ANALOG_RYTM_LESSONS: Lesson[] = [f1, f2, s1, s2, s3, s4, s5, s6, e1, e2, e3, e4, q1, q2, q3, q4, p1, p2, t1, t2];
+export const ANALOG_RYTM_LESSONS: Lesson[] = [f1, f2, s1, s2, s3, s4, s5, s6, e1, e2, e3, e4, q1, q2, q3, q4, q5, q6, p1, p2, t1, t2];
 

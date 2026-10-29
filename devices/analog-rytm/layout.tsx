@@ -22,7 +22,7 @@ import {
 } from '@/lib/sequencer/elektron';
 import { FX_TRACK, PAGE, SEQ_TRACKS, TRACKS, pageControls, describe } from './model';
 import {
-  Key, Menus, PageLeds, Pads, PlayTrigs, RY, RytmStyles, Screen, applyMutePreselect, euclidCtx, flash, funcOn, liveRecording, nudgeHeld, nudgeSwing, openMenu,
+  Key, Menus, PageLeds, Pads, PlayTrigs, RY, RytmStyles, Screen, StepRecTrigs, applyMutePreselect, euclidCtx, flash, funcOn, liveRecording, nudgeHeld, nudgeSwing, openMenu,
   pageReloadOrRandom, reloadKit, reloadSound, saveKit, shiftTrack, storeTrackSound, toggleHeldFlag, toggleHeldMute, trackClear, trackCopy, trackPaste, consumeFunc,
 } from './ui';
 import { slotLabel } from './pool';
@@ -66,6 +66,8 @@ function doublePress(ctx: CustomRenderContext, key: string): boolean {
 }
 
 const projectOf = (ctx: CustomRenderContext) => asProject(ctx.data, SEQ_TRACKS) as RytmProject;
+/** STEP RECORDING is on (engine state) */
+const stepRecOn = (ctx: CustomRenderContext) => !!(ctx.engine.stepRec as { on?: boolean } | undefined)?.on;
 
 // --- Icons (SVG, currentColor) ---------------------------------------------------
 
@@ -167,7 +169,8 @@ const BANK_TRIG_MODE: Record<number, string> = { 4: 'trigmute', 5: 'accent', 6: 
 
 function bankPress(ctx: CustomRenderContext, b: number) {
   // a held trig + [BANK E] / [BANK F] / [BANK H]: trig mute / accent / parameter slide on it (manual pp.49-51)
-  if ((b === 4 && toggleHeldMute(ctx)) || (b === 5 && toggleHeldFlag(ctx, 'accent')) || (b === 7 && toggleHeldFlag(ctx, 'pslide'))) return;
+  const vctx = euclidCtx(ctx);
+  if ((b === 4 && toggleHeldMute(vctx)) || (b === 5 && toggleHeldFlag(vctx, 'accent')) || (b === 7 && toggleHeldFlag(vctx, 'pslide'))) return;
   press(ctx, () => ctx.setUi({ seqMenu: 'pattern', seqBank: b, rytmMenu: null }), () => {
     if (b < 4) {
       ctx.updateData(d => setChangeMode(asProject(d, SEQ_TRACKS), CHANGE_MODES[b] as ChangeMode));
@@ -205,7 +208,9 @@ function arrow(ctx: CustomRenderContext, dir: 'up' | 'down' | 'left' | 'right') 
   const horiz = dir === 'left' || dir === 'right';
   const d = dir === 'right' || dir === 'up' ? 1 : -1;
   const f = funcOn(ctx);
-  if (nudgeHeld(ctx, horiz ? 'micro' : 'retrig', d)) { if (f) consumeFunc(ctx); return; }
+  if (nudgeHeld(euclidCtx(ctx), horiz ? 'micro' : 'retrig', d)) { if (f) consumeFunc(ctx); return; }
+  // STEP RECORDING: LEFT / RIGHT move the active step (manual p.40)
+  if (horiz && stepRecOn(ctx)) { ctx.sendEvent('rytm:step-rec:move', { dir: d }); return; }
   if (f) {
     consumeFunc(ctx);
     if (horiz && Math.round(num(ctx.values.rec)) === 1) { shiftTrack(ctx, d); return; }
@@ -244,7 +249,7 @@ function arrowUp(ctx: CustomRenderContext) {
 function keys(): PanelElement[] {
   const out: PanelElement[] = [];
   // --- Top row: SAMPLING, QPER ------------------------------------------------
-  out.push(key(55.0, 17.1, SMALL, ctx => <Key ctx={ctx} id="key:sampling" label={I.sampling} title="SAMPLING" sub="Direct" funcSub onDown={() => flash(ctx, 'SAMPLING IS NOT MODELLED. THE SMPL PAGE PLAYS SYNTHESIZED ONE-SHOTS')} />));
+  out.push(key(55.0, 17.1, SMALL, ctx => <Key ctx={ctx} id="key:sampling" label={I.sampling} title="SAMPLING" sub="Direct" funcSub onDown={() => flash(ctx, 'SAMPLING IS NOT MODELLED. [FUNC] + [SMPL] LOADS A WAV OR AIFF OF YOURS INTO A SAMPLE SLOT')} />));
   out.push(key(90.7, 17.1, SMALL, ctx => {
     const muted = !!ctx.engine.perfMuted;
     const choosing = !!ctx.ui.qperHeld || !!ctx.ui.qperLatch;
@@ -323,6 +328,8 @@ function keys(): PanelElement[] {
         flash(ctx, 'ERASING PARAMETER LOCKS WHILE HELD');
         return;
       }
+      // STEP RECORDING: [NO] removes the active track's trig on the active step (a rest) and moves on (manual p.40)
+      if (stepRecOn(ctx) && !funcOn(ctx)) { ctx.setUi({ noHeld: true, yesNoUsed: true }); ctx.sendEvent('rytm:step-rec:rest'); return; }
       press(ctx, () => ctx.setUi({ noHeld: true, yesNoUsed: false }), () => reloadKit(ctx));
     }}
     onUp={() => {
@@ -400,8 +407,14 @@ function keys(): PanelElement[] {
     const p = projectOf(ctx);
     const t = Math.round(num(ctx.values.track));
     const euc = t < 12 && euclidOn(getPattern(p, p.active).tracks[t]);
-    return <Key ctx={ctx} id="key:rec" big label={I.rec} sub="Copy" funcSub lit={rec > 0 ? 1 : euc ? 0.6 : 0} blink={rec === 2} control="rec" ledColor={euc ? RY.purple : undefined}
-      onDown={() => press(ctx, () => { ctx.setUi({ recHeld: true }); ctx.setValue('rec', rec === 1 ? 0 : 1); }, () => trackCopy(ctx))}
+    const step = stepRecOn(ctx);
+    return <Key ctx={ctx} id="key:rec" big label={I.rec} sub="Copy" funcSub lit={rec > 0 || step ? 1 : euc ? 0.6 : 0} blink={rec === 2} dblink={step} control="rec" ledColor={euc ? RY.purple : undefined}
+      onDown={() => press(ctx, () => {
+        ctx.setUi({ recHeld: true });
+        // [RECORD] leaves STEP RECORDING (manual p.40)
+        if (stepRecOn(ctx)) { ctx.sendEvent('rytm:step-rec', { on: false }); ctx.setValue('rec', 0); flash(ctx, 'STEP RECORDING OFF'); return; }
+        ctx.setValue('rec', rec === 1 ? 0 : 1);
+      }, () => trackCopy(ctx))}
       onUp={() => ctx.setUi({ recHeld: false })} />;
   }, true));
   out.push(key(303.2, 141.7, BIG, ctx => {
@@ -419,6 +432,7 @@ function keys(): PanelElement[] {
             flash(ctx, q ? 'LIVE RECORDING: QUANTIZED' : 'LIVE RECORDING: KEEPS MICRO TIMING');
             return;
           }
+          if (stepRecOn(ctx)) ctx.sendEvent('rytm:step-rec', { on: false });
           ctx.setValue('rec', 2);
           flash(ctx, 'LIVE RECORDING: PLAY THE PADS, TURN THE ENCODERS');
           if (!playing) pressPlay(ctx);
@@ -432,7 +446,15 @@ function keys(): PanelElement[] {
   }, true));
   out.push(key(323.8, 141.7, BIG, ctx => <Key ctx={ctx} id="key:stop" big label={I.stop} sub="Paste" funcSub control="play" focusIds={['seq:stop']}
     onDown={() => press(ctx, () => {
-      if (ctx.ui.recHeld) { flash(ctx, 'STEP RECORDING IS NOT IN THIS TWIN YET: USE GRID RECORDING'); return; }
+      // [RECORD] + [STOP]: STEP RECORDING; [STOP] again with [RECORD] held: STANDARD / JUMP (manual p.40)
+      if (ctx.ui.recHeld) {
+        const sr = ctx.engine.stepRec as { on?: boolean; jump?: boolean } | undefined;
+        if (sr?.on) { ctx.sendEvent('rytm:step-rec', { toggleJump: true }); flash(ctx, sr.jump ? 'STEP RECORDING: STANDARD' : 'STEP RECORDING: JUMP (LEN SETS THE STEP)'); return; }
+        ctx.setValue('rec', 0);
+        ctx.sendEvent('rytm:step-rec', { on: true });
+        flash(ctx, 'STEP RECORDING: TAP A TRIG KEY, THEN PLAY THE PADS');
+        return;
+      }
       const st = seqStateOf(ctx.engine);
       const twice = doublePress(ctx, 'stopTap') && !st?.playing && !st?.paused;
       pressStop(ctx);
@@ -517,9 +539,11 @@ const sequencer: PanelElement[] = [
       const editing = rec > 0 || mode !== 'trig';
       return (
         <div className="rytm-trigs" style={{ position: 'absolute', inset: 0, ...gap }}>
-          {editing
-            ? <TrigKeys ctx={euclidCtx(ctx)} tracks={SEQ_TRACKS} trackNames={TRACK_NAMES} editable color="#ff3b2a" longPressMs={550} />
-            : <PlayTrigs ctx={ctx} />}
+          {stepRecOn(ctx) && mode === 'trig'
+            ? <StepRecTrigs ctx={ctx} />
+            : editing
+              ? <TrigKeys ctx={euclidCtx(ctx)} tracks={SEQ_TRACKS} trackNames={TRACK_NAMES} editable color="#ff3b2a" longPressMs={550} />
+              : <PlayTrigs ctx={ctx} />}
         </div>
       );
     },

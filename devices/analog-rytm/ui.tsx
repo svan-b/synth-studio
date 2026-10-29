@@ -16,11 +16,12 @@ import type { ControlValue } from '@/types';
 import type { CustomRenderContext } from '@/types/panel';
 import {
   CHANGE_MODES, LOCK_LIMIT_RYTM, asProject, clearTrack, getPattern, setActive, setChangeMode, setMasterMute, setMasterMutes, setPlayMode,
-  setTrigMute, trackLength, updatePatternSettings, updateSteps, withTrack, type Project, type SeqState, type Track,
+  setStep, setTrigMute, trackLength, updatePatternSettings, updateSteps, withTrack, type Project, type SeqState, type Track,
 } from '@/lib/sequencer/elektron';
 import { eraseLocks, eraseTrigs, recordHit, recordHitLength, recordLock } from './live';
 import { POOL_SIZE, captureSound, freeSlot, setSoundLock, slotLabel, soundChoices, soundControls, soundFits, withSound } from './pool';
 import { euclidOn, euclidRefused, euclidSettings, euclidSteps, euclidView, euclidWriteBack, pulseSteps } from './euclid';
+import { MAX_SECONDS, decodeAudioFile, putSample, sampleId, sampleName } from './samples';
 import { isLocked } from '@/lib/sequencer/elektron/locks';
 import { C, Frame, FONT, Group, MONO, Overlay, SeqButton, Stepper } from '@/components/sequencer/shared';
 import { useStudioStore } from '@/store/studio';
@@ -31,7 +32,7 @@ import {
 } from './model';
 import { ANALOG_RYTM, KIT_CONTROL_IDS } from './spec';
 import { KIT_PRESETS, buildPattern, kitIdOf, kitPatternOf, type RytmKit, type RytmProject } from './presets';
-import type { RytmOp } from './engine';
+import type { RytmOp, StepRecState } from './engine';
 import { LOCKS } from './locks';
 
 const T = SEQ_TRACKS;
@@ -135,6 +136,8 @@ export interface KeyProps {
   lit?: number | boolean;
   ledColor?: string;
   blink?: boolean;
+  /** Double blink (STEP RECORDING on [RECORD], manual p.40) */
+  dblink?: boolean;
   onDown?: (e: React.PointerEvent) => void;
   onUp?: () => void;
   big?: boolean;
@@ -178,7 +181,7 @@ export function Key(p: KeyProps) {
         onPointerUp={() => { if (pressed.current) { pressed.current = false; p.onUp?.(); } }}
         onPointerCancel={() => { if (pressed.current) { pressed.current = false; p.onUp?.(); } }}
         onContextMenu={e => e.preventDefault()}
-        className={`${p.blink ? 'rytm-blink' : ''} ${hl && !correct ? 'rytm-target' : ''}`}
+        className={`${p.dblink ? 'rytm-dblink' : p.blink ? 'rytm-blink' : ''} ${hl && !correct ? 'rytm-target' : ''}`}
         style={{
           width: '100%', flex: '0 0 auto', aspectRatio: p.big ? '1 / 1' : undefined, height: p.big ? undefined : '62%',
           borderRadius: '18%', border: `1px solid ${correct ? '#22c55e' : RY.keyEdge}`, padding: 0,
@@ -217,10 +220,12 @@ export function RytmStyles() {
   return (
     <style>{`
 @keyframes rytmBlink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: .35 } }
+@keyframes rytmDBlink { 0%, 14% { opacity: 1 } 15%, 27% { opacity: .35 } 28%, 42% { opacity: 1 } 43%, 100% { opacity: .35 } }
+.rytm-dblink { animation: rytmDBlink 1.1s linear infinite }
 @keyframes rytmPulse { 0%, 100% { box-shadow: 0 0 0 2px #ff9f1c, 0 2px 0 #000 } 50% { box-shadow: 0 0 0 5px #ff9f1c88, 0 2px 0 #000 } }
 .rytm-blink { animation: rytmBlink .6s linear infinite }
 .rytm-target { animation: rytmPulse 1.1s ease-in-out infinite }
-@media (prefers-reduced-motion: reduce) { .rytm-blink { animation-duration: 1.6s } .rytm-target { animation: none; box-shadow: 0 0 0 3px #ff9f1c } }
+@media (prefers-reduced-motion: reduce) { .rytm-blink, .rytm-dblink { animation-duration: 1.6s } .rytm-target { animation: none; box-shadow: 0 0 0 3px #ff9f1c } }
 .rytm-trigs > div > div { gap: var(--rytm-trig-gap, 3px) !important }
 .rytm-trigs [data-tmute] { outline: 2px dashed ${RY.green}; outline-offset: -4px }
 `}</style>
@@ -294,6 +299,8 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
     const m = Math.round(num(c.values.pad_mode));
     const r = e.currentTarget.getBoundingClientRect();
     const h: { pad: number; track: number; note?: number; perf?: boolean; erase?: boolean; y0: number; h: number } = { pad, track: pad, y0: e.clientY, h: r.height };
+    // [YES] + pads (STEP RECORDING: the trig's length is the press) don't close menus on release
+    if (c.ui.yesHeld) c.setUi({ yesNoUsed: true });
     // LIVE RECORDING: [NO] + pads erase those tracks' trigs on every step reached while held (manual p.40)
     if (c.ui.noHeld && liveRecording(c)) {
       h.erase = true;
@@ -344,7 +351,7 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
         const note = 60 + pad + Math.round(num(c.ui.octave)) * 12;
         h.track = tr; h.note = note;
         held.current.set(e.pointerId, h);
-        c.sendEvent('pad', { track: tr, vel: func ? trackVel(c, tr) : velocityOf(e, tr), note, rtrg: rtrgOn(c), rec: recLive(c), quantize: num(c.values.quantize) > 0 });
+        c.sendEvent('pad', { track: tr, vel: func ? trackVel(c, tr) : velocityOf(e, tr), note, rtrg: rtrgOn(c), rec: recLive(c), quantize: num(c.values.quantize) > 0, yes: !!c.ui.yesHeld });
         return;
       }
       case PAD_MODE.SCNE:
@@ -360,7 +367,7 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
       default:
         held.current.set(e.pointerId, h);
         if (num(c.values.auto_trk) > 0) c.setValue('track', pad);   // AUTO TRK SWITCH (SEQUENCER CONFIG); off, [TRK] + pad selects
-        c.sendEvent('pad', { track: pad, vel: func ? trackVel(c, pad) : velocityOf(e, pad), rtrg: rtrgOn(c), rec: recLive(c), quantize: num(c.values.quantize) > 0 });
+        c.sendEvent('pad', { track: pad, vel: func ? trackVel(c, pad) : velocityOf(e, pad), rtrg: rtrgOn(c), rec: recLive(c), quantize: num(c.values.quantize) > 0, yes: !!c.ui.yesHeld });
         // lessons count which pad was played ('pad:bd', 'pad:oh' ...)
         if (c.teaching) c.sendEvent(`pad:${TRACKS[pad].id}`);
     }
@@ -559,6 +566,72 @@ export function PlayTrigs({ ctx }: { ctx: CustomRenderContext }) {
               boxShadow: lv > 0 ? `0 2px 0 #000, 0 0 ${3 + 9 * lv}px ${RY.led}` : '0 2px 0 #000',
               color: RY.sub, fontFamily: FONT, fontSize: 'var(--rytm-sub-font, 10px)', fontWeight: 700,
             }}>{k + 1}</button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The trig keys in STEP RECORDING (manual pp.40-41): they show the active track's trigs
+ * and the active step (green, blinking); a press makes the step active, and holding it
+ * while turning an encoder locks that parameter on it. The shown page follows the step.
+ */
+export function StepRecTrigs({ ctx }: { ctx: CustomRenderContext }) {
+  const sr = ctx.engine.stepRec as StepRecState | undefined;
+  const p = euclidView(projectOf(ctx));
+  const track = Math.round(num(ctx.values.track));
+  const pid = p.active;
+  const pat = getPattern(p, pid);
+  const tr = pat.tracks[track];
+  const len = trackLength(pat, track);
+  const cursor = sr?.step ?? 0;
+  const page = Math.round(num(ctx.ui.stepPage));
+  const st = ctx.engine.seq as { playing?: boolean; pattern?: string | null; steps?: number[] } | undefined;
+  const playStep = st?.playing && st.pattern === pid ? st.steps?.[track] ?? -1 : -1;
+  const live = useRef(ctx);
+  live.current = ctx;
+  const holding = useRef(new Set<number>());
+  useEffect(() => {
+    const pg = Math.floor(cursor / 16);
+    if (pg !== Math.round(num(live.current.ui.stepPage))) live.current.setUi({ stepPage: pg });
+  }, [cursor]);
+  const down = (k: number, e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    e.preventDefault();
+    e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* */ }
+    const c = live.current;
+    const s = page * 16 + k;
+    if (s >= len) return;
+    holding.current.add(e.pointerId);
+    c.sendEvent('rytm:step-rec:select', { step: s });
+    c.setUi({ heldSteps: [s], heldTrack: track, heldPattern: pid, heldEdited: false });
+  };
+  const up = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!holding.current.delete(e.pointerId)) return;
+    live.current.setUi({ heldSteps: [] });
+  };
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 'var(--rytm-trig-gap, 3px)' }}>
+      {Array.from({ length: 16 }, (_, k) => {
+        const s = page * 16 + k;
+        const step = tr?.steps[s];
+        const inLen = s < len;
+        const isCursor = s === cursor;
+        const fill = !inLen ? '#17181a' : isCursor ? RY.green : step ? (step.trigless ? RY.amber : RY.led) : RY.key;
+        return (
+          <button key={k} type="button" data-control={`trig:${k + 1}`} data-step={s} data-active-step={isCursor ? '1' : undefined}
+            aria-label={`Trig key ${s + 1}${step ? (step.trigless ? ' lock trig' : ' trig') : ''}${isCursor ? ', the active step' : ''}`}
+            onPointerDown={e => down(k, e)} onPointerUp={up} onPointerCancel={up} onLostPointerCapture={up} onContextMenu={e => e.preventDefault()}
+            className={isCursor ? 'rytm-dblink' : undefined}
+            style={{
+              flex: 1, minWidth: 0, height: '100%', padding: 0, borderRadius: '14%', cursor: inLen ? 'pointer' : 'default', touchAction: 'none',
+              userSelect: 'none', WebkitUserSelect: 'none', WebkitTapHighlightColor: 'transparent',
+              border: `${k % 4 === 0 ? 2 : 1}px solid ${k % 4 === 0 ? '#55585d' : RY.keyEdge}`, background: fill,
+              boxShadow: [isCursor || step ? `0 0 8px ${fill}` : '0 2px 0 #000', s === playStep ? 'inset 0 0 0 2px #fff' : ''].filter(Boolean).join(', '),
+              color: isCursor || step ? '#101010' : RY.sub, fontFamily: FONT, fontSize: 'var(--rytm-sub-font, 10px)', fontWeight: 700,
+            }}>{s + 1}</button>
         );
       })}
     </div>
@@ -810,7 +883,9 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
   }
 
   const sceneN = num(ctx.engine.scene, -1);
-  const edit = typeof ctx.ui.sceneEdit === 'number' ? `SCENE ${num(ctx.ui.sceneEdit) + 1} EDIT` : typeof ctx.ui.perfEdit === 'number' ? `PERF ${num(ctx.ui.perfEdit) + 1} EDIT` : '';
+  const sr = ctx.engine.stepRec as StepRecState | undefined;
+  const edit = typeof ctx.ui.sceneEdit === 'number' ? `SCENE ${num(ctx.ui.sceneEdit) + 1} EDIT` : typeof ctx.ui.perfEdit === 'number' ? `PERF ${num(ctx.ui.perfEdit) + 1} EDIT`
+    : sr?.on ? `STEP REC${sr.jump ? ' JUMP' : ''} ${sr.step + 1}` : Math.round(num(ctx.values.rec)) === 2 ? `LIVE REC${num(ctx.values.quantize, 1) > 0 ? ' Q' : ''}` : '';
   const right = edit || (mode === PAD_MODE.SCNE ? `SCN ${sceneN >= 0 ? sceneN + 1 : '-'}` : mode === PAD_MODE.PERF ? 'PERF' : mode === PAD_MODE.CHRO ? `CHRO ${num(ctx.ui.octave) >= 0 ? '+' : ''}${num(ctx.ui.octave)}` : st?.mode === 'chain' ? 'CHAIN' : '');
   return (
     <div style={oled}>
@@ -838,6 +913,7 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
       </div>
       <DataSync ctx={ctx} />
       <LiveRec ctx={ctx} />
+      <SampleNotice ctx={ctx} />
       <PresetLoader ctx={ctx} />
     </div>
   );
@@ -887,8 +963,10 @@ function DataSync({ ctx }: { ctx: CustomRenderContext }) {
         working = fullKit(kits[op.to]);
         currentKit = op.to;
         kitChanged = true;
-      } else if (op.type === 'rec') {
+      } else if (op.type === 'rec' || op.type === 'step') {
         p = recordHit(p, op) as RytmProject;
+      } else if (op.type === 'rest') {
+        p = setStep(p, op.pattern, op.track, op.step, null) as RytmProject;
       } else if (op.type === 'reclen') {
         p = recordHitLength(p, op) as RytmProject;
       } else if (op.type === 'lock') {
@@ -1313,21 +1391,95 @@ function SoundMenu({ ctx }: { ctx: CustomRenderContext }) {
   );
 }
 
+/**
+ * The sample slots ([FUNC] + [SMPL], manual p.35): pick the active track's slot, and load
+ * a WAV or AIFF of your own into a slot in place of its built-in one-shot (samples.ts).
+ */
 function SampleMenu({ ctx }: { ctx: CustomRenderContext }) {
   const track = Math.min(11, Math.round(num(ctx.values.track)));
   const t = TRACKS[track];
   const cur = Math.round(num(ctx.values[`${t.id}_smp_slot`]));
+  const user = projectOf(ctx).samples ?? {};
+  const missing = new Map(((ctx.engine.samplesMissing as { slot: number; name: string }[] | undefined) ?? []).map(m => [m.slot, m.name]));
+  const file = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState<string>('');
+  const audition = (i: number) => { ctx.sendEvent('pad', { track, vel: 100 }); setTimeout(() => ctx.sendEvent('pad:up', { track }), 300); void i; };
+  const load = async (f: File) => {
+    const slot = cur;
+    if (slot <= 0) return;
+    setStatus(`Reading ${f.name}…`);
+    try {
+      const dec = await decodeAudioFile(await f.arrayBuffer());
+      const id = sampleId(dec);
+      const name = sampleName(f.name);
+      await putSample({ id, name, rate: dec.rate, data: dec.data, created: Date.now() });
+      ctx.updateData(d => {
+        const q = asProject(d, T) as RytmProject;
+        return { ...q, samples: { ...(q.samples ?? {}), [slot]: { id, name } } };
+      });
+      const secs = dec.data.length / dec.rate;
+      setStatus(`${name} is in slot ${String(slot).padStart(2, '0')} (${secs.toFixed(secs < 10 ? 2 : 1)} s${dec.truncated ? `, cut to ${MAX_SECONDS} s` : ''}). It stays in this browser.`);
+      setTimeout(() => audition(slot), 250);
+    } catch (e) {
+      setStatus(`Could not load ${f.name}: ${e instanceof Error ? e.message : String(e)}. Use a WAV or AIFF file.`);
+    }
+  };
+  const restore = () => {
+    if (cur <= 0 || !user[cur]) return;
+    ctx.updateData(d => {
+      const q = { ...(asProject(d, T) as RytmProject) };
+      const s = { ...(q.samples ?? {}) };
+      delete s[cur];
+      q.samples = Object.keys(s).length ? s : undefined;
+      return q;
+    });
+    setStatus(`Slot ${String(cur).padStart(2, '0')} plays its built-in one-shot again.`);
+  };
   return (
-    <MenuFrame ctx={ctx} title={`SAMPLES · ${t.name}`} sub="synthesized one-shots (the twin ships no recordings)">
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-        {SAMPLES.map((name, i) => (
-          <SeqButton key={i} active={i === cur} color={C.white} minWidth={96} onPress={() => { ctx.setValue(`${t.id}_smp_slot`, i); ctx.setValue('page', PAGE.SMPL); ctx.sendEvent('pad', { track, vel: 100 }); setTimeout(() => ctx.sendEvent('pad:up', { track }), 300); }}>
-            {i === 0 ? 'OFF' : `${String(i).padStart(2, '0')} ${name}`}
-          </SeqButton>
-        ))}
+    <MenuFrame ctx={ctx} title={`SAMPLES · ${t.name}`} sub="32 slots of synthesized one-shots; any slot can take a sample of yours">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontFamily: FONT }}>
+        <Group label={cur > 0 ? `SLOT ${String(cur).padStart(2, '0')} (${t.name}'s SMP)` : `${t.name}'s SMP is OFF: tap a slot below first`}>
+          <SeqButton color={C.green} disabled={cur <= 0} minWidth={150} onPress={() => file.current?.click()} title="Choose a WAV or AIFF file (on an iPad: from the Files app)">LOAD YOUR OWN SAMPLE</SeqButton>
+          <SeqButton disabled={cur <= 0 || !user[cur]} onPress={restore}>BUILT-IN AGAIN</SeqButton>
+          <input ref={file} type="file" accept=".wav,.wave,.aif,.aiff,.aifc,audio/wav,audio/x-wav,audio/aiff,audio/x-aiff" style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void load(f); }} />
+        </Group>
+        {status && <div role="status" style={{ fontSize: 12, color: C.text, lineHeight: 1.4 }}>{status}</div>}
+        {missing.size > 0 && (
+          <div role="alert" style={{ fontSize: 12, color: C.amber, lineHeight: 1.4 }}>
+            {[...missing].map(([slot, name]) => `${name} (slot ${String(slot).padStart(2, '0')})`).join(', ')}: not in this browser, so {missing.size > 1 ? 'those slots play their' : 'that slot plays its'} built-in one-shot. Load the file again to bring it back.
+          </div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {SAMPLES.map((name, i) => {
+            const u = i > 0 ? user[i] : undefined;
+            const gone = missing.has(i);
+            return (
+              <SeqButton key={i} active={i === cur} color={u && !gone ? C.green : C.white} minWidth={96} title={u ? `${u.name}${gone ? ' (missing here: plays the built-in one-shot)' : ' (your sample)'}` : undefined}
+                onPress={() => { ctx.setValue(`${t.id}_smp_slot`, i); ctx.setValue('page', PAGE.SMPL); audition(i); }}>
+                {i === 0 ? 'OFF' : `${String(i).padStart(2, '0')} ${u ? `${gone ? '! ' : '* '}${u.name}` : name}`}
+              </SeqButton>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 11, color: C.faint, lineHeight: 1.4 }}>
+          * = your sample. Your samples are kept in this browser (IndexedDB) and the project only remembers which slot holds which; on another device a slot plays its built-in one-shot until you load the file there.
+        </div>
       </div>
     </MenuFrame>
   );
+}
+
+/** A project whose samples are not in this browser says so once (manual p.59: the slots keep working) */
+function SampleNotice({ ctx }: { ctx: CustomRenderContext }) {
+  const list = (ctx.engine.samplesMissing as { slot: number; name: string }[] | undefined) ?? [];
+  const key = list.map(m => `${m.slot}:${m.name}`).join(',');
+  useEffect(() => {
+    if (!list.length) return;
+    flash(ctx, `${list.length === 1 ? `SAMPLE ${list[0].name}` : `${list.length} SAMPLES`} NOT IN THIS BROWSER: ${list.length === 1 ? `SLOT ${String(list[0].slot).padStart(2, '0')} PLAYS ITS` : 'THOSE SLOTS PLAY THEIR'} BUILT-IN ONE-SHOT ([FUNC] + [SMPL])`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return null;
 }
 
 function TempoMenu({ ctx }: { ctx: CustomRenderContext }) {
