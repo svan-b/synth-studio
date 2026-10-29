@@ -55,12 +55,11 @@ its own `wip/*` branch on GitHub, committed but **not yet merged or browser-veri
 - Smoke test fix: buttons that a paged panel removed are skipped after 1 s; the Rytm smoke went from 498 s to 34 s (the app was never slow, at 67–125 ms per press).
 - Still running:
   - the **producer-path** agent (lesson-engine hooks and first studio lessons)
-  - **independent expert reviews** against the manuals, as was done for the DFAM, for the Analog Four, Sub 37, Mother-32, Subharmonicon and Xone:96, each pushing to `wip/review-<id>`
+  - **independent expert reviews** against the manuals, as was done for the DFAM, for the Analog Four, Sub 37, Mother-32, Subharmonicon, Xone:96 and now the **Analog Rytm**, each pushing to `wip/review-<id>`
+  - the **demo tracks** agent, building the three designed songs as one-click studios (`wip/demo-tracks`)
 - Next:
   - merge each review through the gate, with upgrade entries for any changed defaults
-  - review the Rytm
   - add the producer-path lessons for the Elektrons and Sub 37
-  - build the three demo tracks
   - regenerate the audio-QA baseline for every instrument
   - run the final full e2e and push there after each milestone: analog-four, analog-rytm, xone96, mother32, subharmonicon, sub37, elektron-sequencer (UI kit), dfam-review (verification), panel-teaching (touch e2e and perf). Each merges 01a09bc before its final gate.
 - **Next:** merge each finisher as it passes the gate (section 3). Then add upgrades.ts entries, run audio QA for every instrument, implement the producer path and demo tracks, run independent reviews, do and lazy-load the MIDI code in DeviceHost.
