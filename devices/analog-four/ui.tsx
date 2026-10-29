@@ -1752,7 +1752,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
     // POLY CONFIG: TRIG 1-4 tick the voices - half-bright = a track's own mono voice, full-bright = in
     // the pool - and light up white while their voice plays (manual p.29)
     const act = String(ctx.engine.polyAct ?? '');
-    const focusCtl = ctx.teaching ? ctx.step?.control : undefined;
+    const litIds = new Set<string>(ctx.teaching && ctx.step ? [ctx.step.control, ...(ctx.step.focus ?? [])].filter((x): x is string => typeof x === 'string') : []);
     return strip(i => {
       if (i >= SYNTH_TRACKS) return keyBtn(i, { lit: null, label: `${i + 1}`, aria: 'unused', onPress: () => undefined });
       const id = `poly_v${i + 1}`;
@@ -1760,7 +1760,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
       const playing = on && act[i] === '1';
       return keyBtn(i, {
         lit: playing ? COL.white : COL.red, amt: on ? 1 : 0.4, label: `${i + 1}`, sub: on ? `POLY ${i + 1}` : `MONO ${i + 1}`,
-        aria: `Voice ${i + 1}: ${on ? 'in the poly pool' : `track ${i + 1}'s own mono voice`}`, pressed: on, target: focusCtl === id,
+        aria: `Voice ${i + 1}: ${on ? 'in the poly pool' : `track ${i + 1}'s own mono voice`}`, pressed: on, target: litIds.has(id),
         onPress: () => { ctx.setValue(id, !on); say(ctx, `VOICE ${i + 1}: ${on ? `T${i + 1}'S OWN (MONO)` : 'IN THE POLY POOL'}`, 1100); },
       });
     });
@@ -2226,14 +2226,16 @@ function PolyMenu({ ctx }: { ctx: CustomRenderContext }) {
   const on = [1, 2, 3, 4].map(n => !!ctx.values[`poly_v${n}`]);
   const alloc = Math.round(num(ctx.values.poly_alloc));
   const trk = !!ctx.values.poly_trk;
-  const focusCtl = ctx.teaching ? ctx.step?.control : undefined;
+  // a lesson step about a POLY CONFIG setting lights it (its control, or its focus list)
+  const lit = new Set<string>(ctx.teaching && ctx.step ? [ctx.step.control, ...(ctx.step.focus ?? []), ...(ctx.step.match?.controls ?? [])].filter((x): x is string => typeof x === 'string') : []);
+  const focusCtl = { has: (id: string) => lit.has(id) };
   const polyTracks = on.map((v, i) => (v ? TRACK_NAMES[i] : null)).filter(Boolean).join(' ');
   return (
     <Overlay portal portalSize={{ w: 640, h: 470 }}>
       <Frame title="POLY CONFIG" sub={polyTracks ? `poly tracks: ${polyTracks}` : 'every track plays its own voice'} onClose={() => ctx.setUi({ [UIK.menu]: null })}>
         <Group label="VOICES">
           {on.map((v, i) => (
-            <SeqButton key={i} height={44} minWidth={64} active={v} color={act[i] === '1' && v ? SC.white : SC.red} highlight={focusCtl === `poly_v${i + 1}`}
+            <SeqButton key={i} height={44} minWidth={64} active={v} color={act[i] === '1' && v ? SC.white : SC.red} highlight={focusCtl.has(`poly_v${i + 1}`)}
               onPress={() => ctx.setValue(`poly_v${i + 1}`, !v)} ariaLabel={`Voice ${i + 1} in the poly pool`} title={`TRIG ${i + 1} does the same`}>
               {`${v ? '☑' : '☐'} ${i + 1}`}
             </SeqButton>
@@ -2243,19 +2245,19 @@ function PolyMenu({ ctx }: { ctx: CustomRenderContext }) {
         <div style={{ height: 6 }} />
         <Group label="ALLOCATION">
           {POLY_ALLOC.map((a, i) => (
-            <SeqButton key={a} height={44} minWidth={86} active={alloc === i} color={SC.green} highlight={focusCtl === 'poly_alloc'} onPress={() => ctx.setValue('poly_alloc', i)}>{a}</SeqButton>
+            <SeqButton key={a} height={44} minWidth={86} active={alloc === i} color={SC.green} highlight={focusCtl.has('poly_alloc')} onPress={() => ctx.setValue('poly_alloc', i)}>{a}</SeqButton>
           ))}
           <span style={{ fontSize: 11, color: SC.dim, flex: '1 1 260px' }}>{POLY_ALLOC_HINT[alloc] ?? ''}</span>
         </Group>
         <div style={{ height: 6 }} />
         <Group label="USE TRK SOUNDS">
-          <SeqButton height={44} minWidth={64} active={trk} color={SC.green} highlight={focusCtl === 'poly_trk'} onPress={() => ctx.setValue('poly_trk', !trk)}>{trk ? '☑ ON' : '☐ OFF'}</SeqButton>
+          <SeqButton height={44} minWidth={64} active={trk} color={SC.green} highlight={focusCtl.has('poly_trk')} onPress={() => ctx.setValue('poly_trk', !trk)}>{trk ? '☑ ON' : '☐ OFF'}</SeqButton>
           <span style={{ fontSize: 11, color: SC.dim, flex: '1 1 260px' }}>{trk ? 'Each voice keeps its own track\'s sound: a chord on T1 is spread over the pool\'s sounds.' : 'A voice plays the sound of the track whose note it plays.'}</span>
         </Group>
         <div style={{ height: 6 }} />
         <Group label="UNISON">
-          <BigStep label="DETUNE" value={num(ctx.values.poly_det, 16)} min={0} max={127} onChange={v => ctx.setValue('poly_det', v)} highlight={focusCtl === 'poly_det'} title="UNISON DETUNE: how far apart the voices are tuned" />
-          <BigStep label="PAN SPREAD" value={num(ctx.values.poly_spr, 64)} min={0} max={127} onChange={v => ctx.setValue('poly_spr', v)} highlight={focusCtl === 'poly_spr'} title="UNISON PAN SPREAD: how wide the voices spread" />
+          <BigStep label="DETUNE" value={num(ctx.values.poly_det, 16)} min={0} max={127} onChange={v => ctx.setValue('poly_det', v)} highlight={focusCtl.has('poly_det')} title="UNISON DETUNE: how far apart the voices are tuned" />
+          <BigStep label="PAN SPREAD" value={num(ctx.values.poly_spr, 64)} min={0} max={127} onChange={v => ctx.setValue('poly_spr', v)} highlight={focusCtl.has('poly_spr')} title="UNISON PAN SPREAD: how wide the voices spread" />
         </Group>
         <div style={{ fontSize: 11, color: SC.dim, margin: '8px 2px 0' }}>
           Play a few notes on the keyboard and watch TRIG 1-4: each lights while its voice plays. With no free voice, the one used least recently is taken. Hold a trig and press two or more keys to store a chord.
@@ -2405,12 +2407,14 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
   // locks that LEN on the trig). A key pressed while another is still down joins the chord the first one
   // wrote (POLY tracks). With [YES] held the trig's LEN is how long the key was held.
   const sr = ctx.ui[UIK.stepRec] as StepRec | null | undefined;
-  const srOn = !!sr;
+  const heldNow = Array.isArray(ctx.ui[UI.heldSteps]) && (ctx.ui[UI.heldSteps] as number[]).length > 0;
+  // the engine reports the keys played while they can write something: STEP RECORDING or a held trig
+  const report = !!sr || heldNow;
   useEffect(() => {
-    ctx.sendEvent('a4:step-rec', { on: srOn });
+    ctx.sendEvent('a4:kb-report', { on: report });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [srOn]);
-  const kbNote = ctx.engine.kbNote as { id: number; track: number; note: number; held: number } | undefined;
+  }, [report]);
+  const kbNote = ctx.engine.kbNote as { id: number; track: number; note: number; held: number; src?: string } | undefined;
   const kbOff = ctx.engine.kbOff as { id: number; track: number; note: number; held: number } | undefined;
   const lastKb = useRef(0);
   const lastKbOff = useRef(0);
@@ -2420,7 +2424,20 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
     if (!kbNote || kbNote.id === lastKb.current) return;
     lastKb.current = kbNote.id;
     const cur = stepRecOf(ctx);
-    if (!cur) return;
+    if (!cur) {
+      // GRID RECORDING with a trig held: a computer-keyboard (or MIDI) key gives it its note, and keys
+      // held together make a chord on a poly track (the A4's own keys do this in MiniKeyboard)
+      const u = liveUi(ctx);
+      const steps = Array.isArray(u[UI.heldSteps]) ? (u[UI.heldSteps] as number[]) : [];
+      if (kbNote.src !== 'keys' || !steps.length || typeof u[UI.heldTrack] !== 'number' || u[UI.heldTrack] !== kbNote.track) return;
+      const pat = (u[UI.heldPattern] as string) ?? project(ctx).active;
+      const t = kbNote.track;
+      if (kbNote.held > 1 && isPolyTrack(ctx.values, t)) editTrigs(ctx, p => steps.reduce((q, st) => addChordNote(q, pat, t, st, kbNote.note), p));
+      else editTrigs(ctx, p => updateSteps(p, pat, t, steps, { note: kbNote.note, chord: null }, { create: 'note' }));
+      ctx.setUi({ [UI.heldEdited]: true });
+      say(ctx, `TRIG ${steps.map(x => x + 1).join(' ')}: ${kbNote.held > 1 && isPolyTrack(ctx.values, t) ? 'CHORD +' : 'NOTE'} ${formatNote(kbNote.note)}`, 1000);
+      return;
+    }
     const pr = project(ctx);
     const pat = viewPattern(ctx, pr);
     const t = kbNote.track;

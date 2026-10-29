@@ -180,8 +180,11 @@ export class AnalogFourEngine extends BaseEngine {
   private recSerial = 0;
   /** LIVE RECORDING quantized ([RECORD] + [PLAY][PLAY]): notes land on the grid, no micro timing (manual p.41) */
   private liveQuant = false;
-  /** STEP RECORDING: report each key played (the panel writes it at the active step, manual p.41-42) */
-  private stepRec = false;
+  /**
+   * STEP RECORDING, or a trig held: report each key played and released (kbNote / kbOff), so the
+   * panel can write it - at the active step, or into the held trig (manual p.41-42)
+   */
+  private kbReport = false;
   private kbSerial = 0;
   /** LIVE RECORDING: the step each track's last recorded note went to (POLY chords) */
   private lastRec: ({ step: number; pattern: string } | null)[] = [null, null, null, null];
@@ -757,7 +760,7 @@ export class AnalogFourEngine extends BaseEngine {
   /** note = MIDI note from the computer keyboard (lowNote 48 + offset) */
   noteOn(note: number, _velocity = 1): void {
     if (!this.started) return;
-    this.liveOn(note + 12 * this.octave());
+    this.liveOn(note + 12 * this.octave(), 'keys');
   }
 
   noteOff(note: number): void {
@@ -765,7 +768,8 @@ export class AnalogFourEngine extends BaseEngine {
     this.liveOff(note + 12 * this.octave());
   }
 
-  private liveOn(note: number) {
+  /** A key played: `src` 'panel' (the A4's own keyboard) or 'keys' (the computer keyboard, MIDI) */
+  private liveOn(note: number, src: 'panel' | 'keys' = 'panel') {
     const t = this.activeTrack();
     if (t >= SYNTH_TRACKS) return;
     this.unfadeFx();
@@ -775,8 +779,8 @@ export class AnalogFourEngine extends BaseEngine {
     if (!held.includes(n)) held.push(n);
     const vel = this.trackVel(t);
     this.recordLive(t, n, vel);
-    // STEP RECORDING: `held` counts the keys down on the track, this one included (2+: a chord)
-    if (this.stepRec) this.emit({ kbNote: { id: ++this.kbSerial, track: t, note: n, held: held.length } });
+    // `held` counts the keys down on the track, this one included (2+: a chord)
+    if (this.kbReport) this.emit({ kbNote: { id: ++this.kbSerial, track: t, note: n, held: held.length, src } });
     this.arpPattern[t] = this.seq.getState().pattern ?? null;
     if (this.arpOn(t)) {
       const notes = [...held];
@@ -797,7 +801,7 @@ export class AnalogFourEngine extends BaseEngine {
       const i = held.indexOf(note);
       if (i < 0) continue;
       held.splice(i, 1);
-      if (this.stepRec) this.emit({ kbOff: { id: ++this.kbSerial, track: t, note, held: held.length } });
+      if (this.kbReport) this.emit({ kbOff: { id: ++this.kbSerial, track: t, note, held: held.length } });
       const st = this.arps[t];
       if (st?.live) {
         if (!held.length) this.stopArp(t, time);
@@ -856,7 +860,7 @@ export class AnalogFourEngine extends BaseEngine {
       // LIVE RECORDING: a knob turn recorded as a lock sounds at once (the panel writes the lock)
       case 'a4:live-lock': this.liveLock(payload as { track?: number; key?: string; value?: number } | undefined); break;
       case 'a4:live-quant': this.liveQuant = !!(payload as { on?: boolean } | undefined)?.on; break;
-      case 'a4:step-rec': this.stepRec = !!(payload as { on?: boolean } | undefined)?.on; break;
+      case 'a4:kb-report': this.kbReport = !!(payload as { on?: boolean } | undefined)?.on; break;
       // [STOP][STOP] while stopped: the send effects fade out (manual p.38)
       case 'a4:fxfade': this.fadeFx(); break;
       // the A4's own [STOP] key: the stop it causes lets the send effects ring (manual p.38)

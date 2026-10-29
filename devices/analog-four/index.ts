@@ -151,7 +151,9 @@ const analogFour: DeviceModule = {
     'Trig keys: tap to add or remove a trig. Hold a trig and turn a knob to parameter-lock that step; hold a trig and press a keyboard key to give it a note. A long hold (or double tap) opens the trig editor: note, length, micro timing, conditions, slides.',
     '[FUNC] reaches the grey legends under the keys: hold it, or tap it once for the next key (Shift on a computer keyboard works too). [FUNC] + a track key mutes that track. [BANK A-H] then a trig key picks a pattern; [PTN], [SONG], [FUNC]+[CHAIN] and [FUNC]+[PAGE] open the pattern, song, chain and scale menus.',
     'Space = PLAY/STOP; synced to the studio it is the studio transport. On its own clock [PLAY] while playing pauses and [PLAY] resumes; [STOP] cuts the sound while the delay rings on, and [STOP][STOP] fades the send effects. Keys A-K play the active track, Z/X shift the octave. [SND] or the TRACK LEVEL push opens the sound browser; [KIT] loads whole kits.',
-    'Simplified: one kit per project, no POLY mode (so no PLY arpeggio), no CV or audio-input jacks (the CV track is sequenced and shown), no sound locks and no Euclidean NOTE page. Value-to-Hz and -seconds curves are fits to the documented ranges.',
+    'Chords: [FUNC] + [MIX] opens POLY CONFIG. Tick voices (or TRIG 1-4) to share them between their tracks, then hold a trig and press several keys together to store a chord. ALLOCATION picks how notes find a voice; UNISON stacks them all on one note.',
+    'Recording: [RECORD] + [PLAY] records live - played notes, and knob turns as locks on the steps that pass ([PLAY][PLAY] quantizes). [RECORD] + [STOP] is STEP RECORDING: each key writes the active step and moves on. [PAGE] or held trigs + [RECORD] / [STOP] / [PLAY] copy, paste and clear.',
+    'Simplified: one kit per project, no CV or audio-input jacks (the CV track is sequenced and shown), no sound locks and no Euclidean NOTE page. Value-to-Hz and -seconds curves are fits to the documented ranges.',
   ],
 };
 
