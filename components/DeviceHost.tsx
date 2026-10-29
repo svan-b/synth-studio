@@ -373,7 +373,8 @@ function ControlStatus({ spec, values, touched }: { spec: DeviceSpec; values: Va
     if (c) {
       name = c.label;
       const v = values[id] ?? ('default' in c ? (c.default as ControlValue) : undefined);
-      value = c.type === 'jack' || c.type === 'pattern' ? '' : describeValue(c, v);
+      // A momentary button (TRIGGER, TAP) has no lasting state worth showing
+      value = c.type === 'jack' || c.type === 'pattern' || (c.type === 'button' && c.momentary) ? '' : describeValue(c, v);
       about = firstSentence(c.description);
     }
   } else if (touched?.kind === 'jack') {
