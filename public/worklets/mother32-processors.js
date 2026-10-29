@@ -281,6 +281,7 @@ class Mother32Processor extends AudioWorkletProcessor {
 
     // Main-bus DC blocker (the jacks are DC coupled like the hardware)
     this.dcX = 0; this.dcY = 0; this.dcR = 1 - (2 * Math.PI * 6) / sr;
+    this.dc2X = 0; this.dc2Y = 0; this.dc2R = 1 - (2 * Math.PI * 3) / sr;   // after the output rail
 
     // UI reporting
     this.uiDirty = true; this.uiLast = -1; this.beat = 0; this.beatOffAt = 0;
@@ -1132,6 +1133,10 @@ class Mother32Processor extends AudioWorkletProcessor {
       // The output rail comes last (a sub-audio square stepping through the DC blocker overshoots):
       // however hot the patch - VOLUME up, full RESONANCE, VCA CV on top - the output stays below 0 dBFS
       this.dcX = main; this.dcY = dc; main = rail(dc, 0.7, 0.98);
+      // The rail clips a lopsided wave (a saw's edge overshoot) off-centre, which leaves a little DC
+      // at VOLUME fully up; a slow second blocker takes it away, and a last ceiling keeps 0 dBFS
+      const d2 = main - this.dc2X + this.dc2R * this.dc2Y;
+      this.dc2X = main; this.dc2Y = d2; main = d2 > 0.995 ? 0.995 : d2 < -0.995 ? -0.995 : d2;
 
       // ---- VC MIX (DC coupled): MIX 1 (0 V normal) <-> MIX 2 (+5 V normal) ----
       let p = s[K_VCMIX];
@@ -1199,6 +1204,7 @@ class Mother32Processor extends AudioWorkletProcessor {
     this.z2 = (z2 > 1e-20 || z2 < -1e-20) ? z2 : 0; this.z3 = (z3 > 1e-20 || z3 < -1e-20) ? z3 : 0;
     for (let j = 0; j < 24; j++) { const v = hb[j]; if (!(v > 1e-20 || v < -1e-20)) hb[j] = 0; }
     if (!(this.dcY > 1e-20 || this.dcY < -1e-20)) this.dcY = 0;
+    if (!(this.dc2Y > 1e-20 || this.dc2Y < -1e-20)) this.dc2Y = 0;
     if (!(this.acY > 1e-20 || this.acY < -1e-20)) this.acY = 0;
     if (!Number.isFinite(this.sqA + this.trA + this.sqY + this.trY)) { this.sqA = this.sqB = this.trA = this.trB = 0; this.sqY = 1; this.trY = -1; }
 
