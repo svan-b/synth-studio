@@ -267,6 +267,8 @@ class Mother32Processor extends AudioWorkletProcessor {
     this.hb = new Float64Array(24);
     this.cutLast = NaN; this.gCut = 0;
     this.quality = 1;
+    this.resCv = 0;                                     // VCF RES jack after its slew
+    this.resSlew = 1 - Math.exp(-1 / (0.0015 * sr));
 
     // Main-bus DC blocker (the jacks are DC coupled like the hardware)
     this.dcX = 0; this.dcY = 0; this.dcR = 1 - (2 * Math.PI * 6) / sr;
@@ -1031,8 +1033,14 @@ class Mother32Processor extends AudioWorkletProcessor {
         this.gCut = tanF(fc * wScale);
       }
       let res = s[K_RES];
-      // VCF RES jack: with the knob centred, -5..+5 V sweeps minimum to maximum (manual p.48)
-      if (patched[I_RES]) { res += inV[I_RES] * 0.1; if (res < 0) res = 0; else if (res > 1) res = 1; }
+      // VCF RES jack: with the knob centred, -5..+5 V sweeps minimum to maximum (manual p.48). The
+      // jack reaches the feedback (and the make-up gain below) through a ~1.5 ms slew, like the VCA
+      // in a real feedback path, so a stepped CV (ASSIGN STEP RANDOM) cannot click the output level.
+      if (patched[I_RES]) {
+        this.resCv += (inV[I_RES] * 0.1 - this.resCv) * this.resSlew;
+        res += this.resCv;
+        if (res < 0) res = 0; else if (res > 1) res = 1;
+      } else this.resCv = 0;
       // LOW PASS: the resonant 4-pole ladder (a little make-up gain for the Moog bass loss).
       // HI PASS: the input minus the ladder low-pass. It does not self-oscillate: RESONANCE lets the
       // low band back in, as the manual warns (p.14), and leaves a gentle bump at the cutoff - the

@@ -43,6 +43,10 @@ const toggle = (control: string, title: string, x: number, y: number, legendW = 
   { kind: 'label', text: title, x, y: y - (title.includes('\n') ? 9.4 : 8.2), size: LEGEND, letterSpacing: 0.3 },
 ];
 
+/** The legend of a knob with a scale ring, printed above the ring (manual p.9) */
+const ringLegend = (text: string, x: number, y: number, size = LEGEND): PanelElement =>
+  ({ kind: 'label', text, x, y: y - 12.6, size, letterSpacing: 0.3 });
+
 /** The printed scale ring of FREQUENCY, PULSE WIDTH, TEMPO and LFO RATE (manual p.9, p.11, p.13) */
 const scaleRing = (x: number, y: number): PanelElement[] => [
   { kind: 'section', x: x - 10.4, y: y - 10.4, w: 20.8, h: 20.8, radius: 10.4, border: '1px solid #d9d9d9' },
@@ -142,9 +146,9 @@ const elements: PanelElement[] = [
   // --- Row 1: FREQUENCY, VCO WAVE, PULSE WIDTH, MIX, CUTOFF, RESONANCE, VCA MODE, VOLUME --
   ...scaleRing(21.7, ROW1), ...scaleRing(80.8, ROW1), ...scaleRing(41.0, ROW3), ...scaleRing(80.8, ROW3),
   hole(36.5, ROW1), hole(65.9, ROW1), hole(95.6, ROW1), hole(95.6, ROW2), hole(95.6, ROW3),
-  legend('FREQUENCY', 21.7, ROW1), knob('frequency', 21.7, ROW1),
+  ringLegend('FREQUENCY', 21.7, ROW1), knob('frequency', 21.7, ROW1),
   ...toggle('vco_wave', 'VCO WAVE', 51.3, ROW1, 7.5),
-  legend('PULSE WIDTH', 80.8, ROW1), knob('pulse_width', 80.8, ROW1),
+  ringLegend('PULSE WIDTH', 80.8, ROW1), knob('pulse_width', 80.8, ROW1),
   legend('MIX', 110.3, ROW1), knob('mix', 110.3, ROW1),
   { kind: 'label', text: 'VCO', x: 103.6, y: ROW1 + 8.4, size: 5.6, color: '#bdbdbd' },
   { kind: 'label', text: 'NOISE / EXT', x: 118.4, y: ROW1 + 8.4, size: 5.6, color: '#bdbdbd' },
@@ -183,7 +187,7 @@ const elements: PanelElement[] = [
   ...toggle('vcf_mod_polarity', 'VCF MOD\nPOLARITY', 228.6, ROW2, 3),
 
   // --- Row 3: TEMPO / GATE LENGTH (SWING), LFO RATE, LFO WAVE, ATTACK, SUSTAIN, DECAY, VC MIX --
-  legend('TEMPO / GATE LENGTH', 41.0, ROW3, 7.2),
+  ringLegend('TEMPO / GATE LENGTH', 41.0, ROW3, 7.2),
   // the second function is printed under the knob (manual p.9)
   { kind: 'label', text: '(SWING)', x: 41.0, y: ROW3 + 12.7, size: 6.4, color: '#e8e8e8', font: 'condensed', letterSpacing: 0.3 },
   {
@@ -203,7 +207,7 @@ const elements: PanelElement[] = [
     },
     x: 41.0, y: ROW3, diameter: KNOB, variant: 'moog-black', label: 'none',
   },
-  legend('LFO RATE', 80.8, ROW3), knob('lfo_rate', 80.8, ROW3),
+  ringLegend('LFO RATE', 80.8, ROW3), knob('lfo_rate', 80.8, ROW3),
   ...toggle('lfo_wave', 'LFO WAVE', 110.4, ROW3, 5),
   legend('ATTACK', 139.9, ROW3), knob('attack', 139.9, ROW3),
   ...toggle('sustain', 'SUSTAIN', 169.5, ROW3, 5),

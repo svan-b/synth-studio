@@ -269,7 +269,7 @@ export const MOTHER32: DeviceSpec = {
       manualReference: `${M} p.33, p.43 - SET END`,
     }),
     step_gate: knob({
-      label: 'GATE LENGTH', min: 1, max: 8, default: 4, units: 'none', format: fmtGate,
+      label: 'GATE LENGTH', min: 1, max: 8, step: 1, default: 4, units: 'none', format: fmtGate,
       description: 'The edited step\'s gate length, in eighths of a step; 8/8 ties into the next step. Needs SUSTAIN ON to be heard.',
       manualReference: `${M} p.25 - Gate length`,
     }),
@@ -279,7 +279,7 @@ export const MOTHER32: DeviceSpec = {
       manualReference: `${M} p.26 - Glide on / off`,
     }),
     step_ratchet: knob({
-      label: 'RATCHET', min: 1, max: 4, default: 1, units: 'none', format: v => `${Math.round(v)}x`,
+      label: 'RATCHET', min: 1, max: 4, step: 1, default: 1, units: 'none', format: v => `${Math.round(v)}x`,
       description: 'SHIFT + GLIDE while a step is edited: how many notes the step plays (1-4).',
       manualReference: `${M} p.27 - Ratchet`,
     }),
