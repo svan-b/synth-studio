@@ -28,11 +28,12 @@
 //   { t:'kit', at, tracks:[{m, p}], fx }   whole kit at once
 //   { t:'ovr', tr, i, v }          scene value (NaN clears), tr 12 = FX
 //   { t:'perf', tr, i, target, amt }   performance morph
-//   { t:'trig', at, tr, vel, note, acc, len, locks:{i:v}, rt }   note trig
+//   { t:'trig', at, tr, vel, note, acc, len, locks:{i:v}, rt, mach? }   note trig (mach: a sound lock's machine)
 //   { t:'locks', at, tr, locks }   lock trig (no note)
 //   { t:'off', at, tr }            note-off (gate end)
 //   { t:'fxlocks', at, locks }     FX track lock trig
 //   { t:'tempo', bpm }
+//   { t:'smp', slot, data }         a user sample (Float32Array at this rate) in slot 1-32; null: the built-in one-shot
 //   { t:'stop' }                   [STOP]: cut every voice off (5 ms fade; the FX ring on)
 // Reports: { t:'lv', lv: Float32Array(12) } track levels at ~30 Hz while sounding.
 // ============================================================================
@@ -390,6 +391,10 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         // SOUND SETTINGS > AFTERTOUCH, the default slot: +16 FLT FRQ at full pressure
         this.atAdd[m.tr] = clamp(m.v || 0, 0, 1) * 16; return;
       case 'tempo': this.bpm = clamp(m.bpm || 120, 20, 300); return;
+      case 'smp':
+        // a user sample in a slot (mono, at this rate), or null: the slot's built-in one-shot again
+        if (m.slot > 0 && m.slot < SAMPLES.length) SAMPLES[m.slot] = m.data instanceof Float32Array && m.data.length > 1 ? m.data : null;
+        return;
       case 'fxoff':
         // [STOP] twice: the delay's repeats stop too
         this.dL.fill(0); this.dR.fill(0); this.dHpL = this.dHpR = this.dLpL = this.dLpR = 0; this.dIdle = SR * 6;
@@ -598,7 +603,8 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     v.gate = true;
     v.gateLen = m.len;
     v.choke = 0;
-    const machine = this.mach[tr];
+    // a sound lock (manual p.48) plays a pool Sound: its machine for this trig, its parameters as locks
+    const machine = m.mach === undefined ? this.mach[tr] : m.mach;
     const synth = P[IX_TRIG_SYN] > 0.5;
     if (synth || prevTrack !== tr || v.m !== machine) {
       if (v.m !== machine) { v.s.fill(0); v.h.fill(0); v.e.fill(0); v.clapLeft = 0; v.step = 0; v.stepLeft = 0; }

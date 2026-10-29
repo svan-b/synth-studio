@@ -20,6 +20,8 @@ import {
   LEN_1_STEP, RETRIG_RATE_32, createPattern, createProject, type Pattern, type Project, type Speed, type Step,
 } from '@/lib/sequencer/elektron';
 import { MACHINES, SEQ_TRACKS, TRACKS, TRACK_INDEX, soundDefaults } from './model';
+import type { SoundPool } from './pool';
+import type { UserSampleRef } from './samples';
 
 type TrackKey = 'bd' | 'sd' | 'rs' | 'cp' | 'bt' | 'lt' | 'mt' | 'ht' | 'ch' | 'oh' | 'cy' | 'cb';
 type Vals = Record<string, number>;
@@ -858,6 +860,10 @@ export interface RytmProject extends Project {
   /** The kit whose sounds are in the panel (and the engine) now */
   kit?: string;
   kits?: Record<string, RytmKit>;
+  /** The project's Sound pool: up to 128 Sounds, which trigs can sound lock (manual pp.24, 48) */
+  pool?: SoundPool;
+  /** Sample slots (1-32) holding the learner's own samples in place of the built-in one-shots (samples.ts) */
+  samples?: Record<string, UserSampleRef>;
   /** Last engine operation applied by the panel (see ui.tsx DataSync) */
   opsApplied?: { sid: string; n: number };
   /** Data format of the Rytm extras */

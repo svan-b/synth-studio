@@ -523,6 +523,24 @@ export const TRIG_PAGE: PageParam[] = [
 export const TRIG_COND: PageParam = PP('trig_cond', 'TRC', 'Trig Condition', 0, TRIG_CONDITIONS.length - 1, 0,
   'Condition of the held trig: a probability, FILL / !FILL, PRE / !PRE, NEI / !NEI, 1ST / !1ST, or A:B (play on loop A of every B).', { step: 1 });
 
+/**
+ * TRIG menu page 2, the Euclidean sequencer (manual p.44): [TRIG] again on the TRIG page.
+ * These controls act on the active track's settings in the pattern (index.ts); their ids
+ * have no track prefix.
+ */
+export const EUC_OP_NAMES = ['OR', 'XOR', 'AND', 'SUB'] as const;
+export const EUC_PAGE: PageParam[] = [
+  PP('euc_pl1', 'PL1', 'Pulse Generator 1', 0, 64, 4, 'Pulses (trigs) generator 1 spreads as evenly as it can over the track.', { step: 1 }),
+  PP('euc_pl2', 'PL2', 'Pulse Generator 2', 0, 64, 0, 'Pulses (trigs) generator 2 spreads as evenly as it can over the track.', { step: 1 }),
+  PP('euc_len', 'LEN', 'Track Length', 1, 64, 16, 'Steps of the track. It can be set here in the ADVANCED (per track) scale mode only.', { step: 1 }),
+  PP('euc_on', 'EUC', 'Euclidean Mode', 0, 1, 0, 'Euclidean mode on or off for the track. While it is on, the track\'s own trigs are hidden; [FUNC] held while turning it off keeps the generated trigs instead.', { options: ['OFF', 'ON'] }),
+  PP('euc_ro1', 'RO1', 'Rotation Generator 1', -63, 63, 0, 'Moves generator 1\'s trigs later (+) or earlier (-) on the track.', { bipolar: true, step: 1 }),
+  PP('euc_ro2', 'RO2', 'Rotation Generator 2', -63, 63, 0, 'Moves generator 2\'s trigs later (+) or earlier (-) on the track.', { bipolar: true, step: 1 }),
+  PP('euc_tro', 'TRO', 'Track Rotation', -63, 63, 0, 'Moves the trigs of both generators later (+) or earlier (-).', { bipolar: true, step: 1 }),
+  PP('euc_op', 'OP', 'Boolean Operator', 0, 3, 0, 'How the generators combine: OR keeps both, XOR drops steps both hit, AND keeps only those, SUB takes generator 2\'s steps out of generator 1\'s.', { options: EUC_OP_NAMES }),
+];
+export const EUC_IDS = EUC_PAGE.map(p => p.key);
+
 export const SMPL_PAGE: PageParam[] = [
   PP('smp_tun', 'TUN', 'Tune', -24, 24, 0, 'Sample pitch in semitones.', { bipolar: true, idx: IX.SMP_TUN, step: 1 }),
   PP('smp_fin', 'FIN', 'Fine Tune', -64, 63, 0, 'Fine tune of the sample: the whole range is one semitone down to one up.', { bipolar: true, idx: IX.SMP_FIN }),
@@ -757,7 +775,7 @@ export const machineId = (track: number) => `${TRACKS[track].id}_machine`;
 /** Parse a control id into its track and key (null for globals) */
 export function parseId(id: string): { track: number; key: string } | null {
   const u = id.indexOf('_');
-  if (u < 0) return null;
+  if (u < 0 || id.startsWith('euc_')) return null;
   const pre = id.slice(0, u);
   const key = id.slice(u + 1);
   if (pre === 'fx') return { track: FX_TRACK, key };
@@ -776,6 +794,8 @@ export const machineOf = (values: Record<string, unknown>, track: number): numbe
 export function pageControls(track: number, page: number, values: Record<string, unknown>, ui?: Record<string, unknown>): (string | null)[] {
   // a held trig: encoder D on the TRIG page is TRC, the trig's condition (manual p.48)
   const held = page === PAGE.TRIG && Array.isArray(ui?.heldSteps) && (ui!.heldSteps as unknown[]).length > 0;
+  // TRIG page 2: the Euclidean sequencer of a drum track (manual p.44)
+  if (page === PAGE.TRIG && !held && ui?.trigPage2 === true && track !== FX_TRACK) return EUC_IDS.slice();
   if (track === FX_TRACK) {
     if (page === PAGE.TRIG) return FX_TRIG.map((k, i) => (k ? `fx_${held && i === 3 ? TRIG_COND.key : k}` : null));
     return (FX_PAGES[page] ?? []).map(p => (p ? `fx_${p.key}` : null));
@@ -786,6 +806,10 @@ export function pageControls(track: number, page: number, values: Record<string,
 
 /** Metadata for a control id: a machine parameter or a page parameter */
 export function paramMeta(id: string): { kind: 'machine'; p: MParam; track: number } | { kind: 'page'; p: PageParam; track: number } | null {
+  if (id.startsWith('euc_')) {
+    const e = EUC_PAGE.find(p => p.key === id);
+    return e ? { kind: 'page', p: e, track: -1 } : null;
+  }
   const pi = parseId(id);
   if (!pi) return null;
   if (pi.track === FX_TRACK) {
