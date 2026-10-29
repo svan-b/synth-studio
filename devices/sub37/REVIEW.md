@@ -23,9 +23,10 @@ circle, which overlapped it.
 the free panel around it, sized per site so it never enters a neighbour's own touch area; the boxes
 around the caps no longer take pointer events. MOD DEST and MOD AMT sit 3 mm further apart. Measured
 on the iPad by hit-testing (`elementFromPoint`): SLOPE 67 × 30 px, KNOB SHIFT 60 × 33, MOD OSC and
-CONTROLLERS 52 × 27, PRESET 1-16 52 × 32, glide OSC / TYPE 48 × 31 / 39, KB CTRL 44 × 34, BANK
-33 × 33, MOD DEST 30 × 25, the PROGRAMMING buttons 22-38 × 19-32 (▼ ▲ CURSOR are 14 mm apart), RANGE
-39 × 17 (boxed in by BACK / FORTH). No built-in control lost touch area (checked before / after). Two-finger
+CONTROLLERS 52 × 27, PRESET 1-16 52 × 28, glide OSC / TYPE 48 × 31 / 39, KB CTRL 44 × 34, SYNC [TAP]
+32 × 37, BANK 33 × 33, MOD DEST 30 × 25, KB OCTAVE 23-24 × 34 (at the panel's edge), the PROGRAMMING
+buttons 22-38 × 19-32 (▼ ▲ CURSOR are 14 mm apart), RANGE 39 × 17 (boxed in by BACK / FORTH). No
+built-in control lost touch area (checked before / after). Two-finger
 BANK + LATCH, three-finger KB OCTAVE + key and hold-DEST-and-turn work by touch. So do the keys and
 wheels (checked with multi-touch events): with the arpeggiator's LATCH lit, a three-finger chord keeps
 running after release, the next chord replaces it and a key added while another is held joins; LATCH
@@ -129,11 +130,18 @@ from the same point) and PRESET VOL 75: −18.6 to −18.8 LUFS.
 
 ## Left as they are (P3)
 
-- **CUTOFF legend vs taper.** The printed legend (500 Hz at 12 o'clock, 1.2 kHz and 320 Hz at ±45°)
-  implies a taper compressed around noon; the shared knob mapping offers only linear, log and
+- **CUTOFF legend vs taper.** The printed legend (500 Hz at 12 o'clock, 1.2 kHz and 320 Hz at ±40°,
+  p.28) implies a taper compressed around noon; the shared knob mapping offers only linear, log and
   exponential, so with the twin's 20 Hz × 1000^travel the marks read 0.3-0.7 octave off. The LCD and
   readout show the true value and no lesson relies on the marks. Fixing it needs a custom taper in
   `lib/controls/mapping.ts` (outside this device).
+- **Knob sweep.** Measured on the p.28 drawing, the scales run ±140° (280°): RESONANCE 0-10 at
+  27.9° a step, CUTOFF's 20 Hz and 20 kHz ticks at ±140°, 80 Hz and 5 kHz at ±90°. The twin uses the
+  panel default 270° (5° short at each end). The manual's only clock position is 12 o'clock (the
+  centre of the bipolar amounts and of KB TRACK), the factory settings are unpublished and no lesson
+  or preset names another clock position, so nothing depends on it; Moog's 300° sweep does not apply
+  here. With `PanelLayout.knobTravel`, 280 plus the legend angles in `layout.tsx` (±135° → ±140°,
+  CUTOFF ±43° → ±40°) would match the drawing.
 - **Dense legends on iPad.** The MOD DEST LED names (6.9 px), the MOD SOURCE and WAVE positions
   (6-8 px) and the jack names (6.5-8.5 px) stay small: the iPad fit (0.82) is below the 0.85 the
   panel's text floors assume, and the panel is as dense as the hardware's. The LCD shows any control
