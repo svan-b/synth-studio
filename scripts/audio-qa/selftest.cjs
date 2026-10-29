@@ -139,6 +139,9 @@ function run({ log = console.log } = {}) {
   // 0.05 -> 0.45 -> 0.15 with ~24-sample tanh edges: steep but continuous
   const steep = new Float32Array(Math.round(fs * 0.5)).map((v, i) => 0.25 + 0.2 * Math.tanh((i - 0.2 * fs) / 6) - 0.15 * Math.tanh((i - 0.3 * fs) / 6));
   check('clicks in a steep smooth transient (24-sample edges)', clicks(steep), 0, 0);
+  // A bright ping (8 kHz, 3 ms decay, phase 0): a rimshot-like transient, not a step
+  const ping = new Float32Array(Math.round(fs * 0.05)).map((v, i) => 0.5 * Math.exp(-i / fs / 0.003) * Math.sin(2 * Math.PI * 8000 * i / fs));
+  check('clicks in a bright 8 kHz ping (rimshot-like transient)', clicks(concat(zeros(fs, 0.2), ping, zeros(fs, 0.2))), 0, 0);
   // A 2 ms band-passed noise burst (beater click) into the kick: a designed transient, not a step
   const burst = noise(fs, 0.002, 0.3, 3);
   for (let i = 1; i < burst.length; i++) burst[i] = 0.6 * burst[i] + 0.4 * burst[i - 1];

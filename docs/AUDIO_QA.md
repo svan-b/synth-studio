@@ -45,7 +45,7 @@ Each preset takes about 7.5 s: realtime capture of 0.25 s pre-roll, 4 s of playi
 | `--from <dir\|file>` | Re-evaluate saved JSON reports with the current config, `--target` and `--suggest`. With `--out`, also rewrite the reports there. |
 | `--selftest` | Run the metric self-test (no browser) |
 
-Exit codes: 0 means nothing was flagged, 1 means some presets are flagged, and 2 means a tool error (setup failed, or the calibration failed).
+Exit codes: 0 means nothing was flagged, 1 means something was flagged (a preset, or errors while the app loaded an instrument), and 2 means a tool error (setup failed, or the calibration failed).
 
 ## What happens to each preset
 
@@ -96,15 +96,17 @@ The instrument tap is always measured as two channels, exactly as the stereo bus
 
 ### Click detection
 
-A click is a step in the waveform's value. A slope change is not a click: an instant VCA attack on a waveform at a steep point, a curving attack or a fast pitch sweep does not count. For every sample the detector extrapolates the signal into a 3-sample gap from both sides, with a parabola through the 3 samples just before the gap and one through the 3 samples just after it:
+A click is a step in the waveform's value. A slope change is not a click: an instant VCA attack on a waveform at a steep point, a curving attack or a fast pitch sweep does not count. For every sample the detector extrapolates the signal into a 3-sample gap from both sides, twice: with lines through the 2 samples on each side, and with parabolas through 3.
 
-- **The parabolas meet in the gap.** The signal only bent there (a corner, curvature, a steep but smooth edge), so the step estimate is 0.
-- **They do not meet.** The step estimate is their smallest distance over the gap. That is the height of the step, also when band-limiting spreads it over 2-3 samples.
+- **A pair meets in the gap.** The signal only bent there (a corner, curvature, a steep but smooth edge), so that estimate is 0.
+- **A pair does not meet.** That estimate is the pair's smallest distance over the gap: the height of the step, also when band-limiting spreads it over 2-3 samples.
+
+The step estimate is the smaller of the two. Parabolas see through a corner into a curving attack, where lines would report a step. Lines stay sane on bright content, where parabolas over-shoot. A real step shows in both.
 
 A step counts as a click when:
 
 - it is above -50 dBFS and above 2 % of the capture's peak;
-- the signal is locally smooth on both sides (the step is at least 4x the third difference there);
+- the signal is locally straight on both sides (the step is at least 4x the second difference there);
 - it is at least 2.5x every other step estimate within ±50 ms, so saw, square and sync edges (which repeat every period, down to 20 Hz), noise and bright transients never count;
 - it is at least 10x their RMS.
 
@@ -114,8 +116,8 @@ Measured on 20 real captures (every instrument) with planted defects:
 
 - Cuts to silence were found in 20 of 20, and 128-sample dropouts in 20 of 20.
 - Steps at random sounding moments were found almost always in tonal and smooth material (kicks, basses, drones, sustained notes).
-- Inside a bright saw, pulse, hat or full drum mix, a step smaller than the waveform's own edges is masked by design. Overall, a -26 dBFS step was found in 255 of 400 placements and a -36 dBFS step in 200 of 400.
-- After tuning on the first full run (instant-attack corners, filter-swept saw edges, a 33 Hz saw), no clean capture had a false click.
+- Inside a bright saw, pulse, hat or full drum mix, a step smaller than the waveform's own edges is masked by design. Overall, a -26 dBFS step was found in 221 of 400 placements and a -36 dBFS step in 162 of 400.
+- After tuning on the first full runs (instant-attack corners, curving attacks, filter-swept saw edges, a 33 Hz saw, bright rimshot and FM transients), none of 37 clean captures had a false click.
 
 The detector does not find zipper noise (a periodic train of small gain steps) or clicks that a low-pass filter has already rounded off (thumps).
 
@@ -179,7 +181,7 @@ The steady signals cover the whole capture, so the integrated value is not lower
 - EBU Tech 3341 cases 1-4, including both gates (all within 0.02 LU);
 - true peak;
 - DC, correlation, dropouts and tails;
-- 21 click cases: saw, square, noise, kicks, corners, fades and smooth edges that must not count, and steps, cuts, voice steals and band-limited steps that must.
+- 23 click cases: saw, square, noise, kicks, corners, pings, fades and smooth edges that must not count, and steps, cuts, voice steals and band-limited steps that must.
 
 ## Reports
 

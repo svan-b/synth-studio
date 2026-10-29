@@ -279,21 +279,25 @@ function sanitize(x) {
 // Clicks / discontinuities
 //
 // A click is a step in the waveform's value. For every sample n a "step
-// estimate" s[n] extrapolates the signal into a 3-sample gap from both sides:
-// a parabola through x[n-4..n-2] (just before) and one through x[n+1..n+3]
-// (just after). If the two meet anywhere in the gap the signal only bent there
-// (a corner such as an instant attack, a curving transient, a fast sweep) and
-// s = 0; otherwise s is their smallest distance over the gap, which is the
-// height of the step, also when band-limiting spreads it over 2-3 samples.
-// A step counts as a click when
+// estimate" s[n] extrapolates the signal into a 3-sample gap from both sides,
+// twice: with lines through x[n-3..n-2] and x[n+1..n+2], and with parabolas
+// through x[n-4..n-2] and x[n+1..n+3]. Where a pair meets anywhere in the gap
+// the signal only bent there and that estimate is 0; otherwise it is the pair's
+// smallest distance over the gap, the height of the step (also when
+// band-limiting spreads it over 2-3 samples). s is the smaller of the two: the
+// parabolas see through a corner into a curving attack (an instant VCA attack),
+// where lines would report a step, and lines stay sane on bright content, where
+// parabolas over-shoot. A real step shows in both. The masking context below is
+// measured with the line estimate, which also counts the waveform's own
+// corners and kinks. A step counts as a click when
 //   - s is above an absolute floor (default -50 dBFS, and 2 % of the capture peak),
-//   - the signal is locally smooth on both sides: s is at least `straightness` x
-//     the third difference there (a sharp but smooth edge bends into the gap),
-//   - s is at least `isolation` x every other s within +-50 ms (outside the
-//     +-3 samples a step occupies): saw / square / sync edges repeat every
+//   - the signal is locally straight on both sides: s is at least `straightness` x
+//     the second difference there (a sharp but smooth edge bends into the gap),
+//   - s is at least `isolation` x every line estimate within +-50 ms (outside
+//     the +-3 samples a step occupies): saw / square / sync edges repeat every
 //     period, and noise bursts or bright transients put several step-like
 //     values within a few samples, so they never count; and
-//   - s is at least `rmsRatio` x the RMS of s over the same context.
+//   - s is at least `rmsRatio` x the RMS of the line estimates over the same context.
 // Each click is classified: onset (silence before it), cutoff (silence after
 // it) or mid (inside a sound: glitches, zipper steps, voice steals, dropouts).
 // detectCutoffs() adds sounds that stop dead (full level, then silence), which
@@ -321,9 +325,17 @@ function detectClicksChannel(x, fs, opts) {
   const W = Math.round((opts.contextMs / 1000) * fs);
   const E = Math.max(3, opts.guardSamples | 0);
   const S = W - E;
-  const a = new Float32Array(N);
+  const a = new Float32Array(N);    // step estimate: min(lines, parabolas)
+  const ctx = new Float32Array(N);  // line estimate alone: the masking context
   for (let n = 4; n < N - 3; n++) {
-    // left parabola (Newton backward differences at n-2), right one (forward at n+1)
+    // lines: right minus left at both ends of the gap (n-2 and n+1)
+    const base = x[n + 1] - x[n - 2];
+    const l0 = base - 3 * (x[n + 2] - x[n + 1]);
+    const l1 = base - 3 * (x[n - 2] - x[n - 3]);
+    if (!(l0 > 0 && l1 > 0) && !(l0 < 0 && l1 < 0)) continue; // they cross: no step
+    const lin = Math.min(Math.abs(l0), Math.abs(l1));
+    ctx[n] = lin;
+    // parabolas (Newton backward differences at n-2, forward at n+1)
     const p = x[n - 2], pd1 = p - x[n - 3], pd2 = p - 2 * x[n - 3] + x[n - 4];
     const q = x[n + 1], qd1 = x[n + 2] - q, qd2 = x[n + 3] - 2 * x[n + 2] + q;
     let min = Infinity, pos = false, neg = false;
@@ -334,17 +346,17 @@ function detectClicksChannel(x, fs, opts) {
       const m = Math.abs(D);
       if (m < min) min = m;
     }
-    a[n] = pos && neg ? 0 : min;
+    a[n] = pos && neg ? 0 : Math.min(lin, min);
   }
   const cum2 = new Float64Array(N + 1);
-  for (let n = 0; n < N; n++) cum2[n + 1] = cum2[n] + a[n] * a[n];
-  const M = slidingMax(a, S);
+  for (let n = 0; n < N; n++) cum2[n + 1] = cum2[n] + ctx[n] * ctx[n];
+  const M = slidingMax(ctx, S);
   const rangeMax = (lo, hi) => { // inclusive, clipped
     lo = Math.max(0, lo); hi = Math.min(N - 1, hi);
     if (hi < lo) return 0;
     if (hi - lo + 1 === S) return M[lo];
     let m = 0;
-    for (let i = lo; i <= hi; i++) if (a[i] > m) m = a[i];
+    for (let i = lo; i <= hi; i++) if (ctx[i] > m) m = ctx[i];
     return m;
   };
   const rangeSq = (lo, hi) => {
@@ -357,10 +369,10 @@ function detectClicksChannel(x, fs, opts) {
   for (let n = 5; n < N - 4; n++) {
     const v = a[n];
     if (v < thr || v < a[n - 1] || v < a[n + 1]) continue;
-    // A step sits between locally smooth signal; a fast but smooth edge (a
-    // band-limited wrap behind a resonant filter) bends on both sides of it
-    const bend = Math.max(Math.abs(x[n - 2] - 3 * x[n - 3] + 3 * x[n - 4] - x[n - 5]), Math.abs(x[n + 4] - 3 * x[n + 3] + 3 * x[n + 2] - x[n + 1]));
-    if (v <= opts.straightness * bend) continue;
+    // A step sits between locally straight signal; a fast but smooth edge (a
+    // band-limited wrap behind a resonant filter) curves on both sides of it
+    const curve = Math.max(Math.abs(x[n - 2] - 2 * x[n - 3] + x[n - 4]), Math.abs(x[n + 3] - 2 * x[n + 2] + x[n + 1]));
+    if (v <= opts.straightness * curve) continue;
     const m2 = Math.max(rangeMax(n - W, n - E - 1), rangeMax(n + E + 1, n + W));
     if (v <= opts.isolation * m2) continue;
     const [s1, c1] = rangeSq(n - W, n - E - 1);

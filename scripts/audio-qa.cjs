@@ -468,7 +468,12 @@ async function runDevice(browser, device, run, calibration) {
       writeWav(`${base}.inst.wav`, ch[0], ch[1], info.sampleRate);
       if (rec.master) writeWav(`${base}.master.wav`, ch[2], ch[3], info.sampleRate);
     }
-    if (rec.runError && !(await alive(dp.page))) {
+    if (rec.runError && (!browser.isConnected() || !(await alive(dp.page)))) {
+      if (!browser.isConnected()) {
+        console.log(`  [${device}] the browser went away`);
+        presets.slice(i + 1).forEach(p => records.push({ key: p.key, name: p.name, source: p.source, cables: p.cables, errors: [], runNotes: [], runError: 'not measured: the browser went away' }));
+        break;
+      }
       if (++recoveries > 3) {
         console.log(`  [${device}] page keeps failing - giving up on the remaining presets`);
         presets.slice(i + 1).forEach(p => records.push({ key: p.key, name: p.name, source: p.source, cables: p.cables, errors: [], runNotes: [], runError: 'not measured: the page kept failing' }));
@@ -638,7 +643,8 @@ async function main() {
   const out = path.resolve(args.out || DEFAULT_OUT);
   fs.mkdirSync(out, { recursive: true });
   const { chromium } = require('playwright');
-  const browser = await chromium.launch({ headless: !args.headed, args: ['--autoplay-policy=no-user-gesture-required'] });
+  const launch = () => chromium.launch({ headless: !args.headed, args: ['--autoplay-policy=no-user-gesture-required'] });
+  let browser = await launch();
   const run = {
     args, cfg, ex, baseUrl, out, registry, override, th: cfg.thresholds,
     presetRe: args.presets ? new RegExp(args.presets, 'i') : null,
@@ -662,9 +668,15 @@ async function main() {
       fs.writeFileSync(path.join(out, 'calibration.md'), `# Audio QA meter calibration\n\n${R.calibrationMarkdown(cal)}\n`);
       return cal.ok ? 0 : 1;
     }
-    for (const device of devices) results.push(await runDevice(browser, device, run, calibration));
+    for (const device of devices) {
+      if (!browser.isConnected()) {
+        console.log('  the browser went away - relaunching it');
+        browser = await launch();
+      }
+      results.push(await runDevice(browser, device, run, calibration));
+    }
   } finally {
-    await browser.close();
+    try { await browser.close(); } catch { /* already gone */ }
   }
   if (calibration && calibration.result) {
     fs.writeFileSync(path.join(out, 'calibration.json'), JSON.stringify(calibration.result, null, 1) + '\n');
