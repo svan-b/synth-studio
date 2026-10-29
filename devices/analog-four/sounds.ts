@@ -14,8 +14,8 @@
 import { dest } from './params';
 
 export type SoundParams = Record<string, number>;
-/** One trig of a demo phrase: step, note, LEN index, VEL */
-export type DemoStep = [number, number, number, number?];
+/** One trig of a demo phrase: step, note, LEN index, VEL, slide (glide into it from the previous note) */
+export type DemoStep = [number, number, number, number?, boolean?];
 
 export interface SoundDef {
   id: string;
@@ -43,6 +43,8 @@ const BASS_DEMO: DemoStep[] = [[0, 36, 14], [3, 36, 10], [6, 48, 10], [8, 36, 14
 /** A bouncier 16th-note bass line (10 notes) */
 const RUBBER_DEMO: DemoStep[] = [[0, 36, 10], [2, 36, 10, 80], [3, 48, 10], [6, 36, 10], [8, 39, 10], [10, 36, 10, 80], [11, 43, 10], [12, 46, 10], [14, 36, 10], [15, 48, 10, 80]];
 const LEAD_DEMO: DemoStep[] = [[0, 72, 30], [4, 75, 14], [6, 79, 14], [8, 77, 30], [12, 74, 14], [14, 70, 14]];
+/** The lead line with slide trigs: each slide's previous note overlaps it, so the gate stays open */
+const GLIDE_DEMO: DemoStep[] = [[0, 72, 46], [3, 75, 22, 100, true], [4, 79, 38, 100, true], [6, 77, 30, 100, true], [8, 74, 46], [11, 70, 22, 100, true], [12, 72, 30, 100, true], [14, 67, 14]];
 const PAD_DEMO: DemoStep[] = [[0, 60, 78], [8, 63, 46]];
 /** Plucks: an 8th-note line */
 const PLUCK_DEMO: DemoStep[] = [[0, 60, 10], [2, 67, 10], [4, 72, 10], [6, 70, 10], [8, 67, 10], [10, 63, 10], [12, 65, 10], [14, 67, 10]];
@@ -136,9 +138,9 @@ export const SOUNDS: SoundDef[] = [
   },
   {
     id: 'lead-porta', name: 'Lead / Glide Saw', category: 'Lead',
-    desc: 'Portamento always on: every note slides from the last one.',
+    desc: 'Portamento ON: every note you play on the keyboard glides from the last one in the SLI time. Portamento leaves the sequencer\'s notes alone, so the demo glides with slide trigs.',
     p: { snd_prt: 1, osc_sli: 50, osc2_lev: 70, osc2_tun: -12, flt1_frq: 96, flt1_res: 24, amp_sus: 127, amp_rel: 20 },
-    demo: LEAD_DEMO,
+    demo: GLIDE_DEMO,
   },
   {
     id: 'lead-whistle', name: 'Lead / Filter Whistle', category: 'Lead',

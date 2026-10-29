@@ -5,14 +5,15 @@
 //           public/worklets/analog-four-processors.js)        out0 dry, out1 sends
 //              │ dry ──────────────────────────────────────────────┐
 //              │ sends (cho, del, rev) ──┬─► split ─► chorus ─┐    │
-//              │                         └──────────────────► a4-fx (delay, sends, mix) ─► main ─► out
+//              │                         └──────────────────► a4-fx (delay, sends, mix) ─► stage ─► main ─► out
 //   T(n+1) mono ─► T(n) input (OSC 2 WAV NEI)                  ▲        │ reverb send
 //   a4-fxmod (FX track params, FX LFOs, locks) ─► split ─► chorus / reverb params, a4-fx params
-//                                                         fdn-reverb ◄──┘ ─► revRet ─► main
+//                                                         fdn-reverb ◄──┘ ─► revRet ─► stage
+//   stage: the analog output stage (a soft rail above 0 dBFS); main: MAIN VOLUME
 //
 // Worklet nodes: 4 voices + a4-fxmod + chorus + fdn-reverb + a4-fx = 8 (the
 // previous version used 36 plus about 120 native nodes). Native: 2 splitters,
-// 2 gains.
+// 4 gains, 1 wave shaper.
 //
 // Sequencer: the shared ElektronSequencer with 6 tracks (T1-T4, FX, CV). Trigs
 // carry their parameter locks to the voice at the trig's audio time; the next
@@ -55,6 +56,12 @@ const FXC = { CHO_RATE: 0, CHO_DEPTH: 1, CHO_DELAY: 2, CHO_FB: 3, CHO_WIDTH: 4, 
 const FX_CHANNELS = 25;
 /** [STOP][STOP]: how long the send effects take to fade out */
 const FX_FADE_SEC = 0.3;
+/**
+ * A stop that did not come from the A4's own [STOP] key - the studio's stop (the top bar, Space,
+ * the arranger's end, another machine) - is a full stop for the whole rack: the send effects fade
+ * out over this time instead of ringing on (twin choice; the manual only describes the A4's keys)
+ */
+const STUDIO_STOP_FADE_SEC = 1.5;
 /** A riff for an empty pattern's audition: [step, semitones from the keyboard's C, length in steps] */
 const AUDITION_RIFF: [number, number, number][] = [
   [0, 0, 2], [2, 7, 1], [4, 12, 2], [6, 10, 1], [8, 7, 2], [10, 3, 1], [12, 5, 1], [14, 7, 2],
@@ -70,6 +77,25 @@ function voiceOptions() {
     defs.push(p ? p.def : 0);
   }
   return { keys: VOICE_KEYS, mins, maxs, defs, dests: MOD_DESTS.map(d => ({ keys: d.keys, range: d.range })) };
+}
+
+/**
+ * The analog output stage, ahead of MAIN VOLUME (the FX returns are mixed in before it, manual p.15):
+ * unity up to 0 dBFS, then a soft knee towards +3.5 dBFS, so however hot a kit is (every source,
+ * accent, VOL and TRACK LEVEL up) the A4 stays below about +0.2 dBFS at the default MAIN VOLUME.
+ * Drawn over +-3 (the shaper's input is scaled by 1/3 and its output by 3).
+ */
+const STAGE_SPAN = 3;
+function outputStageCurve(): Float32Array<ArrayBuffer> {
+  const n = 4097;
+  const c = new Float32Array(new ArrayBuffer(n * 4));
+  for (let i = 0; i < n; i++) {
+    const x = ((i / (n - 1)) * 2 - 1) * STAGE_SPAN;
+    const a = Math.abs(x);
+    const y = a <= 1 ? a : 1 + 0.5 * Math.tanh((a - 1) / 0.5);
+    c[i] = (Math.sign(x) * y) / STAGE_SPAN;
+  }
+  return c;
 }
 
 function fxOptions() {
@@ -127,6 +153,8 @@ export class AnalogFourEngine extends BaseEngine {
   /** The audition in progress (a preview): its stop */
   private auditionEnd: (() => void) | null = null;
   private fxFaded = false;
+  /** Audio time of the last press of the A4's own [STOP] key (its stop lets the sends ring) */
+  private stopKeyAt = -Infinity;
   /** Voice t feeds track t+1's OSC 2 (WAV NEI): it keeps running while its VCA is closed */
   private feedOn = [false, false, false];
   /** The playing trig of each synth track locks OSC 2 WAV to NEI */
@@ -193,9 +221,17 @@ export class AnalogFourEngine extends BaseEngine {
     sendSplit.connect(this.chorus, 0, 0);
     this.chorus.connect(this.fx, 0, 1);
     this.fxmod.connect(this.fx, 0, 3);
-    this.fx.connect(this.main, 0);
+    const stageIn = ctx.createGain();
+    stageIn.gain.value = 1 / STAGE_SPAN;
+    const stage = ctx.createWaveShaper();
+    stage.curve = outputStageCurve();
+    stage.oversample = '2x';
+    const stageOut = ctx.createGain();
+    stageOut.gain.value = STAGE_SPAN;
+    stageIn.connect(stage).connect(stageOut).connect(this.main);
+    this.fx.connect(stageIn, 0);
     this.fx.connect(this.reverb, 1, 0);
-    this.reverb.connect(revRet).connect(this.main);
+    this.reverb.connect(revRet).connect(stageIn);
     this.main.connect(this.out);
 
     // --- sequencer -------------------------------------------------------------
@@ -220,6 +256,8 @@ export class AnalogFourEngine extends BaseEngine {
             this.arps[t] = null;
             this.voices[t].port.postMessage({ t: 'cut' });
           }
+          // ... but only the A4's own [STOP] key lets them ring: a studio stop fades them
+          if (now - this.stopKeyAt > 0.6) this.fadeFx(STUDIO_STOP_FADE_SEC);
         }
         this.locks.releaseAll((track, key) => this.revert(track, key, now));
       },
@@ -463,7 +501,8 @@ export class AnalogFourEngine extends BaseEngine {
       this.startArp(t, [note, ...this.arpOffsets(t).map(o => note + o)], e.time, e.duration, e.velocity, e.accent, false);
       return;
     }
-    v.port.postMessage({ t: 'on', time: e.time, note, vel: e.velocity, acc: e.accent ? 1 : 0, slide: e.slide, rt });
+    // ARP LEG also makes the track's overlapping note trigs legato with the arpeggiator off (manual p.44)
+    v.port.postMessage({ t: 'on', time: e.time, note, vel: e.velocity, acc: e.accent ? 1 : 0, slide: e.slide, rt, leg: this.arpVal(t, 'arp_leg') >= 0.5 });
   }
 
   private gateOff(track: number, time: number) {
@@ -668,6 +707,8 @@ export class AnalogFourEngine extends BaseEngine {
         break;
       // [STOP][STOP] while stopped: the send effects fade out (manual p.38)
       case 'a4:fxfade': this.fadeFx(); break;
+      // the A4's own [STOP] key: the stop it causes lets the send effects ring (manual p.38)
+      case 'a4:stopkey': this.stopKeyAt = this.ctx.currentTime; break;
       case 'a4:audition': this.startAudition(); break;
       case 'a4:audition:stop': this.auditionEnd?.(); break;
     }
@@ -677,9 +718,9 @@ export class AnalogFourEngine extends BaseEngine {
   // Send-FX fade, auditions
   // --------------------------------------------------------------------------
 
-  private fadeFx() {
+  private fadeFx(dur = FX_FADE_SEC) {
     this.fxFaded = true;
-    this.fxmod.port.postMessage({ t: 'fade', dur: FX_FADE_SEC });
+    this.fxmod.port.postMessage({ t: 'fade', dur });
   }
 
   private unfadeFx() {
