@@ -202,6 +202,20 @@ const MOOG: StudioSet[] = [
 
 const MORE: StudioSet[] = [
   {
+    // The "Three Clocks" demo's set: the 3-tier Moog rack on a DJ mixer, one clock for all
+    id: 'moog-sound-studio-mix',
+    name: 'Moog Sound Studio + mixer',
+    description: 'DFAM, Mother-32 and Subharmonicon on Xone:96 channels 1-3, with its delay and reverb returns. The Studio Clock steps the DFAM by cable.',
+    goal: 'Mix three semi-modulars like a band: EQ each one into its own frequency range, then send the Subharmonicon into the delay.',
+    rack: [slot('studio-clock'), slot('dfam'), slot('mother32'), slot('subharmonicon'), slot('xone96')],
+    routes: { dfam: 'xone96:studio_1', mother32: 'xone96:studio_2', subharmonicon: 'xone96:studio_3' },
+    sync: { mother32: true, subharmonicon: true, xone96: true },
+    cables: [CLOCK_TO_DFAM],
+    channels: { dfam: ch(0), mother32: ch(0), subharmonicon: ch(0), xone96: ch(0) },
+    bpm: 110,
+    focus: 'xone96',
+  },
+  {
     id: 'bass-and-drums',
     name: 'Bass & drums',
     description: 'Rytm drums with a Sub 37 bassline on the arpeggiator, mixed on the Xone:96.',
