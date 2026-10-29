@@ -38,6 +38,29 @@ const CLOCK_TO_DFAM: StudioCable = { from: { instance: 'studio-clock', jack: 'ou
 
 const ch = (gain: number, pan = 0, sendA = MIN_DB, sendB = MIN_DB): Partial<ChannelDoc> => ({ gain, pan, sendA, sendB });
 
+/**
+ * Starting levels of the instruments routed into the Xone:96 in the Elektron stages and the
+ * bigger sets, measured like MOOG_LINE_UP below: the Xone's channel meters (meterSnapshot)
+ * while the set plays each instrument's default sound, the Sub 37 (no pattern of its own) its
+ * preview phrase. Alone, each channel then averages about 0 with peaks near +4 (Xone:96 guide
+ * p.39). Average / peak before -> after:
+ *   Analog Rytm  +6 / +10 at 0 dB (the reviewed kits)  -> -6 dB:    0 / +4 to +5.5
+ *   Analog Four  -0.6 / +6 at -3 dB, a peaky sound      -> -4 dB:    -1.5 / +5
+ *   Sub 37       +1.6 / +2.4 at -3 dB                   -> -4.5 dB:  0 / +1
+ *   DFAM         -3.4 / -2.5 at -6 dB (panned -0.3, 120-124 BPM) -> -2.5 dB: 0 / +1
+ * The Mother-32 and Subharmonicon use MOOG_LINE_UP.
+ */
+const LINE_UP = { 'analog-rytm': -6, 'analog-four': -4, sub37: -4.5, dfam: -2.5 } as const;
+/**
+ * Lined-up channels sum hotter on the LR MIX, whose PK! LED (+10 dBu sample peaks, faders up)
+ * was lit for 97-100 % of the play in every one of these sets at their old levels - the Rytm
+ * alone at 0 dB lit it. With two or more instruments each set starts its channels this much
+ * under the line-up: the smallest trim, in 1 dB steps, that kept the PK! dark in every 32-64 s
+ * run (1 dB less lit it at least once). Channels then average about -2.5 to -7.5, the LR MIX
+ * -3.5 to 0 with peaks +4 to +5 (64 s each, PK! dark throughout).
+ */
+const SET_TRIM = { live: -4.5, bassDrums: -2.5, full: -5, everything: -6.5 } as const;
+
 // ---- Elektron track: drums, clock, mixer, bass & chords, full set -----------------
 
 const ELEKTRON: StudioSet[] = [
@@ -76,7 +99,7 @@ const ELEKTRON: StudioSet[] = [
     rack: [slot('studio-clock'), slot('analog-rytm'), slot('xone96')],
     routes: { 'analog-rytm': 'xone96:studio_1' },
     sync: { 'analog-rytm': true, xone96: true },
-    channels: { 'analog-rytm': ch(0, 0, MIN_DB, -24) },
+    channels: { 'analog-rytm': ch(LINE_UP['analog-rytm'], 0, MIN_DB, -24) },
     bpm: 124,
     focus: 'xone96',
   },
@@ -91,8 +114,8 @@ const ELEKTRON: StudioSet[] = [
     routes: { 'analog-rytm': 'xone96:studio_1', 'analog-four': 'xone96:studio_2' },
     sync: { 'analog-rytm': true, 'analog-four': true, xone96: true },
     channels: {
-      'analog-rytm': ch(0, 0, MIN_DB, -24),
-      'analog-four': ch(-3, 0, -20, -14),
+      'analog-rytm': ch(LINE_UP['analog-rytm'] + SET_TRIM.live, 0, MIN_DB, -24),
+      'analog-four': ch(LINE_UP['analog-four'] + SET_TRIM.live, 0, -20, -14),
     },
     bpm: 124,
     focus: 'analog-four',
@@ -109,10 +132,10 @@ const ELEKTRON: StudioSet[] = [
     sync: { 'analog-rytm': true, 'analog-four': true, sub37: true, xone96: true },
     cables: [CLOCK_TO_DFAM],
     channels: {
-      'analog-rytm': ch(0, 0, MIN_DB, -24),
-      'analog-four': ch(-4, 0, -20, -14),
-      sub37: ch(-3, 0),
-      dfam: ch(-6, -0.3, MIN_DB, -18),
+      'analog-rytm': ch(LINE_UP['analog-rytm'] + SET_TRIM.full, 0, MIN_DB, -24),
+      'analog-four': ch(LINE_UP['analog-four'] + SET_TRIM.full, 0, -20, -14),
+      sub37: ch(LINE_UP.sub37 + SET_TRIM.full, 0),
+      dfam: ch(LINE_UP.dfam + SET_TRIM.full, -0.3, MIN_DB, -18),
     },
     bpm: 124,
     focus: 'analog-rytm',
@@ -238,7 +261,7 @@ const MORE: StudioSet[] = [
     rack: [slot('analog-rytm'), slot('sub37'), slot('xone96')],
     routes: { 'analog-rytm': 'xone96:studio_1', sub37: 'xone96:studio_2' },
     sync: { 'analog-rytm': true, sub37: true, xone96: true },
-    channels: { 'analog-rytm': ch(0), sub37: ch(-3) },
+    channels: { 'analog-rytm': ch(LINE_UP['analog-rytm'] + SET_TRIM.bassDrums), sub37: ch(LINE_UP.sub37 + SET_TRIM.bassDrums) },
     bpm: 122,
     focus: 'sub37',
   },
@@ -259,12 +282,12 @@ const MORE: StudioSet[] = [
     sync: { 'analog-rytm': true, 'analog-four': true, sub37: true, mother32: true, subharmonicon: true, xone96: true },
     cables: [CLOCK_TO_DFAM],
     channels: {
-      'analog-rytm': ch(0, 0, MIN_DB, -24),
-      'analog-four': ch(-4, 0, -20, -14),
-      sub37: ch(-3),
-      dfam: ch(-6, -0.3, MIN_DB, -18),
-      mother32: ch(-5, 0.3, -18, MIN_DB),
-      subharmonicon: ch(-8, -0.25, MIN_DB, -12),
+      'analog-rytm': ch(LINE_UP['analog-rytm'] + SET_TRIM.everything, 0, MIN_DB, -24),
+      'analog-four': ch(LINE_UP['analog-four'] + SET_TRIM.everything, 0, -20, -14),
+      sub37: ch(LINE_UP.sub37 + SET_TRIM.everything),
+      dfam: ch(LINE_UP.dfam + SET_TRIM.everything, -0.3, MIN_DB, -18),
+      mother32: ch(MOOG_LINE_UP.mother32 + SET_TRIM.everything, 0.3, -18, MIN_DB),
+      subharmonicon: ch(MOOG_LINE_UP.subharmonicon + SET_TRIM.everything, -0.25, MIN_DB, -12),
     },
     bpm: 120,
     focus: 'analog-rytm',
