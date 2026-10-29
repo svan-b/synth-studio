@@ -4,7 +4,7 @@ import type { ControlValue, DeviceSpec, Lesson, LessonCheckState, LessonStep, Mu
 import type { RackSlot, StudioCable } from '@/devices/types';
 import { isStepSatisfied, isValueOnTarget, valueToNorm, defaultOf } from '@/lib/controls/mapping';
 import { transport } from '@/lib/audio/transport';
-import { STORE_VERSION, upgradeDevices } from '@/lib/studio/upgrades';
+import { STORE_VERSION, upgradeCompletedLessons, upgradeDevices } from '@/lib/studio/upgrades';
 import type { ChannelDoc, DelayDoc, MasterDoc, MixerDoc, ReverbDoc } from '@/lib/studio/mixerDoc';
 import { throttledLocalStorage } from '@/lib/studio/persistStorage';
 import { STUDIO_LESSONS } from '@/lib/studio/lessons';
@@ -1147,7 +1147,7 @@ export const useStudioStore = create<StudioStore>()(
           currentDevice,
           devices,
           studio,
-          completedLessons: (old.completedLessons as string[]) ?? [],
+          completedLessons: upgradeCompletedLessons((old.completedLessons as string[]) ?? [], version),
           review: (old.review as Record<string, ReviewItem>) ?? {},
           focusMode: (old.focusMode as boolean) ?? true,
         } as unknown as StudioStore;

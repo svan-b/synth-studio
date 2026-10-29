@@ -254,7 +254,7 @@ interface MeterEl {
   holds: [HTMLElement, HTMLElement];
   read: Reader;
   clip?: HTMLElement;
-  state: { v: [number, number]; hold: [number, number]; holdT: [number, number]; clipT: number; shown: string[] };
+  state: { v: [number, number]; hold: [number, number]; holdT: [number, number]; clipT: number; shown: string[]; colour: string[] };
 }
 
 const meters = new Set<MeterEl>();
@@ -277,12 +277,17 @@ function tickMeters(t: number) {
       m.state.v[c] = cur;
       if (cur >= m.state.hold[c] || t - m.state.holdT[c] > 1500) { m.state.hold[c] = cur; m.state.holdT[c] = t; }
       const p = cur <= -60 ? 0 : dbToFader(Math.min(MAX_DB, cur));
-      const tf = `scaleY(${p.toFixed(3)})`;
+      // Whole-percent steps (well under a pixel here) and the colour only when its band
+      // changes: fewer writes and repaints while the user plays and drags on an iPad.
+      const tf = `scaleY(${p.toFixed(2)})`;
       if (tf !== m.state.shown[c]) {
         m.state.shown[c] = tf;
-        const bar = m.bars[c];
-        bar.style.transform = tf;
-        bar.style.background = cur > -1 ? '#ef4444' : cur > -9 ? '#eab308' : '#22c55e';
+        m.bars[c].style.transform = tf;
+      }
+      const colour = cur > -1 ? '#ef4444' : cur > -9 ? '#eab308' : '#22c55e';
+      if (colour !== m.state.colour[c]) {
+        m.state.colour[c] = colour;
+        m.bars[c].style.background = colour;
       }
       const hp = m.state.hold[c] <= -60 ? 0 : dbToFader(Math.min(MAX_DB, m.state.hold[c]));
       const ht = hp > 0.02 ? `translateY(${((1 - hp) * 100).toFixed(1)}%)` : 'translateY(100%)';
@@ -307,7 +312,7 @@ export function useMeter(read: Reader) {
       holds: [holds[0], holds[1]],
       read: () => readRef.current(),
       clip: el.querySelector<HTMLElement>('[data-clip]') ?? undefined,
-      state: { v: [-90, -90], hold: [-90, -90], holdT: [0, 0], clipT: -1e9, shown: ['', '', '', ''] },
+      state: { v: [-90, -90], hold: [-90, -90], holdT: [0, 0], clipT: -1e9, shown: ['', '', '', ''], colour: ['', ''] },
     };
     meters.add(m);
     if (!meterCb) { lastT = 0; meterCb = onFrame(tickMeters); }
@@ -326,8 +331,8 @@ export function StereoMeter({ read, showClip = false }: { read: Reader; showClip
     <div ref={ref} className="absolute inset-0 flex gap-[1px]" aria-hidden>
       {[0, 1].map(c => (
         <div key={c} className="relative flex-1 bg-black/70 rounded-[1px] overflow-hidden">
-          <div data-bar className="absolute inset-0 origin-bottom will-change-transform" style={{ transform: 'scaleY(0)' }} />
-          <div data-hold className="absolute inset-0 will-change-transform" style={{ transform: 'translateY(100%)' }}>
+          <div data-bar className="absolute inset-0 origin-bottom" style={{ transform: 'scaleY(0)' }} />
+          <div data-hold className="absolute inset-0" style={{ transform: 'translateY(100%)' }}>
             <div className="h-[2px] bg-white/80" />
           </div>
         </div>

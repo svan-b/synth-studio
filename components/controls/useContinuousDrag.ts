@@ -14,7 +14,7 @@ export interface ContinuousDragConfig {
   commit: (norm: number) => void;
   /** Double-tap / double-click */
   reset: () => void;
-  /** Screen pixels of drag for the full travel */
+  /** Screen pixels of drag for the full travel (read when a drag starts) */
   travelPx: () => number;
   /**
    * knob       mouse: drag up/down or left/right (the first direction wins); touch: drag
@@ -23,7 +23,7 @@ export interface ContinuousDragConfig {
    * horizontal crossfader: the same, turned 90 degrees
    */
   axis: 'knob' | 'vertical' | 'horizontal';
-  /** Screen rectangle of the drawn control (for scrub distance and bubble placement) */
+  /** Screen rectangle of the drawn control, for scrub distance and bubble placement (read when a drag starts) */
   bounds: () => DOMRect | null;
   /** Readout text for a travel value, with units */
   format: (norm: number) => string;
@@ -48,6 +48,13 @@ interface DragState {
   mode: string;
   hint?: string;
   timer: ReturnType<typeof setTimeout> | null;
+  /**
+   * The control's screen rectangle and drag travel, measured once at pointer-down: the
+   * page can't scroll during a drag, and reading them on every move would force a
+   * layout after each value change
+   */
+  rect: DOMRect | null;
+  travel: number;
 }
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
@@ -65,7 +72,16 @@ export function useContinuousDrag(cfg: ContinuousDragConfig) {
   const pending = useRef<number | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [bubble, setBubble] = useState<BubbleState | null>(null);
+  const [bubble, setBubbleState] = useState<BubbleState | null>(null);
+  // Most moves change nothing the bubble shows (a detented knob between detents, a mouse
+  // drag whose bubble stays put): skip those renders
+  const shownBubble = useRef<BubbleState | null>(null);
+  const setBubble = (b: BubbleState | null) => {
+    const a = shownBubble.current;
+    if (a === b || (a && b && a.x === b.x && a.y === b.y && a.value === b.value && a.label === b.label && a.mode === b.mode && a.hint === b.hint)) return;
+    shownBubble.current = b;
+    setBubbleState(b);
+  };
 
   const flush = useCallback(() => {
     if (raf.current) cancelAnimationFrame(raf.current);
@@ -83,12 +99,12 @@ export function useContinuousDrag(cfg: ContinuousDragConfig) {
   };
 
   const place = (d: DragState | null, clientX?: number, clientY?: number): { x: number; y: number } => {
-    const r = cfgRef.current.bounds();
+    const r = d ? d.rect : cfgRef.current.bounds();
     const cx = r ? r.left + r.width / 2 : clientX ?? 0;
     const top = r ? r.top : clientY ?? 0;
     // On touch the finger covers the control: lift the bubble above the finger
-    if (d?.touch && clientY !== undefined) return { x: clientX ?? cx, y: Math.min(top - 10, clientY - 64) };
-    return { x: cx, y: top - 10 };
+    if (d?.touch && clientY !== undefined) return { x: Math.round(clientX ?? cx), y: Math.round(Math.min(top - 10, clientY - 64)) };
+    return { x: Math.round(cx), y: Math.round(top - 10) };
   };
 
   const show = (norm: number, d: DragState | null, clientX?: number, clientY?: number, mode?: string) => {
@@ -150,6 +166,7 @@ export function useContinuousDrag(cfg: ContinuousDragConfig) {
       id: e.pointerId, touch, x0: e.clientX, y0: e.clientY, lastX: e.clientX, lastY: e.clientY, t0: now,
       acc, moved: false, axis: null, longFine: false, mode: '', timer: null,
       hint: touch && takeScrubHint() ? (c.axis === 'horizontal' ? 'Slide up or down for finer control' : 'Slide sideways for finer control') : undefined,
+      rect: c.bounds(), travel: Math.max(40, c.travelPx()),
     };
     if (touch) {
       // Hold still, then drag: fine adjust for the whole drag
@@ -183,7 +200,7 @@ export function useContinuousDrag(cfg: ContinuousDragConfig) {
     const ddy = e.clientY - d.lastY;
     d.lastX = e.clientX;
     d.lastY = e.clientY;
-    const r = c.bounds();
+    const r = d.rect;
     let delta: number;
     let zone = { factor: 1, label: '' };
     if (c.axis === 'horizontal') {
@@ -201,7 +218,7 @@ export function useContinuousDrag(cfg: ContinuousDragConfig) {
     }
     const fine = e.shiftKey || d.longFine || secondFingerDown();
     const factor = Math.max(0.02, zone.factor * (fine ? FINE_FACTOR : 1));
-    d.acc = clamp01(d.acc + (delta * factor) / Math.max(40, c.travelPx()));
+    d.acc = clamp01(d.acc + (delta * factor) / d.travel);
     d.mode = fine ? 'Fine' : zone.label;
     schedule(d.acc);
     show(d.acc, d, e.clientX, e.clientY);

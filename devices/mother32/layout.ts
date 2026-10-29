@@ -1,133 +1,233 @@
 // ============================================================================
 // Mother-32 panel layout
-// 60 HP x 3U Eurorack faceplate: 304.8 x 128.5 mm, wooden end cheeks.
-// All x/y in millimetres from the faceplate's top-left. Controls use their
+// 60 HP x 3U Eurorack faceplate, 304.8 x 128.5 mm, in wooden end cheeks.
+// All x/y in millimetres from the faceplate's top-left; controls use their
 // centre, boxes (section / custom) their top-left.
 //
-// Left ~3/4: three rows of synthesis controls above the sequencer buttons and
-// the 13-key button keyboard. Right ~1/4: the 32-point patch bay (4 x 8),
-// outputs with boxed (inverted) legends, gate inputs ringed - as on the panel.
+// Positions: a blank patch-sheet drawing in the v2 manual (p.68) as measured at
+// 200 dpi by the patchscore project, moved into faceplate coordinates; the screws,
+// the button legends and the bottom band follow the default-panel drawing (p.9),
+// measured from a 200 dpi render (see REFERENCE.md). Three rows of identical black
+// knobs and bat toggles, two rows of square pads (the 13-note keyboard and the
+// sequencer keys) with every legend printed under its button, MIDI IN bottom left,
+// and the 4 x 8 patch bay on the right under its IN / OUT legend. The panel prints
+// no section boxes.
 // ============================================================================
 
-import type { PanelElement, PanelLayout } from '@/types/panel';
+import type { ReactNode } from 'react';
+import type { CustomRenderContext, PanelElement, PanelLayout } from '@/types/panel';
 import { MOTHER32 } from './spec';
-import { renderFn, renderKeyboard } from './panelUi';
+import {
+  BLACK, WHITE, editTarget, renderDin, renderFn, renderKey, renderMidiLed, renderOctLeds, renderReadout, renderSetup, renderStepLeds,
+  renderTempoLed, ui,
+} from './panelUi';
 
-const K = 4.1; // px per mm → ~1250 px faceplate
+const K = 4.1; // px per mm -> 1250 px faceplate
 
-const BIG = 17;
-const MED = 13;
-const SMALL = 11;
+const KNOB = 14.5;          // cap diameter (all 14 knobs are the same size)
+const ROW1 = 18.0, ROW2 = 46.9, ROW3 = 75.9;
+const LEGEND = 7.6;         // px
 
-const ROW1 = 24;
-const ROW2 = 54;
-const ROW3 = 82;
+const knob = (control: string, x: number, y: number): PanelElement =>
+  ({ kind: 'knob', control, x, y, diameter: KNOB, variant: 'moog-black', label: 'none' });
 
-const knob = (control: string, x: number, y: number, diameter = MED): PanelElement =>
-  ({ kind: 'knob', control, x, y, diameter, variant: 'moog-black' });
-const sw = (control: string, x: number, y: number, labelText?: string): PanelElement =>
-  ({ kind: 'switch', control, x, y, scale: 1.8, ...(labelText ? { labelText } : {}) });
-const line = (x: number, y: number, w: number, hgt: number): PanelElement =>
-  ({ kind: 'section', x, y, w, h: hgt, background: '#9a9a9a', radius: 0.2 });
+/** A printed legend above a control (one or two lines) */
+const legend = (text: string, x: number, y: number, size = LEGEND): PanelElement => {
+  const lines = text.split('\n').length;
+  return { kind: 'label', text, x, y: y - KNOB / 2 - (lines === 2 ? 4.0 : 2.6), size, letterSpacing: 0.3 };
+};
+
+/** A bat toggle with its title printed above; position legends sit beside the lever */
+const toggle = (control: string, title: string, x: number, y: number, legendW = 7): PanelElement[] => [
+  { kind: 'switch', control, x: x + legendW / 2, y, scale: 1.9, label: 'none' },
+  { kind: 'label', text: title, x, y: y - (title.includes('\n') ? 9.4 : 8.2), size: LEGEND, letterSpacing: 0.3 },
+];
+
+/** The legend of a knob with a scale ring, printed above the ring (manual p.9) */
+const ringLegend = (text: string, x: number, y: number, size = LEGEND): PanelElement =>
+  ({ kind: 'label', text, x, y: y - 12.6, size, letterSpacing: 0.3 });
+
+/** The printed scale ring of FREQUENCY, PULSE WIDTH, TEMPO and LFO RATE (manual p.9, p.11, p.13) */
+const scaleRing = (x: number, y: number): PanelElement[] => [
+  { kind: 'section', x: x - 10.4, y: y - 10.4, w: 20.8, h: 20.8, radius: 10.4, border: '1px solid #d9d9d9' },
+  { kind: 'section', x: x - 9.0, y: y - 9.0, w: 18.0, h: 18.0, radius: 9.0, border: '1px solid #8a8a8a' },
+];
+
+/** The small holes beside some knobs (the panel drawing, manual p.9; four reach the VCO trimmers, p.61) */
+const hole = (x: number, y: number): PanelElement =>
+  ({ kind: 'section', x: x - 1.25, y: y - 1.25, w: 2.5, h: 2.5, radius: 1.25, border: '1px solid #9a9a9a', background: '#050505' });
+
 const screw = (x: number, y: number): PanelElement =>
-  ({ kind: 'section', x: x - 1.7, y: y - 1.7, w: 3.4, h: 3.4, radius: 1.7, background: 'radial-gradient(circle at 40% 35%, #c8c8c8 0%, #7a7a7a 60%, #3a3a3a 100%)' });
+  ({ kind: 'section', x: x - 1.6, y: y - 1.6, w: 3.2, h: 3.2, radius: 1.6, background: 'radial-gradient(circle at 40% 35%, #d0d0d0 0%, #808080 55%, #3a3a3a 100%)' });
 
-// --- Patch bay ---------------------------------------------------------------
-const PB_X = (col: number) => 238 + col * 18;
-const PB_Y = (row: number) => 18 + row * 14.4;
-const GATE_INPUTS = new Set(['in_gate', 'in_tempo', 'in_run_stop', 'in_reset', 'in_hold']);
+// --- Patch bay: 4 columns x 8 rows ---------------------------------------------
+const PB_X = [256.2, 270.0, 283.9, 297.8];
+const PB_Y = (row: number) => 19.6 + row * 13.4;
+// The circled (gate) inputs of the patch bay drawing, manual p.46: GATE, RUN / STOP, RESET, HOLD
+const GATE_INPUTS = new Set(['in_gate', 'in_run_stop', 'in_reset', 'in_hold']);
 
-const patchBay: PanelElement[] = [];
-const allJacks = [...(MOTHER32.patchBay?.inputs ?? []), ...(MOTHER32.patchBay?.outputs ?? [])];
-allJacks.forEach(j => {
-  const x = PB_X(j.column), y = PB_Y(j.row);
+const patchBay: PanelElement[] = [
+  { kind: 'section', x: 248.8, y: 7.9, w: 55, h: 111.6, border: '1px solid #8c8c8c', radius: 1.2 },
+  { kind: 'label', text: 'IN', x: 270.2, y: 5.3, size: 7.5, color: '#f2f2f2' },
+  { kind: 'label', text: '/', x: 273.8, y: 5.3, size: 7.5, color: '#9a9a9a' },
+  { kind: 'label', text: 'OUT', x: 278.6, y: 5.3, size: 7.5, invert: true },
+];
+[...(MOTHER32.patchBay?.inputs ?? []), ...(MOTHER32.patchBay?.outputs ?? [])].forEach(j => {
+  const x = PB_X[j.column], y = PB_Y(j.row);
   if (GATE_INPUTS.has(j.id)) {
-    // Gate inputs have a white circle printed around the jack nut
-    patchBay.push({ kind: 'section', x: x - 4.3, y: y - 4.3, w: 8.6, h: 8.6, radius: 4.3, border: '1px solid #d8d8d8' });
+    // gate inputs are printed inside a circle
+    patchBay.push({ kind: 'section', x: x - 4.4, y: y - 4.4, w: 8.8, h: 8.8, radius: 4.4, border: '1px solid #d8d8d8' });
   }
   patchBay.push({
-    kind: 'label', text: j.label, x, y: y - 6.1, size: 8, font: 'condensed', weight: 700,
+    kind: 'label', text: j.label, x, y: y - 6.0, size: 7.2, font: 'condensed', weight: 700,
     ...(j.jackType === 'output' ? { invert: true } : { color: '#f2f2f2' }),
   });
   patchBay.push({ kind: 'jack', jack: j.id, x, y, label: 'none' });
 });
 
-// --- Sequencer buttons ---------------------------------------------------------
-const BTN_W = 9, BTN_H = 6;
-const BTN_X = [13, 27, 41];
-const BTN_Y1 = 104, BTN_Y2 = 118;
-const rectBtn = { shape: 'rect' as const, w: BTN_W, h: BTN_H, color: '#1c1c1c' };
+// --- Sequencer buttons and keyboard ----------------------------------------------
+const UP_Y = 96.0, LO_Y = 108.2;
+const PAD_W = 8.3, PAD_H = 7.2;
+const ARROW_W = 9.7, ARROW_H = 10.4;
+const STEP_X = (k: number) => 126.4 + k * 15.3;
+const BLACK_X = [134.1, 149.3, 179.9, 195.3, 210.5];
+
+const pad = (x: number, y: number, w: number, hgt: number, render: (c: CustomRenderContext) => ReactNode): PanelElement =>
+  ({ kind: 'custom', x: x - w / 2, y: y - hgt / 2, w, h: hgt, render });
+
+/** A button legend, printed under its button (manual p.9) in the panel's condensed type */
+const keyLegend = (text: string, x: number, y: number): PanelElement =>
+  ({ kind: 'label', text, x, y, size: 7, color: '#e8e8e8', font: 'condensed', letterSpacing: 0.2 });
+const UNDER = 5.4;          // legend centre below a pad's centre (the arrows: 7.6)
+
+const sequencer: PanelElement[] = [
+  // upper row: HOLD / REST, PATTERN (BANK), OCTAVE / LOCATION LEDs, the five black keys
+  pad(40.0, UP_Y, PAD_W, PAD_H, renderFn('hold', PAD_W, PAD_H, K)),
+  keyLegend('HOLD / REST', 40.0, UP_Y + UNDER),
+  // the Tempo LED sits directly above (SHIFT) (manual p.18)
+  { kind: 'custom', x: 55.3 - 1.1, y: UP_Y - 1.1, w: 2.2, h: 2.2, render: renderTempoLed(2.2, K) },
+  pad(70.6, UP_Y, PAD_W, PAD_H, renderFn('pattern', PAD_W, PAD_H, K)),
+  keyLegend('PATTERN (BANK)', 70.6, UP_Y + UNDER),
+  keyLegend('OCTAVE / LOCATION', 98.1, UP_Y - 4.4),
+  { kind: 'custom', x: 98.1 - 18, y: UP_Y - 1.1, w: 36, h: 2.2, render: renderOctLeds(4.5, 2.2, K) },
+  ...['1', '2', '3', '4', '5', '6', '7', '8'].map((n, i): PanelElement => ({ kind: 'label', text: n, x: 98.1 - 18 + 2.25 + i * 4.5, y: UP_Y + 2.8, size: 5, color: '#9a9a9a' })),
+  ...BLACK.map((ki, j) => pad(BLACK_X[j], UP_Y, PAD_W, PAD_H, renderKey(ki, PAD_W, PAD_H, K))),
+  ...['1-8', '9-16', '17-24', '25-32', 'SET END'].map((t, j) => keyLegend(t, BLACK_X[j], UP_Y + UNDER)),
+
+  // lower row: RESET / ACCENT, (SHIFT), RUN / STOP (REC), the two arrows, the eight step pads;
+  // each step number is printed under its pad, with the step LED under the number
+  pad(40.0, LO_Y, PAD_W, PAD_H, renderFn('reset', PAD_W, PAD_H, K)),
+  keyLegend('RESET / ACCENT', 40.0, LO_Y + UNDER),
+  pad(55.3, LO_Y, PAD_W, PAD_H, renderFn('shift', PAD_W, PAD_H, K)),
+  keyLegend('(SHIFT)', 55.3, LO_Y + UNDER),
+  pad(70.7, LO_Y, PAD_W, PAD_H, renderFn('run', PAD_W, PAD_H, K)),
+  keyLegend('RUN / STOP (REC)', 70.7, LO_Y + UNDER),
+  pad(89.4, LO_Y, ARROW_W, ARROW_H, renderFn('kb', ARROW_W, ARROW_H, K)),
+  keyLegend('(KB)', 89.4, LO_Y + 7.6),
+  pad(106.7, LO_Y, ARROW_W, ARROW_H, renderFn('step', ARROW_W, ARROW_H, K)),
+  keyLegend('(STEP)', 106.7, LO_Y + 7.6),
+  ...WHITE.map((ki, k) => pad(STEP_X(k), LO_Y, PAD_W, PAD_H, renderKey(ki, PAD_W, PAD_H, K))),
+  ...WHITE.map((ki, k) => keyLegend(String(k + 1), STEP_X(k), LO_Y + UNDER)),
+  { kind: 'custom', x: STEP_X(0) - 7.65, y: LO_Y + 7.2, w: 15.3 * 8, h: 2.0, render: renderStepLeds(15.3, 2.0, K) },
+
+  // teaching readout (not on the hardware), in the blank band above the keys, and the Setup page
+  { kind: 'custom', x: 120.2, y: 88.0, w: 124, h: 4, render: renderReadout(124, K) },
+  { kind: 'custom', x: 262, y: 121.1, w: 22, h: 5, render: renderSetup(K) },
+];
+
+const editing = (values: CustomRenderContext['values'], u: Record<string, unknown> | undefined) =>
+  editTarget(values, ui({ ui: u })) >= 0;
 
 const elements: PanelElement[] = [
-  // --- Frame details ------------------------------------------------------------
-  screw(7, 3), screw(220, 3), screw(7, 125.5), screw(220, 125.5),
-  screw(298, 3), screw(298, 125.5),
-  line(4, 95, 220, 0.35),                       // controls / keyboard divider
-  { kind: 'section', x: 227.5, y: 7.5, w: 74.5, h: 117, border: '1px solid #8a8a8a', radius: 1.2 },
+  // --- Frame details: the eight M3 panel screws (manual p.63), where the default-panel drawing
+  // puts them (p.9): four along the top rail and four along the bottom ---------------------
+  ...[12.2, 103.9, 200.9, 292.6].flatMap(x => [screw(x, 3.0), screw(x, 125.5)]),
 
-  // --- Row 1: TEMPO, VCO, MIX, VCF, VOLUME -------------------------------------------
-  // TEMPO doubles as GATE LENGTH while SHIFT is on (hardware: SHIFT + TEMPO)
-  { kind: 'knob', control: ({ values }) => (values.shift ? 'gate_length' : 'tempo'), x: 16, y: ROW1, diameter: SMALL, variant: 'moog-black' },
-  knob('frequency', 46, ROW1, BIG),
-  knob('pulse_width', 77, ROW1),
-  knob('mix', 106, ROW1),
-  { kind: 'label', text: 'VCO', x: 98.5, y: ROW1 + 9.5, size: 6, color: '#bdbdbd' },
-  { kind: 'label', text: 'NOISE', x: 113.5, y: ROW1 + 9.5, size: 6, color: '#bdbdbd' },
-  knob('cutoff', 140, ROW1, BIG),
-  knob('resonance', 172, ROW1),
-  knob('volume', 205, ROW1),
+  // --- Row 1: FREQUENCY, VCO WAVE, PULSE WIDTH, MIX, CUTOFF, RESONANCE, VCA MODE, VOLUME --
+  ...scaleRing(21.7, ROW1), ...scaleRing(80.8, ROW1), ...scaleRing(41.0, ROW3), ...scaleRing(80.8, ROW3),
+  hole(36.5, ROW1), hole(65.9, ROW1), hole(95.6, ROW1), hole(95.6, ROW2), hole(95.6, ROW3),
+  ringLegend('FREQUENCY', 21.7, ROW1), knob('frequency', 21.7, ROW1),
+  ...toggle('vco_wave', 'VCO WAVE', 51.3, ROW1, 7.5),
+  ringLegend('PULSE WIDTH', 80.8, ROW1), knob('pulse_width', 80.8, ROW1),
+  legend('MIX', 110.3, ROW1), knob('mix', 110.3, ROW1),
+  { kind: 'label', text: 'VCO', x: 102.8, y: ROW1 + 8.4, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: 'NOISE / EXT', x: 119.6, y: ROW1 + 8.4, size: 5.6, color: '#bdbdbd' },
+  legend('CUTOFF', 146.1, ROW1), knob('cutoff', 146.1, ROW1),
+  { kind: 'label', text: '20Hz', x: 137.8, y: ROW1 + 8.0, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: '200Hz', x: 137.4, y: ROW1 - 7.2, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: '2KHz', x: 154.8, y: ROW1 - 7.2, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: '20KHz', x: 154.6, y: ROW1 + 8.0, size: 5.6, color: '#bdbdbd' },
+  legend('RESONANCE', 181.8, ROW1), knob('resonance', 181.8, ROW1),
+  ...toggle('vca_mode', 'VCA MODE', 206.3, ROW1, 4.5),
+  legend('VOLUME', 228.7, ROW1), knob('volume', 228.7, ROW1),
 
-  // --- Row 2: GLIDE, VCO MOD, VCO WAVE, VCF MOD, VCF MODE, VCA MODE ------------------
-  knob('glide', 16, ROW2, SMALL),
-  knob('vco_mod_amount', 46, ROW2),
-  sw('vco_mod_source', 62, ROW2, 'SOURCE'),
-  sw('vco_mod_dest', 75, ROW2, 'DEST'),
-  sw('vco_wave', 90, ROW2),
-  sw('vcf_mod_source', 124, ROW2, 'SOURCE'),
-  knob('vcf_mod_amount', 140, ROW2),
-  sw('vcf_mode', 157, ROW2),
-  sw('vca_mode', 205, ROW2),
-
-  // --- Row 3: LFO, EG, ASSIGN, VC MIX ----------------------------------------------------
-  knob('lfo_rate', 16, ROW3, SMALL),
-  sw('lfo_wave', 33, ROW3),
-  knob('attack', 106, ROW3),
-  knob('decay', 140, ROW3),
-  sw('sustain', 157, ROW3),
-  { kind: 'switch', control: 'assign_source', x: 180, y: ROW3, style: 'buttons', orientation: 'vertical', scale: 1.4, labelText: 'ASSIGN (SETUP)' },
-  knob('vc_mix', 205, ROW3, SMALL),
-
-  // --- Branding ----------------------------------------------------------------------------
-  { kind: 'label', text: 'moog', x: 70, y: ROW3 - 3, size: 30, font: 'serif', italic: true, weight: 400 },
-  { kind: 'label', text: 'MOTHER-32', x: 70, y: ROW3 + 6, size: 11, weight: 800, letterSpacing: 2 },
-  { kind: 'label', text: 'SEMI-MODULAR ANALOG SYNTHESIZER', x: 70, y: ROW3 + 10.5, size: 5, color: '#8a8a8a', letterSpacing: 0.8 },
-
-  // --- Sequencer / keyboard buttons --------------------------------------------------------
-  { kind: 'button', control: 'shift', x: BTN_X[0], y: BTN_Y1, ...rectBtn, ledColor: '#f5f5f5', label: 'above' },
+  // --- Row 2: GLIDE, VCO MOD SOURCE / AMOUNT / DEST, VCF MODE, VCF MOD SOURCE / AMOUNT / POLARITY --
+  legend('GLIDE', 21.8, ROW2),
   {
-    kind: 'button', event: 'oct_down', x: BTN_X[1], y: BTN_Y1, ...rectBtn, ledColor: '#f5f5f5', labelText: 'KB ◂', label: 'above',
-    lit: ({ engine }) => ((engine.octave as number) ?? 0) < 0,
+    kind: 'knob',
+    // While a step is edited GLIDE turns that step's glide on / off, with SHIFT its ratchet. With
+    // KB / STEP held it picks the swing interval (both: straight, KB: dotted, STEP: triplet); with
+    // SHIFT during playback, live ratchets (manual pp.21, 29)
+    control: ({ values, ui: u }) => {
+      if (editing(values, u)) return values.shift ? 'step_ratchet' : 'step_glide';
+      const held = (u?.held ?? {}) as { kb?: boolean; step?: boolean };
+      if (held.kb && held.step) return 'swing_div';
+      if (held.kb) return 'swing_dotted';
+      if (held.step) return 'swing_triplet';
+      return values.shift ? 'live_ratchet' : 'glide';
+    },
+    x: 21.8, y: ROW2, diameter: KNOB, variant: 'moog-black', label: 'none',
   },
-  {
-    kind: 'button', event: 'oct_up', x: BTN_X[2], y: BTN_Y1, ...rectBtn, ledColor: '#f5f5f5', labelText: 'STEP ▸', label: 'above',
-    lit: ({ engine }) => ((engine.octave as number) ?? 0) > 0,
-  },
-  {
-    kind: 'button', control: 'run_stop', x: BTN_X[0], y: BTN_Y2, ...rectBtn, ledColor: '#ff3b30', label: 'above',
-    lit: ({ values, engine }) => (values.rec ? 0.6 : engine.playing ? 1 : 0),
-  },
-  // REC overlay sits on RUN/STOP while SHIFT is latched (SHIFT + RUN/STOP = REC)
-  // (a zero-size box, so when SHIFT is off nothing covers RUN/STOP; the cap overflows it)
-  { kind: 'custom', x: BTN_X[0] - BTN_W / 2, y: BTN_Y2 - BTN_H / 2, w: 0, h: 0, render: renderFn('rec', BTN_W, BTN_H, K) },
-  { kind: 'label', text: 'HOLD/REST', x: BTN_X[1], y: BTN_Y2 - BTN_H / 2 - 2.1, size: 7, color: '#d4d4d4' },
-  { kind: 'custom', x: BTN_X[1] - BTN_W / 2, y: BTN_Y2 - BTN_H / 2, w: BTN_W, h: BTN_H, render: renderFn('hold', BTN_W, BTN_H, K) },
-  { kind: 'label', text: 'RESET/ACCENT', x: BTN_X[2], y: BTN_Y2 - BTN_H / 2 - 2.1, size: 7, color: '#d4d4d4' },
-  { kind: 'custom', x: BTN_X[2] - BTN_W / 2, y: BTN_Y2 - BTN_H / 2, w: BTN_W, h: BTN_H, render: renderFn('reset', BTN_W, BTN_H, K) },
+  ...toggle('vco_mod_source', 'VCO MOD\nSOURCE', 51.3, ROW2, 5),
+  legend('VCO MOD\nAMOUNT', 80.8, ROW2), knob('vco_mod_amount', 80.8, ROW2),
+  ...toggle('vco_mod_dest', 'VCO MOD\nDEST', 110.5, ROW2, 6),
+  ...toggle('vcf_mode', 'VCF MODE', 139.9, ROW2, 10),
+  ...toggle('vcf_mod_source', 'VCF MOD\nSOURCE', 169.6, ROW2, 5),
+  legend('VCF MOD\nAMOUNT', 199.2, ROW2), knob('vcf_mod_amount', 199.2, ROW2),
+  ...toggle('vcf_mod_polarity', 'VCF MOD\nPOLARITY', 228.6, ROW2, 3),
 
-  // --- 13-key button keyboard (key LEDs show the sounding note / sequencer step) ------------
-  { kind: 'custom', x: 52, y: 96.5, w: 172, h: 27, render: renderKeyboard(172, 27, K) },
+  // --- Row 3: TEMPO / GATE LENGTH (SWING), LFO RATE, LFO WAVE, ATTACK, SUSTAIN, DECAY, VC MIX --
+  ringLegend('TEMPO / GATE LENGTH', 41.0, ROW3, 7.2),
+  // the second function is printed under the knob (manual p.9)
+  { kind: 'label', text: '(SWING)', x: 41.0, y: ROW3 + 12.7, size: 6.4, color: '#e8e8e8', font: 'condensed', letterSpacing: 0.3 },
+  {
+    kind: 'knob',
+    // TEMPO is GATE LENGTH while a step is edited and SWING with SHIFT. Otherwise (firmware 2.0) it
+    // picks the clock division: a straight one when the studio (MIDI) clock or a TEMPO-jack clock
+    // drives the steps, or with KB + STEP held; a dotted one with KB held, a triplet with STEP held.
+    // On the internal clock it sets the tempo.
+    control: ({ values, engine, ui: u }) => {
+      if (editing(values, u)) return 'step_gate';
+      if (values.shift) return 'swing';
+      const held = (u?.held ?? {}) as { kb?: boolean; step?: boolean };
+      if (held.kb && held.step) return 'step_div';
+      if (held.kb) return 'div_dotted';
+      if (held.step) return 'div_triplet';
+      return engine?.synced || engine?.extClock ? 'step_div' : 'tempo';
+    },
+    x: 41.0, y: ROW3, diameter: KNOB, variant: 'moog-black', label: 'none',
+  },
+  ringLegend('LFO RATE', 80.8, ROW3), knob('lfo_rate', 80.8, ROW3),
+  ...toggle('lfo_wave', 'LFO WAVE', 110.4, ROW3, 5),
+  legend('ATTACK', 139.9, ROW3), knob('attack', 139.9, ROW3),
+  ...toggle('sustain', 'SUSTAIN', 169.5, ROW3, 5),
+  legend('DECAY', 199.2, ROW3), knob('decay', 199.2, ROW3),
+  legend('VC MIX', 228.7, ROW3), knob('vc_mix', 228.7, ROW3),
+  { kind: 'label', text: 'LO / MIX 1', x: 219.6, y: ROW3 + 8.4, size: 5.6, color: '#bdbdbd' },
+  { kind: 'label', text: 'HI / MIX 2', x: 237.8, y: ROW3 + 8.4, size: 5.6, color: '#bdbdbd' },
 
-  // --- Patch bay ---------------------------------------------------------------------------
+  // --- MIDI IN: its LED left of TEMPO, the legend above the socket (manual p.9) ---------
+  { kind: 'custom', x: 14.3 - 1.4, y: 77.4 - 1.4, w: 2.8, h: 2.8, render: renderMidiLed(2.8, K) },
+  { kind: 'label', text: 'MIDI IN', x: 14.3, y: 89.0, size: 6.4, color: '#e8e8e8' },
+  { kind: 'custom', x: 13.8 - 7.8, y: 107.8 - 7.8, w: 15.6, h: 15.6, render: renderDin(15.6, K) },
+  // --- Bottom band (manual p.9): "MOTHER-32 | SEMI-MODULAR ANALOG SYNTHESIZER" at the left and
+  // the maker's name centred on the panel, set in type as a stand-in (not the logo artwork) --
+  { kind: 'label', text: 'MOTHER-32', x: 26.4, y: 121.3, size: 18, weight: 800, font: 'condensed', align: 'left', letterSpacing: 0.4, fixed: true },
+  { kind: 'section', x: 53.2, y: 119.0, w: 0.45, h: 4.6, background: '#f2f2f2' },
+  { kind: 'label', text: 'SEMI-MODULAR\nANALOG SYNTHESIZER', x: 55.2, y: 121.3, size: 7.4, weight: 700, font: 'condensed', align: 'left', letterSpacing: 0.3, fixed: true },
+  { kind: 'label', text: 'moog', x: 152.4, y: 121.0, size: 26, font: 'serif', italic: true, weight: 400, fixed: true },
+
+  ...sequencer,
   ...patchBay,
 ];
 
@@ -136,11 +236,11 @@ export const MOTHER32_LAYOUT: PanelLayout = {
   height: 128.5,
   pxPerMm: K,
   theme: {
-    background: 'linear-gradient(180deg, #141414 0%, #0c0c0c 100%)',
+    background: 'linear-gradient(180deg, #161616 0%, #0e0e0e 100%)',
     text: '#f2f2f2',
     muted: '#cfcfcf',
     font: '"Helvetica Neue", Helvetica, Arial, sans-serif',
-    cheeks: { width: 9, background: 'linear-gradient(90deg, #3b2616 0%, #6e4a2c 45%, #5a3b22 70%, #3b2616 100%)' },
+    cheeks: { width: 7.25, background: 'linear-gradient(90deg, #3b2616 0%, #6e4a2c 45%, #5a3b22 70%, #3b2616 100%)' },
     jack: { ring: '#5a5a5a', outputLabelBg: '#f2f2f2', outputLabelText: '#000000' },
   },
   elements,

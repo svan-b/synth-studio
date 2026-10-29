@@ -45,6 +45,16 @@ export default function Home() {
     // after the hub: undo history never sits between a knob and its engine
     history.init();
     setHydrated(true);
+    // Fetch the on-demand views once the page is idle, so the first click on the
+    // Studio tab or a lesson is instant while the first download stays small
+    const prefetch = () => {
+      void import('@/components/studio/StudioView');
+      void import('@/components/teaching/Instructions');
+      void import('@/components/teaching/LessonBrowser');
+    };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    if (w.requestIdleCallback) w.requestIdleCallback(prefetch, { timeout: 1500 });
+    else setTimeout(prefetch, 1200); // Safari has no requestIdleCallback
   }, []);
   if (!hydrated) return <div className="min-h-screen bg-hardware-bg" />;
   return <App />;
