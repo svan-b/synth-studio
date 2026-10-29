@@ -72,8 +72,9 @@ const ring = (x: number, y: number): PanelElement => ({
 const stalk = (control: string, x: number, y: number, extra: KnobOpts = {}): PanelElement =>
   knob(control, x, y, STALK_D, { variant: STALK, ...extra });
 
+/** A toggle as printed (p.7): its title, one position above the lever and the other below (SEQ PITCH MOD's OFF beside) */
 const sw = (control: string, x: number, y: number, scale = 1.6, labelText?: string): PanelElement => ({
-  kind: 'switch', control, x, y, scale, ...(labelText ? { labelText } : {}),
+  kind: 'switch', control, x, y, scale, legends: 'ends', ...(labelText ? { labelText } : {}),
 });
 
 const screw = (x: number, y: number): PanelElement => ({
