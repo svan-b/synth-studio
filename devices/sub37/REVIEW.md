@@ -132,20 +132,29 @@ Cold Wind's gusts come from a free-running 0.15 Hz LFO, so a 4 s phrase caught i
 although the QA judges a NOISE preset at −18. **Fix**: the LFO's KB RESET (every key starts a gust
 from the same point) and PRESET VOL 75: −18.6 to −18.8 LUFS.
 
+### P3. Knob sweep: 280°, as drawn
+
+Measured on the p.28 drawing (angles of its ticks around the knob's centre), the scales run ±140°:
+RESONANCE 0 and 10 at ±139.7° with 27.9° a step, CUTOFF's 20 Hz and 20 kHz ticks at ±140°, 80 Hz and
+5 kHz at ±90°, 320 Hz and 1.2 kHz at ±40°. The twin turned its knobs 270° and printed the CUTOFF marks
+at ±135° and ±43°. **Fix**: `knobTravel: 280`; the stepped knobs' position legends sit at their
+pointer angles (±140° at the ends) and the CUTOFF marks at the drawing's angles. Values do not change,
+only the drawn pointer. Below the centre line a position legend moves in along its pointer's line,
+so it sits no lower than before and the names under the knob keep their room; the CUTOFF name sits
+1.5 mm lower for the end marks. Checked in screenshots on desktop and iPad with every stepped knob,
+WAVE, CUTOFF, RESONANCE and EG AMT at both end stops and mid-travel: each pointer points at its
+legend, and the UI audit's small-text count on the iPad is unchanged (143). The manual's only clock position is 12 o'clock (the centre of the bipolar
+amounts and of KB TRACK), which any sweep keeps, and no lesson or preset names another; Moog's 300°
+sweep (the Mother-32 family's) does not apply.
+
 ## Left as they are (P3)
 
 - **CUTOFF legend vs taper.** The printed legend (500 Hz at 12 o'clock, 1.2 kHz and 320 Hz at ±40°,
   p.28) implies a taper compressed around noon; the shared knob mapping offers only linear, log and
-  exponential, so with the twin's 20 Hz × 1000^travel the marks read 0.3-0.7 octave off. The LCD and
-  readout show the true value and no lesson relies on the marks. Fixing it needs a custom taper in
+  exponential, so with the twin's 20 Hz × 1000^travel the marks read 0.2-0.5 octave off (80 Hz
+  points at 69 Hz, 320 Hz at 236 Hz, 500 Hz at 632 Hz, 1.2 kHz at 1.7 kHz, 5 kHz at 5.8 kHz). The LCD
+  and readout show the true value and no lesson relies on the marks. Fixing it needs a custom taper in
   `lib/controls/mapping.ts` (outside this device).
-- **Knob sweep.** Measured on the p.28 drawing, the scales run ±140° (280°): RESONANCE 0-10 at
-  27.9° a step, CUTOFF's 20 Hz and 20 kHz ticks at ±140°, 80 Hz and 5 kHz at ±90°. The twin uses the
-  panel default 270° (5° short at each end). The manual's only clock position is 12 o'clock (the
-  centre of the bipolar amounts and of KB TRACK), the factory settings are unpublished and no lesson
-  or preset names another clock position, so nothing depends on it; Moog's 300° sweep does not apply
-  here. With `PanelLayout.knobTravel`, 280 plus the legend angles in `layout.tsx` (±135° → ±140°,
-  CUTOFF ±43° → ±40°) would match the drawing.
 - **Dense legends on iPad.** The MOD DEST LED names (6.9 px), the MOD SOURCE and WAVE positions
   (6-8 px) and the jack names (6.5-8.5 px) stay small: the iPad fit (0.82) is below the 0.85 the
   panel's text floors assume, and the panel is as dense as the hardware's. The LCD shows any control
