@@ -39,8 +39,8 @@ import {
   type PatternId, type Project, type Step,
 } from '@/lib/sequencer/elektron';
 import {
-  C, FONT, SeqStyles, UI, editProject, lessonFocus, pageOf, projectOf, seqStateOf, trackOf, trigModeOf, useLatest, viewPattern,
-  type TrigEditorTarget, type TrigKeysMode,
+  C, FONT, SeqStyles, TRIG_MODE_COLOR, UI, editProject, lessonFocus, pageOf, projectOf, seqStateOf, trackOf, trigModeOf, useLatest,
+  viewPattern, type TrigEditorTarget, type TrigKeysMode,
 } from './shared';
 
 export type { TrigKeysMode } from './shared';
@@ -100,9 +100,6 @@ interface Hold {
 type FlagMode = 'accent' | 'slide' | 'pslide' | 'trigmute' | 'swing';
 
 const NO_STEPS: Readonly<Record<number, Step>> = Object.freeze({});
-const MODE_COLOR: Record<TrigKeysMode, string> = {
-  trig: C.red, accent: C.pink, slide: C.yellow, pslide: C.cyan, mute: C.green, trigmute: C.green, swing: C.yellow, solo: C.cyan,
-};
 /** Unlit key holding a trig, per mode (the hardware shows trigs in a pale version of the menu colour) */
 const MODE_DIM: Partial<Record<TrigKeysMode, string>> = {
   accent: '#4a2a3a', slide: '#4a4224', pslide: '#21404d', trigmute: '#1f4a2c', swing: '#4a4224',
@@ -296,7 +293,7 @@ export default function TrigKeys(props: TrigKeysProps) {
     release();
   };
 
-  const color = MODE_COLOR[mode] ?? props.color ?? C.red;
+  const color = TRIG_MODE_COLOR[mode] ?? props.color ?? C.red;
   const trigColor = props.color ?? C.red;
   const perRow = rows === 2 ? 8 : 16;
   const keys = Array.from({ length: 16 }, (_, i) => i);

@@ -475,7 +475,8 @@ export function MenuKey({ ctx, menu, label, color = C.white, style, title }: {
   );
 }
 
-const TRIG_MODE_COLOR: Record<TrigKeysMode, string> = {
+/** LED colour of each trig-key mode (the hardware's menu colours) */
+export const TRIG_MODE_COLOR: Readonly<Record<TrigKeysMode, string>> = {
   trig: C.red, accent: C.pink, slide: C.yellow, pslide: C.cyan, mute: C.green, trigmute: C.green, swing: C.yellow, solo: C.cyan,
 };
 const TRIG_MODE_LABEL: Record<TrigKeysMode, string> = {
@@ -485,7 +486,7 @@ const TRIG_MODE_LABEL: Record<TrigKeysMode, string> = {
 /** TrigKeys mode from ui.seqTrigMode (TrigModeKey), else 'trig' */
 export function trigModeOf(ctx: CustomRenderContext): TrigKeysMode {
   const m = ctx.ui[UI.trigMode];
-  return typeof m === 'string' && m in TRIG_MODE_LABEL ? (m as TrigKeysMode) : 'trig';
+  return typeof m === 'string' && Object.prototype.hasOwnProperty.call(TRIG_MODE_LABEL, m) ? (m as TrigKeysMode) : 'trig';
 }
 
 /**
