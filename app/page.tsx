@@ -187,7 +187,7 @@ function App() {
     <div className="min-h-screen bg-hardware-bg px-3 py-3 sm:px-5">
       <header className="max-w-[1800px] mx-auto mb-3 flex flex-wrap items-center gap-2">
         <div className="mr-2">
-          <h1 className="text-xl font-bold text-white leading-none">SYNTH STUDIO</h1>
+          <h1 className="text-lg xl:text-xl font-bold text-white leading-none">SYNTH STUDIO</h1>
           <p className="text-[11px] text-hardware-label mt-0.5 hidden xl:block">Play it. Patch it. Understand it.</p>
         </div>
         <TransportBar />

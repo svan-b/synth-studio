@@ -83,7 +83,7 @@ export default function Mixer({ onFocus }: { onFocus: (instance: string) => void
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2 px-0.5">
         <h3 className="font-bold text-white text-sm">Mixer</h3>
         <p className="text-[11px] text-gray-500 leading-snug flex-1 min-w-[260px]">
-          0 dB is each instrument&apos;s calibrated level. Sends feed the shared <b className="text-gray-300">delay (A)</b> and <b className="text-gray-300">reverb (B)</b>.
+          At 0 dB every instrument plays at its nominal level (about -18 LUFS). Sends feed the shared <b className="text-gray-300">delay (A)</b> and <b className="text-gray-300">reverb (B)</b>.
           <b className="text-gray-300"> S</b> solos a channel (returns stay on), <b className="text-gray-300">M</b> mutes it. Double-tap a control to reset it.
         </p>
         {anySolo && (
@@ -209,9 +209,11 @@ function Strip({ id, device, name, audible, powered, targets, onFocus }: {
       <span className={`text-[11px] tabular-nums font-mono ${c.gain === 0 ? 'text-amber-300' : 'text-gray-200'}`} title={audible ? undefined : 'Silent: muted, or another channel is soloed'}>
         {formatDb(c.gain)} dB{!audible && <span className="text-gray-500"> ·off</span>}
       </span>
-      <span className="text-[9px] text-gray-600 leading-none" title="Calibration trim: brings this instrument to about -18 LUFS with the fader at 0 dB">
-        {trim ? `cal ${trim > 0 ? '+' : ''}${trim} dB` : 'cal 0 dB'}{!powered ? ' · OFF' : ''}
-      </span>
+      {(trim !== 0 || !powered) && (
+        <span className="text-[9px] text-gray-600 leading-none" title="Input trim before the fader">
+          {trim ? `trim ${trim > 0 ? '+' : ''}${trim} dB` : ''}{!powered ? (trim ? ' · OFF' : 'powered off') : ''}
+        </span>
+      )}
     </StripShell>
   );
 }

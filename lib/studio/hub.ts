@@ -54,6 +54,11 @@ interface Slot {
   routeTeardown: (() => void) | null;
   /** The instrument's mixer channel (the engine's destination is strip.input) */
   strip: ChannelStrip | null;
+  /**
+   * The instrument's own output, before its fader (= strip.input, the engine's
+   * destination). Kept under its original name: the audio QA tool and tests tap it.
+   */
+  outGain: GainNode | null;
   /** Audition in progress: engine values are overridden until restore */
   auditioning: boolean;
 }
@@ -237,6 +242,7 @@ class EngineHub {
       routeKey: '',
       routeTeardown: null,
       strip: null,
+      outGain: null,
       auditioning: false,
     };
     let frame = 0;
@@ -416,6 +422,7 @@ class EngineHub {
         trimDb: levelTrimDb(slot.device),
         stereo: !!slot.module.studio?.stereo,
       });
+      slot.outGain = slot.strip.input;
       slot.engine.start(ctx, slot.strip.input);
       slot.started = true;
       this.applyMixer();

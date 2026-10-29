@@ -437,9 +437,10 @@ class MasterBusProcessor extends AudioWorkletProcessor {
       peakL: this.pkL, peakR: this.pkR, tp: this.tpWin, inPeak: this.inPk,
       gr: this.minG < 1 ? -20 * Math.log10(this.minG) : 0,
       glue,
-      m: isFinite(this.lufsM) ? this.lufsM : null,
-      s: isFinite(this.lufsS) ? this.lufsS : null,
-      i: isFinite(this.lufsI) ? this.lufsI : null,
+      // below the -70 LUFS absolute gate a reading means nothing: report "no signal"
+      m: this.lufsM > -70 ? this.lufsM : null,
+      s: this.lufsS > -70 ? this.lufsS : null,
+      i: this.lufsI > -70 ? this.lufsI : null,
     });
     this.pkL = 0; this.pkR = 0; this.tpWin = 0; this.inPk = 0; this.minG = 1; this.glueGrMax = 0;
   }

@@ -67,10 +67,10 @@ export function MasterMeterCompact() {
     <span className="flex items-center gap-1.5" aria-label="Master meter">
       <HBar />
       <span
-        className="font-mono text-[10px] tabular-nums text-gray-300 w-[44px] text-right"
+        className="font-mono text-[10px] tabular-nums text-gray-300 w-[30px] text-right"
         title="Short-term loudness (last 3 s), LUFS. Streaming services play at about -14."
       >
-        {fmt(s)}<span className="text-gray-500"> LU</span>
+        {fmt(s)}
       </span>
       <span
         className={`text-[9px] font-bold px-1 rounded ${r.limiting ? 'bg-amber-500 text-black' : 'bg-[#2a2a2a] text-gray-600'}`}

@@ -218,9 +218,9 @@ function Position({ songOn }: { songOn: boolean }) {
     });
   }, [songOn]);
   return (
-    <div className="flex flex-col items-center justify-center bg-black/60 rounded px-2 h-9 min-w-[84px]" title="Position: bar . beat . sixteenth (what you hear now)">
+    <div className="flex flex-col items-center justify-center bg-black/60 rounded px-1.5 h-9 min-w-[74px]" title="Position: bar . beat . sixteenth (what you hear now)">
       <span className={`font-mono text-[15px] leading-none tabular-nums ${counting ? 'text-amber-300' : 'text-green-400'}`} aria-label="Song position">{label}</span>
-      <span className="text-[9px] leading-none mt-0.5 text-gray-400 truncate max-w-[96px]">{sub || (songOn ? 'song' : 'bar.beat.16th')}</span>
+      <span className="text-[9px] leading-none mt-0.5 text-gray-400 truncate max-w-[90px]">{sub || (songOn ? 'song' : 'bar.beat.16th')}</span>
     </div>
   );
 }
