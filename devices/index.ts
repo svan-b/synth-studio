@@ -69,6 +69,7 @@ export const DEVICES: DeviceEntry[] = [
     manufacturer: 'Synth Studio',
     category: 'Studio',
     tagline: 'The studio tempo as patchable clock, reset and run voltages',
+    silent: true,
     load: () => import('./studio-clock'),
   },
   // ---- External: bring your own gear (docs/EXTERNAL_GEAR.md) ----

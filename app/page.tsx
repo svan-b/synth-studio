@@ -243,9 +243,12 @@ function App() {
               {labelFor(r.id)}
             </TabButton>
           ))}
-          <button onClick={() => setDevicesOpen(true)} className="px-3 py-2 rounded-lg text-sm text-gray-300 border border-dashed border-[#444] hover:border-[#666] whitespace-nowrap">
-            {singleInstrument ? 'Instruments…' : '+ Instrument'}
-          </button>
+          {/* Pinned to the end of the row, so a full studio's tabs scroll under it instead of cutting it off */}
+          <div className="sticky right-0 z-10 pl-1.5 bg-hardware-bg">
+            <button onClick={() => setDevicesOpen(true)} className="px-3 py-2 rounded-lg text-sm text-gray-300 border border-dashed border-[#444] hover:border-[#666] whitespace-nowrap bg-hardware-bg">
+              {singleInstrument ? 'Instruments…' : '+ Instrument'}
+            </button>
+          </div>
         </nav>
         <div className="shrink-0 flex items-center gap-2">
           <UndoRedo />

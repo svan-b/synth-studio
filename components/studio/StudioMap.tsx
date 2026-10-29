@@ -174,13 +174,15 @@ function buildLayout(
       ch.sendA > MIN_DB ? 'A' : null,
       ch.sendB > MIN_DB ? 'B' : null,
       off[r.id] ? 'OFF' : null,
+      // The mixer channel it feeds (in its own box: labels on converging arrows would overlap)
+      inputLabel ? `→ ${inputLabel.replace(/\s*\(.*\)$/, '')}` : null,
     ].filter(Boolean);
     nodes.push({
       id: r.id, x: COL[1], y: top(insts.length) + i * (NODE_H + GAP),
       label: instanceLabel(rack, r.id), sub: tags.join(' · ') || (mod(r)?.spec.manufacturer ?? ''),
       color: deviceColor(r.device), kind: 'inst',
     });
-    routeEdges.push({ from: r.id, to: target, label: inputLabel });
+    routeEdges.push({ from: r.id, to: target });
   });
   mixers.forEach((r, i) => {
     nodes.push({
