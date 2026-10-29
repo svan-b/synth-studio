@@ -26,6 +26,8 @@ interface Upgrade {
   device: string;
   /** Defaults of the version being replaced, for controls whose default changed or that were removed */
   oldDefaults?: Values;
+  /** No faithful conversion exists: the old values are dropped, and offered to the user as a backup */
+  reset?: boolean;
   apply: (values: Values) => Values;
 }
 
@@ -146,6 +148,7 @@ const UPGRADES: Upgrade[] = [
     store: 7,
     project: 4,
     device: 'analog-four',
+    reset: true,
     apply: () => ({}),
   },
   {
@@ -217,6 +220,7 @@ const UPGRADES: Upgrade[] = [
     store: 11,
     project: 8,
     device: 'analog-rytm',
+    reset: true,
     apply: () => ({}),
   },
   {
@@ -311,12 +315,15 @@ export const PROJECT_VERSION = 9;
  * Upgrade the control values of every instance saved before version `from`
  * ('store' for browser saves, 'project' for project files). `rack` maps
  * instance ids to devices; ids not in it are "<device>" or "<device>#n".
+ * `onReset` gets the values an upgrade without a conversion drops, so the
+ * caller can keep a copy for the user.
  */
 export function upgradeDevices<S extends { controlValues?: Values }>(
   devices: Record<string, S>,
   rack: RackSlot[],
   key: 'store' | 'project',
   from: number,
+  onReset?: (instance: string, device: string, values: Values) => void,
 ): Record<string, S> {
   const pending = UPGRADES.filter(u => u[key] > from);
   if (!pending.length) return devices;
@@ -325,7 +332,9 @@ export function upgradeDevices<S extends { controlValues?: Values }>(
     const device = rack.find(r => r.id === instance)?.device ?? instance.split('#')[0];
     let values = state.controlValues;
     pending.forEach(u => {
-      if (values && u.device === device) values = u.apply(u.oldDefaults ? { ...u.oldDefaults, ...values } : values);
+      if (!values || u.device !== device) return;
+      if (u.reset && Object.keys(values).length) onReset?.(instance, device, values);
+      values = u.apply(u.oldDefaults ? { ...u.oldDefaults, ...values } : values);
     });
     out[instance] = values === state.controlValues ? state : { ...state, controlValues: values };
   });

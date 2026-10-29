@@ -18,12 +18,18 @@ const { chromium } = require('playwright');
     sessionStorage.setItem('seeded', '1');
     localStorage.setItem('synth-studio-welcomed', '1');
     localStorage.setItem('synth-studio-storage', JSON.stringify({ version: 4, state: { currentDevice: 'dfam', completedLessons: ['sub37-waveforms'], review: {}, focusMode: true,
-      devices: { dfam: { controlValues: { tempo: 120, vco1_freq: 220 }, patchConnections: [] }, mother32: { controlValues: { tempo: 120 }, patchConnections: [] } },
+      devices: { dfam: { controlValues: { tempo: 120, vco1_freq: 220 }, patchConnections: [] }, mother32: { controlValues: { tempo: 120 }, patchConnections: [] },
+        'analog-four': { controlValues: { old_pattern: 'x-x-x-x-', t1_level: 90 }, patchConnections: [] } },
       studio: { rack: [{ id: 'dfam', device: 'dfam' }], cables: [], routes: {}, sync: {}, bpm: 120, swing: 0, arrangement: { enabled: false, loop: true, sections: [] } } } }));
   });
   const read = () => p.evaluate(() => {
     const s = JSON.parse(localStorage.getItem('synth-studio-storage'));
-    return { version: s.version, dfamTempo: s.state.devices.dfam?.controlValues.tempo, vco1: s.state.devices.dfam?.controlValues.vco1_freq, m32Tempo: s.state.devices.mother32?.controlValues.tempo, m32Decay: s.state.devices.mother32?.controlValues.decay, lessonCarried: (s.state.completedLessons || []).includes('sub37-f1-oscillators') };
+    return { version: s.version, dfamTempo: s.state.devices.dfam?.controlValues.tempo, vco1: s.state.devices.dfam?.controlValues.vco1_freq, m32Tempo: s.state.devices.mother32?.controlValues.tempo, m32Decay: s.state.devices.mother32?.controlValues.decay, lessonCarried: (s.state.completedLessons || []).includes('sub37-f1-oscillators'),
+      // A rebuild with no conversion (the A4) starts fresh, and the old settings are kept for the learner
+      a4Values: Object.keys(s.state.devices['analog-four']?.controlValues ?? {}).length,
+      a4Kept: (JSON.parse(localStorage.getItem('synth-studio-old-settings') || '{}').kept || []).flatMap(k => k.settings).filter(x => x.device === 'analog-four' && x.values.old_pattern === 'x-x-x-x-').length,
+      notice: !!document.querySelector('[aria-label="Messages"]')?.innerText.match(/rebuilt from its manual/),
+      saveButton: [...document.querySelectorAll('[aria-label="Messages"] button')].some(b => /save old settings/i.test(b.innerText)) };
   });
   let first = null;
   let afterReload = null;

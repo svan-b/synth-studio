@@ -13,7 +13,8 @@ export type NoticeId =
   | 'wake-lock'      // iPad Home Screen app before iOS 18.4: set Auto-Lock to Never
   | 'home-import'    // first launch from the Home Screen: separate storage
   | 'export'         // gentle reminder to save a project file
-  | 'save-file';     // a finished bounce waiting for a tap to share (iPad)
+  | 'save-file'      // a finished bounce waiting for a tap to share (iPad)
+  | 'old-settings';  // a rebuild couldn't convert saved settings: a copy is kept
 
 export interface Notice {
   id: NoticeId;

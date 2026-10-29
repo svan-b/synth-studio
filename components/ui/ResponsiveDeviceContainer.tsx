@@ -43,7 +43,9 @@ export default function ResponsiveDeviceContainer({
     if (!outer || !inner) return;
     const measure = () => {
       setAvail(outer.clientWidth);
-      setNative({ w: inner.offsetWidth, h: inner.offsetHeight });
+      const w = inner.offsetWidth;
+      const h = inner.offsetHeight;
+      setNative(n => (n.w === w && n.h === h ? n : { w, h }));
       const touch = fitHeight && window.matchMedia('(pointer: coarse)').matches;
       // From the page top, so scrolling doesn't change it; 12 px clear of the bottom edge
       setRoom(touch ? window.innerHeight - (outer.getBoundingClientRect().top + window.scrollY) - 12 : 0);
@@ -52,6 +54,8 @@ export default function ResponsiveDeviceContainer({
     const ro = new ResizeObserver(measure);
     ro.observe(outer);
     ro.observe(inner);
+    // A message or toolbar row appearing above moves the panel down without resizing it
+    if (fitHeight) ro.observe(document.body);
     window.addEventListener('resize', measure);
     return () => {
       ro.disconnect();

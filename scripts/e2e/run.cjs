@@ -80,6 +80,8 @@ check('upgrade: old DFAM TEMPO keeps its speed (120 -> 30)', u.first?.dfamTempo 
 check('upgrade: other values and instruments untouched', u.first?.vco1 === 220 && u.first?.m32Tempo === 120, u.first);
 check('upgrade: runs only once', u.afterReload?.dfamTempo === 30, u.afterReload);
 check('upgrade: an untouched Mother-32 DECAY keeps the time it had (400 ms)', u.first?.m32Decay === 400, u.first?.m32Decay);
+check('upgrade: settings a rebuild cannot convert start fresh, are kept once, and the learner is told', u.first?.a4Values === 0 && u.first?.a4Kept === 1 && u.first?.notice && u.first?.saveButton && u.afterReload?.a4Kept === 1,
+  { values: u.first?.a4Values, kept: [u.first?.a4Kept, u.afterReload?.a4Kept], notice: u.first?.notice, button: u.first?.saveButton });
 check('upgrade: completed lessons carry over to their rebuilt successors', u.first?.lessonCarried === true, u.first?.lessonCarried);
 
 // ---- Touch gestures (iPad) -----------------------------------------------------
