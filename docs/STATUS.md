@@ -135,6 +135,8 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Branch | What | Checkpoint |
 |---|---|---|
 | `wip/demo-tracks` | Follow-up: line up the Elektron sets and "The whole studio" on the Xone's meters | 3329d65 (demos merged) |
+| `wip/demo-excerpts` | The Producer path's `info.play` and `listen.demo` on pre-rendered AAC excerpts of the demos (no studio swap mid-lesson), plus Listen on the demo cards | — |
+| `wip/perf-shared-fx` | Idle the shared chorus (bit-identical) and FDN reverb (below −120 dBFS) when nothing feeds them | — |
 
 Each merges through the gate below. Before merging, run `defaults-tool/diff.sh <device> HEAD origin/wip/<branch>` (in the scratchpad) to find changed defaults and removed ids, then add an upgrade entry.
 
