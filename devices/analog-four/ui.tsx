@@ -2012,20 +2012,22 @@ function liveKitValues(ctx: CustomRenderContext): Record<string, ControlValue> {
  * Load kit slot `k` (a pattern linked to it started, or was picked while stopped): the kit being left
  * keeps its edits, and the knobs take the new kit. With `link`, the active pattern is linked to it.
  */
-export function switchKit(ctx: CustomRenderContext, k: string, opts: { saved?: boolean; link?: boolean } = {}) {
+export function switchKit(ctx: CustomRenderContext, k: string, opts: { saved?: boolean; link?: boolean; values?: Record<string, ControlValue> } = {}) {
   const { kits, active } = projectKits(project(ctx));
   const slot = kits[k];
   if (!slot) return;
   const left = kitSnapshot(liveKitValues(ctx));
+  // the values the engine already plays (a pattern start), else the kit's last played / saved values
+  const loaded = opts.values ?? (opts.saved ? slot.saved : slot.values);
   ctx.updateData(d => {
     const p = asProject(d, TRACKS) as A4Project;
     const ks = { ...(p.a4kits ?? {}) };
     if (active && ks[active] && active !== k) ks[active] = { ...ks[active], values: left };
-    if (opts.saved) ks[k] = { ...ks[k], values: ks[k].saved };
+    if (ks[k] && (opts.saved || opts.values)) ks[k] = { ...ks[k], values: loaded };
     const next: A4Project = { ...p, a4kits: ks, a4kit: k };
     return opts.link ? withPattern(next, next.active, x => (x.kit === k ? x : { ...x, kit: k })) : next;
   });
-  useStudioStore.getState().setControlValues(ctx.instance, kitFull(opts.saved ? slot.saved : slot.values));
+  useStudioStore.getState().setControlValues(ctx.instance, kitFull(loaded));
 }
 
 /** SAVE KIT: the loaded settings into a slot (the loaded kit's, or a new one), linked to the active pattern (manual p.25) */
@@ -2593,10 +2595,11 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
   // KITS (manual p.16, p.24, p.38). A pattern linked to another kit started: the engine switched the
   // sound right there, and the knobs follow (the kit left behind keeps its edits). Picking a linked
   // pattern while stopped loads its kit. An unlinked pattern you edit joins the loaded kit.
-  const kitNow = ctx.engine.kitNow as { n: number; kit: string } | undefined;
+  // (also when the panel mounts again after the A4 played on off screen)
+  const kitNow = ctx.engine.kitNow as { n: number; kit: string; values?: Record<string, ControlValue> } | undefined;
   useEffect(() => {
     if (!kitNow || projectKits(project(ctx)).active === kitNow.kit) return;
-    switchKit(ctx, kitNow.kit);
+    switchKit(ctx, kitNow.kit, { values: kitNow.values });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kitNow?.n]);
   const prNow = project(ctx);

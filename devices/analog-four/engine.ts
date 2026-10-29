@@ -52,7 +52,7 @@ import {
   SYNTH_TRACKS, VOICE_KEYS, tid,
 } from './params';
 import { ARP_KEYS, isArpKey, isTransposable, patternArp, type ArpKey } from './arp';
-import { kitFull, projectKits } from './kits';
+import { KIT_CONTROLS, kitFull, kitSnapshot, projectKits, type KitSlot } from './kits';
 
 const VI: Record<string, number> = Object.fromEntries(VOICE_KEYS.map((k, i) => [k, i]));
 const FI: Record<string, number> = Object.fromEntries(FX_KEYS.map((k, i) => [k, i]));
@@ -182,6 +182,11 @@ export class AnalogFourEngine extends BaseEngine {
   /** The loaded kit's slot ('' = none linked), and a counter for the panel's kitNow reports */
   private kitNow = '';
   private kitSerial = 0;
+  /**
+   * The working copy of each kit the engine left while the panel could not follow (an A4 off screen
+   * during a song): used when that kit comes back, unless the project's copy changed since (`from`)
+   */
+  private kitWork = new Map<string, { values: Record<string, ControlValue>; from: KitSlot | undefined }>();
   /** LIVE RECORDING quantized ([RECORD] + [PLAY][PLAY]): notes land on the grid, no micro timing (manual p.41) */
   private liveQuant = false;
   /**
@@ -509,10 +514,14 @@ export class AnalogFourEngine extends BaseEngine {
     const p = asProject(this.data, SEQ_TRACKS);
     const k = getPattern(p, id).kit;
     if (!k || k === this.kitNow) return;
-    const slot = projectKits(p).kits[k];
+    const { kits } = projectKits(p);
+    const slot = kits[k];
     if (!slot) return;
+    if (this.kitNow) this.kitWork.set(this.kitNow, { values: this.kitValuesNow(), from: kits[this.kitNow] });
+    const mem = this.kitWork.get(k);
+    const snap = mem && mem.from === slot ? mem.values : slot.values;
     this.kitNow = k;
-    const v = kitFull(slot.values);
+    const v = kitFull(snap);
     // a kit with another POLY CONFIG: the new pool is set up now, so the new pattern's first trigs (scheduled
     // next) already use it; the panel's echo of these values then changes nothing
     let polyMoved = false;
@@ -544,8 +553,18 @@ export class AnalogFourEngine extends BaseEngine {
       this.toneAt(key, x, time);
     }
     if (fl.length) this.fxmod.port.postMessage({ t: 'at', time, list: fl });
-    // the panel follows when you hear it (earlier, its knobs would reach the voices before the pattern change)
-    this.emitAt(time, { kitNow: { n: ++this.kitSerial, kit: k } });
+    // the panel follows when you hear it (earlier, its knobs would reach the voices before the pattern change),
+    // with the values applied here
+    this.emitAt(time, { kitNow: { n: ++this.kitSerial, kit: k, values: snap } });
+  }
+
+  /** The loaded kit as the engine plays it (its sounds, FX track, CV, macros, POLY CONFIG), stored like a kit */
+  private kitValuesNow(): Record<string, ControlValue> {
+    const out: Record<string, ControlValue> = {};
+    for (let t = 0; t < SYNTH_TRACKS; t++) for (let i = 0; i < VOICE_KEYS.length; i++) out[tid(t, VOICE_KEYS[i])] = this.base[t][i];
+    for (let i = 0; i < FX_KEYS.length; i++) out[`fx_${FX_KEYS[i]}`] = this.fxBase[i];
+    for (const id of KIT_CONTROLS) if (!(id in out) && this.params[id] !== undefined) out[id] = this.params[id];
+    return kitSnapshot(out);
   }
 
   protected onTransport(t: Transport | null): void {
