@@ -51,7 +51,17 @@ its own `wip/*` branch on GitHub, committed but **not yet merged or browser-veri
 - 2a41240: merged **Mother-32** (QA 0/43 for keys and transport, lessons 19/19, check 18/18). Upgrade store v8 covers the flipped switches, VCF MOD amount and polarity, ranges, per-step gates and the old default sequence.
 - 9e75bfa: merged the **DFAM review** (QA 0/40, lessons 20/20, 0 manual). Upgrade store v9: untouched SEQ PITCH MOD keeps VCO 1&2. The audio-QA click threshold for the DFAM is 2, for its lo-fi crackle.
 - 7a606eb: merged **Subharmonicon** (QA 0/36 for audition and transport, lessons 20/20, in-app check passing). Upgrade store v10 covers TEMPO 240, EG AMT ×0.625 and the 5 ms decay floor.
-- Still running: the **Analog Rytm** finisher (kit loudness and lessons) and the **producer-path** agent (lesson-engine hooks and first studio lessons). and push there after each milestone: analog-four, analog-rytm, xone96, mother32, subharmonicon, sub37, elektron-sequencer (UI kit), dfam-review (verification), panel-teaching (touch e2e and perf). Each merges 01a09bc before its final gate.
+- Still running:
+  - the **Analog Rytm** finisher (kit loudness and lessons)
+  - the **producer-path** agent (lesson-engine hooks and first studio lessons)
+  - **independent expert reviews** against the manuals, as was done for the DFAM, for the Analog Four, Sub 37, Mother-32, Subharmonicon and Xone:96, each pushing to `wip/review-<id>`
+- Next:
+  - merge each review through the gate, with upgrade entries for any changed defaults
+  - merge the Rytm, then review it
+  - add the producer-path lessons for the Elektrons and Sub 37
+  - build the three demo tracks
+  - regenerate the audio-QA baseline for every instrument
+  - run the final full e2e and push there after each milestone: analog-four, analog-rytm, xone96, mother32, subharmonicon, sub37, elektron-sequencer (UI kit), dfam-review (verification), panel-teaching (touch e2e and perf). Each merges 01a09bc before its final gate.
 - **Next:** merge each finisher as it passes the gate (section 3). Then add upgrades.ts entries, run audio QA for every instrument, implement the producer path and demo tracks, run independent reviews, do and lazy-load the MIDI code in DeviceHost.
 
 ## 2. Work in progress (each on `wip/<name>`, not merged)
