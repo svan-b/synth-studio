@@ -90,7 +90,10 @@ The panel geometry was verified first, because the earlier verdict on this instr
   - The init pulse at -22.5 LUFS.
   
   They were calibrated: Glide Saw TRACK LEVEL 76, and the init trigs are 3 steps long. The Acid Workout bass VOL went from 84 to 76 for true-peak margin (finding 5).
-- After: see "Gate".
+- After, on the final build:
+  - Audition: `[analog-four] median -18.9 LUFS, spread 7.4 LU, 0 of 47 flagged (none)`, exit 0, max true peak -2.4 dBTP.
+  - Transport: `[analog-four] median -19.0 LUFS, spread 7.4 LU, 0 of 47 flagged (none)`, exit 0, max true peak -1.6 dBTP (Drum / Zap Perc, the same as before the review).
+  - Every tail is at about -103 dBFS 2 s after a studio stop.
 - Names follow "Category / Name". "Kit / Empty project (init sounds)" became "Kit / Init sounds (blank pattern)", with the same preset id.
 - The sounds are musically sensible and true to their character, with no copied factory names.
 
@@ -134,7 +137,10 @@ The panel geometry was verified first, because the earlier verdict on this instr
 |---|---|
 | tsc, `next lint`, `npm run validate analog-four` | clean; 0 errors (17 warnings, none from this review: controls driven by custom elements, and the studio challenges without solutions) |
 | build | passes |
-| `scripts/smoke.cjs` | no errors; no horizontal scroll on desktop or iPad; keys 0.33, transport 0.42, buttons 0.18 peak |
+| `scripts/smoke.cjs` | no errors; no horizontal scroll on desktop or iPad; peaks: keys 0.33, transport 0.33, buttons 0.16 |
 | `scripts/lesson-runner.cjs analog-four` | 20 lessons, 0 failed, 2 manual steps (the arranger) |
 | `scripts/e2e/run.cjs` | 34/34 |
-| audio QA, audition and transport | see "Presets" |
+| `scripts/audio-qa.cjs analog-four --target -18 --suggest` | exit 0: 0 of 47 flagged, median -18.9 LUFS, max true peak -2.4 dBTP |
+| the same with `--excite analog-four=transport` | exit 0: 0 of 47 flagged, median -19.0 LUFS, max true peak -1.6 dBTP |
+| in-app checks (Playwright) | worst case on all four tracks +0.20 dBFS at the tap; Dub Chords rings after the [STOP] key (-35 / -47 dBFS at 1 / 2 s) and fades after a studio stop (-51 / -103 dBFS) |
+| screenshots (desktop 1440 x 900, iPad 1180 x 820) | read against M p.12 and IMG at equal scale; no legend touches another; the last legend row sits just below the iPad fold (see "Panel") |
