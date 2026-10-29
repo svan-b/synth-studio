@@ -1698,7 +1698,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
       {Array.from({ length: 16 }, (_, i) => <div key={i} style={{ position: 'absolute', left: i * pitch, top: 0, width: keyW, height: '100%' }}>{render(i)}</div>)}
     </div>
   );
-  const keyBtn = (i: number, opts: { lit: string | null; amt?: number; label: string; sub?: string; blink?: boolean; outline?: boolean; target?: boolean; pressed?: boolean; onPress: (e: React.PointerEvent) => void; onRelease?: (e: React.PointerEvent) => void; aria: string }) => {
+  const keyBtn = (i: number, opts: { lit: string | null; amt?: number; label: string; sub?: string; blink?: boolean; outline?: boolean; target?: boolean; pressed?: boolean; subSize?: number; onPress: (e: React.PointerEvent) => void; onRelease?: (e: React.PointerEvent) => void; aria: string }) => {
     const col = opts.lit ? mix(COL.trigOff, opts.lit, 0.35 + 0.65 * (opts.amt ?? 1)) : COL.trigOff;
     return (
       <button
@@ -1719,7 +1719,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
       >
         <span style={{ position: 'absolute', left: 0, right: 0, top: '22%', textAlign: 'center', fontSize: 14, fontWeight: 400, lineHeight: '15px' }}>{opts.label}</span>
         <span style={{ position: 'absolute', left: '36%', right: '36%', top: '63%', height: 2, borderRadius: 1, background: col }} />
-        {opts.sub && <span style={{ position: 'absolute', left: 1, right: 1, bottom: 1.5, fontSize: 9, letterSpacing: -0.2, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'center', color: COL.trigOff }}>{opts.sub}</span>}
+        {opts.sub && <span style={{ position: 'absolute', left: 1, right: 1, bottom: 1.5, fontSize: opts.subSize ?? 9, letterSpacing: -0.2, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'center', color: COL.trigOff }}>{opts.sub}</span>}
       </button>
     );
   };
@@ -1771,7 +1771,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
       const on = !!ctx.values[id];
       const playing = on && act[i] === '1';
       return keyBtn(i, {
-        lit: playing ? COL.white : COL.red, amt: on ? 1 : 0.4, label: `${i + 1}`, sub: on ? `POLY ${i + 1}` : `MONO ${i + 1}`,
+        lit: playing ? COL.white : COL.red, amt: on ? 1 : 0.4, label: `${i + 1}`, sub: on ? `POLY ${i + 1}` : `MONO ${i + 1}`, subSize: 10,
         aria: `Voice ${i + 1}: ${on ? 'in the poly pool' : `track ${i + 1}'s own mono voice`}`, pressed: on, target: litIds.has(id),
         onPress: () => { ctx.setValue(id, !on); say(ctx, `VOICE ${i + 1}: ${on ? `T${i + 1}'S OWN (MONO)` : 'IN THE POLY POOL'}`, 1100); },
       });
@@ -1829,7 +1829,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
       const inLen = step < len;
       return keyBtn(i, {
         lit: !inLen ? null : active ? COL.green : s ? (s.trigless ? COL.yellow : COL.red) : null, amt: inLen ? 1 : 0.3,
-        blink: active, outline: playStep === step, label: `${step + 1}`, sub: s?.chord?.length ? `${s.chord.length + 1} NOTES` : undefined,
+        blink: active, outline: playStep === step, label: `${step + 1}`, sub: s?.chord?.length ? `${s.chord.length + 1} NOTES` : undefined, subSize: 10,
         target: !!focus && (focus.has(`seq:trig:${step + 1}`) || focus.has('seq:trigs')),
         aria: `Step ${step + 1}${active ? ' (active step)' : ''}${s ? (s.trigless ? ', lock trig' : ', note trig') : ''}`,
         onPress: () => {

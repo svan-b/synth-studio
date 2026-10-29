@@ -72,7 +72,7 @@ The panel geometry was verified first, because the earlier verdict on this instr
 | No Euclidean page | **Acceptable**; low value for the effort |
 | No STEP RECORDING | **Acceptable.** Grid recording plus hold-a-trig + keyboard covers note entry, and with a mouse step recording saves little |
 
-**Also missing for making full tracks.** These are reported, not built:
+**Also missing for making full tracks.** These are reported, not built here. A later pass built POLY, STEP RECORDING and items 1, 3, 4 and 5 (see "Full-track features" at the end):
 1. **A kit per pattern.** All patterns share one kit, so the sound cannot change between song sections except by p-locks (M p.38).
 2. **Separate track outputs.** The A4 is one stereo stem, so its four voices cannot be mixed or bounced separately in the studio mixer (M p.14: four stereo track outputs).
 3. **LIVE RECORDING of knob moves** (M p.50). Parameter slides are the workaround.
@@ -196,3 +196,54 @@ The final build passes both modes:
 The old code over two runs per mode gave −19.05 / 7.69 LU (audition) and −19.03 / 7.57 LU (transport). The presets whose level repeats within 0.2 LU from run to run differ by a median of 0.01 LU between the versions.
 
 Found here and fixed in a separate commit after the merge: an idle voice's free-running LFOs did not actually run. `this.lfo1.ph -= Math.floor(this.lfo1.ph += d1)` read the phase before the addition, so the phase stayed put, and after a wrap it stuck at a negative value until the voice woke. `idleBlock` now advances, then wraps. A FREE LFO keeps running while its voice is silent, as on the unit, so the phase a note starts on depends on how long the voice rested.
+
+## Full-track features
+
+A second pass built what this review listed as missing for making whole tracks, to the manual (M p.N as above). Every new feature is off until you use it. With POLY off and no kit links, every preset and the demo song give the engine's old message stream (163 of 163 harness scenarios) and the worklet renders bit-identically (163 of 163).
+
+| Feature | Manual | What the twin does |
+|---|---|---|
+| **POLY** | M p.25, p.28-31 | POLY CONFIG ([FUNC] + [MIX], or KIT > POLY CONFIG) ticks voices into a pool; a track whose voice is ticked plays polyphonically on any pool voice, and the others keep their own mono voice. ALLOCATION RESET, ROTATE, REASSIGN and UNISON; with no free voice the least recently used one is stolen. USE TRK SOUNDS keeps each voice on its own track's sound. UNISON DETUNE and PAN SPREAD (16 and 64, as on the manual's screen). TRIG 1-4 tick the voices while the menu is open and light white while their voice plays. The settings are kit controls, so a kit loads its own |
+| Chord trigs | M p.28, p.42 | A trig holds up to four notes (`Step.chord`). Hold a trig and press several keys together (panel keys, or the computer keyboard with a mouse), or play them together in LIVE or STEP RECORDING. Overlapping trigs sound together on a poly track; a mono track plays the chord's first note. The screen lists a held chord trig's notes |
+| PLY arpeggio | M p.43 | ARP MOD PLY plays the whole chord on each arpeggio step, an octave up each step until RNG |
+| **LIVE RECORDING of knob moves** | M p.40-41, p.47, p.50 | A knob turned with no trig held records a lock on the step that plays on the active track: a note trig takes it, an empty step gets a lock trig. The value sounds at once, the kit keeps its own value, and the knob shows the recorded value until recording ends. NOT, VEL and LEN go into the note trigs the playhead passes. A held trig still takes the knob as in GRID RECORDING. Real-time erase while held: [FUNC] + [NO] the locks, [TRACK] + [NO] the trigs, [NO] + a knob turn that parameter's locks. [RECORD] + [PLAY][PLAY] records quantized |
+| **STEP RECORDING** | M p.41-42 | [RECORD] + [STOP] (again: STANDARD / JUMP), [RECORD] leaves it. The trig keys pick the active step, LEFT / RIGHT move it; each key writes there and moves on one step, or the NOTE page's LEN in JUMP (also locked on the trig). Keys held together make a chord, [NO] a rest, [YES] held sets LEN from how long the key was held. Existing locks stay |
+| **Copy / clear / paste** | M p.19, p.54 | [PAGE] + [RECORD] / [STOP] / [PLAY] for the shown page; held trigs + [RECORD] copy them, a held trig + [STOP] pastes them from there, held trigs + [PLAY] clear their locks; repeating a paste or clear undoes it, and again redoes it. [TRACK] + [RECORD] / [STOP] copy and paste a Sound. The TRACK menu has the same as buttons for a mouse, and with the trig editor open its steps count as held |
+| **TRANSPOSABLE** | M p.47, p.53, p.57 | Per pattern track (NOTES SETUP): off, the track's notes ignore [TRNS] and the song's transpose. [TRNS] + [TRACK] switches it; while [TRNS] is held, the lit track keys are the transposable ones. The brief placed it under SOUND SETTINGS (p.35); the manual puts it in NOTES SETUP |
+| **Kits per pattern** | M p.16, p.24-25, p.38 | The project keeps its kits and each pattern can link one. SAVE KIT ([FUNC] / [YES] + [KIT]), SAVE AS NEW, LOAD (links the active pattern; the loaded kit reloads from its save), RELOAD ([NO] + [KIT]), CLEAR. When a pattern with another kit starts (a pattern change, a chain, a song, the studio arranger), the engine schedules that kit's voices, FX track and POLY CONFIG exactly at the pattern's start, and the knobs follow when you hear it. The kit left behind keeps its edits. A linked pattern picked while stopped loads its kit; an unlinked one plays the loaded kit and joins it when you edit it |
+
+**Where the manual leaves room** (also in REFERENCE.md):
+- RESET counts up from the playing track's own voice and wraps round (the manual's figure plays from track 1).
+- UNISON spreads the voices evenly by their place in the pool: the outer ones DETUNE/128 semitone and SPREAD/127 x 64 PAN either side.
+- A poly voice takes the new sound at the note's start with no crossfade, as a stolen voice must.
+- On a poly track, an INF note holds until its voice is stolen or the sequencer stops.
+- Knob locks land on the step under the playhead; they carry no micro timing.
+- The twin's knobs have no push switch, so [NO] + turning a knob erases its locks.
+- Kits are slots of the project, named KIT nn (there is no NAMING menu).
+
+**Library additions** (`lib/sequencer/elektron`; nothing existing changed): `Step.chord`, `CHORD_MAX` / `CHORD_SPAN`, `cleanChord` (also in `normalizeStep`), `trigNotes`, `addChordNote`, `formatChord`, `patchStep` cleaning `chord`, and `LockTracker.add` for live-recorded locks. There are four new test cases (`npm run test:seq`: 237 pass). `docs/ELEKTRON_SEQUENCER.md` documents them.
+
+**Lessons:**
+- *Chords with POLY* (`analog-four-sq5-poly-chords`, sequencing): the pool, a chord trig, POLY on against off, voice stealing, a chord progression, and UNISON with an ear match of UNISON DETUNE.
+- *Record knob moves live* (`analog-four-p2-live-locks`, performance): live recording, a recorded filter sweep, what the knob still controls, an ear match of RES, and a second take on the delay send.
+- Every step has a solution. Every existing lesson id and check is unchanged.
+
+**Verification:**
+- Offline harness, POLY and kits: 22 checks. The manual's four allocation figures note for note; stealing with stale note-offs ignored; RESET from T2; chord trigs on three and four voices; T1's sound on the other voices; UNISON offsets; USE TRK SOUNDS; knob turns reaching every voice that holds the sound; a mono track beside a poly pool; PLY; POLY off again; kit switches at the pattern start (FX too) and back.
+- Browser checks on the production build: 30 checks (POLY CONFIG, chord entry, live-recorded locks and erase, step recording with a chord, page and trig copy / undo, TRANSPOSABLE, kits through a chain), plus iPad screenshots and text and touch-target sizes of every new menu.
+
+GATE_TABLE
+
+**Upgrade notes** (for `lib/studio/upgrades.ts`):
+- `t1..t4_arp_mod`: max 6 → 7 (PLY added at 7) → no conversion: every saved value keeps its meaning.
+- New controls, whose defaults keep the old sound: `poly_v1`..`poly_v4` (off), `poly_alloc` (0, RESET), `poly_trk` (off), `poly_det` (16), `poly_spr` (64). The kit presets now set them, all mono.
+- [PAGE] shows the next page when it is let go, not when it is pressed, so that it can be held for the page combinations.
+- New optional data, so older saves load as they are: `Step.chord`, `Pattern.kit` (now used: a slot of the project's `a4kits`), the project's `a4kits` / `a4kit`, and the pattern's `a4trns`.
+
+**Still missing**, with the reason for each:
+- VOICE ROUTING (voice to main / to FX, M p.29): it matters once separate track outputs come, which the integrator adds after this merges.
+- Sound locks, the Euclidean NOTE page, KEY SCALE / KEY NOTE, [PAGE] + [TRIG] page playback, and trig shift / destructive transpose: these are sequencer extras with no musical gap left by the work above.
+- LIVE RECORDING takes note lengths from the NOTE page's LEN, not from the keys. The manual does not say whether it records them.
+- VELOCITY TO VOL and the MIDI controller routings (M p.35-36) need MIDI-velocity input, which the A4's own keyboard does not have.
+- Kit naming and the kit / macro copy-paste menus (M p.26).
+- With a mouse, the two-key combinations need the TRACK and KIT menu buttons (or the trig editor). On a touch screen they are two fingers, as on the unit. The shared menu frame's close button is 30 px.
