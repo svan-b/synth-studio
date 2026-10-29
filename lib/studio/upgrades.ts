@@ -182,6 +182,15 @@ const UPGRADES: Upgrade[] = [
       return o;
     },
   },
+  {
+    // DFAM review: SEQ PITCH MOD now starts OFF, as in the manual's walkthrough (p.9).
+    // Saves that never touched it keep the sequencer's pitch on VCO 1&2.
+    store: 9,
+    project: 6,
+    device: 'dfam',
+    oldDefaults: { seq_pitch_mod: 0 },
+    apply: v => v,
+  },
 ];
 
 /** Lessons replaced by a rebuild: completing the old one counts for its successor */
@@ -228,8 +237,8 @@ export function upgradeCompletedLessons(done: string[], from: number): string[] 
   return [...out];
 }
 
-export const STORE_VERSION = 8;
-export const PROJECT_VERSION = 5;
+export const STORE_VERSION = 9;
+export const PROJECT_VERSION = 6;
 
 /**
  * Upgrade the control values of every instance saved before version `from`

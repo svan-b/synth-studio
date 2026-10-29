@@ -72,5 +72,10 @@ module.exports = {
   ],
 
   /** Per-device overrides, e.g. { "xone96": { "excite": "transport", "thresholds": { "loudnessLu": 6 } } } */
-  devices: {},
+  devices: {
+    // NOISE / VCF MOD makes the resonant filter crackle at a hit's onset (the lo-fi sound the
+    // DFAM manual describes, p.12 and p.20). One such crackle in a render is character, not a
+    // defect; real click bugs repeat. See devices/dfam/REVIEW.md.
+    dfam: { thresholds: { clicksMin: 2 } },
+  },
 };

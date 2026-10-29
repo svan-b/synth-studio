@@ -35,6 +35,8 @@ const K_PITCH = 24, K_VEL = 32, NK = 40;
 const I_TRIG = 0, I_VCA_CV = 1, I_VEL = 2, I_VCA_DEC = 3, I_EXT = 4, I_VCF_DEC = 5, I_NOISE = 6, I_VCO_DEC = 7;
 const I_VCF_MOD = 8, I_VCO1_CV = 9, I_FM = 10, I_VCO2_CV = 11, I_TEMPO = 12, I_RUN = 13, I_ADV = 14, NIN = 15;
 const O_VCA = 0, O_VCA_EG = 1, O_VCF_EG = 2, O_VCO_EG = 3, O_VCO1 = 4, O_VCO2 = 5, O_TRIG = 6, O_VEL = 7, O_PITCH = 8, NOUT = 9;
+/** AudioParam names, built once: process() must not allocate (WebKit's 128-frame quanta) */
+const PARAM_NAMES = Array.from({ length: NIN }, (_, j) => 'in' + j);
 
 // Scaling
 const EG_PEAK = 8;            // envelopes peak at +8 V at full velocity
@@ -44,7 +46,9 @@ const BASE_HZ = 130.8128;     // VCO FREQUENCY at noon = C3
 const EDGE_ON = 1.5, EDGE_OFF = 1.0; // gate / trigger thresholds (volts)
 const DEDUPE = 0.0015;        // an event and an audio pulse closer than this are one pulse
 const FB_SAT = 2.4;           // ladder feedback saturation (lets self-oscillation reach ~VCO level)
+const HP_RES_HZ = 500;        // HP feedback roll-off: full RESONANCE oscillates from ~1 kHz up
 const TRIG_OUT_SEC = 0.001;   // TRIGGER output pulse width
+const EVENT_ORDER = { run: 0, 'aud-on': 0, 'aud-off': 0, adv: 1, 'button-adv': 1, trig: 2, 'button-trig': 2 };
 
 // Continuous knobs smoothed per sample (others jump)
 const SMOOTHED = [K_VCO1_FREQ, K_VCO2_FREQ, K_VCO1_EG, K_VCO2_EG, K_FM, K_VCO1_LEVEL, K_VCO2_LEVEL, K_NOISE_LEVEL, K_RES, K_VCF_EG, K_NOISE_VCF, K_VOLUME];
@@ -59,6 +63,18 @@ function tanhf(x) {
   if (x < -3) return -1;
   const x2 = x * x;
   return x * (27 + x2) / (27 + 9 * x2);
+}
+
+/**
+ * Output buffer rail: unity gain up to RAIL_KNEE, then a tanh knee toward
+ * RAIL_MAX. However hot the patch (every source up, full RESONANCE, VCA CV
+ * on top), the instrument output never reaches 0 dBFS (1.0 = 5 V).
+ */
+const RAIL_KNEE = 0.7, RAIL_MAX = 0.98, RAIL_W = RAIL_MAX - RAIL_KNEE;
+function rail(x) {
+  if (x > RAIL_KNEE) return RAIL_KNEE + RAIL_W * tanhf((x - RAIL_KNEE) / RAIL_W);
+  if (x < -RAIL_KNEE) return -RAIL_KNEE - RAIL_W * tanhf((-x - RAIL_KNEE) / RAIL_W);
+  return x;
 }
 
 // ----------------------------------------------------------------------------
@@ -158,7 +174,7 @@ class DfamProcessor extends AudioWorkletProcessor {
     const sr = sampleRate;
     this.sr = sr;
     const k = new Float64Array(NK);
-    k[K_VCO1_WAVE] = 1; k[K_VCO2_WAVE] = 1; k[K_SYNC] = 0;
+    k[K_VCO1_WAVE] = 1; k[K_VCO2_WAVE] = 1; k[K_SYNC] = 0; k[K_SEQ_MOD] = 1;
     k[K_VCO_DECAY] = 0.1; k[K_VCF_DECAY] = 0.3; k[K_VCA_DECAY] = 0.3;
     k[K_VCO1_LEVEL] = 0.75; k[K_CUTOFF] = 2000; k[K_VCF_MODE] = 1; k[K_VOLUME] = 0.75; k[K_TEMPO] = 8;
     for (let i = 0; i < NSTEP; i++) k[K_VEL + i] = 1;
@@ -173,7 +189,9 @@ class DfamProcessor extends AudioWorkletProcessor {
     this.routes = [];                      // internal self-patches [out, in, scale]
     this.prevOut = new Float64Array(NOUT); // last sample of every output (volts) for internal routes
     this.inV = new Float64Array(NIN);
-    this.active = [];                      // inputs with a live external signal this block
+    this.arrs = new Array(NIN).fill(null); // this block's param arrays
+    this.activeIdx = new Int32Array(NIN);  // inputs with a live external signal this block
+    this.isActive = new Uint8Array(NIN);
 
     // Envelopes
     this.egVco = new Envelope(); this.egVcf = new Envelope(); this.egVca = new Envelope();
@@ -187,6 +205,7 @@ class DfamProcessor extends AudioWorkletProcessor {
     this.trigHigh = false; this.advHigh = false;
     this.lastTrigAudio = -1; this.lastTrigEvent = -1;
     this.lastAdvAudio = -1; this.lastAdvEvent = -1; this.lastAdvAt = -1;
+    this.lastAdvEdgeAt = -1;       // last rising edge at ADV/CLOCK, played or not (is a clock live?)
     this.queue = [];
     this.trigOut = 0;              // samples left of the TRIGGER output pulse
     this.seqPitch = 0;             // volts on the internal pitch bus
@@ -201,9 +220,9 @@ class DfamProcessor extends AudioWorkletProcessor {
 
     // Ladder state and coefficient cache
     this.z0 = 0; this.z1 = 0; this.z2 = 0; this.z3 = 0;
-    this.cutLast = NaN; this.gCut = 0;
-    // DC blocker (8 Hz) on the main output
-    this.dcX = 0; this.dcY = 0; this.dcR = 1 - (2 * Math.PI * 8) / sr;
+    this.cutLast = NaN; this.gCut = 0; this.hpK = 1;
+    // DC blocker (5 Hz) on the main output, ahead of the output rail
+    this.dcX = 0; this.dcY = 0; this.dcR = 1 - (2 * Math.PI * 5) / sr;
 
     // UI reporting
     this.uiDirty = true; this.uiTrig = false; this.uiLast = -1;
@@ -232,8 +251,10 @@ class DfamProcessor extends AudioWorkletProcessor {
   }
 
   push(time, ch, v) {
-    this.queue.push({ time, ch, v });
-    if (this.queue.length > 1) this.queue.sort((a, b) => a.time - b.time);
+    this.queue.push({ time, ch, v, o: EVENT_ORDER[ch] ?? 2 });
+    // In time order; at the same instant RUN, then ADVANCE / CLOCK, then TRIGGER, so one clock
+    // patched into ADV/CLOCK and TRIGGER plays the step it advances to (as the jacks do)
+    if (this.queue.length > 1) this.queue.sort((a, b) => a.time - b.time || a.o - b.o);
   }
 
   // --------------------------------------------------------------------------
@@ -264,7 +285,26 @@ class DfamProcessor extends AudioWorkletProcessor {
   clockPulse() {
     this.lastAdvAt = currentTime;
     this.advance();
+    this.seqOutputsNow();
     if (!this.patched[I_TRIG]) this.fire();
+  }
+
+  /**
+   * The PITCH and VELOCITY outputs change on the clock edge. Self-patches normally run one sample
+   * late; pass the new step's voltages through at once, so a patch such as PITCH -> VELOCITY fires
+   * each step's envelopes at that step's own level, not the previous step's.
+   */
+  seqOutputsNow() {
+    const routes = this.routes;
+    if (!routes.length) return;
+    const prev = this.prevOut, inV = this.inV;
+    const np = this.k[K_PITCH + this.step], nv = this.k[K_VEL + this.step] * 5;
+    for (let q = 0; q < routes.length; q++) {
+      const rt = routes[q];
+      if (rt[0] === O_PITCH) inV[rt[1]] += (np - prev[O_PITCH]) * rt[2];
+      else if (rt[0] === O_VEL) inV[rt[1]] += (nv - prev[O_VEL]) * rt[2];
+    }
+    prev[O_PITCH] = np; prev[O_VEL] = nv;
   }
 
   handleEvent(ev) {
@@ -273,8 +313,9 @@ class DfamProcessor extends AudioWorkletProcessor {
       case 'button-adv': this.advance(); break;
       case 'aud-on': {
         // Audition from step 1 when stopped - or when armed for an external clock that is not
-        // sending pulses (studio stopped): then the internal clock plays the phrase
-        const idleClock = this.running && this.patched[I_ADV] && currentTime - this.lastAdvAt > 0.5;
+        // sending pulses (studio stopped): then the internal clock plays the phrase. A clock that
+        // is running (a self-patched VCO, another DFAM) keeps clocking the audition.
+        const idleClock = this.running && this.patched[I_ADV] && currentTime - this.lastAdvEdgeAt > 0.5;
         if (!this.audition && (!this.running || idleClock)) {
           this.audition = true; this.auditionStep = this.step; this.step = NSTEP - 1;
           if (this.running) this.phase = 1;
@@ -297,8 +338,9 @@ class DfamProcessor extends AudioWorkletProcessor {
       case 'adv':
         if (Math.abs(ev.time - this.lastAdvAudio) < DEDUPE) break;
         this.lastAdvEvent = ev.time;
+        this.lastAdvEdgeAt = ev.time;
         // ADV/CLOCK only plays while the sequencer runs (press RUN/STOP first)
-        if (this.running && this.patched[I_ADV] && !this.audition) this.clockPulse();
+        if (this.running && this.patched[I_ADV]) this.clockPulse();
         break;
       case 'run': this.runEvent = ev.v > 0.5; break;
     }
@@ -319,16 +361,15 @@ class DfamProcessor extends AudioWorkletProcessor {
     const egVco = this.egVco, egVcf = this.egVcf, egVca = this.egVca;
     const o1s = this.osc1, o2s = this.osc2;
 
-    // External inputs with signal this block (most are silent)
-    const active = this.active; active.length = 0;
-    const arrs = [];
+    // External inputs with signal this block (most are silent). No allocation here.
+    const arrs = this.arrs, activeIdx = this.activeIdx, isActive = this.isActive;
+    let na = 0;
     for (let j = 0; j < NIN; j++) {
-      const arr = params['in' + j];
-      arrs.push(arr);
-      if (arr.length > 1 || arr[0] !== 0) active.push(j);
-      else inV[j] = 0;
+      const arr = params[PARAM_NAMES[j]];
+      arrs[j] = arr;
+      if (arr.length > 1 || arr[0] !== 0) { activeIdx[na++] = j; isActive[j] = 1; }
+      else { isActive[j] = 0; inV[j] = 0; }
     }
-    const na = active.length;
 
     // Smoothing needed this block?
     const a = this.smoothA;
@@ -367,12 +408,12 @@ class DfamProcessor extends AudioWorkletProcessor {
 
       // ---- inputs: cables from other instruments (1.0 = 5 V) + self-patches (last sample, volts) ----
       for (let q = 0; q < na; q++) {
-        const j = active[q], arr = arrs[j];
+        const j = activeIdx[q], arr = arrs[j];
         inV[j] = (arr.length > 1 ? arr[i] : arr[0]) * 5;
       }
       if (nr) {
         if (!na) for (let q = 0; q < nr; q++) inV[routes[q][1]] = 0;
-        else for (let q = 0; q < nr; q++) { const j = routes[q][1]; if (active.indexOf(j) < 0) inV[j] = 0; }
+        else for (let q = 0; q < nr; q++) { const j = routes[q][1]; if (!isActive[j]) inV[j] = 0; }
         for (let q = 0; q < nr; q++) { const rt = routes[q]; inV[rt[1]] += prev[rt[0]] * rt[2]; }
       }
 
@@ -381,12 +422,6 @@ class DfamProcessor extends AudioWorkletProcessor {
         for (let q = 0; q < SMOOTHED.length; q++) { const id = SMOOTHED[q]; s[id] += (k[id] - s[id]) * a; }
         this.cutLog += (cutTarget - this.cutLog) * a;
       }
-      const curPitch = k[K_PITCH + this.step];
-      if (this.seqPitch !== curPitch) {
-        this.seqPitch += (curPitch - this.seqPitch) * a;
-        if (Math.abs(curPitch - this.seqPitch) < 1e-6) this.seqPitch = curPitch;
-      }
-
       // ---- timed events: buttons, cables from other instruments, auditions ----
       while (this.queue.length && this.queue[0].time <= t) this.handleEvent(this.queue.shift());
 
@@ -403,21 +438,15 @@ class DfamProcessor extends AudioWorkletProcessor {
         this.uiDirty = true;
       }
 
-      // ---- TRIGGER jack: fires the envelopes without advancing ----
-      if (patched[I_TRIG]) {
-        const gv = inV[I_TRIG];
-        if (!this.trigHigh && gv > EDGE_ON) {
-          this.trigHigh = true;
-          if (Math.abs(t - this.lastTrigEvent) >= DEDUPE) { this.lastTrigAudio = t; this.fire(); }
-        } else if (this.trigHigh && gv < EDGE_OFF) this.trigHigh = false;
-      }
-
       // ---- clock: a cable in ADV/CLOCK replaces the internal clock ----
-      const extClock = patched[I_ADV] && !this.audition;
+      // (before the TRIGGER jack, so one pulse patched into both advances first and then plays the new step)
+      // An audition uses the internal clock unless a clock is arriving at ADV/CLOCK
+      const extClock = patched[I_ADV] && (!this.audition || t - this.lastAdvEdgeAt < 0.5);
       if (patched[I_ADV]) {
         const gv = inV[I_ADV];
         if (!this.advHigh && gv > EDGE_ON) {
           this.advHigh = true;
+          this.lastAdvEdgeAt = t;
           if (Math.abs(t - this.lastAdvEvent) >= DEDUPE) {
             this.lastAdvAudio = t;
             if (this.running && extClock) this.clockPulse();
@@ -433,6 +462,22 @@ class DfamProcessor extends AudioWorkletProcessor {
           if (this.phase >= 1) this.phase = 0;
           this.clockPulse();
         }
+      }
+
+      // ---- TRIGGER jack: fires the envelopes without advancing ----
+      if (patched[I_TRIG]) {
+        const gv = inV[I_TRIG];
+        if (!this.trigHigh && gv > EDGE_ON) {
+          this.trigHigh = true;
+          if (Math.abs(t - this.lastTrigEvent) >= DEDUPE) { this.lastTrigAudio = t; this.fire(); }
+        } else if (this.trigHigh && gv < EDGE_OFF) this.trigHigh = false;
+      }
+
+      // ---- the current step's PITCH (after the clock, so the outputs change on its edge) ----
+      const curPitch = k[K_PITCH + this.step];
+      if (this.seqPitch !== curPitch) {
+        this.seqPitch += (curPitch - this.seqPitch) * a;
+        if (Math.abs(curPitch - this.seqPitch) < 1e-6) this.seqPitch = curPitch;
       }
 
       // ---- envelopes ----
@@ -511,14 +556,20 @@ class DfamProcessor extends AudioWorkletProcessor {
         let fc = Math.pow(2, cutOct);
         if (fc < 8) fc = 8; else if (fc > nyq) fc = nyq;
         this.gCut = Math.tan(fc * piOverSr);
+        // HP mode: RESONANCE scales differently - at maximum it only self-oscillates from a
+        // CUTOFF of about 1 kHz up (DFAM manual p.18). Less feedback at low cutoffs does that.
+        const f2 = fc * fc;
+        this.hpK = f2 / (f2 + HP_RES_HZ * HP_RES_HZ);
       }
       const g = this.gCut;
       const G = g / (1 + g), inv = 1 / (1 + g);
-      const kk = s[K_RES] * 5;            // self-oscillates past ~80% (about 3 o'clock)
+      // LP self-oscillates past ~80 % (3 o'clock, p.18): a 4-pole ladder oscillates at k = 4
+      const kk = s[K_RES] * 5 * (hp ? this.hpK : 1);
       const S1 = this.z0 * inv, S2 = this.z1 * inv, S3 = this.z2 * inv, S4 = this.z3 * inv;
       const G2 = G * G, G4 = G2 * G2;
       const sigma = G2 * G * S1 + G2 * S2 + G * S3 + S4;
-      const xd = 1.6 * tanhf((mix + 1e-6 * noise) * 0.625) * (1 + 0.45 * kk); // soft input drive + bass make-up
+      // soft input drive; in LP, part of the passband (bass) that resonance takes away is made up
+      const xd = 1.6 * tanhf((mix + 1e-6 * noise) * 0.625) * (hp ? 1 : 1 + 0.45 * kk);
       const y4e = (G4 * xd + sigma) / (1 + kk * G4);
       const u = FB_SAT * tanhf((xd - kk * y4e) / FB_SAT);
       let v = (u - this.z0) * G; const y1 = v + this.z0; this.z0 = y1 + v;
@@ -538,9 +589,11 @@ class DfamProcessor extends AudioWorkletProcessor {
         const vol = s[K_VOLUME];
         main = amp * vol * vol;
       }
+      // AC-coupled output, then the rail: a sub-audio square stepping through the
+      // DC blocker can overshoot, so the rail comes last
       const dc = main - this.dcX + this.dcR * this.dcY;
       this.dcX = main; this.dcY = dc;
-      main = dc;
+      main = rail(dc);
 
       // ---- outputs ----
       const trig = this.trigOut > 0 ? 1 : 0;
@@ -569,9 +622,9 @@ class DfamProcessor extends AudioWorkletProcessor {
     if (Math.abs(this.z3) < 1e-30) this.z3 = 0;
     if (Math.abs(this.dcY) < 1e-30) this.dcY = 0;
 
-    // UI: current step, running and trigger flash - at most every 25 ms
+    // UI: current step, running and trigger flash - at most 20 times a second (plenty for LEDs)
     const now = t0 + n / sr;
-    if (this.uiDirty && now - this.uiLast >= 0.025) {
+    if (this.uiDirty && now - this.uiLast >= 0.05) {
       // RUN LED: the button or the RUN/STOP gate - an audition does not light it
       const lit = this.runButton || (patched[I_RUN] && (this.runGate || this.runEvent));
       this.port.postMessage({ t: 's', step: this.step, run: lit ? 1 : 0, trig: this.uiTrig ? 1 : 0, time: now });

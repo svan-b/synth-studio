@@ -64,7 +64,7 @@ const f1: Lesson = {
     run('An oscillator makes a repeating wave; repeated fast enough, the ear hears a pitch.'),
     {
       kind: 'predict', control: 'vco1_frequency', targetValue: 1, concept: 'oscillator-pitch',
-      instruction: 'Turn VCO 1 FREQUENCY up to +1 (one octave).',
+      instruction: 'Turn VCO 1 FREQUENCY up one octave, from 131 Hz to about 262 Hz.',
       predict: {
         question: 'What will turning VCO 1 FREQUENCY up do?',
         options: ['Raise the pitch', 'Make it louder', 'Make each hit longer'], answer: 0,
@@ -100,10 +100,10 @@ const f1: Lesson = {
       manualReference: 'Manual: Mixer',
     },
     {
-      kind: 'do', control: 'vco2_frequency', targetValue: 1.583, concept: 'oscillator-pitch',
-      instruction: 'Turn VCO 2 FREQUENCY to about +1.6, a fifth above VCO 1.',
+      kind: 'do', control: 'vco2_frequency', targetValue: 1.585, tolerance: 0.06, concept: 'oscillator-pitch',
+      instruction: 'Turn VCO 2 FREQUENCY slowly up to about 392 Hz, a fifth above VCO 1 (262 Hz).',
       principle: 'Pitches at a simple ratio (3:2, a fifth) blend into one rich tone; odd ratios sound metallic.',
-      explanation: 'A fifth is 7 semitones, and 7/12 of an octave is about 0.58. So +1.58 sits a fifth above VCO 1\'s +1. Move the knob slowly and listen for the point where the beating stops.',
+      explanation: 'A fifth is a 3:2 ratio: 262 Hz x 1.5 = 392 Hz. Close to it the two waves beat - a slow wobble. Watch the readout, and listen for the wobble to stop as they lock into one tone.',
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'oscillator-pitch',
@@ -123,9 +123,9 @@ const f1: Lesson = {
       instruction: 'Make a fuller tone: add VCO 2 exactly one octave above VCO 1, loud enough to hear.',
       checklist: [
         { text: 'VCO 2 LEVEL at least 40%', check: s => num(s, 'vco2_level') >= 40 },
-        { text: 'VCO 2 FREQUENCY one octave above VCO 1 (about +1 more)', check: s => Math.abs(num(s, 'vco2_frequency') - num(s, 'vco1_frequency') - 1) < 0.15 },
+        { text: 'VCO 2 FREQUENCY one octave above VCO 1 (twice its Hz)', check: s => Math.abs(num(s, 'vco2_frequency') - num(s, 'vco1_frequency') - 1) < 0.15 },
       ],
-      hints: ['An octave on these knobs is 1.0.', 'VCO 1 is at +1, so where should VCO 2 go?', 'VCO 2 FREQUENCY at about +2, VCO 2 LEVEL around 60%.'],
+      hints: ['An octave doubles the frequency.', 'VCO 1 reads 262 Hz, so where should VCO 2 go?', 'VCO 2 FREQUENCY at about 523 Hz, VCO 2 LEVEL around 60%.'],
       solution: { values: { vco1_frequency: 1, vco2_frequency: 2, vco2_level: 60 } },
     },
     {
@@ -530,7 +530,7 @@ const f6: Lesson = {
   source: 'Synth Studio · DFAM manual, Sequencer section', estimatedMinutes: 7,
   prerequisites: ['dfam-f5-envelopes'],
   concepts: ['sequencer-pattern', 'timing-tempo', 'velocity-dynamics'],
-  start: { reset: true, values: { vco1_frequency: -0.5, vco1_eg_amount: 30, vco_decay: 40, vca_decay: 200, tempo: 120 } },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -0.5, vco1_eg_amount: 30, vco_decay: 40, vca_decay: 200, tempo: 120 } },
   steps: [
     run(),
     {
@@ -576,8 +576,8 @@ const f6: Lesson = {
       instruction: 'Press RUN / STOP to stop the sequencer.',
       predict: {
         question: 'When you start it again, where will it carry on from?',
-        options: ['The step it stopped on', 'Always step 1', 'A random step'], answer: 0,
-        explain: 'The DFAM carries on from wherever it is. To start on step 1, park it on step 8 with ADVANCE: the first clock moves it to step 1 and then plays it.',
+        options: ['Where it stopped: the next step plays first', 'Always step 1', 'A random step'], answer: 0,
+        explain: 'The DFAM has no reset: it carries on from where it stopped, and the first clock moves it on one step before it plays. So to start on step 1, park it on step 8 with ADVANCE.',
       },
       principle: 'A step sequencer remembers its position; starting moves to the next step and plays it.',
     },
@@ -889,7 +889,7 @@ const sd3: Lesson = {
   source: 'Synth Studio · DFAM manual preset "Quick Hats"', estimatedMinutes: 7,
   prerequisites: ['dfam-f3-filter', 'dfam-f4-vca'],
   concepts: ['filter-type', 'noise', 'envelope-decay', 'signal-routing'],
-  start: { reset: true, values: { vco1_level: 0, noise_level: 100, vcf_cutoff: 2000, vcf_resonance: 25, vca_decay: 45, tempo: 120, ...seq(undefined, [100, 55, 80, 55, 100, 55, 80, 55]) } },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_level: 0, noise_level: 100, vcf_cutoff: 2000, vcf_resonance: 25, vca_decay: 45, tempo: 120, ...seq(undefined, [100, 55, 80, 55, 100, 55, 80, 55]) } },
   steps: [
     run('Hats are short bursts of bright noise, usually on every 8th or 16th note.'),
     {
@@ -997,7 +997,7 @@ const sd4: Lesson = {
     },
     {
       kind: 'do', control: 'vco1_frequency', targetValue: 1, concept: 'frequency-modulation',
-      instruction: 'Sweep VCO 1 FREQUENCY slowly up to about +1 and listen to the overtones change.',
+      instruction: 'Sweep VCO 1 FREQUENCY slowly up to about 262 Hz and listen to the overtones change.',
       principle: 'FM timbre depends on the ratio between the two frequencies: simple ratios ring, odd ones clang.',
     },
     {
@@ -1038,7 +1038,7 @@ const sd4: Lesson = {
     },
     {
       kind: 'do', control: 'vco2_frequency', targetValue: 2.5, concept: 'oscillator-sync',
-      instruction: 'Sweep VCO 2 FREQUENCY up to about +2.5: the pitch stays, the tone tears.',
+      instruction: 'Sweep VCO 2 FREQUENCY up to about 740 Hz: the pitch stays, the tone tears.',
       principle: 'Sweeping a synced oscillator gives the classic "tearing" sync sound.',
     },
     {
@@ -1350,7 +1350,7 @@ const sq1: Lesson = {
   source: 'Synth Studio · DFAM manual, Sequencer (and the acid-house tradition)', estimatedMinutes: 8,
   prerequisites: ['dfam-f6-sequencer', 'dfam-f3-filter'],
   concepts: ['sequencer-pattern', 'velocity-dynamics', 'filter-resonance', 'oscillator-pitch'],
-  start: { reset: true, values: { vco1_frequency: -1, vco1_wave: 0, vco1_level: 80, vco2_frequency: -0.985, vco2_wave: 0, vco2_level: 35, vcf_cutoff: 280, vcf_resonance: 72, vcf_eg_amount: 55, vcf_decay: 170, vca_decay: 260, tempo: 126 } },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -1, vco1_wave: 0, vco1_level: 80, vco2_frequency: -0.985, vco2_wave: 0, vco2_level: 35, vcf_cutoff: 280, vcf_resonance: 72, vcf_eg_amount: 55, vcf_decay: 170, vca_decay: 260, tempo: 126 } },
   steps: [
     run('A bassline is rhythm plus intervals; the same note repeated is the starting point.'),
     {
@@ -1432,7 +1432,7 @@ const sq2: Lesson = {
   source: 'Synth Studio · Moog support FAQ "Can I change DFAM\'s note length?" and community kit patches', estimatedMinutes: 9,
   prerequisites: ['dfam-f7-patching', 'dfam-sd1-kick'],
   concepts: ['signal-routing', 'sequencer-pattern', 'timing-tempo', 'noise'],
-  start: { reset: true, values: { vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, tempo: 110, ...seq(undefined, [100, 0, 55, 0, 100, 0, 70, 40]) } },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, tempo: 110, ...seq(undefined, [100, 0, 55, 0, 100, 0, 70, 40]) } },
   steps: [
     run('Eight steps of one drum voice can still be a whole beat, if every step is different.'),
     {
@@ -1521,7 +1521,7 @@ const p1: Lesson = {
   source: 'Synth Studio · performance techniques', estimatedMinutes: 7,
   prerequisites: ['dfam-f6-sequencer'],
   concepts: ['filter-cutoff', 'envelope-decay', 'velocity-dynamics', 'timing-tempo'],
-  start: { reset: true, values: { vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, tempo: 120, ...seq([0, 0, 0, 0, 30, 0, 0, 30], [100, 0, 55, 0, 100, 0, 70, 40]) }, patches: [{ from: 'out_pitch', to: 'in_noise_level' }] },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, tempo: 120, ...seq([0, 0, 0, 0, 30, 0, 0, 30], [100, 0, 55, 0, 100, 0, 70, 40]) }, patches: [{ from: 'out_pitch', to: 'in_noise_level' }] },
   steps: [
     run('Performing is changing the sound over time while the pattern keeps going.'),
     {
@@ -1606,7 +1606,7 @@ const st1: Lesson = {
   requires: ['studio-clock'],
   prerequisites: ['dfam-f6-sequencer'],
   concepts: ['timing-tempo', 'signal-routing', 'sequencer-pattern'],
-  start: { reset: true, values: { vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, ...seq([0, 0, 0, 0, 30, 0, 0, 30], [100, 0, 55, 0, 100, 0, 70, 40]) }, patches: [{ from: 'out_pitch', to: 'in_noise_level' }] },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 3500, vcf_eg_amount: 20, vcf_decay: 60, vca_decay: 220, ...seq([0, 0, 0, 0, 30, 0, 0, 30], [100, 0, 55, 0, 100, 0, 70, 40]) }, patches: [{ from: 'out_pitch', to: 'in_noise_level' }] },
   steps: [
     {
       kind: 'info', concept: 'timing-tempo', focus: ['in_adv_clock'],
@@ -1620,6 +1620,15 @@ const st1: Lesson = {
       instruction: 'In the Studio tab, patch Studio Clock CLOCK into the DFAM\'s ADV / CLOCK.',
       checklist: [{ text: 'CLOCK → ADV / CLOCK cable', check: s => studioCable(s, 'out_clock', 'in_adv_clock', 'studio-clock', 'dfam') }],
       hints: ['Open the Studio tab at the top of the page.', 'Tap CLOCK on the Studio Clock, then tap ADV / CLOCK on the DFAM.'],
+      solution: { studioCables: [{ from: { device: 'studio-clock', jack: 'out_clock' }, to: { device: 'dfam', jack: 'in_adv_clock' } }] },
+    },
+    {
+      // ADVANCE steps the sequencer while it is stopped (DFAM manual p.23), so park it before arming
+      kind: 'info', concept: 'sequencer-pattern', focus: ['advance'],
+      instruction: 'While the DFAM is stopped, press ADVANCE until step 8\'s light is on.',
+      principle: 'The first pulse advances before it plays, so a sequencer parked on its last step starts on step 1.',
+      explanation: 'The DFAM has no reset input. Parking it on step 8 is how you make its step 1 land on the studio\'s downbeat.',
+      manualReference: 'Manual: Sequencer - ADVANCE',
     },
     {
       kind: 'predict', control: 'run_stop', targetValue: true, concept: 'timing-tempo',
@@ -1632,16 +1641,11 @@ const st1: Lesson = {
       principle: 'An external clock replaces the internal one; the follower must be armed before the leader starts.',
     },
     {
-      kind: 'info', concept: 'sequencer-pattern', focus: ['advance'],
-      instruction: 'Press ADVANCE until step 8\'s light is on.',
-      principle: 'The first pulse advances before it plays, so a sequencer parked on its last step starts on step 1.',
-      explanation: 'The DFAM has no reset input. Parking it on step 8 is how you make its step 1 land on the studio\'s downbeat.',
-    },
-    {
       kind: 'challenge', concept: 'timing-tempo',
       instruction: 'Press ▶ in the top bar. The DFAM now plays in time with the studio.',
       checklist: [{ text: 'Studio transport playing', check: s => s.transport.playing }],
       hints: ['The play button is at the top of the page, next to the tempo.'],
+      solution: { transport: 'play' },
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
@@ -1656,6 +1660,7 @@ const st1: Lesson = {
       instruction: 'Set the Studio Clock\'s CLOCK DIV to 1/8T. Hear the DFAM play triplets against the studio\'s beat.',
       checklist: [{ text: 'CLOCK DIV on 1/8T', check: s => Number(deviceValues(s, 'studio-clock').division) === 4 }],
       hints: ['CLOCK DIV is the selector on the Studio Clock.', 'Tap 1/8T: three pulses per beat instead of four.'],
+      solution: { values: { division: 4 } },
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',
@@ -1681,7 +1686,7 @@ const st2: Lesson = {
   requires: ['mother32'],
   prerequisites: ['dfam-f7-patching'],
   concepts: ['signal-routing', 'sequencer-pattern', 'oscillator-pitch'],
-  start: { reset: true, values: { vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 1500, vca_decay: 300, tempo: 110, ...seq([0, 0, 12, 0, 7, 0, 10, 3], [100, 60, 80, 60, 100, 60, 80, 60]) } },
+  start: { reset: true, values: { seq_pitch_mod: 0, vco1_frequency: -1.4, vco1_eg_amount: 45, vco_decay: 45, vco1_level: 90, vcf_cutoff: 1500, vca_decay: 300, tempo: 110, ...seq([0, 0, 12, 0, 7, 0, 10, 3], [100, 60, 80, 60, 100, 60, 80, 60]) } },
   steps: [
     run('A sequencer\'s outputs are just voltages: any synth with CV inputs can follow them.'),
     {
@@ -1689,12 +1694,14 @@ const st2: Lesson = {
       instruction: 'In the Studio tab, patch the DFAM\'s PITCH into the Mother-32\'s VCO 1V/OCT.',
       checklist: [{ text: 'DFAM PITCH → Mother-32 VCO 1V/OCT', check: s => studioCable(s, 'out_pitch', 'in_vco_1voct', 'dfam', 'mother32') }],
       hints: ['Tap PITCH on the DFAM, then VCO 1V/OCT on the Mother-32.', 'Both use 1 volt per octave, so the notes match.'],
+      solution: { studioCables: [{ from: { device: 'dfam', jack: 'out_pitch' }, to: { device: 'mother32', jack: 'in_vco_1voct' } }] },
     },
     {
       kind: 'challenge', instance: 'mother32', focus: ['in_gate'], concept: 'signal-routing',
       instruction: 'Now patch the DFAM\'s TRIGGER output into the Mother-32\'s GATE.',
       checklist: [{ text: 'DFAM TRIGGER → Mother-32 GATE', check: s => studioCable(s, 'out_trigger', 'in_gate', 'dfam', 'mother32') }],
       hints: ['TRIGGER is the bottom-left output on the DFAM.', 'GATE replaces the Mother-32\'s own keyboard and sequencer gate.'],
+      solution: { studioCables: [{ from: { device: 'dfam', jack: 'out_trigger' }, to: { device: 'mother32', jack: 'in_gate' } }] },
     },
     {
       kind: 'predict', control: 'pitch_3', targetValue: 0.583, concept: 'oscillator-pitch',
