@@ -1011,6 +1011,14 @@ export class AnalogFourEngine extends BaseEngine {
     }
     segs.splice(k + 1, 0, seg);
     if (list.length) this.voices[u].port.postMessage({ t: 'at', time, list });
+    // loaded ahead of a segment already scheduled (a key played into notes queued by the sequencer):
+    // that one was sent as a change from the state before, so it is sent whole again
+    const nextSeg = segs[k + 2];
+    if (nextSeg) {
+      const full: number[] = [];
+      for (let i = 0; i < VOICE_KEYS.length; i++) full.push(i, this.segValue(nextSeg, i));
+      this.voices[u].port.postMessage({ t: 'at', time: nextSeg.time, list: full });
+    }
     // a sound that takes OSC 2 from the voice before (WAV NEI) keeps that voice running (manual p.73)
     if (u >= 1) {
       const nei = Math.round(this.segValue(seg, VI.osc2_wav)) === NEI_WAVE;
@@ -1226,7 +1234,8 @@ export class AnalogFourEngine extends BaseEngine {
   private polyStop(now: number, paused: boolean) {
     for (const u of this.poolVoices) {
       const b = this.book[u];
-      if (b.live) continue;
+      // held keys keep playing, and so does an arpeggio of held keys
+      if (b.live || this.arps[b.track]?.live) continue;
       if (paused) {
         if (b.end > now) { this.voices[u].port.postMessage({ t: 'off', time: now, id: b.id }); b.end = now; }
       } else {

@@ -640,8 +640,8 @@ const KEYDEFS: Record<string, KeyDef> = {
   },
   RECORD: {
     label: '', icon: 'rec', sub: 'Copy', aria: 'Record',
-    // lit in GRID RECORDING; flashing in LIVE RECORDING (manual p.40)
-    led: e => (e.ctx.values.live_rec ? [COL.red, 1, true] : e.ctx.values.rec ? [COL.red, 0.85] : null),
+    // lit in GRID RECORDING; flashing in LIVE RECORDING and STEP RECORDING (manual p.40-41)
+    led: e => (e.ctx.values.live_rec || e.ctx.ui[UIK.stepRec] ? [COL.red, 1, true] : e.ctx.values.rec ? [COL.red, 0.85] : null),
     press: e => {
       if (e.func) { spendFunc(e.ctx); copyPaste(e, 'copy'); return; }
       // [PAGE] + [RECORD] copies the page, held trigs + [RECORD] copy the trigs, [TRACK] + [RECORD] the Sound (manual p.54)
@@ -2231,7 +2231,7 @@ function PolyMenu({ ctx }: { ctx: CustomRenderContext }) {
   const focusCtl = { has: (id: string) => lit.has(id) };
   const polyTracks = on.map((v, i) => (v ? TRACK_NAMES[i] : null)).filter(Boolean).join(' ');
   return (
-    <Overlay portal portalSize={{ w: 640, h: 470 }}>
+    <Overlay portal portalSize={{ w: 640, h: 540 }}>
       <Frame title="POLY CONFIG" sub={polyTracks ? `poly tracks: ${polyTracks}` : 'every track plays its own voice'} onClose={() => ctx.setUi({ [UIK.menu]: null })}>
         <Group label="VOICES">
           {on.map((v, i) => (
