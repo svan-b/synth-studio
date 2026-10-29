@@ -71,7 +71,9 @@ at 2 px/mm. PROGRAMMING is widened from 41 to 50 mm so the LCD can be read on an
 knob row sits 4 mm lower than on the hardware, so the legible-size legends above the stepped knobs
 have room. The jacks of the left side panel sit beside the wheels: the PITCH, FILTER and VOLUME CV
 inputs in one column, KB GATE, EXT IN and AUDIO OUT in the other, EXT IN just above AUDIO OUT as on
-the hardware (p.8).
+the hardware (p.8). Knobs turn 280° (±140°), the sweep of the p.28 drawing's scales
+(`knobTravel`); the stepped knobs' position legends sit at their pointer angles and the CUTOFF marks
+at the drawing's angles.
 
 ### PROGRAMMING (Subsequent 37 manual, pp.12-14)
 
@@ -255,7 +257,7 @@ mono on both sides. **verified** (Subsequent 37 manual, p.34).
 | Mixer law | (level / 5)^1.5: unity at 5, +9 dB at 10. The mixer amp is clean to 1.5× unity, then soft-limits towards 4.5× (it holds the FDBK loop); the overdrive happens at the ladder's input (input scale 0.36): one source at 5 measures about 1 % THD at the output, at 7 about 3 %, at 10 about 8 %, two hot sources about 20 % |
 | FDBK | The mixer output fed back through an AC-coupled (25 Hz), 5 kHz band-limited path; loop gain 1.25 × (level / 10)^1.3, so the top of the knob turns unstable |
 | RESONANCE | The ladder self-oscillates from 7.1 on the dial ("above 7"; 7.0 still only rings), feedback 0.985 of the core's threshold there, up to 1.16 at 10 |
-| CUTOFF taper | 20 Hz × 1000^travel: the knob's centre is 632 Hz. The legend is the hardware's (20, 80, 320, 500, 1.2k, 5k, 20k Hz at −140, −90, −40, 0, 40, 90 and 140° on the p.28 drawing), which implies a taper compressed around noon that the shared knob mapping (linear / log / exponential only) cannot draw, so the printed marks read 0.3-0.7 octave off the value (the LCD and readout always show the true value) |
+| CUTOFF taper | 20 Hz × 1000^travel: the knob's centre is 632 Hz. The legend is the hardware's (20, 80, 320, 500, 1.2k, 5k, 20k Hz at −140, −90, −40, 0, 40, 90 and 140° on the p.28 drawing), which implies a taper compressed around noon that the shared knob mapping (linear / log / exponential only) cannot draw, so the printed marks read 0.2-0.5 octave off the value (the LCD and readout always show the true value) |
 | FILTER EG AMT | ±6 octaves at ±5 |
 | MULTIDRIVE | Drive 0.5 at 0 (clean) to 40 at 10 (square law) into an asymmetric soft clipper, 2× oversampled. Low settings add even and odd harmonics about equally (1.8 % THD at 1, 5 % at 2), 10 is hard clipping (42 %, odd). Its make-up rides on the VCA gain (2× at 0, falling to 0.46× as the stages saturate), so a saw at the mixer's 5 gains 5 dB by 2 and 7 dB by 4, then levels off (8.5 dB at 10) as the clipping squares it off: grit more than level |
 | MOD amounts | PITCH AMT ±2 octaves at ±5 (squared taper, for fine vibrato); FILTER AMT ±5 octaves; MOD AMT: the other LFO's rate ±4 octaves, VCA gain 0-2, WAVE ±100 % of travel, NOISE ±10 on the dial, EG TIME ±3 octaves. A modulated parameter stays inside its own control's range: mixer levels 0-10, WAVE triangle to the narrowest pulse, EG AMT ±5, FREQUENCY ±7 (±36 as a drone), BEAT FREQ ±3.5 Hz |

@@ -36,6 +36,12 @@ const ROW3 = 132.2;
 const KN = 15;           // standard knob, mm
 const KN_MIX = 14;
 const KN_BIG = 23;       // CUTOFF
+/**
+ * Knob sweep, degrees. Measured on the manual's filter drawing (p.28): the scales run ±140°
+ * (RESONANCE 0 and 10 at ±139.7°, 27.9° a step; CUTOFF's 20 Hz and 20 kHz ticks at ±140°), so not
+ * Moog's 300° sweep of the Mother-32 family. Pointers, ticks and the printed legends all use it.
+ */
+const KNOB_TRAVEL = 280;
 const LABEL = '#f2f2f2';
 const SHIFT_LABEL = '#8fb3ff';
 const LED_RED = '#ff2d2d';
@@ -75,21 +81,26 @@ const box = (x0: number, x1: number, title: string): PanelElement[] => [
 ];
 /**
  * A legend on a knob's arc at `deg` (0 = top). Legends left of the knob end at their point and
- * those to the right start there, so they grow away from the knob, never into it.
+ * those to the right start there, so they grow away from the knob, never into it. Below the
+ * knob's centre line a legend moves in along its pointer's line, so it sits no lower than at 45°
+ * under the horizontal: the names printed under the knob keep their room at the 140° end stops.
  */
-const arcLabel = (text: string, cx: number, cy: number, r: number, deg: number, size = 6.5, fixed = false): PanelElement => {
+const arcLabel = (text: string, cx: number, cy: number, r: number, deg: number, size = 6.5, fixed = false, pullIn = true): PanelElement => {
   const a = (deg * Math.PI) / 180;
-  const x = cx + r * Math.sin(a), y = cy - r * Math.cos(a);
+  const below = -Math.cos(a);
+  const rr = pullIn && below > Math.SQRT1_2 ? (r * Math.SQRT1_2) / below : r;
+  const x = cx + rr * Math.sin(a), y = cy - rr * Math.cos(a);
   if (deg < -15) return small(text, x + 1.6, y, { size, align: 'right', fixed });
   if (deg > 15) return small(text, x - 1.6, y, { size, align: 'left', fixed });
   return small(text, x, y, { size, fixed });
 };
 /**
- * Position legends around a stepped knob, at the pointer's angles (-135 to +135 degrees). Short
- * legends (`fixedSize`) are drawn at one size, so no position reads larger than its neighbours.
+ * Position legends around a stepped knob, at the pointer's angles (-140 to +140 degrees, the
+ * panel's `knobTravel`). Short legends (`fixedSize`) are drawn at one size, so no position reads
+ * larger than its neighbours.
  */
 const arc = (cx: number, cy: number, r: number, names: string[], fixedSize?: number): PanelElement[] => names.map((n, i) =>
-  arcLabel(n, cx, cy, r, -135 + (270 * i) / Math.max(1, names.length - 1), fixedSize ?? 6.5, fixedSize !== undefined));
+  arcLabel(n, cx, cy, r, -KNOB_TRAVEL / 2 + (KNOB_TRAVEL * i) / Math.max(1, names.length - 1), fixedSize ?? 6.5, fixedSize !== undefined));
 /** A knob with its printed name above */
 const named = (name: string, control: KnobElement['control'], x: number, y: number, d = KN, extra: Partial<KnobElement> = {}): PanelElement[] => [
   label(name, x, y - d / 2 - 3.2),
@@ -167,7 +178,15 @@ function envRow(p: 'feg' | 'aeg', y: number, btnY: number): PanelElement[] {
 }
 
 // ---- FILTER: the CUTOFF legend (p.28 drawing) -----------------------------------------
-const CUTOFF_LEGEND: [string, number][] = [['20Hz', -135], ['80Hz', -90], ['320Hz', -43], ['500Hz', 0], ['1.2KHz', 43], ['5KHz', 90], ['20KHz', 135]];
+/**
+ * Each mark sits where the manual's FILTER drawing (p.28) prints it, measured from the knob's
+ * centre on the drawing's long ticks (degrees from 12 o'clock, clockwise positive):
+ * 20 Hz -139.8 and 20 kHz +139.7 (the scale's end ticks, the ends of the 280° sweep);
+ * 80 Hz and 5 kHz -90 / +90 (the horizontal ticks at 9 and 3 o'clock);
+ * 320 Hz -39.7 and 1.2 kHz +39.8 (the fourth tick either side of the top, at 10° a tick);
+ * 500 Hz 0 (the top tick, 12 o'clock).
+ */
+const CUTOFF_LEGEND: [string, number][] = [['20Hz', -140], ['80Hz', -90], ['320Hz', -40], ['500Hz', 0], ['1.2KHz', 40], ['5KHz', 90], ['20KHz', 140]];
 
 const elements: PanelElement[] = [
   // ===== PROGRAMMING (pp.12-14): LCD, ▼ ▲ CURSOR, two button columns, FINE TUNE ===========
@@ -247,8 +266,10 @@ const elements: PanelElement[] = [
   // ===== FILTER (pp.28-29, drawing p.28) =====================================================
   ...box(421.9, 485.9, 'FILTER'),
   knob('cutoff', 453.8, 33, KN_BIG),
-  ...CUTOFF_LEGEND.map(([t, deg]) => arcLabel(t, 453.8, 33, deg === 0 ? 16 : Math.abs(deg) < 90 ? 17 : Math.abs(deg) > 90 ? 15.5 : 16.5, deg)),
-  label('CUTOFF', 453.8, 52.5),
+  // The big knob's end marks stay out on their radius (pulled in, they would sit under its
+  // curve); its name sits 1.5 mm lower, so the marks at the 140° ends keep their size
+  ...CUTOFF_LEGEND.map(([t, deg]) => arcLabel(t, 453.8, 33, deg === 0 ? 16 : Math.abs(deg) < 90 ? 17 : Math.abs(deg) > 90 ? 15.5 : 16.5, deg, 6.5, false, false)),
+  label('CUTOFF', 453.8, 54),
   ...named('RESONANCE', 'resonance', 437.3, ROW2),
   ...named('MULTIDRIVE', 'multidrive', 470.4, ROW2),
   // SLOPE: LEDs 6 12 | button | 18 24 in their own box
@@ -325,5 +346,6 @@ export const SUB37_LAYOUT: PanelLayout = {
     frame: { padding: 0, background: '#0a0a0a', radius: 2.5 },
     jack: { ring: '#6a6a6a', outputLabelBg: '#e8e8e8', outputLabelText: '#111' },
   },
+  knobTravel: KNOB_TRAVEL,
   elements,
 };
