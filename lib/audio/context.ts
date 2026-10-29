@@ -7,12 +7,16 @@
 //
 // The master is transparent by default:
 //
-//   instruments / returns ─► masterIn (unity) ─► master-bus worklet ─► masterOut ─┬─► speakers
-//                                                 optional EQ + glue (off)          ├─► analyser (__synthLevel, scope)
-//                                                 master gain                       └─► recorder tap
+//   instruments / returns ─► masterIn (unity) ─► master-bus worklet ─► masterOut ─┬─► studioOut ─► speakers ─┬─► destination
+//                                                 optional EQ + glue (off)          └─► recorder tap           └─► analyser (__synthLevel, scope)
+//                                                 master gain
 //                                                 true-peak limiter -1 dBTP, 1.5 ms
 //                                                 BS.1770-4 meter
-//   metronome / count-in ─► monitor ─► speakers (never recorded)
+//   demo recordings (lib/studio/demoAudio.ts) ─► speakers (never metered or recorded)
+//   metronome / count-in ─► monitor ─► destination (never recorded)
+//
+// studioOut is unity, except while a demo recording plays: the studio keeps running (its
+// meter, recordings and lesson checks see it as before) but is held back from the speakers.
 //
 // The limiter only acts on overs; below the ceiling the signal passes bit for bit,
 // 1.5 ms late (its look-ahead). Until the worklet has loaded, masterIn feeds masterOut
@@ -24,6 +28,8 @@ let ctx: AudioContext | null = null;
 let masterIn: GainNode | null = null;
 let masterNode: AudioWorkletNode | null = null;
 let masterOut: GainNode | null = null;
+let studioOut: GainNode | null = null;
+let speakers: GainNode | null = null;
 let monitor: GainNode | null = null;
 let analyser: AnalyserNode | null = null;
 let levelBuf: Float32Array<ArrayBuffer> | null = null;
@@ -148,16 +154,20 @@ function createContext(): AudioContext {
   masterIn.channelInterpretation = 'speakers';
   masterOut = c.createGain();
   masterIn.connect(masterOut); // bypass until the master worklet is in
-  masterOut.connect(c.destination);
+  studioOut = c.createGain();
+  speakers = c.createGain();
+  masterOut.connect(studioOut);
+  studioOut.connect(speakers);
+  speakers.connect(c.destination);
 
   monitor = c.createGain();
   monitor.connect(c.destination);
 
-  // Output tap for the level meter, the scope and automated audio tests
+  // Output tap for the level meter, the scope and automated audio tests: what the speakers play
   analyser = c.createAnalyser();
   analyser.fftSize = 2048;
   levelBuf = new Float32Array(analyser.fftSize);
-  masterOut.connect(analyser);
+  speakers.connect(analyser);
   (window as unknown as { __synthLevel?: () => number }).__synthLevel = getOutputLevel;
 
   c.addEventListener('statechange', () => notify(c.state === 'running'));
@@ -189,6 +199,28 @@ export function getMonitorBus(): AudioNode {
 export function getRecordTap(): AudioNode {
   getAudioContext();
   return masterOut!;
+}
+
+/**
+ * What the speakers play: the studio after its master, and demo recordings (which go in
+ * here, past the master and every recording). The scope watches it; the metronome is not on it.
+ */
+export function getSpeakerBus(): AudioNode {
+  getAudioContext();
+  return speakers!;
+}
+
+/**
+ * Let the studio through to the speakers, or hold it back while a demo recording plays. The
+ * studio keeps running: its meter, recordings and lesson checks are all before this point.
+ */
+export function setStudioToSpeakers(on: boolean, seconds = 0.05) {
+  if (!ctx || !studioOut) return;
+  const g = studioOut.gain;
+  const now = ctx.currentTime;
+  g.cancelScheduledValues(now);
+  g.setValueAtTime(g.value, now);
+  g.linearRampToValueAtTime(on ? 1 : 0, now + seconds);
 }
 
 /** The master analyser - for scopes and meters */

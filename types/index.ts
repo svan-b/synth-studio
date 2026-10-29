@@ -253,6 +253,12 @@ export interface LessonStep {
    */
   kind?: 'do' | 'patch' | 'info' | 'predict' | 'listen' | 'match' | 'quiz' | 'reflect' | 'challenge';
   predict?: MultipleChoice;
+  /**
+   * v3, demo recordings (docs/PEDAGOGY.md "Demo recordings"): an `info` step's ▶ Hear it plays
+   * these excerpts of the demo tracks, in turn, instead of the instrument's audition. They are
+   * recordings (public/demos), so the learner's studio is never touched.
+   */
+  info?: { play: DemoClipRef | DemoClipRef[] };
   listen?: {
     a: Record<string, ControlValue>;
     b: Record<string, ControlValue>;
@@ -279,6 +285,13 @@ export interface LessonStep {
     patterns?: { a: Record<string, LessonPatternPatch>; b: Record<string, LessonPatternPatch> };
     /** Start the A/B from this song section (by name), so both sides play the same part of the song */
     from?: string;
+    /**
+     * v3, demo recordings: A/B two variations of one excerpt of a demo track (`a` and `b` are
+     * variation ids in public/demos/manifest.json, 'as-made' the demo itself). Both sides loop
+     * the excerpt's bars in step and always play at the same loudness; the studio isn't used,
+     * so `a`, `b` and the other fields above stay empty.
+     */
+    demo?: { demo: DemoClipRef['demo']; excerpt: string; a: string; b: string };
   };
   match?: {
     target: Record<string, ControlValue>;
@@ -350,6 +363,17 @@ export interface LessonStep {
    * snapshot, merged with what the snapshot already holds.
    */
   capture?: { instance: string; controls: string[]; label?: string };
+}
+
+/**
+ * A recording of a demo track (Lesson API v3, demo recordings): an excerpt of the song and one
+ * of its variations, by the ids in public/demos/manifest.json (scripts/render-demos.cjs renders
+ * them). `excerpt: 'full'` is the whole song; `variation` defaults to 'as-made'.
+ */
+export interface DemoClipRef {
+  demo: 'low-tide-lights' | 'three-clocks' | 'copper-wire';
+  excerpt: string;
+  variation?: string;
 }
 
 /**

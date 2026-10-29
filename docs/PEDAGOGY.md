@@ -290,6 +290,47 @@ pattern's SWING and LENGTH), `barOf(n)`, and for pitch `pc`, `A_MINOR`, `A_MINOR
   match: { target: {}, controls: [], pattern: { target: { swing: 64 }, start: { swing: 50 } }, tolerance: 0.1 } }
 ```
 
-**Demo excerpts** (`info.play`, `listen.demo` in the curriculum) wait for the demo tracks
-(`lib/studio/demos`, built on `wip/demo-tracks`): until they merge, hooks are info steps with
-the Rytm or Analog Four's own audition, and the A/B hooks compare the learner's own track.
+### Demo recordings: `info.play` and `listen.demo`
+
+A hook lets the learner hear where the lesson is going before they build it. In the Producer path
+that is a **recording** of a demo track, never the demo itself: loading a demo in the middle of a
+lesson would replace the learner's studio (autosave would store the demo over their work, the
+checks would read the demo, undo would mix the two). The recordings are rendered ahead of time
+by the app itself (`scripts/render-demos.cjs`, see `docs/DEMOS.md`) and listed in
+`public/demos/manifest.json` by demo, excerpt (its bars) and variation.
+
+| Field | What it does |
+|---|---|
+| `info: { play: { demo, excerpt, variation? } }` | An `info` step's ▶ Hear it plays this recording instead of the instrument's audition; a list plays in turn. `variation` defaults to `'as-made'`, the demo itself; `excerpt: 'full'` is the whole song |
+| `listen.demo: { demo, excerpt, a, b }` | The A/B plays two variations of one excerpt, looping its bars in step: pressing the other side switches on the same phrase, the lit side again stops. Both sides always play at the same loudness, so `matchLoudness` isn't needed; `listen.a` and `b` stay `{}`, and `labels` and `question` work as in any listen step. Once the question is answered, the coach says what each side was |
+
+The player (`lib/studio/demoAudio.ts`) fetches and decodes a recording on its first press and
+keeps it. It plays past the studio master (the demos are mastered already), trimmed to about the
+loudness the learner's studio has been playing at (its master meter; −20 LUFS before it has
+played) and never above −1 dBTP. While it plays, the studio is held back from the speakers but
+keeps running: its meters, recordings and lesson checks see it as before. Leaving the step,
+finishing or stopping the lesson, the studio's ▶ or ■, and a second press all stop it. Nothing in
+the store, the hub or the studio changes.
+
+```ts
+{ kind: 'info', instance: 'analog-rytm',
+  instruction: 'This path ends with a finished track of your own, like this one. Press ▶ Hear it and listen for the kick on every beat.',
+  info: { play: { demo: 'low-tide-lights', excerpt: 'drop-17-20', variation: 'drums' } } }
+{ kind: 'listen', instruction: 'Same parts, same levels. One mix is clear, one is muddy. Play A, then B, and switch a few times.',
+  listen: { a: {}, b: {}, labels: ['Mix A', 'Mix B'],
+    demo: { demo: 'low-tide-lights', excerpt: 'drop-17-20', a: 'as-made', b: 'muddy' },
+    question: { question: 'What makes B muddy?', options: […], answer: 0, explain: '…' } } }
+```
+
+`npm run validate` checks that every reference is in the manifest with its file in
+`public/demos`, that both sides of an A/B loop the same bars, that every rendered recording is
+played by some lesson, and that `public/demos` stays within its 10 MB. The lesson runner plays
+every recording a lesson uses (both sides of an A/B) and fails a step whose recording is
+missing, silent or doesn't stop.
+
+In the Producer path the hooks of L1 (the demo's drums), L3 (its kick and bass), L4 (Three
+Clocks), L5, L6, L8, L12 and L15 (all three demos in turn) are `info.play`, and L2 (straight
+against swung, with ghost notes), L7 (as made against muddy: every high-pass off, the low mids
+up), L9 (dry against as
+made), L11 (everything against the drums alone), L13 (as made against the drums 6 dB down) and
+L14 (its master against the same mix pushed 9 dB into the limiter) are `listen.demo`.

@@ -2,7 +2,7 @@
 // Producer path on an iPad (touch, 1180×820): a learner with a studio of their
 // own opens Lessons, finds the Producer path, and takes "Frequency slots" by
 // touch: the lesson loads its own studio (theirs is saved), the loudness-matched
-// A/B plays the whole studio, answers and Next are tapped, the knob moves happen
+// A/B plays recordings of the demo track (not the studio), answers and Next are tapped, the knob moves happen
 // on the real instruments, the live challenge checklist turns green, and at the
 // end "Bring back the studio I had before this lesson" restores their studio
 // (the lesson's is kept as a copy). Prints one JSON object; exits non-zero on a
@@ -10,6 +10,7 @@
 //   node scripts/e2e/producer.cjs <baseUrl> [outPrefix]
 // ============================================================================
 const { chromium } = require('playwright');
+const { serveDemoRecordings } = require('./demoRecordings.cjs');
 
 const LESSON = 'studio-producer-07-frequency-slots';
 
@@ -17,6 +18,7 @@ const LESSON = 'studio-producer-07-frequency-slots';
   const [, , url = 'http://localhost:3000', out = '/tmp/producer'] = process.argv;
   const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await b.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true, deviceScaleFactor: 1 });
+  await serveDemoRecordings(ctx);
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', e => errs.push('pageerror: ' + String(e)));
@@ -98,21 +100,22 @@ const LESSON = 'studio-producer-07-frequency-slots';
     });
     check('iPad: the coach fits the screen, no horizontal page scroll', fit.left >= 0 && fit.right <= fit.w && fit.top >= 0 && fit.bottom <= fit.h && !fit.overflowX, fit);
 
-    // ---- 1 · loudness-matched A/B of the whole studio ------------------------------
+    // ---- 1 · loudness-matched A/B of two recordings of the demo ---------------------
     await tap(coach().getByRole('button', { name: /Mix A/ }));
-    await wait(2600);
-    const a = await S(() => ({ playing: window.__synthStudio.transport.playing, level: window.__synthLevel() }));
+    await waitFor(() => S(() => window.__synthDemoAudio.getPlayback()?.status === 'playing'), 8000);
+    await wait(1200);
+    const a = await S(() => ({ studioPlaying: window.__synthStudio.transport.playing, demo: window.__synthDemoAudio.getPlayback()?.status, level: window.__synthLevel() }));
     await tap(coach().getByRole('button', { name: /Mix B/ }));
-    await wait(3200);
-    const ab = await S(() => ({ playing: window.__synthStudio.transport.playing, text: document.querySelector('aside[aria-label="Lesson coach"] [aria-live="polite"].text-\\[10px\\]')?.textContent ?? '' }));
+    await wait(1500);
+    const ab = await S(() => ({ side: window.__synthDemoAudio.getPlayback()?.side, text: document.querySelector('aside[aria-label="Lesson coach"] [aria-live="polite"].text-\\[10px\\]')?.textContent ?? '' }));
     log.ab = { a, ab };
-    check('A/B: pressing a side plays the whole studio', a.playing && a.level > 0.02, a);
-    check('A/B: the coach reports the loudness match', /Loudness matched/.test(ab.text), ab.text);
+    check('A/B: pressing a side plays the demo\'s recording, not the studio', !a.studioPlaying && a.demo === 'playing' && a.level > 0.02, a);
+    check('A/B: B switches sides; the coach says both play at the same loudness', ab.side === 'b' && /same loudness/.test(ab.text), ab);
     await p.screenshot({ path: `${out}-03-ab.png` });
     await tap(coach().getByRole('button', { name: /Mix B/ })); // stop
     await answer('Too many parts pile up');
     await wait(300);
-    log.revealed = await coach().getByText(/In B the stabs keep their lows/).count();
+    log.revealed = await coach().getByText(/In B every high-pass is off/).count();
     check('A/B: the answer is revealed with its explanation', log.revealed === 1);
     await next();
 

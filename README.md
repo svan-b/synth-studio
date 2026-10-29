@@ -42,6 +42,8 @@ Lessons follow [docs/PEDAGOGY.md](docs/PEDAGOGY.md):
 - **Each lesson:** predict, observe, explain; ear-training "match the sound" challenges with fading hints; self-explanation.
 - **Over time:** spaced daily review of past lessons.
 - **Producer path:** whole-studio lessons, from a beat to a mixed, mastered and bounced track.
+  Their hooks play recordings of the finished demo tracks, and the demo cards play a whole song
+  without loading it ([docs/DEMOS.md](docs/DEMOS.md)).
 
 The coach highlights the control to change and checks your result.
 

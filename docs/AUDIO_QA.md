@@ -204,6 +204,8 @@ A `--presets` or `--limit` run merges into the device report that is already in 
 
 For the best excitation, give your module an `audition()` that plays what a user would hear when trying a preset (a riff, or its pattern). Name presets `Category / Name`, and put drones and FX in categories the rules match, or add a rule for your device in a `--config` file.
 
+6. If the instrument plays in a demo track, render the demo recordings again (`node scripts/render-demos.cjs`, see [DEMOS.md](DEMOS.md)): the lessons' hooks and the demo cards play recordings, which don't follow the instrument by themselves.
+
 ## Limits
 
 - **Realtime capture.** It takes about 7.5 s per preset. On a loaded machine the audio clock can fall behind; the capture stays continuous, and a note warns when the audio ran below 0.9x realtime.

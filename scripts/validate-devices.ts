@@ -4,6 +4,8 @@
 // lessons or the panel at runtime. Exits non-zero on errors.
 // ============================================================================
 
+import fs from 'fs';
+import path from 'path';
 import type { ControlSpec, ControlValue, Lesson, LessonCheckState, LessonStep, MultipleChoice } from '../types';
 import { LESSON_PATHS } from '../types';
 import type { PanelElement } from '../types/panel';
@@ -12,8 +14,81 @@ import type { DeviceModule } from '../devices/types';
 import { isProject } from '../lib/sequencer/elektron/project';
 import { MAX_STEPS } from '../lib/sequencer/elektron/types';
 import { patternPatchProblem } from '../lib/studio/elektronEdits';
+import { DEMO_RECORDINGS, FULL, refsOf, resolveClip } from '../lib/studio/demos/recordings';
 
 type Issue = { level: 'error' | 'warn'; msg: string };
+
+// ----------------------------------------------------------------------------
+// Demo recordings (Lesson API v3): `info.play` and `listen.demo` name files of
+// public/demos/manifest.json, which scripts/render-demos.cjs renders
+// ----------------------------------------------------------------------------
+
+/** Every recording a lesson plays, 'demo/excerpt/variation' */
+const usedRecordings = new Set<string>();
+const recKey = (demo: string, excerpt: string, variation: string) => `${demo}/${excerpt}/${variation}`;
+/** At most this much in public/demos (docs/DEMOS.md) */
+const DEMO_BUDGET_BYTES = 10_000_000;
+
+function checkDemoRefs(s: LessonStep, w: string, kind: string, out: Issue[]) {
+  const err = (m: string) => out.push({ level: 'error', msg: `${w}: ${m}` });
+  const warn = (m: string) => out.push({ level: 'warn', msg: `${w}: ${m}` });
+  const missing = (demo: string, excerpt: string, variation: string) =>
+    `no recording ${demo} / ${excerpt} / ${variation} in public/demos/manifest.json (add it to scripts/render-demos.cjs and render)`;
+  if (s.info) {
+    const refs = refsOf(s.info.play);
+    if (kind !== 'info') err(`info.play on a ${kind} step: only info steps play it`);
+    if (!refs.length) err('info.play names no recording');
+    refs.forEach((r, k) => {
+      const c = resolveClip(r);
+      if (!c) err(`info.play${refs.length > 1 ? `[${k}]` : ''}: ${missing(r.demo, r.excerpt, r.variation ?? 'as-made')}`);
+      else usedRecordings.add(recKey(c.demo, c.excerpt, c.variation));
+    });
+  }
+  const d = s.listen?.demo;
+  if (d) {
+    const l = s.listen!;
+    if (kind !== 'listen') err(`listen.demo on a ${kind} step`);
+    const a = resolveClip({ demo: d.demo, excerpt: d.excerpt, variation: d.a });
+    const b = resolveClip({ demo: d.demo, excerpt: d.excerpt, variation: d.b });
+    if (!a) err(`listen.demo a: ${missing(d.demo, d.excerpt, d.a)}`);
+    if (!b) err(`listen.demo b: ${missing(d.demo, d.excerpt, d.b)}`);
+    if (d.a === d.b) err('listen.demo plays the same variation on both sides');
+    if (a && b && Math.abs(a.loop - b.loop) > 0.01) err(`listen.demo: the sides loop different lengths (${a.loop} s and ${b.loop} s)`);
+    if (d.excerpt === FULL) warn('listen.demo loops the whole song: give it an excerpt');
+    if (l.parts || l.master || l.studio || l.patterns || l.from || l.matchLoudness || Object.keys(l.a).length || Object.keys(l.b).length) {
+      warn('listen.demo plays recordings: parts, master, studio, patterns, from, matchLoudness and the a / b values are not used');
+    }
+    [a, b].forEach(c => { if (c) usedRecordings.add(recKey(c.demo, c.excerpt, c.variation)); });
+  }
+}
+
+/** The recordings themselves: every file there, the size budget, nothing rendered that no lesson plays */
+function validateRecordings(): { issues: Issue[]; files: number; bytes: number } {
+  const out: Issue[] = [];
+  const err = (m: string) => out.push({ level: 'error', msg: m });
+  const warn = (m: string) => out.push({ level: 'warn', msg: m });
+  const dir = path.join(__dirname, '..', 'public', 'demos');
+  const listed = new Set<string>(['manifest.json']);
+  let bytes = fs.existsSync(path.join(dir, 'manifest.json')) ? fs.statSync(path.join(dir, 'manifest.json')).size : 0;
+  for (const [demo, d] of Object.entries(DEMO_RECORDINGS.demos)) {
+    if (!d.excerpts[FULL]) warn(`${demo}: no full recording, so its demo card has nothing to Listen to`);
+    for (const [ex, e] of Object.entries(d.excerpts)) {
+      for (const [v, r] of Object.entries(e.variations)) {
+        listed.add(r.file);
+        const f = path.join(dir, r.file);
+        if (!fs.existsSync(f)) { err(`${r.file} (${demo} / ${ex} / ${v}) is in the manifest but not in public/demos`); continue; }
+        const size = fs.statSync(f).size;
+        bytes += size;
+        if (size !== r.bytes) warn(`${r.file} has ${size} bytes, the manifest says ${r.bytes}: render it again`);
+        if (!Number.isFinite(r.lufs) || !Number.isFinite(r.truePeak) || !(r.loop > 0) || !(r.frames > 0)) err(`${r.file}: the manifest has no loudness, peak or length for it`);
+        if (ex !== FULL && !usedRecordings.has(recKey(demo, ex, v))) warn(`${demo} / ${ex} / ${v} is rendered, but no lesson plays it: take it out of scripts/render-demos.cjs`);
+      }
+    }
+  }
+  if (fs.existsSync(dir)) fs.readdirSync(dir).forEach(f => { if (!listed.has(f)) warn(`public/demos/${f} is not in the manifest`); });
+  if (bytes > DEMO_BUDGET_BYTES) err(`public/demos holds ${(bytes / 1e6).toFixed(2)} MB, over its ${DEMO_BUDGET_BYTES / 1e6} MB budget (docs/DEMOS.md)`);
+  return { issues: out, files: listed.size, bytes };
+}
 
 /** An instrument a lesson names (an instance id or a device): its device, data and module when known */
 type NamedInst = { device: string; data: unknown; mod?: DeviceModule };
@@ -288,6 +363,7 @@ function validate(id: string, mod: DeviceModule): Issue[] {
       const sw = `${where} step ${si + 1}`;
       const kind = s.kind ?? (s.patchFrom && s.patchTo ? 'patch' : s.control ? 'do' : s.checklist?.length ? 'challenge' : 'info');
       kinds.add(kind);
+      checkDemoRefs(s, sw, kind, out);
       if (s.control) {
         const c = controls[s.control];
         if (!c) err(`${sw}: unknown control "${s.control}"`);
@@ -492,6 +568,7 @@ async function validateStudioLessons(lessons: Lesson[]): Promise<Issue[]> {
       const w = `${where} step ${i + 1}`;
       const kind = s.kind ?? (s.patchFrom && s.patchTo ? 'patch' : s.control ? 'do' : s.checklist?.length ? 'challenge' : 'info');
       kinds.add(kind);
+      checkDemoRefs(s, w, kind, out);
       [s.predict, s.quiz, s.listen?.question].forEach((mc, k) => checkMC(mc, `${w} ${['predict', 'quiz', 'listen.question'][k]}`));
       if (kind === 'predict' && !s.predict) err(`${w}: predict step without predict`);
       if (kind === 'quiz' && !s.quiz) err(`${w}: quiz step without quiz`);
@@ -614,6 +691,14 @@ async function validateStudioLessons(lessons: Lesson[]): Promise<Issue[]> {
     e.forEach(i => console.log(`  ERROR ${i.msg}`));
     w.slice(0, 40).forEach(i => console.log(`  warn  ${i.msg}`));
     if (w.length > 40) console.log(`  ... ${w.length - 40} more warnings`);
+  }
+  // The demo recordings, once every lesson has said which it plays
+  if (!only.length || only.includes('studio') || only.includes('producer')) {
+    const rec = validateRecordings();
+    const e = rec.issues.filter(i => i.level === 'error');
+    errors += e.length;
+    console.log(`\ndemo recordings: ${rec.files} files in public/demos, ${(rec.bytes / 1e6).toFixed(2)} MB, ${usedRecordings.size} played by lessons — ${e.length} errors, ${rec.issues.length - e.length} warnings`);
+    rec.issues.forEach(i => console.log(`  ${i.level === 'error' ? 'ERROR' : 'warn '} ${i.msg}`));
   }
   process.exit(errors ? 1 : 0);
 })();

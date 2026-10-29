@@ -1,7 +1,7 @@
 // ============================================================================
 // Producer path on an iPad (touch, 1180×820), the Elektron lessons. A learner
 // takes "First beat" from start to finish by touch on the Analog Rytm: the
-// lesson loads its studio, ▶ Hear it plays the kick, the trig keys and pads are
+// lesson loads its studio, ▶ Hear it plays a recording of the demo's drums, the trig keys and pads are
 // tapped on the real panel (and are not hidden under the coach), ▶ in the top bar
 // starts the studio, the A/B, the quiz, the challenge's checklist, the reflect and
 // the summary. Then "Groove": the A/B plays other pattern SWING settings on the
@@ -11,6 +11,7 @@
 //   node scripts/e2e/producer-elektron.cjs <baseUrl> [outPrefix]
 // ============================================================================
 const { chromium } = require('playwright');
+const { serveDemoRecordings } = require('./demoRecordings.cjs');
 
 const L1 = 'studio-producer-01-first-beat';
 const L2 = 'studio-producer-02-groove';
@@ -20,6 +21,7 @@ const RYTM = 'analog-rytm';
   const [, , url = 'http://localhost:3000', out = '/tmp/producer-elektron'] = process.argv;
   const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await b.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true, deviceScaleFactor: 1 });
+  await serveDemoRecordings(ctx);
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', e => errs.push('pageerror: ' + String(e)));
@@ -103,11 +105,12 @@ const RYTM = 'analog-rytm';
     check('start: the Elektron studio (clock, Rytm, A4, Xone) at 124 BPM, the learner\'s studio saved', log.start.lesson === L1 && log.start.rack.join() === 'studio-clock,analog-rytm,analog-four,xone96' && log.start.bpm === 124 && log.start.backups === 1, log.start);
     await p.screenshot({ path: `${out}-01-start.png` });
 
-    // 1 · ▶ Hear it: the Rytm plays four kicks
+    // 1 · ▶ Hear it: a recording of the demo's drums
     await tap(coach().getByRole('button', { name: /Hear it/ }));
     log.hearLevel = 0;
-    await waitFor(async () => { log.hearLevel = Math.max(log.hearLevel, await S(() => window.__synthLevel())); return log.hearLevel > 0.01; }, 3000);
-    check('step 1: ▶ Hear it plays the kick', log.hearLevel > 0.01, log.hearLevel);
+    await waitFor(async () => { log.hearLevel = Math.max(log.hearLevel, await S(() => window.__synthLevel())); return log.hearLevel > 0.01; }, 6000);
+    log.hearDemo = await S(() => window.__synthDemoAudio.getPlayback()?.clips.map(c => c.file).join());
+    check('step 1: ▶ Hear it plays the demo\'s drums (a recording)', log.hearLevel > 0.01 && /drums/.test(log.hearDemo ?? ''), { level: log.hearLevel, file: log.hearDemo });
     await next();
 
     // 2 · the first win: four trigs on the kick, ▶

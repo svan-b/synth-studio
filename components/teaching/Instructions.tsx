@@ -9,7 +9,9 @@ import { getLessonLive, onLessonLive } from '@/lib/studio/lessonLive';
 import { captureInto, goTo, isStudioListen, setPatternSettings, studioAB } from '@/lib/studio/lessonRuntime';
 import { withPatternPatch } from '@/lib/studio/elektronEdits';
 import { onProducerLessons, producerLessonsNow } from '@/lib/studio/producerIndex';
+import { isLessonOwner, lessonOwner, stop as stopDemoAudio } from '@/lib/studio/demoAudio';
 import Scope from './Scope';
+import { DemoABToggle, DemoHearIt } from './DemoClips';
 import { canShowMe, cancelShowMe, showMe } from './coachActions';
 import { conceptLabel } from './concepts';
 
@@ -79,6 +81,8 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
 
   // A demonstration never outlives its step
   useEffect(() => () => cancelShowMe(), [currentStep, lesson?.id]);
+  // Nor does a demo recording: leaving the step, finishing or stopping the lesson stops it
+  useEffect(() => () => stopDemoAudio(isLessonOwner), [currentStep, lesson?.id, finished, isTeaching]);
 
   // Screen readers: the new step, then whether it is done
   const step = lesson?.steps[currentStep];
@@ -435,7 +439,14 @@ function StepCard({ lesson, stepIndex, step, spec, satisfied, session, instance,
 
       {kind === 'listen' && step.listen && (
         <div className="mt-2 space-y-2">
-          {isStudioListen(step) || step.listen.matchLoudness || lesson.start?.studio ? (
+          {step.listen.demo ? (
+            <DemoABToggle
+              owner={lessonOwner(lesson.id, stepIndex)}
+              demo={step.listen.demo}
+              labels={[step.listen.labels?.[0] ?? 'A', step.listen.labels?.[1] ?? 'B']}
+              reveal={!step.listen.question || session?.answer !== undefined}
+            />
+          ) : isStudioListen(step) || step.listen.matchLoudness || lesson.start?.studio ? (
             <StudioABToggle lesson={lesson} stepIndex={stepIndex} labels={[step.listen.labels?.[0] ?? 'A', step.listen.labels?.[1] ?? 'B']} match={!!step.listen.matchLoudness} />
           ) : (
             <ABToggle
@@ -473,7 +484,8 @@ function StepCard({ lesson, stepIndex, step, spec, satisfied, session, instance,
         <ChecklistView step={step} instance={instance} />
       )}
 
-      {kind === 'info' && (
+      {kind === 'info' && step.info?.play && <DemoHearIt owner={lessonOwner(lesson.id, stepIndex)} refs={step.info.play} />}
+      {kind === 'info' && !step.info?.play && (
         <div className="mt-2 flex gap-2 items-center">
           <button onClick={() => hub.audition(instance, null)} className="px-3 py-1.5 rounded bg-[#1e2a36] text-sky-200 text-xs hover:bg-[#263646]">▶ Hear it</button>
           <span className="text-[11px] text-gray-400">Read, listen, then press Next.</span>
