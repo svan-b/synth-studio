@@ -8,6 +8,8 @@
 // ============================================================================
 
 import type { ControlValue, LessonCheckState } from '@/types';
+import { NOTE_LENGTHS, type PatternId, type Pattern, type Project, type Step } from '@/lib/sequencer/elektron/types';
+import { getPattern, isPatternId, isProject } from '@/lib/sequencer/elektron/project';
 
 type S = LessonCheckState;
 
@@ -220,7 +222,123 @@ export function sectionMuted(s: S, section: string | number, dev: string): boole
   return !!part(s, x, dev)?.muted;
 }
 
+// ---- Elektron sequencers (Analog Rytm, Analog Four) ---------------------------------------
+// Trigs are numbered 1..64 like the trig keys and the lesson text (trig 17 is page 2's first
+// key); tracks by index (Rytm BD 0 … CB 11; Analog Four T1 0 … T4 3). `pattern` defaults to
+// the instrument's active pattern.
+
+/** The Elektron project of a device (undefined when it has none) */
+export function proj(s: S, dev: string): Project | undefined {
+  const id = inst(s, dev);
+  const d = id ? s.instances[id]?.data : undefined;
+  return isProject(d) ? d : undefined;
+}
+
+/** A pattern of a device's project: the active one, or `pattern` */
+export function pat(s: S, dev: string, pattern?: string): Pattern | undefined {
+  const p = proj(s, dev);
+  if (!p) return undefined;
+  return getPattern(p, (pattern && isPatternId(pattern) ? pattern : p.active) as PatternId);
+}
+
+/** The trigs (note trigs, not lock trigs) of a track, as trig numbers 1..64 */
+export function trigs(s: S, dev: string, track: number, pattern?: string): number[] {
+  const t = pat(s, dev, pattern)?.tracks[track];
+  if (!t) return [];
+  return Object.entries(t.steps).filter(([, x]) => !x.trigless).map(([k]) => Number(k) + 1).sort((a, b) => a - b);
+}
+
+/** Does a track hold note trigs on every one of these trig numbers? */
+export const hasTrigs = (s: S, dev: string, track: number, nums: number[], pattern?: string) => {
+  const t = new Set(trigs(s, dev, track, pattern));
+  return nums.every(n => t.has(n));
+};
+
+/** A trig or lock trig by number (undefined when the step is empty) */
+export function trig(s: S, dev: string, track: number, n: number, pattern?: string): Step | undefined {
+  return pat(s, dev, pattern)?.tracks[track]?.steps[n - 1];
+}
+
+/** The note a trig plays: its own NOTE, else the track's (Analog Four: MIDI note; Rytm: 60 = the sound's pitch) */
+export function noteOf(s: S, dev: string, track: number, n: number, pattern?: string): number | undefined {
+  const t = pat(s, dev, pattern)?.tracks[track];
+  const x = t?.steps[n - 1];
+  if (!t || !x || x.trigless) return undefined;
+  return x.note ?? t.note;
+}
+
+/** A trig's velocity: its own, else the track's */
+export function velOf(s: S, dev: string, track: number, n: number, pattern?: string): number | undefined {
+  const t = pat(s, dev, pattern)?.tracks[track];
+  const x = t?.steps[n - 1];
+  if (!t || !x || x.trigless) return undefined;
+  return x.vel ?? t.vel;
+}
+
+/** A trig's note length in steps (one step = a 16th): its own LEN, else the track's */
+export function lenOf(s: S, dev: string, track: number, n: number, pattern?: string): number | undefined {
+  const t = pat(s, dev, pattern)?.tracks[track];
+  const x = t?.steps[n - 1];
+  if (!t || !x || x.trigless) return undefined;
+  const i = x.len ?? t.len;
+  return NOTE_LENGTHS[Math.max(0, Math.min(NOTE_LENGTHS.length - 1, Math.round(i)))];
+}
+
+/** Trig numbers of a track that lock a parameter (lock key: the control id without the track prefix) */
+export function lockedTrigs(s: S, dev: string, track: number, key: string, pattern?: string): number[] {
+  const t = pat(s, dev, pattern)?.tracks[track];
+  if (!t) return [];
+  return Object.entries(t.steps).filter(([, x]) => x.locks && key in x.locks).map(([k]) => Number(k) + 1).sort((a, b) => a - b);
+}
+
+/** Every trig of a pattern with a condition, as [track, trig number, condition] */
+export function conditions(s: S, dev: string, pattern?: string): [number, number, string][] {
+  const p = pat(s, dev, pattern);
+  if (!p) return [];
+  const out: [number, number, string][] = [];
+  p.tracks.forEach((t, ti) => Object.entries(t.steps).forEach(([k, x]) => { if (x.cond) out.push([ti, Number(k) + 1, x.cond]); }));
+  return out;
+}
+
+/** Number of parameter locks (one per locked parameter per trig) in a pattern */
+export function lockCount(s: S, dev: string, pattern?: string): number {
+  const p = pat(s, dev, pattern);
+  if (!p) return 0;
+  return p.tracks.reduce((n, t) => n + Object.values(t.steps).reduce((m, x) => m + Object.keys(x.locks ?? {}).length, 0), 0);
+}
+
+/** Tracks of a pattern that hold note trigs */
+export function busyTracks(s: S, dev: string, pattern?: string): number[] {
+  const p = pat(s, dev, pattern);
+  if (!p) return [];
+  return p.tracks.map((t, i) => (Object.values(t.steps).some(x => !x.trigless) ? i : -1)).filter(i => i >= 0);
+}
+
+/** Pattern SWING, 50..80 % (NaN without a project) */
+export const pswing = (s: S, dev: string, pattern?: string) => pat(s, dev, pattern)?.swing ?? NaN;
+
+/** Pattern LENGTH in steps (NaN without a project) */
+export const plen = (s: S, dev: string, pattern?: string) => pat(s, dev, pattern)?.length ?? NaN;
+
+/** The trig numbers 1..64 of a bar (bar 1 = 1..16) */
+export const barOf = (n: number) => Math.floor((n - 1) / 16) + 1;
+
 // ---- music ----------------------------------------------------------------------------
 
 /** Pitch class 0..11 of a MIDI note (A = 9) */
 export const pc = (note: number) => ((Math.round(note) % 12) + 12) % 12;
+
+/** A natural minor (A B C D E F G) and A minor pentatonic (A C D E G) as pitch classes */
+export const A_MINOR = [9, 11, 0, 2, 4, 5, 7];
+export const A_MINOR_PENTA = [9, 0, 2, 4, 7];
+
+/** Is every note in one major / natural minor key (any of the 12)? */
+export function oneKey(notes: number[]): boolean {
+  const pcs = new Set(notes.map(pc));
+  const MAJOR = [0, 2, 4, 5, 7, 9, 11];
+  for (let root = 0; root < 12; root++) {
+    const scale = new Set(MAJOR.map(x => (x + root) % 12));
+    if ([...pcs].every(x => scale.has(x))) return true;
+  }
+  return false;
+}

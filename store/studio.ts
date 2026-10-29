@@ -12,6 +12,7 @@ import { STUDIO_LESSONS } from '@/lib/studio/lessons';
 import { getLessonLive, lessonStudioHooks } from '@/lib/studio/lessonLive';
 import { isProducerLessonId, producerLessonsNow, setProducerRegister } from '@/lib/studio/producerIndex';
 import { buildLessonStudio, newBackupId, pushBackup, sameStudio, type LessonBackup } from '@/lib/studio/lessonStudio';
+import { SWING_RANGE, patternSwing, withPatternPatch } from '@/lib/studio/elektronEdits';
 import { LIMITER_CEILING_DB } from '@/lib/audio/context';
 
 // ============================================================================
@@ -621,6 +622,8 @@ export const useStudioStore = create<StudioStore>()(
               if (!step.match!.controls.includes(k)) values[k] = v;
             });
           }
+          // An Elektron pattern setting being matched starts where the step says (v3)
+          const patternStart = stepKind(step) === 'match' ? step.match?.pattern?.start : undefined;
           set(state => {
             const d = state.devices[instance] ?? initInstance();
             return {
@@ -630,6 +633,7 @@ export const useStudioStore = create<StudioStore>()(
                   ...d,
                   controlValues: { ...d.controlValues, ...values },
                   patchConnections: step.setupPatches ?? step.match?.patches ?? d.patchConnections,
+                  ...(patternStart ? { data: withPatternPatch(d.data, patternStart) } : {}),
                 },
               },
             };
@@ -1130,7 +1134,15 @@ export const useStudioStore = create<StudioStore>()(
               if (!ok) off.push({ id, dir: 'different' });
             }
           });
-          const score = (step.match.controls.length - off.length) / Math.max(1, step.match.controls.length);
+          // An Elektron pattern setting (v3): SWING of the active pattern, in knob travel too
+          const pm = step.match.pattern;
+          if (pm) {
+            const v = patternSwing(s.devices[instance]?.data);
+            const err = v === undefined ? Infinity : Math.abs(v - pm.target.swing) / SWING_RANGE;
+            if (!(err <= tol)) off.push({ id: 'pattern:swing', dir: v === undefined ? 'different' : v < pm.target.swing ? 'higher' : 'lower', far: err > tol * 2.5 });
+          }
+          const tested = step.match.controls.length + (pm ? 1 : 0);
+          const score = (tested - off.length) / Math.max(1, tested);
           const attempts = (s.session[s.currentStep]?.attempts ?? 0) + 1;
           setSession({ attempts, match: { score, off } });
           evaluate();
