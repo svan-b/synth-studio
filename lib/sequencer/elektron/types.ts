@@ -13,8 +13,9 @@
 //   - note lengths, retrig rates and conditions are stored as small indices /
 //     short strings (the hardware's own encoder positions)
 //
-// Behaviour follows the Analog Four MKII / Analog Rytm MKII manuals' sequencer
-// chapters (see docs/ELEKTRON_SEQUENCER.md for what is and isn't modelled).
+// Behaviour follows the Analog Four MKII (OS 1.55) / Analog Rytm MKII (OS 1.72)
+// manuals' sequencer, chain and song chapters (see docs/ELEKTRON_SEQUENCER.md
+// for the page references and what is and isn't modelled).
 // ============================================================================
 
 /** Sequencer resolution: 24 ticks per quarter note, the same as the studio transport */
@@ -35,7 +36,11 @@ export type PatternId = string;
 // Scale (speed)
 // ----------------------------------------------------------------------------
 
-/** SCALE menu speeds, fastest first (the hardware's order) */
+/**
+ * SCALE menu speeds, fastest first (the manuals list the same seven slowest
+ * first: A4 MKII manual p.48, Rytm MKII manual p.46). Per pattern, or per track
+ * in ADVANCED (PER TRACK) mode.
+ */
 export const SPEEDS = ['2x', '3/2x', '1x', '3/4x', '1/2x', '1/4x', '1/8x'] as const;
 export type Speed = (typeof SPEEDS)[number];
 
@@ -67,12 +72,28 @@ export const CHANGE_MODES: readonly ChangeMode[] = ['sequential', 'direct-start'
 export type PlayMode = 'pattern' | 'chain' | 'song';
 export const PLAY_MODES: readonly PlayMode[] = ['pattern', 'chain', 'song'];
 
+/**
+ * PROJECT: one tempo for every pattern. PATTERN: each pattern keeps its own
+ * tempo, which takes over when the pattern starts (internal clock only)
+ * ([FUNC] + [YES] in the TEMPO menu, A4 MKII manual p.39, Rytm MKII manual p.38).
+ */
+export type TempoMode = 'project' | 'pattern';
+
+/** TEMP JUMP state: armed ([FUNC] + [BANK D]), active (the jumped-to pattern plays), off */
+export type TempJumpState = 'off' | 'armed' | 'active';
+
+/** Most different parameters a pattern can lock: Analog Four 128 (A4 MKII manual p.50), Analog Rytm 72 (Rytm MKII manual p.47) */
+export const LOCK_LIMIT_A4 = 128;
+export const LOCK_LIMIT_RYTM = 72;
+
 // ----------------------------------------------------------------------------
 // Note length (LEN) - the hardware's 128-position encoder scale
 //
 //   0.125 .. 2 steps in 1/16-step increments, then the increment doubles every
 //   time the length doubles (2-4 by 1/8, 4-8 by 1/4 ... 64-128 by 4), and the
-//   last position is INF. 1 step = a 16th note at 1x speed. Stored as the index.
+//   last position is INF. 1 step = a 16th note at 1x speed: LEN 1/16 is one
+//   step, 1/8 two, 1/4 four (A4 MKII manual p.41, Rytm MKII manual p.40); the
+//   range is 0.125 step .. INF (Rytm MKII manual p.41). Stored as the index.
 // ----------------------------------------------------------------------------
 
 function buildNoteLengths(): number[] {
@@ -98,16 +119,28 @@ export const LEN_DEFAULT = LEN_1_STEP;
 
 // ----------------------------------------------------------------------------
 // Micro timing: -23/384 .. +23/384 of a whole note at 1x, i.e. 1/24 of a step
-// per unit (the grid gets finer with the speed, like the hardware)
+// per unit (the grid gets finer with the speed, like the hardware). One unit is
+// 1/384 note (A4 MKII manual p.45); the micro timing pop-up spans one step on
+// either side in 24 divisions (Rytm MKII manual p.39), so the range stops one
+// unit short of the neighbouring steps.
 // ----------------------------------------------------------------------------
 
 export const MICRO_MIN = -23;
 export const MICRO_MAX = 23;
 export const MICRO_PER_STEP = 24;
 
+/**
+ * GLOBAL / TRACK QUANTIZE 0..127: pulls micro-timed trigs towards the grid
+ * (127 = fully on the grid), non-destructively (A4 MKII manual p.47, Rytm MKII
+ * manual p.45).
+ */
+export const QUANTIZE_MAX = 127;
+
 // ----------------------------------------------------------------------------
-// Retrig (Analog Rytm): rate 1/1 .. 1/80 of a whole note (1/16 = once per step),
-// length on the LEN scale (0.125 .. INF), velocity curve -128 .. +127
+// Retrig (Analog Rytm): rate 1/1 .. 1/80 of a whole note (1/16 = once per step,
+// 1/32 twice, 1/12 and 1/24 triplets), length on the LEN scale (0.125 .. INF),
+// velocity curve -128 (fade out completely) .. +127 (fade in from silence) over
+// that length (Rytm MKII manual p.41-42)
 // ----------------------------------------------------------------------------
 
 /** Denominators of the RATE values: 1/1, 1/2 ... 1/80 */
@@ -129,12 +162,15 @@ export interface Retrig {
 export const RETRIG_DEFAULT: Readonly<Retrig> = { rate: RETRIG_RATE_32, len: 30 /* 2 steps */, vel: 0 };
 
 // ----------------------------------------------------------------------------
-// Trig conditions
+// Trig conditions (A4 MKII manual p.50-51, Rytm MKII manual p.48-49)
 //   A:B    true on loop A of every B loops of the track (1:2 ... 8:8)
 //   X%     probability
 //   FILL / !FILL   fill mode active / not active
-//   PRE / !PRE     most recent condition on this track was true / false
-//   NEI / !NEI     most recent condition on the neighbour track (the one before) was true / false
+//   PRE / !PRE     the most recently evaluated condition on this track was true /
+//                  was not true (PRE and !PRE are not evaluated themselves, so
+//                  they never change it; nothing evaluated yet = not true)
+//   NEI / !NEI     the same for the neighbour track (the track before); NEI is
+//                  false when the neighbour has no evaluated condition, !NEI true
 //   1ST / !1ST     first loop of the pattern / every loop but the first
 // Stored as the display string; '' / missing = no condition.
 // ----------------------------------------------------------------------------
@@ -212,6 +248,11 @@ export interface Step {
   pslide?: true;
   /** Accent (Analog Rytm, also Analog Four) */
   accent?: true;
+  /**
+   * Trig mute: the trig is silenced - no note, no locks - while its condition
+   * is still evaluated (TRIG MUTE menu, A4 MKII manual p.51, Rytm MKII manual p.49)
+   */
+  mute?: true;
   /** Parameter locks for this trig only */
   locks?: Locks;
 }
@@ -232,13 +273,20 @@ export interface Track extends TrackDefaults {
   length?: number;
   /** PER TRACK scale mode: this track's speed (default: the pattern speed) */
   speed?: Speed;
-  /** Track muted in this pattern */
+  /**
+   * Track muted in this pattern only. Not a hardware feature: the hardware's
+   * track mutes are global (Project.mutes / ElektronSequencer.setMute) and
+   * song mutes belong to a song position (SongRow.mutes).
+   */
   mute?: boolean;
   /**
-   * Track trig probability 0..100 % (missing = 100). Applies to the trigs of the
-   * track that have no trig condition (A4 OS 1.50 / AR OS 1.60).
+   * Track trig probability (PRB) 0..100 % (missing = 100), rolled again every
+   * time a trig is due. A trig condition overrides it (A4 MKII manual p.45,
+   * Rytm MKII manual p.43-44).
    */
   prob?: number;
+  /** TRACK QUANTIZE 0..127 of the micro timing (the larger of this and Pattern.quantize applies) */
+  quantize?: number;
 }
 
 export interface Pattern {
@@ -248,44 +296,83 @@ export interface Pattern {
   /** Pattern speed (PER PATTERN) / master speed (PER TRACK) */
   speed: Speed;
   scaleMode: ScaleMode;
-  /** PER TRACK: master length in master steps (1..1024), MASTER_INF (0) = never restart all tracks */
+  /**
+   * PER TRACK: master length in master steps (1..1024): every track restarts
+   * after it. MASTER_INF (0) = the tracks loop on their own and never restart
+   * together (A4 MKII manual p.49, Rytm MKII manual p.47).
+   */
   master: number;
   /**
    * PER TRACK: master change - master steps the pattern plays before a cued or
-   * chained pattern starts (1..1024). CHANGE_OFF (0) = at the master length; with
-   * the master length at INF too the pattern plays forever and a SEQUENTIAL
-   * change never happens (as on the hardware - DIRECT modes still work).
+   * chained pattern starts (1..1024). CHANGE_OFF (0, the hardware default) = at
+   * the master length; with the master length at INF too the pattern plays
+   * forever and a SEQUENTIAL change never happens (DIRECT modes still work,
+   * Rytm MKII manual p.47).
    */
   change: number;
   /**
-   * Swing 50..80 % (50 = straight): the share of each pair of steps taken by the
-   * first one, so every second step (2, 4, 6...) is late by (swing-50)/50 of a
-   * step. Counted on the track's own steps, like the hardware's default swing trigs.
+   * Swing 50..80 % (50 = straight, 51-80 % swing, Rytm MKII manual p.50): the
+   * share of each pair of steps taken by the first one, so a swing trig's step
+   * is late by (swing-50)/50 of a step.
    */
   swing: number;
+  /**
+   * Swing trigs: the step indices (0..63) that swing. Missing = the default,
+   * every second step (keys 2, 4, 6...). One set for the pattern; a step swings
+   * on every track that plays it (A4 MKII manual p.38, Rytm MKII manual p.50).
+   */
+  swingTrigs?: number[];
   /** Opaque reference to the device's kit / sound setup ('' = none) */
   kit: string;
+  /** This pattern's BPM in PATTERN tempo mode (Project.tempoMode) */
+  tempo?: number;
+  /** GLOBAL QUANTIZE 0..127 of the micro timing (A4 MKII manual p.47, Rytm MKII manual p.45) */
+  quantize?: number;
   tracks: Track[];
 }
 
-export interface SongRow {
+/** One pattern position in a song row: its pattern, song mutes and transpose */
+export interface SongEntry {
   pattern: PatternId;
+  /** Song mutes of this position (replace the pattern's own track mutes while it plays) */
+  mutes?: number[];
+  /** Semitones added to every note at this position (Analog Four song transpose), -48..48 */
+  transpose?: number;
+}
+
+/**
+ * A song row: a pattern, or a chain of patterns (`pattern` then `chain`), played
+ * `repeats` times. Song mutes and transpose belong to each pattern position
+ * (A4 MKII manual p.56-57, Rytm MKII manual p.54-55). The row itself is the
+ * first position.
+ */
+export interface SongRow extends SongEntry {
   /** Times the row plays (1..99) */
   repeats: number;
-  /** Master steps per repeat (default: the pattern's own length / change) */
+  /** The row's further pattern positions, played in order after `pattern` */
+  chain?: SongEntry[];
+  /**
+   * Master steps each pattern position plays per repeat (default: the pattern's
+   * own length / change). Not on the A4 / Rytm MKII: their rows always play
+   * whole patterns.
+   */
   length?: number;
-  /** BPM while this row plays (internal clock only - the studio transport keeps its tempo) */
+  /**
+   * BPM from the start of this row (internal clock only - the studio transport
+   * keeps its tempo). Not on the A4 / Rytm MKII: they change tempo per pattern
+   * (Project.tempoMode 'pattern').
+   */
   tempo?: number;
-  /** Tracks muted while this row plays (replaces the pattern's own track mutes) */
-  mutes?: number[];
-  /** Semitones added to every note while this row plays (Analog Four song transpose), -48..48 */
-  transpose?: number;
 }
 
 export interface Song {
   name: string;
   rows: SongRow[];
-  /** At the end: jump back to `loopRow` (true) or stop (false) */
+  /**
+   * At the end: jump back to `loopRow` (true) or stop (false). The A4 / Rytm
+   * MKII songs play their rows once and stop - their song chapters have no
+   * loop setting (A4 MKII manual p.55-57, Rytm MKII manual p.53-55).
+   */
   loop: boolean;
   loopRow?: number;
 }
@@ -305,6 +392,21 @@ export interface Project {
   song: Song;
   mode: PlayMode;
   changeMode: ChangeMode;
+  /**
+   * Track mutes ([FUNC] + [TRACK] on the A4, MUTE mode on the Rytm): global,
+   * kept through pattern changes and saved with the project, and they win over
+   * trig mutes and song mutes (A4 MKII manual p.16, p.37; Rytm MKII manual p.23).
+   */
+  mutes?: number[];
+  /** PROJECT (default) or PATTERN tempo mode */
+  tempoMode?: TempoMode;
+  /**
+   * RELOAD PATTERN / RELOAD TRACK restore point of the active pattern: its
+   * state when it was selected (the auto-save) or at the last SAVE PATTERN /
+   * SAVE TRACK. Selecting another pattern replaces it (A4 MKII manual p.42-43,
+   * Rytm MKII manual p.42-43, p.51-52). null pattern = the slot was empty.
+   */
+  restore?: { id: PatternId; pattern: Pattern | null };
 }
 
 // ----------------------------------------------------------------------------
@@ -380,4 +482,14 @@ export interface SeqState {
   bpm: number;
   /** Runtime (performance) mutes, on top of the pattern's track mutes */
   mutes: boolean[];
+  /** Internal clock paused ([PLAY] while playing): resume() continues from here */
+  paused?: boolean;
+  /** Soloed tracks (Rytm [RTRG] + pad): while any is on, the others are muted */
+  solos?: boolean[];
+  /** Pattern position in the playing (or cued) song row's chain */
+  songPos?: number;
+  /** TEMP JUMP: armed (blinks), active (the jumped-to pattern plays) or off */
+  tempJump?: TempJumpState;
+  /** The change mode the next pattern selection uses (a used TEMP JUMP falls back to the mode before it) */
+  changeMode?: ChangeMode;
 }

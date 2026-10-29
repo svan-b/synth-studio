@@ -411,14 +411,14 @@ test('swing follows the track\'s own steps: at 2x every second 32nd moves by a s
   nearAll(times(r).slice(0, 4), [T0, T0 + h + d, T0 + 2 * h, T0 + 3 * h + d]);
 });
 
-test('swing counts steps across loops: with an odd length the swung steps shift every loop', () => {
+test('swing trigs are step positions: with an odd length the same steps swing every loop (Rytm p.50)', () => {
   const r = rig(proj(1, { 0: { 0: {}, 1: {}, 2: {} } }, { swing: 60, length: 3 }));
   r.seq.start();
   r.clock.advance(T0 + 6 * STEP120 - STEP120);
   const d = 0.2 * STEP120;
   const late = r.trigs.map((e, i) => Math.abs(e.time - (T0 + i * STEP120 + d)) < 1e-9);
   eq(r.trigs.map(e => e.step), [0, 1, 2, 0, 1, 2]);
-  eq(late, [false, true, false, true, false, true]);
+  eq(late, [false, true, false, false, true, false], 'step 2 (a default swing trig) swings on every loop');
 });
 
 test('positive micro timing: +12 = half a step later', () => {
@@ -540,9 +540,9 @@ test('PRE / !PRE follow the most recent non-PRE condition on the track', () => {
   eq(r.trigs.map(e => `${e.loop}:${e.step}`), ['0:0', '0:4', '1:8', '2:0', '2:4', '3:8']);
 });
 
-test('PRE with no earlier condition is false, !PRE too', () => {
+test('nothing evaluated yet: PRE is false and !PRE true (A4 p.50: !PRE is true when PRE is false)', () => {
   eq(playedLoops(proj(1, { 0: { 0: { cond: 'PRE' } } }), 3), []);
-  eq(playedLoops(proj(1, { 0: { 0: { cond: '!PRE' } } }), 3), []);
+  eq(playedLoops(proj(1, { 0: { 0: { cond: '!PRE' } } }), 3), [0, 1, 2], 'PRE conditions never change the state');
 });
 
 test('NEI / !NEI read the track before; NEI results chain', () => {
@@ -560,15 +560,21 @@ test('NEI / !NEI read the track before; NEI results chain', () => {
   eq(d, c.map(x => !x), 'chains through NEI results');
 });
 
-test('NEI with no condition on the neighbour is false; track 1 is its own neighbour', () => {
-  eq(playedLoops(proj(2, { 0: { 0: {} }, 1: { 0: { cond: 'NEI' } } }), 3, 1), []);
-  eq(playedLoops(proj(2, { 0: { 0: {} }, 1: { 0: { cond: '!NEI' } } }), 3, 1), []);
-  // track 0: step 0 1:2 then step... NEI on track 0 reads its own state
-  const p = proj(1, { 0: { 0: { cond: '1:2' }, 1: { cond: 'NEI' } } }, { length: 2 });
+test('no condition on the neighbour: NEI false, !NEI true; the first track has no neighbour (A4 p.50-51)', () => {
+  eq(playedLoops(proj(2, { 0: { 0: {} }, 1: { 0: { cond: 'NEI' } } }), 3, 1), [], 'a plain trig is not a condition');
+  eq(playedLoops(proj(2, { 0: { 0: {} }, 1: { 0: { cond: '!NEI' } } }), 3, 1), [0, 1, 2]);
+  // track 1: its own 1:2 results don't feed its NEI - there is no track before it
+  const p = proj(1, { 0: { 0: { cond: '1:2' }, 1: { cond: 'NEI' }, 2: { cond: '!NEI' } } }, { length: 3 });
   const r = rig(p);
   r.seq.start();
-  r.clock.advance(T0 + 8 * STEP120 - STEP120);
-  eq(r.trigs.map(e => `${e.loop}:${e.step}`), ['0:0', '0:1', '2:0', '2:1']);
+  r.clock.advance(T0 + 12 * STEP120 - STEP120);
+  eq(r.trigs.map(e => `${e.loop}:${e.step}`), ['0:0', '0:2', '1:2', '2:0', '2:2', '3:2']);
+  // a custom neighbour map (e.g. wrap round to the last track)
+  const q = updatePatternSettings(proj(2, { 0: { 0: { cond: 'NEI' } }, 1: { 0: { cond: '1:2' } } }), 'A01', { length: 1 });
+  const w = rig(q, { neighbor: t => (t === 0 ? 1 : t - 1) });
+  w.seq.start();
+  w.clock.advance(T0 + 4 * STEP120 - STEP120);
+  eq(w.trigs.filter(e => e.track === 0).map(e => e.loop), [1, 3], 'track 1 reads track 2, evaluated one tick later');
 });
 
 test('probability: seeded, deterministic, roughly right', () => {
@@ -886,13 +892,14 @@ test('PER TRACK with master length INF and CHG OFF: a SEQUENTIAL change never ha
   eq(r.patterns.map(x => x.id), ['A01', 'A02']);
 });
 
-test('entering PER TRACK keeps playback: master length and change start at the pattern length', () => {
+test('entering PER TRACK keeps playback: master length = the pattern length, master change OFF (A4 p.49)', () => {
   let p = proj(1, { 0: { 0: {} } }, { length: 32 });
   p = updatePatternSettings(p, 'A01', { scaleMode: 'track' });
-  eq([p.patterns.A01.master, p.patterns.A01.change], [32, 32]);
+  eq([p.patterns.A01.master, p.patterns.A01.change], [32, 0]);
   p = updatePatternSettings(p, 'A01', { scaleMode: 'pattern' });
-  p = updatePatternSettings(p, 'A01', { scaleMode: 'track', master: 0 });
-  eq([p.patterns.A01.master, p.patterns.A01.change], [0, 32]);
+  p = updatePatternSettings(p, 'A01', { scaleMode: 'track', master: 0, change: 16 });
+  eq([p.patterns.A01.master, p.patterns.A01.change], [0, 16]);
+  eq(createProject({ tracks: 1 }).song.loop, false, 'a new song stops at its end');
 });
 
 test('preview (REC off trig keys): plays a step now with its locks; empty steps play the track default', () => {
