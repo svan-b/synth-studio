@@ -30,7 +30,7 @@ import { EVENT_INPUTS, INPUTS, NUM_INPUTS, NUM_OUTPUTS, OUTPUTS, internalRoutes,
 
 type WorkletReport = { t: 's'; s1: number; s2: number; run: number; trig: number; rhy: number; midi: number; aud: number };
 
-const TICKS_PER_16TH = PPQN / 4;
+
 
 export class SubharmoniconEngine extends BaseEngine {
   private node!: AudioWorkletNode;
@@ -152,17 +152,24 @@ export class SubharmoniconEngine extends BaseEngine {
       this.post({ t: 'k', i: knobMessage('play', false)![0], v: this.bool('play') ? 1 : 0 });
       return;
     }
+    // The worklet counts the 16ths itself from the transport's grid (it keeps time when the
+    // page's timers are throttled); the grid is re-sent every beat and on tempo / locate
+    const anchor = () => this.post({ t: 'sync', time: t.timeOfTick(t.position), tick: t.position, dur: t.tickDuration(), swing: t.swing });
+    anchor();
     this.unsubTransport.push(t.onTick(tick => {
-      if (tick.tick % TICKS_PER_16TH === 0) this.post({ t: 'ev', ch: 'midi-clock', time: tick.time });
+      if (tick.tick % PPQN === 0) this.post({ t: 'sync', time: tick.time, tick: tick.tick, dur: tick.tickDuration, swing: t.swing });
     }));
     this.unsubTransport.push(t.onEvent(e => {
-      if (e.type === 'start') this.post({ t: 'ev', ch: 'midi-start', time: e.time });
-      else if (e.type === 'stop') this.post({ t: 'ev', ch: 'midi-stop', time: e.time });
+      if (e.type === 'start') {
+        this.post({ t: 'sync', time: e.time, tick: t.position, dur: t.tickDuration(), swing: t.swing });
+        this.post({ t: 'ev', ch: 'midi-start', time: e.time, v: t.position });
+      } else if (e.type === 'stop') this.post({ t: 'ev', ch: 'midi-stop', time: e.time });
+      else if (e.type === 'tempo' || e.type === 'locate') anchor();
     }));
     // Joining a transport that is already running: start with it on the next beat
     if (t.playing) {
       const tick = Math.ceil(t.position / PPQN) * PPQN;
-      this.post({ t: 'ev', ch: 'midi-start', time: t.timeOfTick(tick) - 0.0005 });
+      this.post({ t: 'ev', ch: 'midi-start', time: t.timeOfTick(tick) - 0.0005, v: tick });
     }
   }
 
