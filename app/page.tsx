@@ -9,13 +9,18 @@ import { useStudioStore, dueReviewItems } from '@/store/studio';
 import { hub } from '@/lib/studio/hub';
 import { arranger } from '@/lib/studio/arranger';
 import { STUDIO_LESSONS } from '@/lib/studio/lessons';
-import { downloadProject, importProject } from '@/lib/studio/project';
+import { downloadProject, importProject, newProject, lastProjectExport } from '@/lib/studio/project';
+import { history } from '@/lib/studio/history';
+import { showNotice } from '@/lib/studio/notices';
+import { isStandalone } from '@/lib/studio/platform';
 import DeviceHost from '@/components/DeviceHost';
 import Instructions from '@/components/teaching/Instructions';
 import LessonBrowser from '@/components/teaching/LessonBrowser';
 import ReviewSession from '@/components/teaching/ReviewSession';
 import TransportBar from '@/components/studio/TransportBar';
 import StudioView from '@/components/studio/StudioView';
+import UndoRedo from '@/components/studio/UndoRedo';
+import SystemNotices from '@/components/studio/SystemNotices';
 import Welcome, { type WelcomeChoice } from '@/components/onboarding/Welcome';
 import MidiButton from '@/components/midi/MidiButton'; // external gear: MIDI settings
 
@@ -26,6 +31,8 @@ export default function Home() {
   useEffect(() => {
     hub.init();
     arranger.init();
+    // after the hub: undo history never sits between a knob and its engine
+    history.init();
     setHydrated(true);
   }, []);
   if (!hydrated) return <div className="min-h-screen bg-hardware-bg" />;
@@ -56,6 +63,50 @@ function App() {
   // First visit: welcome screen
   useEffect(() => {
     try { if (!localStorage.getItem('synth-studio-welcomed')) setWelcomeOpen(true); } catch { /* private mode */ }
+  }, []);
+
+  // Messages ask for a project save / open (storage full, Home Screen import)
+  const projectName = useCallback(() => {
+    const st = useStudioStore.getState();
+    const dev = st.deviceOf(st.currentDevice);
+    const e = DEVICES.find(d => d.id === dev);
+    return e ? `${e.name} session` : 'My track';
+  }, []);
+  useEffect(() => {
+    const save = () => downloadProject(projectName());
+    const open = () => fileRef.current?.click();
+    window.addEventListener('synth-studio:save-project', save);
+    window.addEventListener('synth-studio:open-project', open);
+    return () => {
+      window.removeEventListener('synth-studio:save-project', save);
+      window.removeEventListener('synth-studio:open-project', open);
+    };
+  }, [projectName]);
+
+  // Home Screen apps on iPad get their own, empty storage: offer to bring a project over.
+  // And now and then, a nudge to keep a project file (browsers can clear site data).
+  useEffect(() => {
+    let first = false;
+    try { first = !localStorage.getItem('synth-studio-launched'); localStorage.setItem('synth-studio-launched', String(Date.now())); } catch { /* */ }
+    if (first && isStandalone()) {
+      showNotice({
+        id: 'home-import', level: 'info', once: true,
+        text: 'This Home Screen app keeps its own storage, separate from Safari. Started a project in Safari? Save it there (Project ▾ → Save project to a file), then open the file here.',
+        action: { label: 'Open project file…', run: () => window.dispatchEvent(new CustomEvent('synth-studio:open-project')) },
+      });
+    }
+    const t = setTimeout(() => {
+      const st = useStudioStore.getState().studio;
+      const worked = st.rack.length > 1 || st.arrangement.sections.length > 0 || history.depth.undo >= 15;
+      if (worked && Date.now() - lastProjectExport() > 7 * 86_400_000) {
+        showNotice({
+          id: 'export', level: 'info',
+          text: 'Your studio saves in this browser, but browsers can clear site data (and iPad Home Screen apps keep their own). Keep a copy: save the project to a file now and then.',
+          action: { label: 'Save project to a file', run: () => window.dispatchEvent(new CustomEvent('synth-studio:save-project')) },
+        });
+      }
+    }, 15 * 60_000);
+    return () => clearTimeout(t);
   }, []);
   const closeWelcome = () => {
     setWelcomeOpen(false);
@@ -136,12 +187,13 @@ function App() {
     <div className="min-h-screen bg-hardware-bg px-3 py-3 sm:px-5">
       <header className="max-w-[1800px] mx-auto mb-3 flex flex-wrap items-center gap-2">
         <div className="mr-2">
-          <h1 className="text-xl font-bold text-white leading-none">SYNTH STUDIO</h1>
+          <h1 className="text-lg xl:text-xl font-bold text-white leading-none">SYNTH STUDIO</h1>
           <p className="text-[11px] text-hardware-label mt-0.5 hidden xl:block">Play it. Patch it. Understand it.</p>
         </div>
         <TransportBar />
       </header>
 
+      <div className="max-w-[1800px] mx-auto"><SystemNotices /></div>
       {projectMsg && <p className="max-w-[1800px] mx-auto text-xs text-sky-300 mb-2">{projectMsg}</p>}
 
       {/* Rack tabs: Studio overview + one tab per instrument */}
@@ -160,6 +212,7 @@ function App() {
           </button>
         </nav>
         <div className="shrink-0 flex items-center gap-2">
+          <UndoRedo />
           <button
             onClick={() => setReviewOpen(true)}
             className={`px-3 py-2 rounded-lg text-sm border ${dueCount ? 'border-sky-500 text-sky-200 bg-sky-950/40' : 'border-[#3a3a3a] text-gray-300'}`}
@@ -179,9 +232,9 @@ function App() {
           </button>
           <MidiButton />
           <ProjectMenu
-            onSave={() => downloadProject(entry ? `${entry.name} session` : 'My track')}
+            onSave={() => downloadProject(projectName())}
             onOpen={() => fileRef.current?.click()}
-            onNew={() => { if (confirm('Start a new empty project? Save first if you want to keep this one.')) useStudioStore.getState().newProject(); }}
+            onNew={() => { if (confirm('Start a new empty project? Save first if you want to keep this one.')) newProject(); }}
           />
           <input
             ref={fileRef}
@@ -229,7 +282,7 @@ function App() {
       <Dialog.Root open={devicesOpen} onOpenChange={setDevicesOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-3xl shadow-2xl z-50 max-h-[88vh] overflow-y-auto">
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-3xl shadow-2xl z-50 max-h-[88dvh] overflow-y-auto">
             <Dialog.Title className="text-lg font-bold text-white mb-1">Instruments</Dialog.Title>
             <Dialog.Description className="text-xs text-hardware-label mb-4">
               {singleInstrument
@@ -283,7 +336,7 @@ function App() {
       <Dialog.Root open={lessonsOpen} onOpenChange={setLessonsOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-2xl shadow-2xl z-50 max-h-[90vh] flex flex-col">
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-2xl shadow-2xl z-50 max-h-[90dvh] flex flex-col">
             <Dialog.Title className="text-lg font-bold text-white">{entry?.name ?? 'Instrument'} lessons</Dialog.Title>
             <Dialog.Description className="text-xs text-hardware-label mb-3">
               Short, hands-on lessons. You will predict, listen, match sounds by ear and explain ideas in your own words - the
@@ -301,7 +354,7 @@ function App() {
       <Dialog.Root open={reviewOpen} onOpenChange={setReviewOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-lg shadow-2xl z-50 max-h-[88vh] overflow-y-auto">
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-5 w-[calc(100%-2rem)] max-w-lg shadow-2xl z-50 max-h-[88dvh] overflow-y-auto">
             <Dialog.Title className="text-lg font-bold text-white mb-1">Daily review</Dialog.Title>
             <Dialog.Description className="text-xs text-hardware-label mb-3">A few quick questions from earlier lessons, timed to come back just before you would forget them.</Dialog.Description>
             {reviewOpen && <ReviewSession onClose={() => setReviewOpen(false)} />}
@@ -325,17 +378,27 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 
 function ProjectMenu({ onSave, onOpen, onNew }: { onSave: () => void; onOpen: () => void; onNew: () => void }) {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  // Close on a tap anywhere else (iPad has no mouseleave), or Escape
+  useEffect(() => {
+    if (!open) return;
+    const down = (e: PointerEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('keydown', key);
+    return () => { window.removeEventListener('pointerdown', down, true); window.removeEventListener('keydown', key); };
+  }, [open]);
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <button onClick={() => setOpen(o => !o)} className="px-3 py-2 rounded-lg text-sm border border-[#3a3a3a] text-gray-300" aria-expanded={open}>
         Project ▾
       </button>
       {open && (
-        <div className="absolute right-0 mt-1 w-56 bg-[#1b1b1b] border border-[#3a3a3a] rounded-lg shadow-2xl z-30 p-1" onMouseLeave={() => setOpen(false)}>
+        <div className="absolute right-0 mt-1 w-56 bg-[#1b1b1b] border border-[#3a3a3a] rounded-lg shadow-2xl z-30 p-1">
           <MenuItem onClick={() => { onSave(); setOpen(false); }}>Save project to a file</MenuItem>
           <MenuItem onClick={() => { onOpen(); setOpen(false); }}>Open project file…</MenuItem>
           <MenuItem onClick={() => { onNew(); setOpen(false); }}>New empty project</MenuItem>
-          <p className="text-[10px] text-gray-500 px-2 py-1.5">Your work also saves automatically in this browser. Use REC in the top bar to bounce a WAV.</p>
+          <p className="text-[10px] text-gray-500 px-2 py-1.5">Your work also saves automatically in this browser. Use REC or Bounce… in the top bar to export WAV files and stems.</p>
         </div>
       )}
     </div>
