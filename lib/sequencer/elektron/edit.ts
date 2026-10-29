@@ -11,13 +11,13 @@
 // ============================================================================
 
 import {
-  CHANGE_OFF, LEN_DEFAULT, MASTER_MAX, MAX_STEPS, NOTE_LENGTHS, PAGE_SIZE, QUANTIZE_MAX, RETRIG_RATES, RETRIG_VEL_MAX,
+  CHANGE_OFF, CHORD_MAX, CHORD_SPAN, LEN_DEFAULT, MASTER_MAX, MAX_STEPS, NOTE_LENGTHS, PAGE_SIZE, QUANTIZE_MAX, RETRIG_RATES, RETRIG_VEL_MAX,
   RETRIG_VEL_MIN, SPEEDS, SWING_MAX, SWING_MIN, TEMPO_MAX, TEMPO_MIN, TRIG_CONDITIONS,
   type ChangeMode, type Pattern, type PatternId, type PlayMode, type Project, type Retrig, type SongEntry,
   type SongRow, type Speed, type Step, type TempoMode, type Track, type TrackDefaults,
 } from './types';
 import {
-  DEFAULT_SWING_TRIGS, createPattern, createTrack, getPattern, isPatternId, lockedParamCount, normalizePattern,
+  DEFAULT_SWING_TRIGS, cleanChord, createPattern, createTrack, getPattern, isPatternId, lockedParamCount, normalizePattern,
   normalizeTrack, pageSteps, rowSize, trackLength,
 } from './project';
 import { normalizeCondition } from './conditions';
@@ -116,6 +116,7 @@ export function patchStep(s: Step, patch: StepPatch): Step {
       case 'micro': { const m = clampInt(v as number, -23, 23); if (m) o.micro = m; else delete o.micro; break; }
       case 'cond': { const c = normalizeCondition(v); if (c) o.cond = c; else delete o.cond; break; }
       case 'retrig': o.retrig = cleanRetrig(v as Retrig); break;
+      case 'chord': { const c = cleanChord(v); if (c) o.chord = c; else delete o.chord; break; }
       case 'locks': {
         const l = v as Record<string, number>;
         if (Object.keys(l).length) o.locks = { ...l }; else delete o.locks;
@@ -161,6 +162,29 @@ export function updateSteps(
       s = opts.create === 'lock' ? { trigless: true } : {};
     }
     return patchStep(s, patch);
+  });
+}
+
+/**
+ * Add a note to a chord trig (Analog Four POLY: hold a keyboard key and press more, A4 MKII
+ * manual p.42). An empty step gets a note trig with `init` (e.g. trackTrigDefaults) and this
+ * note; a trig without a note takes it as its note. Otherwise the note joins the chord as an
+ * offset from the trig's note, unless the trig already plays it, the chord is full
+ * (`max` notes, CHORD_MAX by default) or it lies further than CHORD_SPAN away.
+ */
+export function addChordNote(
+  p: Project, id: PatternId, track: number, step: number, note: number,
+  opts: { max?: number; init?: Step } = {},
+): Project {
+  const n = clampInt(note, 0, 127);
+  const max = Math.max(1, Math.min(CHORD_MAX, Math.round(opts.max ?? CHORD_MAX)));
+  return withStep(p, id, track, step, s => {
+    if (!s || s.trigless) return patchStep({ ...(s ?? {}), ...(opts.init ?? {}) }, { trigless: null, note: n, chord: null });
+    if (s.note === undefined) return patchStep(s, { note: n, chord: null });
+    const off = n - s.note;
+    const chord = s.chord ?? [];
+    if (off === 0 || chord.includes(off) || Math.abs(off) > CHORD_SPAN || chord.length + 1 >= max) return s;
+    return { ...s, chord: [...chord, off] };
   });
 }
 

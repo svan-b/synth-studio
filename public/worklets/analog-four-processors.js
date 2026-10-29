@@ -37,8 +37,9 @@
 // port messages scheduled on the audio clock:
 //   { t: 'p', list: [i, v, i, v...] }              set now
 //   { t: 'at', time, list }                        set at audio time (p-locks)
-//   { t: 'on', time, note, vel, acc, slide, live } gate on
-//   { t: 'off', time }                             gate off
+//   { t: 'on', time, note, vel, acc, slide, live, id } gate on (id: a POLY note's number, else none)
+//   { t: 'off', time, id }                         gate off; with an id, only if that note still owns
+//                                                  the voice (a stolen voice ignores its old note's off)
 //   { t: 'ramp', time, t1, list: [i, from, to] }   parameter slide
 //   { t: 'off2', list }                            performance-macro offsets
 //   { t: 'bpm', v } / { t: 'step', v }             tempo (LFO sync) / step length (LEN)
@@ -390,6 +391,7 @@ class A4Voice extends AudioWorkletProcessor {
     this.note = 60; this.pitch = 60; this.glideFrom = 60; this.glideT = 0; this.glideTime = 0;
     this.bendAmt = 0; this.bendT = 0; this.bendTime = 0;   // auto bend (OSC 1&2 BND)
     this.vel = 100 / 127; this.acc = 0; this.gate = false;
+    this.noteId = -1;   // the POLY note that owns the voice (-1: a mono note)
     this.envA = new Env(); this.envF = new Env(); this.env2 = new Env();
     this.lfo1 = new Lfo(); this.lfo2 = new Lfo();
     this.vibPh = 0; this.vibFade = 1; this.pwm1 = Math.random(); this.pwm2 = Math.random();
@@ -480,7 +482,7 @@ class A4Voice extends AudioWorkletProcessor {
       list = list.slice();
       for (let k = 0; k < list.length; k += step) list[k] = this.own(list[k]);
     }
-    return { t: m.t, time: m.time, t1: m.t1, list, note: m.note, vel: m.vel, acc: m.acc, slide: m.slide, live: m.live, leg: m.leg, rt: m.rt };
+    return { t: m.t, time: m.time, t1: m.t1, list, note: m.note, vel: m.vel, acc: m.acc, slide: m.slide, live: m.live, leg: m.leg, rt: m.rt, id: m.id === undefined ? -1 : m.id };
   }
 
   /**
@@ -512,6 +514,7 @@ class A4Voice extends AudioWorkletProcessor {
     if (this.cutLeft > 0) { this.cutLeft = 0; this.silence(); }
     const wasGate = this.gate;
     this.note = ev.note;
+    this.noteId = ev.id;
     this.vel = Math.max(1, ev.vel) / 127;
     this.acc = ev.acc ? 1 : 0;
     const prt = P[I.snd_prt];
@@ -1029,7 +1032,7 @@ class A4Voice extends AudioWorkletProcessor {
       if (ev.t === 'at') { const l = ev.list; for (let k = 0; k < l.length; k += 2) P[l[k]] = l[k + 1]; }
       else if (ev.t === 'on') this.noteOn(ev, now);
       else if (ev.t === 'rtrg') { this.retrig(ev.rt, now); this.idle = false; }
-      else if (ev.t === 'off') { if (!A4Voice.legatoNext(q, ev.time)) this.noteOff(); }
+      else if (ev.t === 'off') { if ((ev.id < 0 || ev.id === this.noteId) && !A4Voice.legatoNext(q, ev.time)) this.noteOff(); }
       else if (ev.t === 'ramp') { const l = ev.list; for (let k = 0; k < l.length; k += 3) this.ramps.push({ i: l[k], from: l[k + 1], to: l[k + 2], t0: ev.time, t1: ev.t1 }); }
     }
   }

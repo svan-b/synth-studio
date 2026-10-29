@@ -82,6 +82,11 @@ export type TempoMode = 'project' | 'pattern';
 /** TEMP JUMP state: armed ([FUNC] + [BANK D]), active (the jumped-to pattern plays), off */
 export type TempJumpState = 'off' | 'armed' | 'active';
 
+/** Notes a chord trig can hold: the Analog Four plays up to four on one track (A4 MKII manual p.28) */
+export const CHORD_MAX = 4;
+/** Largest chord offset from a trig's note, in semitones */
+export const CHORD_SPAN = 48;
+
 /** Most different parameters a pattern can lock: Analog Four 128 (A4 MKII manual p.50), Analog Rytm 72 (Rytm MKII manual p.47) */
 export const LOCK_LIMIT_A4 = 128;
 export const LOCK_LIMIT_RYTM = 72;
@@ -229,6 +234,12 @@ export interface Step {
   trigless?: true;
   /** MIDI note 0..127 (Rytm: pitch offset around the track's default) */
   note?: number;
+  /**
+   * Chord trig (Analog Four POLY): the trig's further notes, as semitone offsets from `note`
+   * (non-zero, unique, -48..48; at most CHORD_MAX - 1 of them). A track playing polyphonically
+   * sounds them together with `note`; a mono track plays `note` alone (A4 MKII manual p.28, p.42).
+   */
+  chord?: number[];
   /** Velocity 1..127 */
   vel?: number;
   /** Note length, index into NOTE_LENGTHS */

@@ -23,6 +23,16 @@
 // sequenced but has no outputs (rear-panel jacks are not in the twin).
 // Track mutes live in the project (Project.mutes, applied by the sequencer).
 //
+// POLY (manual p.28-31): voices ticked in POLY CONFIG form a pool shared by
+// their tracks. A poly track's notes (chord trigs, overlapping trigs, keys,
+// arpeggios) each take a pool voice by the allocation method (RESET, ROTATE,
+// REASSIGN; UNISON plays them all), stealing the least recently used one when
+// none is free. The voice loads the playing track's sound (or keeps its own
+// with USE TRK SOUNDS) and the trig's locks at the note's audio time; knob
+// turns reach every voice that holds that track's sound. Poly notes carry ids,
+// so a stolen voice ignores its old note's note-off. Voices out of the pool, and
+// everything with POLY off, run the mono code paths unchanged.
+//
 // Transport (manual p.38-39): [PLAY] starts, [PLAY] while playing pauses
 // (sounding notes are released) and [PLAY] again resumes (the kit's pressPlay:
 // seq:pause / seq:resume); [STOP] stops and cuts the voices while the send
@@ -35,11 +45,11 @@ import type { ControlValue } from '@/types';
 import { BaseEngine } from '@/lib/audio/engine';
 import type { Transport } from '@/lib/audio/transport';
 import {
-  ElektronSequencer, LockTracker, NOTE_LENGTHS, asProject, getPattern, type TrigEvent,
+  ElektronSequencer, LockTracker, NOTE_LENGTHS, asProject, getPattern, getStep, trigNotes, type Locks, type TrigEvent,
 } from '@/lib/sequencer/elektron';
 import {
-  CV_TRACK, FX_BY_KEY, FX_DESTS, FX_KEYS, FX_TRACK, MOD_DESTS, PERF_MACROS, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS,
-  VOICE_KEYS,
+  ARP_PLY, CV_TRACK, FX_BY_KEY, FX_DESTS, FX_KEYS, FX_TRACK, MOD_DESTS, PERF_MACROS, POLY_UNISON, SEQ_TRACKS, SYNTH_BY_KEY,
+  SYNTH_TRACKS, VOICE_KEYS,
 } from './params';
 import { ARP_KEYS, patternArp, type ArpKey } from './arp';
 
@@ -49,6 +59,18 @@ const FI: Record<string, number> = Object.fromEntries(FX_KEYS.map((k, i) => [k, 
 const KB_C1 = 72;
 /** OSC 2 WAV index of NEI: the previous track's multimode filter output (manual p.73) */
 const NEI_WAVE = 6;
+const EMPTY_LOCKS: Readonly<Locks> = Object.freeze({});
+const clampNote = (n: number) => Math.max(0, Math.min(127, Math.round(n)));
+
+/** A poly voice's latest note: its id, the track that played it, when it started and ends (Infinity: held) */
+interface Booking { id: number; track: number; note: number; on: number; end: number; live: boolean }
+/**
+ * What a poly voice's parameters hold from `time` on: the sound of track `owner`, the playing
+ * trig's `locks`, and the UNISON position `uni` (-1 .. 1 across the pool; NaN = not in unison)
+ */
+interface Seg { time: number; owner: number; locks: Readonly<Locks>; uni: number }
+/** Voice parameters a UNISON position offsets: both oscillators' TUN (detune) and PAN (spread) */
+const UNI_KEYS = ['osc1_tun', 'osc2_tun', 'amp_pan'];
 
 
 /** a4-fxmod output channels driving the shared processors (must match the worklet) */
@@ -123,6 +145,11 @@ interface ArpState {
   accent: boolean;
   live: boolean;
   lastNote: number;
+  /** The trig's locks (poly voices load them with each arpeggio note) */
+  locks: Readonly<Locks>;
+  /** POLY: the voices and note ids of the sounding arpeggio note (null on a mono track) */
+  pv: number[] | null;
+  pid: number[];
 }
 
 export class AnalogFourEngine extends BaseEngine {
@@ -151,6 +178,8 @@ export class AnalogFourEngine extends BaseEngine {
   private lastStep: { step: number; time: number }[] = [];
   private transportUnsub: (() => void) | null = null;
   private recSerial = 0;
+  /** LIVE RECORDING: the step each track's last recorded note went to (POLY chords) */
+  private lastRec: ({ step: number; pattern: string } | null)[] = [null, null, null, null];
   /** The audition in progress (a preview): its stop */
   private auditionEnd: (() => void) | null = null;
   private fxFaded = false;
@@ -160,6 +189,39 @@ export class AnalogFourEngine extends BaseEngine {
   private feedOn = [false, false, false];
   /** The playing trig of each synth track locks OSC 2 WAV to NEI */
   private neiLock = [false, false, false, false];
+  /** The mono tracks want voice t running for track t+1's NEI (feedOn is what the voices were told) */
+  private feedNeed = [false, false, false];
+
+  // --- POLY (manual p.28-31) ---------------------------------------------------
+  /** POLY CONFIG: the voices in the pool (a track whose voice is in it plays polyphonically) */
+  private pool = [false, false, false, false];
+  private poolVoices: number[] = [];
+  /** ALLOCATION: 0 RESET, 1 ROTATE, 2 REASSIGN, 3 UNISON */
+  private alloc = 0;
+  /** USE TRK SOUNDS: each voice keeps its own track's sound */
+  private trkSounds = false;
+  private uniDet = 16;
+  private uniSpr = 64;
+  private book: Booking[] = [0, 1, 2, 3].map(v => ({ id: 0, track: v, note: -1, on: -Infinity, end: -Infinity, live: false }));
+  /** Per voice, in time order: what its parameters hold (the last one before now is in effect) */
+  private segs: Seg[][] = [0, 1, 2, 3].map(v => [{ time: -Infinity, owner: v, locks: EMPTY_LOCKS, uni: NaN }]);
+  private nextNoteId = 1;
+  /** ROTATE: the voice the last note took */
+  private rotPos = -1;
+  /** REASSIGN: the voice each note (MIDI number) had last time */
+  private lastVoiceOf = new Int8Array(128).fill(-1);
+  /** Each poly track's last trig: its voices and note ids (a note slide takes them over) */
+  private lastTrig: { voices: number[]; ids: number[] }[] = [0, 1, 2, 3].map(() => ({ voices: [], ids: [] }));
+  /** Keys held on poly tracks ('track:note'), and UNISON's sounding key per track */
+  private polyKeys = new Map<string, { voices: number[]; ids: number[] }>();
+  private uniLive: ({ voices: number[]; ids: number[] } | null)[] = [null, null, null, null];
+  /** A poly voice needs its neighbour running (its sound takes OSC 2 from it, WAV NEI) */
+  private feedPoly = [false, false, false];
+  /** Knob turns for poly voices, scheduled per voice and time ('at' messages) */
+  private pendingAt = new Map<number, Map<number, number[]>>();
+  /** POLY CONFIG open: the voices' activity for the TRIG 1-4 LEDs (manual p.29) */
+  private watchTimer: ReturnType<typeof setInterval> | null = null;
+  private lastAct = '';
 
   // --------------------------------------------------------------------------
 
@@ -256,6 +318,7 @@ export class AnalogFourEngine extends BaseEngine {
           for (let t = 0; t < SYNTH_TRACKS; t++) {
             if (this.liveNote[t] !== null || this.arps[t]?.live) continue;
             this.arps[t] = null;
+            if (this.pool[t]) continue; // poly voices: polyStop
             this.voices[t].port.postMessage({ t: 'cut' });
           }
           // ... after the A4's own [STOP] key or the end of its song. A studio stop (the transport, or
@@ -263,6 +326,7 @@ export class AnalogFourEngine extends BaseEngine {
           const studioStop = this.transport ? !this.transport.playing : !this.bool('play');
           if (studioStop && now - this.stopKeyAt > 0.6) this.fadeFx(STUDIO_STOP_FADE_SEC);
         }
+        if (this.poolVoices.length) this.polyStop(now, this.seq.isPaused);
         this.locks.releaseAll((track, key) => this.revert(track, key, now));
       },
     });
@@ -273,6 +337,7 @@ export class AnalogFourEngine extends BaseEngine {
       this.seq.dispose();
       this.transportUnsub?.();
       if (this.arpTimer) clearInterval(this.arpTimer);
+      if (this.watchTimer) clearInterval(this.watchTimer);
       [...this.voices, this.fxmod, this.fx, this.chorus, this.reverb].forEach(n => { try { n.disconnect(); n.port.close(); } catch { /* */ } });
     });
     this.emit({ playing: false, seq: this.seq.getState(), kbTrack: this.lastSynth });
@@ -296,6 +361,23 @@ export class AnalogFourEngine extends BaseEngine {
     this.flushQueued = false;
     this.pending.forEach((list, port) => port.postMessage({ t: 'p', list }));
     this.pending.clear();
+    if (this.pendingAt.size) {
+      this.pendingAt.forEach((m, u) => m.forEach((list, time) => this.voices[u].port.postMessage({ t: 'at', time, list })));
+      this.pendingAt.clear();
+    }
+  }
+
+  /** A poly voice's parameter at an audio time (batched like queue()) */
+  private queueAt(u: number, time: number, i: number, v: number) {
+    let m = this.pendingAt.get(u);
+    if (!m) { m = new Map(); this.pendingAt.set(u, m); }
+    let l = m.get(time);
+    if (!l) { l = []; m.set(time, l); }
+    l.push(i, v);
+    if (!this.flushQueued) {
+      this.flushQueued = true;
+      queueMicrotask(() => this.flush());
+    }
   }
 
   private bpm(): number {
@@ -325,6 +407,8 @@ export class AnalogFourEngine extends BaseEngine {
       if (i === undefined) return;
       this.base[t][i] = v;
       if (key === 'osc2_wav') this.updateFeed(t);
+      // a poly track's sound can be on any pool voice: every voice holding it gets the change
+      if (this.pool[t]) { this.polyParam(t, i, key); return; }
       if (this.locks.isLocked(t, key)) return; // the playing trig holds a lock for it
       this.queue(this.voices[t], i, v);
       return;
@@ -340,6 +424,7 @@ export class AnalogFourEngine extends BaseEngine {
       return;
     }
     if (/^perf_/.test(id)) { this.applyPerf(); return; }
+    if (id.startsWith('poly_')) { this.polyConfig(); return; }
     switch (id) {
       case 'tempo':
         this.seq.setTempo(v);
@@ -414,10 +499,16 @@ export class AnalogFourEngine extends BaseEngine {
   /** Track t uses OSC 2 WAV NEI (its own value or the playing trig's lock): the voice before it must keep running */
   private updateFeed(t: number) {
     if (t < 1 || t >= SYNTH_TRACKS) return;
-    const on = Math.round(this.base[t][VI.osc2_wav]) === NEI_WAVE || this.neiLock[t];
-    if (on === this.feedOn[t - 1]) return;
-    this.feedOn[t - 1] = on;
-    this.voices[t - 1].port.postMessage({ t: 'feed', v: on });
+    this.feedNeed[t - 1] = Math.round(this.base[t][VI.osc2_wav]) === NEI_WAVE || this.neiLock[t];
+    this.postFeed(t - 1);
+  }
+
+  /** Voice k keeps running for its neighbour while a mono track or a poly voice needs it */
+  private postFeed(k: number) {
+    const on = this.feedNeed[k] || this.feedPoly[k];
+    if (on === this.feedOn[k]) return;
+    this.feedOn[k] = on;
+    this.voices[k].port.postMessage({ t: 'feed', v: on });
   }
 
   private revert(track: number, key: string, time: number) {
@@ -461,6 +552,7 @@ export class AnalogFourEngine extends BaseEngine {
       if (!e.trigless) this.fxmod.port.postMessage({ t: 'trig', time: e.time });
       return;
     }
+    if (this.pool[t]) { this.polyTrig(e); return; }
     const v = this.voices[t];
     if (!v) return;
     const list: number[] = [];
@@ -512,6 +604,9 @@ export class AnalogFourEngine extends BaseEngine {
   private gateOff(track: number, time: number) {
     if (track >= SYNTH_TRACKS) return;
     if (this.arps[track] && !this.arps[track]!.live) { this.stopArp(track, time); return; }
+    // a poly track's notes overlap: each ends on its own LEN (polyTrig schedules it), and a stop or
+    // pause releases them (polyStop)
+    if (this.pool[track]) return;
     if (this.liveNote[track] !== null) return; // a held key owns the voice
     this.voices[track].port.postMessage({ t: 'off', time });
   }
@@ -535,11 +630,14 @@ export class AnalogFourEngine extends BaseEngine {
     return (['arp_n2', 'arp_n3', 'arp_n4'] as const).map(k => Math.round(this.arpVal(t, k))).filter(o => o > 0);
   }
 
-  private startArp(t: number, notes: number[], time: number, duration: number, vel: number, accent: boolean, live: boolean) {
+  private startArp(t: number, notes: number[], time: number, duration: number, vel: number, accent: boolean, live: boolean, locks: Readonly<Locks> = EMPTY_LOCKS) {
     const uniq = notes.filter((n, i) => notes.indexOf(n) === i);
+    // a poly track's previous arpeggio ends where this one starts (one arpeggiator per track)
+    const old = this.arps[t];
+    if (old?.pv) this.polyRelease(old.pv, old.pid, time);
     const st: ArpState = {
       notes: uniq, order: [], idx: 0, oct: 0, next: time, end: duration === Infinity ? time + 32 * (60 / this.bpm() / 4) : time + duration,
-      dir: 1, vel, accent, live, lastNote: uniq[0],
+      dir: 1, vel, accent, live, lastNote: uniq[0], locks, pv: this.pool[t] ? [] : null, pid: [],
     };
     if (live) st.end = Infinity;
     st.order = this.arpOrder(t, st);
@@ -552,7 +650,8 @@ export class AnalogFourEngine extends BaseEngine {
     const st = this.arps[t];
     if (!st) return;
     st.end = Math.min(st.end, time);
-    this.voices[t].port.postMessage({ t: 'off', time: Math.max(time, this.ctx.currentTime) });
+    if (st.pv) this.polyRelease(st.pv, st.pid, Math.max(time, this.ctx.currentTime));
+    else this.voices[t].port.postMessage({ t: 'off', time: Math.max(time, this.ctx.currentTime) });
     this.arps[t] = null;
   }
 
@@ -565,6 +664,9 @@ export class AnalogFourEngine extends BaseEngine {
       case 3: return sorted.reverse();                                // DWN
       case 4: return sorted.length > 2 ? [...sorted, ...sorted.slice(1, -1).reverse()] : sorted; // CYC
       case 5: { const s = [...sorted]; for (let i = s.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [s[i], s[j]] = [s[j], s[i]]; } return s; } // SHF
+      // PLY: the whole chord is one arpeggio step, so each step climbs an octave (manual p.43); a mono
+      // track plays the chord's first note
+      case ARP_PLY: return [st.notes[0]];
       default: return sorted;                                         // RND picks per note
     }
   }
@@ -591,15 +693,26 @@ export class AnalogFourEngine extends BaseEngine {
         }
         const base = mode === 6 ? st.notes[Math.floor(Math.random() * st.notes.length)] : st.order[st.idx];
         const note = Math.max(0, Math.min(127, base + 12 * st.oct));
-        v.port.postMessage({ t: 'on', time: st.next, note, vel: st.vel, acc: st.accent ? 1 : 0, slide: false, leg: legato, live: legato });
         const off = st.next + (legato ? Math.max(nlen, period * 1.02) : Math.min(nlen, period * 0.98));
-        if (!legato || off >= st.end) v.port.postMessage({ t: 'off', time: Math.min(off, st.end) });
+        if (st.pv) {
+          // POLY: each arpeggio note takes a pool voice (PLY: the whole chord); legato keeps the voices
+          const chord = mode === ARP_PLY ? st.notes.map(n => clampNote(n + 12 * st.oct)) : [note];
+          const last = !legato || off >= st.end;
+          const r = this.polyPlay(t, chord, st.next, last ? Math.min(off, st.end) : Infinity, {
+            vel: st.vel, acc: st.accent, slide: false, leg: legato, live: legato, locks: st.locks, prefer: legato && st.pv.length ? st.pv : null, postOff: last,
+          });
+          st.pv = r.voices; st.pid = r.ids;
+        } else {
+          v.port.postMessage({ t: 'on', time: st.next, note, vel: st.vel, acc: st.accent ? 1 : 0, slide: false, leg: legato, live: legato });
+          if (!legato || off >= st.end) v.port.postMessage({ t: 'off', time: Math.min(off, st.end) });
+        }
         st.lastNote = note;
         st.idx++;
         st.next += period;
       }
       if (st.next >= st.end && st.end !== Infinity) {
-        v.port.postMessage({ t: 'off', time: st.end });
+        if (st.pv) this.polyRelease(st.pv, st.pid, st.end);
+        else v.port.postMessage({ t: 'off', time: st.end });
         this.arps[t] = null;
       }
     }
@@ -654,6 +767,7 @@ export class AnalogFourEngine extends BaseEngine {
       else this.startArp(t, notes, time, Infinity, vel, false, true);
       return;
     }
+    if (this.pool[t]) { this.polyKeyOn(t, n, vel, time); return; }
     this.liveNote[t] = n;
     this.voices[t].port.postMessage({ t: 'on', time, note: n, vel, acc: 0, slide: false, live: true });
   }
@@ -671,6 +785,7 @@ export class AnalogFourEngine extends BaseEngine {
         else { st.notes = [...held]; st.order = this.arpOrder(t, st); }
         continue;
       }
+      if (this.pool[t]) { this.polyKeyOff(t, note, time); continue; }
       if (held.length) {
         // last-note priority: return to the previous held key (legato)
         const prev = held[held.length - 1];
@@ -696,7 +811,14 @@ export class AnalogFourEngine extends BaseEngine {
     const next = frac > 0.5;
     const step = next ? ls.step + 1 : ls.step;
     const micro = Math.max(-23, Math.min(23, Math.round((next ? frac - 1 : frac) * 24)));
-    this.emit({ recNote: { id: ++this.recSerial, track: t, note, vel, step, micro, pattern: st.pattern } });
+    // POLY: a key pressed while another is held, on the same step, joins that trig's chord
+    let add = false;
+    if (this.pool[t] && this.held[t].length > 1) {
+      const lr = this.lastRec[t];
+      add = !!lr && lr.step === step && lr.pattern === st.pattern;
+    }
+    this.lastRec[t] = { step, pattern: st.pattern };
+    this.emit({ recNote: { id: ++this.recSerial, track: t, note, vel, step, micro, pattern: st.pattern, add } });
   }
 
   event(name: string, payload?: unknown): void {
@@ -708,7 +830,10 @@ export class AnalogFourEngine extends BaseEngine {
       case 'kb:off': this.liveOff(KB_C1 + 12 * this.octave() + (p.offset ?? 0)); break;
       case 'panic':
         for (let t = 0; t < SYNTH_TRACKS; t++) { this.held[t] = []; this.liveNote[t] = null; this.stopArp(t, this.ctx.currentTime); this.voices[t].port.postMessage({ t: 'reset' }); }
+        this.polyReset();
         break;
+      // POLY CONFIG open / closed: report the voices' activity for the TRIG 1-4 LEDs (manual p.29)
+      case 'a4:poly-watch': this.setWatch(!!(payload as { on?: boolean } | undefined)?.on); break;
       // [STOP][STOP] while stopped: the send effects fade out (manual p.38)
       case 'a4:fxfade': this.fadeFx(); break;
       // the A4's own [STOP] key: the stop it causes lets the send effects ring (manual p.38)
@@ -716,6 +841,357 @@ export class AnalogFourEngine extends BaseEngine {
       case 'a4:audition': this.startAudition(); break;
       case 'a4:audition:stop': this.auditionEnd?.(); break;
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // POLY (manual p.28-31)
+  // --------------------------------------------------------------------------
+
+  /** POLY CONFIG changed ([FUNC] + [MIX], a kit, a lesson): a new pool starts from silence */
+  private polyConfig() {
+    const pool = [1, 2, 3, 4].map(n => this.bool(`poly_v${n}`));
+    const alloc = Math.max(0, Math.min(POLY_UNISON, Math.round(this.num('poly_alloc', 0))));
+    const trk = this.bool('poly_trk');
+    const det = this.num('poly_det', 16), spr = this.num('poly_spr', 64);
+    const uniMoved = det !== this.uniDet || spr !== this.uniSpr;
+    this.uniDet = det;
+    this.uniSpr = spr;
+    if (pool.every((x, i) => x === this.pool[i]) && alloc === this.alloc && trk === this.trkSounds) {
+      if (uniMoved) this.retuneUnison();
+      return;
+    }
+    const now = this.ctx.currentTime;
+    const touched = [0, 1, 2, 3].filter(v => pool[v] || this.pool[v]);
+    this.pool = pool;
+    this.alloc = alloc;
+    this.trkSounds = trk;
+    this.poolVoices = [0, 1, 2, 3].filter(v => pool[v]);
+    this.rotPos = -1;
+    this.lastVoiceOf.fill(-1);
+    this.polyKeys.clear();
+    // Every voice the old or the new pool holds is cut (nothing it had queued may sound) and goes
+    // back to its own track's sound; those tracks start without held keys, arpeggios or locks
+    for (const v of touched) {
+      const node = this.voices[v];
+      node.port.postMessage({ t: 'cut' });
+      this.held[v] = [];
+      this.liveNote[v] = null;
+      this.arps[v] = null;
+      this.uniLive[v] = null;
+      this.arpLock[v] = {};
+      this.locks.release(v, () => undefined);
+      this.neiLock[v] = false;
+      const b = this.book[v];
+      b.id = 0; b.end = -Infinity; b.live = false;
+      this.lastTrig[v] = { voices: [], ids: [] };
+      this.segs[v] = [{ time: now, owner: v, locks: EMPTY_LOCKS, uni: NaN }];
+      const list: number[] = [];
+      for (let i = 0; i < VOICE_KEYS.length; i++) list.push(i, this.base[v][i]);
+      node.port.postMessage({ t: 'at', time: now, list });
+    }
+    this.feedPoly.fill(false);
+    for (let t = 1; t < SYNTH_TRACKS; t++) this.updateFeed(t);
+    for (let k = 0; k < 3; k++) this.postFeed(k);
+  }
+
+  /** Panic: forget every poly note */
+  private polyReset() {
+    this.polyKeys.clear();
+    this.uniLive.fill(null);
+    for (const b of this.book) { b.id = 0; b.end = -Infinity; b.live = false; }
+    this.lastTrig = [0, 1, 2, 3].map(() => ({ voices: [], ids: [] }));
+  }
+
+  /** A voice parameter for a segment: the owner's sound, the trig's lock, the UNISON offset */
+  private segValue(s: Seg, i: number): number {
+    const key = VOICE_KEYS[i];
+    const l = s.locks[key];
+    let v = l !== undefined ? l : this.base[s.owner][i];
+    if (s.uni === s.uni) {
+      if (key === 'osc1_tun' || key === 'osc2_tun') v += (s.uni * this.uniDet) / 128;
+      else if (key === 'amp_pan') v = Math.max(-64, Math.min(63, v + (s.uni * this.uniSpr * 64) / 127));
+    }
+    return v;
+  }
+
+  /** The segment of voice u in effect at `time` (index), -1 when none */
+  private segAt(u: number, time: number): number {
+    const segs = this.segs[u];
+    let k = segs.length - 1;
+    while (k >= 0 && segs[k].time > time + 1e-9) k--;
+    return k;
+  }
+
+  /**
+   * From `time` on, voice u plays a note of `track`: it loads that track's sound (its own with USE
+   * TRK SOUNDS), the trig's `locks` and the UNISON position `uni` - the whole sound when the owner
+   * changes, else only what the locks and the position change
+   */
+  private loadVoice(u: number, track: number, locks: Readonly<Locks>, time: number, uni: number) {
+    const owner = this.trkSounds ? u : track;
+    const segs = this.segs[u];
+    // segments long past are dropped (the last one before now stays in effect)
+    const now = this.ctx.currentTime;
+    while (segs.length > 1 && segs[1].time <= now - 0.25) segs.shift();
+    const k = this.segAt(u, time);
+    const prev = k >= 0 ? segs[k] : null;
+    const seg: Seg = { time, owner, locks, uni };
+    const list: number[] = [];
+    if (!prev || prev.owner !== owner || k < segs.length - 1) {
+      for (let i = 0; i < VOICE_KEYS.length; i++) list.push(i, this.segValue(seg, i));
+    } else {
+      const keys = new Set<number>();
+      for (const key in prev.locks) { const i = VI[key]; if (i !== undefined) keys.add(i); }
+      for (const key in locks) { const i = VI[key]; if (i !== undefined) keys.add(i); }
+      if (!Object.is(prev.uni, uni)) for (const key of UNI_KEYS) keys.add(VI[key]);
+      keys.forEach(i => list.push(i, this.segValue(seg, i)));
+    }
+    segs.splice(k + 1, 0, seg);
+    if (list.length) this.voices[u].port.postMessage({ t: 'at', time, list });
+    // a sound that takes OSC 2 from the voice before (WAV NEI) keeps that voice running (manual p.73)
+    if (u >= 1) {
+      const nei = Math.round(this.segValue(seg, VI.osc2_wav)) === NEI_WAVE;
+      if (nei !== this.feedPoly[u - 1]) { this.feedPoly[u - 1] = nei; this.postFeed(u - 1); }
+    }
+  }
+
+  /** A knob of poly track t moved: every voice that holds (or will hold) t's sound follows, except where a trig locks it */
+  private polyParam(t: number, i: number, key: string) {
+    const now = this.ctx.currentTime;
+    for (const u of this.poolVoices) {
+      const segs = this.segs[u];
+      for (let k = Math.max(0, this.segAt(u, now)); k < segs.length; k++) {
+        const s = segs[k];
+        if (s.owner !== t || key in s.locks) continue;
+        this.queueAt(u, Math.max(s.time, now), i, this.segValue(s, i));
+      }
+    }
+  }
+
+  /** UNISON DETUNE / PAN SPREAD moved: the voices in unison retune at once */
+  private retuneUnison() {
+    const now = this.ctx.currentTime;
+    for (const u of this.poolVoices) {
+      const segs = this.segs[u];
+      for (let k = Math.max(0, this.segAt(u, now)); k < segs.length; k++) {
+        const s = segs[k];
+        if (s.uni !== s.uni) continue;
+        for (const key of UNI_KEYS) this.queueAt(u, Math.max(s.time, now), VI[key], this.segValue(s, VI[key]));
+      }
+    }
+  }
+
+  /** Is poly voice u free at `time`: its note has ended and no later one is booked on it */
+  private voiceFree(u: number, time: number): boolean {
+    const b = this.book[u];
+    return b.end <= time + 1e-9 && b.on <= time + 1e-9;
+  }
+
+  /**
+   * Pool voices for `notes` of `track` at `time` (manual p.29-31). RESET: the first free voice
+   * counting up from the track's own voice. ROTATE: the next free voice after the last one used.
+   * REASSIGN: the voice the note had last time when it is free, else the free voice used least
+   * recently. No free voice: the least recently used one is stolen. UNISON: every pool voice.
+   * `prefer` (a note slide, a legato arpeggio) takes those voices first.
+   */
+  private allocVoices(track: number, notes: number[], time: number, prefer: number[] | null): number[] {
+    const pool = this.poolVoices;
+    if (!pool.length) return [];
+    if (this.alloc === POLY_UNISON) return pool.slice();
+    const out: number[] = [];
+    const lru = (ok: (u: number) => boolean) => {
+      let pick = -1;
+      for (const u of pool) if (ok(u) && (pick < 0 || this.book[u].on < this.book[pick].on)) pick = u;
+      return pick;
+    };
+    for (let k = 0; k < notes.length && out.length < pool.length; k++) {
+      const note = notes[k];
+      const free = (u: number) => !out.includes(u) && this.voiceFree(u, time);
+      let pick = -1;
+      if (prefer && k < prefer.length && pool.includes(prefer[k]) && !out.includes(prefer[k])) pick = prefer[k];
+      else if (this.alloc === 0 || this.alloc === 1) {
+        const start = this.alloc === 0 ? Math.max(0, pool.indexOf(track)) : pool.indexOf(this.rotPos) + 1;
+        for (let j = 0; j < pool.length && pick < 0; j++) { const u = pool[(start + j) % pool.length]; if (free(u)) pick = u; }
+      } else {
+        const last = this.lastVoiceOf[note];
+        pick = last >= 0 && pool.includes(last) && free(last) ? last : lru(free);
+      }
+      if (pick < 0) pick = lru(u => !out.includes(u));
+      if (pick < 0) break;
+      out.push(pick);
+      if (this.alloc === 1) this.rotPos = pick;
+    }
+    return out;
+  }
+
+  /**
+   * Play `notes` on poly track `track` from `time` until `end` (Infinity: until released): a trig's
+   * note and chord, an arpeggio step, a key. UNISON plays the first note on every pool voice, each
+   * detuned and panned by its place in the pool. Returns the voices and the note ids.
+   */
+  private polyPlay(track: number, notes: number[], time: number, end: number, o: {
+    vel: number; acc: boolean; slide: boolean; rt?: number; leg: boolean; live: boolean; locks: Readonly<Locks>; prefer: number[] | null; postOff: boolean;
+  }): { voices: number[]; ids: number[] } {
+    const unison = this.alloc === POLY_UNISON;
+    const list = unison ? notes.slice(0, 1) : notes;
+    const voices = this.allocVoices(track, list, time, o.prefer);
+    const ids: number[] = [];
+    const n = this.poolVoices.length;
+    voices.forEach((u, k) => {
+      const note = unison ? list[0] : list[k];
+      const uni = unison ? (n > 1 ? (2 * this.poolVoices.indexOf(u)) / (n - 1) - 1 : 0) : NaN;
+      this.loadVoice(u, track, o.locks, time, uni);
+      const id = this.nextNoteId++;
+      const on: Record<string, unknown> = { t: 'on', time, note, vel: o.vel, acc: o.acc ? 1 : 0, slide: o.slide, leg: o.leg, live: o.live, id };
+      if (o.rt !== undefined) on.rt = o.rt;
+      this.voices[u].port.postMessage(on);
+      if (o.postOff && end !== Infinity) this.voices[u].port.postMessage({ t: 'off', time: end, id });
+      const b = this.book[u];
+      b.id = id; b.track = track; b.note = note; b.on = time; b.end = end; b.live = o.live && end === Infinity;
+      if (!unison) this.lastVoiceOf[note] = u;
+      ids.push(id);
+    });
+    return { voices, ids };
+  }
+
+  /** End poly notes (voice, id) at `time`; a voice another note has taken ignores it */
+  private polyRelease(voices: number[], ids: number[], time: number) {
+    voices.forEach((u, k) => {
+      this.voices[u].port.postMessage({ t: 'off', time, id: ids[k] });
+      const b = this.book[u];
+      if (b.id === ids[k]) { b.end = Math.min(b.end, time); b.live = false; }
+    });
+  }
+
+  /** A sequencer trig on a poly track: its notes (a chord trig plays them all), locks and slides on the voices it takes */
+  private polyTrig(e: TrigEvent) {
+    const t = e.track;
+    // NO2-NO4 locks belong to this trig: the next one replaces them
+    const arpL: Partial<Record<ArpKey, number>> = {};
+    for (const k in e.locks) if ((ARP_KEYS as readonly string[]).includes(k)) arpL[k as ArpKey] = e.locks[k];
+    this.arpLock[t] = arpL;
+    const sw = (k: string, d: number) => { const x = e.locks[k]; return x === undefined ? d : x >= 0.5 ? 1 : 0; };
+    if (e.trigless) {
+      // a lock trig changes the sound of the voices playing this track's notes
+      const rt = sw('trig_envf', 0) | (sw('trig_env2', 0) << 1) | (sw('trig_lfo1', 0) << 2) | (sw('trig_lfo2', 0) << 3);
+      const voices: number[] = [];
+      for (const u of this.poolVoices) {
+        const b = this.book[u];
+        if (b.track !== t || b.on > e.time + 1e-9) continue;
+        const k = this.segAt(u, e.time);
+        const prev = k >= 0 ? this.segs[u][k] : null;
+        this.loadVoice(u, t, { ...(prev?.locks ?? {}), ...e.locks }, e.time, prev ? prev.uni : NaN);
+        if (rt) this.voices[u].port.postMessage({ t: 'rtrg', time: e.time, rt });
+        voices.push(u);
+      }
+      this.polySlide(e, voices);
+      return;
+    }
+    const rt = sw('trig_envf', 1) | (sw('trig_env2', 1) << 1) | (sw('trig_lfo1', 1) << 2) | (sw('trig_lfo2', 1) << 3);
+    const step = getStep(asProject(this.data, SEQ_TRACKS), e.pattern, t, e.step);
+    const notes = trigNotes(step, e.note + Math.round(this.num('trns', 0)));
+    this.arpPattern[t] = e.pattern;
+    if (this.arpOn(t)) {
+      this.startArp(t, [...notes, ...this.arpOffsets(t).map(o => notes[0] + o)], e.time, e.duration, e.velocity, e.accent, false, e.locks);
+      return;
+    }
+    const end = e.duration === Infinity ? Infinity : e.time + e.duration;
+    const r = this.polyPlay(t, notes, e.time, end, {
+      vel: e.velocity, acc: e.accent, slide: e.slide, rt, leg: this.arpVal(t, 'arp_leg') >= 0.5, live: false, locks: e.locks,
+      prefer: e.slide ? this.lastTrig[t].voices : null, postOff: true,
+    });
+    this.lastTrig[t] = r;
+    this.polySlide(e, r.voices);
+  }
+
+  /** A parameter slide on poly voices: this trig's values glide to the next trig's */
+  private polySlide(e: TrigEvent, voices: number[]) {
+    if (!e.paramSlide || !e.slideTo || !voices.length) return;
+    const to = e.slideTo;
+    const keys = new Set([...Object.keys(e.locks), ...Object.keys(to.locks)]);
+    for (const u of voices) {
+      const k = this.segAt(u, e.time);
+      const s = k >= 0 ? this.segs[u][k] : null;
+      if (!s) continue;
+      const ramp: number[] = [];
+      keys.forEach(key => {
+        const i = VI[key];
+        if (i === undefined) return;
+        ramp.push(i, this.segValue({ ...s, locks: e.locks }, i), this.segValue({ ...s, locks: to.locks }, i));
+      });
+      if (ramp.length) this.voices[u].port.postMessage({ t: 'ramp', time: e.time, t1: to.time, list: ramp });
+    }
+  }
+
+  /** A key on a poly track: a voice of its own (UNISON: every voice, the last key wins) */
+  private polyKeyOn(t: number, n: number, vel: number, time: number) {
+    const opts = { vel, acc: false, slide: false, leg: false, live: true, locks: EMPTY_LOCKS, prefer: null, postOff: false };
+    if (this.alloc === POLY_UNISON) { this.uniLive[t] = this.polyPlay(t, [n], time, Infinity, opts); return; }
+    const prev = this.polyKeys.get(`${t}:${n}`);
+    if (prev) this.polyRelease(prev.voices, prev.ids, time);
+    this.polyKeys.set(`${t}:${n}`, this.polyPlay(t, [n], time, Infinity, opts));
+  }
+
+  /** A key on a poly track released (`held`: the keys still down on it) */
+  private polyKeyOff(t: number, n: number, time: number) {
+    if (this.alloc === POLY_UNISON) {
+      const cur = this.uniLive[t];
+      if (!cur) return;
+      const held = this.held[t];
+      if (held.length) {
+        // back to the last key still held, like a mono track
+        this.uniLive[t] = this.polyPlay(t, [held[held.length - 1]], time, Infinity, {
+          vel: this.trackVel(t), acc: false, slide: false, leg: false, live: true, locks: EMPTY_LOCKS, prefer: null, postOff: false,
+        });
+      } else {
+        this.polyRelease(cur.voices, cur.ids, time);
+        this.uniLive[t] = null;
+      }
+      return;
+    }
+    const r = this.polyKeys.get(`${t}:${n}`);
+    if (!r) return;
+    this.polyKeys.delete(`${t}:${n}`);
+    this.polyRelease(r.voices, r.ids, time);
+  }
+
+  /**
+   * The sequencer stopped (the poly voices are cut, as [STOP] cuts the sound) or paused (their
+   * sequencer notes are released). Held keys keep playing. Locks end with the stop: each voice
+   * returns to its sound.
+   */
+  private polyStop(now: number, paused: boolean) {
+    for (const u of this.poolVoices) {
+      const b = this.book[u];
+      if (b.live) continue;
+      if (paused) {
+        if (b.end > now) { this.voices[u].port.postMessage({ t: 'off', time: now, id: b.id }); b.end = now; }
+      } else {
+        this.voices[u].port.postMessage({ t: 'cut' });
+        b.end = Math.min(b.end, now);
+        // the cut drops what the voice had queued, so its later segments go too
+        this.segs[u].length = Math.max(0, this.segAt(u, now)) + 1;
+      }
+      const k = this.segAt(u, now);
+      const s = k >= 0 ? this.segs[u][k] : null;
+      if (s && Object.keys(s.locks).length) this.loadVoice(u, s.owner, EMPTY_LOCKS, now, s.uni);
+    }
+  }
+
+  /** POLY CONFIG open: report which pool voices sound (engine state `polyAct`, e.g. '0101'), 25 times a second */
+  private setWatch(on: boolean) {
+    if (on && !this.watchTimer) this.watchTimer = setInterval(() => this.emitActivity(), 40);
+    if (!on && this.watchTimer) { clearInterval(this.watchTimer); this.watchTimer = null; }
+    this.lastAct = '';
+    this.emitActivity();
+  }
+
+  private emitActivity() {
+    const now = this.ctx.currentTime;
+    const act = this.book.map((b, u) => (this.pool[u] && b.on <= now && b.end > now ? '1' : '0')).join('');
+    if (act === this.lastAct) return;
+    this.lastAct = act;
+    this.emit({ polyAct: act });
   }
 
   // --------------------------------------------------------------------------
@@ -755,6 +1231,12 @@ export class AnalogFourEngine extends BaseEngine {
     const v = this.voices[t];
     const stepSec = 60 / this.bpm() / 4;
     const t0 = this.ctx.currentTime + 0.03;
+    if (this.pool[t]) {
+      // a poly track's own voice may hold another track's sound: give it this track's for the riff
+      this.loadVoice(t, t, EMPTY_LOCKS, t0, NaN);
+      const b = this.book[t];
+      b.id = 0; b.track = t; b.on = t0; b.end = t0 + 32 * stepSec; b.live = false;
+    }
     const root = KB_C1 + 12 * this.octave();
     const vel = this.trackVel(t);
     for (const [step, semis, len] of AUDITION_RIFF) {
