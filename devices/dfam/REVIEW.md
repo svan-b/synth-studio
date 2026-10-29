@@ -5,7 +5,8 @@ Moog DFAM Owner's Manual with Patch Sheets (primary source, cited as "M p.N"), t
 review, VoltPages and forum reports. Measurements come from an offline Node harness that runs the
 worklet exactly as the engine drives it, plus Playwright runs of the real app.
 
-Status: **work in progress** (the session was parked). Sections marked *open* were not finished.
+Status: **complete** (finished on `finish/dfam-review`, merged with the integrated framework at
+5878311). The merge gate passes; see "Gate" at the end. The items under "Open" need a hardware unit.
 
 ## Findings and changes
 
@@ -29,6 +30,11 @@ Status: **work in progress** (the session was parked). Sections marked *open* we
 | 16 | Low | VCO FREQUENCY read in octaves; lessons talk about Hz | - | readout in Hz (noon 131 Hz); the f1 "fifth" step now needs 392 Hz +-0.06 oct instead of passing anywhere within a minor third to a minor seventh |
 | 17 | Low | Unit dimensions height/depth swapped | M p.40: 12.57" x 4.21" x 5.24" | fixed |
 | 18 | Low | Buttons drawn green/red with glow; hardware buttons are plain black, RUN has a separate LED | M p.22/p.23 drawings | black caps, grey press feedback, RUN LED only |
+| 19 | High | Presets could fail the merge gate at random. Over repeated renders (the noise and the oscillators' start phase differ each time) Bright noise snare, Closed hat and Shuffle reached -0.5 to -0.6 dBTP, Snappy snare -0.9 and Noise hits -1.0 (the ceiling is -1). Snappy snare, Rimshot, Clap, Metallic hat and Techno percussion measured 4.1-4.5 LU under the -18 LUFS target, with no headroom left for gain; Accent bassline sat on the -22 edge | QA before: 5 of 40 flagged; harness: 10-24 renders per preset, measured with the QA tool's own meters (it agrees with the QA run within 0.2 LU) | more body instead of level: VCA DECAY longer, VOLUME lower where the peak was close (table under "Preset loudness"). Every preset now stays at or below -2 dBTP in all renders |
+| 20 | Medium | RUN / STOP and ADVANCE legends rendered truncated ("RUN / ST...", "ADVAN...") under the new legibility floor: the TEMPO readout sat where the panel prints them, just under the TEMPO ring. Once they could grow, RUN / STOP covered the RUN LED | panel fit debug (`window.__panelFitDebug`); screenshots against M p.7 | TEMPO's readout shows on hover / touch only (the hardware has none); the legends render at 10 px; RUN / STOP is centred on its button as drawn and the LED sits 2.5 mm further left |
+| 21 | Medium | dfam-st1 pressed RUN / STOP before parking on step 8 with ADVANCE; the manual describes ADVANCE with playback stopped, and Moog's sync order arms the follower last | M p.23, pp.30-31 | ADVANCE now comes before RUN / STOP |
+| 22 | Low | The lesson runner could not do the five cross-instrument studio steps (cables between instruments, the studio ▶, CLOCK DIV) | lesson runner: 5 manual steps | lesson API v3 solutions (`studioCables`, `transport`, `values`): 0 manual steps |
+| 23 | Low | Six preset descriptions had lost the letter Q ("FRE'UENCY", "'uick Hats", "SE' PITCH MOD") | the preset menu text | fixed |
 
 ## Measurements against the hardware
 
@@ -44,7 +50,7 @@ Status: **work in progress** (the session was parked). Sections marked *open* we
 | HP self-oscillation | at maximum, from ~1 kHz (M p.18) | from ~1.0 kHz at 100 %, from ~1.4 kHz at 90 % |
 | Retrigger | - | no envelope ever drops at a retrigger (largest 0.002 V); the only transient is the 1 ms attack |
 | DC | - | |mean| < 1e-3 on all presets |
-| CPU | - | 68x realtime, 1 worklet node (bench before the allocation fix; *open*: re-run after) |
+| CPU | - | 51x realtime, 1 worklet node (`scripts/bench.cjs`, after the allocation fix, on a machine shared by about ten agents; the earlier 68x came from a quieter machine, so the two are not comparable) |
 
 ## Preset loudness
 
@@ -53,11 +59,36 @@ Status: **work in progress** (the session was parked). Sections marked *open* we
 - First pass (harness target -25 LUFS mono): 3.2 LU spread. QA run on that build: every preset at
   about -22.3 LUFS (stereo measure), i.e. just under the -18 +-4 window, plus the two audition
   outliers fixed in #10 and #13 and the stuck tail in #14.
-- Now: VOLUME re-computed in the harness for the QA target (-18.6 LUFS stereo, FX -22.6, sample
-  peaks <= -2.2 dBFS). *Open*: confirm with
-  `node scripts/audio-qa.cjs http://localhost:3131 dfam --target -18 --suggest`. Expected at risk:
-  the spiky snare / clap / rim / closed and metallic hats land around -21.1 to -22.6 because of the
-  peak cap; give them more body (longer VCA DECAY) or a lower PLR if they flag.
+- Second pass: VOLUME re-computed in the harness for the QA target (-18.6 LUFS stereo, FX -22.6).
+- Audio QA on that build (`--target -18`): `[dfam] median -19.2 LUFS, spread 5.2 LU, 5 of 40 flagged
+  (loudness 5)`, exit 1, max true peak -1.3 dBTP. Flagged low: Snappy snare -22.5, Rimshot -22.3,
+  Clap -22.2, Metallic hat -22.1, Techno percussion -22.1; their suggested gains would have taken
+  them to +0.4 to +2.5 dBTP. Repeated renders also found the true-peak risks of finding #19.
+- Final pass: loudness from body, not level. Each change was chosen offline (12-24 renders) and
+  checked in the app:
+
+  | Preset | VCA DECAY | VOLUME | Other |
+  |---|---|---|---|
+  | Snare / Snappy snare | 260 -> 640 ms | 97 -> 86 | VCO 1 LEVEL 70 -> 80 |
+  | Snare / Bright noise snare | 220 -> 380 ms | 75 -> 68 | |
+  | Snare / Hand clap | 230 -> 520 ms | 81 -> 78 | CUTOFF 1.8 -> 2.2 kHz |
+  | Snare / Rimshot | 80 -> 170 ms | | |
+  | Hats / Closed hat | 45 -> 90 ms | 83 -> 76 | |
+  | Hats / Metallic hat | 110 -> 220 ms | 98 -> 94 | |
+  | Toms / Bongos | 120 -> 150 ms | | |
+  | Bass / Accent bassline | 260 -> 420 ms | | |
+  | Loop / Techno percussion | 110 -> 200 ms | | |
+  | Loop / Noise hits | 180 -> 360 ms | 85 -> 76 | |
+  | Loop / Shuffle | 70 -> 130 ms | 92 -> 84 | |
+
+- Final audio QA (audition, the gate command): `[dfam] median -19.1 LUFS, spread 5.2 LU, 0 of 40
+  flagged (none)`, exit 0; max true peak -2.3 dBTP, IQR 1.4 LU (was 2.9). Non-FX presets -17.8 to
+  -20.6 LUFS, FX -22.7 to -23.0. With `--excite dfam=transport`: `[dfam] median -19.1 LUFS, spread
+  5.2 LU, 0 of 40 flagged (none)`, exit 0.
+- The clap reads about 0.4 LU lower in the app than offline (-20.3 to -21.6 over seven app runs at
+  1.8 kHz, against -20.2 to -20.7 offline); every other preset agrees within about 0.3 LU. It is the
+  only preset with a VCA EG -> NOISE LEVEL self-patch. The cause was not found; the brighter cutoff
+  gives it about 1 LU of extra margin (-20.1 in the final run).
 
 ## Lessons
 
@@ -66,18 +97,38 @@ Status: **work in progress** (the session was parked). Sections marked *open* we
 - f6: the restart prediction now says the next step plays first (no reset).
 - Start states set SEQ PITCH MOD to VCO 1&2 where the PITCH knobs must move the VCOs
   (f6, sd3, sq1, sq2, p1, st1, st2).
-- Studio lessons checked for real (Playwright, Studio Clock, studio ▶, Mother-32): every step
-  satisfied, the DFAM waits silently when armed, the first hit lands on the first clock pulse
-  (within 0.2 ms), 1/16 = 8 pulses/s, 1/8T = 6/s, 1/8 = 4/s.
-- Lesson runner: 0 failures; the 5 manual steps are the cross-instrument actions (studio cables,
-  the studio ▶, the Studio Clock's CLOCK DIV) that the runner cannot perform; they were verified by
-  the Playwright run above. The runner would need `step.instance` support in `solution` to cover them.
+- st1: parks on step 8 with ADVANCE before RUN / STOP (finding #21).
+- The five studio steps carry lesson API v3 solutions; the lesson runner now plays all 20 lessons
+  with 0 failures and 0 manual steps.
+- Studio lessons checked for real on the final build. Playwright started each lesson from the
+  Lessons dialog, tapped the jacks in the Studio tab, pressed ▶ and the DFAM's own buttons, and
+  recorded the DFAM TRIGGER output, the Studio Clock CLOCK output and the instrument audio:
+  - **Studio lesson 2** (Studio Clock -> ADV / CLOCK, ▶): every step satisfied and the lesson
+    finishes. Silent before ▶. At 1/16 the DFAM plays 8 steps/s, each hit on a clock pulse (0 ms
+    apart), starting on step 1. At 1/8, 4 steps/s. Silent after stop.
+  - **dfam-st1**: ADVANCE parks it on step 8 (4 presses from where it was). Armed by RUN / STOP, it
+    waits silently (0 triggers, no audio). After ▶ it starts on step 1 at 8 steps/s on the clock
+    pulses, and plays 6 steps/s at 1/8T.
+  - **dfam-st2**: the Mother-32 is silent until DFAM TRIGGER reaches its GATE, then plays on every
+    DFAM step (7.3 steps/s at 110 BPM), including the steps the DFAM itself leaves silent.
 
-## Open (not finished when the session was parked)
+## Open
 
-- Re-run the audio-QA tool, the lesson runner, smoke and e2e on the final build.
-- REFERENCE.md: positions, defaults and the manual page cites for every row need the final pass
-  (partly done: knobs, VCO FREQUENCY, ADV/CLOCK, TRIGGER OUT, model choices).
 - VCA DECAY clock-position descriptions (M p.21) suggest longer mid-range times than the twin's
   log taper (noon 316 ms); VCO/VCF descriptions fit the current taper, so it was left.
-- The Default patch image (M p.8) and the patch sheets of pp.34-37 were not available as images.
+- The Default patch image (M p.8) and the patch sheets of pp.34-37 are not legible enough to read
+  knob positions from; those presets follow the sheet notes.
+- The clap's 0.4 LU app/offline difference (see "Preset loudness").
+- The model choices in REFERENCE.md need a hardware unit to confirm.
+
+## Gate (final build: finish/dfam-review, integration branch 5878311 merged)
+
+| Check | Result |
+|---|---|
+| tsc, `next lint`, `npm run validate dfam` | clean; 0 errors, 0 warnings |
+| build | passes |
+| `scripts/smoke.cjs` | no console errors; transport peak 0.31, button peak 0.30; no horizontal scroll on desktop or iPad |
+| `scripts/e2e/run.cjs` | 23/23 |
+| `scripts/lesson-runner.cjs dfam` | 20 lessons, 0 failed, 0 manual steps |
+| `scripts/audio-qa.cjs dfam --target -18 --suggest` | exit 0, 0 of 40 flagged; also 0 of 40 with `--excite dfam=transport` |
+| screenshots (desktop 1440 x 900, iPad 1180 x 820) | read against M p.7: layout, legends and patch bay match; no truncated text |

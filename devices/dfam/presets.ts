@@ -109,7 +109,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
     'Noise only, with VCA EG patched into NOISE LEVEL: the noise is loudest at the start and dies faster than the VCA, like the slap of a clap. A resonant low-pass centres it.',
     'community', {
       vco1_level: 0, noise_level: 35,
-      vcf_cutoff: 1800, vcf_resonance: 40, vcf_eg_amount: 30, vcf_decay: 60, vca_decay: 520, volume: 80,
+      vcf_cutoff: 2200, vcf_resonance: 40, vcf_eg_amount: 30, vcf_decay: 60, vca_decay: 520, volume: 78,
       ...steps(FLAT, [0, 0, 0, 0, 100, 0, 0, 0]),
     }, [{ from: 'out_vca_eg', to: 'in_noise_level' }]),
   snare_rim: preset('Snare / Rimshot',
