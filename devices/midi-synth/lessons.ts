@@ -631,6 +631,7 @@ const st1: Lesson = {
       instruction: 'Add a second one: Instruments… → Your synth (MIDI) → Add another. Then come back to this tab.',
       checklist: [{ text: 'Two "Your synth" instruments in the studio', check: s => otherSynths(s).length >= 1 }],
       hints: ['Instruments… is next to the instrument tabs at the top.', 'Choose "Add another", not "Open".', 'The lesson waits on this tab: click "Bass" to come back.'],
+      solution: { studio: { rack: [{ device: 'midi-synth', count: 2 }] } },
     },
     {
       kind: 'challenge', concept: 'signal-routing',
@@ -640,6 +641,8 @@ const st1: Lesson = {
         { text: 'On a different channel from Bass', check: s => otherSynths(s).some(d => /lead/i.test(d.name) && d.channel !== md(s).channel) },
       ],
       hints: ['Its tab says "Your synth (MIDI) 2" until you name it.', 'Channel 2 is the Practice synth\'s keys part.', 'If both were on channel 1, both parts would play every note.'],
+      // The second Your synth (added as midi-synth#2): the Practice synth's keys part
+      solution: { instance: 'midi-synth#2', data: practice({ name: 'Lead', channel: 1 }) },
     },
     {
       kind: 'predict', control: 'play', targetValue: true, concept: 'sequencer-pattern',

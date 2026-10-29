@@ -43,10 +43,16 @@ const lufsOf = (meanEnergy: number) => (meanEnergy > 0 ? -0.691 + 10 * Math.log1
 const energyOf = (lufs: number) => Math.pow(10, (lufs + 0.691) / 10);
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
-/** The instance a lesson names: an instance id, or the first instance of a device */
+/**
+ * The instance a lesson names: an instance id, the first instance of a device, or
+ * '<device>#<n>', the n-th instance of a device in rack order (a second one is added
+ * as '<device>#2', so that is usually its id too)
+ */
 export function resolveInstance(idOrDevice: string): string | undefined {
   const rack = useStudioStore.getState().studio.rack;
   if (rack.some(r => r.id === idOrDevice)) return idOrDevice;
+  const nth = /^(.+)#(\d+)$/.exec(idOrDevice);
+  if (nth) return rack.filter(r => r.device === nth[1])[Number(nth[2]) - 1]?.id;
   return rack.find(r => r.device === idOrDevice)?.id;
 }
 
@@ -617,6 +623,11 @@ export function applyStudioSolution(sol: LessonSolution, instance?: string) {
       ...(sol.master.glue ? { glue: sol.master.glue } : {}),
     });
   }
+  // Instruments the step needs in the rack (Instruments… → Add another)
+  sol.studio?.rack?.forEach(r => {
+    const count = () => useStudioStore.getState().studio.rack.filter(x => x.device === r.device).length;
+    for (let k = 0; k < 8 && count() < (r.count ?? 1); k++) st.addToRack(r.device, { duplicate: true });
+  });
   if (sol.studio?.bpm !== undefined) st.setBpm(sol.studio.bpm);
   if (sol.studio?.swing !== undefined) st.setSwing(sol.studio.swing);
   Object.entries(sol.studio?.routes ?? {}).forEach(([k, r]) => { const inst = resolveInstance(k); if (inst) st.setRoute(inst, resolveRoute(r)); });

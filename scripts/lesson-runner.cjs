@@ -77,6 +77,9 @@ const { chromium } = require('playwright');
     const resolveRef = ref => {
       const rack = S().studio.rack;
       if (rack.some(r => r.id === ref)) return ref;
+      // '<device>#<n>': the n-th instance of a device
+      const nth = /^(.+)#(\d+)$/.exec(ref);
+      if (nth) { const r = rack.filter(x => x.device === nth[1])[Number(nth[2]) - 1]; return r ? r.id : ref; }
       const r = rack.find(x => x.device === ref);
       return r ? r.id : ref;
     };

@@ -111,7 +111,7 @@ export async function showMe(step: LessonStep, instance: string, labelOf: (id: s
     // An open challenge: one way to do it, left in place
     if (step.solution) {
       const sol = step.solution;
-      const target = sol.instance ?? instance;
+      const target = sol.instance ? resolveInstance(sol.instance) ?? sol.instance : instance;
       store.setLessonDemo({ instance: target });
       const tspec = getSpec(store.deviceOf(target));
       for (const [id, v] of Object.entries(sol.values ?? {})) await sweep(target, id, tspec?.controls[id], v, 450);

@@ -493,10 +493,13 @@ export interface LessonSolution {
   /** Studio mixer channel strips: { [instance or device]: fader dB, pan, sends... } */
   channels?: Record<string, { gain?: number; pan?: number; mute?: boolean; solo?: boolean; sendA?: number; sendB?: number }>;
   /**
-   * Studio tempo, swing and routing. `routes`: { [instance or device]: 'master' or
-   * '<mixer instance or device>:<input>' } - an instrument's Output, e.g. 'xone96:studio_1'
+   * Studio tempo, swing, routing and rack. `routes`: { [instance or device]: 'master' or
+   * '<mixer instance or device>:<input>' } - an instrument's Output, e.g. 'xone96:studio_1'.
+   * `rack`: the rack holds at least `count` (default 1) instruments of each device, adding
+   * them as Instruments… → Add another does. A second instance is '<device>#2', and solutions
+   * can name it that way.
    */
-  studio?: { bpm?: number; swing?: number; routes?: Record<string, string>; sync?: Record<string, boolean> };
+  studio?: { bpm?: number; swing?: number; routes?: Record<string, string>; sync?: Record<string, boolean>; rack?: { device: string; count?: number }[] };
   /**
    * The song arranger: `sections` replace the song (same shape as a start state's, parts by
    * instance or device); `enabled` and `loop` switch it, keeping the sections when none are given

@@ -67,6 +67,10 @@ function checkV3(s: LessonStep, w: string, ctx: { instOf: (name: string) => Name
     if (!m || !input) { err(`solution.studio.routes.${k}: "${target}" is not 'master' or '<mixer>:<input>'`); return; }
     if (m.mod && !m.mod.studio?.mixerInputs?.some(x => x.id === input)) err(`solution.studio.routes.${k}: ${m.device} has no mixer input "${input}"`);
   });
+  sol.studio?.rack?.forEach(r => {
+    if (!DEVICES.some(d => d.id === r.device)) err(`solution.studio.rack: unknown device "${r.device}"`);
+    if (r.count !== undefined && !(Number.isInteger(r.count) && r.count >= 1 && r.count <= 8)) err(`solution.studio.rack: count ${r.count} for ${r.device} is outside 1..8`);
+  });
   sol.arrangement?.sections?.forEach((x, xi) => {
     if (!(x.bars >= 1)) err(`solution.arrangement section ${xi + 1} needs at least 1 bar`);
     Object.keys(x.parts ?? {}).forEach(k => { if (!ctx.instOf(k)) err(`solution.arrangement section "${x.name}" has a part for "${k}", which is not in the studio`); });
@@ -325,7 +329,11 @@ function validate(id: string, mod: DeviceModule): Issue[] {
       // (the lesson's `requires` puts them in the rack)
       checkV3(s, sw, {
         stepInst: id,
-        instOf: name => (name === id ? { device: id, data: mod.data?.initial(), mod } : DEVICES.some(d => d.id === name) ? { device: name, data: undefined } : undefined),
+        instOf: name => {
+          const dev = name.replace(/#\d+$/, '');
+          if (dev === id) return { device: id, data: mod.data?.initial(), mod };
+          return DEVICES.some(d => d.id === dev) ? { device: dev, data: undefined } : undefined;
+        },
       }, out);
       // Run custom checks against the default state to catch crashes
       const st = fakeState({ ...defaults });
