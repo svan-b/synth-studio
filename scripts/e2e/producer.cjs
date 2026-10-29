@@ -157,17 +157,22 @@ const LESSON = 'studio-producer-07-frequency-slots';
     await setControl('xone96', 'ch2_lomid', -0.407);
     await setControl('xone96', 'ch2_himid', 0.45);
     await tap(coach().getByRole('button', { name: /Check my sound/ }));
-    log.matched = await coach().getByText(/Matched by ear/).count();
-    check('step 11: the ear match accepts the target', log.matched === 1);
+    // (screen readers hear it too: the live region repeats the text)
+    log.matched = await coach().locator('p:visible', { hasText: /Matched by ear/ }).count();
+    check('step 11: the ear match accepts the target', log.matched >= 1);
     await next();
 
     // ---- 12 · the challenge's live checklist ------------------------------------------------------------
     const ticks = () => coach().locator('li span.bg-green-600').count();
     const before = await ticks();
+    // Undo one move: its check goes dark; redo it: green again
+    await setControl('dfam', 'vcf_mode', 1);
+    const broken = await waitFor(async () => (await ticks()) === before - 1, 4000);
+    await setControl('dfam', 'vcf_mode', 0);
     await setControl('xone96', 'ch2_lomid', -0.07);
     const after = await waitFor(async () => (await ticks()) === 5, 4000);
-    log.checklist = { before, after: await ticks() };
-    check('step 12: the checklist updates live and every check passes', after, log.checklist);
+    log.checklist = { before, broken, after: await ticks() };
+    check('step 12: the checklist updates live and every check passes', broken && after, log.checklist);
     await p.screenshot({ path: `${out}-04-challenge.png` });
     check('step 12: the challenge is satisfied', await satisfied());
     await next();
@@ -176,7 +181,7 @@ const LESSON = 'studio-producer-07-frequency-slots';
     await tap(coach().getByRole('button', { name: /Write a sentence first|Compare with a model answer/ }));
     await tap(coach().getByRole('button', { name: 'Got it' }));
     await next();
-    await coach().getByText('Lesson complete').waitFor({ timeout: 5000 });
+    await coach().locator('p:visible', { hasText: /Lesson complete/ }).first().waitFor({ timeout: 5000 });
     await p.screenshot({ path: `${out}-05-summary.png` });
     const restoreBtn = coach().getByRole('button', { name: /Bring back the studio I had before this lesson/ });
     check('summary: offers to bring back the learner\'s studio', (await restoreBtn.count()) === 1);
