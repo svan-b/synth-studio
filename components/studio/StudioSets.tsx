@@ -143,14 +143,13 @@ function ListenButton({ demo }: { demo: DemoMeta }) {
   );
 }
 
-/** While a card's recording plays: how far, and the time */
+/** While a card's recording plays: how far, and the time (the row is kept, so the cards' buttons stay in line) */
 function ListenProgress({ demo }: { demo: DemoMeta }) {
   const pb = useDemoPlayback(`card:${demo.id}`);
-  if (!pb) return null;
-  if (pb.status === 'error') return <p className="text-[11px] text-orange-200 mt-1.5" role="status">Couldn&apos;t play the recording: {pb.error}.</p>;
+  if (pb?.status === 'error') return <p className="text-[11px] text-orange-200 mt-1.5 min-h-4 leading-4" role="status">Couldn&apos;t play the recording: {pb.error}.</p>;
   return (
-    <div className="mt-2">
-      <DemoProgress playing={pb.status === 'playing'} color={demo.accent} label={`How far the recording of ${demo.title} has played`} time />
+    <div className="mt-2 h-4">
+      {pb && <DemoProgress playing={pb.status === 'playing'} color={demo.accent} label={`How far the recording of ${demo.title} has played`} time />}
     </div>
   );
 }

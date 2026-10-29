@@ -1323,6 +1323,13 @@ What has to exist before these lessons can ship, in rough priority order.
 | Sequencer settings in listen and match | Either expose pattern SWING as a control on both Elektrons, or allow `listen`/`match` targets on project data (`{ data: { swing: 64 } }`) | L2, L10 |
 | Arranger snapshots of chosen controls | A "capture snapshot" button per instrument per section that stores only the controls the learner picked (for the Xone: one channel's filter assignment, the filter type and frequency) | L12, demos |
 
+**As built, the demo hooks play recordings** instead of a temporary engine state: swapping
+studios in the middle of a lesson would put the learner's work at risk (autosave could store the
+demo over it, the checks would read the demo, undo would mix the two), and older iPads can't run
+every instrument at once. `info.play: { demo, excerpt, variation? }` and `listen.demo: { demo,
+excerpt, a, b }` name pre-rendered excerpts and variations, and `listen.demo` is always
+loudness-matched. See `docs/DEMOS.md` and "Lesson API v3" in `docs/PEDAGOGY.md`.
+
 ### 7.2 Check state
 
 The fields in §5 marked "proposed": `transport.swing`, `meters` (master, channels, parts), `master`,

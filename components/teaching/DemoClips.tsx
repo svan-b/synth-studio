@@ -50,7 +50,7 @@ export function DemoProgress({ playing, color = '#38bdf8', label, time }: { play
 }
 
 const fmtSec = (s: number) => `${Math.round(s)} s`;
-const fmtDb = (g: number) => (Math.abs(g) < 0.05 ? '0.0' : `${g > 0 ? '+' : ''}${g.toFixed(1)}`);
+const fmtDb = (g: number) => (Math.abs(g) < 0.05 ? '0.0' : `${g > 0 ? '+' : '−'}${Math.abs(g).toFixed(1)}`);
 
 /** "Low Tide Lights · bars 17–20" */
 export const clipCaption = (c: DemoClip) => `${c.title} · ${barsLabel(c)}`;
@@ -85,7 +85,7 @@ export function DemoHearIt({ owner, refs }: { owner: string; refs: DemoClipRef |
           ) : (
             <p className="text-gray-200">{clipCaption(clips[0])}</p>
           )}
-          <p className="text-gray-400">A recording{many ? `s, ${clips.length} in turn` : ''}, {fmtSec(total)}. Your studio keeps its own sound.</p>
+          <p className="text-gray-400">{many ? `${clips.length} recordings in turn` : 'A recording'}, {fmtSec(total)}. Your studio stays as it is.</p>
         </div>
       </div>
       <DemoProgress playing={status === 'playing'} label="How far the recording has played" />
@@ -139,7 +139,7 @@ export function DemoABToggle({ owner, demo, labels, reveal }: {
       <p className="text-[10px] text-gray-400 leading-snug" aria-live="polite">
         A recording of {ca.title}, {barsLabel(ca)}, looping. Both sides play at the same loudness
         {pb?.gainDb.length === 2 ? <> (A {fmtDb(pb.gainDb[0])} dB, B {fmtDb(pb.gainDb[1])} dB)</> : null}
-        {on ? '; switch sides on the same phrase, press the lit side again to stop.' : '. Your studio keeps its own sound.'}
+        {on ? '; switch sides on the same phrase, press the lit side again to stop.' : '. Your studio stays as it is.'}
       </p>
       {reveal && (
         <p className="text-[11px] text-gray-300 leading-snug">
