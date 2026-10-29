@@ -99,7 +99,7 @@ p.7). Ranges are those of the hardware. "Twin" gives the value units used in `sp
 |---|---|---|---|---|---|---|---|
 | TRIGGER | Transport | (18.9, 87.0), legend above | push button | plays the current step (the lit one) without advancing; the manual describes it with the sequencer stopped | momentary | (DFAM manual, p.23; p.7) | **verified** |
 | TEMPO | Transport | (46.4, 87.1), inside a printed scale ring | large | 0.7 Hz - 700 Hz, continuously variable: about 10 - 10,000 BPM if each step is a 16th note; ignored while ADV / CLOCK is patched | 10.5-10500 BPM (16th-note steps), log; default 120; readout on hover or touch only, because RUN / STOP and ADVANCE are printed just under the ring | (DFAM manual, p.23, p.29, p.40; p.7) | **verified** |
-| RUN / STOP | Transport | (36.9, 107.9), legend at (36.0, 100.6) | push button | starts the sequencer from the current step at the current TEMPO, and stops it when it is running | toggle | (DFAM manual, p.22; p.7) | **verified** |
+| RUN / STOP | Transport | (36.9, 107.9), legend centred above it at (36.9, 100.6) | push button | starts the sequencer from the current step at the current TEMPO, and stops it when it is running | toggle | (DFAM manual, p.22; p.7) | **verified** |
 | ADVANCE | Transport | (55.9, 107.9), legend at (55.9, 100.6) | push button | with the sequencer stopped, moves to the next step without playing the steps it passes | momentary | (DFAM manual, p.23; p.7) | **verified** |
 | PITCH 1-8 | Sequencer | top row of eight at (79.9 + 23.94 x (n - 1), 84.3); "PITCH" printed at the left | stalk | about +-5 V, roughly ten octaves; right of centre adds to VCO FREQUENCY, left subtracts; reaches the VCOs only with SEQ PITCH MOD on VCO 1&2 or VCO 2; always on the PITCH jack | -5...+5 V, shown in semitones (1/12 V detents) | (DFAM manual, p.22, p.15; p.7) | **verified** (detents: twin choice) |
 | VELOCITY 1-8 | Sequencer | bottom row (y 108.0); "VELOCITY" printed at the left | stalk | 0-5 V; sets the level of all three EGs, and a higher velocity gives a slightly longer decay; the minimum is silent | 0-100 %; default 100 % | (DFAM manual, p.22; p.7) | **verified** |
@@ -109,7 +109,7 @@ p.7). Ranges are those of the hardware. "Twin" gives the value units used in `sp
 
 | LED | Position | Behaviour | Source | Confidence |
 |---|---|---|---|---|
-| RUN / STOP | (28.5, 100.6), left of the RUN / STOP legend | red, lit while the sequencer runs; in the twin also while the RUN / STOP jack's gate holds it running | (DFAM manual, p.22; p.7) | **verified**; the jack case **likely** |
+| RUN / STOP | left of the RUN / STOP legend, drawn at (28.5, 100.6); the twin puts it at (26.0, 100.6) because its legend is printed larger than on the panel and would cover it | red, lit while the sequencer runs; in the twin also while the RUN / STOP jack's gate holds it running | (DFAM manual, p.22; p.7) | **verified**; the jack case **likely** |
 | Step 1-8 | (x of each step, 96.0), between the PITCH and VELOCITY rows | red, the current step, also while stopped (TRIGGER plays the step "indicated by the LED"); the twin shows it dimmer while stopped and flashes it on each hit | (DFAM manual, p.22, p.23; p.7) | **verified**; dim and flash: twin choice |
 
 ## Patch bay (24 jacks)

@@ -148,8 +148,10 @@ const elements: PanelElement[] = [
   // TEMPO's readout shows on hover / touch only: a permanent one would sit where the panel
   // prints RUN / STOP and ADVANCE, just under the TEMPO ring (p.7)
   ring(46.4, 87.1), ...main('tempo', 'TEMPO', 46.4, 87.1, { value: 'hover' }),
-  { kind: 'led', x: 28.5, y: 100.6, size: 2.6, color: '#ff3333', on: ({ engine }) => !!engine.playing },
-  text('RUN / STOP', 36.0, 100.6, SMALL, { color: MUTED }),
+  // RUN LED left of the RUN / STOP legend (p.7). The legend is printed larger than on the
+  // hardware (the legibility floor), so the LED sits 2.5 mm further left to stay visible
+  { kind: 'led', x: 26.0, y: 100.6, size: 2.6, color: '#ff3333', on: ({ engine }) => !!engine.playing },
+  text('RUN / STOP', 36.9, 100.6, SMALL, { color: MUTED }),
   { kind: 'button', control: 'run_stop', x: 36.9, y: 107.9, w: BUTTON, color: BUTTON_CAP, ledColor: BUTTON_PRESS, label: 'none', lit: () => false },
   text('ADVANCE', 55.9, 100.6, SMALL, { color: MUTED }),
   { kind: 'button', control: 'advance', event: 'advance', x: 55.9, y: 107.9, w: BUTTON, color: BUTTON_CAP, ledColor: BUTTON_PRESS, label: 'none' },
