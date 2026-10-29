@@ -3,7 +3,7 @@
 import { memo, useRef } from 'react';
 import type { LabelPosition } from '@/types/panel';
 import { fitTransform, type TextFit } from '@/lib/controls/textFit';
-import styles from './controls.module.css';
+import styles from './controlStyles';
 
 export interface ButtonProps {
   id: string;

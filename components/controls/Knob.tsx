@@ -8,7 +8,7 @@ import { knobTravelPx, markPointerEnter, wheelBelongsToControl, wheelDelta } fro
 import { fitTransform, type TextFit } from '@/lib/controls/textFit';
 import { useContinuousDrag } from './useContinuousDrag';
 import ValueBubble from './ValueBubble';
-import styles from './controls.module.css';
+import styles from './controlStyles';
 
 export interface KnobProps {
   id: string;

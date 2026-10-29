@@ -1,7 +1,7 @@
 'use client';
 
 import { createPortal } from 'react-dom';
-import styles from './controls.module.css';
+import styles from './controlStyles';
 
 export interface BubbleState {
   /** Screen point the bubble sits above (CSS px, viewport coordinates) */
