@@ -126,8 +126,8 @@ export function DemoReplaceBody({ demo, onConfirm, onCancel }: { demo: DemoMeta;
   return (
     <div>
       <p className="text-sm text-gray-300 leading-relaxed">
-        <b className="text-white">{demo.title}</b> is a complete studio: {demoInstruments(demo)}, with its patterns, sounds, mix and a
-        {' '}{demoBars(demo)}-bar song. It replaces what is in the studio now{work ? ', and the undo history starts again' : ''}.
+        <b className="text-white">{demo.title}</b> is a complete studio: {demoInstruments(demo)}, with its patterns, sounds, mix and
+        {' '}{/^(8|11$|18$)/.test(String(demoBars(demo))) ? 'an' : 'a'} {demoBars(demo)}-bar song. It replaces what is in the studio now{work ? ', and the undo history starts again' : ''}.
       </p>
       {work && <p className="text-sm text-amber-200 mt-2">Save your current project to a file first?</p>}
       <div className="flex flex-wrap gap-2 mt-4 justify-end">

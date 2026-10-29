@@ -111,19 +111,21 @@ const SUBH: Values = {
 // the hardware's constant-power curve (6.5 on the dial is -16 dB), and its sends rise with the
 // square of the dial, so faders and sends sit higher than the design's numbers; the returns then
 // come in about where the design puts them (delay -14, reverb -15 against the kick).
+// All the faders sit 5 dB under that balance and MASTER 1 makes it up (9.65, +5 dB): three channels
+// lined up sum hot, and this keeps the LR MIX meters (before MASTER) under their PK! LED.
 const XONE: Values = {
   ch1_src: XDECK_NONE, ch2_src: XDECK_NONE, ch3_src: XDECK_NONE, ch4_src: XDECK_NONE, cha_src: XDECK_NONE, chb_src: XDECK_NONE,
   ch1_input: 2, ch2_input: 2, ch3_input: 2, cha_input: 2, chb_input: 2,
-  ch1_gain: 4, ch1_hi: xoneKill(-2), ch1_himid: 0, ch1_lomid: xoneMid(-2), ch1_lo: xoneKill(1), ch1_fader: 10, ch1_snd1: 0, ch1_snd2: 5, ch1_filter: XFILTER.off,
-  ch2_gain: 2, ch2_hi: 0, ch2_himid: xoneMid(2), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 9.3, ch2_snd1: 0, ch2_snd2: 3.5, ch2_filter: XFILTER.off,
+  ch1_gain: 4, ch1_hi: xoneKill(-2), ch1_himid: 0, ch1_lomid: xoneMid(-2), ch1_lo: xoneKill(1), ch1_fader: 8.92, ch1_snd1: 0, ch1_snd2: 5, ch1_filter: XFILTER.off,
+  ch2_gain: 2, ch2_hi: 0, ch2_himid: xoneMid(2), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 8.49, ch2_snd1: 0, ch2_snd2: 3.5, ch2_filter: XFILTER.off,
   // the Subharmonicon's LO shelf at -6 dB hands 87-147 Hz to the bass; it sends the most
-  ch3_gain: 4, ch3_hi: xoneKill(-1), ch3_himid: 0, ch3_lomid: xoneMid(-2), ch3_lo: xoneKill(-6), ch3_fader: 8.5, ch3_snd1: 7, ch3_snd2: 7.5, ch3_filter: XFILTER.off,
+  ch3_gain: 4, ch3_hi: xoneKill(-1), ch3_himid: 0, ch3_lomid: xoneMid(-2), ch3_lo: xoneKill(-6), ch3_fader: 7.36, ch3_snd1: 7, ch3_snd2: 7.5, ch3_filter: XFILTER.off,
   cha_hi: xoneKill(-3), cha_mid: 0, cha_lo: xoneKill(-12), cha_fader: 10, cha_filter: XFILTER.off,
   chb_hi: xoneKill(-2), chb_mid: xoneMid(-3, true), chb_midf: 400, chb_lo: xoneKill(-12), chb_fader: 10, chb_filter: XFILTER.off,
   // FX unit: DELAY 3/16 (409 ms), FDBK 4.5, REVERB 3.0 s, SEND 1 post-fader
   fx_time: 1, fx_fdbk: 4.5, fx_size: 3,
   f1_on: false, f2_on: false,
-  master: 8, monitor_out: 0, bpm: BPM, play: false,
+  master: 9.65, monitor_out: 0, bpm: BPM, play: false,
 };
 
 // ----------------------------------------------------------------------------

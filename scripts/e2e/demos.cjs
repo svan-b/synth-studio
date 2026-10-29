@@ -6,7 +6,8 @@
 //
 // Per demo it checks that:
 //   - the demo loads (rack, routes, tempo, song sections) and every engine starts
-//   - every instrument makes sound, and none clips (instrument outputs < 0 dBFS, no Xone PK!)
+//   - every instrument makes sound, and none clips (instrument outputs < 0 dBFS, no Xone PK!,
+//     the Xone's LR MIX under its PK! LED too)
 //   - the song plays through its sections and the changes land on bar lines: the caption
 //     follows the arranger section by section, the kick hits each section's first beat, and
 //     a part the arranger unmutes comes in exactly on its section's bar line
@@ -185,9 +186,10 @@ const EXPECT = {
       R.sound = sound;
       check(id, 'every instrument makes sound', audible.every(i => sound[i].lufs > -45), sound);
       check(id, 'nothing clips at an instrument output (< 0 dBFS before its studio fader)', audible.every(i => sound[i].peakDb < 0), Object.fromEntries(audible.map(i => [i, sound[i].peakDb])));
-      const pkLit = Object.entries(log.xone).filter(([k, m]) => m.pk > 0 && /^[1-4ab]$/.test(k)).map(([k]) => k);
+      // the channels' PK! (post-GAIN, +15 dBu) and the LR MIX meters' PK! LED (+10 dBu, before MASTER)
+      const pkLit = Object.entries(log.xone).filter(([k, m]) => m.pk > 0 && /^([1-4ab]|mix)$/.test(k)).map(([k]) => k);
       R.xoneMaxDbu = Object.fromEntries(Object.entries(log.xone).filter(([, m]) => m.max > -100).map(([k, m]) => [k, r1(m.max)]));
-      check(id, 'no Xone channel PK! lit', pkLit.length === 0, { pk: pkLit, maxDbu: R.xoneMaxDbu });
+      check(id, 'no Xone channel or LR MIX PK! lit', pkLit.length === 0, { pk: pkLit, maxDbu: R.xoneMaxDbu });
 
       // the caption follows the arranger: each section's note shows within 0.4 s of its first bar line
       const capMs = inSong.map((s, i) => {

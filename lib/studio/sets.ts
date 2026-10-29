@@ -125,10 +125,16 @@ const ELEKTRON: StudioSet[] = [
  * Starting levels of the Moogs routed into the Xone:96, measured on its channel meters with
  * the instruments' default sounds (scripts: the Xone's meterSnapshot while the set plays):
  * each channel then averages about 0 with peaks near +4, the guide's line-up (Xone:96 guide
- * p.39), and the LR MIX of all three stays under its PK! LED. The DFAM arrives there at unity;
- * the Mother-32 arrives hot (about +4 average at -3 dB), the Subharmonicon about 2 dB hot.
+ * p.39). The DFAM arrives there at unity; the Mother-32 arrives hot (about +4 average at
+ * -3 dB), the Subharmonicon about 2 dB hot.
  */
 const MOOG_LINE_UP = { mother32: -6.5, subharmonicon: -8 } as const;
+/**
+ * With all three in, each starts this much under the line-up: three lined-up channels sum about
+ * 4 dB hotter on the LR MIX, whose PK! LED (+10 dBu, faders up) then lit about 40 % of the time;
+ * 2.5 dB under, it stayed dark (channels averaging about -2, the LR MIX about +2, peaks near +5).
+ */
+const MOOG_TRIO = -2.5;
 
 const MOOG: StudioSet[] = [
   {
@@ -198,9 +204,9 @@ const MOOG: StudioSet[] = [
     sync: { mother32: true, subharmonicon: true, xone96: true },
     cables: [CLOCK_TO_DFAM],
     channels: {
-      dfam: ch(0, 0, MIN_DB, -22),
-      mother32: ch(MOOG_LINE_UP.mother32, 0.15, -18, MIN_DB),
-      subharmonicon: ch(MOOG_LINE_UP.subharmonicon, -0.25, MIN_DB, -12),
+      dfam: ch(MOOG_TRIO, 0, MIN_DB, -22),
+      mother32: ch(MOOG_LINE_UP.mother32 + MOOG_TRIO, 0.15, -18, MIN_DB),
+      subharmonicon: ch(MOOG_LINE_UP.subharmonicon + MOOG_TRIO, -0.25, MIN_DB, -12),
     },
     bpm: 110,
     focus: 'dfam',
@@ -220,7 +226,7 @@ const MORE: StudioSet[] = [
     routes: { dfam: 'xone96:studio_1', mother32: 'xone96:studio_2', subharmonicon: 'xone96:studio_3' },
     sync: { mother32: true, subharmonicon: true, xone96: true },
     cables: [CLOCK_TO_DFAM],
-    channels: { dfam: ch(0), mother32: ch(MOOG_LINE_UP.mother32), subharmonicon: ch(MOOG_LINE_UP.subharmonicon), xone96: ch(0) },
+    channels: { dfam: ch(MOOG_TRIO), mother32: ch(MOOG_LINE_UP.mother32 + MOOG_TRIO), subharmonicon: ch(MOOG_LINE_UP.subharmonicon + MOOG_TRIO), xone96: ch(0) },
     bpm: 110,
     focus: 'xone96',
   },

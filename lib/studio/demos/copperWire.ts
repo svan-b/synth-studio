@@ -196,16 +196,18 @@ const XONE: Values = {
   ch1_input: 2, ch2_input: 2, cha_input: 2, chb_input: 2,
   // GAIN lines both channels up (meter peaks near +6); the faders set the bass 1 dB under the kick.
   // The twin's faders follow the hardware's constant-power curve (8.0 on the dial is -10 dB), so
-  // they sit higher than the design's 8.0 / 7.5; SEND 2 and channel B are up for an audible room
-  ch1_gain: 5, ch1_hi: 0, ch1_himid: xoneMid(1), ch1_lomid: xoneMid(-2), ch1_lo: 0, ch1_fader: 10, ch1_snd1: 0, ch1_snd2: 2, ch1_filter: XFILTER.off,
+  // they sit higher than the design's 8.0 / 7.5; SEND 2 and channel B are up for an audible room.
+  // Both faders sit 3 dB under that balance and MASTER 1 makes it up (8.95, +3 dB), which keeps the
+  // LR MIX meters (before MASTER) under their PK! LED in FINAL
+  ch1_gain: 5, ch1_hi: 0, ch1_himid: xoneMid(1), ch1_lomid: xoneMid(-2), ch1_lo: 0, ch1_fader: 9.3, ch1_snd1: 0, ch1_snd2: 2, ch1_filter: XFILTER.off,
   // HI MID +1.5 dB at 1.1 kHz: the bass's harmonics for small speakers
-  ch2_gain: 3, ch2_hi: xoneKill(-2), ch2_himid: xoneMid(1.5), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 9.5, ch2_snd1: 0, ch2_snd2: 0, ch2_filter: XFILTER.off,
+  ch2_gain: 3, ch2_hi: xoneKill(-2), ch2_himid: xoneMid(1.5), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 8.93, ch2_snd1: 0, ch2_snd2: 0, ch2_filter: XFILTER.off,
   cha_hi: xoneKill(-3), cha_mid: 0, cha_lo: xoneKill(-12), cha_fader: 4, cha_filter: XFILTER.off,
   chb_hi: xoneKill(-2), chb_mid: xoneMid(-2, true), chb_midf: 500, chb_lo: xoneKill(-12), chb_fader: 8, chb_filter: XFILTER.off,
   // FX unit: DELAY 1/8, FDBK 3.5, REVERB 1.6 s; FILTER 2 LPF 2.5 kHz RES 3 (BREAKDOWN)
   fx_time: 0, fx_fdbk: 3.5, fx_size: 1.6,
   f1_on: false, f2_on: true, f2_type: XTYPE.lpf, f2_freq: 2500, f2_res: 3, f2_crunch: 0,
-  master: 8, monitor_out: 0, bpm: BPM, play: false,
+  master: 8.95, monitor_out: 0, bpm: BPM, play: false,
 };
 
 export function build(): { devices: Record<string, InstanceState>; studio: StudioDoc; currentDevice: string } {

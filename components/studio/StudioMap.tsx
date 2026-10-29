@@ -26,9 +26,12 @@ export default function StudioMap({ onFocus }: { onFocus: (instance: string) => 
   const cables = useStudioStore(s => s.studio.cables);
   const mixer = useStudioStore(s => s.studio.mixer);
   const off = useStudioStore(s => s.studio.off);
-  useSlotsVersion();
+  // The layout reads each device's module (is it a mixer? does it follow the clock?), so it is
+  // rebuilt when modules arrive: a whole studio loaded at once (a demo) draws before they load
+  const slots = useSlotsVersion();
 
-  const layout = useMemo(() => buildLayout(rack, routes, sync, mixer, off ?? {}), [rack, routes, sync, mixer, off]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- slots: the modules the layout reads have loaded
+  const layout = useMemo(() => buildLayout(rack, routes, sync, mixer, off ?? {}), [rack, routes, sync, mixer, off, slots]);
   const { nodes, height, routeEdges, syncEdges } = layout;
   const pos = (id: string) => nodes.find(n => n.id === id);
   const audible = useMemo(() => audibleChannels(mixer, rack, routes), [mixer, rack, routes]);

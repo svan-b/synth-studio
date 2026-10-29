@@ -91,7 +91,7 @@ export default function Welcome({ open, onClose, onChoose }: { open: boolean; on
                     <button
                       key={d.id}
                       onClick={() => pick(d)}
-                      className="text-left p-3 rounded-lg bg-[#161616] border border-[#333] hover:border-[#555] transition-colors"
+                      className="flex flex-col justify-start text-left p-3 rounded-lg bg-[#161616] border border-[#333] hover:border-[#555] transition-colors"
                       aria-label={`Play a demo track: ${d.title}`}
                     >
                       <span className="block text-sm font-bold" style={{ color: d.accent }}>▶ {d.title}</span>

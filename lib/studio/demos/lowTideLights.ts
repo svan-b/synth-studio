@@ -316,16 +316,17 @@ const XONE: Values = {
   // the built-in decks stay silent: every channel hears its studio input or FX return
   ch1_src: XDECK_NONE, ch2_src: XDECK_NONE, ch3_src: XDECK_NONE, ch4_src: XDECK_NONE, cha_src: XDECK_NONE, chb_src: XDECK_NONE,
   ch1_input: 2, ch2_input: 2, cha_input: 2, chb_input: 2,
-  ch1_gain: 1, ch1_hi: xoneKill(-1), ch1_himid: 0, ch1_lomid: xoneMid(-2), ch1_lo: 0, ch1_fader: 9, ch1_snd1: 0, ch1_snd2: 0, ch1_filter: XFILTER.off,
-  ch2_gain: 1, ch2_hi: xoneKill(-1.5), ch2_himid: xoneMid(1.5), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 10, ch2_snd1: 0, ch2_snd2: 4, ch2_filter: XFILTER.off,
+  ch1_gain: 1, ch1_hi: xoneKill(-1), ch1_himid: 0, ch1_lomid: xoneMid(-2), ch1_lo: 0, ch1_fader: 8.71, ch1_snd1: 0, ch1_snd2: 0, ch1_filter: XFILTER.off,
+  ch2_gain: 1, ch2_hi: xoneKill(-1.5), ch2_himid: xoneMid(1.5), ch2_lomid: xoneMid(-3), ch2_lo: 0, ch2_fader: 9.5, ch2_snd1: 0, ch2_snd2: 4, ch2_filter: XFILTER.off,
   cha_hi: xoneKill(-3), cha_mid: 0, cha_lo: xoneKill(-12), cha_fader: 5, cha_filter: XFILTER.off,
   chb_hi: xoneKill(-2), chb_mid: xoneMid(-2, true), chb_midf: 400, chb_lo: xoneKill(-12), chb_fader: 9, chb_filter: XFILTER.off,
   // FX unit: DELAY 3/16, FDBK 4.0, REVERB 2.2 s; FILTER 1 HPF RES 4 (Build B), FILTER 2 LPF RES 2 (Groove)
   fx_time: 1, fx_fdbk: 4, fx_size: 2.2,
   f1_on: true, f1_type: XTYPE.hpf, f1_freq: 140, f1_res: 4, f1_crunch: 0,
   f2_on: true, f2_type: XTYPE.lpf, f2_freq: 900, f2_res: 2, f2_crunch: 0,
-  // MASTER 9 (+3.4 dB over unity at 8): the Xone's output then peaks about -1.5 dBFS
-  master: 9, monitor_out: 0, bpm: BPM, play: false,
+  // MASTER 9.7 (+5.2 dB over unity at 8), the faders 2 dB under the balance above: the LR MIX
+  // meters (before MASTER) stay under their PK! LED, and the Xone's output peaks about -1.5 dBFS
+  master: 9.7, monitor_out: 0, bpm: BPM, play: false,
 };
 
 /** Xone snapshot: which channels are on a filter in this section */
