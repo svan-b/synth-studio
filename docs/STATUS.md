@@ -1,4 +1,4 @@
-# Synth Studio: status and next actions (updated 2026-10-29)
+# Synth Studio: status and next actions (updated 2026-10-29, everything merged)
 
 Working branch: `claude/dfam-documentation-review-iYhxN` (PR #54). Everything below
 marked **merged** is on this branch, built and verified. Everything marked **in progress** is on
@@ -22,7 +22,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Elektron sequencer library + UI kit | `docs/ELEKTRON_SEQUENCER.md` (233 tests) |
 | Bring your own gear | Web MIDI, Practice synth (works on iPad without hardware), audio input, Web Audio plugins, 16 lessons, Safari guidance. See `docs/EXTERNAL_GEAR.md` |
 | Audio QA tool | `scripts/audio-qa.cjs`, see `docs/AUDIO_QA.md`: LUFS, true peak, DC, clicks, stuck tails per preset. Baseline regenerated at aa0a41a: 271 presets on 7 instruments, medians −18.0 to −19.1 LUFS, 2 intermittent click flags (each clean in 4 of 4 re-runs) |
-| E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs), 38 checks including two iPad producer walkthroughs. `--full` adds smoke and lessons for every instrument: 87/87 at the last full run |
+| E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs): the core checks, both iPad Producer walkthroughs and the demo recordings. `--demos` adds the three demo tracks in real time; `--full` adds those plus smoke and lessons for every instrument: **138/138** at the final run |
 | iPad | Home-screen install, floating lesson coach, 44 px touch targets, fine-adjust gestures, value bubble. Fit may shrink a panel up to 20 % so it ends above the bottom of the screen (the whole Xone:96 at 87 %, the A4 at 90 %), and the control readout shares the toolbar row. First-load JS 198 kB (MIDI, studio view and coach load on demand) |
 | Research notes | `docs/research/<device>/` (sources, signal-flow, presets, lessons) from the official manuals, in our own words. See `docs/research/COPYRIGHT-RULES.md` |
 
@@ -111,6 +111,10 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Demo cards have Listen, which plays the recording without loading the studio.
   - `scripts/render-demos.cjs` re-renders the recordings after an instrument changes (see `docs/AUDIO_QA.md`).
   - Not tested here: AAC decoding in Safari and Chrome. Playwright's Chromium can't decode AAC, so the tests decode the same files to WAV.
+- **Final gate on d050c81** (everything merged): `run.cjs --full` **138/138**.
+  - Covers smoke and every lesson for every instrument, the three real-time demo tracks, the demo recordings, both iPad Producer walkthroughs and the core checks.
+  - Studio lessons: 20, 0 failed (2 manual steps in studio-5).
+  - Audio-QA baseline at aa0a41a: 271 presets, medians −18.0 to −19.1 LUFS.
 - **Vercel build rate limit.** Previews from 49f3469 on failed with `build-rate-limit`, not a code error (local builds pass). Every push to any branch, the agents' `wip/*` included, starts a preview build. Pushes are now batched. Option for the user: disable preview builds for scratch branches with `vercel.json` → `"git": { "deploymentEnabled": { "wip/*": false } }`.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
