@@ -251,6 +251,11 @@ function validate(id: string, mod: DeviceModule): Issue[] {
         }
       }
       if (kind === 'reflect' && (!s.reflect?.prompt || !s.reflect?.model)) err(`${sw}: reflect needs prompt and model answer`);
+      if (kind === 'challenge') {
+        // Without a solution the coach can't "show me" and the lesson runner can't verify the step
+        if (!s.solution) warn(`${sw}: challenge without solution`);
+        if (!s.hints?.length) warn(`${sw}: challenge without hints`);
+      }
       // Run custom checks against the default state to catch crashes
       const st = fakeState({ ...defaults });
       if (s.check) { try { s.check(st); } catch (e) { err(`${sw}: check() throws on the default state: ${e}`); } }
@@ -259,8 +264,10 @@ function validate(id: string, mod: DeviceModule): Issue[] {
       if (s.instruction && s.instruction.split(/\s+/).length > 32) warn(`${sw}: instruction is long (${s.instruction.split(/\s+/).length} words)`);
     });
     // Pedagogy shape (docs/PEDAGOGY.md) - warnings only
+    if (!l.id.startsWith(`${id}-`)) warn(`${where}: id should start with "${id}-"`);
     if (lessonV2(l)) {
       if (!l.objective) warn(`${where}: no objective`);
+      if (!l.path) warn(`${where}: no path (foundations, sound-design, ear-training, sequencing, performance or studio)`);
       if (!kinds.has('predict') && !kinds.has('listen')) warn(`${where}: no predict or listen step`);
       if (!kinds.has('quiz')) warn(`${where}: no quiz step`);
       if (!kinds.has('match') && !kinds.has('challenge')) warn(`${where}: no match or challenge step`);
@@ -315,6 +322,8 @@ function validateStudioLessons(lessons: Lesson[]): Issue[] {
     const w = issues.filter(i => i.level === 'warn');
     errors += e.length;
     console.log(`\n${entry.id}: ${Object.keys(mod.spec.controls).length} controls, ${mod.layout.elements.length} elements, ${mod.lessons.length} lessons, ${Object.keys(mod.spec.presets ?? {}).length} presets — ${e.length} errors, ${w.length} warnings`);
+    const byPath = mod.lessons.reduce((m: Record<string, number>, l: Lesson) => ({ ...m, [l.path ?? 'none']: (m[l.path ?? 'none'] ?? 0) + 1 }), {});
+    if (mod.lessons.length) console.log(`  lessons by path: ${Object.entries(byPath).map(([k, n]) => `${k} ${n}`).join(', ')}`);
     e.forEach(i => console.log(`  ERROR ${i.msg}`));
     w.slice(0, 40).forEach(i => console.log(`  warn  ${i.msg}`));
     if (w.length > 40) console.log(`  ... ${w.length - 40} more warnings`);
