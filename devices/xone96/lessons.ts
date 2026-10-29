@@ -22,16 +22,16 @@ import { SRC } from './model';
 const O = (n: number) => n / 100;
 
 const REF = {
-  inputs: 'User Guide p.10 – Input select',
-  gain: 'User Guide p.10 – Channel GAIN',
-  eq: 'User Guide p.10 – Channel EQ',
-  meters: 'User Guide p.11 – Channel meters',
-  fader: 'User Guide p.12 – Channel faders and curve switch',
-  xfader: 'User Guide p.12 – XFADER assign and curve',
-  filter: 'User Guide p.13 – Xone:VCF filter sections',
-  sends: 'User Guide p.14 – SEND 1 / SEND 2',
-  master: 'User Guide p.15 – Master section',
-  cue: 'User Guide p.17 – Monitor section and CUE',
+  inputs: 'User Guide p.8, p.10 – Input select',
+  gain: 'User Guide p.8, p.10 – Channel GAIN and PK!',
+  eq: 'User Guide p.8, p.10 – Channel EQ',
+  meters: 'User Guide p.9, p.11 – Channel meters',
+  fader: 'User Guide p.11–12 – Channel faders and the CHANNEL FADER curve',
+  xfader: 'User Guide p.11–12 – XFADER assign and curve',
+  filter: 'User Guide p.13–14 – Xone:VCF filter sections',
+  sends: 'User Guide p.8, p.10 – SEND 1 / SEND 2',
+  master: 'User Guide p.16 – LR MIX meters, MASTER 1 / MASTER 2',
+  cue: 'User Guide p.9, p.17 – CUE and the MONITOR section',
   twin: 'Twin only – the deck strip above the mixer',
   studio: 'Synth Studio – Studio tab, instrument Output',
 };
@@ -74,6 +74,7 @@ const studioPlay: LessonStep = {
   instruction: 'Press ▶ (Play studio) in the top bar so every instrument plays.',
   checklist: [{ text: 'Studio transport playing', check: s => s.transport.playing }],
   hints: ['The ▶ button sits in the top bar, next to the tempo.', 'Space works too while an instrument with a PLAY button is focused.'],
+  solution: { transport: 'play' },
 };
 
 // ============================================================================
@@ -81,7 +82,7 @@ const studioPlay: LessonStep = {
 // ============================================================================
 
 const f1: Lesson = {
-  id: 'xone96-f1-signal-flow', device: 'xone96', path: 'foundations', order: O(1), difficulty: 'beginner',
+  id: 'xone96-signal-flow', device: 'xone96', path: 'foundations', order: O(1), difficulty: 'beginner',
   name: 'Signal flow: from deck to master',
   description: 'Follow one source through INPUT, the channel fader and MASTER 1, and see why the channel meter moves with the fader down.',
   objective: 'Send a deck through a channel to the master and read the pre-fader channel meter.',
@@ -138,7 +139,7 @@ const f1: Lesson = {
       kind: 'do', control: 'master', targetValue: 8, concept: 'gain-staging',
       instruction: 'Set MASTER 1 back to 8, its unity mark.',
       principle: 'Unity gain means the level out equals the level in.',
-      explanation: 'On Xone mixers MASTER 1 is unity at about 3 o\'clock, two notches below the top. Fully up adds 6 dB.',
+      explanation: 'On Xone mixers MASTER 1 reaches unity at about 3 o\'clock, two notches below the top (8 on this dial). Fully up adds 6 dB.',
       manualReference: REF.master,
     },
     {
@@ -148,10 +149,11 @@ const f1: Lesson = {
         a: { ch1_fader: 10 }, b: { ch1_fader: 5 }, labels: ['Fader at 10', 'Fader at 5'],
         question: {
           question: 'How much quieter is halfway on the CONST PWR fader curve?',
-          options: ['Much quieter: about -15 dB', 'Exactly half as loud', 'The same'], answer: 0,
-          explain: 'The smooth CONST PWR curve does most of its work near the top, like the Xone:92. Halfway is about -15 dB. That is why DJs keep the fader near the top and set loudness with GAIN.',
+          options: ['Much quieter: about -22 dB', 'Exactly half as loud (-6 dB)', 'The same'], answer: 0,
+          explain: 'The CONST PWR channel curve spreads its change over the whole travel, a few dB per step: 7.5 is already about -12 dB and halfway about -22 dB (the guide\'s curve graph). That is why DJs match loudness with GAIN and ride the faders near the top.',
         },
       },
+      manualReference: REF.fader,
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'gain-staging',
@@ -189,12 +191,12 @@ const f1: Lesson = {
 };
 
 const f2: Lesson = {
-  id: 'xone96-f2-gain-staging', device: 'xone96', path: 'foundations', order: O(2), difficulty: 'beginner',
+  id: 'xone96-gain-staging', device: 'xone96', path: 'foundations', order: O(2), difficulty: 'beginner',
   name: 'Gain staging: GAIN first, then the fader',
   description: 'Set input gain with the meters before the fader comes up, find the headroom, and hear what clipping does.',
   objective: 'Set GAIN so a channel averages around 0 with peaks near +6, and match two tracks by meter.',
   source: 'Synth Studio · Xone:96 User Guide, GAIN and metering', estimatedMinutes: 7,
-  prerequisites: ['xone96-f1-signal-flow'],
+  prerequisites: ['xone96-signal-flow'],
   concepts: ['gain-staging', 'mixing'],
   start: { reset: true, values: { ch1_src: SRC.TRACK_A, ch2_src: SRC.TRACK_B, ch2_fader: 0 } },
   steps: [
@@ -219,20 +221,20 @@ const f2: Lesson = {
     },
     {
       kind: 'predict', control: 'ch2_gain', targetValue: 10, concept: 'gain-staging',
-      instruction: 'Turn channel 2 GAIN up to +10 dB and watch the top of its meter.',
+      instruction: 'Turn channel 2 GAIN up to +10 dB and watch the top of its meter and the PK! LED beside GAIN.',
       predict: {
         question: 'What will the meter show?',
-        options: ['The +10 and PK! LEDs flash: little headroom is left', 'It stays the same', 'It switches off'], answer: 0,
-        explain: '+10 dB of gain lifts the peaks to around +16 dBu. The channel clips at +20 dBu, and PK! lights 5 dB before that, so it flashes on every kick.',
+        options: ['The +10 LED and the PK! LED flash: little headroom is left', 'It stays the same', 'It switches off'], answer: 0,
+        explain: '+10 dB of gain lifts the peaks to around +16 dBu, close to the channel\'s +20 dBu ceiling. PK! sits right after GAIN and warns you (the twin lights it from +15 dBu); the guide\'s fix for a lit PK! is to turn that channel\'s GAIN down.',
       },
       principle: 'Headroom is the space between your normal level and the point where the circuit clips.',
-      manualReference: REF.meters,
+      manualReference: REF.gain,
     },
     {
       kind: 'do', control: 'ch2_lo', targetValue: 1, concept: 'gain-staging',
       instruction: 'With GAIN still at +10, turn channel 2 LO fully clockwise (+6 dB).',
       principle: 'EQ boosts add energy, so they raise the level just as gain does.',
-      explanation: 'The meter reads after the EQ, so the bass boost pushes the kick peaks into the +20 dBu ceiling. They get squashed flat: that is clipping.',
+      explanation: 'The meter reads after the EQ, so the bass boost pushes the kick peaks into the +20 dBu ceiling. They get squashed flat: that is clipping. PK! reads before the EQ, so it doesn\'t change - the meter\'s +10 LED is the one that shows the boost.',
       manualReference: REF.eq,
     },
     {
@@ -284,26 +286,26 @@ const f2: Lesson = {
   ],
   review: [
     { question: 'The manual\'s target for a channel meter is…', options: ['Average about 0, peaks about +6', 'Always on +10', 'As low as possible'], answer: 0, explain: 'Room for peaks and boosts.' },
-    { question: 'PK! lit continuously means…', options: ['Turn GAIN or EQ boosts down', 'Turn the fader up', 'Nothing'], answer: 0, explain: 'It lights 5 dB before clipping.' },
+    { question: 'The PK! LED beside a channel\'s GAIN lights. You turn down…', options: ['That channel\'s GAIN', 'Its fader', 'MASTER 1'], answer: 0, explain: 'PK! reads right after GAIN, before the EQ. If the meter\'s +10 LED stays lit, take back GAIN or an EQ boost.' },
     { question: 'EQ boosts…', options: ['Raise the level, just like gain', 'Never change the level', 'Lower the level'], answer: 0, explain: 'They add energy.' },
     { question: 'Clipping sounds…', options: ['Harsh and crunchy', 'Muffled', 'Slower'], answer: 0, explain: 'Flattened peaks add harmonics.' },
   ],
 };
 
 const f3: Lesson = {
-  id: 'xone96-f3-eq-bands', device: 'xone96', path: 'foundations', order: O(3), difficulty: 'beginner',
+  id: 'xone96-eq-fundamentals', device: 'xone96', path: 'foundations', order: O(3), difficulty: 'beginner',
   name: 'The four EQ bands',
   description: 'What lives in LO, LO MID, HI MID and HI - and what a kill takes away.',
   objective: 'Name what each of the four EQ bands holds and hear it go with a kill or a cut.',
   source: 'Synth Studio · Xone:96 User Guide, 4-band EQ', estimatedMinutes: 7,
-  prerequisites: ['xone96-f2-gain-staging'],
+  prerequisites: ['xone96-gain-staging'],
   concepts: ['equalization'],
   start: { reset: true, values: { ch1_src: SRC.FULL } },
   steps: [
     play('Every sound is a mix of frequencies, from low rumbles to high sizzle.'),
     {
-      kind: 'predict', control: 'ch1_lo', targetValue: -1, concept: 'equalization',
-      instruction: 'Turn channel 1 LO fully anticlockwise, to KILL.',
+      kind: 'predict', control: 'ch1_lo', targetValue: -1, concept: 'equalization', scope: 'spectrum',
+      instruction: 'Turn channel 1 LO fully anticlockwise, to KILL. Watch the left end of the spectrum.',
       predict: {
         question: 'FULL MIX is a whole band. Which parts will disappear?',
         options: ['The kick\'s thump and the bassline', 'The hi-hats', 'The chords'], answer: 0,
@@ -318,7 +320,7 @@ const f3: Lesson = {
       principle: 'A kill is a filter at the band\'s edge: what it removes comes straight back when you open it.',
     },
     {
-      kind: 'predict', control: 'ch1_hi', targetValue: -1, concept: 'equalization',
+      kind: 'predict', control: 'ch1_hi', targetValue: -1, concept: 'equalization', scope: 'spectrum',
       instruction: 'Now kill HI (fully anticlockwise).',
       predict: {
         question: 'What goes this time?',
@@ -334,7 +336,7 @@ const f3: Lesson = {
       principle: 'Centre is 0 dB on every band of the Xone EQ.',
     },
     {
-      kind: 'do', control: 'ch1_lomid', targetValue: -1, concept: 'equalization',
+      kind: 'do', control: 'ch1_lomid', targetValue: -1, concept: 'equalization', scope: 'spectrum',
       instruction: 'Cut LO MID (350 Hz) all the way: -27 dB.',
       principle: 'Low mids give a sound body and warmth; too much of them sounds muddy.',
       explanation: 'The bass and chords get thinner but stay. The mid bands cut -27 dB but never fully kill, and they can boost +10 dB: the "asymmetric" Xone EQ.',
@@ -346,7 +348,7 @@ const f3: Lesson = {
       principle: 'Cuts are easier on the ear than boosts: they remove clutter instead of adding level.',
     },
     {
-      kind: 'listen', concept: 'equalization', focus: ['ch1_himid'],
+      kind: 'listen', concept: 'equalization', focus: ['ch1_himid'], scope: 'spectrum',
       instruction: 'Compare flat with HI MID (1.1 kHz) cut.',
       listen: {
         a: { ch1_himid: 0 }, b: { ch1_himid: -1 }, labels: ['Flat', 'HI MID cut'],
@@ -372,7 +374,7 @@ const f3: Lesson = {
       hints: ['Listen for the kick, then for the hats.', 'The kick is there; the sizzle is not.', 'Kill HI, leave LO.'],
     },
     {
-      kind: 'challenge', concept: 'equalization',
+      kind: 'challenge', concept: 'equalization', scope: 'spectrum',
       instruction: 'Make channel 1 sound like it is playing in the next room: dull and muffled, but with the bass still there.',
       checklist: [
         { text: 'The top is gone (HI at -12 dB or lower)', check: s => num(s, 'ch1_hi') <= -0.5 },
@@ -398,12 +400,12 @@ const f3: Lesson = {
 };
 
 const f4: Lesson = {
-  id: 'xone96-f4-cut-boost', device: 'xone96', path: 'foundations', order: O(4), difficulty: 'intermediate',
+  id: 'xone96-low-end-clash', device: 'xone96', path: 'foundations', order: O(4), difficulty: 'intermediate',
   name: 'Cut, don\'t boost: kick vs bass',
   description: 'Two sounds in the same band mask each other. Make room with cuts instead of boosts.',
   objective: 'Give a kick and a bassline their own space by cutting, not boosting.',
   source: 'Synth Studio · mixing practice', estimatedMinutes: 7,
-  prerequisites: ['xone96-f3-eq-bands'],
+  prerequisites: ['xone96-eq-fundamentals'],
   concepts: ['equalization', 'mixing', 'gain-staging'],
   start: { reset: true, values: { ch1_src: SRC.DRUMS, ch2_src: SRC.BASS } },
   steps: [
@@ -432,7 +434,7 @@ const f4: Lesson = {
       manualReference: REF.eq,
     },
     {
-      kind: 'do', control: 'ch2_lo', targetValue: -0.29, concept: 'equalization',
+      kind: 'do', control: 'ch2_lo', targetValue: -0.29, concept: 'equalization', scope: 'spectrum',
       instruction: 'Now cut instead: set channel 2 LO to about -6 dB.',
       principle: 'Cutting a clashing band makes room without adding level or distortion.',
       explanation: 'The bass keeps its notes (the harmonics above 180 Hz) but gives the kick\'s thump room.',
@@ -445,7 +447,7 @@ const f4: Lesson = {
       manualReference: REF.eq,
     },
     {
-      kind: 'listen', concept: 'equalization', focus: ['ch2_lo', 'ch1_lomid'],
+      kind: 'listen', concept: 'equalization', focus: ['ch2_lo', 'ch1_lomid'], scope: 'spectrum',
       instruction: 'Compare the boosted version with the carved one.',
       listen: {
         a: { ch2_lo: 1, ch1_lomid: 0 }, b: { ch2_lo: -0.29, ch1_lomid: -0.5 }, labels: ['Boosted', 'Carved'],
@@ -498,12 +500,12 @@ const f4: Lesson = {
 };
 
 const f5: Lesson = {
-  id: 'xone96-f5-filters', device: 'xone96', path: 'foundations', order: O(5), difficulty: 'intermediate',
+  id: 'xone96-filter-sweeps', device: 'xone96', path: 'foundations', order: O(5), difficulty: 'intermediate',
   name: 'The Xone:VCF filters',
   description: 'Assign a channel to FILTER 1, switch it ON, and sweep HPF, BPF and LPF with FREQ, RES and CRUNCH.',
   objective: 'Route a channel through a Xone:VCF and shape it with type, FREQ, RES and CRUNCH.',
   source: 'Synth Studio · Xone:96 User Guide, Xone:VCF sections', estimatedMinutes: 8,
-  prerequisites: ['xone96-f3-eq-bands'],
+  prerequisites: ['xone96-eq-fundamentals'],
   concepts: ['filter-type', 'filter-cutoff', 'filter-resonance'],
   start: { reset: true, values: { ch1_src: SRC.FULL } },
   steps: [
@@ -523,7 +525,7 @@ const f5: Lesson = {
       manualReference: REF.filter,
     },
     {
-      kind: 'predict', control: 'f1_freq', targetValue: 800, concept: 'filter-cutoff',
+      kind: 'predict', control: 'f1_freq', targetValue: 800, concept: 'filter-cutoff', scope: 'spectrum',
       instruction: 'Turn FILTER 1 FREQ up to about 800 Hz.',
       predict: {
         question: 'FILTER 1 is a high-pass. What will turning FREQ up do?',
@@ -534,10 +536,10 @@ const f5: Lesson = {
       manualReference: REF.filter,
     },
     {
-      kind: 'do', control: 'f1_res', targetValue: 8, concept: 'filter-resonance',
+      kind: 'do', control: 'f1_res', targetValue: 8, concept: 'filter-resonance', scope: 'spectrum',
       instruction: 'Turn RES up towards WILD.',
-      principle: 'Resonance boosts a narrow band right at the cutoff, so the filter rings.',
-      explanation: 'A whistling peak appears at FREQ. Sweep FREQ a little and the peak follows it - the classic DJ filter sweep.',
+      principle: 'Resonance feeds some of the filter\'s output back to its input, which boosts a band right at the cutoff.',
+      explanation: 'A resonant peak rises at FREQ - about +7.6 dB at WILD on the guide\'s graphs, a strong colour but never a whistle. Sweep FREQ a little and the peak follows it: the classic Xone filter sweep.',
       manualReference: REF.filter,
     },
     {
@@ -548,7 +550,7 @@ const f5: Lesson = {
       manualReference: REF.filter,
     },
     {
-      kind: 'listen', concept: 'filter-type', focus: ['f1_type'],
+      kind: 'listen', concept: 'filter-type', focus: ['f1_type'], scope: 'spectrum',
       instruction: 'Compare HPF and LPF at the same FREQ.',
       listen: {
         a: { f1_type: 0, f1_res: 3 }, b: { f1_type: 2, f1_res: 3 }, labels: ['HPF at 800 Hz', 'LPF at 800 Hz'],
@@ -604,18 +606,18 @@ const f5: Lesson = {
   review: [
     { question: 'A channel assigned to FILTER 1 while FILTER 1 is OFF…', options: ['Passes through unfiltered', 'Goes silent', 'Gets distorted'], answer: 0, explain: 'OFF means not affected.' },
     { question: 'A high-pass filter…', options: ['Removes the lows', 'Removes the highs', 'Changes the tempo'], answer: 0, explain: 'It passes the highs.' },
-    { question: 'RES near WILD…', options: ['Rings sharply at the cutoff', 'Removes everything', 'Adds reverb'], answer: 0, explain: 'A narrow resonant peak.' },
+    { question: 'RES near WILD…', options: ['Adds a resonant peak at the cutoff', 'Removes everything', 'Adds reverb'], answer: 0, explain: 'Output fed back to the input: about +7.6 dB at FREQ.' },
     { question: 'CRUNCH is…', options: ['Distortion before the filter', 'A delay', 'A second fader'], answer: 0, explain: 'Harmonic distortion, pre-filter.' },
   ],
 };
 
 const f6: Lesson = {
-  id: 'xone96-f6-crossfader', device: 'xone96', path: 'foundations', order: O(6), difficulty: 'beginner',
+  id: 'xone96-crossfader', device: 'xone96', path: 'foundations', order: O(6), difficulty: 'beginner',
   name: 'The crossfader: assign and curves',
   description: 'Put channels on X and Y and choose the curve for smooth blends or sharp cuts.',
   objective: 'Assign channels to X and Y and pick the crossfader curve that suits blends or cuts.',
   source: 'Synth Studio · Xone:96 User Guide, XFADER', estimatedMinutes: 6,
-  prerequisites: ['xone96-f1-signal-flow'],
+  prerequisites: ['xone96-signal-flow'],
   concepts: ['dj-mixing', 'mixing'],
   start: { reset: true, values: { ch1_src: SRC.TRACK_A, ch2_src: SRC.TRACK_B, xfader: 0 } },
   steps: [
@@ -656,15 +658,16 @@ const f6: Lesson = {
         question: {
           question: 'In the middle, the TRANSITION curve sounds…',
           options: ['Louder: both tracks stay at full level', 'Quieter', 'Muted'], answer: 0,
-          explain: 'TRANSITION keeps both sides at full level up to the middle and fades them only near the ends. CONST PWR dips each side to -3 dB in the middle.',
+          explain: 'TRANSITION holds both sides at full level across the middle; each side only fades in the last stretch of travel, close to the far end (the guide\'s curve graph). CONST PWR dips each side to about -3 dB in the middle.',
         },
       },
+      manualReference: REF.xfader,
     },
     {
       kind: 'do', control: 'xf_curve', targetValue: 2, concept: 'dj-mixing',
       instruction: 'Set XFADER CURVE to FAST CUT.',
       principle: 'A sharp curve turns the crossfader into an on/off switch for cuts and scratching.',
-      explanation: 'Both sides now stay at full level until the last millimetre of travel.',
+      explanation: 'Both sides now stay at full level until the last few millimetres of travel, where the closing side cuts out almost at once.',
       manualReference: REF.xfader,
     },
     {
@@ -703,18 +706,19 @@ const f6: Lesson = {
   review: [
     { question: 'A channel with its XFADER switch on OFF…', options: ['Ignores the crossfader', 'Is muted', 'Follows X'], answer: 0, explain: 'It goes straight to the LR MIX.' },
     { question: 'CONST PWR in the middle puts each side at about…', options: ['-3 dB', '-20 dB', '+6 dB'], answer: 0, explain: 'Equal power.' },
+    { question: 'TRANSITION in the middle puts each side at…', options: ['Full level', '-3 dB', 'Silence'], answer: 0, explain: 'It fades each side only near the far end.' },
     { question: 'FAST CUT is for…', options: ['Cuts and scratching', 'Long blends', 'Recording'], answer: 0, explain: 'Almost instant cut-in.' },
     { question: 'The crossfader sits after the channel fader, so it also sets…', options: ['The level into the filters', 'The GAIN', 'The cue level'], answer: 0, explain: 'It is a VCA before the FILTER assign.' },
   ],
 };
 
 const f7: Lesson = {
-  id: 'xone96-f7-fx-sends', device: 'xone96', path: 'foundations', order: O(7), difficulty: 'intermediate',
+  id: 'xone96-fx-send', device: 'xone96', path: 'foundations', order: O(7), difficulty: 'intermediate',
   name: 'FX sends and returns',
   description: 'Send a channel to the delay and the reverb, and ride the returns on channels A and B.',
   objective: 'Use SEND 1 and SEND 2 to add delay and reverb, and control them on the returns.',
   source: 'Synth Studio · Xone:96 User Guide, SEND 1 / SEND 2', estimatedMinutes: 8,
-  prerequisites: ['xone96-f2-gain-staging'],
+  prerequisites: ['xone96-gain-staging'],
   concepts: ['effects', 'signal-routing'],
   start: { reset: true, values: { ch1_src: SRC.DRUMS, ch3_src: SRC.STABS, ch1_fader: 8 } },
   steps: [
@@ -810,12 +814,12 @@ const f7: Lesson = {
 };
 
 const f8: Lesson = {
-  id: 'xone96-f8-cueing', device: 'xone96', path: 'foundations', order: O(8), difficulty: 'beginner',
+  id: 'xone96-cue', device: 'xone96', path: 'foundations', order: O(8), difficulty: 'beginner',
   name: 'Cueing in the headphones',
   description: 'Listen to the next track before the crowd hears it, with CUE, CUE/MST and SPLIT CUE.',
   objective: 'Preview a track in the headphones and check it against the live mix.',
   source: 'Synth Studio · Xone:96 User Guide, Monitor section', estimatedMinutes: 6,
-  prerequisites: ['xone96-f6-crossfader'],
+  prerequisites: ['xone96-crossfader'],
   concepts: ['dj-mixing', 'signal-routing'],
   start: { reset: true, values: { ch1_src: SRC.TRACK_A, ch2_src: SRC.TRACK_B, ch1_xf: 0, ch2_xf: 2, xfader: 0 } },
   steps: [
@@ -827,7 +831,7 @@ const f8: Lesson = {
       kind: 'do', control: 'monitor_out', targetValue: 2, concept: 'signal-routing',
       instruction: 'Set YOU HEAR to PHONES. You are now listening to the DJ\'s headphones.',
       principle: 'Headphones let a DJ hear a track before it goes out to the room.',
-      explanation: 'Twin only: a browser has one output, so YOU HEAR picks which mixer output plays. Nothing is cued yet, so the headphones are quiet.',
+      explanation: 'Twin only: a browser has one output, so YOU HEAR picks which mixer output plays. Nothing is cued yet, so the headphones carry the program - the LR MIX, TRACK A, the same as the room.',
       manualReference: REF.twin,
     },
     {
@@ -835,23 +839,24 @@ const f8: Lesson = {
       instruction: 'Press channel 2\'s CUE.',
       predict: {
         question: 'What do you hear in the headphones now?',
-        options: ['TRACK B, even though the room cannot hear it', 'TRACK A', 'Nothing'], answer: 0,
-        explain: 'CUE taps the channel before its fader and the crossfader, so you hear TRACK B while the room still hears only TRACK A.',
+        options: ['TRACK B, even though the room cannot hear it', 'TRACK A, as before', 'Nothing'], answer: 0,
+        explain: 'Once a CUE is on, the headphones switch from the program to the cue. CUE taps the channel before its fader and the crossfader, so you hear TRACK B while the room still hears only TRACK A. The CUE ACTIVE LED in the MONITOR section lights.',
       },
       principle: 'Cue listens to a channel before its fader, so you can preview it silently.',
       manualReference: REF.cue,
     },
     {
       kind: 'do', control: 'cue_mix', targetValue: 5, concept: 'dj-mixing',
-      instruction: 'Turn CUE / MST to the middle: the cue and the master mix together.',
+      instruction: 'Turn CUE / MST to the middle: the LR MIX joins the cue in the headphones.',
       principle: 'Hearing the cue and the mix together shows whether two tracks line up.',
+      explanation: 'CUE/MST adds the mix to the cue: the cue stays at full level, and turning clockwise brings in more and more of the LR MIX alongside it. Fully anticlockwise is the cue alone.',
       manualReference: REF.cue,
     },
     {
       kind: 'do', control: 'split_cue', targetValue: true, concept: 'dj-mixing',
       instruction: 'Press SPLIT CUE: cue in your left ear, the master mix in your right.',
       principle: 'Separate ears let you compare two sounds without them blurring together.',
-      explanation: 'With SPLIT CUE the left LR meter shows the cue and the right shows the mix.',
+      explanation: 'SPLIT CUE overrides CUE/MST. The left main meter now shows the cue and the right one the mix (CUE and PRG on the legend).',
       manualReference: REF.cue,
     },
     {
@@ -871,8 +876,9 @@ const f8: Lesson = {
       quiz: {
         question: 'While a CUE is on (no split), what do the LR MIX meters show?',
         options: ['The cued channel\'s level', 'The master only', 'Nothing'], answer: 0,
-        explain: 'Cueing switches the main meters to the cued channel, so you can compare its level with the live track before it goes out.',
+        explain: 'Cueing switches the main meters to the cued channels (their sum, if several are cued), so you can check the incoming level before it goes out. With nothing cued they read the LR MIX before MASTER 1; SPLIT CUE shows both, cue left and mix right.',
       },
+      manualReference: REF.master,
     },
     {
       kind: 'do', control: 'monitor_out', targetValue: 0, concept: 'signal-routing',
@@ -902,7 +908,8 @@ const f8: Lesson = {
     { question: 'CUE sends a channel to…', options: ['The headphones (MONITOR)', 'The master', 'The booth'], answer: 0, explain: 'Preview only.' },
     { question: 'SPLIT CUE puts…', options: ['The cue in one ear, the mix in the other', 'Both tracks in both ears', 'The booth in the headphones'], answer: 0, explain: 'Left cue, right mix.' },
     { question: 'Pressing a new CUE on the Xone:96 (AUTO-CUE)…', options: ['Cancels the previous one', 'Adds to it', 'Mutes the master'], answer: 0, explain: 'One cue at a time by default.' },
-    { question: 'CUE/MST turned fully to MST plays…', options: ['The master mix in the headphones', 'Only the cue', 'Nothing'], answer: 0, explain: 'It blends cue into mix.' },
+    { question: 'CUE/MST turned fully clockwise plays…', options: ['The cue and the LR MIX together', 'Only the LR MIX', 'Only the cue'], answer: 0, explain: 'It adds the mix to the cue; the cue never fades out.' },
+    { question: 'With no CUE pressed, the MONITOR headphones play…', options: ['The LR MIX (the program)', 'Silence', 'Channel 1'], answer: 0, explain: 'The cue takes over only while a CUE is on.' },
   ],
 };
 
@@ -911,12 +918,12 @@ const f8: Lesson = {
 // ============================================================================
 
 const p1: Lesson = {
-  id: 'xone96-p1-phrasing', device: 'xone96', path: 'performance', order: O(9), difficulty: 'intermediate',
+  id: 'xone96-phrasing', device: 'xone96', path: 'performance', order: O(9), difficulty: 'intermediate',
   name: 'Phrasing: mix on the 8-bar line',
   description: 'Count beats, bars and phrases, and start a blend where the music expects a change.',
   objective: 'Count bars and phrases, and start a blend on the first bar of a phrase.',
   source: 'Synth Studio · DJ practice', estimatedMinutes: 7,
-  prerequisites: ['xone96-f6-crossfader'],
+  prerequisites: ['xone96-crossfader'],
   concepts: ['timing-tempo', 'dj-mixing'],
   start: { reset: true, values: { ch1_src: SRC.TRACK_A, ch2_src: SRC.TRACK_B, ch1_xf: 0, ch2_xf: 2, xfader: 0 } },
   steps: [
@@ -996,12 +1003,12 @@ const p1: Lesson = {
 };
 
 const p2: Lesson = {
-  id: 'xone96-p2-transitions', device: 'xone96', path: 'performance', order: O(10), difficulty: 'intermediate',
+  id: 'xone96-bass-swap', device: 'xone96', path: 'performance', order: O(10), difficulty: 'intermediate',
   name: 'Transitions: the bass swap and the filter out',
   description: 'Two classic transitions: swap the bass between tracks, then filter the old one away.',
   objective: 'Perform a bass swap and a high-pass filter exit between two tracks.',
   source: 'Synth Studio · DJ practice', estimatedMinutes: 8,
-  prerequisites: ['xone96-f4-cut-boost', 'xone96-p1-phrasing'],
+  prerequisites: ['xone96-low-end-clash', 'xone96-phrasing'],
   concepts: ['dj-mixing', 'equalization', 'filter-cutoff'],
   start: { reset: true, values: { ch1_src: SRC.TRACK_A, ch2_src: SRC.TRACK_B, ch2_lo: -1 } },
   steps: [
@@ -1022,7 +1029,7 @@ const p2: Lesson = {
       explanation: 'With two hands it happens on the same beat. With one mouse, do it as fast as you can on the downbeat.',
     },
     {
-      kind: 'listen', concept: 'dj-mixing', focus: ['ch1_lo', 'ch2_lo'],
+      kind: 'listen', concept: 'dj-mixing', focus: ['ch1_lo', 'ch2_lo'], scope: 'spectrum',
       instruction: 'Compare before and after the swap.',
       listen: {
         a: { ch1_lo: 0, ch2_lo: -1 }, b: { ch1_lo: -1, ch2_lo: 0 }, labels: ['Before', 'After'],
@@ -1095,12 +1102,12 @@ const p2: Lesson = {
 };
 
 const p3: Lesson = {
-  id: 'xone96-p3-full-blend', device: 'xone96', path: 'performance', order: O(11), difficulty: 'advanced',
+  id: 'xone96-full-blend', device: 'xone96', path: 'performance', order: O(11), difficulty: 'advanced',
   name: 'A full blend from A to B',
   description: 'Everything together: cue, match the gain, kill, blend on the phrase, swap and finish.',
   objective: 'Mix from TRACK A into TRACK B over a phrase using cue, GAIN, EQ and the crossfader.',
   source: 'Synth Studio · DJ practice', estimatedMinutes: 10,
-  prerequisites: ['xone96-p2-transitions', 'xone96-f8-cueing'],
+  prerequisites: ['xone96-bass-swap', 'xone96-cue'],
   concepts: ['dj-mixing', 'gain-staging', 'equalization'],
   start: { reset: true, values: { ch1_src: SRC.TRACK_A, ch2_src: SRC.TRACK_B, ch1_xf: 0, ch2_xf: 2, xfader: 0, ch2_gain: 4 } },
   steps: [
@@ -1203,12 +1210,12 @@ const e1: Lesson = {
   description: 'Wide differences first: was the LO or the HI killed?',
   objective: 'Hear whether the low or the high band was killed, and recreate it.',
   source: 'Synth Studio · ear training', estimatedMinutes: 6,
-  prerequisites: ['xone96-f3-eq-bands'],
+  prerequisites: ['xone96-eq-fundamentals'],
   concepts: ['equalization'],
   start: { reset: true, values: { ch1_src: SRC.FULL } },
   steps: [
     {
-      kind: 'listen', concept: 'equalization', focus: ['ch1_lo', 'ch1_hi'],
+      kind: 'listen', concept: 'equalization', focus: ['ch1_lo', 'ch1_hi'], scope: 'spectrum',
       instruction: 'Warm up: compare the full band with LO killed. Listen to the kick.',
       listen: { a: {}, b: { ch1_lo: -1 }, labels: ['Full', 'LO killed'] },
     },
@@ -1282,7 +1289,7 @@ const e2: Lesson = {
   start: { reset: true, values: { ch1_src: SRC.FULL } },
   steps: [
     {
-      kind: 'listen', concept: 'equalization', focus: ['ch1_lomid'],
+      kind: 'listen', concept: 'equalization', focus: ['ch1_lomid'], scope: 'spectrum',
       instruction: 'Warm up: flat against LO MID cut.',
       listen: {
         a: {}, b: { ch1_lomid: -1 }, labels: ['Flat', 'LO MID cut'],
@@ -1361,12 +1368,12 @@ const e3: Lesson = {
   description: 'HPF, BPF or LPF? Then find the cutoff by ear.',
   objective: 'Recognise HPF, BPF and LPF by ear and match the filter frequency.',
   source: 'Synth Studio · ear training', estimatedMinutes: 8,
-  prerequisites: ['xone96-f5-filters'],
+  prerequisites: ['xone96-filter-sweeps'],
   concepts: ['filter-type', 'filter-cutoff'],
   start: { reset: true, values: { ch1_src: SRC.FULL, ...FILTER_ON, f1_type: 2, f1_freq: 1000 } },
   steps: [
     {
-      kind: 'listen', concept: 'filter-type', focus: ['f1_type'],
+      kind: 'listen', concept: 'filter-type', focus: ['f1_type'], scope: 'spectrum',
       instruction: 'Warm up: HPF against LPF, both at 1 kHz.',
       listen: {
         a: { f1_type: 0 }, b: { f1_type: 2 }, labels: ['HPF', 'LPF'],
@@ -1442,7 +1449,7 @@ const e4: Lesson = {
   description: 'Clean or clipped? Hear distortion at matched loudness, then mix gain, EQ and filter clues.',
   objective: 'Hear when a channel is over-driven, set GAIN by ear, and tell clipping from a filter.',
   source: 'Synth Studio · ear training (interleaved)', estimatedMinutes: 8,
-  prerequisites: ['xone96-f2-gain-staging', 'xone96-e1-which-band'],
+  prerequisites: ['xone96-gain-staging', 'xone96-e1-which-band'],
   concepts: ['gain-staging', 'equalization', 'filter-type'],
   start: { reset: true, values: { ch1_src: SRC.FULL } },
   steps: [
@@ -1469,10 +1476,11 @@ const e4: Lesson = {
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'gain-staging',
       quiz: {
-        question: 'The channel meter sits on +10 with PK! flashing. What do you turn down first?',
-        options: ['GAIN (or an EQ boost) on that channel', 'MASTER 1', 'The channel fader'], answer: 0,
-        explain: 'The channel meter reads after GAIN and EQ, before the fader. Only GAIN or the EQ can bring it down; the fader and MASTER 1 are later in the chain.',
+        question: 'The channel meter sits on +10 and the PK! LED beside GAIN is flashing. What do you turn down first?',
+        options: ['That channel\'s GAIN', 'MASTER 1', 'The channel fader'], answer: 0,
+        explain: 'PK! reads right after GAIN, before the EQ, so GAIN is the fix the guide gives. If the meter\'s +10 LED still stays lit, take back an EQ boost too: the meter reads after the EQ. The fader and MASTER 1 come later in the chain.',
       },
+      manualReference: REF.gain,
     },
     {
       kind: 'match', instruction: 'Round 2: level, not distortion. How much quieter is the target?', concept: 'gain-staging',
@@ -1488,21 +1496,21 @@ const e4: Lesson = {
         b: { ch1_filter: 0, f1_on: true, f1_type: 0, f1_freq: 20, f1_crunch: 8 },
         labels: ['A', 'B'],
         question: {
-          question: 'Which one shows PK! on the channel meter?',
+          question: 'Which one lights the PK! LED beside channel 1\'s GAIN?',
           options: ['A: it is the channel running out of headroom', 'B', 'Both'], answer: 0,
-          explain: 'CRUNCH distorts inside the filter section, after the channel meter, so the meter stays healthy. A is the channel itself clipping, and PK! says so.',
+          explain: 'CRUNCH distorts inside the filter section, after the channel\'s GAIN, EQ and meter, so PK! stays dark. A is the channel itself driven too hot at GAIN, and PK! says so.',
         },
       },
     },
     {
       kind: 'challenge', concept: 'gain-staging',
-      instruction: 'Set channel 1 hot but clean: GAIN up for more level, no boosts, and the meter never on PK!.',
+      instruction: 'Set channel 1 hot but clean: GAIN up for more level, no boosts, and PK! never lit.',
       checklist: [
         { text: 'GAIN between 0 and +6 dB', check: s => num(s, 'ch1_gain') >= 0 && num(s, 'ch1_gain') <= 6 },
         { text: 'No EQ boosts', check: s => ['ch1_hi', 'ch1_himid', 'ch1_lomid', 'ch1_lo'].every(c => num(s, c) <= 0.05) },
         { text: 'MASTER 1 back at unity (8)', check: s => Math.abs(num(s, 'master') - 8) <= 0.3 },
       ],
-      hints: ['Start with the EQ flat.', 'At 0 dB the FULL MIX peaks near +6; PK! is +15.', 'GAIN about +3 dB, all EQ centred, MASTER 1 at 8.'],
+      hints: ['Start with the EQ flat.', 'At 0 dB the FULL MIX peaks near +6; the twin\'s PK! lights from +15.', 'GAIN about +3 dB, all EQ centred, MASTER 1 at 8.'],
       solution: { values: { ch1_gain: 3, ch1_hi: 0, ch1_himid: 0, ch1_lomid: 0, ch1_lo: 0, master: 8 } },
     },
     {
@@ -1515,7 +1523,7 @@ const e4: Lesson = {
   ],
   review: [
     { question: 'Over-gain on a channel sounds…', options: ['Crunchy and flattened on the loudest hits', 'Muffled', 'Delayed'], answer: 0, explain: 'Clipping adds harmonics.' },
-    { question: 'Fix a channel stuck on PK! with…', options: ['GAIN or the EQ boosts', 'MASTER 1', 'The crossfader'], answer: 0, explain: 'The meter reads before the fader.' },
+    { question: 'A channel\'s PK! LED keeps lighting. Fix it with…', options: ['Its GAIN', 'MASTER 1', 'The crossfader'], answer: 0, explain: 'PK! reads right after GAIN, before the EQ.' },
     { question: 'CRUNCH distortion happens…', options: ['In the filter section, after the channel meter', 'Before GAIN', 'In the headphones'], answer: 0, explain: 'Pre-filter, post-fader.' },
     { question: 'Compare distortion at…', options: ['Matched loudness', 'Full volume', 'Any level'], answer: 0, explain: 'Loudness fools the ear.' },
   ],
@@ -1532,7 +1540,7 @@ const st1: Lesson = {
   objective: 'Route two instruments into Xone:96 channels and control where each channel takes its sound from.',
   source: 'Synth Studio · studio routing', estimatedMinutes: 8,
   requires: ['analog-rytm', 'dfam'],
-  prerequisites: ['xone96-f2-gain-staging'],
+  prerequisites: ['xone96-gain-staging'],
   concepts: ['signal-routing', 'mixing', 'gain-staging'],
   start: { reset: true, values: { ch4_src: SRC.PERC } },
   steps: [
@@ -1613,7 +1621,7 @@ const st2: Lesson = {
   objective: 'Balance drums and synths on the Xone:96 so every part is clear and the LR MIX stays out of the red.',
   source: 'Synth Studio · mixing practice', estimatedMinutes: 10,
   requires: ['analog-rytm', 'analog-four'],
-  prerequisites: ['xone96-st1-route', 'xone96-f4-cut-boost'],
+  prerequisites: ['xone96-st1-route', 'xone96-low-end-clash'],
   concepts: ['mixing', 'gain-staging', 'equalization'],
   start: { reset: true, values: { ch1_src: SRC.DRUMS, ch2_src: SRC.BASS } },
   steps: [
@@ -1663,7 +1671,8 @@ const st2: Lesson = {
       kind: 'do', control: 'ch2_fader', targetValue: 7.5, concept: 'mixing',
       instruction: 'Bring channel 2 up under the drums, to about 7.5.',
       principle: 'Supporting parts sit just under the leader, not level with it.',
-      explanation: 'On the CONST PWR curve 7.5 is about -6 dB, enough to sit under the drums without disappearing.',
+      explanation: 'On the CONST PWR channel curve 7.5 is about -12 dB (the guide\'s curve graph): clearly under the drums, still easy to hear. The taper is gentle near the top, so small moves there are fine trims.',
+      manualReference: REF.fader,
     },
     {
       kind: 'listen', concept: 'mixing', focus: ['ch2_lo'],
@@ -1680,10 +1689,11 @@ const st2: Lesson = {
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'gain-staging',
       quiz: {
-        question: 'The LR MIX meters keep hitting +10. What do you turn down first?',
-        options: ['Channel GAINs or faders', 'MASTER 1', 'The booth'], answer: 0,
-        explain: 'The LR MIX meters read before MASTER 1, so only the channels feeding the mix can bring them down. MASTER 1 changes how loud the output is, not how hot the mix bus runs.',
+        question: 'The LR MIX meters keep lighting their top LED, PK!. What do you turn down first?',
+        options: ['Channel GAIN, EQ boosts or faders', 'MASTER 1', 'The booth'], answer: 0,
+        explain: 'The LR MIX meters read before MASTER 1, so only the channels feeding the mix can bring them down: check that no channel is clipping at GAIN or EQ, then take the faders down if needed. MASTER 1 changes how loud the output is, not how hot the mix bus runs.',
       },
+      manualReference: REF.master,
     },
     {
       kind: 'challenge', concept: 'mixing',
@@ -1707,7 +1717,7 @@ const st2: Lesson = {
   ],
   review: [
     { question: 'Balance a mix starting from…', options: ['The leading part, usually the drums', 'The quietest part', 'The master'], answer: 0, explain: 'Fit the rest under it.' },
-    { question: 'LR MIX in the red: first fix?', options: ['Channel GAINs or faders', 'MASTER 1', 'Headphone level'], answer: 0, explain: 'The meters read before MASTER 1.' },
+    { question: 'LR MIX on PK!: first fix?', options: ['Channel GAIN, EQ or faders', 'MASTER 1', 'Headphone level'], answer: 0, explain: 'The meters read before MASTER 1.' },
     { question: 'A synth masking the kick usually needs…', options: ['A LO cut', 'A LO boost', 'More reverb'], answer: 0, explain: 'Free the kick\'s band.' },
     { question: 'Gain-stage a channel with its fader…', options: ['Down, using the pre-fader meter', 'Fully up', 'At half'], answer: 0, explain: 'Silently, by the meter.' },
   ],
@@ -1719,7 +1729,7 @@ const st3: Lesson = {
   description: 'Turn your own jam into a track: an intro, a filtered build, a drop and a reverb-washed ending, then record it.',
   objective: 'Perform a mix-down of your studio jam on the Xone:96: intro, build, drop and outro, recorded with REC.',
   source: 'Synth Studio · arranging and mixing', estimatedMinutes: 12,
-  prerequisites: ['xone96-st2-balance', 'xone96-f5-filters'],
+  prerequisites: ['xone96-st2-balance', 'xone96-filter-sweeps'],
   concepts: ['mixing', 'dj-mixing', 'effects', 'filter-cutoff'],
   start: { reset: true, values: { ch1_src: SRC.DRUMS, ch2_src: SRC.BASS, ch3_src: SRC.STABS } },
   steps: [

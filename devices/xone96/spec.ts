@@ -279,7 +279,7 @@ export const XONE96: DeviceSpec = {
     cue_mix: {
       type: 'knob', label: 'CUE / MST', min: 0, max: 10, default: 0, units: 'none',
       format: v => (v < 0.1 ? 'CUE' : v > 9.9 ? 'CUE + MST' : v.toFixed(1)),
-      description: 'MONITOR headphones: fully anticlockwise only the cued channels; turning clockwise adds the LR MIX alongside them. SPLIT CUE overrides it.',
+      description: 'MONITOR headphones: an add-mix control. Fully anticlockwise you hear only the cued channels; turning clockwise adds the LR MIX alongside them, while the cue stays at full level. SPLIT CUE overrides it. With nothing cued, the headphones play the LR MIX.',
       manualReference: P.monitor,
     },
     phones: {
