@@ -293,11 +293,11 @@ export const XONE96: DeviceSpec = {
     },
     cue_post_eq: {
       type: 'button', label: 'POST EQ', default: true, ledColor: '#ffb020',
-      description: 'Take every channel cue after the EQ (lit) or before it: the CUE switches and the PHONES 2 selector alike.', manualReference: P.monitor,
+      description: 'Take the channel CUEs (the MONITOR headphones and the cue on the meters) after the EQ (lit) or before it, for every channel at once. PHONES 2 always listens after the EQ.', manualReference: P.monitor,
     },
     phones2_src: {
       type: 'switch', label: 'PHONES 2', options: PHONES2_SOURCES, default: 0,
-      description: 'The second, independent cue system: pick the LR MIX (MST) or one channel (1-4, A, B, C, D, before its fader; after its EQ while POST EQ is lit). The channel CUE switches don\'t affect it.',
+      description: 'The second, independent cue system: pick the LR MIX (MST) or one channel (1-4, A, B, C, D), heard after its EQ and before its fader. The channel CUE switches and POST EQ don\'t affect it.',
       manualReference: P.phones2,
     } as SwitchSpec,
     phones2_mix: {

@@ -174,7 +174,7 @@ export const addMixLaw = (v: number) => Math.pow(Math.max(0, Math.min(10, v)) / 
 /** RTN C/D LEVEL: -40 (off) .. +10 dB, like GAIN */
 export const returnLevelLin = gainLin;
 
-/** PHONES 2 9-way source select (guide p.7, p.16): the LR MIX or one channel's pre-fader signal (pre/post EQ as CUE) */
+/** PHONES 2 9-way source select (guide p.7, p.16): the LR MIX or one channel's post-EQ, pre-fader signal (block diagram) */
 export const PHONES2_SOURCES = ['MST', '1', '2', '3', '4', 'A', 'B', 'C', 'D'];
 
 // ---------------------------------------------------------------------------
@@ -216,8 +216,8 @@ export const SRC = { TRACK_A: 0, TRACK_B: 1, DRUMS: 2, BASS: 3, STABS: 4, PERC: 
 export const SOURCE_MENU = [SRC.TRACK_A, SRC.TRACK_B, SRC.FULL, SRC.DRUMS, SRC.BASS, SRC.STABS, SRC.PERC, SRC.PAD, SRC.LEAD, SRC.NONE];
 /**
  * Output trim per deck source (dB), before the deck's +8 dBu ceiling (a CDJ's full scale; the
- * worklet's deckOut), so each one reads around 0 on the channel meter with its loudest peaks
- * around +6 to +8 at GAIN 0 dB, as the guide asks (measured offline). At unity a full track then
+ * worklet's deckOut), so each one reads around 0 to +3 on the (quasi-peak) channel meter with its
+ * loudest peaks at +4 to +6 at GAIN 0 dB, as the guide asks (measured in the app). At unity a full track then
  * leaves the mixer near -18 LUFS. TRACK B is ~1.5 dB hotter than TRACK A on purpose: matching
  * them with GAIN is a DJ's first move.
  */

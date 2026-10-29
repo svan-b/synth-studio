@@ -84,9 +84,12 @@ The guide's p.10 text repeats the CH A/B input wording; its panel photo (p.10) a
   full kill; the 4-band mids boost +10 and cut -27 dB; the A/B swept mid boosts +10 and cuts
   -24 dB. Every knob centred is flat.
 - Shapes, **measured** from the response graphs (Xone:96 User Guide, p.8, p.10): kill skirts about
-  12 dB/oct (LO killed: about -10 dB at 100 Hz, -20 dB at 60 Hz, -30 dB at 35 Hz); the 4-band
-  mids narrow when boosting (Q about 1.4) and wide when cutting (Q about 0.85); the A/B swept mid
-  narrower (Q about 2.4 boosting, 1.2 cutting).
+  12 dB/oct (LO killed: about -3 dB at 190 Hz, -10 dB at 110 Hz, -20 dB at 60 Hz, -30 dB at
+  35 Hz); the 4-band mids narrow when boosting (Q about 1.6-1.7: +10 dB at the centre, about
+  +4.5 dB half an octave either side) and wide when cutting (Q about 0.7: the -27 dB cuts still
+  take about 13 dB an octave from their centre, HI MID -12 dB at 500 Hz and -14.5 dB at 2 kHz);
+  the A/B swept mid narrower (Q about 2.4 boosting, 1.2 cutting). Read again for the review:
+  the first fit (Q 1.4 / 0.85) made the 4-band cuts 2-3.5 dB too shallow an octave out.
 - With every band fully down a channel is not silent: the mids stop at -27 dB. That follows from
   the figures above. **verified** (Xone:96 User Guide, p.10).
 
@@ -183,7 +186,7 @@ No EQ, filter, sends or fader: LEVEL, then ON into the LR MIX; both cue systems 
 | BOOTH level | (315.5, 172.5), 11 mm | 0 … 10, unity at 8 | `booth` | **verified** UG p.17; law **guess** |
 | MUTE | (315.5, 193.5), 11.5 mm, red | booth only | `booth_mute` | **verified** UG p.17 |
 | CUE ACTIVE | LED (305.5, 240) | lit while any CUE is on | - | **verified** UG p.17 |
-| POST EQ | (311.5, 252), small amber | every channel cue pre- or post-EQ | `cue_post_eq` | **verified** UG p.17 |
+| POST EQ | (311.5, 252), small amber | every channel CUE pre- or post-EQ (not PHONES 2) | `cue_post_eq` | **verified** UG p.17; the switch reaches only the CUE 1 selectors (BD) |
 | SPLIT CUE | (311.5, 264), small amber | cue left, LR MIX right | `split_cue` | **verified** UG p.17 |
 | CUE/MST | (315.5, 284), 11 mm | cue only … cue plus the LR MIX | `cue_mix` | **verified** UG p.17; ADD MIX in BD |
 | LEVEL | (315.5, 310.5), 12 mm | 0 … 11 | `phones` | **verified** UG p.17, legend UG p.7 |
@@ -208,8 +211,10 @@ No EQ, filter, sends or fader: LEVEL, then ON into the LR MIX; both cue systems 
   the cue: fully anticlockwise only the cued channels, turning clockwise brings the mix in beside
   them; SPLIT CUE overrides it. **verified** (Xone:96 User Guide, p.17; block diagram).
 - **PHONES 2** is a second, independent cue system; it doesn't change the channel CUEs, the
-  BOOTH or the MONITOR. **verified** (Xone:96 User Guide, p.16). It follows the global POST EQ
-  switch and its MST is the music-only mix. **verified** (block diagram).
+  BOOTH or the MONITOR. **verified** (Xone:96 User Guide, p.16). Each channel's CUE 2 feed is
+  taken straight from the post-EQ line, so PHONES 2 hears every channel after its EQ and
+  before its fader whatever POST EQ is set to; its MST is the music-only mix. **verified**
+  (block diagram: the POST EQ logic line reaches only the CUE 1 pre/post selectors).
 - **BOOTH:** music only, then 3-band EQ, STEREO/MONO, MUTE and level; none of them affect MST,
   MONITOR or PHONES 2. A level drop or thin bass in MONO means reversed polarity between left and
   right. **verified** (Xone:96 User Guide, p.17; block diagram).
@@ -239,7 +244,7 @@ instrument, and turns amber with "INPUT → LN/RTN" when the INPUT switch is els
 
 ```
 CH 1-4:  INPUT (USB 1 | PH | LN | USB 2) ─► GAIN ─┬─► PK! (post-GAIN, pre-EQ)
-                                                 └─► EQ ─┬─► meter, CUE 1 / PHONES 2 (POST EQ, or pre-EQ after GAIN)
+                                                 └─► EQ ─┬─► meter, PHONES 2; CUE 1 (POST EQ, or pre-EQ after GAIN)
                                                          ├─► SEND 1 when PRE is lit
                                                          └─► VCA = fader curve × crossfader (X / OFF / Y)
                                                                ├─► SEND 1 (post), SEND 2
@@ -263,14 +268,14 @@ The order of operations is the diagram's.
 | Quantity | Twin value |
 |---|---|
 | Internal level | 0.1 = 0 dBu. Soft clips (linear to 80 %, then a tanh knee): channel +20 dBu (the +20 dB channel headroom, p.35), LR MIX +21 dBu, MASTER 1 output +24 dBu, MASTER 2 and BOOTH outputs +18 dBu (maximum output levels, p.35) |
-| Studio alignment | the guide's own digital line-up, 0 dBu = -14 dBFS (p.35), in and out, so at unity (GAIN 0 dB, fader up, EQ flat, MASTER 1 at 8) a routed instrument leaves the Xone at its own level (measured within 0.02 dB at 100 Hz, 1 kHz and 8 kHz). Instruments normalised to -18 LUFS arrive a few dB under the meter target, so GAIN does its job |
+| Studio alignment | the guide's own digital line-up, 0 dBu = -14 dBFS (p.35), in and out, so at unity (GAIN 0 dB, fader up, EQ flat, MASTER 1 at 8) a routed instrument leaves the Xone at its own level (review measurement: -0.02 dB from 50 Hz to 15 kHz on CH 1 LINE, CH A RTN and RTN C; a -20 dBFS tone reads -6 on the meters). Instruments normalised to -18 LUFS read about -5 to +7 on the channel meters at GAIN 0 dB, bass-heavy ones the hottest, so GAIN does its job; several at unity sum past the guide's LR MIX target, as on the hardware |
 | Files on USB | the same line-up (the USB soundcards, p.35): a file at 0 dBFS arrives at +14 dBu |
-| Built-in decks | each plays like a CDJ with a mastered record: its output is soft-limited at +8 dBu (0 dBFS of a 2 V rms line out), linear up to about +6 dBu, so at GAIN 0 dB the loudest peaks read around +6 to +8 and a full track leaves the mixer near -18 LUFS. The flat EQ is an all-pass, so peaks after it can read a dB or two higher |
+| Built-in decks | each plays like a CDJ with a mastered record: its output is soft-limited at +8 dBu (0 dBFS of a 2 V rms line out), linear up to about +6 dBu, so at GAIN 0 dB a deck reads around 0 to +3 with its loudest peaks at +4 to +6 on the channel meter (review measurement, quasi-peak meter) and a full track leaves the mixer near -18 LUFS. The flat EQ is an all-pass, so sample peaks after it can be a dB or two higher |
 | PK! (channels) | sample peak at +15 dBu, after GAIN, held 1 s |
-| Meters | sample peak, instant attack, release 20 dB in 1.5 s, updated every 32 ms |
+| Meters | the LED ladders (channel and LR MIX alike) are quasi-peak, like an analogue LED driver: the rectified signal charges the reading with a 1 ms attack, release 20 dB in 1.5 s, updated every 32 ms. A steady tone reads its level; the sharpest drum transients read 2-4 dB under their sample peak, so material at the studio's -18 LUFS reads the guide's "average around 0, loudest peaks around +6" at GAIN 0 dB. The PK! LEDs (channel, LR MIX, RTN SIG red) take sample peaks |
 | GAIN | linear in dB from -40 (shown -∞) to +10; 0 dB at 80 % of travel |
 | HI / LO law | +6 dB × knob above centre; amplitude (1 + knob)² below it: -6 dB at -0.29, a kill at -1 |
-| Mid law | linear in dB; bell width from the p.8/p.10 graphs: CH 1-4 Q = 1 + 0.04·dB boosting, 1 + 0.0045·dB cutting; CH A/B Q = 1.4 + 0.1·dB boosting, 1.4 + 0.0083·dB cutting |
+| Mid law | linear in dB; bell width from the p.8/p.10 graphs: CH 1-4 Q = 1 + 0.065·dB boosting (1.65 at +10), 1 + 0.011·dB cutting (0.70 at -27); CH A/B Q = 1.4 + 0.1·dB boosting, 1.4 + 0.0083·dB cutting |
 | Kill bands | 2nd-order Linkwitz-Riley split at 180 Hz and 3 kHz: the bands sum to an all-pass at centre. The corner is softer than the p.10 graph (LO killed: -6 dB at 180 Hz where the graph shows about -3 dB, -13 dB at 100 Hz against -10); from 60 Hz down it matches within 2 dB |
 | MID FREQ | logarithmic 190 Hz - 2.75 kHz, default 650 Hz |
 | Fader / crossfader laws | the p.12 breakpoint tables above, dB interpolated linearly; the bottom stop is -∞ |
