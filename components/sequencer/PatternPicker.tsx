@@ -8,20 +8,28 @@
 //                      playing pattern - it blinks until then)
 //   COPY / PASTE       copy the selected pattern, paste it into another slot
 //   CLEAR              empty the selected slot (tap twice to confirm)
-//   CHANGE             SEQUENTIAL / DIRECT START / DIRECT JUMP / TEMP JUMP
+//   UNDO               puts back what the last PASTE or CLEAR replaced; tap
+//                      again to redo (the hardware: the same keys again)
+//   SAVE / RELOAD      SAVE PATTERN sets the restore point, RELOAD PATTERN goes
+//                      back to it (its state when it was selected, or at the
+//                      last SAVE) - an undo for live edits
+//   CHANGE             SEQUENTIAL / DIRECT START / DIRECT JUMP; TEMP JUMP arms a
+//                      one-shot jump ('seq:temp-jump'): it blinks while armed,
+//                      lights while the jumped-to pattern plays, then goes off
 //   PLAY               what PLAY plays: the pattern, the chain or the song
 //
 // LEDs: green = playing, blinking amber = cued, white outline = selected,
 // red dot = holds trigs. Opens with ui.seqMenu = 'pattern' (MenuKey), or pass
 // `open`. Lesson focus ids: 'seq:pattern:<ID>', 'seq:patterns', 'seq:bank:<B>',
-// 'seq:copy', 'seq:paste', 'seq:clear', 'seq:change:<mode>', 'seq:mode:<mode>'.
+// 'seq:copy', 'seq:paste', 'seq:clear', 'seq:undo', 'seq:save', 'seq:reload',
+// 'seq:change:<mode>', 'seq:temp-jump', 'seq:mode:<mode>'.
 // ============================================================================
 
 import { useEffect, useRef, useState } from 'react';
 import type { CustomRenderContext } from '@/types/panel';
 import {
-  CHANGE_MODES, clearPattern, copyPattern, getPattern, pastePattern, setActive, setChangeMode, setPlayMode,
-  updatePatternSettings, type ChangeMode, type Pattern, type PlayMode,
+  CHANGE_MODES, clearPattern, copyPattern, getPattern, pastePattern, reloadPattern, savePattern, setActive, setChangeMode,
+  setPlayMode, updatePatternSettings, type ChangeMode, type Pattern, type PatternId, type PlayMode, type Project,
 } from '@/lib/sequencer/elektron';
 import {
   C, Frame, Group, MONO, Overlay, PatternGrid, SeqButton, UI, bankOf, closeMenu, editProject, lessonFocus, menuOpen,
@@ -33,7 +41,7 @@ export interface PatternPickerProps extends OverlayProps {
   tracks?: number;
   /** Banks offered (default 8: A-H) */
   banks?: number;
-  /** Change modes offered (default all four) */
+  /** Change modes offered (default all four; 'temp-jump' is the TEMP JUMP arming key) */
   changeModes?: readonly ChangeMode[];
   /** Show the PATTERN / CHAIN / SONG play mode keys (default true) */
   playModes?: boolean;
@@ -41,6 +49,17 @@ export interface PatternPickerProps extends OverlayProps {
   names?: boolean;
   /** Close the menu after picking a pattern (default false) */
   closeOnPick?: boolean;
+  /** Show SAVE / RELOAD (default true) */
+  saveReload?: boolean;
+}
+
+/** What the last PASTE / CLEAR (or UNDO) replaced in a slot: UNDO puts it back */
+interface UndoRecord {
+  id: PatternId;
+  pattern: Pattern | null;
+  what: 'paste' | 'clear';
+  /** The record now holds the state before an UNDO: the key reads REDO */
+  undone?: boolean;
 }
 
 const CHANGE_LABEL: Record<ChangeMode, string> = {
@@ -50,9 +69,21 @@ const CHANGE_HELP: Record<ChangeMode, string> = {
   sequential: 'The new pattern starts when the playing one reaches its end',
   'direct-start': 'Changes on the next step; the new pattern starts from step 1',
   'direct-jump': 'Changes on the next step and carries on from the same position',
-  'temp-jump': 'Like DIRECT JUMP, plays the new pattern to its end once, then returns',
+  'temp-jump': 'Arms a one-off jump: the next pattern you pick starts at once from the same position, plays to its end once, then the previous pattern returns',
 };
 const PLAY_LABEL: Record<PlayMode, string> = { pattern: 'PATTERN', chain: 'CHAIN', song: 'SONG' };
+
+const isUndo = (x: unknown): x is UndoRecord => typeof x === 'object' && x !== null && typeof (x as UndoRecord).id === 'string';
+
+/** Does the active pattern differ from its restore point (so RELOAD would change it)? */
+function canReload(p: Project): boolean {
+  const r = p.restore;
+  if (!r || r.id !== p.active) return false;
+  const cur = p.patterns[p.active] ?? null;
+  if (cur === r.pattern) return false;
+  // Identity breaks after a save / load round trip: compare the content
+  return JSON.stringify(cur) !== JSON.stringify(r.pattern);
+}
 
 export default function PatternPicker(props: PatternPickerProps) {
   const { ctx } = props;
@@ -70,11 +101,26 @@ export default function PatternPicker(props: PatternPickerProps) {
   const clip = ctx.ui[UI.clipboard] as Pattern | null | undefined;
   const bank = bankOf(ctx, active);
   const modes = props.changeModes ?? CHANGE_MODES;
+  const baseModes = modes.filter(m => m !== 'temp-jump');
   const name = getPattern(project, active).name;
+  const undoRec = isUndo(ctx.ui[UI.undo]) && (ctx.ui[UI.undo] as UndoRecord).id === active ? (ctx.ui[UI.undo] as UndoRecord) : null;
+  const tempJump = st?.tempJump ?? 'off';
+  // The base change mode: a saved 'temp-jump' project mode (older data) shows the mode it falls back to
+  const baseMode: ChangeMode = project.changeMode !== 'temp-jump'
+    ? project.changeMode
+    : st?.changeMode && st.changeMode !== 'temp-jump' ? st.changeMode : 'sequential';
+  const reloadable = canReload(project);
+  const saved = !reloadable && project.restore?.id === active;
 
   const pick = (id: string) => {
     editProject(ctx, tracks, p => setActive(p, id));
     if (props.closeOnPick) closeMenu(ctx);
+  };
+  /** Replace the active slot, remembering what was there for UNDO */
+  const replace = (what: UndoRecord['what'], next: Pattern | null) => {
+    const rec: UndoRecord = { id: active, pattern: copyPattern(project, active), what };
+    ctx.setUi({ [UI.undo]: rec });
+    editProject(ctx, tracks, p => (next ? pastePattern(p, active, next) : clearPattern(p, active)));
   };
   const clear = () => {
     if (!confirmClear) {
@@ -84,15 +130,23 @@ export default function PatternPicker(props: PatternPickerProps) {
       return;
     }
     setConfirmClear(false);
-    editProject(ctx, tracks, p => clearPattern(p, active));
+    replace('clear', null);
+  };
+  const undo = () => {
+    if (!undoRec) return;
+    // Swap: the slot gets the remembered pattern, the record keeps what the slot held (REDO)
+    const rec: UndoRecord = { ...undoRec, pattern: copyPattern(project, active), undone: !undoRec.undone };
+    ctx.setUi({ [UI.undo]: rec });
+    editProject(ctx, tracks, p => pastePattern(p, undoRec.id, undoRec.pattern));
   };
 
   const status = st?.playing
     ? `${active} · playing ${st.pattern ?? '-'}${st.queued ? ` · cued ${st.queued}` : ''}${st.arranged ? ' · ARRANGER' : ''}`
-    : `${active}${name ? ` ${name}` : ''}`;
+    : `${active}${name ? ` ${name}` : ''}${st?.paused ? ' · PAUSED' : ''}`;
+  const undoLabel = `${undoRec?.undone ? 'REDO' : 'UNDO'}${undoRec ? ` ${undoRec.what.toUpperCase()}` : ''}`;
 
   return (
-    <Overlay portal={props.portal} portalPlacement={props.portalPlacement} portalSize={props.portalSize ?? { w: 620, h: 420 }}>
+    <Overlay portal={props.portal} portalPlacement={props.portalPlacement} portalSize={props.portalSize ?? { w: 640, h: 440 }}>
       <Frame
         title="PATTERN"
         sub={status}
@@ -100,9 +154,18 @@ export default function PatternPicker(props: PatternPickerProps) {
         right={(
           <>
             <SeqButton onPress={() => ctx.setUi({ [UI.clipboard]: copyPattern(project, active) })} disabled={!pat} highlight={!!focus?.has('seq:copy')} title={`Copy ${active}`}>COPY</SeqButton>
-            <SeqButton onPress={() => editProject(ctx, tracks, p => pastePattern(p, active, clip ?? null))} disabled={!clip} highlight={!!focus?.has('seq:paste')} title={clip ? `Paste into ${active}` : 'Copy a pattern first'}>PASTE</SeqButton>
+            <SeqButton onPress={() => replace('paste', clip ?? null)} disabled={!clip} highlight={!!focus?.has('seq:paste')} title={clip ? `Paste into ${active} (UNDO puts back what was there)` : 'Copy a pattern first'}>PASTE</SeqButton>
             <SeqButton onPress={clear} active={confirmClear} color={C.red} disabled={!pat} highlight={!!focus?.has('seq:clear')} title={confirmClear ? 'Tap again to clear' : `Clear ${active}`}>
               {confirmClear ? 'SURE?' : 'CLEAR'}
+            </SeqButton>
+            <SeqButton
+              onPress={undo}
+              disabled={!undoRec}
+              highlight={!!focus?.has('seq:undo')}
+              title={undoRec ? `${undoRec.undone ? 'Redo' : 'Undo'} the ${undoRec.what} on ${active}` : 'Undo the last PASTE or CLEAR on this slot'}
+              ariaLabel={undoLabel}
+            >
+              {undoRec?.undone ? 'REDO' : 'UNDO'}
             </SeqButton>
           </>
         )}
@@ -111,10 +174,10 @@ export default function PatternPicker(props: PatternPickerProps) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
           {modes.length > 1 && (
             <Group label="PATTERN CHANGE">
-              {modes.map(m => (
+              {baseModes.map(m => (
                 <SeqButton
                   key={m}
-                  active={project.changeMode === m}
+                  active={baseMode === m}
                   color={C.cyan}
                   onPress={() => editProject(ctx, tracks, p => setChangeMode(p, m))}
                   highlight={!!focus?.has(`seq:change:${m}`)}
@@ -123,6 +186,19 @@ export default function PatternPicker(props: PatternPickerProps) {
                   {CHANGE_LABEL[m]}
                 </SeqButton>
               ))}
+              {modes.includes('temp-jump') && (
+                <SeqButton
+                  active={tempJump !== 'off'}
+                  blink={tempJump === 'armed'}
+                  color={C.amber}
+                  onPress={() => ctx.sendEvent('seq:temp-jump')}
+                  highlight={!!focus?.has('seq:change:temp-jump') || !!focus?.has('seq:temp-jump')}
+                  title={tempJump === 'armed' ? 'TEMP JUMP armed: pick a pattern (tap again to disarm)' : tempJump === 'active' ? 'TEMP JUMP: the jumped-to pattern plays once, then the previous one returns' : CHANGE_HELP['temp-jump']}
+                  ariaLabel={`Temp jump ${tempJump}`}
+                >
+                  {CHANGE_LABEL['temp-jump']}
+                </SeqButton>
+              )}
             </Group>
           )}
           {props.playModes !== false && (
@@ -143,6 +219,30 @@ export default function PatternPicker(props: PatternPickerProps) {
                   </SeqButton>
                 );
               })}
+            </Group>
+          )}
+          {props.saveReload !== false && (
+            <Group label="RESTORE POINT">
+              <SeqButton
+                onPress={() => editProject(ctx, tracks, savePattern)}
+                dim={saved}
+                highlight={!!focus?.has('seq:save')}
+                title={`SAVE PATTERN: ${active} as it is now becomes the point RELOAD goes back to`}
+              >
+                SAVE
+              </SeqButton>
+              <SeqButton
+                onPress={() => editProject(ctx, tracks, reloadPattern)}
+                disabled={!reloadable}
+                highlight={!!focus?.has('seq:reload')}
+                title={reloadable
+                  ? `RELOAD PATTERN: undo the edits to ${active} since it was selected or saved`
+                  : project.restore?.id === active
+                    ? 'Nothing to reload: no edits since the pattern was selected or saved'
+                    : 'No restore point yet: SAVE (or select the pattern) first'}
+              >
+                RELOAD
+              </SeqButton>
             </Group>
           )}
           {props.names !== false && (

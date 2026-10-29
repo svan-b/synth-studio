@@ -7,25 +7,11 @@ import { describeValue, pressTargetOf, pressesNeeded } from '@/lib/controls/mapp
 import { hub } from '@/lib/studio/hub';
 import Scope from './Scope';
 import { canShowMe, cancelShowMe, showMe } from './coachActions';
+import { conceptLabel } from './concepts';
 
 interface InstructionsProps {
   spec: DeviceSpec | null;
   onNextLesson?: () => void;
-}
-
-const CONCEPT_LABELS: Record<string, string> = {
-  'oscillator-pitch': 'Pitch', 'oscillator-waveform': 'Waveforms', 'oscillator-sync': 'Hard sync',
-  'frequency-modulation': 'FM', subharmonics: 'Subharmonics', noise: 'Noise', mixing: 'Mixing',
-  'envelope-attack': 'Attack', 'envelope-decay': 'Decay', 'envelope-sustain': 'Sustain', 'envelope-release': 'Release',
-  'envelope-shape': 'Envelope shape', 'filter-cutoff': 'Filter cutoff', 'filter-resonance': 'Resonance',
-  'filter-type': 'Filter type', lfo: 'LFO', 'modulation-source': 'Mod sources', 'modulation-depth': 'Mod depth',
-  'signal-routing': 'Patching', 'velocity-dynamics': 'Velocity', glide: 'Glide', 'timing-tempo': 'Tempo',
-  'sequencer-pattern': 'Sequencing', polyrhythm: 'Polyrhythm', 'parameter-locks': 'Parameter locks',
-  effects: 'Effects', equalization: 'EQ', 'dj-mixing': 'DJ mixing', 'gain-staging': 'Gain staging',
-};
-
-export function conceptLabel(c: string) {
-  return CONCEPT_LABELS[c] ?? c;
 }
 
 const KIND_LABEL: Record<string, string> = {

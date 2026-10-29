@@ -151,6 +151,7 @@ function Strip({ id, device, name, audible, powered, targets, onFocus }: {
     return l ? { l: l.peakL, r: l.peakR } : null;
   };
   const routeTarget = targets.find(t => t.value === route);
+  const viaMixer = !isMixer && !!routeTarget;
   return (
     <StripShell accent={deviceColor(device)} dim={!powered} label={`${name} channel`}>
       <button
@@ -174,12 +175,18 @@ function Strip({ id, device, name, audible, powered, targets, onFocus }: {
       ) : (
         <span className="w-full text-center text-[10px] text-gray-500 h-[24px] leading-[24px]">→ Master</span>
       )}
-      <Labeled text="A · delay">
-        <HSlider value={c.sendA} min={MIN_DB} max={6} onChange={v => set({ sendA: v })} label={`${name} send A (delay)`} format={sendFmt} resetTo={MIN_DB} width={78} toPos={sendToPos} fromPos={posToSend} accent="#22d3ee" />
-      </Labeled>
-      <Labeled text="B · reverb">
-        <HSlider value={c.sendB} min={MIN_DB} max={6} onChange={v => set({ sendB: v })} label={`${name} send B (reverb)`} format={sendFmt} resetTo={MIN_DB} width={78} toPos={sendToPos} fromPos={posToSend} accent="#a78bfa" />
-      </Labeled>
+      <div
+        className={viaMixer ? 'opacity-40 pointer-events-none w-full' : 'w-full'}
+        aria-disabled={viaMixer || undefined}
+        title={viaMixer ? `This channel goes through ${routeTarget?.label ?? 'a mixer'}: use that mixer's FX sends` : undefined}
+      >
+        <Labeled text="A · delay">
+          <HSlider value={c.sendA} min={MIN_DB} max={6} onChange={v => set({ sendA: v })} label={`${name} send A (delay)`} format={sendFmt} resetTo={MIN_DB} width={78} toPos={sendToPos} fromPos={posToSend} accent="#22d3ee" />
+        </Labeled>
+        <Labeled text="B · reverb">
+          <HSlider value={c.sendB} min={MIN_DB} max={6} onChange={v => set({ sendB: v })} label={`${name} send B (reverb)`} format={sendFmt} resetTo={MIN_DB} width={78} toPos={sendToPos} fromPos={posToSend} accent="#a78bfa" />
+        </Labeled>
+      </div>
       <Labeled text="pan">
         <HSlider value={c.pan} min={-1} max={1} onChange={v => set({ pan: Math.round(v * 100) / 100 })} label={`${name} pan`} format={formatPan} resetTo={0} width={78} centered accent="#e5e7eb" />
       </Labeled>

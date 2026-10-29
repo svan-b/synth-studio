@@ -131,7 +131,9 @@ Checks receive `s.events` (presses this step, by control id and event name), `s.
 runs, but optional in the type: write `(s.events?.advance ?? 0) >= 3`. `s.engine` is now the
 instrument's live engine state (current step, LEDs), and checks re-run as it changes, so
 "press ADVANCE until step 8 is lit" can be `check: s => s.engine.step === 7`. Presses made
-before a prediction is committed don't count.
+before a prediction is committed don't count. `npm run validate` calls every check on a step
+that has just begun (nothing pressed or played: `events: {}`, `notesPlayed: []`), and a check
+that throws there is an error.
 
 **Feedback and help.** Hints are a ladder (vague → specific); after the last hint the coach
 offers "Show me": it turns the knob to the target while the instrument plays, holds it so the
