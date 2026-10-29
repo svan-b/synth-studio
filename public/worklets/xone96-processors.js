@@ -39,6 +39,8 @@ const METER_REL = Math.pow(10, (-20 / 1.5 / 20) * (BLOCK / SR));
 /** Meter attack: the rectified signal charges the reading with a 1 ms time constant (quasi-peak) */
 const METER_ATK = 1 - Math.exp(-1 / (0.001 * SR));
 const PK_LIN = 0.1 * Math.pow(10, 15 / 20);
+/** The LR MIX meters' top LED is printed PK! at +10 dBu: a sample-peak indicator there, held like the channel PK! */
+const PK_MIX_LIN = 0.1 * Math.pow(10, 10 / 20);
 const PK_HOLD = Math.round((1.0 * SR) / BLOCK);
 const METER_EVERY = 12;
 // Keep filtering this long after a channel's input goes quiet (EQ tails), then sleep
@@ -1099,7 +1101,7 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
     const cL = cue && cue.length ? cue[0] : null, cR = cue && cue.length ? cue[1] || cue[0] : null;
 
     // Summing amplifier (+21 dBu) and the pre-MASTER meters (music only: no clean feed). The LED
-    // ladders are quasi-peak like the channel meters; the PK! flags take sample peaks.
+    // ladders are quasi-peak like the channel meters; the PK! flags (the top LED) take sample peaks.
     const pk = this.peaks, me = this.meters;
     pk[0] = pk[1] = pk[2] = pk[3] = 0;
     let e0 = me[0] * METER_REL, e1 = me[1] * METER_REL;
@@ -1128,7 +1130,7 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
     me[2] = e2; me[3] = e3;
     for (let k = 0; k < 4; k++) {
       if (me[k] < 1e-7) me[k] = 0;
-      if (pk[k] >= PK_LIN) this.pk[k] = PK_HOLD; else if (this.pk[k] > 0) this.pk[k]--;
+      if (pk[k] >= PK_MIX_LIN) this.pk[k] = PK_HOLD; else if (this.pk[k] > 0) this.pk[k]--;
     }
 
     const mon = Math.round(c[M_MONITOR]);

@@ -99,8 +99,11 @@ function useFrame(fn: () => void) {
 type XoneEngineLike = { meterSnapshot?: () => MeterSnapshot; position?: () => number };
 const engineOf = (instance: string) => hub.getEngine(instance) as unknown as XoneEngineLike | undefined;
 
-/** A vertical LED ladder. `k` is the engine's meter key (channel id, 'L', 'R'). */
-function Ladder({ instance, k, steps, height, width, aria }: { instance: string; k: string; steps: number[]; height: number; width: number; aria: string }) {
+/**
+ * A vertical LED ladder. `k` is the engine's meter key (channel id, 'L', 'R'). With `pkTop` the top
+ * LED is a PK! indicator: it also lights on the engine's sample-peak flag (the LR MIX meters).
+ */
+function Ladder({ instance, k, steps, height, width, aria, pkTop = false }: { instance: string; k: string; steps: number[]; height: number; width: number; aria: string; pkTop?: boolean }) {
   const refs = useRef<(HTMLDivElement | null)[]>([]);
   const box = useRef<HTMLDivElement | null>(null);
   const last = useRef(-1);
@@ -109,19 +112,21 @@ function Ladder({ instance, k, steps, height, width, aria }: { instance: string;
     const db = m ? m.db : -120;
     let lit = 0;
     for (const s of steps) if (db >= s) lit++;
-    if (lit === last.current) return;
-    last.current = lit;
+    const top = pkTop && !!m?.pk;
+    const key = lit + (top ? 100 : 0);
+    if (key === last.current) return;
+    last.current = key;
     // Assistive tech reads the highest lit LED's legend (the bottom one when dark)
     box.current?.setAttribute('aria-valuenow', String(steps[Math.max(0, lit - 1)]));
-    box.current?.setAttribute('aria-valuetext', lit ? `${steps[lit - 1]} dB` : 'no signal');
+    box.current?.setAttribute('aria-valuetext', `${lit ? `${steps[lit - 1]} dB` : 'no signal'}${top ? ', PK!' : ''}`);
     refs.current.forEach((el, i) => {
       if (!el) return;
       const c = meterColor(steps[i]);
-      const on = i < lit;
+      const on = i < lit || (top && i === steps.length - 1);
       el.style.background = on ? c : LED_OFF;
       el.style.boxShadow = on ? `0 0 5px ${c}` : 'inset 0 1px 1px #000';
     });
-  }, [instance, k, steps]);
+  }, [instance, k, steps, pkTop]);
   useFrame(update);
   const n = steps.length, seg = height / n;
   const d = Math.min(width, seg - 2);
@@ -194,9 +199,9 @@ function LrMeters({ c, h, gap }: { c: Ctx; h: number; gap: number }) {
   return (
     <div style={{ width: (gap + 4) * K, pointerEvents: 'none' }} aria-label="LR MIX meters">
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <Ladder instance={c.instance} k="L" steps={MASTER_METER_DBU} height={hp} width={wl} aria="Left meter" />
+        <Ladder instance={c.instance} k="L" steps={MASTER_METER_DBU} height={hp} width={wl} aria="Left meter" pkTop />
         {ladderScale(MASTER_METER_LABELS, hp, 'center', 9, (gap - 4) * K)}
-        <Ladder instance={c.instance} k="R" steps={MASTER_METER_DBU} height={hp} width={wl} aria="Right meter" />
+        <Ladder instance={c.instance} k="R" steps={MASTER_METER_DBU} height={hp} width={wl} aria="Right meter" pkTop />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginTop: 2, lineHeight: 1.15 }}>
         {legend(cueOn, cueOn && !split ? 'CUE' : 'L')}{legend(false, 'MIX')}{legend(cueOn && !split, cueOn && !split ? 'CUE' : 'R')}
@@ -1075,10 +1080,10 @@ function deckStripCompact(): PanelElement[] {
     { kind: 'custom', x: 280, y: 4, w: 36, h: 12, render: c => <DeckDisplay c={c} compact /> },
     { kind: 'custom', x: 258, y: 17.6, w: 58, h: 6.6, render: c => <YouHearSelect c={c} /> },
     label('FX', 333, 5.5, 5, { color: TWIN_INK }),
-    buttons('fx_time', 333, 10.5, 0.62),
+    buttons('fx_time', 333, 10.8, 0.8),
     knob('fx_fdbk', 350, 13, 6, { label: 'above', labelText: 'FDBK' }),
     knob('fx_size', 363, 13, 6, { label: 'above', labelText: 'REVERB' }),
-    { kind: 'button', control: 'cue_latch', x: 338.6, y: 20.6, shape: 'rect', w: 14, h: 4.5, color: '#26292c', ledColor: RED, capText: 'LATCH CUE', label: 'none' },
+    { kind: 'button', control: 'cue_latch', x: 336.4, y: 20.7, shape: 'rect', w: 18, h: 4.8, color: '#26292c', ledColor: RED, capText: 'LATCH CUE', label: 'none' },
     { kind: 'custom', x: 346.5, y: 17.9, w: 24, h: 5.5, render: c => <ViewToggle c={c} compact /> },
   ];
 }
