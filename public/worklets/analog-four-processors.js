@@ -138,8 +138,15 @@ var ENV_MIN_RISE = 0.0015;
 //   decay/release 0 linear, 1 exponential (snappy, with a tail)
 const SHAPES = [[0, 0], [1, 1], [2, 0], [2, 1], [3, 0], [3, 1]];
 
+// V8 stores a field created with an integer value (this.v = 0) as a small integer. The first fractional
+// value then gives the object a new map, deprecates the old one and throws away the code optimised
+// against it - over and over in the first seconds, as each voice reaches new code paths (and TurboFan
+// needs 50-200 ms to recompile the big functions). So every numeric state field that ever holds a
+// fraction is created holding one (D) before its real initial value is stored.
+const D = 0.5;
+
 class Env {
-  constructor() { this.stage = 0; this.v = 0; this.gate = false; this.pending = false; this.gateEnd = Infinity; this.x = 0; }
+  constructor() { this.v = this.x = D; this.stage = 0; this.v = 0; this.gate = false; this.pending = false; this.gateEnd = Infinity; this.x = 0; }
   trig(shape, now, lenSec) {
     if (shape & 1) this.v = 0;            // (R): restart from zero
     this.stage = 1;
@@ -192,7 +199,10 @@ class Env {
 }
 
 class Lfo {
-  constructor() { this.ph = Math.random(); this.run = true; this.left = Infinity; this.hold = 0; this.holding = false; this.fade = 1; this.rnd = Math.random() * 2 - 1; this.last = 0; }
+  constructor() {
+    this.ph = this.left = this.hold = this.fade = this.rnd = this.last = D;
+    this.ph = Math.random(); this.run = true; this.left = Infinity; this.hold = 0; this.holding = false; this.fade = 1; this.rnd = Math.random() * 2 - 1; this.last = 0;
+  }
   trig(mode, sph, fad) {
     this.fade = fad < 0 ? 0 : 1;
     if (mode === 0) return;                                            // FREE
@@ -245,6 +255,34 @@ function enqueue(q, ev) {
 // Oscillator event kinds
 const E_WRAP = 1, E_PW = 2, E_HALF = 3, E_RESET = 4;
 
+// The parameter indices the code reads by name, as an object literal with a fixed shape. The map the
+// nodes get (processorOptions.keys) is built by keyed stores, and with ~100 keys V8 keeps that object
+// in dictionary mode: every I.xxx read would be a hash lookup, and a control tick reads ~150 of them.
+const voiceIndex = I => ({
+  osc1_tun: I.osc1_tun, osc1_fin: I.osc1_fin, osc1_det: I.osc1_det, osc1_trk: I.osc1_trk, osc1_lev: I.osc1_lev,
+  osc1_wav: I.osc1_wav, osc1_sub: I.osc1_sub, osc1_pw: I.osc1_pw, osc1_spd: I.osc1_spd, osc1_pwm: I.osc1_pwm,
+  osc1_pmod: I.osc1_pmod,
+  osc2_tun: I.osc2_tun, osc2_fin: I.osc2_fin, osc2_det: I.osc2_det, osc2_trk: I.osc2_trk, osc2_lev: I.osc2_lev,
+  osc2_wav: I.osc2_wav, osc2_sub: I.osc2_sub, osc2_pw: I.osc2_pw, osc2_spd: I.osc2_spd, osc2_pwm: I.osc2_pwm,
+  osc2_pmod: I.osc2_pmod,
+  noise_snh: I.noise_snh, noise_col: I.noise_col, noise_fad: I.noise_fad, noise_lev: I.noise_lev,
+  osc_am1: I.osc_am1, osc_am2: I.osc_am2, osc_smd: I.osc_smd, osc_snc: I.osc_snc, osc_bnd: I.osc_bnd,
+  osc_sli: I.osc_sli, osc_trg: I.osc_trg, osc_vfa: I.osc_vfa, osc_vsp: I.osc_vsp, osc_vib: I.osc_vib,
+  flt1_frq: I.flt1_frq, flt1_res: I.flt1_res, flt1_ovr: I.flt1_ovr, flt1_trk: I.flt1_trk, flt1_dep: I.flt1_dep,
+  flt2_frq: I.flt2_frq, flt2_res: I.flt2_res, flt2_typ: I.flt2_typ, flt2_trk: I.flt2_trk, flt2_dep: I.flt2_dep,
+  amp_atk: I.amp_atk, amp_dec: I.amp_dec, amp_sus: I.amp_sus, amp_rel: I.amp_rel, amp_shp: I.amp_shp,
+  amp_cho: I.amp_cho, amp_del: I.amp_del, amp_rev: I.amp_rev, amp_pan: I.amp_pan, amp_vol: I.amp_vol,
+  envf_atk: I.envf_atk, envf_dec: I.envf_dec, envf_sus: I.envf_sus, envf_rel: I.envf_rel, envf_shp: I.envf_shp,
+  envf_len: I.envf_len, envf_dsta: I.envf_dsta, envf_depa: I.envf_depa, envf_dstb: I.envf_dstb, envf_depb: I.envf_depb,
+  env2_atk: I.env2_atk, env2_dec: I.env2_dec, env2_sus: I.env2_sus, env2_rel: I.env2_rel, env2_shp: I.env2_shp,
+  env2_len: I.env2_len, env2_dsta: I.env2_dsta, env2_depa: I.env2_depa, env2_dstb: I.env2_dstb, env2_depb: I.env2_depb,
+  lfo1_spd: I.lfo1_spd, lfo1_mul: I.lfo1_mul, lfo1_fad: I.lfo1_fad, lfo1_sph: I.lfo1_sph, lfo1_mod: I.lfo1_mod,
+  lfo1_wav: I.lfo1_wav, lfo1_dsta: I.lfo1_dsta, lfo1_depa: I.lfo1_depa, lfo1_dstb: I.lfo1_dstb, lfo1_depb: I.lfo1_depb,
+  lfo2_spd: I.lfo2_spd, lfo2_mul: I.lfo2_mul, lfo2_fad: I.lfo2_fad, lfo2_sph: I.lfo2_sph, lfo2_mod: I.lfo2_mod,
+  lfo2_wav: I.lfo2_wav, lfo2_dsta: I.lfo2_dsta, lfo2_depa: I.lfo2_depa, lfo2_dstb: I.lfo2_dstb, lfo2_depb: I.lfo2_depb,
+  snd_acc: I.snd_acc, snd_leg: I.snd_leg, snd_prt: I.snd_prt, snd_drf: I.snd_drf, snd_bst: I.snd_bst, level: I.level,
+});
+
 // ============================================================================
 // Voice
 // ============================================================================
@@ -252,11 +290,19 @@ const E_WRAP = 1, E_PW = 2, E_HALF = 3, E_RESET = 4;
 class A4Voice extends AudioWorkletProcessor {
   constructor(options) {
     super();
+    // the fractional state fields, created as doubles (see D)
+    this.bpm = this.pitch = this.glideFrom = this.glideT = this.glideTime = this.bendAmt = this.bendT = this.bendTime = D;
+    this.vibPh = this.vibFade = this.pwm1 = this.pwm2 = this.noiseFade = this.drift1 = this.drift2 = this.snc = D;
+    this.rng = this.nVal = this.nHp = this.pk0 = this.pk1 = this.pk2 = this.nRed = this.p1 = this.p2 = D;
+    this.l0 = this.l1 = this.l2 = this.l3 = this.ic1 = this.ic2 = this.lp1 = this.fb = D;
+    this.gain = this.sendC = this.sendD = this.sendR = this.gS = D;
+    // set by each control tick (created here, so the object's shape never changes)
+    this.w1 = 0; this.w2 = 0; this.sub1 = 0; this.sub2 = 0; this.smd = 0; this.snc = 0; this.am1 = false; this.am2 = false; this.type2 = 0;
     const o = (options && options.processorOptions) || {};
     const keys = o.keys || [];
     const I = {};
     keys.forEach((k, i) => (I[k] = i));
-    this.I = I;
+    this.I = voiceIndex(I);
     this.N = keys.length;
     this.P = new Float32Array(this.N);
     this.O = new Float32Array(this.N);
@@ -944,6 +990,7 @@ const FX_MIN = { 0: 0.01, 1: 0, 2: 0.0005, 3: -0.95, 4: 0, 5: 0, 6: 0.1, 7: 0, 8
 class A4FxMod extends AudioWorkletProcessor {
   constructor(options) {
     super();
+    this.bpm = this.fade = this.fadeTo = this.fadeSec = D;   // doubles from the start (see D)
     const o = (options && options.processorOptions) || {};
     const keys = o.keys || [];
     const I = {};
@@ -1070,6 +1117,7 @@ const NOISE_FLOOR_STEP = (2 * NOISE_FLOOR) / 65535;
 class A4Fx extends AudioWorkletProcessor {
   constructor() {
     super();
+    this.time = this.lpL = this.lpR = this.hpL = this.hpR = this.fd = this.nz = D;   // doubles from the start (see D)
     const sr = sampleRate;
     this.len = Math.ceil(sr * 4);
     this.dL = new Float32Array(this.len); this.dR = new Float32Array(this.len);
