@@ -6,7 +6,7 @@ import { useStudioStore, stepKind, buildCheckState, getSpec, type StepSession } 
 import { describeValue, pressTargetOf, pressesNeeded } from '@/lib/controls/mapping';
 import { hub } from '@/lib/studio/hub';
 import { getLessonLive, onLessonLive } from '@/lib/studio/lessonLive';
-import { goTo, isStudioListen, studioAB } from '@/lib/studio/lessonRuntime';
+import { captureInto, goTo, isStudioListen, studioAB } from '@/lib/studio/lessonRuntime';
 import { onProducerLessons, producerLessonsNow } from '@/lib/studio/producerIndex';
 import Scope from './Scope';
 import { canShowMe, cancelShowMe, showMe } from './coachActions';
@@ -379,6 +379,8 @@ function StepCard({ lesson, stepIndex, step, spec, satisfied, session, instance,
 
       {step.readout?.length ? <LiveReadout items={step.readout} /> : null}
 
+      {step.capture && !needsPrediction && <CaptureRow capture={step.capture} />}
+
       {lesson.device === 'studio' && !needsPrediction && (step.area || (step.instance && step.instance !== 'studio')) && (
         <WhereButton step={step} />
       )}
@@ -654,6 +656,45 @@ function WhereButton({ step }: { step: LessonStep }) {
     <button onClick={() => goTo({ instance: area ? undefined : step.instance, area })} className="mt-2 text-[11px] text-sky-300 hover:text-sky-100 underline-offset-2 hover:underline">
       {label} ↗
     </button>
+  );
+}
+
+/**
+ * Arranger snapshots of chosen controls (Lesson API v3): one button per song section. A tap
+ * stores the instrument's current values of just these controls in that section, so a
+ * section can change what plays without freezing the rest of the mix.
+ */
+function CaptureRow({ capture }: { capture: NonNullable<LessonStep['capture']> }) {
+  const sections = useStudioStore(s => s.studio.arrangement.sections);
+  const rack = useStudioStore(s => s.studio.rack);
+  const [flash, setFlash] = useState<string | null>(null);
+  const r = rack.find(x => x.id === capture.instance || x.device === capture.instance);
+  const name = r ? r.label ?? getSpec(r.device)?.name ?? r.id : capture.instance;
+  if (!sections.length) return <p className="mt-2 text-[11px] text-gray-400">Add song sections in the arranger first: then capture into each one here.</p>;
+  const holds = (sec: (typeof sections)[number]) => {
+    const snap = r ? (sec.parts[r.id]?.snapshot as Record<string, ControlValue> | undefined) : undefined;
+    return !!snap && capture.controls.every(c => snap[c] !== undefined);
+  };
+  return (
+    <div className="mt-2">
+      <p className="text-[11px] text-gray-300 mb-1">Capture {capture.label ?? `${name}'s settings`} into:</p>
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Capture into a section">
+        {sections.map((sec, i) => (
+          <button
+            key={sec.id}
+            onClick={() => {
+              captureInto(i, capture.instance, capture.controls);
+              setFlash(sec.id);
+              setTimeout(() => setFlash(f => (f === sec.id ? null : f)), 900);
+            }}
+            className={`px-2 py-1 rounded text-[11px] border ${flash === sec.id ? 'bg-teaching-current text-black border-teaching-current' : holds(sec) ? 'bg-sky-950/60 text-sky-100 border-sky-700' : 'bg-[#1b1b1b] text-gray-200 border-[#333]'}`}
+            aria-label={`Capture into ${sec.name}${holds(sec) ? ' (has a snapshot)' : ''}`}
+          >
+            {holds(sec) ? '✓ ' : ''}{sec.name}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

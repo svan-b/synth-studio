@@ -80,6 +80,10 @@ export function producerStudio(opts: {
   ownStudio?: string;
   bpm?: number;
   swing?: number;
+  /** Leave the clock cable out (the lesson patches it) */
+  noCable?: boolean;
+  /** Park clock-stepped DFAMs on ▶ (default true; the clock lesson teaches doing it by hand) */
+  alignClocked?: boolean;
 } = {}): LessonStudioStart {
   return {
     rack: [
@@ -89,14 +93,14 @@ export function producerStudio(opts: {
     ],
     routes: { dfam: 'xone96:studio_4' },
     sync: { xone96: true },
-    cables: [{ from: { instance: 'studio-clock', jack: 'out_clock' }, to: { instance: 'dfam', jack: 'in_adv_clock' }, color: '#38bdf8' }],
+    cables: opts.noCable ? [] : [{ from: { instance: 'studio-clock', jack: 'out_clock' }, to: { instance: 'dfam', jack: 'in_adv_clock' }, color: '#38bdf8' }],
     bpm: opts.bpm ?? 124,
     swing: opts.swing ?? 0,
     mixer: opts.mixer ?? {},
     ...(opts.arrangement ? { arrangement: opts.arrangement } : {}),
     focus: 'xone96',
     ...(opts.ownStudio ? { ownStudio: opts.ownStudio } : {}),
-    alignClocked: true,
+    alignClocked: opts.alignClocked ?? true,
   };
 }
 
@@ -113,6 +117,110 @@ export const CP_MUDDY = {
 
 /** Frequency slots, one solution: the DFAM high-passed, the stabs' lows and low mids cut, the bass flat */
 export const CP_SLOTTED = {
-  xone: { ch3_lo: killKnob(-6), ch3_lomid: midKnob(-3), ch2_lomid: 0 },
-  dfam: { ...DFAM_BOOMY, vcf_mode: 0, vcf_cutoff: 220 },
+  xone: { ch3_lo: killKnob(-6), ch3_lomid: midKnob(-3), ch2_lomid: 0 } as Values,
+  dfam: { ...DFAM_BOOMY, vcf_mode: 0, vcf_cutoff: 220 } as Values,
 };
+
+/** Space and depth, start: the slotted mix, completely dry. The delay is on 1/8, the returns flat. */
+export const CP_DRY = {
+  xone: { ...CP_SLOTTED.xone, fx_time: 0, fx_fdbk: 4, fx_size: 1.2, cha_fader: 7, chb_fader: 7 } as Values,
+  dfam: CP_SLOTTED.dfam,
+};
+
+/** Space and depth, one solution: perc in a dotted-8th delay, stabs in the reverb, returns kept out of the lows */
+export const CP_SPACED = {
+  xone: {
+    ...CP_DRY.xone,
+    ch4_snd1: 5, ch3_snd2: 4.5, fx_time: 1, fx_fdbk: 4, fx_size: 3,
+    cha_lo: killKnob(-12), chb_lo: killKnob(-12), cha_fader: 7, chb_fader: 7,
+  } as Values,
+  dfam: CP_SLOTTED.dfam,
+};
+
+/**
+ * Mixdown, start: the "rough mix". Every fader up, the drums' GAIN at +9 dB and the stabs' at
+ * +8 so their PK LEDs light, the returns as loud as the instruments and MASTER 1 fully up, so
+ * the studio limiter is crushing the peaks. The booth is at unity for a fair mono check.
+ */
+export const CP_ROUGH = {
+  xone: {
+    ...CP_SPACED.xone,
+    ch1_fader: 10, ch2_fader: 10, ch3_fader: 10, ch4_fader: 10, cha_fader: 10, chb_fader: 10,
+    ch1_gain: 9, ch3_gain: 8, master: 10, booth: 8,
+  } as Values,
+  dfam: CP_SLOTTED.dfam,
+};
+
+/**
+ * Mixdown, one solution (and the master lesson's start): every channel peaking about +3 to +6
+ * on its meter, the drums leading, the bass 2 dB under them, stabs and perc further down,
+ * returns below the instruments, and MASTER 1 set for about -6 dBFS peaks at the studio master.
+ */
+export const CP_MIXED = {
+  xone: {
+    ...CP_ROUGH.xone,
+    ch1_gain: 0, ch2_gain: -1, ch3_gain: -2, ch4_gain: 5,
+    ch1_fader: 10, ch2_fader: 9.5, ch3_fader: 9, ch4_fader: 8.5, cha_fader: 7.5, chb_fader: 7.5,
+    master: 7.75, booth: 8,
+  } as Values,
+  dfam: CP_SLOTTED.dfam,
+};
+
+// ---- the song ----------------------------------------------------------------------
+
+/** Deck sources of a section: what channels 1-3 play */
+const decks = (ch1: number, ch2: number, ch3: number): Values => ({ ch1_src: ch1, ch2_src: ch2, ch3_src: ch3 });
+
+type Section = NonNullable<LessonStudioStart['arrangement']>['sections'][number];
+const section = (name: string, bars: number, xone: Values, opts: { dfamMuted?: boolean; clock?: Values; dfam?: Values } = {}): Section => ({
+  name,
+  bars,
+  parts: {
+    xone96: { snapshot: xone },
+    ...(opts.dfamMuted ? { dfam: { muted: true } } : opts.dfam ? { dfam: { snapshot: opts.dfam } } : {}),
+    ...(opts.clock ? { 'studio-clock': { snapshot: opts.clock } } : {}),
+  },
+});
+
+/**
+ * The Tide Pool song: 72 bars, 2:19 at 124 BPM. Each section switches which stems the decks
+ * play (like an Elektron pattern change) and mutes the DFAM where it sits out, so the mix
+ * itself (GAIN, EQ, faders, sends) stays one static mix underneath.
+ *   Intro 8 · Groove 8 · Drop 16 · Break 8 · Build 7 · Fill 1 · Drop 2 16 · Outro 8
+ */
+export function songSections(): Section[] {
+  return [
+    section('Intro', 8, decks(SRC.DRUMS, SRC.NONE, SRC.NONE), { dfamMuted: true }),
+    section('Groove', 8, decks(SRC.DRUMS, SRC.BASS, SRC.NONE)),
+    section('Drop', 16, decks(SRC.DRUMS, SRC.BASS, SRC.STABS)),
+    section('Break', 8, decks(SRC.PERC, SRC.NONE, SRC.PAD), { dfamMuted: true }),
+    section('Build', 7, decks(SRC.DRUMS, SRC.NONE, SRC.STABS)),
+    section('Fill', 1, decks(SRC.DRUMS, SRC.NONE, SRC.STABS)),
+    section('Drop 2', 16, decks(SRC.DRUMS, SRC.BASS, SRC.STABS)),
+    section('Outro', 8, decks(SRC.DRUMS, SRC.NONE, SRC.NONE)),
+  ];
+}
+
+/** Filter-off and clock-back values a section uses to undo a transition */
+const FILTERS_OFF: Values = { ch1_filter: 1, ch2_filter: 1, f1_on: false, f2_on: false };
+
+/**
+ * The song with its transitions (the Transitions lesson's solution): the bass enters through
+ * FILTER 2's low-pass in the Groove, the Build high-passes the drums through FILTER 1, the
+ * Fill bar drops the drums out while the DFAM rolls in 32nds, and Drop 2 puts it all back.
+ */
+export function songWithTransitions(): Section[] {
+  const s = songSections();
+  const patch = (name: string, xone: Values, opts: { clock?: Values } = {}) => {
+    const x = s.find(v => v.name === name)!;
+    x.parts = { ...x.parts, xone96: { snapshot: { ...(x.parts?.xone96?.snapshot ?? {}), ...xone } } };
+    if (opts.clock) x.parts['studio-clock'] = { snapshot: opts.clock };
+  };
+  patch('Intro', FILTERS_OFF, { clock: { division: 2 } });
+  patch('Groove', { ch2_filter: 2, f2_on: true, f2_type: 2, f2_freq: 900, f2_res: 2 });
+  patch('Drop', FILTERS_OFF);
+  patch('Build', { ch1_filter: 0, f1_on: true, f1_type: 0, f1_freq: 300, f1_res: 5 });
+  patch('Fill', { ch1_src: SRC.NONE }, { clock: { division: 3 } });
+  patch('Drop 2', FILTERS_OFF, { clock: { division: 2 } });
+  return s;
+}

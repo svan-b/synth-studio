@@ -447,7 +447,11 @@ class StudioAB {
     this.switchAt = now();
     if (studioWide) {
       hub.ensureAudio();
-      if (!transport.playing) { hub.startAll({ countIn: false }); this.startedTransport = true; }
+      if (!transport.playing) {
+        // Both sides on the same part of the song
+        if (!(listen.from && playFromSection(listen.from))) hub.startAll({ countIn: false });
+        this.startedTransport = true;
+      }
     } else {
       // A single instrument with its own phrase: the hub audition plays it, then stops
       if (this.auditionTimer) clearTimeout(this.auditionTimer);
@@ -593,16 +597,41 @@ export function applyStudioSolution(sol: LessonSolution) {
   }
   sol.capture?.forEach(c => {
     const i = sectionIndex(c.section);
-    const inst = resolveInstance(c.instance);
-    if (i < 0 || !inst) return;
-    const all = { ...hub.valuesFor(inst), ...(c.values ?? {}) };
-    const snap: Record<string, ControlValue> = c.controls ? Object.fromEntries(c.controls.map(k => [k, all[k]])) : all;
-    st.setArrangement(a => ({
-      ...a,
-      sections: a.sections.map((x, k) => (k === i ? { ...x, parts: { ...x.parts, [inst]: { ...x.parts[inst], snapshot: snap } } } : x)),
-    }));
+    if (i >= 0) captureInto(i, c.instance, c.controls, c.values);
   });
   if (sol.transport === 'stop' && transport.playing) hub.stopAll();
+}
+
+/**
+ * An arranger snapshot of chosen controls: the instrument's current values of `controls`
+ * (all its controls without a list), plus `extra`, into section `index`'s snapshot. A
+ * partial capture merges with what the snapshot already holds.
+ */
+export function captureInto(index: number, instanceOrDevice: string, controls?: string[], extra?: Record<string, ControlValue>) {
+  const inst = resolveInstance(instanceOrDevice);
+  const st = useStudioStore.getState();
+  if (!inst || index < 0 || index >= st.studio.arrangement.sections.length) return;
+  const all = { ...hub.valuesFor(inst), ...(extra ?? {}) };
+  const picked: Record<string, ControlValue> = controls ? Object.fromEntries(controls.filter(k => all[k] !== undefined).map(k => [k, all[k]])) : all;
+  st.setArrangement(a => ({
+    ...a,
+    sections: a.sections.map((x, k) => {
+      if (k !== index) return x;
+      const prev = (x.parts[inst]?.snapshot ?? {}) as Record<string, ControlValue>;
+      return { ...x, parts: { ...x.parts, [inst]: { ...x.parts[inst], snapshot: controls ? { ...prev, ...picked } : picked } } };
+    }),
+  }));
+}
+
+/** Start the song from a section (song mode on), like the arranger's "▶ from here" */
+export function playFromSection(name: string): boolean {
+  const i = sectionIndex(name);
+  if (i < 0) return false;
+  const st = useStudioStore.getState();
+  if (!st.studio.arrangement.enabled) st.setArrangement(a => ({ ...a, enabled: true }));
+  hub.ensureAudio();
+  arranger.playFrom(i);
+  return true;
 }
 
 /** Run the timed parts of a solution: play for a while, bounce, record. Resolves when done. */
@@ -610,8 +639,9 @@ export async function runTimedSolution(sol: LessonSolution, opts: { until?: () =
   const st = useStudioStore.getState();
   if (sol.play) {
     if (sol.play.song && st.studio.arrangement.sections.length && !st.studio.arrangement.enabled) st.setArrangement(a => ({ ...a, enabled: true }));
-    if (transport.playing && (sol.play.fromStart || sol.play.song)) { hub.stopAll(); await wait(400); }
-    if (!transport.playing) hub.startAll({ countIn: false, fromTick: 0 });
+    if (transport.playing && (sol.play.fromStart || sol.play.song || sol.play.from)) { hub.stopAll(); await wait(400); }
+    if (sol.play.from && playFromSection(sol.play.from)) { /* started at that section */ }
+    else if (!transport.playing) hub.startAll({ countIn: false, fromTick: 0 });
     const secs = sol.play.song ? songSeconds() + 1 : sol.play.seconds ?? 8;
     const t0 = now();
     while (now() - t0 < secs * 1000) {
@@ -740,6 +770,8 @@ export const lessonRuntimeApi = {
   runTimedSolution,
   isTimedSolution,
   resolveInstance,
+  captureInto,
+  playFromSection,
   studioAB,
   publish,
   /** Recorder nodes created so far (stems check) */

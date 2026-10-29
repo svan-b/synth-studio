@@ -271,6 +271,8 @@ export interface LessonStep {
     master?: { a: LessonMasterPatch; b: LessonMasterPatch };
     /** Studio-wide settings per side (swing 0..0.75) */
     studio?: { a: { swing?: number }; b: { swing?: number } };
+    /** Start the A/B from this song section (by name), so both sides play the same part of the song */
+    from?: string;
   };
   match?: {
     target: Record<string, ControlValue>;
@@ -330,6 +332,12 @@ export interface LessonStep {
   readout?: ('loudness' | 'peaks' | 'limiter' | 'channels')[];
   /** Where on screen the step happens: the coach offers to take the learner there */
   area?: 'mixer' | 'master' | 'arranger' | 'transport' | 'rack';
+  /**
+   * Arranger snapshots of chosen controls: the coach shows one "capture" button per song
+   * section that stores only these controls of the instrument (now) in that section's
+   * snapshot, merged with what the snapshot already holds.
+   */
+  capture?: { instance: string; controls: string[]; label?: string };
 }
 
 /** A studio master section patch (lesson A/B, solutions) */
@@ -435,9 +443,11 @@ export interface LessonSolution {
    * Play the studio (from bar 1 with `fromStart`, or the whole song with `song`) and keep
    * playing for `seconds`, so meter checks have something to measure (the lesson runner waits)
    */
-  play?: { seconds?: number; fromStart?: boolean; song?: boolean };
+  play?: { seconds?: number; fromStart?: boolean; song?: boolean; from?: string };
   /** Bounce the song (Bounce dialog), optionally with stems. The runner waits until it is done. */
   bounce?: { stems?: boolean };
+  /** Press this button (control id or event name, on the solution's instrument) until the step is done, 16 times at most */
+  pressUntilDone?: string;
   /** Record with REC for `seconds` (optionally with stems) */
   record?: { seconds: number; stems?: boolean };
 }

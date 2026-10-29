@@ -4,7 +4,7 @@
 // lessons or the panel at runtime. Exits non-zero on errors.
 // ============================================================================
 
-import type { ControlSpec, ControlValue, Lesson, LessonCheckState, LessonStep, MultipleChoice } from '../types';
+import type { ControlSpec, ControlValue, Lesson, LessonCheckState, MultipleChoice } from '../types';
 import { LESSON_PATHS } from '../types';
 import type { PanelElement } from '../types/panel';
 import { DEVICES } from '../devices';
@@ -472,14 +472,15 @@ async function validateStudioLessons(lessons: Lesson[]): Promise<Issue[]> {
         try { s.check?.(st); } catch (e) { err(`${w}: check() throws on ${label}: ${e}`); }
         s.checklist?.forEach((c, ci) => { try { c.check?.(st); } catch (e) { err(`${w}: checklist[${ci}] throws on ${label}: ${e}`); } });
       }
-      // A step already done at the start teaches nothing (except steps that only ask for Play)
-      if (startState && (kind === 'challenge' || kind === 'do' || kind === 'predict') && (s.check || s.checklist?.length) && !s.control) {
+      // An open challenge already done in the start studio teaches nothing (earlier steps
+      // change the studio, so this only says something about challenges)
+      if (startState && kind === 'challenge' && (s.check || s.checklist?.length)) {
         let done = true;
         try {
           if (s.check && !s.check(startState)) done = false;
           if (s.checklist?.some(c => c.check && !c.check(startState!))) done = false;
         } catch { done = false; }
-        if (done && i > 0 && !isPlayOnly(s)) warn(`${w}: already satisfied by the start studio`);
+        if (done) warn(`${w}: already satisfied by the start studio`);
       }
     }
     // Pedagogy shape (docs/PEDAGOGY.md) - warnings only
@@ -495,10 +496,6 @@ async function validateStudioLessons(lessons: Lesson[]): Promise<Issue[]> {
   return out;
 }
 
-/** A step whose only check is "the transport is playing" (fine to be done already) */
-function isPlayOnly(s: LessonStep): boolean {
-  return !!s.solution?.transport && !s.checklist?.length;
-}
 
 (async () => {
   const only = process.argv.slice(2);

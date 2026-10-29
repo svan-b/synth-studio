@@ -11,7 +11,14 @@ import { STUDIO_LESSONS } from './lessons';
 
 /** Every Producer path lesson id (lib/studio/producerLessons.ts must list exactly these) */
 export const PRODUCER_LESSON_IDS = [
+  'studio-producer-04-one-clock',
   'studio-producer-07-frequency-slots',
+  'studio-producer-09-space-depth',
+  'studio-producer-10-ear-lab',
+  'studio-producer-11-arrangement',
+  'studio-producer-12-transitions',
+  'studio-producer-13-mixdown',
+  'studio-producer-14-master-bounce',
 ] as const;
 
 const ID_SET = new Set<string>(PRODUCER_LESSON_IDS);

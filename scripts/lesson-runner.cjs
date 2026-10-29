@@ -1,7 +1,7 @@
 // ============================================================================
 // Lesson runner - plays every lesson of a device like a perfect student and
 // reports any step that cannot be completed.
-//   node scripts/lesson-runner.cjs <baseUrl> <deviceId>
+//   node scripts/lesson-runner.cjs <baseUrl> <deviceId> [lesson id filter]
 // For each step it performs the intended action through the real store:
 //   do/predict  -> answer the prediction correctly, then set the target value -
 //                  or, for a momentary button / `event` step, PRESS it through the
@@ -26,7 +26,8 @@
 const { chromium } = require('playwright');
 
 (async () => {
-  const [, , base = 'http://localhost:3000', device = 'dfam'] = process.argv;
+  // An optional third argument runs only the lessons whose id contains it
+  const [, , base = 'http://localhost:3000', device = 'dfam', only = ''] = process.argv;
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   const errors = [];
@@ -44,7 +45,7 @@ const { chromium } = require('playwright');
   await page.waitForFunction(() => window.__synthStudio, null, { timeout: 15000 });
   await page.waitForTimeout(800);
 
-  const report = await page.evaluate(async device => {
+  const report = await page.evaluate(async ([device, only]) => {
     const { store, hub } = window.__synthStudio;
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const S = () => store.getState();
@@ -195,7 +196,7 @@ const { chromium } = require('playwright');
       return satisfied() ? applied : null;
     };
 
-    for (const lesson of mod.lessons) {
+    for (const lesson of mod.lessons.filter(l => !only || l.id.includes(only))) {
       const t0 = performance.now();
       // A studio lesson starts in the current studio (or loads its own); a device lesson on its instrument
       S().startLesson(lesson, studio ? undefined : device);
@@ -231,7 +232,10 @@ const { chromium } = require('playwright');
             S().checkMatch();
           }
           if (kind === 'reflect') { S().revealStep(); S().rateReflection('got-it'); }
-          const sol = step.solution;
+          // A studio step already done (an earlier bounce or play-through counts): don't redo it
+          const already = studio && step.solution && kind !== 'reflect' && satisfied();
+          const sol = already ? null : step.solution;
+          if (already) how = 'already satisfied';
           if (sol) {
             const si = sol.instance ? resolveRef(sol.instance) : inst;
             if (sol.values) S().setControlValues(si, sol.values);
@@ -245,6 +249,12 @@ const { chromium } = require('playwright');
             if (sol.presses) for (const p of sol.presses) await press(si, p);
             if (sol.notes) await playNotes(si, sol.notes);
             await wait(20);
+            // Press until done (park a sequencer on its last step...)
+            if (sol.pressUntilDone) {
+              // Through the engine, like the panel button (which may be off screen)
+              const id = sol.pressUntilDone;
+              for (let k = 0; k < 16 && !satisfied(); k++) { hub.event(si, id); S().lessonPress(si, [id]); await wait(150); }
+            }
             // Play, bounce or record for real, until the step is satisfied (meters need time)
             if (rt && rt.isTimedSolution(sol)) {
               how = `timed: ${['play', 'bounce', 'record'].filter(k => sol[k]).join(', ')}`;
@@ -259,22 +269,24 @@ const { chromium } = require('playwright');
         // Live checks (meters, takes) settle a moment later: give them a second
         if (rt) { rt.publish(); for (let k = 0; k < 8 && !satisfied(); k++) { await wait(150); rt.publish(); } }
         let ok = satisfied();
-        let auto = null;
-        if (!ok) {
-          auto = await search(step);
-          ok = !!auto;
-        }
-        // An open challenge with no `solution` that no single move solves needs a human
-        const manual = !ok && kind === 'challenge' && !step.solution;
-        // What a failing studio check saw, so the report says why
+        // What a failing studio check saw, before any search moves change it
         let seen;
         if (!ok && studio) {
           const cs = S().lessonCheckState();
           const fails = [];
           (step.checklist || []).forEach(c => { try { if (c.check && !c.check(cs)) fails.push(c.text); } catch (e) { fails.push(`${c.text} (threw)`); } });
           const m = cs && cs.meters && cs.meters.master;
-          seen = { failing: fails, meters: m ? { I: m.lufsI, S: m.lufsS, peak: m.peakDb, tp: m.maxTruePeakDb, gr: m.maxGrDb, sec: m.measuredSec, fromStart: m.fromStart } : undefined, bounce: cs && cs.bounce && cs.bounce.last };
+          const ch = cs && cs.meters ? Object.fromEntries(Object.entries(cs.meters.channels).filter(([k]) => /:[1-4ab]$/.test(k)).map(([k, v]) => [k, `${Math.round(v.peak * 10) / 10}${v.pk ? ' PK' : ''}`])) : undefined;
+          seen = { failing: fails, meters: m ? { I: m.lufsI, S: m.lufsS, peak: m.peakDb, tp: m.maxTruePeakDb, gr: m.grDb, maxGr: m.maxGrDb, sec: m.measuredSec, fromStart: m.fromStart, steady: m.steady } : undefined, channels: ch, bounce: cs && cs.bounce && cs.bounce.last, arranger: cs && cs.arranger };
         }
+        let auto = null;
+        // Single learner moves can't fix a measurement: timed steps stand on their own solution
+        if (!ok && !(rt && rt.isTimedSolution(step.solution))) {
+          auto = await search(step);
+          ok = !!auto;
+        }
+        // An open challenge with no `solution` that no single move solves needs a human
+        const manual = !ok && kind === 'challenge' && !step.solution;
         stepResults.push({
           i: i + 1, kind, ok: ok || manual, manual, how, auto: auto && auto.length ? auto : undefined, seen,
           why: ok ? '' : manual ? 'challenge needs a manual/solution check' : 'not satisfied after performing the action (and no single learner move solved it)',
@@ -293,7 +305,7 @@ const { chromium } = require('playwright');
       });
     }
     return results;
-  }, device);
+  }, [device, only]);
 
   const failedLessons = report.filter(r => r.failed.length);
   const autoSteps = report.reduce((n, r) => n + r.auto.length, 0);
