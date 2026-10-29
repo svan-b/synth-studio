@@ -22,11 +22,11 @@ import { BaseEngine } from '@/lib/audio/engine';
 import type { Transport } from '@/lib/audio/transport';
 import { Reverb2 } from '@/lib/audio/dsp';
 import {
-  ElektronSequencer, RETRIG_RATES, asProject, getPattern, stepSeconds, trackLength, trackSpeed,
+  ElektronSequencer, NOTE_LENGTHS, RETRIG_RATES, asProject, getPattern, stepSeconds, trackLength, trackSpeed,
   type SeqState, type TrigEvent,
 } from '@/lib/sequencer/elektron';
 import {
-  FX, FX_PAGES, FX_TRACK, IX, MACHINES, SEQ_TRACKS, TRACKS, TRACK_EXTRA, TRACK_PAGES, TRIG_PAGE, parseId,
+  FX, FX_PAGES, FX_TRACK, FX_TRACK_LEVEL, IX, MACHINES, SEQ_TRACKS, TRACKS, TRACK_EXTRA, TRACK_PAGES, TRIG_PAGE, parseId,
 } from './model';
 import { ANALOG_RYTM, KIT_CONTROL_IDS } from './spec';
 import type { RytmProject } from './presets';
@@ -40,7 +40,10 @@ for (const page of [...Object.values(TRACK_PAGES), TRACK_EXTRA, TRIG_PAGE]) for 
 /** FX key -> FX parameter index */
 const FX_IDX: Record<string, number> = {};
 for (const page of Object.values(FX_PAGES)) for (const p of page) if (p && p.idx !== undefined) FX_IDX[p.key] = p.idx;
-const REVERB_KEYS = new Set(['rev_pre', 'rev_dec', 'rev_frq', 'rev_gai', 'rev_hpf', 'rev_lpf', 'rev_vol']);
+FX_IDX[FX_TRACK_LEVEL.key] = FX_TRACK_LEVEL.idx!;
+/** The reverb runs in a Reverb2 node: its parameters (and the FX track level, its master return) are applied here */
+const REVERB_KEYS = new Set(['rev_pre', 'rev_dec', 'rev_frq', 'rev_gai', 'rev_hpf', 'rev_lpf', 'rev_vol', 'trk_lev']);
+const FX_KEY_OF: Record<number, string> = Object.fromEntries(Object.entries(FX_IDX).map(([k, i]) => [i, k]));
 
 const DEFAULTS: Record<string, ControlValue> = {};
 for (const [id, c] of Object.entries(ANALOG_RYTM.controls)) if ('default' in c && c.default !== undefined) DEFAULTS[id] = c.default as ControlValue;
@@ -71,13 +74,21 @@ export class AnalogRytmEngine extends BaseEngine {
   private padLv = new Float32Array(12);
   private ops: { sid: string; n: number; list: RytmOp[] } = { sid: Math.random().toString(36).slice(2), n: 0, list: [] };
   private scene = -1;
+  /** Pad pressure of each performance macro (PERF mode), 0..1 */
   private perfAmt = new Float64Array(12);
-  private perfLatch = new Uint8Array(12);
+  /** Macros under the QUICK PERF AMOUNT knob ([QPER] + pads) */
+  private perfQuick = new Uint8Array(12);
+  /** [FUNC] + [QPER]: the performance macros are muted */
+  private perfMuted = false;
+  /** FX track lock on a reverb parameter (held until the next FX trig) and the FX LFO's reverb offset */
+  private revLock: Record<string, number> = {};
+  private revLfo: { key: string; v: number } | null = null;
   private stepClock = Array.from({ length: SEQ_TRACKS }, () => ({ step: -1, time: 0 }));
-  private retrigs = new Map<number, { next: number; vel: number; timer: ReturnType<typeof setInterval> }>();
+  private retrigs = new Map<number, { next: number; vel: number; start: number; timer: ReturnType<typeof setInterval> }>();
   private auditionStop: (() => void) | null = null;
   private auditionTimer: ReturnType<typeof setTimeout>[] = [];
   private lastBpm = 0;
+  private fxOffTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected build(): void {
     const ctx = this.ctx;
@@ -98,8 +109,13 @@ export class AnalogRytmEngine extends BaseEngine {
     this.node.connect(this.master, 3, 3);
     this.master.connect(this.mainVol).connect(this.out);
     this.node.port.onmessage = (e: MessageEvent) => {
-      const m = e.data as { t: string; lv?: Float32Array };
-      if (m.t === 'lv' && m.lv) this.padLv.set(m.lv);
+      const m = e.data as { t: string; lv?: Float32Array; rv?: number; rvv?: number };
+      if (m.t !== 'lv') return;
+      if (m.lv) this.padLv.set(m.lv);
+      // FX LFO on a reverb parameter: the worklet reports the effective value (~30 Hz)
+      const key = m.rv !== undefined && m.rv >= 0 ? FX_KEY_OF[m.rv] : undefined;
+      if (key && REVERB_KEYS.has(key)) { this.revLfo = { key, v: m.rvv ?? 0 }; this.applyReverb(0); }
+      else if (this.revLfo) { this.revLfo = null; this.applyReverb(0); }
     };
 
     this.seq = new ElektronSequencer({
@@ -115,6 +131,7 @@ export class AnalogRytmEngine extends BaseEngine {
 
     this.onDispose(() => {
       this.seq.dispose();
+      if (this.fxOffTimer) clearTimeout(this.fxOffTimer);
       this.retrigs.forEach(r => clearInterval(r.timer));
       this.auditionTimer.forEach(t => clearTimeout(t));
       this.node.port.onmessage = null;
@@ -124,7 +141,7 @@ export class AnalogRytmEngine extends BaseEngine {
 
     // Start from the defaults so the voices are set before the first control push
     this.applyKit(DEFAULTS, 0);
-    this.emit({ playing: false, padLv: this.padLv, ops: this.ops, scene: -1, perf: Array.from(this.perfAmt), kit: this.kitId });
+    this.emit({ playing: false, padLv: this.padLv, ops: this.ops, scene: -1, perf: Array.from(this.perfAmt), perfQuick: Array.from(this.perfQuick), perfMuted: false, kit: this.kitId });
   }
 
   private post(m: Record<string, unknown>) {
@@ -165,9 +182,9 @@ export class AnalogRytmEngine extends BaseEngine {
     const at = this.paramTime();
     if (pi.track === FX_TRACK) {
       this.fxv[pi.key] = v;
-      if (REVERB_KEYS.has(pi.key)) { this.applyReverb(at); return; }
       const i = FX_IDX[pi.key];
       if (i !== undefined) this.post({ t: 'fx', i, v, at });
+      if (REVERB_KEYS.has(pi.key)) this.applyReverb(at);
       return;
     }
     const tr = pi.track;
@@ -213,19 +230,29 @@ export class AnalogRytmEngine extends BaseEngine {
     this.applyReverb(at);
   }
 
-  /** The FX track's reverb parameters -> Reverb2 (kit values, then scene, then performance) */
+  /**
+   * The FX track's reverb parameters -> Reverb2: the kit value (or the scene's, or an
+   * FX-track lock), plus the performance macros' depth, or the FX LFO's effective value.
+   * The FX track level is the master return of the reverb (and of the delay, in the worklet).
+   */
   private applyReverb(at: number) {
     if (!this.reverb) return;
-    const v = (k: string) => this.perfRev[k] ?? this.sceneRev[k] ?? this.fxv[k] ?? num(DEFAULTS[`fx_${k}`]);
+    const v = (k: string) => {
+      if (this.revLfo && this.revLfo.key === k) return this.revLfo.v;
+      const base = this.sceneRev[k] ?? this.revLock[k] ?? this.fxv[k] ?? num(DEFAULTS[`fx_${k}`]);
+      return base + (this.perfRev[k] ?? 0);
+    };
     const t = Math.max(this.ctx.currentTime, at || 0);
     const set = (p: AudioParam, x: number) => { p.cancelScheduledValues(t); p.setTargetAtTime(x, t, 0.02); };
-    set(this.reverb.preDelay, Math.pow(v('rev_pre') / 127, 2) * 0.3);
-    set(this.reverb.decay, expT(v('rev_dec'), 0.25, 14));
-    set(this.reverb.size, 0.35 + 0.65 * v('rev_dec') / 127);
-    const shelf = expT(v('rev_frq'), 600, 16000);
-    set(this.reverb.damping, clamp(shelf * (0.25 + 1.75 * Math.pow(v('rev_gai') / 127, 2)), 200, 20000));
-    set(this.revVol.gain, Math.pow(v('rev_vol') / 127, 2) * 1.5);
-    this.reverb.set({ lowCut: expT(v('rev_hpf'), 20, 2000), highCut: expT(v('rev_lpf'), 600, 20000) });
+    const c = (x: number) => clamp(x, 0, 127);
+    set(this.reverb.preDelay, Math.pow(c(v('rev_pre')) / 127, 2) * 0.3);
+    set(this.reverb.decay, expT(c(v('rev_dec')), 0.25, 14));
+    set(this.reverb.size, 0.35 + 0.65 * c(v('rev_dec')) / 127);
+    const shelf = expT(c(v('rev_frq')), 600, 16000);
+    set(this.reverb.damping, clamp(shelf * (0.25 + 1.75 * Math.pow(c(v('rev_gai')) / 127, 2)), 200, 20000));
+    const lev = c(v('trk_lev')) / 100;
+    set(this.revVol.gain, Math.pow(c(v('rev_vol')) / 127, 2) * 1.5 * lev * lev);
+    this.reverb.set({ lowCut: expT(c(v('rev_hpf')), 20, 2000), highCut: expT(c(v('rev_lpf')), 600, 20000) });
   }
 
   // --------------------------------------------------------------------------
@@ -253,6 +280,7 @@ export class AnalogRytmEngine extends BaseEngine {
     this.pending = at > this.ctx.currentTime ? { at, values } : null;
     this.pushOp({ type: 'kit', from, to: link });
     this.scene = -1;
+    this.revLock = {};
     this.applyScene();
     this.applyPerf();
     this.emit({ kit: link, scene: -1 });
@@ -279,7 +307,7 @@ export class AnalogRytmEngine extends BaseEngine {
     }
     // scenes and macros live in the kit: edits apply at once
     if (this.scene >= 0) this.applyScene();
-    if (this.perfAmt.some(a => a > 0)) this.applyPerf();
+    if (this.perfAmt.some(a => a > 0) || this.perfQuick.some(Boolean)) this.applyPerf();
   }
 
   private onPattern(id: string, time: number) {
@@ -301,7 +329,7 @@ export class AnalogRytmEngine extends BaseEngine {
     if (sc) for (const id in sc) {
       const pi = parseId(id);
       if (!pi) continue;
-      if (pi.track === FX_TRACK && REVERB_KEYS.has(pi.key)) { rev[pi.key] = sc[id]; continue; }
+      if (pi.track === FX_TRACK && REVERB_KEYS.has(pi.key)) rev[pi.key] = sc[id];
       const i = this.target(pi.track, pi.key);
       if (i >= 0) this.post({ t: 'ovr', tr: pi.track, i, v: sc[id] });
     }
@@ -312,36 +340,38 @@ export class AnalogRytmEngine extends BaseEngine {
   private sceneRev: Record<string, number> = {};
   private perfRev: Record<string, number> = {};
 
+  /** Amount of each macro: pad pressure in PERF mode, or the QUICK PERF AMOUNT knob for the assigned ones */
+  private perfAmounts(): number[] {
+    const q = this.num('qper', 0) / 127;
+    return Array.from(this.perfAmt, (a, i) => (this.perfMuted ? 0 : Math.max(a, this.perfQuick[i] ? q : 0)));
+  }
+
+  /**
+   * Performance macros: each lock is a depth (an offset from the sound's value, manual p.30),
+   * applied in proportion to the amount; macros on one parameter add up.
+   */
   private applyPerf() {
     this.post({ t: 'perfclear' });
     const kit = this.currentKit();
-    const q = this.num('qper', 127) / 127;
-    const best = new Map<string, { target: number; amt: number }>();
+    const amts = this.perfAmounts();
+    const sum = new Map<string, number>();
     for (let i = 0; i < 12; i++) {
-      const amt = this.perfLatch[i] ? Math.max(this.perfAmt[i], q) : this.perfAmt[i];
-      if (amt <= 0) continue;
+      const amt = amts[i];
       const macro = kit?.perfs?.[i];
-      if (!macro) continue;
-      for (const id in macro) {
-        const prev = best.get(id);
-        if (!prev || amt > prev.amt) best.set(id, { target: macro[id], amt });
-      }
+      if (amt <= 0 || !macro) continue;
+      for (const id in macro) sum.set(id, (sum.get(id) ?? 0) + macro[id] * amt);
     }
     const rev: Record<string, number> = {};
-    best.forEach(({ target, amt }, id) => {
+    sum.forEach((add, id) => {
       const pi = parseId(id);
       if (!pi) return;
-      if (pi.track === FX_TRACK && REVERB_KEYS.has(pi.key)) {
-        const base = this.sceneRev[pi.key] ?? this.fxv[pi.key] ?? num(DEFAULTS[id]);
-        rev[pi.key] = base + (target - base) * amt;
-        return;
-      }
+      if (pi.track === FX_TRACK && REVERB_KEYS.has(pi.key)) rev[pi.key] = add;
       const i = this.target(pi.track, pi.key);
-      if (i >= 0) this.post({ t: 'perf', tr: pi.track, i, target, amt });
+      if (i >= 0) this.post({ t: 'perf', tr: pi.track, i, add });
     });
     this.perfRev = rev;
     this.applyReverb(0);
-    this.emit({ perf: Array.from(this.perfAmt).map((a, i) => (this.perfLatch[i] ? Math.max(a, q) : a)) });
+    this.emit({ perf: amts, perfQuick: Array.from(this.perfQuick), perfMuted: this.perfMuted });
   }
 
   // --------------------------------------------------------------------------
@@ -359,8 +389,12 @@ export class AnalogRytmEngine extends BaseEngine {
 
   private onTrig(e: TrigEvent) {
     if (e.track === FX_TRACK) {
-      // FX track: lock trigs only (delay, distortion, compressor parameters)
+      // FX track: lock trigs only. The worklet holds them until the next FX trig;
+      // the reverb's (a separate node) are scheduled here.
       this.post({ t: 'fxlocks', at: e.time, locks: this.convertLocks(FX_TRACK, e.locks) });
+      const rl: Record<string, number> = {};
+      for (const k in e.locks) if (REVERB_KEYS.has(k)) rl[k] = e.locks[k];
+      if (Object.keys(rl).length || Object.keys(this.revLock).length) { this.revLock = rl; this.applyReverb(e.time); }
       return;
     }
     const locks = this.convertLocks(e.track, e.locks);
@@ -407,7 +441,7 @@ export class AnalogRytmEngine extends BaseEngine {
   event(name: string, payload?: unknown): void {
     if (!this.started) return;
     if (this.seq.handleEvent(name, payload)) return;
-    const p = (payload ?? {}) as { track?: number; vel?: number; note?: number; rtrg?: number; rec?: boolean; quantize?: boolean; index?: number; amount?: number };
+    const p = (payload ?? {}) as { track?: number; vel?: number; note?: number; rtrg?: boolean | number; rec?: boolean; quantize?: boolean; index?: number; amount?: number };
     switch (name) {
       case 'pad': {
         const track = clamp(Math.round(p.track ?? 0), 0, 11);
@@ -419,12 +453,22 @@ export class AnalogRytmEngine extends BaseEngine {
           const pos = this.livePosition(track, now + 0.01);
           if (pos) this.pushOp({ type: 'rec', pattern: pos.pattern, track, step: pos.step, micro: p.quantize ? 0 : pos.micro, vel });
         }
-        if (p.rtrg !== undefined) this.startRetrig(track, vel, note, p.rtrg, now);
+        // [RTRG] held, or the track's retrig set to ALWAYS ON: roll for as long as the pad is held
+        if (p.rtrg || this.num(`${TRACKS[track].id}_rtrg_on`) > 0) this.startRetrig(track, vel, note, now);
+        return;
+      }
+      case 'pad:pressure': {
+        // pad pressure: the retrig velocity while rolling, else aftertouch (SOUND SETTINGS: +16 FLT FRQ)
+        const track = clamp(Math.round(p.track ?? 0), 0, 11);
+        const r = this.retrigs.get(track);
+        if (r) r.vel = clamp(Math.round(p.vel ?? r.vel), 1, 127);
+        else this.post({ t: 'at', tr: track, v: clamp(p.amount ?? 0, 0, 1) });
         return;
       }
       case 'pad:up': {
         const track = clamp(Math.round(p.track ?? 0), 0, 11);
         this.stopRetrig(track);
+        this.post({ t: 'at', tr: track, v: 0 });
         this.post({ t: 'off', at: 0, tr: track });
         return;
       }
@@ -439,25 +483,54 @@ export class AnalogRytmEngine extends BaseEngine {
       case 'perf:up':
         if (p.index !== undefined) { this.perfAmt[p.index] = 0; this.applyPerf(); }
         return;
-      case 'perf:latch':
-        if (p.index !== undefined) { this.perfLatch[p.index] = this.perfLatch[p.index] ? 0 : 1; this.applyPerf(); this.emit({ perfLatch: Array.from(this.perfLatch) }); }
+      case 'perf:assign': {
+        // [QPER] + pads: these macros follow the QUICK PERF AMOUNT knob (replacing the earlier choice)
+        const list = (payload as { list?: number[] } | undefined)?.list ?? [];
+        this.perfQuick.fill(0);
+        for (const i of list) if (i >= 0 && i < 12) this.perfQuick[i] = 1;
+        this.applyPerf();
+        return;
+      }
+      case 'perf:mute':
+        this.perfMuted = !this.perfMuted;
+        this.applyPerf();
         return;
       case 'perf:clear':
-        this.perfAmt.fill(0); this.perfLatch.fill(0); this.applyPerf(); this.emit({ perfLatch: Array.from(this.perfLatch) });
+        this.perfAmt.fill(0); this.applyPerf();
+        return;
+      case 'rytm:fx-off':
+        // [STOP] twice: the send effects fade out as well (manual p.37)
+        this.post({ t: 'fxoff' });
+        this.revVol.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.revVol.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05);
+        this.fxOffTimer && clearTimeout(this.fxOffTimer);
+        this.fxOffTimer = setTimeout(() => { this.fxOffTimer = null; this.applyReverb(0); }, 2500);
         return;
       case 'rytm:audition': this.audition(); return;
       case 'rytm:audition:stop': this.stopAudition(); return;
     }
   }
 
-  private startRetrig(track: number, vel: number, note: number, rateIdx: number, from: number) {
+  /** Pad retrig with the track's RETRIG menu: rate, velocity curve over LENGTH (manual p.41) */
+  private startRetrig(track: number, vel: number, note: number, from: number) {
     this.stopRetrig(track);
-    const r = { next: 0, vel, timer: 0 as unknown as ReturnType<typeof setInterval> };
-    const period = () => (4 * 60) / Math.max(20, this.seq.getState().bpm) / RETRIG_RATES[clamp(Math.round(rateIdx), 0, RETRIG_RATES.length - 1)];
+    const id = TRACKS[track].id;
+    const r = { next: 0, vel, start: from, timer: 0 as unknown as ReturnType<typeof setInterval> };
+    const bpm = () => Math.max(20, this.seq.getState().bpm || this.num('bpm', 120));
+    const period = () => (4 * 60) / bpm() / RETRIG_RATES[clamp(Math.round(this.num(`${id}_rtrg_rate`, 9)), 0, RETRIG_RATES.length - 1)];
+    const velAt = (t: number) => {
+      const curve = clamp(this.num(`${id}_rtrg_vcr`), -128, 127);
+      if (!curve) return r.vel;
+      const li = clamp(Math.round(this.num(`${id}_rtrg_len`, 14)), 0, NOTE_LENGTHS.length - 1);
+      const len = li >= NOTE_LENGTHS.length - 1 ? Infinity : NOTE_LENGTHS[li] * 15 / bpm();
+      const frac = Math.min(1, (t - r.start) / len);
+      const g = curve < 0 ? 1 + (curve / 128) * frac : 1 - (curve / 127) * (1 - frac);
+      return clamp(Math.round(r.vel * g), 1, 127);
+    };
     r.next = from + period();
     const pump = () => {
       const horizon = this.ctx.currentTime + 0.1;
-      while (r.next < horizon) { this.padTrig(track, r.vel, note, r.next); r.next += period(); }
+      while (r.next < horizon) { this.padTrig(track, velAt(r.next), note, r.next); r.next += period(); }
     };
     r.timer = setInterval(pump, 25);
     pump();

@@ -12,14 +12,15 @@
 //  - Machine numbers, storage order of the 8 SRC parameters and the machines
 //    each track may run come from libanalogrytm (sound.h / sound.c) and the
 //    firmware's machine table (rytm-mods machines.md).
-//  - SRC page knob order: TUN on A, DEC on D and LEV on H for every machine;
-//    BD HARD reads TUN SWT SNP DEC / WAV HLD TIC LEV (firmware knob table and
-//    the manual). Other machines follow that family pattern (likely).
+//  - SRC page knob positions (encoders A..H, with their gaps) are read from
+//    the screen images of the Rytm MKII manual (OS 1.72, Appendix D,
+//    pp.96-109); BD HARD matches the firmware's knob table. Storage order
+//    (the slots, and the MIDI CC order, p.86) differs.
 //  - FLTR FRQ is one semitone a step: 440 Hz at 60, 13.8 Hz at 0, 21.1 kHz at
 //    127 (measured on hardware, filter-hz mod).
 // ============================================================================
 
-import { NOTE_LENGTHS, TRIG_CONDITIONS, formatLength } from '@/lib/sequencer/elektron';
+import { NOTE_LENGTHS, RETRIG_RATES, TRIG_CONDITIONS, formatLength } from '@/lib/sequencer/elektron';
 
 // ----------------------------------------------------------------------------
 // Machines (hardware numbering, libanalogrytm AR_SOUND_MACHINE_*)
@@ -72,120 +73,130 @@ export const CHIP_SPEEDS = [
   '128T', '128', '64T', '128.', '64', '32T', '64.', '32', '16T', '32.', '16', '8T', '16.', '8', '4T', '8.', '4', '2T', '4.', '2', '1T', '2.', '1', '1.',
   '1Hz', '1.56Hz', '1.88Hz', '2Hz', '3.13Hz', '3.75Hz', '4Hz', '5Hz', '6.25Hz', '7.5Hz', '10Hz', '12.5Hz', '15Hz', '20Hz', '25Hz', '30Hz', '40Hz',
   '50Hz', '60Hz', '75Hz', '100Hz', '120Hz', '150Hz', '180Hz', '200Hz', '240Hz', '250Hz', '300Hz', '350Hz', '360Hz', '400Hz', '420Hz', '480Hz',
+  // single-shot: the arpeggio runs once and holds its last note
+  '240S', '200S', '150S', '120S', '100S', '60S', '50S', '30S', '25S',
 ] as const;
-/** SY CHIP step programs (OS 1.70 list): basic waves, animations, PWM, variants, tables, pulse widths */
+/** First single-shot speed */
+export const CHIP_ONESHOT = 57;
+/** SY CHIP waveforms (manual p.103-104): analog waves, pitched noise, animations, PWM, tables, pulse widths */
 export const CHIP_WAVES: readonly string[] = [
-  'ASIN0', 'ASIN', 'TRI', 'SSAW', 'SAW', 'SQR', 'NOIS', 'ANM1', 'ANM2', 'ANM3', 'ANM4', 'ANM5', 'PWM+', 'PWM-',
+  'SIN', 'ASIN', 'TRI', 'SSAW', 'SAW', 'SQR', 'NOIS', 'ANM1', 'ANM2', 'ANM3', 'ANM4', 'ANM5', 'PWM+', 'PWM-',
   '.TRI', '+TRI', 'TRI+', 'TRI*', '.SAW', '+SAW', 'SAW+', 'SAW*', '.SQR', '+SQR', 'SQR+', 'SQR*', 'TBL1', 'TBL2', 'TBL3',
   ...Array.from({ length: 99 }, (_, i) => `P${i + 1}%`),
 ];
-/** SY DUAL VCO CFG 0..79: osc 1 wave (Sine, Sinesaw) x mode (+ mix, R ring, F FM, FR) x osc 2 wave x restart */
+/** SY DUAL VCO CFG 0..79: osc 1 wave (Sine, Sinesaw) x mode (+ mix, R ring, F FM, FR FM + ring) x osc 2 wave, each with and without "_" (oscillators reset on the trig) */
 export const DUAL_CFG: readonly string[] = (() => {
   const w1 = ['SIN', 'SSW'];
   const md = ['+', 'R', 'F', 'FR'];
   const w2 = ['SIN', 'SKW', 'TRI', 'SSW', 'SAW'];
   const out: string[] = [];
-  for (const a of w1) for (const m of md) for (const b of w2) { out.push(`${a}${m}${b}-`); out.push(`${a}${m}${b}`); }
+  for (const a of w1) for (const m of md) for (const b of w2) { out.push(`${a}${m}${b}_`); out.push(`${a}${m}${b}`); }
   return out;
 })();
 export const RIDE_TYPES = ['A', 'B', 'C', 'D'] as const;
 
 /** Two-oscillator voices: BD, SD, RS, CP tracks */
 const DUAL_PARAMS: MParam[] = [
-  U('lev', 'LEV', 'Level', 100, 'Output level of the machine. It is squared on the way to the VCA, so halving it is about -12 dB.'),
-  T('tun', 'TUN', 'Tune', 'Pitch in semitones around the machine\'s base note. Trig NOTE and LFO add to it.'),
-  U('dec', 'DEC', 'Decay', 50, 'Decay time of the machine\'s own amplitude envelope - how long the drum rings.'),
-  U('hld', 'HLD', 'Hold', 10, 'Time the body is held up before the decay starts.'),
-  U('swt', 'SWT', 'Sweep Time', 40, 'How fast the pitch sweep falls back to the tuned pitch. Low = a click, high = a long "boom" or a laser.'),
-  U('swd', 'SWD', 'Sweep Depth', 64, 'How far above the tuned pitch the sweep starts (the value is squared, so the low half is subtle).'),
-  U('snp', 'SNP', 'Snap', 48, 'An immediate, very fast pitch drop at the start of the attack - the hard "snap" of the transient.'),
-  P('wav', 'WAV', 'Waveform', 0, 2, 0, 'Oscillator waveform: sine, asymmetric sine or triangle. More harmonics = a harder, buzzier kick.', { options: BD_WAVES }),
-  P('wavx', 'WAV', 'Waveform', 0, 11, 0, 'Waveform: sine, asymmetric sine, triangle, sinesaw, saw or square. A versions restart the oscillator on each trig, B versions run free.', { options: SHARP_WAVES }),
-  U('tic', 'TIC', 'Tick Level', 40, 'Level of a short digital click at the very start - the beater hitting the skin.'),
-  P('tra', 'TRA', 'Transient', 0, 55, 8, 'Picks one of 56 attack transients: combinations of click, noise level and noise colour.'),
-  U('fma', 'FMA', 'FM Amount', 40, 'Frequency modulation depth: the modulator adds brighter, more inharmonic partials.'),
-  U('fms', 'FMS', 'FM Sweep Time', 30, 'Pitch sweep time of the modulator - moves the FM tone during the attack.'),
-  U('fmd', 'FMD', 'FM Decay', 40, 'How fast the FM brightness fades, leaving the plain tone.'),
-  T('fmt', 'FMT', 'FM Tune', 'Modulator pitch in semitones. At 0 the modulator sits an octave above the carrier.'),
-  P('typ', 'TYP', 'Type', 0, 1, 0, 'Modulation type: A = FM with the ring modulator, B = FM alone.', { options: ['A', 'B'] }),
-  U('mod', 'MOD', 'Modulation', 30, 'Amount of modulation from the second oscillator. It does not decay, so it colours the whole hit.'),
-  U('dus', 'DUS', 'Dust', 0, 'A noise layer ("dust") that follows the level and fades with the decay.'),
-  U('clk', 'CLK', 'Click', 30, 'An analog click from the second oscillator gated by a very fast envelope.'),
-  U('imp', 'IMP', 'Impact', 40, 'Level of a recorded-style beater / stick impulse layered over the start.'),
-  U('det', 'DET', 'Detune', 56, 'Interval between the two drum-head oscillators (0 = unison, 56 = about a minor seventh).'),
-  U('nod', 'NOD', 'Noise Decay', 50, 'Decay of the noise layer - the snare wires.'),
-  U('nol', 'NOL', 'Noise Level', 64, 'Level of the noise layer.'),
-  B('bal', 'BAL', 'Balance', 'Balance between the two oscillators (0 = equal).'),
-  U('nbal', 'BAL', 'Body/Noise Balance', 64, 'Balance between the drum body and the noise.'),
-  U('bdy', 'BDY', 'Body Decay', 50, 'Decay of the drum body (the tonal part).'),
-  U('lpf', 'LPF', 'Lowpass', 100, 'Low-pass cutoff of the digital noise filter: brightness of the noise.'),
-  U('hpf', 'HPF', 'Highpass', 40, 'High-pass cutoff of the digital noise filter: thinness of the noise.'),
-  U('nres', 'RES', 'Noise Resonance', 20, 'Resonant peak of the noise filter.'),
-  B('sym', 'SYM', 'Symmetry', 'Wave symmetry of the rim oscillators: asymmetry gives the knock of a rim shot.'),
-  T('t1', 'T1', 'Tune 1', 'Pitch of the lower oscillator.'),
-  T('t2', 'T2', 'Tune 2', 'Pitch of the upper oscillator.'),
-  U('ton', 'TON', 'Tone', 64, 'Centre frequency of the band-passed clap noise.'),
-  U('num', 'NUM', 'Number', 48, 'Number of hand claps before the tail (0 = one clap).'),
-  U('rat', 'RAT', 'Rate', 50, 'Spacing between the individual claps.'),
-  U('rnd', 'RND', 'Random', 20, 'Random variation of the clap spacing - more human.'),
-  U('cpd', 'CPD', 'Clap Decay', 50, 'Decay of each individual clap.'),
-  U('lpq', 'LPQ', 'LP Resonance', 30, 'Resonance of the noise low-pass.'),
-  U('atk', 'ATK', 'Attack', 0, 'Attack time of the generator.'),
-  B('nswd', 'SWD', 'Sweep Depth', 'Bipolar low-pass sweep at the start of the note.'),
-  P('pol', 'POL', 'Polarity', 0, 1, 0, 'Pulse polarity: positive or negative.', { options: ['POS', 'NEG'] }),
-  U('dec2', 'DEC2', 'Decay 2', 50, 'Decay of oscillator 2 (127 = hold).'),
-  T('vdet', 'DET', 'Detune', 'Interval of oscillator 2 above or below oscillator 1, in semitones.'),
-  B('bnd', 'BND', 'Bend', 'A pitch bend that starts at this offset and glides back to the tuned pitch.'),
-  P('cfg', 'CFG', 'Oscillator Config', 0, 79, 1, 'Waveform pair and connection: + mix, R ring modulation, F FM, FR both; "-" = free-running oscillators.', { options: DUAL_CFG }),
-  T('of2', 'OF2', 'Offset 2', 'Pitch of arpeggio step 2, in semitones.', 24),
-  T('of3', 'OF3', 'Offset 3', 'Pitch of arpeggio step 3, in semitones.', 24),
-  T('of4', 'OF4', 'Offset 4', 'Pitch of arpeggio step 4, in semitones.', 24),
-  P('cwav', 'WAV', 'Waveform', 0, 127, 5, 'Step program: VCO waves, chip pulse waves, PWM sweeps, chip noise.', { options: CHIP_WAVES }),
-  P('cspd', 'SPD', 'Speed', 0, 56, 10, 'Arpeggio speed: note values synced to the tempo, then fixed rates in Hz.', { options: CHIP_SPEEDS }),
-  T('rdet', 'DET', 'Detune', 'Detune of oscillator 1 against oscillator 2, in semitones.', 24),
-  P('wav1', 'WAV1', 'Osc 1 Wave', 0, 6, 0, 'Oscillator 1 waveform.', { options: RAW_WAVES1 }),
-  P('wav2', 'WAV2', 'Osc 2 Wave', 0, 3, 0, 'Oscillator 2 waveform.', { options: RAW_WAVES2 }),
+  U('lev', 'LEV', 'Level', 100, 'Overall volume of the machine. It is squared on the way to the VCA, so halving it is about -12 dB.'),
+  T('tun', 'TUN', 'Tune', 'Pitch of the oscillator in semitones. The trig NOTE, CHRO and the LFO add to it.'),
+  U('dec', 'DEC', 'Decay', 50, 'Length of the decay phase: how long the drum rings.'),
+  U('hld', 'HLD', 'Hold', 32, 'Hold time before the decay phase starts: the body of the drum.'),
+  U('swt', 'SWT', 'Sweep Time', 64, 'Pitch sweep time. Low values give a short, clicky sweep; high values a long boom or a laser.'),
+  U('swd', 'SWD', 'Sweep Depth', 64, 'Depth of the pitch sweep: how far above the tuned pitch the sweep starts.'),
+  U('snp', 'SNP', 'Snap', 48, 'Snap: an immediate, very fast pitch drop at the start of the attack. Shape the transient with TIC.'),
+  P('wav', 'WAV', 'Waveform', 0, 2, 0, 'Oscillator waveform: sine, asymmetric sine or triangle, with more overtones in that order.', { options: BD_WAVES }),
+  P('wavx', 'WAV', 'Waveform', 0, 11, 0, 'Waveform: sine, asymmetric sine, triangle, sinesaw, saw or square. A restarts the oscillator on every trig, B lets it run free.', { options: SHARP_WAVES }),
+  U('tic', 'TIC', 'Tick Level', 64, 'Level of the transient tick at the very start: the beater hitting the skin.'),
+  P('tra', 'TRA', 'Transient', 0, 55, 17, 'Chooses the transient (a tick or a noise burst) together with its level: 56 variations.'),
+  U('fma', 'FMA', 'FM Amount', 32, 'How strongly the second oscillator frequency-modulates the first: brighter, inharmonic partials.'),
+  U('fms', 'FMS', 'FM Sweep Time', 32, 'Pitch sweep time of the modulating oscillator.'),
+  U('fmd', 'FMD', 'FM Decay', 48, 'Decay of the modulating oscillator, so how long the FM brightness lasts.'),
+  T('fmt', 'FMT', 'FM Tune', 'Pitch of the modulating oscillator in semitones.'),
+  P('typ', 'TYP', 'Modulation Type', 0, 1, 1, 'A: linear FM between the two oscillators. B: FM together with ring modulation.', { options: ['A', 'B'] }),
+  U('mod', 'MOD', 'Modulation', 32, 'Modulation depth between the oscillators: the harmonics and the rubbery bounce of the drum.'),
+  U('dus', 'DUS', 'Dust', 64, 'Level of a soft, tape-like static layer.'),
+  U('clk', 'CLK', 'VCO Click', 100, 'Level of a soft click made by the oscillator itself.'),
+  U('imp', 'IMP', 'Impact', 64, 'Level of the digital transient: a mix of a short recording and noise.'),
+  U('det', 'DET', 'Detune', 52, 'Pitch of the second oscillator relative to the first (0 = unison).'),
+  U('nod', 'NOD', 'Noise Decay', 50, 'Length of the noise decay: the snare wires.'),
+  U('nol', 'NOL', 'Noise Level', 64, 'Level of the noise.'),
+  B('bal', 'BAL', 'Osc Balance', 'Balance between the levels of oscillator 1 and oscillator 2.'),
+  U('nbal', 'BAL', 'Noise Balance', 64, 'Balance between the noise and the oscillator.'),
+  U('bdy', 'BDY', 'Body Decay', 64, 'Decay time of the oscillator: the shell of the drum.'),
+  U('lpf', 'LPF', 'Lowpass', 100, 'Low-pass cutoff of the noise filter.'),
+  U('hpf', 'HPF', 'Highpass', 32, 'High-pass cutoff of the noise filter.'),
+  U('nres', 'RES', 'Noise Resonance', 32, 'Resonant peak at the noise low-pass cutoff (0 = none).'),
+  B('sym', 'SYM', 'Symmetry', 'Non-linearity of the rim-shot circuit: changes the knock of the rim.'),
+  T('t1', 'T1', 'Tune Osc 1', 'Pitch of the first oscillator in semitones.'),
+  T('t2', 'T2', 'Tune Osc 2', 'Pitch of the second oscillator in semitones.'),
+  U('ton', 'TON', 'Noise Tone', 64, 'Pitch of the clap noise (the centre of its band-pass).'),
+  U('num', 'NUM', 'Clap Number', 2, 'Number of hand claps before the tail.'),
+  U('rat', 'RAT', 'Clap Rate', 85, 'Rate of the hand claps: higher is faster, so the claps sit closer together.'),
+  U('rnd', 'RND', 'Random Claps', 32, 'Randomizes the timing of the claps: a looser, more human clap.'),
+  U('cpd', 'CPD', 'Clap Decay', 90, 'Length of the decay of each clap.'),
+  U('lpq', 'LPQ', 'LP Resonance', 0, 'Resonance at the low-pass cutoff (0 = none).'),
+  U('atk', 'ATK', 'Attack', 0, 'Length of the attack phase.'),
+  B('nswd', 'SWD', 'Sweep Depth', 'Depth of the low-pass cutoff sweep, up or down.'),
+  P('pol', 'POL', 'Polarity', 0, 1, 0, 'Polarity of the impulse: positive or negative.', { options: ['POS', 'NEG'] }),
+  U('dec2', 'DEC', 'Osc 2 Decay', 70, 'Decay of oscillator 2 (127 holds).'),
+  T('vdet', 'DET', 'Osc 2 Detune', 'Pitch of oscillator 2 relative to oscillator 1, in semitones.', 16),
+  B('bnd', 'BND', 'Bend', 'Depth of a fixed-time pitch envelope, up or down (24 steps an octave).'),
+  P('cfg', 'CFG', 'Osc Config', 0, 79, 16, 'Waveforms and interaction: osc 1 sine or sinesaw; + mixes, R ring-modulates, F frequency-modulates (osc 1 the carrier), FR does both; osc 2 sine, skewed sine, triangle, sinesaw or saw; "_" resets the oscillators on every trig.', { options: DUAL_CFG }),
+  T('of2', 'OF2', 'Offset 2', 'Second note of the arpeggio, in semitones above (or below) TUN. 0 ends the arpeggio here.', 24),
+  T('of3', 'OF3', 'Offset 3', 'Third note of the arpeggio. 0 ends the arpeggio here.', 24),
+  T('of4', 'OF4', 'Offset 4', 'Fourth note of the arpeggio. 0 ends the arpeggio here.', 24),
+  P('cwav', 'WAV', 'Waveform', 0, 127, 2, 'Waveform: analog waves, pitched chip noise, animated and ring-modulated variants, PWM, noise-then-wave tables and fixed pulse widths.', { options: CHIP_WAVES }),
+  P('cspd', 'SPD', 'Speed', 0, CHIP_SPEEDS.length - 1, 41, 'Arpeggio speed: note values of the tempo, then fixed rates in Hz, then single-shot rates (S) that play the arpeggio once.', { options: CHIP_SPEEDS }),
+  T('rdet', 'DET', 'Detune', 'Tuning of oscillator 2 relative to oscillator 1, in semitones.', 24),
+  P('wav1', 'WAV1', 'Osc 1 Wave', 0, 6, 4, 'Oscillator 1 waveform: sine, asymmetric sine, triangle, sinesaw, asymmetric saw, saw, or RING (oscillator 1 ring-modulates oscillator 2 with a square wave).', { options: RAW_WAVES1 }),
+  P('wav2', 'WAV2', 'Osc 2 Wave', 0, 3, 0, 'Oscillator 2 waveform: sine or sinesaw. A resets both oscillators on every trig, B lets them run free.', { options: RAW_WAVES2 }),
 ];
 
 /** UT NOISE / UT IMPULSE run on every voice */
 const UT_KEYS = ['lev', 'lpf', 'hpf', 'lpq', 'atk', 'swt', 'nswd', 'pol', 'dec'];
 
+/** TUN of the tom, hat, cymbal and cowbell circuits: shown -64..63, half a semitone a step (BT: a quarter) */
+const TUN64 = P('tun', 'TUN', 'Tune', -64, 63, 0, 'Pitch of the circuit.', { bipolar: true });
+
 /** Resonator voices: BT, LT, MT, HT */
 const RES_PARAMS: MParam[] = [
-  ...DUAL_PARAMS.filter(p => ['lev', 'tun', 'dec', 'swd', 'swt', 'nod', 'nol', 'lpf', 'hpf', 'lpq', 'atk', 'nswd', 'pol'].includes(p.key)),
-  P('snp', 'SNP', 'Snap', 0, 3, 1, 'Snap: switches the resonator to a sharper state for a moment after the strike (0 = off, 3 = longest).'),
-  B('ton', 'TON', 'Noise Tone', 'Colour of the noise layer. It follows TUN, so the noise stays in tune with the drum.'),
+  ...DUAL_PARAMS.filter(p => ['lev', 'dec', 'swd', 'swt', 'nod', 'nol', 'lpf', 'hpf', 'lpq', 'atk', 'nswd', 'pol'].includes(p.key)),
+  TUN64,
+  P('snp', 'SNP', 'Snap', 0, 3, 1, 'Length of the snap transient: the resonator is switched to a sharper state for a moment after the strike (0 = off, 3 = longest).'),
+  B('ton', 'TON', 'Noise Tone', 'Pitch of the noise. It follows TUN, so the noise stays in tune with the drum.'),
 ];
 
 /** Hi-hat bank: CH, OH */
 const HAT_PARAMS: MParam[] = [
-  ...DUAL_PARAMS.filter(p => [...UT_KEYS, 'tun', 'nol', 'nod'].includes(p.key)),
-  B('col', 'COL', 'Color', 'Tone of the six-oscillator bank: lower = darker and more metallic, higher = brighter and thinner.'),
-  B('ton', 'TON', 'Tone', 'Tone of the bank.'),
-  U('trd', 'TRD', 'Transient Decay', 30, 'Length of the initial transient.'),
-  P('rst', 'RST', 'Osc Reset', 0, 1, 0, 'Restart the oscillators on every trig, so every hit sounds the same.', { options: ['OFF', 'ON'] }),
-  U('osc1', 'OSC1', 'Osc 1', 40, 'Frequency of oscillator 1.'),
-  U('osc2', 'OSC2', 'Osc 2', 52, 'Frequency of oscillator 2.'),
-  U('osc3', 'OSC3', 'Osc 3', 58, 'Frequency of oscillator 3.'),
-  U('osc4', 'OSC4', 'Osc 4', 70, 'Frequency of oscillator 4.'),
-  U('osc5', 'OSC5', 'Osc 5', 71, 'Frequency of oscillator 5.'),
-  U('osc6', 'OSC6', 'Osc 6', 84, 'Frequency of oscillator 6.'),
+  ...DUAL_PARAMS.filter(p => UT_KEYS.includes(p.key)),
+  TUN64,
+  B('col', 'COL', 'Noise Color', 'Timbral colour: the hardness of the metal. Lower is darker, higher is brighter and thinner.'),
+  B('ton', 'TON', 'Tone', 'Tone of the hat: higher is more shrill, lower is deeper.'),
+  U('trd', 'TRD', 'Transient Decay', 68, 'Length of the transient at the start of the hit.'),
+  P('rst', 'RST', 'Osc Reset', 0, 1, 0, 'ON restarts the oscillators on every trig, so every hit sounds the same; OFF lets them run free.', { options: ['OFF', 'ON'] }),
+  U('osc1', 'OSC1', 'Osc 1 Frequency', 40, 'Frequency of oscillator 1.'),
+  U('osc2', 'OSC2', 'Osc 2 Frequency', 52, 'Frequency of oscillator 2.'),
+  U('osc3', 'OSC3', 'Osc 3 Frequency', 58, 'Frequency of oscillator 3.'),
+  U('osc4', 'OSC4', 'Osc 4 Frequency', 70, 'Frequency of oscillator 4.'),
+  U('osc5', 'OSC5', 'Osc 5 Frequency', 71, 'Frequency of oscillator 5.'),
+  U('osc6', 'OSC6', 'Osc 6 Frequency', 84, 'Frequency of oscillator 6.'),
 ];
 
 /** Cymbal / cowbell bank: CY, CB */
 const CYM_PARAMS: MParam[] = [
-  ...DUAL_PARAMS.filter(p => [...UT_KEYS, 'tun'].includes(p.key)),
-  B('col', 'COL', 'Color', 'Tone of the oscillator bank.'),
-  B('ton', 'TON', 'Tone', 'Balance between the low and high cymbal bands (or transient and body).'),
-  U('trd', 'TRD', 'Transient Decay', 30, 'Decay of the attack transient.'),
-  P('typ', 'TYP', 'Cymbal Type', 0, 3, 0, 'Oscillator bank: A = 808 ratios, B = HH BASIC set, C / D = metallic sets.', { options: RIDE_TYPES }),
-  U('hit', 'HIT', 'Hit Decay', 30, 'Decay of the hit (attack) band.'),
-  U('c1', 'C1', 'Component 1', 90, 'Level of the hit band.'),
-  U('c2', 'C2', 'Component 2', 64, 'Level of the second band.'),
-  U('c3', 'C3', 'Component 3', 64, 'Level of the third band.'),
-  U('cdet', 'DET', 'Detune', 27, 'Interval between the two pulse oscillators (27 = the classic 540 / 800 Hz cowbell).'),
-  B('pw1', 'PW1', 'Pulse Width 1', 'Pulse width of oscillator 1: timbre.'),
-  B('pw2', 'PW2', 'Pulse Width 2', 'Pulse width of oscillator 2: timbre.'),
+  ...DUAL_PARAMS.filter(p => UT_KEYS.includes(p.key)),
+  TUN64,
+  B('col', 'COL', 'Noise Color', 'Timbral colour of the cymbal.'),
+  B('ton', 'TON', 'Tone', 'Metallic tone: the balance of the cymbal bands (CY METALLIC: of transient and body).'),
+  U('trd', 'TRD', 'Transient Decay', 35, 'Length of the transient decay phase.'),
+  P('typ', 'TYP', 'Cymbal Type', 0, 3, 0, 'Set of oscillator frequencies and how they interact: A 808 ratios, B the HH BASIC set, C and D metallic sets.', { options: RIDE_TYPES }),
+  U('hit', 'HIT', 'Hit Decay', 64, 'Decay of the top (hit) component.'),
+  U('c1', 'C1', 'Component 1', 64, 'Level of component 1 (the hit).'),
+  U('c2', 'C2', 'Component 2', 64, 'Level of component 2.'),
+  U('c3', 'C3', 'Component 3', 32, 'Level of component 3.'),
+  U('cdet', 'DET', 'Detune', 64, 'Detune offset of the second oscillator.'),
+  B('pw1', 'PW1', 'Pulse Width 1', 'Pulse width of oscillator 1: its timbre.'),
+  B('pw2', 'PW2', 'Pulse Width 2', 'Pulse width of oscillator 2: its timbre.'),
 ];
 
 export const PARAMS_BY_TYPE: Record<VoiceType, MParam[]> = { dual: DUAL_PARAMS, res: RES_PARAMS, hat: HAT_PARAMS, cym: CYM_PARAMS };
@@ -206,84 +217,137 @@ export interface MachineDef {
   short: string;
   slots: (string | null)[];
   knobs: (string | null)[];
-  /** Parameter values the machine starts from when selected (others keep their value) */
+  /** The machine's own values when it is selected (the hardware's defaults, rytm-rs) */
   init?: Record<string, number>;
+  /** Screen label / name / text of a parameter on this machine, where it differs from the catalogue */
+  labels?: Record<string, { abbr?: string; name?: string; desc?: string }>;
   desc: string;
 }
 
-const MD = (id: number, name: string, short: string, slots: (string | null)[], knobs: (string | null)[], desc: string, init?: Record<string, number>): MachineDef =>
-  ({ id, name, short, slots, knobs, desc, init });
+const MD = (id: number, name: string, short: string, slots: (string | null)[], knobs: (string | null)[], desc: string,
+  init?: Record<string, number>, labels?: MachineDef['labels']): MachineDef =>
+  ({ id, name, short, slots, knobs, desc, init, labels });
 
+// knobs: the manual's SRC screens (Appendix D); slots: libanalogrytm / firmware storage order.
 export const MACHINES: Record<number, MachineDef> = {
   [M.BD_HARD]: MD(M.BD_HARD, 'BD HARD', 'BDHD', ['lev', 'tun', 'dec', 'hld', 'swt', 'snp', 'wav', 'tic'], ['tun', 'swt', 'snp', 'dec', 'wav', 'hld', 'tic', 'lev'],
-    'A hard, punchy kick: one oscillator with a fixed-depth pitch sweep, an extra snap and a hold-then-decay body.', { dec: 60, hld: 16 }),
+    'A hard, punchy kick: one oscillator with a fixed-depth pitch sweep, an extra snap and a hold-then-decay body.',
+    { tun: -3, dec: 47, hld: 40, swt: 90, snp: 6, wav: 0, tic: 64 },
+    { snp: { name: 'Snap Amount', desc: 'Level of the snap transient: an immediate pitch drop at the attack (the sweep depth itself is fixed).' } }),
   [M.BD_CLASSIC]: MD(M.BD_CLASSIC, 'BD CLASSIC', 'BDCL', ['lev', 'tun', 'dec', 'hld', 'swt', 'swd', 'wav', 'tra'], ['tun', 'swt', 'swd', 'dec', 'wav', 'hld', 'tra', 'lev'],
-    'The classic analog kick: a swept oscillator with adjustable sweep depth and a choice of 56 transients.'),
-  [M.BD_FM]: MD(M.BD_FM, 'BD FM', 'BDFM', ['lev', 'tun', 'dec', 'fma', 'swt', 'fms', 'fmd', 'fmt'], ['tun', 'swt', 'fms', 'dec', 'fma', 'fmd', 'fmt', 'lev'],
-    'Two-operator FM kick: the modulator adds a bright, inharmonic attack that fades with FMD.'),
+    'The classic analog kick: a swept oscillator with adjustable sweep depth and a choice of 56 transients.',
+    { tun: -6, dec: 32, hld: 32, swt: 64, swd: 42, wav: 1, tra: 17 }),
+  [M.BD_FM]: MD(M.BD_FM, 'BD FM', 'BDFM', ['lev', 'tun', 'dec', 'fma', 'swt', 'fms', 'fmd', 'fmt'], ['tun', 'swt', 'fmd', 'dec', 'fmt', 'fms', 'fma', 'lev'],
+    'Two-operator FM kick: the second oscillator modulates the first, adding a bright, inharmonic attack that fades with FMD.',
+    { tun: -6, dec: 32, fma: 32, swt: 48, fms: 32, fmd: 48, fmt: -16 },
+    { tun: { desc: 'Pitch of the first (modulated) oscillator in semitones.' }, swt: { desc: 'Pitch sweep time of the first (modulated) oscillator.' }, dec: { desc: 'Decay of the first oscillator, and so of the whole drum.' } }),
   [M.BD_PLASTIC]: MD(M.BD_PLASTIC, 'BD PLASTIC', 'BDPL', ['lev', 'tun', 'dec', 'typ', 'mod', 'swt', 'swd', 'tic'], ['tun', 'swt', 'swd', 'dec', 'typ', 'mod', 'tic', 'lev'],
-    'Both oscillators at one pitch, the second modulating the first all the way through: a tight, plastic, clicky kick.',
-    { swt: 20, swd: 70, dec: 40 }),
-  [M.BD_SILKY]: MD(M.BD_SILKY, 'BD SILKY', 'BDSI', ['lev', 'tun', 'dec', 'hld', 'swt', 'swd', 'dus', 'clk'], ['tun', 'swt', 'swd', 'dec', 'dus', 'hld', 'clk', 'lev'],
-    'A smooth sine kick with an analog click from the second oscillator and an optional dust (noise) layer.'),
-  [M.BD_SHARP]: MD(M.BD_SHARP, 'BD SHARP', 'BDSH', ['lev', 'tun', 'dec', 'hld', 'swt', 'swd', 'wavx', 'tic'], ['tun', 'swt', 'swd', 'dec', 'wavx', 'hld', 'tic', 'lev'],
-    'A single oscillator with twelve waveforms (up to saw and square) and a recorded transient: aggressive and sharp.'),
-  [M.BD_ACOUSTIC]: MD(M.BD_ACOUSTIC, 'BD ACOUSTIC', 'BDAC', ['lev', 'tun', 'dec', 'hld', 'swt', 'swd', 'wavx', 'imp'], ['tun', 'swt', 'swd', 'dec', 'wavx', 'hld', 'imp', 'lev'],
-    'Built like BD SHARP with a beater impulse: an acoustic kick drum.', { swd: 40, swt: 60, imp: 60 }),
+    'Two interacting oscillators at one pitch, the second modulating the first all the way through: a tight, rubbery, clicky kick.',
+    { tun: -6, dec: 80, typ: 1, mod: 32, swt: 64, swd: 100, tic: 64 },
+    { tun: { desc: 'Pitch of the two interacting oscillators in semitones.' } }),
+  [M.BD_SILKY]: MD(M.BD_SILKY, 'BD SILKY', 'BDSI', ['lev', 'tun', 'dec', 'hld', 'swt', 'swd', 'dus', 'clk'], ['tun', 'swt', 'swd', 'dec', 'hld', 'dus', 'clk', 'lev'],
+    'A smooth sine kick with a soft click from the oscillator and a tape-like dust layer.',
+    { tun: -6, dec: 64, hld: 32, swt: 64, swd: 64, dus: 64, clk: 100 }),
+  [M.BD_SHARP]: MD(M.BD_SHARP, 'BD SHARP', 'BDSH', ['lev', 'tun', 'dec', 'hld', 'swt', 'swd', 'wavx', 'tic'], ['tun', 'swt', 'swd', 'dec', 'hld', 'tic', 'wavx', 'lev'],
+    'A single oscillator with six waveforms (up to saw and square), free-running or reset, and a recorded transient: aggressive and sharp.',
+    { tun: -6, dec: 80, hld: 32, swt: 100, swd: 100, wavx: 0, tic: 64 }),
+  [M.BD_ACOUSTIC]: MD(M.BD_ACOUSTIC, 'BD ACOUSTIC', 'BDAC', ['lev', 'tun', 'dec', 'hld', 'swt', 'swd', 'wavx', 'imp'], ['tun', 'swt', 'swd', 'dec', 'hld', 'imp', 'wavx', 'lev'],
+    'Built like BD SHARP with a beater impact layer: an acoustic kick drum.',
+    { tun: -3, dec: 64, hld: 64, swt: 80, swd: 92, wavx: 0, imp: 64 }),
   [M.SD_HARD]: MD(M.SD_HARD, 'SD HARD', 'SDHD', ['lev', 'tun', 'dec', 'swd', 'tic', 'nod', 'nol', 'swt'], ['tun', 'swt', 'swd', 'dec', 'tic', 'nod', 'nol', 'lev'],
-    'Two swept oscillators a fifth apart plus snare-wire noise: a hard, cracking snare.', { swd: 40, swt: 30, dec: 40 }),
-  [M.SD_CLASSIC]: MD(M.SD_CLASSIC, 'SD CLASSIC', 'SDCL', ['lev', 'tun', 'dec', 'det', 'snp', 'nod', 'nol', 'bal'], ['tun', 'det', 'snp', 'dec', 'nod', 'nol', 'bal', 'lev'],
-    'The classic analog snare: two drum-head oscillators at an adjustable interval, a fixed snap and wire noise.', { dec: 40 }),
-  [M.SD_FM]: MD(M.SD_FM, 'SD FM', 'SDFM', ['lev', 'tun', 'dec', 'fmt', 'fmd', 'nod', 'nol', 'fma'], ['tun', 'fmt', 'fmd', 'dec', 'nod', 'nol', 'fma', 'lev'],
-    'An FM snare: carrier and modulator, a short pitch blip and noise.', { dec: 40 }),
-  [M.SD_NATURAL]: MD(M.SD_NATURAL, 'SD NATURAL', 'SDNA', ['lev', 'tun', 'bdy', 'dec', 'nbal', 'lpf', 'hpf', 'nres'], ['tun', 'bdy', 'nbal', 'dec', 'lpf', 'hpf', 'nres', 'lev'],
-    'One oscillator for the shell and noise with its own filter (LPF, HPF, RES) for the wires: a natural snare.', { dec: 50 }),
-  [M.SD_ACOUSTIC]: MD(M.SD_ACOUSTIC, 'SD ACOUSTIC', 'SDAC', ['lev', 'tun', 'bdy', 'nod', 'nol', 'hld', 'swd', 'imp'], ['tun', 'hld', 'swd', 'bdy', 'nod', 'nol', 'imp', 'lev'],
-    'Two oscillators a fifth apart, wire noise and a stick impulse: an acoustic snare.', { hld: 4, swd: 30 }),
-  [M.RS_HARD]: MD(M.RS_HARD, 'RS HARD', 'RSHD', ['lev', 'tun', 'dec', 'swd', 'tic', 'nol', 'sym', 'swt'], ['tun', 'swt', 'swd', 'dec', 'sym', 'nol', 'tic', 'lev'],
-    'Two oscillators at the inharmonic rim-shot ratio (about 3.7:1) with a pitch sweep.', { dec: 30, swd: 20, swt: 10 }),
-  [M.RS_CLASSIC]: MD(M.RS_CLASSIC, 'RS CLASSIC', 'RSCL', ['lev', 't1', 'dec', 'bal', 't2', 'sym', 'nol', 'tic'], ['t1', 't2', 'bal', 'dec', 'sym', 'nol', 'tic', 'lev'],
-    'Two independently tuned oscillators with symmetry shaping: the classic analog rim shot.', { dec: 30 }),
-  [M.CP_CLASSIC]: MD(M.CP_CLASSIC, 'CP CLASSIC', 'CPCL', ['lev', 'ton', 'nod', 'num', 'rat', 'nol', 'rnd', 'cpd'], ['ton', 'num', 'rat', 'nod', 'nol', 'rnd', 'cpd', 'lev'],
-    'Hand clap: bursts of filtered noise followed by a reverberant tail.'),
-  [M.BT_CLASSIC]: MD(M.BT_CLASSIC, 'BT CLASSIC', 'BTCL', ['lev', 'tun', 'dec', null, 'nol', 'snp', 'swd', null], ['tun', 'swd', 'snp', 'dec', 'nol', null, null, 'lev'],
-    'Bass tom: a tuned resonator struck by a pulse, with snap, pitch sweep and a noise layer.', { swd: 30, nol: 20, dec: 60 }),
-  [M.XT_CLASSIC]: MD(M.XT_CLASSIC, 'XT CLASSIC', 'XTCL', ['lev', 'tun', 'dec', 'swd', 'swt', 'nod', 'nol', 'ton'], ['tun', 'swt', 'swd', 'dec', 'nod', 'nol', 'ton', 'lev'],
-    'Analog tom: a tuned resonator with pitch sweep and a noise layer tuned with the drum.', { swd: 40, swt: 60, nol: 20, nod: 30, dec: 60 }),
-  [M.CH_CLASSIC]: MD(M.CH_CLASSIC, 'CH CLASSIC', 'CHCL', ['lev', 'tun', 'dec', 'col', null, null, null, null], ['tun', 'col', null, 'dec', null, null, null, 'lev'],
-    'Closed hat: six square oscillators at the TR-808 ratios through the metal path, a quick drop then DEC.', { dec: 30 }),
-  [M.OH_CLASSIC]: MD(M.OH_CLASSIC, 'OH CLASSIC', 'OHCL', ['lev', 'tun', 'dec', 'col', null, null, null, null], ['tun', 'col', null, 'dec', null, null, null, 'lev'],
-    'Open hat: the same 808-ratio bank through the long path.', { dec: 60 }),
+    'Two swept oscillators at a fixed interval (a fifth) plus snare-wire noise: a hard, cracking snare.',
+    { tun: 0, dec: 76, swd: 127, tic: 64, nod: 32, nol: 64, swt: 43 }),
+  [M.SD_CLASSIC]: MD(M.SD_CLASSIC, 'SD CLASSIC', 'SDCL', ['lev', 'tun', 'dec', 'det', 'snp', 'nod', 'nol', 'bal'], ['tun', 'det', 'bal', 'dec', 'snp', 'nod', 'nol', 'lev'],
+    'The classic analog snare: two drum-head oscillators at an adjustable interval, a snap and wire noise.',
+    { tun: -6, dec: 48, det: 52, snp: 64, nod: 64, nol: 64, bal: -32 },
+    { tun: { desc: 'Common pitch of the two oscillators in semitones.' }, snp: { name: 'Snap Amount', desc: 'Level of the snap transient.' } }),
+  [M.SD_FM]: MD(M.SD_FM, 'SD FM', 'SDFM', ['lev', 'tun', 'dec', 'fmt', 'fmd', 'nod', 'nol', 'fma'], ['tun', 'fmt', 'fmd', 'dec', 'fma', 'nod', 'nol', 'lev'],
+    'An FM snare: carrier and modulator, a short pitch blip and noise.',
+    { tun: -6, dec: 64, fmt: 12, fmd: 64, nod: 32, nol: 64, fma: 127 },
+    { tun: { desc: 'Pitch of the first (modulated) oscillator in semitones.' }, dec: { desc: 'Decay of the first oscillator, and so of the whole drum.' } }),
+  [M.SD_NATURAL]: MD(M.SD_NATURAL, 'SD NATURAL', 'SDNA', ['lev', 'tun', 'bdy', 'dec', 'nbal', 'lpf', 'hpf', 'nres'], ['tun', 'dec', 'nbal', 'bdy', 'hpf', 'lpf', 'nres', 'lev'],
+    'One oscillator for the shell and noise with its own filter (HPF, LPF, RES) for the wires: a natural snare.',
+    { tun: 6, bdy: 90, dec: 32, nbal: 64, lpf: 90, hpf: 32, nres: 32 },
+    { dec: { name: 'Noise Decay', desc: 'Length of the noise decay: the wires.' }, bdy: { name: 'Decay Time', desc: 'Length of the decay of the oscillator: the shell.' } }),
+  [M.SD_ACOUSTIC]: MD(M.SD_ACOUSTIC, 'SD ACOUSTIC', 'SDAC', ['lev', 'tun', 'bdy', 'nod', 'nol', 'hld', 'swd', 'imp'], ['tun', 'nod', 'nol', 'bdy', 'hld', 'imp', 'swd', 'lev'],
+    'Two oscillators a fifth apart, wire noise and a stick impact: an acoustic snare.',
+    { tun: 6, bdy: 64, nod: 64, nol: 64, hld: 64, swd: 32, imp: 64 },
+    { bdy: { name: 'Decay Time', desc: 'Length of the decay of the oscillator: the shell.' } }),
+  [M.RS_HARD]: MD(M.RS_HARD, 'RS HARD', 'RSHD', ['lev', 'tun', 'dec', 'swd', 'tic', 'nol', 'sym', 'swt'], ['tun', 'swt', 'swd', 'dec', 'sym', 'tic', 'nol', 'lev'],
+    'Two oscillators at the inharmonic rim-shot ratio (about 3.7:1) with a pitch sweep and the rim-shot circuit.',
+    { tun: 0, dec: 52, swd: 127, tic: 48, nol: 8, sym: 0, swt: 34 }),
+  [M.RS_CLASSIC]: MD(M.RS_CLASSIC, 'RS CLASSIC', 'RSCL', ['lev', 't1', 'dec', 'bal', 't2', 'sym', 'nol', 'tic'], ['t1', 't2', 'bal', 'dec', 'sym', 'tic', 'nol', 'lev'],
+    'Two independently tuned oscillators through the rim-shot circuit: the classic analog rim shot.',
+    { t1: 0, dec: 64, bal: 0, t2: 0, sym: 0, nol: 16, tic: 64 }),
+  [M.CP_CLASSIC]: MD(M.CP_CLASSIC, 'CP CLASSIC', 'CPCL', ['lev', 'ton', 'nod', 'num', 'rat', 'nol', 'rnd', 'cpd'], ['rat', 'num', 'rnd', 'cpd', 'ton', 'nod', 'nol', 'lev'],
+    'Hand clap: a few bursts of filtered noise, then a noise tail.',
+    { lev: 115, ton: 64, nod: 55, num: 2, rat: 85, nol: 90, rnd: 32, cpd: 90 }),
+  [M.BT_CLASSIC]: MD(M.BT_CLASSIC, 'BT CLASSIC', 'BTCL', ['lev', 'tun', 'dec', null, 'nol', 'snp', 'swd', null], ['tun', null, 'swd', 'dec', 'snp', null, 'nol', 'lev'],
+    'Bass tom: a tuned resonator struck by a pulse, with snap, a pitch sweep and a noise layer.',
+    { tun: 16, dec: 63, nol: 0, snp: 1, swd: 0 },
+    { tun: { desc: 'Pitch of the bass tom: a quarter semitone a step, about 16 semitones either way.' } }),
+  [M.XT_CLASSIC]: MD(M.XT_CLASSIC, 'XT CLASSIC', 'XTCL', ['lev', 'tun', 'dec', 'swd', 'swt', 'nod', 'nol', 'ton'], ['tun', 'swt', 'swd', 'dec', 'ton', 'nod', 'nol', 'lev'],
+    'Analog tom: a tuned resonator with a pitch sweep and a noise layer that follows the tuning.',
+    { tun: 34, dec: 52, swd: 36, swt: 34, nod: 5, nol: 85, ton: 0 },
+    { tun: { desc: 'Pitch of the tom: half a semitone a step, about 2.7 octaves either way.' } }),
+  [M.CH_CLASSIC]: MD(M.CH_CLASSIC, 'CH CLASSIC', 'CHCL', ['lev', 'tun', 'dec', 'col', null, null, null, null], ['tun', null, null, 'dec', null, null, 'col', 'lev'],
+    'Closed hat: six square oscillators at the TR-808 ratios through the closed path: a quick fixed drop, then DEC.',
+    { tun: 0, dec: 32, col: 0 }),
+  [M.OH_CLASSIC]: MD(M.OH_CLASSIC, 'OH CLASSIC', 'OHCL', ['lev', 'tun', 'dec', 'col', null, null, null, null], ['tun', null, null, 'dec', null, null, 'col', 'lev'],
+    'Open hat: the same 808-ratio bank through the open path.',
+    { tun: 0, dec: 32, col: 0 }),
   [M.CH_METALLIC]: MD(M.CH_METALLIC, 'CH METALLIC', 'CHMT', ['lev', 'tun', 'dec', null, null, null, null, null], ['tun', null, null, 'dec', null, null, null, 'lev'],
-    'Closed hat from a wider, more inharmonic oscillator set: harder and more metallic.', { dec: 30 }),
+    'Closed hat from interacting oscillators in a wider, more inharmonic set: harder and more metallic.',
+    { tun: 0, dec: 40 }),
   [M.OH_METALLIC]: MD(M.OH_METALLIC, 'OH METALLIC', 'OHMT', ['lev', 'tun', 'dec', null, null, null, null, null], ['tun', null, null, 'dec', null, null, null, 'lev'],
-    'Open hat from the metallic set, with a fixed opening segment before DEC.', { dec: 60 }),
-  [M.HH_BASIC]: MD(M.HH_BASIC, 'HH BASIC', 'HHBA', ['lev', 'tun', 'dec', 'ton', 'trd', 'rst', 'nol', 'nod'], ['tun', 'ton', 'trd', 'dec', 'rst', 'nol', 'nod', 'lev'],
-    'A basic hat: its own oscillator set with transient decay, tone, oscillator reset and a noise layer.', { dec: 30 }),
+    'Open hat from the metallic set, with a fixed opening segment before DEC.',
+    { tun: 0, dec: 40 }),
+  [M.HH_BASIC]: MD(M.HH_BASIC, 'HH BASIC', 'HHBA', ['lev', 'tun', 'dec', 'ton', 'trd', 'rst', null, null], ['tun', 'ton', 'trd', 'dec', null, null, 'rst', 'lev'],
+    'A basic hat: its own six-oscillator set with tone, transient decay and oscillator reset.',
+    { lev: 110, tun: 0, dec: 29, ton: 0, trd: 68, rst: 0 }),
   [M.HH_LAB]: MD(M.HH_LAB, 'HH LAB', 'HHLA', ['lev', 'osc1', 'dec', 'osc2', 'osc3', 'osc4', 'osc5', 'osc6'], ['osc1', 'osc2', 'osc3', 'dec', 'osc4', 'osc5', 'osc6', 'lev'],
-    'A hat lab: set the frequency of each of the six oscillators yourself.', { dec: 30 }),
-  [M.CY_CLASSIC]: MD(M.CY_CLASSIC, 'CY CLASSIC', 'CYCL', ['lev', 'tun', 'dec', 'col', 'ton', null, null, null], ['tun', 'col', 'ton', 'dec', null, null, null, 'lev'],
-    'Cymbal: the 808-ratio bank through three bands; two decay quickly, DEC sets the long tail.', { dec: 70 }),
+    'A hat laboratory: set the frequency of each of the six oscillators yourself.',
+    { lev: 110, dec: 29 }),
+  [M.CY_CLASSIC]: MD(M.CY_CLASSIC, 'CY CLASSIC', 'CYCL', ['lev', 'tun', 'dec', 'col', 'ton', null, null, null], ['tun', 'ton', null, 'dec', null, null, 'col', 'lev'],
+    'Cymbal: the 808-ratio bank through three bands; two decay quickly, DEC sets the long tail.',
+    { lev: 127, tun: 0, dec: 64, col: 0, ton: 0 }),
   [M.CY_METALLIC]: MD(M.CY_METALLIC, 'CY METALLIC', 'CYMT', ['lev', 'tun', 'dec', 'ton', 'trd', null, null, null], ['tun', 'ton', 'trd', 'dec', null, null, null, 'lev'],
-    'A metallic cymbal: an attack transient and a body, balanced with TON.', { dec: 70 }),
+    'A metallic cymbal from ring-modulated oscillators: a transient and a body, balanced with TON.',
+    { tun: 0, dec: 35, ton: 35, trd: 35 },
+    { ton: { desc: 'Tone of the metallic transient.' } }),
   [M.CY_RIDE]: MD(M.CY_RIDE, 'CY RIDE', 'CYRD', ['lev', 'tun', 'dec', 'typ', 'hit', 'c1', 'c2', 'c3'], ['tun', 'typ', 'hit', 'dec', 'c1', 'c2', 'c3', 'lev'],
-    'Ride cymbal: four oscillator banks and three separately set bands (hit, body, tail).', { dec: 70 }),
-  [M.CB_CLASSIC]: MD(M.CB_CLASSIC, 'CB CLASSIC', 'CBCL', ['lev', 'tun', 'dec', 'cdet', 'pw1', 'pw2', null, null], ['tun', 'cdet', null, 'dec', 'pw1', 'pw2', null, 'lev'],
-    'Cowbell: two pulse oscillators (540 and 800 Hz at the defaults) with a two-stage envelope, like the TR-808.', { dec: 45 }),
-  [M.CB_METALLIC]: MD(M.CB_METALLIC, 'CB METALLIC', 'CBMT', ['lev', 'tun', 'dec', 'cdet', 'pw1', 'pw2', null, null], ['tun', 'cdet', null, 'dec', 'pw1', 'pw2', null, 'lev'],
-    'A metallic cowbell: the pulse pair through a brighter path, DET in whole semitones.', { dec: 45, cdet: 7 }),
-  [M.UT_NOISE]: MD(M.UT_NOISE, 'UT NOISE', 'UTNO', ['lev', 'lpf', 'dec', 'hpf', 'lpq', 'atk', 'swt', 'nswd'], ['lpf', 'hpf', 'lpq', 'dec', 'atk', 'swt', 'nswd', 'lev'],
-    'Utility noise: white noise through a digital low-pass / high-pass with an attack-decay envelope and a cutoff sweep.', { dec: 40 }),
-  [M.UT_IMPULSE]: MD(M.UT_IMPULSE, 'UT IMPULSE', 'UTIM', ['lev', 'atk', 'dec', null, null, null, null, 'pol'], ['atk', null, null, 'dec', 'pol', null, null, 'lev'],
-    'A single shaped pulse. Into the filter with high resonance it makes the filter ring like a tuned drum.', { dec: 20, atk: 0 }),
-  [M.SY_DUAL_VCO]: MD(M.SY_DUAL_VCO, 'SY DUAL VCO', 'SYDV', ['lev', 'tun', 'dec', 'vdet', 'dec2', 'bal', 'bnd', 'cfg'], ['tun', 'vdet', 'bnd', 'dec', 'dec2', 'bal', 'cfg', 'lev'],
-    'A general two-oscillator synth voice: 80 waveform / ring / FM configurations, independent decays and a pitch bend.', { dec: 70, dec2: 70 }),
+    'Ride cymbal: four oscillator sets and three separately set components (hit, body, tail).',
+    { tun: 0, dec: 64, typ: 0, hit: 64, c1: 64, c2: 64, c3: 32 },
+    { dec: { name: 'Tail Decay', desc: 'Decay of the tail.' } }),
+  [M.CB_CLASSIC]: MD(M.CB_CLASSIC, 'CB CLASSIC', 'CBCL', ['lev', 'tun', 'dec', 'cdet', 'pw1', 'pw2', null, null], ['tun', null, null, 'dec', 'cdet', 'pw1', 'pw2', 'lev'],
+    'Cowbell: two pulse oscillators with a two-stage envelope, like the TR-808.',
+    { tun: 1, dec: 20, cdet: 64, pw1: 0, pw2: 0 },
+    { tun: { desc: 'Base pitch of the two oscillators (half a semitone a step).' } }),
+  [M.CB_METALLIC]: MD(M.CB_METALLIC, 'CB METALLIC', 'CBMT', ['lev', 'tun', 'dec', 'cdet', 'pw1', 'pw2', null, null], ['tun', null, null, 'dec', 'cdet', 'pw1', 'pw2', 'lev'],
+    'A metallic cowbell: the pulse pair through a brighter path, tuned over half the range, DET in whole semitones.',
+    { tun: 23, dec: 50, cdet: 64, pw1: 0, pw2: 0 },
+    { tun: { desc: 'Base pitch of the two oscillators (a quarter semitone a step).' } }),
+  [M.UT_NOISE]: MD(M.UT_NOISE, 'UT NOISE', 'UTNO', ['lev', 'lpf', 'dec', 'hpf', 'lpq', 'atk', 'swt', 'nswd'], ['lpf', 'lpq', 'atk', 'dec', 'hpf', 'nswd', 'swt', 'lev'],
+    'White noise generator: noise through a low-pass and a high-pass, an attack-decay envelope and a low-pass sweep.',
+    { lev: 100, lpf: 127, dec: 40, hpf: 0, lpq: 0, atk: 0, swt: 64, nswd: 0 },
+    { lpf: { desc: 'Low-pass filter cutoff.' }, hpf: { desc: 'High-pass filter cutoff.' }, swt: { desc: 'Length of the low-pass sweep set by SWD: low values are snappy, high values long.' }, dec: { desc: 'Length of the decay phase (127 holds).' } }),
+  [M.UT_IMPULSE]: MD(M.UT_IMPULSE, 'UT IMPULSE', 'UTIM', ['lev', 'atk', 'dec', null, null, null, null, 'pol'], [null, null, 'atk', 'dec', null, null, 'pol', 'lev'],
+    'A single shaped pulse, positive or negative. Into the filter with high resonance it rings like a tuned drum.',
+    { lev: 64, atk: 0, dec: 25, pol: 0 }),
+  [M.SY_DUAL_VCO]: MD(M.SY_DUAL_VCO, 'SY DUAL VCO', 'SYDV', ['lev', 'tun', 'dec', 'vdet', 'dec2', 'bal', 'bnd', 'cfg'], ['tun', 'vdet', 'dec', 'dec2', 'cfg', 'bnd', 'bal', 'lev'],
+    'A two-oscillator synth voice: two waves for oscillator 1, five for oscillator 2, mixed, ring- or frequency-modulated, with separate decays and a pitch bend.',
+    { tun: 0, dec: 70, vdet: 0, dec2: 70, bal: 0, bnd: 0, cfg: 16 },
+    { tun: { name: 'Osc 1 Tune', desc: 'Pitch of oscillator 1 in semitones.' }, dec: { name: 'Osc 1 Decay', desc: 'Decay of oscillator 1 (127 holds).' }, bal: { name: 'Balance', desc: 'Levels of the two oscillators: at 0 both are full, negative values turn oscillator 2 down, positive values oscillator 1.' } }),
   [M.SY_CHIP]: MD(M.SY_CHIP, 'SY CHIP', 'SYCH', ['lev', 'tun', 'dec', 'of2', 'of3', 'of4', 'cwav', 'cspd'], ['tun', 'cwav', 'cspd', 'dec', 'of2', 'of3', 'of4', 'lev'],
-    'An 8-bit style arpeggiator: four pitch steps with chip waveforms, PWM and periodic noise.', { dec: 60, of2: 12, of3: 7, of4: 3 }),
+    'A home-computer style chip voice: a fast internal arpeggio over up to four notes fakes a chord; chip waveforms, PWM and pitched noise.',
+    { tun: 12, dec: 42, of2: 3, of3: 7, of4: 10, cwav: 2, cspd: 41 },
+    { tun: { abbr: 'TUNE', desc: 'Pitch of the oscillator (the root note of the arpeggio) in semitones.' }, dec: { desc: 'Length of the decay phase (127 holds).' } }),
   [M.SY_RAW]: MD(M.SY_RAW, 'SY RAW', 'SYRA', ['lev', 'tun', 'dec', 'rdet', 'nol', 'wav1', 'wav2', 'bal'], ['tun', 'rdet', 'bal', 'dec', 'wav1', 'wav2', 'nol', 'lev'],
-    'A raw two-oscillator voice with independent waveforms and a noise layer.', { dec: 60, nol: 0 }),
+    'A raw two-oscillator voice with seven waves for oscillator 1, two for oscillator 2 and a noise layer.',
+    { tun: 0, dec: 127, rdet: -12, nol: 15, wav1: 4, wav2: 0, bal: 0 },
+    { tun: { abbr: 'TUNE', name: 'Osc 1 Tune', desc: 'Pitch of oscillator 1 in semitones.' }, dec: { abbr: 'DEC2', name: 'Osc 2 Decay', desc: 'Decay of oscillator 2 level (127 holds).' }, nol: { abbr: 'NLEV', name: 'Noise Level', desc: 'Level of the noise.' }, bal: { name: 'Balance', desc: 'Balance between oscillator 1 and oscillator 2.' } }),
   [M.DISABLE]: MD(M.DISABLE, 'DISABLE', 'DISA', [null, null, null, null, null, null, null, null], [null, null, null, null, null, null, null, null],
-    'No machine: the track only plays its sample layer.'),
+    'No machine: the analog sound generator is off and the track only plays its sample layer.'),
 };
 
 const DUAL_MACHINES = [M.BD_HARD, M.BD_CLASSIC, M.BD_FM, M.BD_PLASTIC, M.BD_SILKY, M.BD_SHARP, M.BD_ACOUSTIC,
@@ -307,8 +371,8 @@ export interface TrackDef {
   type: VoiceType;
   machines: number[];
   machine: number;
-  /** Default TUN of the default sound (toms are spread across the kit) */
-  tune?: number;
+  /** The track's own defaults for its default machine (the toms are tuned and damped per track) */
+  init?: Record<string, number>;
 }
 
 export const TRACKS: TrackDef[] = [
@@ -317,9 +381,12 @@ export const TRACKS: TrackDef[] = [
   { id: 'rs', name: 'RS', full: 'RIM SHOT', voice: 2, type: 'dual', machines: RSCP_MACHINES, machine: M.RS_HARD },
   { id: 'cp', name: 'CP', full: 'HAND CLAP', voice: 2, type: 'dual', machines: RSCP_MACHINES, machine: M.CP_CLASSIC },
   { id: 'bt', name: 'BT', full: 'BASS TOM', voice: 3, type: 'res', machines: [M.BT_CLASSIC, M.UT_NOISE, M.UT_IMPULSE, M.DISABLE], machine: M.BT_CLASSIC },
-  { id: 'lt', name: 'LT', full: 'LOW TOM', voice: 4, type: 'res', machines: [M.XT_CLASSIC, M.UT_NOISE, M.UT_IMPULSE, M.DISABLE], machine: M.XT_CLASSIC },
-  { id: 'mt', name: 'MT', full: 'MID TOM', voice: 5, type: 'res', machines: [M.XT_CLASSIC, M.UT_NOISE, M.UT_IMPULSE, M.DISABLE], machine: M.XT_CLASSIC },
-  { id: 'ht', name: 'HT', full: 'HIGH TOM', voice: 5, type: 'res', machines: [M.XT_CLASSIC, M.UT_NOISE, M.UT_IMPULSE, M.DISABLE], machine: M.XT_CLASSIC, tune: 5 },
+  { id: 'lt', name: 'LT', full: 'LOW TOM', voice: 4, type: 'res', machines: [M.XT_CLASSIC, M.UT_NOISE, M.UT_IMPULSE, M.DISABLE], machine: M.XT_CLASSIC,
+    init: { tun: 34, dec: 52, swd: 36, swt: 34, nod: 5, nol: 85, ton: 0 } },
+  { id: 'mt', name: 'MT', full: 'MID TOM', voice: 5, type: 'res', machines: [M.XT_CLASSIC, M.UT_NOISE, M.UT_IMPULSE, M.DISABLE], machine: M.XT_CLASSIC,
+    init: { tun: 44, dec: 70, swd: 42, swt: 29, nod: 5, nol: 100, ton: 0 } },
+  { id: 'ht', name: 'HT', full: 'HIGH TOM', voice: 5, type: 'res', machines: [M.XT_CLASSIC, M.UT_NOISE, M.UT_IMPULSE, M.DISABLE], machine: M.XT_CLASSIC,
+    init: { tun: 50, dec: 89, swd: 50, swt: 27, nod: 5, nol: 100, ton: 0 } },
   { id: 'ch', name: 'CH', full: 'CLOSED HIHAT', voice: 6, type: 'hat', machines: HAT_MACHINES, machine: M.CH_CLASSIC },
   { id: 'oh', name: 'OH', full: 'OPEN HIHAT', voice: 6, type: 'hat', machines: HAT_MACHINES, machine: M.OH_CLASSIC },
   { id: 'cy', name: 'CY', full: 'CYMBAL', voice: 7, type: 'cym', machines: CYM_MACHINES, machine: M.CY_CLASSIC },
@@ -343,12 +410,29 @@ export function trackParamKeys(t: TrackDef): string[] {
   return PARAMS_BY_TYPE[t.type].map(p => p.key).filter(k => keys.has(k));
 }
 
-/** Default value of a track's machine parameter (machine init values for the default machine) */
+/**
+ * The values a machine starts from on a track: catalogue defaults, then the
+ * machine's own defaults, then the track's (the toms) when it is the track's
+ * default machine. Selecting a machine on the hardware loads these.
+ */
+export function soundDefaults(track: number, machine: number): Record<string, number> {
+  const t = TRACKS[track];
+  const out: Record<string, number> = {};
+  for (const k of MACHINES[machine].slots) {
+    if (!k) continue;
+    const p = PARAM_INDEX[t.type][k];
+    if (p) out[k] = p.def;
+  }
+  Object.assign(out, MACHINES[machine].init ?? {});
+  if (machine === t.machine && t.init) Object.assign(out, t.init);
+  return out;
+}
+
+/** Default value of a track's machine parameter (its default machine's sound) */
 export function machineParamDefault(t: TrackDef, key: string): number {
   const p = PARAM_INDEX[t.type][key];
-  const init = MACHINES[t.machine].init?.[key];
-  if (key === 'tun' && t.tune !== undefined) return t.tune;
-  return init ?? p?.def ?? 0;
+  const d = soundDefaults(TRACK_INDEX[t.id], t.machine)[key];
+  return d ?? p?.def ?? 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -422,24 +506,24 @@ export const LFO_DESTS: LfoDest[] = [
 ];
 
 export const TRIG_PAGE: PageParam[] = [
-  PP('trig_note', 'NOT', 'Note', 36, 84, 60, 'Note of the trigs: 60 (C3) plays the sound at its TUN; every step up is a semitone.', { step: 1 }),
+  PP('trig_note', 'NOT', 'Note', 36, 84, 60, 'Pitch of the trigs, -24 to +24 semitones (C3 = 0 plays the sound at its TUN). SOUND SETTINGS > CHROMATIC sets which part it moves.', { step: 1 }),
   PP('trig_vel', 'VEL', 'Velocity', 1, 127, 100, 'Velocity of the trigs - how hard each hit is played.', { step: 1 }),
   PP('trig_len', 'LEN', 'Length', 0, 127, 14, 'Note length (1/16 = one step). With AMP HLD at 0 the amp holds for this long.', { step: 1 }),
   PP('trig_prob', 'PRB', 'Probability', 0, 100, 100, 'Chance that a trig without a condition plays.', { step: 1 }),
   PP('trig_syn', 'SYN', 'Synth Trig', 0, 1, 1, 'Trigs start the analog machine.', { options: ['OFF', 'ON'], idx: IX.TRIG_SYN }),
   PP('trig_smp', 'SMP', 'Sample Trig', 0, 1, 1, 'Trigs start the sample layer.', { options: ['OFF', 'ON'], idx: IX.TRIG_SMP }),
   PP('trig_env', 'ENV', 'Filter Env Trig', 0, 1, 1, 'Trigs restart the filter envelope.', { options: ['OFF', 'ON'], idx: IX.TRIG_ENV }),
-  PP('trig_lfo', 'LFO', 'LFO Trig', 0, 1, 1, 'Trigs restart the LFO (in TRG, HLD, ONE and HLF modes).', { options: ['OFF', 'ON'], idx: IX.TRIG_LFO }),
+  PP('trig_lfo', 'LFO', 'LFO Trig', 0, 1, 0, 'Trigs restart the LFO (in TRG, HLD, ONE and HLF modes).', { options: ['OFF', 'ON'], idx: IX.TRIG_LFO }),
 ];
 
 export const SMPL_PAGE: PageParam[] = [
   PP('smp_tun', 'TUN', 'Tune', -24, 24, 0, 'Sample pitch in semitones.', { bipolar: true, idx: IX.SMP_TUN, step: 1 }),
-  PP('smp_fin', 'FIN', 'Fine Tune', -64, 63, 0, 'Fine tune of the sample (cents).', { bipolar: true, idx: IX.SMP_FIN }),
+  PP('smp_fin', 'FIN', 'Fine Tune', -64, 63, 0, 'Fine tune of the sample: the whole range is one semitone down to one up.', { bipolar: true, idx: IX.SMP_FIN }),
   PP('smp_br', 'BR', 'Bit Reduction', 0, 127, 0, 'Bit reduction: lower resolution adds grit and aliasing.', { idx: IX.SMP_BR }),
   PP('smp_slot', 'SMP', 'Sample Slot', 0, 32, 0, 'Sample layered with the machine (OFF = none). This twin ships synthesized one-shots.', { idx: IX.SMP_SLOT, step: 1 }),
   PP('smp_sta', 'STA', 'Start', 0, 120, 0, 'Sample start point.', { idx: IX.SMP_STA }),
-  PP('smp_end', 'END', 'End', 0, 120, 120, 'Sample end point.', { idx: IX.SMP_END }),
-  PP('smp_lop', 'LOP', 'Loop', 0, 1, 0, 'Loop the sample between start and end.', { options: ['OFF', 'ON'], idx: IX.SMP_LOP }),
+  PP('smp_end', 'END', 'End', 0, 120, 120, 'Sample end point. Below STA the sample plays backwards.', { idx: IX.SMP_END }),
+  PP('smp_lop', 'LOP', 'Loop', 0, 1, 0, 'Loop the sample for the length of the trig (within the AMP envelope).', { options: ['OFF', 'ON'], idx: IX.SMP_LOP }),
   PP('smp_lev', 'LEV', 'Level', 0, 127, 100, 'Sample level.', { idx: IX.SMP_LEV }),
 ];
 
@@ -449,36 +533,44 @@ export const FLTR_PAGE: PageParam[] = [
   PP('flt_sus', 'SUS', 'Sustain Level', 0, 127, 0, 'Filter envelope sustain level, held for the trig length.', { idx: IX.FLT_SUS }),
   PP('flt_rel', 'REL', 'Release Time', 0, 127, 64, 'Filter envelope release time after the trig length.', { idx: IX.FLT_REL }),
   PP('flt_frq', 'FRQ', 'Frequency', 0, 127, 127, 'Cutoff / centre frequency: one semitone a step, 440 Hz at 60.', { idx: IX.FLT_FRQ }),
-  PP('flt_res', 'RES', 'Resonance', 0, 127, 0, 'Resonance: boosts the frequencies at the cutoff, ringing at high values.', { idx: IX.FLT_RES }),
-  PP('flt_typ', 'TYP', 'Type', 0, 6, 0, 'Filter type: 2- and 1-pole low-pass, band-pass, 1- and 2-pole high-pass, band-stop, peak.', { options: FILTER_TYPES, idx: IX.FLT_TYP }),
+  PP('flt_res', 'RES', 'Resonance', 0, 127, 0, 'Resonance: a peak at the cutoff that rings at high values. With BS it narrows the notch.', { idx: IX.FLT_RES }),
+  PP('flt_typ', 'TYP', 'Type', 0, 6, 0, 'Filter type: 2-pole and 1-pole low-pass, band-pass, 1-pole and 2-pole high-pass, band-stop, peak. All are resonant 2-pole filters; the 1-pole types have a flatter slope.', { options: FILTER_TYPES, idx: IX.FLT_TYP }),
   PP('flt_env', 'ENV', 'Env Depth', -64, 63, 0, 'How far the filter envelope moves the cutoff (two FRQ steps per unit).', { bipolar: true, idx: IX.FLT_ENV }),
 ];
 
 export const AMP_PAGE: PageParam[] = [
   PP('amp_atk', 'ATK', 'Attack Time', 0, 127, 0, 'Amp attack. A new trig ramps on from the current level.', { idx: IX.AMP_ATK }),
-  PP('amp_hld', 'HLD', 'Hold Time', 0, 127, 0, 'Amp hold. 0 = hold for the trig length (LEN), then decay.', { idx: IX.AMP_HLD }),
+  PP('amp_hld', 'HLD', 'Hold Time', 0, 127, 0, 'Amp hold before the decay. AUTO (0) holds for as long as the pad is pressed or the trig lasts (LEN); 1-127 is a fixed time.', { idx: IX.AMP_HLD }),
   PP('amp_dec', 'DEC', 'Decay Time', 0, 127, 127, 'Amp decay after the hold. 127 = INF: the amp stays open and the machine\'s own decay shapes the sound.', { idx: IX.AMP_DEC }),
-  PP('amp_ovr', 'OVR', 'Overdrive', 0, 127, 0, 'Analog overdrive before the filter.', { idx: IX.AMP_OVR }),
+  PP('amp_ovr', 'OVR', 'Overdrive', 0, 127, 0, 'Analog overdrive (a gain boost of the amp) before the multimode filter.', { idx: IX.AMP_OVR }),
   PP('amp_del', 'DEL', 'Delay Send', 0, 127, 0, 'Send to the FX track delay.', { idx: IX.AMP_DEL }),
   PP('amp_rev', 'REV', 'Reverb Send', 0, 127, 0, 'Send to the FX track reverb.', { idx: IX.AMP_REV }),
   PP('amp_pan', 'PAN', 'Pan', -64, 63, 0, 'Stereo position.', { bipolar: true, idx: IX.AMP_PAN }),
-  PP('amp_vol', 'VOL', 'Volume', 0, 127, 100, 'Sound volume.', { idx: IX.AMP_VOL }),
+  PP('amp_vol', 'VOL', 'Volume', 0, 127, 110, 'Volume of the sound, separate from the track level.', { idx: IX.AMP_VOL }),
 ];
 
 export const LFO_PAGE: PageParam[] = [
-  PP('lfo_spd', 'SPD', 'Speed', -64, 63, 16, 'LFO speed. With MUL, SPD x MUL = 128 is one cycle per bar. Negative runs the wave backwards.', { bipolar: true, idx: IX.LFO_SPD }),
-  PP('lfo_mul', 'MUL', 'Multiplier', 0, 23, 3, 'Speed multiplier: x1 .. x2k follow the tempo, .1 .. .2k are fixed (120 BPM).', { options: LFO_MULTS, idx: IX.LFO_MUL }),
+  PP('lfo_spd', 'SPD', 'Speed', -64, 63, 48, 'LFO speed: 8, 16 or 32 sync to straight beats (SPD x MUL = 128 is one cycle a bar). Negative runs the wave backwards.', { bipolar: true, idx: IX.LFO_SPD }),
+  PP('lfo_mul', 'MUL', 'Multiplier', 0, 23, 4, 'Multiplies SPD: x1 .. x2k follow the tempo, .1 .. .2k run at 120 BPM whatever the tempo.', { options: LFO_MULTS, idx: IX.LFO_MUL }),
   PP('lfo_fad', 'FAD', 'Fade In/Out', -64, 63, 0, 'Fade: negative fades the LFO in after each trig, positive fades it out.', { bipolar: true, idx: IX.LFO_FAD }),
   PP('lfo_dst', 'DST', 'Destination', 0, LFO_DESTS.length - 1, 0, 'What the LFO modulates.', { options: LFO_DESTS.map(d => d.name), idx: IX.LFO_DST }),
   PP('lfo_wav', 'WAV', 'Waveform', 0, 6, 0, 'LFO waveform.', { options: LFO_WAVES, idx: IX.LFO_WAV }),
-  PP('lfo_sph', 'SPH', 'Start Phase', 0, 127, 0, 'Where the wave starts after a trig (TRG, HLD, ONE, HLF).', { idx: IX.LFO_SPH }),
+  PP('lfo_sph', 'SPH', 'Start Phase', 0, 127, 0, 'Where the wave starts when it is trigged (0 = start, 64 = middle). With WAV RND it adds slew instead.', { idx: IX.LFO_SPH }),
   PP('lfo_mod', 'MOD', 'Trig Mode', 0, 4, 0, 'FREE runs on, TRG restarts at each trig, HLD holds the value at the trig, ONE plays one cycle, HLF half a cycle.', { options: LFO_MODES, idx: IX.LFO_MOD }),
-  PP('lfo_dep', 'DEP', 'Depth', -64, 63, 0, 'Modulation depth (bipolar).', { bipolar: true, idx: IX.LFO_DEP }),
+  PP('lfo_dep', 'DEP', 'Depth', -128, 127, 0, 'Depth and polarity of the modulation: positive starts towards the crest of the wave, negative towards the trough.', { bipolar: true, idx: IX.LFO_DEP }),
 ];
 
 export const TRACK_PAGES: Record<number, PageParam[]> = {
   [PAGE.TRIG]: TRIG_PAGE, [PAGE.SMPL]: SMPL_PAGE, [PAGE.FLTR]: FLTR_PAGE, [PAGE.AMP]: AMP_PAGE, [PAGE.LFO]: LFO_PAGE,
 };
+
+/** RETRIG menu ([RTRG] held): per track, stored in the kit (manual p.41) */
+export const RETRIG_MENU: PageParam[] = [
+  PP('rtrg_rate', 'RTRG', 'Retrig Rate', 0, RETRIG_RATES.length - 1, 9, 'Rate of the pad retrig: 1/16 is one hit a step, 1/32 two; 1/12 and 1/24 give triplets.', { options: RETRIG_RATES.map(r => `1/${r}`) }),
+  PP('rtrg_len', 'LEN', 'Retrig Length', 0, 127, 14, 'Length of the velocity curve of the pad retrig (1/16 = one step).'),
+  PP('rtrg_vcr', 'VCUR', 'Velocity Curve', -128, 127, 0, 'Velocity curve over LEN: -128 fades out completely, 0 is flat, 127 fades in from silence.', { bipolar: true }),
+  PP('rtrg_on', 'ON', 'Always On', 0, 1, 0, 'ON: the pad retrigs whenever it is held, without [RTRG].', { options: ['OFF', 'ON'] }),
+];
 
 /** Kit-level per-track settings (not on the PARAMETER pages) */
 export const TRACK_EXTRA: PageParam[] = [
@@ -493,7 +585,7 @@ export const TRACK_EXTRA: PageParam[] = [
 
 export const FX = {
   DEL_TIM: 0, DEL_X: 1, DEL_WID: 2, DEL_FDB: 3, DEL_HPF: 4, DEL_LPF: 5, DEL_REV: 6, DEL_VOL: 7,
-  REV_PRE: 8, REV_DEC: 9, REV_FRQ: 10, REV_GAI: 11, REV_HPF: 12, REV_LPF: 13, REV_VOL: 14,
+  REV_PRE: 8, REV_DEC: 9, REV_FRQ: 10, REV_GAI: 11, REV_HPF: 12, REV_LPF: 13, REV_VOL: 14, TRK_LEV: 15,
   DIS_AMT: 16, DIS_SYM: 17, DIS_DOV: 18, DIS_DEL: 19, DIS_REV: 20,
   CMP_THR: 24, CMP_ATK: 25, CMP_REL: 26, CMP_MUP: 27, CMP_RAT: 28, CMP_SEQ: 29, CMP_MIX: 30, CMP_VOL: 31,
   LFO_SPD: 32, LFO_MUL: 33, LFO_FAD: 34, LFO_DST: 35, LFO_WAV: 36, LFO_SPH: 37, LFO_MOD: 38, LFO_DEP: 39,
@@ -506,16 +598,22 @@ export const COMP_RATIOS = ['1:2', '1:4', '1:8', 'MAX'] as const;
 export const COMP_SEQ = ['OFF', 'LPF', 'HPF', 'HIT'] as const;
 export const PRE_POST = ['PRE', 'POST'] as const;
 
-/** FX LFO destinations: the delay (voice worklet) and the distortion / compressor (master worklet) */
+/** FX LFO destinations in the hardware's order (libanalogrytm AR_FX_LFO_DEST_*): delay, reverb, distortion, compressor */
 export const FX_LFO_DESTS: LfoDest[] = [
   { name: 'NONE', abbr: '-', idx: -1, range: 0 },
-  { name: 'DEL TIM', abbr: 'DTIM', idx: FX.DEL_TIM, range: 128 }, { name: 'DEL WID', abbr: 'DWID', idx: FX.DEL_WID, range: 128 },
-  { name: 'DEL FDB', abbr: 'DFDB', idx: FX.DEL_FDB, range: 198 }, { name: 'DEL HPF', abbr: 'DHPF', idx: FX.DEL_HPF, range: 128 },
-  { name: 'DEL LPF', abbr: 'DLPF', idx: FX.DEL_LPF, range: 128 }, { name: 'DEL REV', abbr: 'DREV', idx: FX.DEL_REV, range: 128 },
-  { name: 'DEL VOL', abbr: 'DVOL', idx: FX.DEL_VOL, range: 128 },
+  { name: 'DEL TIM', abbr: 'DTIM', idx: FX.DEL_TIM, range: 128 }, { name: 'DEL X', abbr: 'DX', idx: FX.DEL_X, range: 2 },
+  { name: 'DEL WID', abbr: 'DWID', idx: FX.DEL_WID, range: 128 }, { name: 'DEL FDB', abbr: 'DFDB', idx: FX.DEL_FDB, range: 198 },
+  { name: 'DEL HPF', abbr: 'DHPF', idx: FX.DEL_HPF, range: 128 }, { name: 'DEL LPF', abbr: 'DLPF', idx: FX.DEL_LPF, range: 128 },
+  { name: 'DEL REV', abbr: 'DREV', idx: FX.DEL_REV, range: 128 }, { name: 'DEL VOL', abbr: 'DVOL', idx: FX.DEL_VOL, range: 128 },
+  { name: 'DEL DOV', abbr: 'DDOV', idx: FX.DIS_DOV, range: 128 },
+  { name: 'REV PRE', abbr: 'RPRE', idx: FX.REV_PRE, range: 128 }, { name: 'REV DEC', abbr: 'RDEC', idx: FX.REV_DEC, range: 128 },
+  { name: 'REV FRQ', abbr: 'RFRQ', idx: FX.REV_FRQ, range: 128 }, { name: 'REV GAI', abbr: 'RGAI', idx: FX.REV_GAI, range: 128 },
+  { name: 'REV HPF', abbr: 'RHPF', idx: FX.REV_HPF, range: 128 }, { name: 'REV LPF', abbr: 'RLPF', idx: FX.REV_LPF, range: 128 },
+  { name: 'REV VOL', abbr: 'RVOL', idx: FX.REV_VOL, range: 128 },
   { name: 'DIS AMT', abbr: 'DAMT', idx: FX.DIS_AMT, range: 128 }, { name: 'DIS SYM', abbr: 'DSYM', idx: FX.DIS_SYM, range: 128 },
-  { name: 'DIS DOV', abbr: 'DDOV', idx: FX.DIS_DOV, range: 128 },
-  { name: 'CMP THR', abbr: 'CTHR', idx: FX.CMP_THR, range: 128 }, { name: 'CMP MUP', abbr: 'CMUP', idx: FX.CMP_MUP, range: 128 },
+  { name: 'CMP THR', abbr: 'CTHR', idx: FX.CMP_THR, range: 128 }, { name: 'CMP ATK', abbr: 'CATK', idx: FX.CMP_ATK, range: 7 },
+  { name: 'CMP REL', abbr: 'CREL', idx: FX.CMP_REL, range: 8 }, { name: 'CMP RAT', abbr: 'CRAT', idx: FX.CMP_RAT, range: 4 },
+  { name: 'CMP SEQ', abbr: 'CSEQ', idx: FX.CMP_SEQ, range: 4 }, { name: 'CMP MUP', abbr: 'CMUP', idx: FX.CMP_MUP, range: 128 },
   { name: 'CMP MIX', abbr: 'CMIX', idx: FX.CMP_MIX, range: 128 }, { name: 'CMP VOL', abbr: 'CVOL', idx: FX.CMP_VOL, range: 128 },
 ];
 
@@ -524,55 +622,57 @@ const FXP = (key: string, abbr: string, name: string, min: number, max: number, 
 
 export const FX_PAGES: Record<number, (PageParam | null)[]> = {
   [PAGE.SRC]: [
-    FXP('del_tim', 'TIM', 'Delay Time', 0, 127, 23, FX.DEL_TIM, 'Delay time in 128th notes (16 = 1/8, 24 = dotted 1/8, 32 = 1/4).'),
-    FXP('del_x', 'X', 'Ping-pong', 0, 1, 0, FX.DEL_X, 'Ping-pong: repeats bounce between left and right.', { options: ['OFF', 'ON'] }),
-    FXP('del_wid', 'WID', 'Stereo Width', -64, 63, 63, FX.DEL_WID, 'Stereo width of the repeats.', { bipolar: true }),
-    FXP('del_fdb', 'FDB', 'Feedback', 0, 198, 49, FX.DEL_FDB, 'Feedback: how many repeats. Above 127 the delay feeds itself and builds up.'),
-    FXP('del_hpf', 'HPF', 'Highpass', 0, 127, 0, FX.DEL_HPF, 'High-pass filter in the delay loop.'),
-    FXP('del_lpf', 'LPF', 'Lowpass', 0, 127, 127, FX.DEL_LPF, 'Low-pass filter in the delay loop: darker repeats.'),
-    FXP('del_rev', 'REV', 'Reverb Send', 0, 127, 0, FX.DEL_REV, 'Sends the delay into the reverb.'),
-    FXP('del_vol', 'VOL', 'Mix Volume', 0, 127, 127, FX.DEL_VOL, 'Delay return level.'),
+    FXP('del_tim', 'TIM', 'Delay Time', 0, 127, 23, FX.DEL_TIM, 'Delay time in 128th notes of the tempo: 32 is one beat (16 = an eighth, 24 = a dotted eighth).'),
+    FXP('del_x', 'X', 'Pingpong', 0, 1, 0, FX.DEL_X, 'OFF: WID places the repeats in the stereo field. ON: the repeats alternate left and right, WID sets how far.', { options: ['OFF', 'ON'] }),
+    FXP('del_wid', 'WID', 'Stereo Width', -64, 63, 0, FX.DEL_WID, 'Pan width of the delay signal across the stereo field.', { bipolar: true }),
+    FXP('del_fdb', 'FDB', 'Feedback', 0, 198, 49, FX.DEL_FDB, 'How much of the delay output feeds back: more repeats; above 127 the delay swells and can get very loud.'),
+    FXP('del_hpf', 'HPF', 'HP Filter', 0, 127, 32, FX.DEL_HPF, 'Cutoff of the delay high-pass filter.'),
+    FXP('del_lpf', 'LPF', 'LP Filter', 0, 127, 96, FX.DEL_LPF, 'Cutoff of the delay low-pass filter: darker repeats.'),
+    FXP('del_rev', 'REV', 'Reverb Send', 0, 127, 0, FX.DEL_REV, 'Sends the delay output to the reverb.'),
+    FXP('del_vol', 'VOL', 'Mix Volume', 0, 127, 110, FX.DEL_VOL, 'Volume of the delay output. It returns before or after the distortion and compressor (DIST page, DEL).'),
   ],
   [PAGE.SMPL]: [
-    FXP('rev_pre', 'PRE', 'Pre-delay', 0, 127, 8, FX.REV_PRE, 'Time before the reverb starts.'),
-    FXP('rev_dec', 'DEC', 'Decay Time', 0, 127, 64, FX.REV_DEC, 'Reverb decay time (room size).'),
-    FXP('rev_frq', 'FRQ', 'Shelving Freq', 0, 127, 64, FX.REV_FRQ, 'Frequency of the shelving filter in the reverb.'),
-    FXP('rev_gai', 'GAI', 'Shelving Gain', 0, 127, 96, FX.REV_GAI, 'Gain of the shelving filter: lower = a darker tail.'),
-    FXP('rev_hpf', 'HPF', 'Highpass', 0, 127, 32, FX.REV_HPF, 'High-pass filter on the reverb input.'),
-    FXP('rev_lpf', 'LPF', 'Lowpass', 0, 127, 96, FX.REV_LPF, 'Low-pass filter on the reverb input.'),
+    FXP('rev_pre', 'PRE', 'Pre-delay', 0, 127, 8, FX.REV_PRE, 'Pre-delay of the reverb.'),
+    FXP('rev_dec', 'DEC', 'Decay', 0, 127, 40, FX.REV_DEC, 'Length of the reverb decay: the size of the space.'),
+    FXP('rev_frq', 'FRQ', 'Shelving Freq', 0, 127, 64, FX.REV_FRQ, 'Frequency of the shelving filter that damps the reverb.'),
+    FXP('rev_gai', 'GAI', 'Shelving Gain', 0, 127, 32, FX.REV_GAI, 'Damping above the shelving frequency: at 127 the treble stays in, lower values darken the tail.'),
+    FXP('rev_hpf', 'HPF', 'HP Filter', 0, 127, 32, FX.REV_HPF, 'Cutoff of the reverb high-pass filter.'),
+    FXP('rev_lpf', 'LPF', 'LP Filter', 0, 127, 96, FX.REV_LPF, 'Cutoff of the reverb low-pass filter.'),
     null,
-    FXP('rev_vol', 'VOL', 'Mix Volume', 0, 127, 100, FX.REV_VOL, 'Reverb return level.'),
+    FXP('rev_vol', 'VOL', 'Mix Volume', 0, 127, 110, FX.REV_VOL, 'Volume of the reverb output. It returns before or after the distortion and compressor (DIST page, REV).'),
   ],
   [PAGE.FLTR]: [
-    FXP('dis_amt', 'AMT', 'Amount', 0, 127, 0, FX.DIS_AMT, 'Amount of analog master distortion.'),
-    FXP('dis_sym', 'SYM', 'Symmetry', -64, 63, 0, FX.DIS_SYM, 'Shifts the signal before distortion: asymmetric clipping adds even harmonics.', { bipolar: true }),
-    FXP('dis_dov', 'DOV', 'Delay Overdrive', 0, 127, 0, FX.DIS_DOV, 'Overdrive inside the delay: warm, dirty repeats. Works with FDB.'),
-    null,
-    FXP('dis_del', 'DEL', 'Delay Dist/Comp', 0, 1, 0, FX.DIS_DEL, 'Delay returns before (PRE) or after (POST) the distortion and compressor.', { options: PRE_POST }),
-    FXP('dis_rev', 'REV', 'Reverb Dist/Comp', 0, 1, 1, FX.DIS_REV, 'Reverb returns before (PRE) or after (POST) the distortion and compressor.', { options: PRE_POST }),
-    null, null,
+    FXP('dis_amt', 'AMT', 'Distortion Amount', 0, 127, 0, FX.DIS_AMT, 'Amount of the analog master distortion: it drives the peaks of the whole mix into the clipper.'),
+    FXP('dis_sym', 'SYM', 'Distortion Symmetry', -64, 63, 0, FX.DIS_SYM, 'Offsets the signal up or down before the distortion, so only the crests or the troughs clip.', { bipolar: true }),
+    FXP('dis_dov', 'DOV', 'Delay Overdrive', 0, 127, 0, FX.DIS_DOV, 'Overdrive inside the delay: from a little edge to aggressive overtones. Works with FDB.'),
+    null, null, null,
+    FXP('dis_del', 'DEL', 'Delay Dist/Comp', 0, 1, 0, FX.DIS_DEL, 'The delay returns before (PRE) or after (POST) the distortion and compressor.', { options: PRE_POST }),
+    FXP('dis_rev', 'REV', 'Reverb Dist/Comp', 0, 1, 1, FX.DIS_REV, 'The reverb returns before (PRE) or after (POST) the distortion and compressor.', { options: PRE_POST }),
   ],
   [PAGE.AMP]: [
-    FXP('cmp_thr', 'THR', 'Threshold', 0, 127, 105, FX.CMP_THR, 'Level above which the compressor works: about 0.9 dB a step, no reduction from 105 up.'),
-    FXP('cmp_atk', 'ATK', 'Attack', 0, 6, 1, FX.CMP_ATK, 'Attack in ms: fast attacks catch transients, slower ones let the punch through.', { options: COMP_ATTACKS }),
-    FXP('cmp_rel', 'REL', 'Release', 0, 7, 1, FX.CMP_REL, 'Release in seconds (A1 / A2 = auto).', { options: COMP_RELEASES }),
-    FXP('cmp_mup', 'MUP', 'Makeup Gain', 0, 127, 47, FX.CMP_MUP, 'Make-up gain after compression (47 = unity).'),
-    FXP('cmp_rat', 'RAT', 'Ratio', 0, 3, 0, FX.CMP_RAT, 'Ratio: how strongly level above the threshold is reduced.', { options: COMP_RATIOS }),
-    FXP('cmp_seq', 'SEQ', 'Sidechain EQ', 0, 3, 1, FX.CMP_SEQ, 'Filter on the detector: LPF reacts to the kick, HPF ignores it, HIT to the transients.', { options: COMP_SEQ }),
-    FXP('cmp_mix', 'MIX', 'Dry/Wet Mix', 0, 127, 127, FX.CMP_MIX, 'Parallel compression: blend of the dry and compressed signal.'),
-    FXP('cmp_vol', 'VOL', 'Output Volume', 0, 127, 127, FX.CMP_VOL, 'Output level after the compressor.'),
+    FXP('cmp_thr', 'THR', 'Threshold', 0, 127, 96, FX.CMP_THR, 'Threshold: about 1 dB a step; lower means more of the mix is compressed.'),
+    FXP('cmp_atk', 'ATK', 'Attack', 0, 6, 0, FX.CMP_ATK, 'Attack time in ms: how fast the compressor reacts to peaks. Slow attacks let the transients through.', { options: COMP_ATTACKS }),
+    FXP('cmp_rel', 'REL', 'Release', 0, 7, 2, FX.CMP_REL, 'Release time in seconds; A1 and A2 adapt to the material (A2 slightly longer).', { options: COMP_RELEASES }),
+    FXP('cmp_mup', 'MUP', 'Makeup Gain', 0, 127, 0, FX.CMP_MUP, 'Makeup gain of the compressed signal: about 0.6 dB a step up to 48, then up to +40 dB.'),
+    FXP('cmp_rat', 'RAT', 'Ratio', 0, 3, 0, FX.CMP_RAT, 'Compression ratio (1:2, 1:4, 1:8, MAX).', { options: COMP_RATIOS }),
+    FXP('cmp_seq', 'SEQ', 'Sidechain EQ', 0, 3, 1, FX.CMP_SEQ, 'Filter on the detector: LPF reacts to the bass (pumping), HPF ignores it, HIT is balanced, OFF unfiltered.', { options: COMP_SEQ }),
+    FXP('cmp_mix', 'MIX', 'Dry/Wet Mix', 0, 127, 0, FX.CMP_MIX, 'Parallel compression: 0 is the dry mix, 127 only the compressed signal.'),
+    FXP('cmp_vol', 'VOL', 'Volume', 0, 127, 64, FX.CMP_VOL, 'Output volume of the compressor section (the whole mix).'),
   ],
   [PAGE.LFO]: [
-    FXP('lfo_spd', 'SPD', 'Speed', -64, 63, 16, FX.LFO_SPD, 'FX LFO speed.', { bipolar: true }),
-    FXP('lfo_mul', 'MUL', 'Multiplier', 0, 23, 3, FX.LFO_MUL, 'FX LFO speed multiplier.', { options: LFO_MULTS }),
-    FXP('lfo_fad', 'FAD', 'Fade In/Out', -64, 63, 0, FX.LFO_FAD, 'FX LFO fade.', { bipolar: true }),
-    FXP('lfo_dst', 'DST', 'Destination', 0, FX_LFO_DESTS.length - 1, 0, FX.LFO_DST, 'What the FX LFO modulates.', { options: FX_LFO_DESTS.map(d => d.name) }),
+    FXP('lfo_spd', 'SPD', 'Speed', -64, 63, 48, FX.LFO_SPD, 'FX LFO speed (8, 16, 32 sync to straight beats; negative runs backwards).', { bipolar: true }),
+    FXP('lfo_mul', 'MUL', 'Multiplier', 0, 23, 4, FX.LFO_MUL, 'Multiplies SPD: x follows the tempo, . runs at 120 BPM.', { options: LFO_MULTS }),
+    FXP('lfo_fad', 'FAD', 'Fade In/Out', -64, 63, 0, FX.LFO_FAD, 'Fade: negative fades the LFO in, positive fades it out.', { bipolar: true }),
+    FXP('lfo_dst', 'DST', 'Destination', 0, FX_LFO_DESTS.length - 1, 0, FX.LFO_DST, 'Which FX parameter the LFO modulates.', { options: FX_LFO_DESTS.map(d => d.name) }),
     FXP('lfo_wav', 'WAV', 'Waveform', 0, 6, 0, FX.LFO_WAV, 'FX LFO waveform.', { options: LFO_WAVES }),
-    FXP('lfo_sph', 'SPH', 'Start Phase', 0, 127, 0, FX.LFO_SPH, 'FX LFO start phase.'),
-    FXP('lfo_mod', 'MOD', 'Trig Mode', 0, 4, 0, FX.LFO_MOD, 'FX LFO trig mode (FX track lock trigs restart it).', { options: LFO_MODES }),
-    FXP('lfo_dep', 'DEP', 'Depth', -64, 63, 0, FX.LFO_DEP, 'FX LFO depth.', { bipolar: true }),
+    FXP('lfo_sph', 'SPH', 'Start Phase', 0, 127, 0, FX.LFO_SPH, 'Start phase when trigged (RND: slew).'),
+    FXP('lfo_mod', 'MOD', 'Trig Mode', 0, 4, 0, FX.LFO_MOD, 'FX LFO trig mode: FX track trigs restart it.', { options: LFO_MODES }),
+    FXP('lfo_dep', 'DEP', 'Depth', -128, 127, 0, FX.LFO_DEP, 'FX LFO depth and polarity.', { bipolar: true }),
   ],
 };
+
+/** The FX track's level: the master return level of the delay and the reverb (TRACK LEVEL with [FX] selected) */
+export const FX_TRACK_LEVEL: PageParam = FXP('trk_lev', 'LEV', 'FX Track Level', 0, 127, 100, FX.TRK_LEV, 'Master return level of the delay and the reverb (the TRACK LEVEL knob with the FX track active).');
 
 /** The FX track's TRIG page: only probability matters (its trigs are lock trigs) */
 export const FX_TRIG: (string | null)[] = [null, null, null, 'trig_prob', null, null, null, null];
@@ -604,11 +704,12 @@ export function formatPage(p: PageParam, v: number): string {
   if (p.options) return p.options[Math.round(v)] ?? '';
   switch (p.key) {
     case 'trig_note': return `${noteName(v)} ${signed(v - 60)}`;
-    case 'trig_len': return formatLength(Math.round(v));
+    case 'trig_len': case 'rtrg_len': return LEN_TEXT(Math.round(v));
     case 'trig_prob': return `${Math.round(v)}%`;
     case 'flt_frq': return hzText(filterHz(v));
     case 'amp_pan': return panText(v);
     case 'amp_dec': return v >= 127 ? 'INF' : `${Math.round(v)}`;
+    case 'amp_hld': return Math.round(v) <= 0 ? 'AUTO' : `${Math.round(v)}`;
   }
   return p.bipolar ? signed(v) : `${Math.round(v)}`;
 }
@@ -618,6 +719,12 @@ export function formatMachineParam(p: MParam, v: number): string {
   if (p.semis) return signed(v);
   if ((p.key === 'dec' || p.key === 'dec2') && v >= 127) return 'INF';
   return p.bipolar ? signed(v) : `${Math.round(v)}`;
+}
+
+/** A machine parameter as it reads on a given machine (labels that differ, e.g. SY RAW DEC2) */
+export function machineParam(p: MParam, machine: number | undefined): MParam {
+  const o = machine === undefined ? undefined : MACHINES[machine]?.labels?.[p.key];
+  return o ? { ...p, abbr: o.abbr ?? p.abbr, name: o.name ?? p.name, desc: o.desc ?? p.desc } : p;
 }
 
 export const LEN_TEXT = (i: number) => (i >= NOTE_LENGTHS.length - 1 ? 'INF' : formatLength(i));
@@ -665,19 +772,23 @@ export function paramMeta(id: string): { kind: 'machine'; p: MParam; track: numb
   if (pi.track === FX_TRACK) {
     for (const page of Object.values(FX_PAGES)) for (const p of page) if (p && p.key === pi.key) return { kind: 'page', p, track: pi.track };
     if (pi.key === 'trig_prob') return { kind: 'page', p: TRIG_PAGE[3], track: pi.track };
+    if (pi.key === 'trk_lev') return { kind: 'page', p: FX_TRACK_LEVEL, track: pi.track };
     return null;
   }
   const t = TRACKS[pi.track];
   const mp = PARAM_INDEX[t.type][pi.key];
   if (mp) return { kind: 'machine', p: mp, track: pi.track };
-  for (const page of [...Object.values(TRACK_PAGES), TRACK_EXTRA]) for (const p of page) if (p.key === pi.key) return { kind: 'page', p, track: pi.track };
+  for (const page of [...Object.values(TRACK_PAGES), TRACK_EXTRA, RETRIG_MENU]) for (const p of page) if (p.key === pi.key) return { kind: 'page', p, track: pi.track };
   return null;
 }
 
-/** Screen label + readout for a control id */
-export function describe(id: string, v: number): { abbr: string; name: string; text: string } | null {
+/** Screen label + readout for a control id (`machine`: the track's machine, for its own labels) */
+export function describe(id: string, v: number, machine?: number): { abbr: string; name: string; text: string } | null {
   const m = paramMeta(id);
   if (!m) return null;
-  if (m.kind === 'machine') return { abbr: m.p.abbr, name: m.p.name, text: formatMachineParam(m.p, v) };
+  if (m.kind === 'machine') {
+    const p = machineParam(m.p, machine);
+    return { abbr: p.abbr, name: p.name, text: formatMachineParam(p, v) };
+  }
   return { abbr: m.p.abbr, name: m.p.name, text: formatPage(m.p, v) };
 }

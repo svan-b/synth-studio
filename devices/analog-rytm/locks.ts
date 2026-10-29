@@ -8,7 +8,7 @@
 import { asProject, type LockOptions } from '@/lib/sequencer/elektron';
 import { SEQ_TRACKS, parseId } from './model';
 
-const NOT_LOCKABLE = new Set(['machine', 'trk_lev', 'acc_lev', 'vel_vol']);
+const NOT_LOCKABLE = new Set(['machine', 'trk_lev', 'acc_lev', 'vel_vol', 'rtrg_rate', 'rtrg_len', 'rtrg_vcr', 'rtrg_on']);
 
 export const LOCKS: LockOptions = {
   lockKey: id => {

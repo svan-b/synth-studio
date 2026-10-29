@@ -47,14 +47,16 @@ const analogRytm: DeviceModule = {
   createEngine: () => new AnalogRytmEngine(),
   worklets: ['/worklets/analog-rytm-processors.js'],
   transportControl: 'play',
-  uiControls: ['track', 'page', 'pad_mode', 'rec', 'fix'],
+  uiControls: ['track', 'page', 'pad_mode', 'rec', 'fix', 'auto_trk'],
   data: { initial: defaultProject, migrate },
   interceptChange: (id, value, api) => {
     const m = macroTarget(api.ui);
     if (m && KIT_IDS.has(id) && typeof value === 'number' && !id.endsWith('_machine')) {
+      // scenes store fixed values; performance macros store the depth from the kit's value (manual pp.28-30)
+      const base = typeof api.values[id] === 'number' ? (api.values[id] as number) : 0;
       api.updateData(d => {
         const p = asProject(d, SEQ_TRACKS) as RytmProject;
-        return editMacro(p, p.kit ?? '01', m.kind, m.index, macro => ({ ...macro, [id]: value }));
+        return editMacro(p, p.kit ?? '01', m.kind, m.index, macro => ({ ...macro, [id]: m.kind === 'perf' ? Math.round(value - base) : value }));
       });
       return true;
     }
@@ -68,7 +70,7 @@ const analogRytm: DeviceModule = {
       const macro = (m.kind === 'scene' ? k?.scenes : k?.perfs)?.[m.index];
       if (macro && Object.keys(macro).length) {
         const out: Values = { ...api.values };
-        for (const id in macro) out[id] = macro[id];
+        for (const id in macro) out[id] = m.kind === 'perf' ? (typeof api.values[id] === 'number' ? (api.values[id] as number) : 0) + macro[id] : macro[id];
         return out;
       }
       return api.values;

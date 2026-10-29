@@ -1,6 +1,9 @@
 // ============================================================================
 // Analog Rytm MKII panel layout (mm from the faceplate's top-left)
 //
+// Labels and key functions follow the Rytm MKII manual (OS 1.72), 3.1 FRONT
+// PANEL (pp.10-11), the quick keys (pp.74-75) and the chapters they point to.
+//
 // Positions follow a front-on photo of the MKII (rytm-emu's photo layout,
 // REFERENCE.md "Front panel"), black finish (2020-): top row MAIN VOLUME,
 // SAMPLING, QPER, QUICK PERF AMOUNT, TRACK LEVEL; the mode keys; FUNC / TRK /
@@ -19,7 +22,8 @@ import {
 } from '@/lib/sequencer/elektron';
 import { FX_TRACK, PAGE, SEQ_TRACKS, TRACKS, pageControls, describe } from './model';
 import {
-  Key, Menus, PageLeds, Pads, RY, RytmStyles, Screen, flash, funcOn, nudgeHeld, openMenu, reloadKit, trackClear, trackCopy, trackPaste, useFunc,
+  Key, Menus, PageLeds, Pads, PlayTrigs, RY, RytmStyles, Screen, applyMutePreselect, flash, funcOn, nudgeHeld, openMenu, pageReloadOrRandom, reloadKit,
+  reloadSound, saveKit, shiftTrack, toggleHeldFlag, trackClear, trackCopy, trackPaste, consumeFunc,
 } from './ui';
 import type { RytmProject } from './presets';
 
@@ -45,11 +49,19 @@ function key(x: number, y: number, size: { w: number; h: number }, render: (ctx:
 
 /** FUNC-aware press: `normal` without FUNC, `func` with it */
 const press = (ctx: CustomRenderContext, normal: () => void, func?: () => void) => {
-  if (func && funcOn(ctx)) { useFunc(ctx); func(); } else normal();
+  if (func && funcOn(ctx)) { consumeFunc(ctx); func(); } else normal();
 };
 
 const closeAll = (ctx: CustomRenderContext) =>
-  ctx.setUi({ rytmMenu: null, seqMenu: null, sceneEdit: null, perfEdit: null, trigEditor: null, trkLatch: false, heldSteps: [] });
+  ctx.setUi({ rytmMenu: null, seqMenu: null, sceneEdit: null, perfEdit: null, trigEditor: null, trkLatch: false, qperLatch: false, heldSteps: [] });
+
+/** A second press within 350 ms (pointer timing: no dblclick on touch) */
+function doublePress(ctx: CustomRenderContext, key: string): boolean {
+  const now = Date.now();
+  const last = num(ctx.ui[key]);
+  ctx.setUi({ [key]: now });
+  return now - last < 350;
+}
 
 const projectOf = (ctx: CustomRenderContext) => asProject(ctx.data, SEQ_TRACKS) as RytmProject;
 
@@ -69,6 +81,8 @@ const I = {
   tempo: icon(<><path d="M8 20 L10.5 4 L13.5 4 L16 20 Z" /><path d="M12 15 L17 8" /></>),
   chain: icon(<><rect x={3} y={9} width={9} height={6} rx={3} /><rect x={12} y={9} width={9} height={6} rx={3} /></>),
   song: icon(<><path d="M5 7 H19" /><path d="M5 12 H19" /><path d="M5 17 H13" /></>),
+  sampling: icon(<><path d="M5 10 V14" /><path d="M8.5 7 V17" /><path d="M12 4.5 V19.5" /><path d="M15.5 7 V17" /><path d="M19 10 V14" /></>),
+  gear: icon(<><circle cx={12} cy={12} r={3.2} /><path d="M12 3.5 V6 M12 18 V20.5 M3.5 12 H6 M18 12 H20.5 M6 6 L7.8 7.8 M16.2 16.2 L18 18 M6 18 L7.8 16.2 M16.2 7.8 L18 6" /></>),
 };
 
 // ----------------------------------------------------------------------------
@@ -89,6 +103,46 @@ function modeFunc(ctx: CustomRenderContext, menu: string) {
   else openMenu(ctx, menu);
 }
 
+/** [YES] / [NO] + a mode key: quick save / reload (manual p.51) */
+function quickSaveReload(ctx: CustomRenderContext, mode: number): boolean {
+  const yes = !!ctx.ui.yesHeld, no = !!ctx.ui.noHeld;
+  if (!yes && !no) return false;
+  ctx.setUi({ yesNoUsed: true });
+  if (mode === 0) { if (yes) saveKit(ctx); else reloadKit(ctx); return true; }
+  if (mode === 1) { if (yes) flash(ctx, 'THE SOUND IS KEPT IN THE KIT ([YES] + [PLAY] SAVES IT)'); else reloadSound(ctx); return true; }
+  const what = mode === 2 ? 'TRACKS' : mode === 3 ? 'PATTERNS' : 'SONGS';
+  flash(ctx, `${what} ARE SAVED AUTOMATICALLY IN THIS TWIN`);
+  return true;
+}
+
+function modeDown(ctx: CustomRenderContext, mode: number, menu: string) {
+  if (quickSaveReload(ctx, mode)) return;
+  if (funcOn(ctx)) { consumeFunc(ctx); modeFunc(ctx, menu); return; }
+  const cur = Math.round(num(ctx.values.pad_mode));
+  // in an edit, the key ends it
+  if (mode === 3 && typeof ctx.ui.sceneEdit === 'number') { ctx.setUi({ sceneEdit: null }); return; }
+  if (mode === 4 && typeof ctx.ui.perfEdit === 'number') { ctx.setUi({ perfEdit: null }); return; }
+  ctx.setUi({ modeHeld: mode, modeAt: Date.now(), modeWasOn: cur === mode });
+  if (cur !== mode) ctx.setValue('pad_mode', mode);
+  if (mode === 3 || mode === 4) {
+    // hold [SCNE] / [PERF] for a moment: scene / performance edit
+    const at = Date.now();
+    setTimeout(() => {
+      if (ctx.ui.modeHeld !== mode || num(ctx.ui.modeAt) !== at) return;
+      const idx = mode === 3 ? Math.max(0, num(ctx.engine.scene, 0)) : 0;
+      ctx.setUi(mode === 3 ? { sceneEdit: idx, perfEdit: null, modeHeld: null } : { perfEdit: idx, sceneEdit: null, modeHeld: null });
+      flash(ctx, mode === 3 ? `SCENE ${idx + 1} EDIT: TAP A PAD, TURN ENCODERS` : `PERF ${idx + 1} EDIT: TAP A PAD, TURN ENCODERS`);
+    }, 550);
+  }
+}
+
+function modeUp(ctx: CustomRenderContext, mode: number) {
+  if (ctx.ui.modeHeld !== mode) return;
+  // a press on the lit mode key switches it off (back to PLAY)
+  if (ctx.ui.modeWasOn && mode !== 0) ctx.setValue('pad_mode', 0);
+  ctx.setUi({ modeHeld: null });
+}
+
 const PARAM_KEYS: [string, string | undefined, string | undefined][] = [
   // label, FX-track page name, FUNC function
   ['TRIG', undefined, 'Quantize'], ['SRC', 'Delay', 'Assign'], ['SMPL', 'Reverb', 'Samples'], ['FLTR', 'Dist', 'Settings'], ['AMP', 'Comp', undefined], ['LFO', 'LFO', undefined],
@@ -101,61 +155,108 @@ const BANK_SUB = ['', '', '', '', 'Trig Mute', 'Accent', 'Swing', 'Slide'];
 const MODE_LED_NAMES = ['Sequential', 'Direct Start', 'Direct Jump', 'Temp Jump'];
 
 function bankPress(ctx: CustomRenderContext, b: number) {
+  // a held trig + [BANK F] / [BANK H]: accent / parameter slide on it (manual pp.49-51)
+  if ((b === 5 && toggleHeldFlag(ctx, 'accent')) || (b === 7 && toggleHeldFlag(ctx, 'pslide'))) return;
   press(ctx, () => ctx.setUi({ seqMenu: 'pattern', seqBank: b, rytmMenu: null }), () => {
     if (b < 4) {
       ctx.updateData(d => setChangeMode(asProject(d, SEQ_TRACKS), CHANGE_MODES[b] as ChangeMode));
-      flash(ctx, `PATTERN CHANGE: ${MODE_LED_NAMES[b].toUpperCase()}`);
-    } else if (b === 4) flash(ctx, 'TRIG MUTE IS NOT MODELLED');
-    else if (b === 5) { const on = ctx.ui.trigMode === 'accent'; ctx.setUi({ trigMode: on ? 'trig' : 'accent' }); flash(ctx, on ? 'TRIG KEYS: TRIGS' : 'TRIG KEYS: ACCENTS'); }
-    else if (b === 6) openMenu(ctx, 'tempo');
+      flash(ctx, `PATTERN MODE: ${MODE_LED_NAMES[b].toUpperCase()}`);
+    } else if (b === 4) flash(ctx, 'TRIG MUTE IS NOT IN THIS TWIN YET (USE MUTE MODE)');
+    else if (b === 5) {
+      const on = ctx.ui.trigMode === 'accent';
+      ctx.setUi({ trigMode: on ? 'trig' : 'accent' });
+      flash(ctx, on ? 'TRIG KEYS: TRIGS' : 'ACCENT: TRIG KEYS SET ACCENTS, TRACK LEVEL THE AMOUNT');
+    } else if (b === 6) { openMenu(ctx, 'tempo'); flash(ctx, 'SWING: SET THE AMOUNT (EVERY SECOND STEP SWINGS)'); }
     else { const on = ctx.ui.trigMode === 'pslide'; ctx.setUi({ trigMode: on ? 'trig' : 'pslide' }); flash(ctx, on ? 'TRIG KEYS: TRIGS' : 'TRIG KEYS: PARAMETER SLIDE'); }
   });
 }
 
+/** [FX] + [NO]: every FX track parameter back to the stored kit */
+function fxReload(ctx: CustomRenderContext) {
+  const prev = Math.round(num(ctx.values.page, 1));
+  for (let pg = 1; pg <= 5; pg++) { ctx.setValue('page', pg); pageReloadOrRandom(ctx, pg, false); }
+  ctx.setValue('page', prev);
+  flash(ctx, 'FX TRACK RELOADED');
+}
+
+/**
+ * The arrow keys outside menus: with a trig held, LEFT / RIGHT micro-time it and UP / DOWN
+ * set its retrig; [FUNC] + LEFT / RIGHT shift the track's trigs (GRID RECORDING); in CHRO
+ * mode UP / DOWN change the octave; [RTRG] held, UP / DOWN change the retrig rate;
+ * otherwise LEFT / RIGHT nudge the tempo -10 % / +10 % while held (manual p.38).
+ */
 function arrow(ctx: CustomRenderContext, dir: 'up' | 'down' | 'left' | 'right') {
+  const horiz = dir === 'left' || dir === 'right';
+  const d = dir === 'right' || dir === 'up' ? 1 : -1;
   const f = funcOn(ctx);
+  if (nudgeHeld(ctx, horiz ? 'micro' : 'retrig', d)) { if (f) consumeFunc(ctx); return; }
   if (f) {
-    useFunc(ctx);
-    const what = dir === 'left' || dir === 'right' ? 'micro' : 'retrig';
-    const d = dir === 'right' || dir === 'up' ? 1 : -1;
-    if (nudgeHeld(ctx, what, d)) return;
+    consumeFunc(ctx);
+    if (horiz && Math.round(num(ctx.values.rec)) === 1) { shiftTrack(ctx, d); return; }
   }
-  if ((ctx.ui.rtrgHeld || ctx.ui.rtrgLatch) && (dir === 'up' || dir === 'down')) {
-    const v = Math.max(0, Math.min(16, Math.round(num(ctx.values.rtrg_rate, 9)) + (dir === 'up' ? 1 : -1)));
-    ctx.setValue('rtrg_rate', v);
-    flash(ctx, `RETRIG 1/${[1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 64, 80][v]}`);
+  if ((ctx.ui.rtrgHeld || ctx.ui.rtrgLatch) && !horiz) {
+    const t = Math.min(11, Math.round(num(ctx.values.track)));
+    const id = `${TRACKS[t].id}_rtrg_rate`;
+    const v = Math.max(0, Math.min(16, Math.round(num(ctx.values[id], 9)) + d));
+    ctx.setValue(id, v);
+    flash(ctx, `${TRACKS[t].name} RETRIG 1/${[1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 64, 80][v]}`);
     return;
   }
-  if (num(ctx.values.pad_mode) === 2 && (dir === 'up' || dir === 'down')) {
-    const o = Math.max(-3, Math.min(3, num(ctx.ui.octave) + (dir === 'up' ? 1 : -1)));
+  if (num(ctx.values.pad_mode) === 2 && !horiz) {
+    const o = Math.max(-2, Math.min(1, num(ctx.ui.octave) + d));
     ctx.setUi({ octave: o });
-    flash(ctx, `OCTAVE ${o > 0 ? '+' : ''}${o}`);
+    flash(ctx, `CHROMATIC OCTAVE ${o > 0 ? '+' : ''}${o}`);
     return;
   }
-  if (dir === 'up' || dir === 'down') {
-    const t = Math.round(num(ctx.values.track));
-    ctx.setValue('track', (t + (dir === 'up' ? 12 : 1)) % 13);
-  } else {
-    const p = Math.round(num(ctx.values.page, 1));
-    ctx.setValue('page', (p + (dir === 'left' ? 5 : 1)) % 6);
+  if (horiz) {
+    const synced = !!(ctx.engine.seq as { following?: boolean } | undefined)?.following;
+    if (synced) { flash(ctx, 'FOLLOWING THE STUDIO CLOCK: NO TEMPO NUDGE'); return; }
+    const bpm = num(ctx.ui.nudgeFrom, 0) || num(ctx.values.bpm, 120);
+    ctx.setUi({ nudgeFrom: bpm });
+    ctx.setValue('bpm', Math.round(bpm * (1 + 0.1 * d) * 10) / 10);
+    flash(ctx, `TEMPO ${d > 0 ? '+' : '-'}10 %`);
   }
+}
+
+/** Releasing LEFT / RIGHT ends a tempo nudge */
+function arrowUp(ctx: CustomRenderContext) {
+  const from = num(ctx.ui.nudgeFrom, 0);
+  if (from > 0) { ctx.setValue('bpm', from); ctx.setUi({ nudgeFrom: 0 }); }
 }
 
 function keys(): PanelElement[] {
   const out: PanelElement[] = [];
   // --- Top row: SAMPLING, QPER ------------------------------------------------
-  out.push(key(55.0, 17.1, SMALL, ctx => <Key ctx={ctx} id="key:sampling" label="SMPLNG" sub="Direct" funcSub onDown={() => flash(ctx, 'SAMPLING IS NOT MODELLED. THE SMPL PAGE PLAYS SYNTHESIZED ONE-SHOTS')} />));
+  out.push(key(55.0, 17.1, SMALL, ctx => <Key ctx={ctx} id="key:sampling" label={I.sampling} title="SAMPLING" sub="Direct" funcSub onDown={() => flash(ctx, 'SAMPLING IS NOT MODELLED. THE SMPL PAGE PLAYS SYNTHESIZED ONE-SHOTS')} />));
   out.push(key(90.7, 17.1, SMALL, ctx => {
-    const latched = ((ctx.engine.perfLatch as number[] | undefined) ?? []).some(Boolean);
-    return <Key ctx={ctx} id="key:qper" label="QPER" sub="Mute" funcSub lit={latched || !!ctx.ui.qper} ledColor={RY.green}
-      onDown={() => press(ctx, () => { const on = !ctx.ui.qper; ctx.setUi({ qper: on }); flash(ctx, on ? 'QUICK PERFORMANCE: PADS LATCH MACROS' : 'QUICK PERFORMANCE OFF'); }, () => { ctx.sendEvent('perf:clear'); flash(ctx, 'PERFORMANCE MACROS OFF'); })} />;
+    const muted = !!ctx.engine.perfMuted;
+    const choosing = !!ctx.ui.qperHeld || !!ctx.ui.qperLatch;
+    return <Key ctx={ctx} id="key:qper" label="QPER" sub="Mute" funcSub lit={choosing ? 1 : muted ? 0 : 0.45} blink={!!ctx.ui.qperLatch} ledColor={RY.green}
+      title="Hold [QPER] and press pads (or trig keys 1-12) to choose the macros of the QUICK PERF AMOUNT knob; [FUNC] + [QPER] mutes the macros"
+      onDown={() => press(ctx, () => ctx.setUi({ qperHeld: true, qperAt: Date.now(), qperList: ctx.ui.qperLatch ? ctx.ui.qperList : [] }), () => {
+        ctx.sendEvent('perf:mute');
+        flash(ctx, muted ? 'PERFORMANCE MACROS ON' : 'PERFORMANCE MACROS MUTED');
+      })}
+      onUp={() => {
+        if (!ctx.ui.qperHeld) return;
+        const list = (ctx.ui.qperList as number[] | undefined) ?? [];
+        const tap = Date.now() - num(ctx.ui.qperAt) < 350;
+        if (tap && !list.length && !ctx.ui.qperLatch) { ctx.setUi({ qperHeld: false, qperLatch: true }); flash(ctx, 'QPER: TAP PADS FOR THE QUICK PERF KNOB, THEN [QPER]'); return; }
+        if (list.length || ctx.ui.qperLatch) {
+          ctx.sendEvent('perf:assign', { list });
+          flash(ctx, list.length ? `QUICK PERF AMOUNT: MACRO ${list.map(x => x + 1).join(' ')}` : 'QUICK PERF: NO MACROS');
+        }
+        ctx.setUi({ qperHeld: false, qperLatch: false, qperList: [] });
+      }} />;
   }));
   // --- Mode row ------------------------------------------------------------------
-  out.push(key(26.2, ROW2, SMALL, ctx => <Key ctx={ctx} id="key:global" label="GLOBAL" sub="Save Proj" funcSub onDown={() => press(ctx, () => flash(ctx, 'GLOBAL SETTINGS ARE NOT MODELLED'), () => flash(ctx, 'THE PROJECT SAVES AUTOMATICALLY'))} />));
+  out.push(key(26.2, ROW2, SMALL, ctx => <Key ctx={ctx} id="key:global" label={I.gear} title="GLOBAL SETTINGS" sub="Save Project" funcSub onDown={() => press(ctx, () => flash(ctx, 'GLOBAL SETTINGS ARE NOT MODELLED'), () => flash(ctx, 'THE PROJECT SAVES AUTOMATICALLY'))} />));
   MODE_KEYS.forEach(([label, sub, menu, mode], i) => out.push(key(MODE_X[i], ROW2, SMALL, ctx => (
-    <Key ctx={ctx} id={`key:${label.toLowerCase()}`} label={label} sub={sub} funcSub lit={Math.round(num(ctx.values.pad_mode)) === mode} ledColor={mode === 0 ? RY.green : RY.led}
-      control="pad_mode" value={mode}
-      onDown={() => press(ctx, () => ctx.setValue('pad_mode', Math.round(num(ctx.values.pad_mode)) === mode && mode !== 0 ? 0 : mode), () => modeFunc(ctx, menu))} />
+    <Key ctx={ctx} id={`key:${label.toLowerCase()}`} label={label} sub={sub} funcSub
+      lit={Math.round(num(ctx.values.pad_mode)) === mode ? 1 : (mode === 1 && ((ctx.engine.seq as { mutes?: boolean[] } | undefined)?.mutes ?? []).some(Boolean)) || (mode === 3 && num(ctx.engine.scene, -1) >= 0) ? 0.35 : 0}
+      blink={(mode === 3 && typeof ctx.ui.sceneEdit === 'number') || (mode === 4 && typeof ctx.ui.perfEdit === 'number')}
+      ledColor={mode === 0 ? RY.green : RY.led} control="pad_mode" value={mode}
+      onDown={() => modeDown(ctx, mode, menu)} onUp={() => modeUp(ctx, mode)} />
   ))));
   out.push(key(144.0, ROW2, SMALL, ctx => <Key ctx={ctx} id="key:fix" label={<span style={{ fontStyle: 'italic', fontWeight: 900, letterSpacing: -0.5 }}>FIX</span>} sub="Setup" funcSub
     lit={num(ctx.values.fix) > 0} control="fix" onDown={() => press(ctx, () => ctx.setValue('fix', num(ctx.values.fix) > 0 ? 0 : 1), () => openMenu(ctx, 'fix'))} />));
@@ -173,32 +274,58 @@ function keys(): PanelElement[] {
   // --- Left column -----------------------------------------------------------------
   out.push(key(26.6, 74.2, BIG, ctx => <Key ctx={ctx} id="key:func" big label="FUNC" lit={funcOn(ctx) ? 1 : 0} ledColor={RY.blue}
     onDown={() => ctx.setUi({ func: true, funcUsed: false })}
-    onUp={() => ctx.setUi(ctx.ui.funcUsed ? { func: false } : { func: false, funcLatch: !ctx.ui.funcLatch })}
+    onUp={() => { applyMutePreselect(ctx); ctx.setUi(ctx.ui.funcUsed ? { func: false } : { func: false, funcLatch: !ctx.ui.funcLatch }); }}
     capStyle={{ fontSize: 'var(--rytm-func-font, 11px)' }} title="Hold (or tap) FUNC, then press a key for its second function" />, true));
   out.push(key(26.6, 111.3, SMALL, ctx => <Key ctx={ctx} id="key:trk" label="TRK" sub="Save Kit" funcSub lit={!!ctx.ui.trkHeld || !!ctx.ui.trkLatch}
-    onDown={() => press(ctx, () => ctx.setUi({ trkHeld: true, trkAt: Date.now() }), () => openMenu(ctx, 'kit'))}
+    onDown={() => press(ctx, () => {
+      if (doublePress(ctx, 'trkTap')) { ctx.setUi({ trkHeld: false, trkLatch: false }); openMenu(ctx, 'sound'); return; }
+      ctx.setUi({ trkHeld: true, trkAt: Date.now() });
+    }, () => saveKit(ctx))}
     onUp={() => { if (!ctx.ui.trkHeld) return; const tap = Date.now() - num(ctx.ui.trkAt) < 350; ctx.setUi({ trkHeld: false, trkLatch: tap ? !ctx.ui.trkLatch : false }); }} />));
   out.push(key(26.6, 145.0, SMALL, ctx => <Key ctx={ctx} id="key:rtrg" label="RTRG" sub="Metronome" funcSub lit={!!ctx.ui.rtrgHeld || !!ctx.ui.rtrgLatch} ledColor={RY.amber}
-    onDown={() => press(ctx, () => ctx.setUi({ rtrgHeld: true, rtrgAt: Date.now() }), () => flash(ctx, 'THE METRONOME IS NOT MODELLED'))}
-    onUp={() => { if (!ctx.ui.rtrgHeld) return; const tap = Date.now() - num(ctx.ui.rtrgAt) < 350; ctx.setUi({ rtrgHeld: false, rtrgLatch: tap ? !ctx.ui.rtrgLatch : false }); if (tap && !ctx.ui.rtrgLatch) flash(ctx, 'RETRIG ON: PADS ROLL. UP / DOWN CHANGE THE RATE'); }} />));
+    onDown={() => press(ctx, () => ctx.setUi({ rtrgHeld: true, rtrgAt: Date.now(), rytmMenu: 'retrig' }), () => flash(ctx, 'THE CLICK TRACK (METRONOME) IS NOT MODELLED'))}
+    onUp={() => {
+      if (!ctx.ui.rtrgHeld) return;
+      // a tap latches RTRG (pads roll until the next tap); a hold shows the RETRIG menu while held
+      const tap = Date.now() - num(ctx.ui.rtrgAt) < 350;
+      const latch = tap ? !ctx.ui.rtrgLatch : false;
+      ctx.setUi({ rtrgHeld: false, rtrgLatch: latch, rytmMenu: latch ? 'retrig' : null });
+      if (latch) flash(ctx, 'RETRIG ON: PADS ROLL WHILE HELD');
+    }} />));
   // --- YES / NO / arrows ------------------------------------------------------------
-  out.push(key(197.2, 79.6, SMALL, ctx => <Key ctx={ctx} id="key:yes" label="YES" sub="Save" funcSub onDown={() => press(ctx, () => closeAll(ctx), () => openMenu(ctx, 'kit'))} />));
-  out.push(key(197.2, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:no" label="NO" sub="Reload" funcSub onDown={() => press(ctx, () => closeAll(ctx), () => reloadKit(ctx))} />));
-  out.push(key(228.8, 79.6, SMALL, ctx => <Key ctx={ctx} id="key:up" label={I.up} sub="Retrig +" funcSub onDown={() => arrow(ctx, 'up')} />));
-  out.push(key(213.1, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:left" label={I.left} sub="μTime -" funcSub onDown={() => arrow(ctx, 'left')} />));
-  out.push(key(228.8, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:down" label={I.down} sub="Retrig -" funcSub onDown={() => arrow(ctx, 'down')} />));
-  out.push(key(244.8, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:right" label={I.right} sub="μTime +" funcSub onDown={() => arrow(ctx, 'right')} />));
+  // [YES] / [NO]: confirm / back; held with a mode key they save / reload (with a mouse: [FUNC] + [YES] = KIT menu, [FUNC] + [NO] = reload kit)
+  out.push(key(197.2, 79.6, SMALL, ctx => <Key ctx={ctx} id="key:yes" label="YES" sub="Save" lit={!!ctx.ui.yesHeld}
+    onDown={() => press(ctx, () => ctx.setUi({ yesHeld: true, yesNoUsed: false }), () => openMenu(ctx, 'kit'))}
+    onUp={() => { if (!ctx.ui.yesHeld) return; const used = !!ctx.ui.yesNoUsed; ctx.setUi({ yesHeld: false }); if (!used) closeAll(ctx); }} />));
+  out.push(key(197.2, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:no" label="NO" sub="Reload" lit={!!ctx.ui.noHeld}
+    onDown={() => press(ctx, () => ctx.setUi({ noHeld: true, yesNoUsed: false }), () => reloadKit(ctx))}
+    onUp={() => { if (!ctx.ui.noHeld) return; const used = !!ctx.ui.yesNoUsed; ctx.setUi({ noHeld: false }); if (!used) closeAll(ctx); }} />));
+  out.push(key(228.8, 79.6, SMALL, ctx => <Key ctx={ctx} id="key:up" label={I.up} sub="Retrig +" onDown={() => arrow(ctx, 'up')} />));
+  out.push(key(213.1, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:left" label={I.left} sub="µTime -" onDown={() => arrow(ctx, 'left')} onUp={() => arrowUp(ctx)} />));
+  out.push(key(228.8, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:down" label={I.down} sub="Retrig -" onDown={() => arrow(ctx, 'down')} />));
+  out.push(key(244.8, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:right" label={I.right} sub="µTime +" onDown={() => arrow(ctx, 'right')} onUp={() => arrowUp(ctx)} />));
   // --- PARAMETER keys ------------------------------------------------------------------
   PARAM_KEYS.forEach(([label, fx, func], i) => out.push(key(PARAM_X[i], ROW_PARAM, SMALL, ctx => (
     <Key ctx={ctx} id={`key:${label.toLowerCase()}`} label={label} sub={func} sub2={fx} funcSub lit={Math.round(num(ctx.values.page, 1)) === i} control="page" value={i}
-      onDown={() => press(ctx, () => ctx.setValue('page', i), func ? () => {
-        if (i === 0) { const q = num(ctx.values.quantize, 1) > 0 ? 0 : 1; ctx.setValue('quantize', q); flash(ctx, q ? 'LIVE RECORDING QUANTIZED' : 'LIVE RECORDING WITH MICRO TIMING'); }
-        else if (i === 1 || i === 3) openMenu(ctx, 'sound');
-        else if (i === 2) openMenu(ctx, 'samples');
-      } : undefined)} />
+      onDown={() => {
+        if (ctx.ui.yesHeld || ctx.ui.noHeld) { ctx.setUi({ yesNoUsed: true }); ctx.setValue('page', i); pageReloadOrRandom(ctx, i, !!ctx.ui.yesHeld); return; }
+        press(ctx, () => {
+          // a quick double press on [SRC] opens the MACHINE menu
+          if (i === 1 && Math.round(num(ctx.values.track)) !== FX_TRACK && doublePress(ctx, 'srcTap')) { openMenu(ctx, 'sound'); return; }
+          ctx.setValue('page', i);
+        }, func ? () => {
+          if (i === 0) { const q = num(ctx.values.quantize, 1) > 0 ? 0 : 1; ctx.setValue('quantize', q); flash(ctx, q ? 'TRIGS SETUP: LIVE RECORDING QUANTIZED' : 'TRIGS SETUP: LIVE RECORDING KEEPS MICRO TIMING'); }
+          else if (i === 1 || i === 3) openMenu(ctx, 'sound');
+          else if (i === 2) openMenu(ctx, 'samples');
+        } : undefined);
+      }} />
   ))));
   out.push(key(353.8, 103.2, SMALL, ctx => <Key ctx={ctx} id="key:fx" label="FX" sub="MIDI Config" funcSub lit={Math.round(num(ctx.values.track)) === FX_TRACK} control="track" value={FX_TRACK} ledColor={RY.amber}
-    onDown={() => press(ctx, () => ctx.setValue('track', FX_TRACK), () => flash(ctx, 'MIDI CONFIG IS NOT MODELLED'))} />));
+    onDown={() => {
+      if (ctx.ui.noHeld) { ctx.setUi({ yesNoUsed: true }); fxReload(ctx); return; }
+      if (ctx.ui.qperHeld) return;
+      press(ctx, () => ctx.setValue('track', FX_TRACK), () => flash(ctx, 'MIDI CONFIG IS NOT MODELLED'));
+    }} />));
   out.push(key(292.7, 115.5, SMALL, ctx => {
     const p = projectOf(ctx);
     return <Key ctx={ctx} id="key:chain" label={I.chain} sub="New Chain" funcSub lit={p.mode === 'chain'} ledColor={RY.green} focusIds={['seq:menu:chain']}
@@ -244,11 +371,25 @@ function keys(): PanelElement[] {
       }, () => trackClear(ctx))} />;
   }, true));
   out.push(key(323.8, 141.7, BIG, ctx => <Key ctx={ctx} id="key:stop" big label={I.stop} sub="Paste" funcSub control="play"
-    onDown={() => press(ctx, () => { ctx.setValue('play', false); if (Math.round(num(ctx.values.rec)) === 2) ctx.setValue('rec', 1); }, () => trackPaste(ctx))} />, true));
+    onDown={() => press(ctx, () => {
+      if (ctx.ui.recHeld) { flash(ctx, 'STEP RECORDING IS NOT IN THIS TWIN YET: USE GRID RECORDING'); return; }
+      const twice = doublePress(ctx, 'stopTap') && !ctx.engine.playing;
+      ctx.setValue('play', false);
+      if (Math.round(num(ctx.values.rec)) === 2) ctx.setValue('rec', 1);
+      // [STOP] twice: the delay and reverb fade out too
+      if (twice) { ctx.sendEvent('rytm:fx-off'); flash(ctx, 'SEND FX OFF'); }
+    }, () => trackPaste(ctx))} />, true));
   out.push(key(353.8, 145.2, SMALL, ctx => {
     const st = ctx.engine.seq as { fill?: boolean; fillCued?: boolean } | undefined;
     return <Key ctx={ctx} id="key:fill" label="FILL" sub="Cue Fill" funcSub lit={!!st?.fill} blink={!!st?.fillCued} ledColor={RY.yellow} focusIds={['seq:fill']}
-      onDown={() => press(ctx, () => { ctx.setUi({ fillHeld: true }); ctx.sendEvent('seq:fill'); }, () => ctx.sendEvent('seq:fill-cue'))}
+      onDown={() => press(ctx, () => {
+        if ((st as { fillLatched?: boolean } | undefined)?.fillLatched) { ctx.sendEvent('seq:fill-latch', { on: false }); return; }
+        ctx.setUi({ fillHeld: true }); ctx.sendEvent('seq:fill');
+      }, () => {
+        // [FUNC] + [FILL] cues a fill for one cycle; [FUNC] + [FILL] twice latches it
+        if (doublePress(ctx, 'fillTap')) { ctx.sendEvent('seq:fill-latch', { on: true }); flash(ctx, 'FILL LATCHED: [FILL] RELEASES IT'); }
+        else ctx.sendEvent('seq:fill-cue');
+      })}
       onUp={() => { if (ctx.ui.fillHeld) { ctx.setUi({ fillHeld: false }); ctx.sendEvent('seq:fill:up'); } }} />;
   }));
   out.push(key(354.4, 176.8, SMALL, ctx => <Key ctx={ctx} id="key:page" label="PAGE" sub="Scale" funcSub focusIds={['seq:pages', 'seq:menu:scale']}
@@ -274,9 +415,10 @@ const ENC_D = 13.6;
 export const encoderBinding = (i: number) => ({ values }: PanelContext) =>
   pageControls(Math.round(num(values.track)), Math.max(0, Math.min(5, Math.round(num(values.page, 1)))), values)[i] ?? null;
 
-const levelBinding = ({ values }: PanelContext) => {
+const levelBinding = ({ values, ui }: PanelContext) => {
   const t = Math.round(num(values.track));
-  return t === FX_TRACK ? 'fx_cmp_vol' : `${TRACKS[t].id}_trk_lev`;
+  if (t === FX_TRACK) return 'fx_trk_lev';
+  return (ui as Record<string, unknown> | undefined)?.trigMode === 'accent' ? `${TRACKS[t].id}_acc_lev` : `${TRACKS[t].id}_trk_lev`;
 };
 
 const knobs: PanelElement[] = [
@@ -307,17 +449,20 @@ const sequencer: PanelElement[] = [
   {
     kind: 'custom', x: TRIG_X0 - TRIG_SIZE / 2, y: TRIG_Y - TRIG_SIZE / 2, w: TRIG_PITCH * 15 + TRIG_SIZE, h: TRIG_SIZE,
     render: ctx => {
-      const rec = Math.round(num(ctx.values.rec, 1));
+      const rec = Math.round(num(ctx.values.rec, 0));
       const mode = (ctx.ui.trigMode as 'trig' | 'accent' | 'pslide' | undefined) ?? 'trig';
+      const gap = { ['--rytm-trig-gap' as string]: `${(TRIG_PITCH - TRIG_SIZE) * PX}px` };
+      const editing = rec > 0 || mode !== 'trig';
       return (
-        <div className="rytm-trigs" style={{ position: 'absolute', inset: 0, ['--rytm-trig-gap' as string]: `${(TRIG_PITCH - TRIG_SIZE) * PX}px` }}>
-          <TrigKeys ctx={ctx} tracks={SEQ_TRACKS} trackNames={TRACK_NAMES} editable={rec > 0} mode={mode} color="#ff3b2a" longPressMs={550} />
+        <div className="rytm-trigs" style={{ position: 'absolute', inset: 0, ...gap }}>
+          {editing
+            ? <TrigKeys ctx={ctx} tracks={SEQ_TRACKS} trackNames={TRACK_NAMES} editable mode={mode} color="#ff3b2a" longPressMs={550} />
+            : <PlayTrigs ctx={ctx} />}
         </div>
       );
     },
   },
   ...TRACKS.map((t, i): PanelElement => ({ kind: 'label', text: t.name, x: TRIG_X0 + i * TRIG_PITCH, y: TRIG_Y + TRIG_SIZE / 2 + 3.6, size: 9, color: '#d8d8d8', weight: 700 })),
-  { kind: 'label', text: 'FX', x: TRIG_X0 + 12 * TRIG_PITCH, y: TRIG_Y + TRIG_SIZE / 2 + 3.6, size: 8, color: RY.sub, weight: 600 },
   { kind: 'custom', x: 344.0, y: 160.6, w: 21.0, h: 6.2, render: ctx => <PageLeds ctx={ctx} /> },
   ...['1:4', '2:4', '3:4', '4:4'].map((t, i): PanelElement => ({ kind: 'label', text: t, x: 346.3 + i * 5.25, y: 158.0, size: 6.5, color: RY.sub, weight: 600 })),
   // Pattern-mode LEDs over BANK A-D (FUNC + BANK A-D sets them)
@@ -348,7 +493,7 @@ const sequencer: PanelElement[] = [
 // Decor: rear-panel legends, screen window, logo, the mode-key line
 // ----------------------------------------------------------------------------
 
-const REAR = ['Headphones', 'Main L', 'Main R', 'BD', 'SD', 'RS/CP', 'BT', 'LT', 'MT/HT', 'CH/OH', 'CY/CB', 'Audio In', 'MIDI In', 'MIDI Out / Sync A', 'MIDI Thru / Sync B', 'Control In', 'USB', 'DC In', 'Power'];
+const REAR = ['Headphones', 'Main Out', 'Ext In', 'BD', 'SD', 'RS/CP', 'BT', 'LT', 'MT/HT', 'CH/OH', 'CY/CB', 'Audio In', 'MIDI In', 'MIDI Out / Sync A', 'MIDI Thru / Sync B', 'Control In', 'USB', 'DC In', 'Power'];
 
 const decor: PanelElement[] = [
   ...REAR.map((t, i): PanelElement => ({ kind: 'label', text: t, x: 12 + i * 19.0, y: 3.4, size: 6.5, color: '#6f7277', weight: 600, align: 'left' })),

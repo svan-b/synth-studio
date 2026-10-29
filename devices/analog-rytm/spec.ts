@@ -14,20 +14,20 @@
 
 import type { ControlSpec, DeviceSpec, KnobSpec } from '@/types';
 import {
-  FX_PAGES, FX_TRACK, MACHINES, PAGES, PARAM_INDEX, TRACKS, TRACK_EXTRA, TRACK_OPTIONS, TRACK_PAGES, TRIG_PAGE,
+  FX_PAGES, FX_TRACK, FX_TRACK_LEVEL, MACHINES, PAGES, PARAM_INDEX, RETRIG_MENU, TRACKS, TRACK_EXTRA, TRACK_OPTIONS, TRACK_PAGES, TRIG_PAGE,
   formatMachineParam, formatPage, machineParamDefault, trackParamKeys, type PageParam,
 } from './model';
 import { KIT_PRESETS } from './presets';
-import { RETRIG_RATES } from '@/lib/sequencer/elektron';
 
 const REF = {
-  trig: 'Manual Appendix A: TRIG page',
-  src: 'Manual Appendix D: machines (SYNTH page)',
-  smpl: 'Manual Appendix A: SAMPLE page',
-  fltr: 'Manual Appendix A: FILTER page',
-  amp: 'Manual Appendix A: AMP page',
-  lfo: 'Manual Appendix A: LFO page',
-  fx: 'Manual Appendix B: FX track parameters',
+  trig: 'Rytm MKII manual p.43: TRIG menu',
+  src: 'Rytm MKII manual pp.96-109: Appendix D, machines',
+  smpl: 'Rytm MKII manual pp.77-78: SMPL page',
+  fltr: 'Rytm MKII manual pp.78-79: FLTR page',
+  amp: 'Rytm MKII manual p.79: AMP page',
+  lfo: 'Rytm MKII manual pp.79-80: LFO page',
+  fx: 'Rytm MKII manual pp.81-84: Appendix B, FX track',
+  retrig: 'Rytm MKII manual p.41: RETRIG menu',
 };
 
 const knob = (label: string, description: string, ref: string, min: number, max: number, def: number, extra: Partial<KnobSpec> = {}): KnobSpec => ({
@@ -64,12 +64,13 @@ function buildControls(): Record<string, ControlSpec> {
         bipolar: p.bipolar, units: p.semis ? 'semitones' : 'none', format: v => formatMachineParam(p, v),
       }));
     }
-    const pages: [PageParam[], string][] = [[TRIG_PAGE, REF.trig], [TRACK_PAGES[2], REF.smpl], [TRACK_PAGES[3], REF.fltr], [TRACK_PAGES[4], REF.amp], [TRACK_PAGES[5], REF.lfo], [TRACK_EXTRA, REF.amp]];
+    const pages: [PageParam[], string][] = [[TRIG_PAGE, REF.trig], [TRACK_PAGES[2], REF.smpl], [TRACK_PAGES[3], REF.fltr], [TRACK_PAGES[4], REF.amp], [TRACK_PAGES[5], REF.lfo], [TRACK_EXTRA, REF.amp], [RETRIG_MENU, REF.retrig]];
     for (const [page, ref] of pages) for (const p of page) add(`${t.id}_${p.key}`, pageKnob(pre, p, ref), !SEQ_FIELDS.has(p.key));
   });
 
   // FX track
   for (const page of Object.values(FX_PAGES)) for (const p of page) if (p) add(`fx_${p.key}`, pageKnob('FX', p, REF.fx));
+  add('fx_trk_lev', pageKnob('FX', FX_TRACK_LEVEL, 'Rytm MKII manual p.36: FX track level'));
   add('fx_trig_prob', pageKnob('FX', TRIG_PAGE[3], REF.trig), false);
 
   // Globals (project settings, not part of a kit)
@@ -77,14 +78,12 @@ function buildControls(): Record<string, ControlSpec> {
     units: 'BPM', step: 0.1, format: v => v.toFixed(1),
   });
   c.main_volume = knob('MAIN VOLUME', 'Main output and headphones volume', 'Manual 3.1 Front panel: MAIN VOLUME', 0, 127, 100, { endless: false });
-  c.qper = knob('QUICK PERF AMOUNT', 'Depth of the latched performance macros ([QPER])', 'Manual: PERFORMANCE mode', 0, 127, 127, { endless: false });
-  c.fix_vel = knob('FIXED VEL', 'Velocity of the pads while [FIX] is on ([FUNC] + [FIX] = SETUP)', 'Manual: FIXED VELOCITY', 1, 127, 100);
-  c.rtrg_rate = {
-    type: 'switch', label: 'RETRIG RATE', options: RETRIG_RATES.map(r => `1/${r}`), default: 9,
-    description: 'Rate of the pad retrig: hold [RTRG] and play a pad', manualReference: 'Manual: RETRIG menu',
-  };
-  c.quantize = { type: 'switch', label: 'QUANTIZE', options: ['OFF', 'ON'], default: 1, description: 'Live recording quantizes pad hits to the nearest step ([FUNC] + [TRIG])', manualReference: 'Manual: QUANTIZE' };
-  c.play = { type: 'button', label: 'PLAY', default: false, ledColor: '#3fd65a', description: 'Start / stop the sequencer (Space)', manualReference: 'Manual: [PLAY] / [STOP]' };
+  c.qper = knob('QUICK PERF AMOUNT', 'Amount of the performance macros chosen with [QPER] + pads (an absolute knob)', 'Rytm MKII manual pp.30-31: QUICK PERFORMANCE', 0, 127, 0, { endless: false });
+  c.fix_vel = knob('FIXED VEL', 'Velocity of the pads while [FIX] is on (AUTO = the track\'s VEL on the TRIG page)', 'Rytm MKII manual p.45: FIXED VELOCITY', 0, 127, 100, {
+    format: v => (Math.round(v) <= 0 ? 'AUTO' : `${Math.round(v)}`),
+  });
+  c.quantize = { type: 'switch', label: 'QUANTIZE LIVE REC', options: ['OFF', 'ON'], default: 1, description: 'Live recording places pad hits on whole steps; off, they keep their micro timing ([REC] + double [PLAY])', manualReference: 'Rytm MKII manual p.40: LIVE RECORDING' };
+  c.play = { type: 'button', label: 'PLAY', default: false, ledColor: '#3fd65a', description: 'Start / stop the sequencer (Space)', manualReference: 'Rytm MKII manual p.37: PATTERN CONTROL' };
   c.kit_demo = {
     type: 'switch', label: 'KIT DEMO', options: ['-', ...KIT_PRESETS.map(k => k.name)], default: 0,
     description: 'Factory kit loaded from the preset menu (selects its demo pattern)', manualReference: 'Factory kits',
@@ -94,8 +93,9 @@ function buildControls(): Record<string, ControlSpec> {
   c.track = { type: 'switch', label: 'TRACK', options: TRACK_OPTIONS, default: 0, description: 'Active track: tap a pad, or [TRK] + a trig key ([FX] for the FX track)', manualReference: 'Manual: selecting a track' };
   c.page = { type: 'switch', label: 'PAGE', options: [...PAGES], default: 1, description: 'PARAMETER page on the screen and the DATA ENTRY encoders', manualReference: 'Manual: PARAMETER pages' };
   c.pad_mode = { type: 'switch', label: 'PAD MODE', options: ['PLAY', 'MUTE', 'CHRO', 'SCNE', 'PERF'], default: 0, description: 'What the pads do: play, mute tracks, play chromatically, select scenes or play performance macros', manualReference: 'Manual: pad modes' };
-  c.rec = { type: 'switch', label: 'REC', options: ['OFF', 'GRID', 'LIVE'], default: 1, description: 'GRID RECORDING: trig keys place trigs. LIVE RECORDING ([REC] + [PLAY]): pad hits are recorded.', manualReference: 'Manual: recording modes' };
-  c.fix = { type: 'switch', label: 'FIX', options: ['OFF', 'ON'], default: 0, description: 'Fixed velocity for the pads', manualReference: 'Manual: [FIX]' };
+  c.rec = { type: 'switch', label: 'REC', options: ['OFF', 'GRID', 'LIVE'], default: 0, description: 'OFF: trig keys 1-12 play the tracks. GRID RECORDING ([REC]): trig keys place trigs. LIVE RECORDING ([REC] + [PLAY]): pad hits are recorded.', manualReference: 'Rytm MKII manual pp.39-40: recording modes' };
+  c.fix = { type: 'switch', label: 'FIX', options: ['OFF', 'ON'], default: 0, description: 'Fixed velocity for the pads', manualReference: 'Rytm MKII manual p.45: FIXED VELOCITY' };
+  c.auto_trk = { type: 'switch', label: 'AUTO TRK SWITCH', options: ['OFF', 'ON'], default: 0, description: 'ON: the pad or trig key you play last becomes the active track. OFF (default): select tracks with [TRK] + pad.', manualReference: 'Rytm MKII manual p.67: SEQUENCER CONFIG' };
   return c;
 }
 

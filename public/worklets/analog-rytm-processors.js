@@ -95,7 +95,7 @@ const IX_TRK_LEV = 40, IX_ACC_LEV = 41, IX_VEL_VOL = 42, IX_TRIG_SYN = 43, IX_TR
 
 const NFX = 40;
 const FX_DEL_TIM = 0, FX_DEL_X = 1, FX_DEL_WID = 2, FX_DEL_FDB = 3, FX_DEL_HPF = 4, FX_DEL_LPF = 5, FX_DEL_REV = 6, FX_DEL_VOL = 7;
-const FX_REV_PRE = 8, FX_REV_DEC = 9, FX_REV_FRQ = 10, FX_REV_GAI = 11, FX_REV_HPF = 12, FX_REV_LPF = 13, FX_REV_VOL = 14;
+const FX_REV_PRE = 8, FX_REV_DEC = 9, FX_REV_FRQ = 10, FX_REV_GAI = 11, FX_REV_HPF = 12, FX_REV_LPF = 13, FX_REV_VOL = 14, FX_TRK_LEV = 15;
 const FX_DIS_AMT = 16, FX_DIS_SYM = 17, FX_DIS_DOV = 18, FX_DIS_DEL = 19, FX_DIS_REV = 20;
 const FX_CMP_THR = 24, FX_CMP_ATK = 25, FX_CMP_REL = 26, FX_CMP_MUP = 27, FX_CMP_RAT = 28, FX_CMP_SEQ = 29, FX_CMP_MIX = 30, FX_CMP_VOL = 31;
 const FX_LFO_SPD = 32, FX_LFO_MUL = 33, FX_LFO_FAD = 34, FX_LFO_DST = 35, FX_LFO_WAV = 36, FX_LFO_SPH = 37, FX_LFO_MOD = 38, FX_LFO_DEP = 39;
@@ -118,10 +118,29 @@ const LFO_DEST_IDX = [-1, 0, 1, 2, 3, 4, 5, 6, 7, IX_SMP_TUN, IX_SMP_FIN, IX_SMP
   IX_AMP_ATK, IX_AMP_HLD, IX_AMP_DEC, IX_AMP_OVR, IX_AMP_VOL, IX_AMP_PAN, IX_ACC_LEV, IX_AMP_DEL, IX_AMP_REV];
 const LFO_DEST_RANGE = [0, 128, 128, 128, 128, 128, 128, 128, 128, 48, 128, 16, 128, 120, 120, 2, 128,
   128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128];
-const FX_LFO_DEST_IDX = [-1, FX_DEL_TIM, FX_DEL_WID, FX_DEL_FDB, FX_DEL_HPF, FX_DEL_LPF, FX_DEL_REV, FX_DEL_VOL,
-  FX_DIS_AMT, FX_DIS_SYM, FX_DIS_DOV, FX_CMP_THR, FX_CMP_MUP, FX_CMP_MIX, FX_CMP_VOL];
-const FX_LFO_DEST_RANGE = [0, 128, 128, 198, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128];
+// FX LFO destinations (model.ts FX_LFO_DESTS, libanalogrytm order): delay, reverb, distortion, compressor
+const FX_LFO_DEST_IDX = [-1, FX_DEL_TIM, FX_DEL_X, FX_DEL_WID, FX_DEL_FDB, FX_DEL_HPF, FX_DEL_LPF, FX_DEL_REV, FX_DEL_VOL, FX_DIS_DOV,
+  FX_REV_PRE, FX_REV_DEC, FX_REV_FRQ, FX_REV_GAI, FX_REV_HPF, FX_REV_LPF, FX_REV_VOL,
+  FX_DIS_AMT, FX_DIS_SYM, FX_CMP_THR, FX_CMP_ATK, FX_CMP_REL, FX_CMP_RAT, FX_CMP_SEQ, FX_CMP_MUP, FX_CMP_MIX, FX_CMP_VOL];
+const FX_LFO_DEST_RANGE = [0, 128, 2, 128, 198, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 7, 8, 4, 4, 128, 128, 128];
 const LFO_MULT = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048];
+/** Samples over which a retriggered voice blends out of its last output */
+const DECLICK_N = Math.max(16, Math.round(0.0013 * SR));
+/** Right-hand track of each shared voice (it wins when both trig together; manual p.21) */
+const RIGHT_OF = [-1, -1, 3, -1, -1, -1, 7, -1, 9, -1, 11, -1];
+// Tables used by the generators (module level: nothing is allocated per block)
+const HH_LAB_SLOTS = [1, 3, 4, 5, 6, 7];
+/** SY CHIP SPD 0..23: note values in bars */
+const CHIP_NOTEV = [1 / 128 * 2 / 3, 1 / 128, 1 / 64 * 2 / 3, 1.5 / 128, 1 / 64, 1 / 32 * 2 / 3, 1.5 / 64, 1 / 32, 1 / 16 * 2 / 3, 1.5 / 32, 1 / 16, 1 / 8 * 2 / 3,
+  1.5 / 16, 1 / 8, 1 / 4 * 2 / 3, 1.5 / 8, 1 / 4, 1 / 2 * 2 / 3, 1.5 / 4, 1 / 2, 2 / 3, 1.5 / 2, 1, 1.5];
+/** SY CHIP SPD 24..56: fixed rates; 57..65: single-shot rates */
+const CHIP_HZ = [1, 1.56, 1.88, 2, 3.13, 3.75, 4, 5, 6.25, 7.5, 10, 12.5, 15, 20, 25, 30, 40, 50, 60, 75, 100, 120, 150, 180, 200, 240, 250, 300, 350, 360, 400, 420, 480,
+  240, 200, 150, 120, 100, 60, 50, 30, 25];
+const CHIP_ONESHOT = 57;
+/** SY CHIP ANM1-4: ring-modulated analog pairs (wave, partner wave, partner ratio) */
+const CHIP_ANIM = [[0, 5, 2], [2, 4, 1.5], [3, 5, 3], [1, 2, 2.5]];
+/** SY CHIP ANM5 and TBL1-3: waveforms that alternate (ANM5 every note, TBL after a noise burst) */
+const CHIP_TBL = [[0, 2, 3, 4, 5], [0, 5, 4], [2, 3, 5], [4, 0, 1]];
 // FX parameters the master node reads from the voice node's control output (one channel each)
 const MASTER_CH = [FX_DIS_AMT, FX_DIS_SYM, FX_DIS_DEL, FX_DIS_REV, FX_CMP_THR, FX_CMP_ATK, FX_CMP_REL, FX_CMP_MUP, FX_CMP_RAT, FX_CMP_SEQ, FX_CMP_MIX, FX_CMP_VOL];
 
@@ -248,8 +267,10 @@ class Voice {
     this.gen = 0;        // machine generator "alive" level estimate
     // machine-derived per-block values
     this.base = 55; this.fb = new Float64Array(8);
-    // chip arp
+    // chip arp: the notes (semitones), how many, single-shot
     this.step = 0; this.stepLeft = 0;
+    this.arp = new Float64Array(4); this.arpN = 1; this.arpShot = false; this.arpDone = false;
+    this.trigAt = -1;     // audio time of the last trig (right-hand priority of shared voices)
     // clap
     this.clapLeft = 0; this.clapNext = 0; this.clapEnv = 0;
     // sample layer
@@ -265,6 +286,8 @@ class Voice {
     this.drv = 0; this.drvN = 1; this.gl = 1; this.gr = 1; this.dsend = 0; this.rsend = 0; this.gain = 0;
     this.peak = 0;
     this.quiet = 0;
+    this.dts = new Float64Array(6);
+    this.lastY = 0; this.dclArm = false; this.dcl = 0; this.dclN = 0;
   }
 
   noise() { let x = this.rng; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.rng = x >>> 0; return (x | 0) * 4.656612873077393e-10; }
@@ -279,13 +302,12 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     super();
     this.base = new Float64Array(NT * NP);
     this.ovr = new Float64Array(NT * NP).fill(NaN);
-    this.perfT = new Float64Array(NT * NP);
-    this.perfA = new Float64Array(NT * NP);
+    this.perfAdd = new Float64Array(NT * NP);
+    this.atAdd = new Float64Array(NT);   // pad pressure (aftertouch) on FLT FRQ
     this.mach = new Int32Array(NT).fill(DISABLE);
     this.fx = new Float64Array(NFX);
     this.fxOvr = new Float64Array(NFX).fill(NaN);
-    this.fxPerfT = new Float64Array(NFX);
-    this.fxPerfA = new Float64Array(NFX);
+    this.fxPerfAdd = new Float64Array(NFX);
     this.fxEff = new Float64Array(NFX);
     this.fxLockMask = new Uint8Array(NFX);
     this.fxLockVal = new Float64Array(NFX);
@@ -296,6 +318,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     this.lfoPh = new Float64Array(13); this.lfoOut = new Float64Array(13); this.lfoHeld = new Float64Array(13);
     this.lfoFade = new Float64Array(13).fill(1); this.lfoRun = new Uint8Array(13).fill(1); this.lfoRnd = new Float64Array(13);
     this.lfoT = new Float64Array(13);
+    this.lfoSlew = new Float64Array(13);
     this.bpm = 120;
     this.queue = [];
     // delay
@@ -314,9 +337,10 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       this.base[o + IX_AMP_DEC] = 127; this.base[o + IX_AMP_VOL] = 100; this.base[o + IX_TRK_LEV] = 100;
       this.base[o + IX_ACC_LEV] = 32; this.base[o + IX_VEL_VOL] = 1; this.base[o + IX_SMP_END] = 120; this.base[o + IX_SMP_LEV] = 100;
       this.base[o + IX_TRIG_SYN] = 1; this.base[o + IX_TRIG_SMP] = 1; this.base[o + IX_TRIG_ENV] = 1; this.base[o + IX_TRIG_LFO] = 1;
-      this.base[o + IX_LFO_SPD] = 16; this.base[o + IX_LFO_MUL] = 3;
+      this.base[o + IX_LFO_SPD] = 48; this.base[o + IX_LFO_MUL] = 4;
     }
-    this.fx[FX_DEL_TIM] = 23; this.fx[FX_DEL_WID] = 63; this.fx[FX_DEL_FDB] = 49; this.fx[FX_DEL_LPF] = 127; this.fx[FX_DEL_VOL] = 127;
+    this.fx[FX_DEL_TIM] = 23; this.fx[FX_DEL_FDB] = 49; this.fx[FX_DEL_HPF] = 32; this.fx[FX_DEL_LPF] = 96; this.fx[FX_DEL_VOL] = 110; this.fx[FX_TRK_LEV] = 100;
+    this.lvMsg = { t: 'lv', lv: this.lvOut, rv: -1, rvv: 0 };
     this.port.onmessage = e => this.onMessage(e.data);
   }
 
@@ -327,13 +351,21 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         if (m.tr === 12) this.fxOvr[m.i] = m.v; else this.ovr[m.tr * NP + m.i] = m.v;
         return;
       case 'perf':
-        if (m.tr === 12) { this.fxPerfT[m.i] = m.target; this.fxPerfA[m.i] = m.amt; } else { this.perfT[m.tr * NP + m.i] = m.target; this.perfA[m.tr * NP + m.i] = m.amt; }
+        // the summed depth of the engaged macros on one parameter
+        if (m.tr === 12) this.fxPerfAdd[m.i] = m.add; else this.perfAdd[m.tr * NP + m.i] = m.add;
         return;
       case 'ovrclear':
         this.ovr.fill(NaN); this.fxOvr.fill(NaN); return;
       case 'perfclear':
-        this.perfA.fill(0); this.fxPerfA.fill(0); return;
+        this.perfAdd.fill(0); this.fxPerfAdd.fill(0); return;
+      case 'at':
+        // SOUND SETTINGS > AFTERTOUCH, the default slot: +16 FLT FRQ at full pressure
+        this.atAdd[m.tr] = clamp(m.v || 0, 0, 1) * 16; return;
       case 'tempo': this.bpm = clamp(m.bpm || 120, 20, 300); return;
+      case 'fxoff':
+        // [STOP] twice: the delay's repeats stop too
+        this.dL.fill(0); this.dR.fill(0); this.dHpL = this.dHpR = this.dLpL = this.dLpR = 0; this.dIdle = SR * 6;
+        return;
       case 'stop':
         this.queue.length = 0;
         for (const v of this.voices) if (v.active) { v.gate = false; if (v.ampStage < 3) v.ampStage = 3; if (v.ampInf) v.choke = 1; }
@@ -389,18 +421,17 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
   resolve(v) {
     const tr = v.track;
     if (tr < 0) return;
-    const o = tr * NP, P = v.P, base = this.base, ovr = this.ovr, pA = this.perfA, pT = this.perfT, lm = v.lockMask, lv = v.lockVal;
+    const o = tr * NP, P = v.P, base = this.base, ovr = this.ovr, pAdd = this.perfAdd, lm = v.lockMask, lv = v.lockVal;
     for (let i = 0; i < NP; i++) {
       let x = ovr[o + i];
       if (x !== x) x = lm[i] ? lv[i] : base[o + i];
-      const a = pA[o + i];
-      if (a > 0) x += (pT[o + i] - x) * a;
-      P[i] = x;
+      P[i] = x + pAdd[o + i];
     }
-    // LFO
+    P[IX_FLT_FRQ] += this.atAdd[tr];
+    // LFO (DEP 128 swings half the destination's range either way)
     const dst = Math.round(P[IX_LFO_DST]);
     if (dst > 0 && dst < LFO_DEST_IDX.length) {
-      const amt = this.lfoOut[tr] * (P[IX_LFO_DEP] / 64) * LFO_DEST_RANGE[dst] * 0.5;
+      const amt = this.lfoOut[tr] * (P[IX_LFO_DEP] / 128) * LFO_DEST_RANGE[dst] * 0.5;
       P[LFO_DEST_IDX[dst]] += amt;
     }
   }
@@ -410,12 +441,10 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < NFX; i++) {
       let x = this.fxOvr[i];
       if (x !== x) x = this.fxLockMask[i] ? this.fxLockVal[i] : this.fx[i];
-      const a = this.fxPerfA[i];
-      if (a > 0) x += (this.fxPerfT[i] - x) * a;
-      E[i] = x;
+      E[i] = x + this.fxPerfAdd[i];
     }
     const dst = Math.round(E[FX_LFO_DST]);
-    if (dst > 0 && dst < FX_LFO_DEST_IDX.length) E[FX_LFO_DEST_IDX[dst]] += this.lfoOut[12] * (E[FX_LFO_DEP] / 64) * FX_LFO_DEST_RANGE[dst] * 0.5;
+    if (dst > 0 && dst < FX_LFO_DEST_IDX.length) E[FX_LFO_DEST_IDX[dst]] += this.lfoOut[12] * (E[FX_LFO_DEP] / 128) * FX_LFO_DEST_RANGE[dst] * 0.5;
   }
 
   // --------------------------------------------------------------------------
@@ -481,6 +510,15 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       }
       this.lfoPh[l] = ph;
       let val = mode === 2 ? this.lfoHeld[l] : this.lfoValue(l, ph);
+      // WAV RND: SPH adds slew to the steps (OS 1.70)
+      if (Math.round(fx ? b[FX_LFO_WAV] : b[o + IX_LFO_WAV]) === 6) {
+        const sph = clamp(fx ? b[FX_LFO_SPH] : b[o + IX_LFO_SPH], 0, 127) / 127;
+        if (sph > 0 && cps > 0) {
+          const a = Math.min(1, n / (sph * SR / cps * 0.5 + 1));
+          this.lfoSlew[l] += (val - this.lfoSlew[l]) * a;
+          val = this.lfoSlew[l];
+        } else this.lfoSlew[l] = val;
+      }
       if (fad) {
         const fadeTime = Math.pow(Math.abs(fad) / 64, 2) * 16 * 60 / bpm; // up to ~4 bars
         const step = n * INV_SR / Math.max(0.005, fadeTime);
@@ -512,6 +550,10 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
   trig(m) {
     const tr = m.tr;
     const v = this.voices[TRACK_VOICE[tr]];
+    // both tracks of a pair at once: the right-hand track (CP, HT, OH, CB) plays
+    const at = m.at || currentTime;
+    if (RIGHT_OF[tr] >= 0 && v.track === RIGHT_OF[tr] && v.active && Math.abs(at - v.trigAt) < 0.0015) return;
+    v.trigAt = at;
     const prevTrack = v.track;
     v.track = tr;
     this.setLocks(v, m.locks);
@@ -542,8 +584,10 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         v.sBuf = buf;
         const len = buf.length;
         const sta = clamp(P[IX_SMP_STA], 0, 120) / 120, end = clamp(P[IX_SMP_END], 0, 120) / 120;
-        v.sStart = Math.floor(sta * len);
-        v.sEnd = Math.max(v.sStart + 1, Math.floor(end * len));
+        v.sRev = end < sta;
+        // forward: STA -> END; reverse (END below STA): STA down to END
+        v.sStart = Math.min(len - 2, Math.floor(sta * (len - 1)));
+        v.sEnd = v.sRev ? Math.floor(end * (len - 1)) : Math.max(v.sStart + 1, Math.floor(end * (len - 1)));
         v.sPos = v.sStart;
         v.sOn = true;
       }
@@ -554,7 +598,8 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     if (!v.active || prevTrack !== tr) v.amp = v.active ? v.amp * 0.5 : 0;
     v.ampStage = 1;
     v.ampHoldLeft = -1;
-    if (!v.active) { v.ic1 = 0; v.ic2 = 0; }
+    if (!v.active) { v.ic1 = 0; v.ic2 = 0; v.lastY = 0; }
+    else v.dclArm = true;
     v.active = true;
     v.quiet = 0;
     v.t = 0;
@@ -579,7 +624,8 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         break;
       }
       case CP_CLASSIC: {
-        v.clapLeft = 1 + Math.round(clamp(P[3], 0, 127) / 127 * 7);
+        // NUM claps, then the tail (NUM 0 = a single clap)
+        v.clapLeft = 1 + Math.round(clamp(P[3], 0, 127));
         v.clapNext = 0; v.clapEnv = 0; e[0] = 0; e[1] = 0;
         break;
       }
@@ -601,13 +647,21 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       case UT_NOISE: e[0] = 0; e[1] = 1; h[0] = 0; break;
       case UT_IMPULSE: e[0] = 0; h[0] = 0; break;
       case SY_DUAL_VCO: {
+        // even CFG values ("_") reset the oscillators on the trig
         const cfg = Math.round(clamp(P[7], 0, 79));
-        if (cfg & 1) { p[0] = 0; p[1] = 0; }
+        if (!(cfg & 1)) { p[0] = 0; p[1] = 0; }
         e[0] = 1; e[1] = 1; e[2] = 1;
         break;
       }
-      case SY_RAW: p[0] = 0; p[1] = 0; e[0] = 1; break;
-      case SY_CHIP: v.step = 0; v.stepLeft = 0; e[0] = 1; s[0] = 1; s[1] = 0; break;
+      case SY_RAW: if (Math.round(clamp(P[6], 0, 3)) < 2) { p[0] = 0; p[1] = 0; } e[0] = 1; break;
+      case SY_CHIP: {
+        // the arpeggio: TUN, then OF2..OF4 up to the first 0 (which restarts it)
+        v.arp[0] = 0; let n = 1;
+        for (let k = 3; k <= 5; k++) { const o = Math.round(clamp(P[k], -24, 24)); if (!o) break; v.arp[n++] = o; }
+        v.arpN = n; v.arpShot = Math.round(clamp(P[7], 0, 65)) >= CHIP_ONESHOT; v.arpDone = false;
+        v.step = 0; v.stepLeft = 0; e[0] = 1; s[0] = 1; s[1] = 0; s[3] = 0;
+        break;
+      }
       default: break;
     }
     v.gen = 1;
@@ -655,7 +709,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         fb[2] = 0.004 * SR;                          // short fixed hold
         fb[3] = Math.pow(clamp(P[0], 0, 127) / 127, 2);
         fb[4] = 1.8 * Math.pow(clamp(P[4], 0, 127) / 127, 2); // MOD^2: FM index
-        fb[5] = Math.round(P[3]) === 0 ? 0.45 : 0;   // TYP A: ring modulator in
+        fb[5] = Math.round(P[3]) >= 1 ? 0.45 : 0;    // TYP B: FM with ring modulation (A: FM only)
         break;
       }
       case SD_HARD: case SD_CLASSIC: case SD_FM: case SD_ACOUSTIC: case SD_NATURAL: {
@@ -733,18 +787,19 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       case CP_CLASSIC: {
         fb[3] = Math.pow(clamp(P[0], 0, 127) / 127, 2);
         fb[0] = svfG(expT(P[1], 450, 4200));         // TON: band-pass centre
-        fb[1] = expT(P[4], 0.004, 0.045) * SR;       // RAT: burst spacing (samples)
+        fb[1] = expT(127 - clamp(P[4], 0, 127), 0.0035, 0.045) * SR; // RAT: higher = faster claps (spacing in samples)
         fb[2] = clamp(P[6], 0, 127) / 127;           // RND
-        v.k[0] = k60(expT(P[7], 0.004, 0.08));       // CPD: each clap
+        v.k[0] = k60(expT(P[7], 0.0015, 0.045));     // CPD: each clap
         v.k[1] = k60(expT(P[2], 0.05, 3.0));         // NOD: tail
         fb[4] = Math.pow(clamp(P[5], 0, 127) / 127, 1.5); // NOL: tail level
         break;
       }
       case BT_CLASSIC: case XT_CLASSIC: {
+        // TUN shows -64..63: XT half a semitone a step (+-2.7 octaves), BT a quarter (+-16 semitones).
+        // One circuit tuning for LT, MT and HT: their default kit values (+34, +44, +50) give G2, C3, D#3.
         const bt = m === BT_CLASSIC;
-        const range = bt ? 0.5 : 1;
-        const baseHz = bt ? 75 : (v.track === 5 ? 110 : 165);
-        v.base = baseHz * exp2((P[1] * range + v.note - 60) / 12);
+        const semis = clamp(P[1], -64, 63) * (bt ? 0.25 : 0.5);
+        v.base = (bt ? 51.9 : 36.7) * exp2((semis + v.note - 60) / 12);
         fb[3] = Math.pow(clamp(P[0], 0, 127) / 127, 2);
         fb[0] = (bt ? 1.0 : 1.6) * Math.pow(clamp(P[bt ? 6 : 3], 0, 127) / 127, 1.3);   // SWD (oct)
         v.k[0] = bt ? kTau(0.017) : kTau(expT(P[4], 0.004, 0.4));                     // sweep
@@ -762,10 +817,9 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       }
       case CH_CLASSIC: case OH_CLASSIC: case CH_METALLIC: case OH_METALLIC: case HH_BASIC: case HH_LAB: {
         const bank = (m === CH_METALLIC || m === OH_METALLIC) ? BANK_METAL : m === HH_BASIC ? BANK_BASIC : BANK_808;
-        const tm = exp2((P[1] + v.note - 60) / 12);
+        const tm = exp2((clamp(P[1], -64, 63) * 0.5 + v.note - 60) / 12);   // TUN: half a semitone a step
         if (m === HH_LAB) {
-          const slots = [1, 3, 4, 5, 6, 7];
-          for (let i = 0; i < 6; i++) v.f[i] = 110 * exp2(clamp(P[slots[i]], 0, 127) / 127 * 7) * exp2((v.note - 60) / 12);
+          for (let i = 0; i < 6; i++) v.f[i] = 110 * exp2(clamp(P[HH_LAB_SLOTS[i]], 0, 127) / 127 * 7) * exp2((v.note - 60) / 12);
         } else for (let i = 0; i < 6; i++) v.f[i] = bank[i] * tm;
         fb[3] = Math.pow(clamp(P[0], 0, 127) / 127, 2);
         const open = m === OH_CLASSIC || m === OH_METALLIC;
@@ -787,7 +841,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         let bank = BANK_808;
         if (m === CY_METALLIC) bank = BANK_METAL2;
         if (m === CY_RIDE) { const ty = Math.round(clamp(P[3], 0, 3)); bank = ty === 0 ? BANK_808 : ty === 1 ? BANK_BASIC : ty === 2 ? BANK_METAL : BANK_METAL2; }
-        const tm = exp2((P[1] + v.note - 60) / 12);
+        const tm = exp2((clamp(P[1], -64, 63) * 0.5 + v.note - 60) / 12);
         for (let i = 0; i < 6; i++) v.f[i] = bank[i] * tm;
         fb[3] = Math.pow(clamp(P[0], 0, 127) / 127, 2);
         const colOct = m === CY_CLASSIC ? clamp(P[3], -64, 63) / 64 : 0;
@@ -811,10 +865,11 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         break;
       }
       case CB_CLASSIC: case CB_METALLIC: {
+        // firmware: oscillator 2 = TUN + DET/4 in TUN steps (half semitones); METALLIC halves TUN and takes DET whole
         const met = m === CB_METALLIC;
-        const t = met ? P[1] * 0.5 : P[1];
+        const t = clamp(P[1], -64, 63) * (met ? 0.25 : 0.5);
         v.f[0] = 540 * exp2((t + v.note - 60) / 12);
-        v.f[1] = v.f[0] * exp2((met ? clamp(P[3], 0, 127) : clamp(P[3], 0, 127) / 4) / 12);
+        v.f[1] = v.f[0] * exp2(clamp(P[3], 0, 127) * (met ? 0.5 : 0.125) / 12);
         fb[3] = Math.pow(clamp(P[0], 0, 127) / 127, 2);
         fb[0] = 0.5 + clamp(P[4], -64, 63) / 64 * 0.45;
         fb[1] = 0.5 + clamp(P[5], -64, 63) / 64 * 0.45;
@@ -843,17 +898,19 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       }
       case SY_DUAL_VCO: {
         v.base = 65.41 * exp2(semi / 12);
-        fb[0] = exp2(clamp(P[3], -32, 32) / 12);     // DET
-        fb[1] = clamp(P[6], -64, 63) / 64 * 2;       // BND (oct)
+        fb[0] = exp2(clamp(P[3], -16, 16) / 12);     // DET (semitones)
+        fb[1] = clamp(P[6], -64, 63) / 24;           // BND: 24 steps an octave
         v.k[0] = kTau(0.066);
         v.k[2] = P[2] >= 127 ? 1 : k60(expT(P[2], 0.02, 8));
         v.k[3] = P[4] >= 127 ? 1 : k60(expT(P[4], 0.02, 8));
-        fb[2] = clamp(P[5], -64, 63) / 64;            // BAL
+        // BAL: 0 = both oscillators full; negative turns oscillator 2 down, positive oscillator 1
+        const bal = clamp(P[5], -64, 63) / 64;
+        fb[2] = bal > 0 ? 1 - bal : 1; fb[7] = bal < 0 ? 1 + bal : 1;
         fb[3] = Math.pow(clamp(P[0], 0, 127) / 127, 2);
         const cfg = Math.round(clamp(P[7], 0, 79));
         fb[4] = (cfg / 40) | 0 ? 3 : 0;              // osc 1 wave: sine / sinesaw
         fb[5] = ((cfg % 40) / 10) | 0;               // 0 mix, 1 ring, 2 FM, 3 FM + ring
-        fb[6] = [0, 1, 2, 3, 4][((cfg % 10) / 2) | 0];
+        fb[6] = ((cfg % 10) / 2) | 0;                 // osc 2 wave: sine, skewed sine, triangle, sinesaw, saw
         break;
       }
       case SY_RAW: {
@@ -871,13 +928,9 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         v.base = 65.41 * exp2(semi / 12);
         fb[3] = Math.pow(clamp(P[0], 0, 127) / 127, 2);
         v.k[2] = P[2] >= 127 ? 1 : k60(expT(P[2], 0.02, 8));
-        fb[0] = 0; fb[1] = clamp(P[3], -24, 24); fb[2] = clamp(P[4], -24, 24); fb[4] = clamp(P[5], -24, 24);
-        const spd = Math.round(clamp(P[7], 0, 56));
-        // note values (in 1/128ths of a bar) for 0..23, then Hz
-        const NOTEV = [1 / 128 * 2 / 3, 1 / 128, 1 / 64 * 2 / 3, 1.5 / 128, 1 / 64, 1 / 32 * 2 / 3, 1.5 / 64, 1 / 32, 1 / 16 * 2 / 3, 1.5 / 32, 1 / 16, 1 / 8 * 2 / 3,
-          1.5 / 16, 1 / 8, 1 / 4 * 2 / 3, 1.5 / 8, 1 / 4, 1 / 2 * 2 / 3, 1.5 / 4, 1 / 2, 2 / 3, 1.5 / 2, 1, 1.5];
-        const HZ = [1, 1.56, 1.88, 2, 3.13, 3.75, 4, 5, 6.25, 7.5, 10, 12.5, 15, 20, 25, 30, 40, 50, 60, 75, 100, 120, 150, 180, 200, 240, 250, 300, 350, 360, 400, 420, 480];
-        fb[5] = spd < 24 ? NOTEV[spd] * 4 * 60 / this.bpm * SR : SR / HZ[Math.min(HZ.length - 1, spd - 24)];
+        const spd = Math.round(clamp(P[7], 0, 65));
+        // SPD: note values of the tempo (0..23), fixed rates in Hz, single-shot rates (57..65)
+        fb[5] = spd < 24 ? CHIP_NOTEV[spd] * 4 * 60 / this.bpm * SR : SR / CHIP_HZ[Math.min(CHIP_HZ.length - 1, spd - 24)];
         fb[6] = Math.round(clamp(P[6], 0, 127));
         break;
       }
@@ -917,7 +970,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     const trk = clamp(P[IX_TRK_LEV], 0, 127) / 100;
     let velG = P[IX_VEL_VOL] > 0.5 ? v.vel : 1;
     if (v.acc) velG *= 1 + clamp(P[IX_ACC_LEV], 0, 127) / 127;
-    v.gain = vol * vol * trk * trk * velG * 0.75;
+    v.gain = vol * vol * trk * trk * velG * 0.55;
     const pan = clamp(P[IX_AMP_PAN], -64, 63) / 64;
     v.gl = pan > 0 ? 1 - pan : 1;
     v.gr = pan < 0 ? 1 + pan : 1;
@@ -925,7 +978,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     v.rsend = Math.pow(clamp(P[IX_AMP_REV], 0, 127) / 127, 2);
     // ---- Sample layer --------------------------------------------------------
     if (v.sOn && v.sBuf) {
-      v.sInc = exp2((P[IX_SMP_TUN] + P[IX_SMP_FIN] / 100 + v.note - 60) / 12);
+      v.sInc = exp2((P[IX_SMP_TUN] + P[IX_SMP_FIN] / 64 + v.note - 60) / 12) * (v.sRev ? -1 : 1);
       v.sGain = Math.pow(clamp(P[IX_SMP_LEV], 0, 127) / 127, 2) * v.vel;
       v.sLoop = P[IX_SMP_LOP] > 0.5;
       const br = clamp(P[IX_SMP_BR], 0, 127);
@@ -1231,7 +1284,8 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       }
       case CY_CLASSIC: case CY_METALLIC: case CY_RIDE: {
         const m = v.m, lev = fb[3], f = v.f;
-        const dts = [f[0] * INV_SR, f[1] * INV_SR, f[2] * INV_SR, f[3] * INV_SR, f[4] * INV_SR, f[5] * INV_SR];
+        const dts = v.dts;
+        for (let j = 0; j < 6; j++) dts[j] = f[j] * INV_SR;
         for (let i = i0; i < i1; i++) {
           const t = v.t++;
           let x = 0;
@@ -1308,8 +1362,9 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         break;
       }
       case SY_DUAL_VCO: {
-        const lev = fb[3], w1 = fb[4], mode = fb[5], w2 = fb[6], bal = fb[2];
-        const fmAmt = (mode === 2 || mode === 3) ? Math.max(0, bal + 1) * 1.2 : 0;
+        const lev = fb[3], w1 = fb[4], mode = fb[5], w2 = fb[6], g1 = fb[2], g2 = fb[7];
+        // FM modes: oscillator 2's level (BAL) is the modulation depth (firmware: BAL^2)
+        const fmAmt = (mode === 2 || mode === 3) ? g2 * g2 * 1.6 : 0;
         for (let i = i0; i < i1; i++) {
           v.t++;
           const bend = fb[1] * e[0]; e[0] *= k[0];
@@ -1323,9 +1378,9 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           else o1 = wave(p[0], w1, d1);
           let y;
           const a1 = e[1], a2 = e[2];
-          if (mode === 1 || mode === 3) y = o1 * o2 * 0.9 * a1;
-          else if (mode === 2) y = o1 * a1;
-          else y = o1 * a1 * (0.5 - 0.5 * bal) + o2 * a2 * (0.5 + 0.5 * bal);
+          if (mode === 1 || mode === 3) y = o1 * o2 * 0.9 * a1 * g1;
+          else if (mode === 2) y = o1 * a1 * g1;
+          else y = (o1 * a1 * g1 + o2 * a2 * g2) * 0.6;
           e[1] *= k[2]; e[2] *= k[3];
           G[i] = y * lev * 0.9;
         }
@@ -1343,7 +1398,8 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           const o2 = (w2 & 1) ? wave(p[1], 3, d2) : sin2pi(p[1]);
           let o1;
           switch (w1) { case 0: o1 = sin2pi(p[0]); break; case 1: o1 = wave(p[0], 1, d1); break; case 2: o1 = wave(p[0], 2, d1); break; case 3: o1 = wave(p[0], 3, d1); break;
-            case 4: { const sk = 0.8; o1 = p[0] < sk ? p[0] / sk * 2 - 1 : 1 - (p[0] - sk) / (1 - sk) * 2; break; } case 5: o1 = wave(p[0], 4, d1); break; default: o1 = sin2pi(p[0]) * o2; }
+            case 4: { const sk = 0.8; o1 = p[0] < sk ? p[0] / sk * 2 - 1 : 1 - (p[0] - sk) / (1 - sk) * 2; break; } case 5: o1 = wave(p[0], 4, d1); break;
+            default: o1 = (p[0] < 0.5 ? 1 : -1) * o2; }   // RING: oscillator 1 ring-modulates oscillator 2 with a square
           let y = o1 * (0.5 - 0.5 * bal) + o2 * (0.5 + 0.5 * bal);
           if (nl) y += v.noise() * nl * 0.6;
           y *= e[0]; e[0] *= k[2];
@@ -1353,26 +1409,46 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         break;
       }
       case SY_CHIP: {
-        const lev = fb[3], prog = fb[6];
-        const offs = [0, fb[1], fb[2], fb[4]];
+        const lev = fb[3], prog = fb[6], len = fb[5];
         for (let i = i0; i < i1; i++) {
-          v.t++;
+          const t = v.t++;
+          // the arpeggio: a note every SPD; single-shot stops on its last note
           if (v.stepLeft <= 0) {
-            v.step = (v.step + (v.t > 1 ? 1 : 0)) & 3;
-            v.stepLeft = fb[5];
-            s[1] = v.base * exp2(offs[v.step] / 12);
+            if (t > 0) {
+              if (v.step + 1 < v.arpN) v.step++;
+              else if (!v.arpShot) v.step = 0;
+              else v.arpDone = true;
+            }
+            v.stepLeft = len;
+            s[1] = v.base * exp2(v.arp[v.step] / 12);
+            s[3] = 0;                                  // samples into this note
           }
           v.stepLeft--;
           const f = s[1], dt = f * INV_SR;
           p[0] += dt; if (p[0] >= 1) p[0] -= 1;
+          const nt = s[3]++;
           let y;
-          if (prog <= 5) y = wave(p[0], prog === 0 ? 0 : prog === 1 ? 1 : prog === 2 ? 2 : prog === 3 ? 3 : prog === 4 ? 4 : 5, dt);
-          else if (prog === 6) { if (p[0] < dt) s[2] = Math.random() < 0.5 ? -1 : 1; y = s[2]; }
-          else if (prog <= 11) { const pat = [0, 2, 5, 4, 1][prog - 7]; y = wave(p[0], (pat + v.step) % 6, dt); }
-          else if (prog <= 13) { const w = 0.5 + 0.42 * Math.sin(v.t * INV_SR * TWO_PI * (prog === 12 ? 3 : 7)); y = pulse(p[0], w, dt); }
-          else if (prog <= 25) { const wv = prog <= 17 ? 2 : prog <= 21 ? 4 : 5; const q = (prog - 14) % 4; y = wave(p[0], wv, dt); if (q === 1 && v.t < 0.012 * SR) y = Math.random() * 2 - 1; else if (q === 3 && v.step & 1) y = wave((p[0] * 2) % 1, wv, dt * 2); }
-          else if (prog <= 28) { const tb = [[0, 5, 4], [2, 3, 5], [4, 0, 1]][prog - 26]; y = wave(p[0], tb[v.step % 3], dt); }
-          else y = pulse(p[0], clamp((prog - 28) / 100, 0.01, 0.99), dt);
+          if (prog <= 5) y = wave(p[0], prog, dt);
+          else if (prog === 6) { if (p[0] < dt) s[2] = v.noise() < 0 ? -1 : 1; y = s[2]; }          // pitched chip noise
+          else if (prog <= 10) {                                                                     // ANM1-4: ring-modulated pairs
+            const a = CHIP_ANIM[prog - 7];
+            p[1] += dt * a[2]; if (p[1] >= 1) p[1] -= 1;
+            y = wave(p[0], a[0], dt) * wave(p[1], a[1], dt * a[2]);
+          } else if (prog === 11) { const tb = CHIP_TBL[0]; y = wave(p[0], tb[v.step % tb.length], dt); } // ANM5: a new wave every note
+          else if (prog <= 13) {                                                                     // PWM+ from 50 %, PWM- from 10 %, swept over each note
+            const ph = Math.min(1, nt / Math.max(1, len));
+            const w = prog === 12 ? 0.5 - 0.42 * ph : 0.1 + 0.4 * ph;
+            y = pulse(p[0], w, dt);
+          } else if (prog <= 25) {                                                                   // .WAV +WAV WAV+ WAV*: noise frames around the wave
+            const wv = prog <= 17 ? 2 : prog <= 21 ? 4 : 5;
+            const q = (prog - 14) & 3;
+            const frame = (t / Math.max(1, len)) | 0;                                                // SPD periods since the trig
+            const noisy = q === 0 ? t < 0.006 * SR : q === 1 ? frame === 0 : q === 2 ? frame === 1 : frame === 1 || frame === 2;
+            if (noisy) { if (p[0] < dt) s[2] = v.noise() < 0 ? -1 : 1; y = s[2]; } else y = wave(p[0], wv, dt);
+          } else if (prog <= 28) {                                                                   // TBL1-3: a noise burst, then alternating waves
+            const tb = CHIP_TBL[prog - 25];
+            if (t < 0.006 * SR) { if (p[0] < dt) s[2] = v.noise() < 0 ? -1 : 1; y = s[2]; } else y = wave(p[0], tb[v.step % tb.length], dt);
+          } else y = pulse(p[0], clamp((prog - 28) / 100, 0.01, 0.99), dt);                          // P1 % .. P99 %
           y *= e[0]; e[0] *= k[2];
           G[i] = y * lev * 0.5;
         }
@@ -1397,8 +1473,9 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     if (v.sOn && v.sBuf) {
       const buf = v.sBuf, inc = v.sInc, end = v.sEnd, g = v.sGain, q = v.sQ;
       let pos = v.sPos;
+      const rev = inc < 0;
       for (let i = i0; i < i1; i++) {
-        if (pos >= end) { if (v.sLoop) pos = v.sStart + (pos - end); else { v.sOn = false; break; } }
+        if (rev ? pos <= end : pos >= end) { if (v.sLoop) pos = v.sStart + (pos - end); else { v.sOn = false; break; } }
         const ip = pos | 0, fr = pos - ip;
         let x = buf[ip] + (buf[ip + 1 < buf.length ? ip + 1 : ip] - buf[ip]) * fr;
         if (q) x = Math.round(x * q) / q;
@@ -1449,6 +1526,9 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       ic2 = 2 * v2 - ic2;
       let y = (m0 * x + m1 * v1 + m2 * v2) * amp;
       if (v.choke > 0) { y *= v.choke; v.choke -= 0.004; if (v.choke <= 0) { v.choke = 0; amp = 0; } }
+      if (v.dclArm) { v.dclArm = false; v.dcl = v.lastY - y; v.dclN = DECLICK_N; }
+      if (v.dclN > 0) { y += v.dcl * (v.dclN / DECLICK_N); v.dclN--; }
+      v.lastY = y;
       const l = y * gl, r = y * gr;
       oL[i] += l; oR[i] += r;
       if (ds) { dL[i] += l * ds; dR[i] += r * ds; }
@@ -1479,12 +1559,15 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     const fdb = clamp(E[FX_DEL_FDB], 0, 198) / 128;
     const pp = E[FX_DEL_X] > 0.5;
     const wid = clamp(E[FX_DEL_WID], -64, 63) / 63;
+    // X off: WID pans the (mono) repeats; X on: they alternate and WID sets how far
+    const panL = wid > 0 ? 1 - wid : 1, panR = wid < 0 ? 1 + wid : 1;
     const hpA = lpA(expT(E[FX_DEL_HPF], 15, 8000) * (E[FX_DEL_HPF] < 0.5 ? 0 : 1) + (E[FX_DEL_HPF] < 0.5 ? 5 : 0));
     const lpAc = lpA(E[FX_DEL_LPF] >= 126.5 ? 20000 : expT(E[FX_DEL_LPF], 300, 20000));
     const dov = clamp(E[FX_DIS_DOV], 0, 127) / 127;
     // DOV: a saturator in the loop with unity small-signal gain (FDB alone sets the repeat level); harder = more distortion, the return gets the make-up
     const dg = 0.6 + dov * 7, dInv = 1 / dg;
-    const vol = Math.pow(clamp(E[FX_DEL_VOL], 0, 127) / 127, 2) * 1.2 * (1 + dov * 1.5);
+    const trkLev = clamp(E[FX_TRK_LEV], 0, 127) / 100;
+    const vol = Math.pow(clamp(E[FX_DEL_VOL], 0, 127) / 127, 2) * 1.2 * (1 + dov * 1.5) * trkLev * trkLev;
     const toRev = Math.pow(clamp(E[FX_DEL_REV], 0, 127) / 127, 2);
     const max = this.dMax, L = this.dL, R = this.dR;
     let w = this.dW, time = this.dTime;
@@ -1504,16 +1587,21 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       // overdrive in the loop (DOV), always a soft limit so FDB > 127 builds up without exploding
       fl = tanhF(fl * dg) * dInv;
       fr2 = tanhF(fr2 * dg) * dInv;
-      const inL = dL[i], inR = dR[i];
-      if (pp) { L[w] = (inL + inR) * 0.5 + fr2 * fdb; R[w] = fl * fdb; }
-      else { L[w] = inL + fl * fdb; R[w] = inR + fr2 * fdb; }
+      const inM = (dL[i] + dR[i]) * 0.5;
+      let ol, or;
+      if (pp) {
+        // ping-pong: in to the left line, each repeat crosses over
+        L[w] = inM + fr2 * fdb; R[w] = fl * fdb;
+        const mid = (yl + yr) * 0.5, side = (yl - yr) * 0.5 * wid;
+        ol = (mid + side) * vol; or = (mid - side) * vol;
+      } else {
+        L[w] = inM + fl * fdb; R[w] = 0;
+        ol = yl * panL * vol; or = yl * panR * vol;
+      }
       w++; if (w >= max) w = 0;
-      // output with stereo width (M/S)
-      const mid = (yl + yr) * 0.5, side = (yl - yr) * 0.5 * wid;
-      const ol = (mid + side) * vol, or = (mid - side) * vol;
       outL[i] += ol; outR[i] += or;
       if (toRev) { revL[i] += ol * toRev; revR[i] += or * toRev; }
-      energy += Math.abs(yl) + Math.abs(inL);
+      energy += Math.abs(yl) + Math.abs(yr) + Math.abs(inM);
     }
     this.dW = w; this.dTime = time;
     this.dHpL = Math.abs(hpL) < 1e-20 ? 0 : hpL; this.dHpR = Math.abs(hpR) < 1e-20 ? 0 : hpR;
@@ -1591,7 +1679,13 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         if (v.track >= 0 && v.active) { lv[v.track] = Math.min(1, v.peak * 1.6); sounding = true; }
         v.peak *= 0.25;
       }
-      if (sounding || this.anyActive) this.port.postMessage({ t: 'lv', lv });
+      const fd = Math.round(this.fxEff[FX_LFO_DST]);
+      const rv = fd >= 10 && fd <= 16 && this.fxEff[FX_LFO_DEP] ? FX_LFO_DEST_IDX[fd] : -1;
+      if (sounding || this.anyActive || rv >= 0) {
+        const msg = this.lvMsg;
+        msg.rv = rv; msg.rvv = rv >= 0 ? this.fxEff[rv] : 0;
+        this.port.postMessage(msg);
+      }
       this.anyActive = sounding;
     }
     return true;
@@ -1599,24 +1693,131 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
 }
 
 // ============================================================================
-// Master: analog distortion and compressor (rytm-mods compressor-hardware.md)
+// Master: analog distortion and compressor
+//
+// A calibrated model of the hardware (rytm-mods mod 0006: compressor-model.md,
+// calibration.toml and the measurements in compressor-hardware.md, OS 1.73):
+//   distortion  DIST gain table, then an order-12 soft clipper at about
+//               0.68 / 0.72 of full scale (it is there even at AMT 0); SYM is a
+//               bias before it and a gain after it (17-point tables)
+//   detector    two first-order sections per side for SEQ (fitted to the
+//               hardware's sidechain response), max(|L|, |R|), a peak
+//               follower with a 5 ms fall, at half the sample rate
+//   curve       GR = slope * w * softplus((L - T) / w), T = knee + 0.955 dB a
+//               THR step, per stored RAT (the labels 1:2 .. MAX run against
+//               the behaviour: stored 0 compresses hardest)
+//   ballistics  slow-attack scale from ATK, REL and RAT; attack a pole,
+//               release a proportional fall per 32-sample block
+//   output      MUP about 0.6 dB a step to 48 then flattening to +40 dB;
+//               MIX a linear crossfade; VOL scales the dry path by the
+//               measured table and the wet path 1.95 dB per dB
 // ============================================================================
 
-const COMP_ATK_MS = [0.03, 0.1, 0.3, 1, 3, 10, 30];
-const COMP_REL_S = [0.1, 0.2, 0.4, 0.6, 1, 2, 0.4, 0.6];
-// Measured: stored RAT 0..3 (labelled 1:2, 1:4, 1:8, MAX) behave as about 10, 6, 3.5 and 2.5 : 1
-const COMP_RATIO = [10, 6, 3.5, 2.5];
-const COMP_VOL_TAB = [[0, -22], [40, -10.85], [52, -8.30], [64, -6.38], [76, -4.85], [88, -3.44], [100, -2.20], [112, -1.13], [124, -0.21], [127, 0]];
+const DIST_X = [0, 32, 64, 96, 127];
+const DIST_G = [1.0, 2.853, 4.534, 5.947, 7.127];
+const SAT_CP = 0.68, SAT_CN = 0.72;
+const SYM_BIAS = [0.7199, 0.4966, 0.4372, 0.396, 0.352, 0.2717, 0.1695, 0.0741, 0.0, -0.0821, -0.1599, -0.2592, -0.3479, -0.4139, -0.4662, -0.5353, -0.5988];
+/** SYM tables are at raw SYM 0, 8, .., 120 and 127 (display -64 .. +63) */
+const SYM_X = [0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127];
+const SYM_GAIN_DB = [-8.927, -8.114, -5.625, -3.508, -1.747, -0.94, -0.026, -0.43, 0.0, -0.42, -0.571, -0.919, -1.589, -2.867, -4.825, -7.143, -9.541];
+// SEQ sidechain: [pole Hz, zero Hz] for two sections, per OFF, LPF, HPF, HIT (designed at 24 kHz)
+const SC_SEC = [
+  [[21.0396, 81.1054], [7114.411, 7735.874]],
+  [[44.6039, 11759.917], [3366.864, 11760.0]],
+  [[458.9453, 75.2315], [9312.442, 11760.0]],
+  [[546.3291, 158.8602], [11760.0, 2159.736]],
+];
+const SC_LEVEL_DB = [0.0, -8.9111, 2.2171, 2.5194 + 1.36];
+const CMP_KNEE = [-55.8984375, -58.60546875, -64.7421875, -71.2109375];
+const CMP_WIDTH = [0.5, 0.5, 0.5, 1.8515625];
+const CMP_SLOPE = [0.7763671875, 0.738525390625, 0.6640625, 0.512451171875];
+const CMP_THR_STEP = 0.955322265625, CMP_CAP = 35.875, CMP_SILENCE = -70;
+const CMP_ATK_S = [0.00003, 0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03];
+const CMP_REL_Q16 = [964, 317, 206, 114, 57, 21, 263, 195];
+const CMP_COUPLING = [[0.588, 1.2406], [0.9948, 1.2406], [1.0296, 0.9205], [2.042, 0.789]];
+const CMP_REL_EFF = [0.084, 0.243, 0.412, 2.017, 6.937, 6.937, 0.171, 0.345];
+const CMP_SEQ_ATK_DB = [1.56, 0.0, 2.77, 3.47];
+const CMP_VOL_X = [0, 40, 52, 64, 76, 88, 100, 112, 124, 127];
+const CMP_DRY_DB = [-24, -10.85, -8.30, -6.38, -4.85, -3.44, -2.20, -1.13, -0.21, 0];
+const CMP_WMD_DB = [-23, -16.57, -14.18, -12.35, -10.86, -9.59, -8.42, -7.38, -6.34, -6.26];
+
+const interp = (xs, ys, x) => {
+  if (x <= xs[0]) return ys[0];
+  for (let i = 1; i < xs.length; i++) if (x <= xs[i]) return ys[i - 1] + (x - xs[i - 1]) / (xs[i] - xs[i - 1]) * (ys[i] - ys[i - 1]);
+  return ys[ys.length - 1];
+};
+/** order-12 soft clipper: unchanged below c/2, a hard-ish knee at c */
+function sat12(u) {
+  const c = u >= 0 ? SAT_CP : SAT_CN;
+  const a = (u < 0 ? -u : u) / c;
+  if (a < 0.5) return u;
+  const a2 = a * a, a4 = a2 * a2, a12 = a4 * a4 * a4;
+  return u * Math.pow(1 + a12, -1 / 12);
+}
+
+/** First-order section y = k x - k r x[-1] + P y[-1] with peak gain 1 */
+function scSection(fp, fz, fs) {
+  const P = Math.exp(-TWO_PI * Math.min(fp, fs * 0.49) / fs), r = Math.exp(-TWO_PI * Math.min(fz, fs * 0.49) / fs);
+  const dc = (1 - r) / (1 - P), ny = (1 + r) / (1 + P);
+  const k = 1 / Math.max(dc, ny);
+  const mag = f => { const w = TWO_PI * f / fs; return k * Math.sqrt((1 - 2 * r * Math.cos(w) + r * r) / (1 - 2 * P * Math.cos(w) + P * P)); };
+  return { k, kr: k * r, P, mag };
+}
 
 class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.p = new Float64Array(NFX);
-    this.p[FX_DIS_REV] = 1; this.p[FX_CMP_THR] = 105; this.p[FX_CMP_ATK] = 1; this.p[FX_CMP_REL] = 1;
-    this.p[FX_CMP_MUP] = 47; this.p[FX_CMP_RAT] = 3; this.p[FX_CMP_SEQ] = 1; this.p[FX_CMP_MIX] = 127; this.p[FX_CMP_VOL] = 127;
-    this.env = 0; this.scLo = 0; this.scHi = 0; this.scLo2 = 0; this.work = 0;
-    this.g = 1; this.gr = 0;
+    this.p[FX_DIS_REV] = 1; this.p[FX_CMP_THR] = 96; this.p[FX_CMP_REL] = 2; this.p[FX_CMP_SEQ] = 1; this.p[FX_CMP_VOL] = 64;
+    const fs2 = SR / 2;
+    // per SEQ: 2 sections, and the level offset (the cascade's 1 kHz loss against OFF's, plus the fitted level)
+    this.sec = SC_SEC.map(row => row.map(([fp, fz]) => scSection(fp, fz, fs2)));
+    const loss = this.sec.map(row => -20 * Math.log10(row[0].mag(1000) * row[1].mag(1000)));
+    this.scOff = this.sec.map((_, i) => loss[i] - loss[0] + SC_LEVEL_DB[i]);
+    // detector state per side: 2 sections x (x1, y1)
+    this.dz = new Float64Array(8);
+    this.pk = 0;
+    this.pkFall = Math.exp(-1 / (0.005 * fs2));
+    // the estimator's 32-sample block, run four times as often here so attacks land within 8 samples
+    this.blockN = Math.max(4, Math.round(8 * SR / 48000));
+    this.cnt = 0;
+    this.state = 0;      // gain reduction, dB
+    this.g = 1; this.gStep = 0; this.gTarget = 1;
+    this.idle = 0;
     this.port.onmessage = e => { const m = e.data; if (m && m.t === 'p') { if (m.all) this.p.set(m.all); else this.p[m.i] = m.v; } };
+  }
+
+  /** The gain-reduction demand and the output gain, once a block */
+  block(P) {
+    const rat = Math.round(clamp(P[FX_CMP_RAT], 0, 3));
+    const seq = Math.round(clamp(P[FX_CMP_SEQ], 0, 3));
+    const atkI = Math.round(clamp(P[FX_CMP_ATK], 0, 6));
+    const relI = Math.round(clamp(P[FX_CMP_REL], 0, 7));
+    const L = 20 * Math.log10(this.pk + 1e-12) + 3.01 + this.scOff[seq];
+    let demand = 0;
+    if (L > CMP_SILENCE) {
+      const T = CMP_KNEE[rat] + CMP_THR_STEP * (clamp(P[FX_CMP_THR], 0, 127) - 64);
+      const w = CMP_WIDTH[rat];
+      const x = (L - T) / w;
+      const sp = x > 30 ? x : Math.log1p(Math.exp(x));
+      demand = Math.min(CMP_SLOPE[rat] * w * sp, CMP_CAP);
+      // a slow attack settles at less reduction (scaled by ATK against REL, per ratio)
+      const C = CMP_COUPLING[rat][0], pw = CMP_COUPLING[rat][1], rel = CMP_REL_EFF[relI];
+      demand *= (1 + C * Math.pow(0.00003 / rel, pw)) / (1 + C * Math.pow(CMP_ATK_S[atkI] / rel, pw));
+      demand = Math.max(0, demand - CMP_SEQ_ATK_DB[seq] * atkI / 6);
+    }
+    let st = this.state;
+    if (demand > st) st += (demand - st) * (1 - Math.exp(-8 / (CMP_ATK_S[atkI] * 48000)));
+    else st = Math.max(demand, st - Math.max(st * CMP_REL_Q16[relI] / 262144, 1 / 1024));
+    this.state = st;
+    // output stage
+    const mup = clamp(P[FX_CMP_MUP], 0, 127);
+    const mupDb = mup <= 48 ? 0.6 * mup : 28.8 + 11.5 * (1 - Math.pow(1 - (mup - 48) / 79, 2));
+    const vol = clamp(P[FX_CMP_VOL], 0, 127);
+    const dryDb = interp(CMP_VOL_X, CMP_DRY_DB, vol);
+    const wetDb = dryDb + interp(CMP_VOL_X, CMP_WMD_DB, vol) + mupDb - st;
+    const mix = clamp(P[FX_CMP_MIX], 0, 127) / 127;
+    return (1 - mix) * Math.pow(10, dryDb / 20) + mix * Math.pow(10, wetDb / 20);
   }
 
   process(inputs, outputs) {
@@ -1632,76 +1833,59 @@ class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
     if (ctl && ctl.length >= MASTER_CH.length) for (let c = 0; c < MASTER_CH.length; c++) P[MASTER_CH[c]] = ctl[c][0];
     // idle: nothing coming in and the detector at rest
     let mx = 0;
-    if (dl) for (let i = 0; i < n; i += 2) { const a = Math.abs(dl[i]); if (a > mx) mx = a; }
-    if (el) for (let i = 0; i < n; i += 2) { const a = Math.abs(el[i]); if (a > mx) mx = a; }
-    if (vl) for (let i = 0; i < n; i += 2) { const a = Math.abs(vl[i]); if (a > mx) mx = a; }
-    if (mx < 1e-7 && this.env < 1e-6) { oL.fill(0); if (oR !== oL) oR.fill(0); return true; }
-    const amt = clamp(P[FX_DIS_AMT], 0, 127) / 127, sym = clamp(P[FX_DIS_SYM], -64, 63) / 64 * 0.8;
-    const dk = 1 + amt * amt * 22, dnorm = 1 / (1 + amt * 3.2), symOff = tanhF(sym * dk) ;
+    if (dl) for (let i = 0; i < n; i += 4) { const a = Math.abs(dl[i]) + Math.abs(dr[i]); if (a > mx) mx = a; }
+    if (el) for (let i = 0; i < n; i += 4) { const a = Math.abs(el[i]) + Math.abs(er[i]); if (a > mx) mx = a; }
+    if (vl) for (let i = 0; i < n; i += 4) { const a = Math.abs(vl[i]) + Math.abs(vr[i]); if (a > mx) mx = a; }
+    if (mx < 1e-7 && this.pk < 1e-6 && this.state < 0.01) {
+      if (++this.idle > 4) { oL.fill(0); if (oR !== oL) oR.fill(0); this.pk = 0; return true; }
+    } else this.idle = 0;
+    // distortion
+    const amt = clamp(P[FX_DIS_AMT], 0, 127);
+    const dg = interp(DIST_X, DIST_G, amt);
+    const symRaw = clamp(P[FX_DIS_SYM], -64, 63) + 64;
+    const bias = interp(SYM_X, SYM_BIAS, symRaw);
+    const symG = Math.pow(10, interp(SYM_X, SYM_GAIN_DB, symRaw) / 20);
+    const satB = sat12(bias);
+    const plain = bias === 0;
     const delPost = P[FX_DIS_DEL] > 0.5, revPost = P[FX_DIS_REV] > 0.5;
-    const thr = -0.9 * (105 - clamp(P[FX_CMP_THR], 0, 127));
-    const ratio = COMP_RATIO[Math.round(clamp(P[FX_CMP_RAT], 0, 3))];
-    const relIdx = Math.round(clamp(P[FX_CMP_REL], 0, 7));
-    const ka = Math.exp(-1 / (COMP_ATK_MS[Math.round(clamp(P[FX_CMP_ATK], 0, 6))] * 0.001 * SR));
-    const relBase = 0.45 * COMP_REL_S[relIdx];
+    // detector sections for this SEQ
     const seq = Math.round(clamp(P[FX_CMP_SEQ], 0, 3));
-    const mup = clamp(P[FX_CMP_MUP], 0, 127);
-    const mupDb = (m => (m <= 48 ? 0.6 * m : 28.8 + (m - 48) * (40.3 - 28.8) / 79))(mup) - 28.2;
-    const mix = clamp(P[FX_CMP_MIX], 0, 127) / 127;
-    const vol = clamp(P[FX_CMP_VOL], 0, 127);
-    let dryDb = 0;
-    for (let i = 1; i < COMP_VOL_TAB.length; i++) {
-      const a = COMP_VOL_TAB[i - 1], b = COMP_VOL_TAB[i];
-      if (vol <= b[0]) { dryDb = a[1] + (vol - a[0]) / (b[0] - a[0]) * (b[1] - a[1]); break; }
-    }
-    const dryG = Math.pow(10, dryDb / 20), wetVolG = Math.pow(10, dryDb * 1.95 / 20);
-    const aLo = 1 - Math.exp(-TWO_PI * 300 * INV_SR), aHi = 1 - Math.exp(-TWO_PI * 2500 * INV_SR), aLo2 = 1 - Math.exp(-TWO_PI * 120 * INV_SR);
-    const knee = 18;
-    let env = this.env, scLo = this.scLo, scHi = this.scHi, scLo2 = this.scLo2, work = this.work;
-    const useDist = amt > 0.001 || Math.abs(sym) > 0.001;
-    const rel = relIdx >= 6 ? relBase * (1 + this.work * (relIdx === 6 ? 4 : 1.5)) : relBase;
-    const kr = Math.exp(-1 / (rel * SR));
-    let g = this.g;
+    const s0 = this.sec[seq][0], s1 = this.sec[seq][1];
+    const z = this.dz;
+    const pkFall = this.pkFall;
+    let pk = this.pk, cnt = this.cnt;
+    let g = this.g, gStep = this.gStep;
     for (let i = 0; i < n; i++) {
       let l = dl ? dl[i] : 0, r = dr ? dr[i] : 0;
       const del = el ? el[i] : 0, delR = er ? er[i] : 0;
       const rev = vl ? vl[i] : 0, revR = vr ? vr[i] : 0;
       if (!delPost) { l += del; r += delR; }
       if (!revPost) { l += rev; r += revR; }
-      if (useDist) {
-        l = (tanhF((l + sym) * dk) - symOff) * dnorm * (1 + amt * 1.5);
-        r = (tanhF((r + sym) * dk) - symOff) * dnorm * (1 + amt * 1.5);
+      if (plain) { l = sat12(l * dg); r = sat12(r * dg); }
+      else { l = symG * (sat12(l * dg + bias) - satB); r = symG * (sat12(r * dg + bias) - satB); }
+      // detector at half rate: SEQ sections per side, then the louder side into the peak follower
+      if (i & 1) {
+        let a = s0.k * l - s0.kr * z[0] + s0.P * z[1]; z[0] = l; z[1] = a;
+        let b = s1.k * a - s1.kr * z[2] + s1.P * z[3]; z[2] = a; z[3] = b;
+        let c = s0.k * r - s0.kr * z[4] + s0.P * z[5]; z[4] = r; z[5] = c;
+        let d = s1.k * c - s1.kr * z[6] + s1.P * z[7]; z[6] = c; z[7] = d;
+        const det = Math.max(b < 0 ? -b : b, d < 0 ? -d : d);
+        pk = det > pk ? det : det + (pk - det) * pkFall;
       }
-      // detector: max(|L|,|R|) through the sidechain EQ
-      const s = Math.abs(l) > Math.abs(r) ? l : r;
-      scLo += aLo * (s - scLo); scHi += aHi * (s - scHi); scLo2 += aLo2 * (s - scLo2);
-      let det;
-      switch (seq) {
-        case 1: det = Math.abs(scLo) * 1.6; break;
-        case 2: det = Math.abs(s - scLo2); break;
-        case 3: det = Math.abs(s - scHi) * 1.6 + Math.abs(s) * 0.3; break;
-        default: det = Math.abs(s) + Math.abs(scLo2) * 0.6;
+      if (++cnt >= this.blockN) {
+        cnt = 0;
+        this.pk = pk;
+        const target = this.block(P);
+        gStep = (target - g) / this.blockN;
       }
-      // auto releases lengthen while the compressor works
-      env = det > env ? det + ka * (env - det) : det + kr * (env - det);
-      if ((i & 3) === 0) {
-        const lvl = 20 * Math.log10(env + 1e-9);
-        const over = lvl - thr;
-        let gr = 0;
-        if (over > -knee * 0.5) {
-          const soft = over >= knee * 0.5 ? over : (over + knee * 0.5) * (over + knee * 0.5) / (2 * knee);
-          gr = soft * (1 - 1 / ratio);
-        }
-        work += ((gr > 1 ? 1 : 0) - work) * 0.00008;
-        this.gr = gr;
-        g = dryG * (1 - mix) + Math.pow(10, (mupDb - gr) / 20) * wetVolG * mix;
-      }
+      g += gStep;
       l *= g; r *= g;
       if (delPost) { l += del; r += delR; }
       if (revPost) { l += rev; r += revR; }
       oL[i] = l; if (oR !== oL) oR[i] = r;
     }
-    this.env = env; this.scLo = scLo; this.scHi = scHi; this.scLo2 = scLo2; this.work = work; this.g = g;
+    for (let j = 0; j < 8; j++) if (Math.abs(z[j]) < 1e-20) z[j] = 0;
+    this.pk = pk; this.cnt = cnt; this.g = g; this.gStep = gStep;
     return true;
   }
 }
