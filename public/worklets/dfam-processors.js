@@ -45,6 +45,7 @@ const EDGE_ON = 1.5, EDGE_OFF = 1.0; // gate / trigger thresholds (volts)
 const DEDUPE = 0.0015;        // an event and an audio pulse closer than this are one pulse
 const FB_SAT = 2.4;           // ladder feedback saturation (lets self-oscillation reach ~VCO level)
 const TRIG_OUT_SEC = 0.001;   // TRIGGER output pulse width
+const EVENT_ORDER = { run: 0, 'aud-on': 0, 'aud-off': 0, adv: 1, 'button-adv': 1, trig: 2, 'button-trig': 2 };
 
 // Continuous knobs smoothed per sample (others jump)
 const SMOOTHED = [K_VCO1_FREQ, K_VCO2_FREQ, K_VCO1_EG, K_VCO2_EG, K_FM, K_VCO1_LEVEL, K_VCO2_LEVEL, K_NOISE_LEVEL, K_RES, K_VCF_EG, K_NOISE_VCF, K_VOLUME];
@@ -244,8 +245,10 @@ class DfamProcessor extends AudioWorkletProcessor {
   }
 
   push(time, ch, v) {
-    this.queue.push({ time, ch, v });
-    if (this.queue.length > 1) this.queue.sort((a, b) => a.time - b.time);
+    this.queue.push({ time, ch, v, o: EVENT_ORDER[ch] ?? 2 });
+    // In time order; at the same instant RUN, then ADVANCE / CLOCK, then TRIGGER, so one clock
+    // patched into ADV/CLOCK and TRIGGER plays the step it advances to (as the jacks do)
+    if (this.queue.length > 1) this.queue.sort((a, b) => a.time - b.time || a.o - b.o);
   }
 
   // --------------------------------------------------------------------------
@@ -276,7 +279,26 @@ class DfamProcessor extends AudioWorkletProcessor {
   clockPulse() {
     this.lastAdvAt = currentTime;
     this.advance();
+    this.seqOutputsNow();
     if (!this.patched[I_TRIG]) this.fire();
+  }
+
+  /**
+   * The PITCH and VELOCITY outputs change on the clock edge. Self-patches normally run one sample
+   * late; pass the new step's voltages through at once, so a patch such as PITCH -> VELOCITY fires
+   * each step's envelopes at that step's own level, not the previous step's.
+   */
+  seqOutputsNow() {
+    const routes = this.routes;
+    if (!routes.length) return;
+    const prev = this.prevOut, inV = this.inV;
+    const np = this.k[K_PITCH + this.step], nv = this.k[K_VEL + this.step] * 5;
+    for (let q = 0; q < routes.length; q++) {
+      const rt = routes[q];
+      if (rt[0] === O_PITCH) inV[rt[1]] += (np - prev[O_PITCH]) * rt[2];
+      else if (rt[0] === O_VEL) inV[rt[1]] += (nv - prev[O_VEL]) * rt[2];
+    }
+    prev[O_PITCH] = np; prev[O_VEL] = nv;
   }
 
   handleEvent(ev) {
@@ -393,12 +415,6 @@ class DfamProcessor extends AudioWorkletProcessor {
         for (let q = 0; q < SMOOTHED.length; q++) { const id = SMOOTHED[q]; s[id] += (k[id] - s[id]) * a; }
         this.cutLog += (cutTarget - this.cutLog) * a;
       }
-      const curPitch = k[K_PITCH + this.step];
-      if (this.seqPitch !== curPitch) {
-        this.seqPitch += (curPitch - this.seqPitch) * a;
-        if (Math.abs(curPitch - this.seqPitch) < 1e-6) this.seqPitch = curPitch;
-      }
-
       // ---- timed events: buttons, cables from other instruments, auditions ----
       while (this.queue.length && this.queue[0].time <= t) this.handleEvent(this.queue.shift());
 
@@ -415,16 +431,8 @@ class DfamProcessor extends AudioWorkletProcessor {
         this.uiDirty = true;
       }
 
-      // ---- TRIGGER jack: fires the envelopes without advancing ----
-      if (patched[I_TRIG]) {
-        const gv = inV[I_TRIG];
-        if (!this.trigHigh && gv > EDGE_ON) {
-          this.trigHigh = true;
-          if (Math.abs(t - this.lastTrigEvent) >= DEDUPE) { this.lastTrigAudio = t; this.fire(); }
-        } else if (this.trigHigh && gv < EDGE_OFF) this.trigHigh = false;
-      }
-
       // ---- clock: a cable in ADV/CLOCK replaces the internal clock ----
+      // (before the TRIGGER jack, so one pulse patched into both advances first and then plays the new step)
       const extClock = patched[I_ADV] && !this.audition;
       if (patched[I_ADV]) {
         const gv = inV[I_ADV];
@@ -445,6 +453,22 @@ class DfamProcessor extends AudioWorkletProcessor {
           if (this.phase >= 1) this.phase = 0;
           this.clockPulse();
         }
+      }
+
+      // ---- TRIGGER jack: fires the envelopes without advancing ----
+      if (patched[I_TRIG]) {
+        const gv = inV[I_TRIG];
+        if (!this.trigHigh && gv > EDGE_ON) {
+          this.trigHigh = true;
+          if (Math.abs(t - this.lastTrigEvent) >= DEDUPE) { this.lastTrigAudio = t; this.fire(); }
+        } else if (this.trigHigh && gv < EDGE_OFF) this.trigHigh = false;
+      }
+
+      // ---- the current step's PITCH (after the clock, so the outputs change on its edge) ----
+      const curPitch = k[K_PITCH + this.step];
+      if (this.seqPitch !== curPitch) {
+        this.seqPitch += (curPitch - this.seqPitch) * a;
+        if (Math.abs(curPitch - this.seqPitch) < 1e-6) this.seqPitch = curPitch;
       }
 
       // ---- envelopes ----

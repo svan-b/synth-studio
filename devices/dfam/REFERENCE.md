@@ -25,6 +25,9 @@ manual. The manual's preset pages are knob diagrams, and their exact positions c
 | K | Aftermarket "33-piece DFAM knob kit" listings (16 sequencer knobs and 17 others), plus a Moog-forum owner's cap sizes ("small" for the 16 step knobs, "mini" for the 3 mixer knobs) |
 | F | Forum reports (Moog forum, ModWiggler, Elektronauts, Gearspace), seen through search excerpts |
 | L | Positions in the first build of this twin, read from the manual's panel diagram (p.5) and patch-bay chart |
+| W | The manual's "Exploring the DFAM" walkthrough (p.8), quoted through search excerpts of a manual mirror: turn VCO 1 FREQUENCY "slowly to the left until you hear a nice, deep bass note repeating (somewhere between 10 and 11 O'clock)", VCO 1 EG AMOUNT to 3 o'clock ("the difference between a silly sound and a slamming kick drum"), VCO DECAY to 9 o'clock |
+| LMS | LoveMySwitches knob-upgrade guide and the aftermarket kit listings (Reverb): the stock mixer and sequencer controls are slim, black-coated pot shafts with a small painted indicator; the 19-piece kits cover exactly those 16 + 3 controls |
+| MSC | Moog support FAQ "How do I clock external gear to my DFAM?": the TRIGGER output "will output a pulse on every step regardless of PITCH/VELOCITY knob position" |
 
 ## Panel
 
@@ -33,10 +36,14 @@ manual. The manual's preset pages are knob diagrams, and their exact positions c
 - Left to right: VCO EG and VCO 1 / VCO 2 (two rows), the mixer column, the VCF, and the VCA. Below
   them on the left are the transport and the 8-step sequencer. The 24-jack patch bay sits on the
   right. **likely** (L, M).
-- Knob caps: there are 33 knobs. 14 are large (all main controls and TEMPO), the 3 mixer knobs are
-  the smallest, and the 16 sequencer knobs are small. **likely** (K). The twin's caps are 17.8 mm,
-  8.9 mm and 9.4 mm. These are *guesses*, kept at least 8 mm for touch, and all are drawn in the
-  silver Moog style the first build used.
+- Knobs: there are 33 controls. 14 have proper knob caps (all main controls and TEMPO). The other
+  19 - the 3 mixer controls and the 16 sequencer controls - have no caps: they are slim black
+  "stalks" (bare pot shafts with a painted line). **verified** (SOS: "its 16 knobless stalks rate as
+  poor in comparison to the other controls"; LMS; K: the 19-piece aftermarket kits cover exactly these
+  16 + 3). The twin draws the 14 caps 17.8 mm wide in the silver style of the first build (cap colour
+  not verified), and the 19 stalks as black shafts with a white line, 8.9 mm (mixer) and 9.4 mm
+  (sequencer) wide - wider than the hardware's ~6 mm shafts so they stay touchable (a **guess** at
+  size, not at style).
 - Printed legends are white on black. On this panel they are long ("VCO 1 EG AMOUNT"), so the twin
   prints them on two lines above each large knob. The line breaks are a **guess**.
 
@@ -52,7 +59,7 @@ spaced. Ranges are those of the hardware. "Twin" gives the value units used in `
 | VCO DECAY | VCO EG | row 1, far left (20, 18) | large | ~10 ms – 10 s decay of the pitch envelope; no effect when both EG AMOUNT knobs are at noon | 10–10000 ms, log | M, V | range **likely** (VCF DECAY is documented as 10 ms–10 s; V says "audio-rate to several seconds") |
 | SEQ PITCH MOD | VCO EG | row 1, between VCO DECAY and VCO 1 EG AMOUNT (36, 35) | 3-way toggle | UP: VCO 1&2 · CENTER: OFF (PITCH still at the jack) · DOWN: VCO 2 | 0/1/2 | M, V, bonedo review | **verified** |
 | VCO 1 EG AMOUNT | VCO EG | row 1 (52, 18) | large | bipolar, noon = 0; CW = pitch jumps up and falls, CCW = dips and rises | −100…+100 % | M, V | **verified** (range in octaves: guess, see below) |
-| VCO 1 FREQUENCY | VCO 1 | row 1 (84, 18) | large | ten-octave range (±5 octaves) | −5…+5 oct, noon = C3 | M, R | range **verified**; noon pitch **guess** |
+| VCO 1 FREQUENCY | VCO 1 | row 1 (84, 18) | large | ten-octave range (±5 octaves) | −5…+5 oct, noon = C3; the readout shows Hz | M, R, W | range **verified**; noon pitch **guess**, consistent with W (10–11 o'clock is about 30–60 Hz in the twin) |
 | (wave) VCO 1 | VCO 1 | right of VCO 1 FREQUENCY (104, 27) | 2-way toggle | UP: square · DOWN: triangle | SQR/TRI | V, R | **verified** |
 | 1→2 FM AMOUNT | VCOs | row 2, far left (20, 48) | large | linear FM of VCO 2 by VCO 1, clearest with sync off; sums with the 1→2 FM AMT jack | 0–100 % | V, M | **verified** (depth in modulation index: guess) |
 | HARD SYNC | VCOs | row 2, between the knobs (36, 64) | 2-way toggle | ON (VCO 2 resets to VCO 1) / OFF; VCO 2 may go quiet when set below VCO 1, especially on square | ON/OFF | V, M | function **verified**; which way is up: **guess** |
@@ -64,15 +71,15 @@ spaced. Ranges are those of the hardware. "Twin" gives the value units used in `
 
 | Printed label | Section | Position | Cap | Range | Twin | Source | Confidence |
 |---|---|---|---|---|---|---|---|
-| VCO 1 LEVEL | Mixer | top of the mixer column (124, 20) | small (mini) | off – full; square sounds louder than triangle | 0–100 % | V, K | **verified** |
-| NOISE / EXT LEVEL | Mixer | middle (124, 38) | small (mini) | white noise, or EXT AUDIO when patched | 0–100 % | V, M | **verified** |
-| VCO 2 LEVEL | Mixer | bottom (124, 56) | small (mini) | off – full | 0–100 % | V, K | **verified** |
+| VCO 1 LEVEL | Mixer | top of the mixer column (123, 20) | stalk | off – full; square sounds louder than triangle | 0–100 % | V, K | **verified** |
+| NOISE / EXT LEVEL | Mixer | middle (123, 38) | stalk | white noise, or EXT AUDIO when patched | 0–100 % | V, M | **verified** |
+| VCO 2 LEVEL | Mixer | bottom (123, 56) | stalk | off – full | 0–100 % | V, K | **verified** |
 
 ### VCF
 
 | Printed label | Section | Position | Cap | Range / positions | Twin | Source | Confidence |
 |---|---|---|---|---|---|---|---|
-| (mode) HP / LP | VCF | left of CUTOFF (140, 27) | 2-way toggle | UP: HP · DOWN: LP; both 4-pole (24 dB/oct) | HP/LP | V, R | **verified** |
+| (mode) HP / LP | VCF | left of CUTOFF (140.6, 27) | 2-way toggle | UP: HP · DOWN: LP; both 4-pole (24 dB/oct) | HP/LP | V, R | **verified** |
 | CUTOFF | VCF | row 1 (154, 18) | large | 20 Hz – 20 kHz | 20–20000 Hz, log | R, V | **verified** |
 | RESONANCE | VCF | row 1 (177, 18) | large | self-oscillates past ~3 o'clock in LP (a sine); HP scales differently | 0–100 % | V, M | **verified** |
 | VCF DECAY | VCF EG | row 2 (154, 48) | large | 10 ms – 10 s | 10–10000 ms, log | M (quoted) | **verified** |
@@ -95,8 +102,8 @@ spaced. Ranges are those of the hardware. "Twin" gives the value units used in `
 | TEMPO | Transport | (50, 78) | large | 0.7 Hz – 700 Hz, continuously variable; ignored while ADV/CLOCK is patched | 10.5–10500 BPM (16th-note steps), log | M (".7Hz to 700Hz"), V, SOS | **verified** |
 | RUN / STOP | Transport | (35, 96), with a red LED | push button | starts/stops from the current step | toggle | M, V | **verified** |
 | ADVANCE | Transport | (65, 96) | push button | moves one step (used to park on step 8 before starting) | momentary | MS, V | function **verified**; "does not fire the EGs": **likely** (V) |
-| PITCH 1–8 | Sequencer | top row of 8 (x 105–210, y 79) | small | −5 V … +5 V, "extremely wide"; right of centre adds to VCO FREQUENCY | −5…+5 V, shown in semitones | SOS, M, V | **verified** (1 V/oct internal routing: likely) |
-| VELOCITY 1–8 | Sequencer | bottom row of 8 (y 93) | small | 0–5 V; sets level (and a little decay) of all three EGs; 0 = silent step | 0–100 % | M (quoted), SOS, V | **verified** |
+| PITCH 1–8 | Sequencer | top row of 8 (x 105–210, y 79) | stalk | −5 V … +5 V, "extremely wide"; right of centre adds to VCO FREQUENCY | −5…+5 V, shown in semitones | SOS, M, V | **verified** (1 V/oct internal routing: likely) |
+| VELOCITY 1–8 | Sequencer | bottom row of 8 (y 93) | stalk | 0–5 V; sets level (and a little decay) of all three EGs; 0 = silent step | 0–100 % | M (quoted), SOS, V | **verified** |
 | 1 … 8 | Sequencer | step numbers above the pitch row | printed | – | – | L | **likely** |
 
 ### LEDs
@@ -133,8 +140,8 @@ outputs. Output labels are printed white-on-black (inverted). Twin signal conven
 | 6/3 | VCO 2 | out | ±5 V | VCO 2 (selected waveform) | V | **verified** |
 | 7/1 | TEMPO | in | ±5 V | sums with the TEMPO knob; the clock is a VCO, so this reaches audio rate (1 V/oct) | M (quoted), V, MS | **verified** (1 V/oct: likely) |
 | 7/2 | RUN / STOP | in | 0–5 V gate (10 V tolerant) | the sequencer plays while the gate is high | M (quoted), V | **verified** |
-| 7/3 | ADV / CLOCK | in | 0–5 V (10 V tolerant) | **normalled to the internal clock**: patched, TEMPO is ignored and each rising edge advances one step. Press RUN / STOP first: pulses play only while the sequencer runs | M (quoted), MS, F | **verified** (silent while stopped: likely, F) |
-| 8/1 | TRIGGER | out | 0–5 V, ~1 ms | the trigger that fires the EGs (clock normal or the TRIGGER jack) | V, M | **verified** |
+| 7/3 | ADV / CLOCK | in | 0–5 V (10 V tolerant) | **normalled to the internal clock**: patched, TEMPO is ignored and each rising edge advances one step. Press RUN / STOP first: pulses play only while the sequencer runs | M (quoted), MS, F | **verified** (silent while stopped: likely - a Moog-forum reply says it "advances only in run mode") |
+| 8/1 | TRIGGER | out | 0–5 V, ~1 ms | a pulse on every step, whatever the PITCH and VELOCITY knobs say (MSC). The twin sends the trigger that fires the EGs, so a cable in TRIGGER IN also drives it | V, M, MSC | every step **verified**; with TRIGGER IN patched: **guess** (V says "from sequencer clock") |
 | 8/2 | VELOCITY | out | 0–5 V | the current step's VELOCITY knob | V | **verified** |
 | 8/3 | PITCH | out | ±5 V | the current step's PITCH knob, live even with SEQ PITCH MOD off | V, SOS | **verified** |
 
@@ -166,12 +173,13 @@ outputs. Output labels are printed white-on-black (inverted). Twin signal conven
 | VCF EG AMOUNT full scale | ±6 octaves |
 | NOISE / VCF MOD full scale | 1 V/oct of the noise (±5 V) or of the VCF MOD jack |
 | 1→2 FM AMOUNT full scale | index 5 (deviation 5 × VCO 2 frequency, not through-zero) |
-| RESONANCE self-oscillation point | ~82 % of travel (k = 5·r, a 4-pole ladder oscillates at k = 4) |
+| RESONANCE self-oscillation point | ~80 % of travel, i.e. 3 o'clock (k = 5·r, a 4-pole ladder oscillates at k = 4; measured: silent at 80 %, a steady sine from 81 %) |
 | Decay CV scaling | +1 V doubles the decay time |
 | Mixer taper | audio taper (≈ level³) |
 | ADV / CLOCK while stopped | pulses are ignored (forum reports differ) |
 | PITCH 1–8 knob feel | the twin snaps to semitones (1/12 V), so steps can be tuned on a touch screen. The hardware knobs are continuous. Presets and cables may still use any voltage |
-| Analog drift | ±3 cents per VCO, slow random |
+| Analog drift | random wander toward ±3 cents per VCO; measured about ±1 cent over 250 ms windows |
+| Main output | AC-coupled (5 Hz), then an output rail: unity to 0.7 (3.5 V), a soft knee above, never reaching 1.0 (5 V, 0 dBFS). Typical patches never reach the knee; everything up peaks at −0.2 dBFS instead of the +4.7 dBFS it reached before |
 
 ## Presets
 
@@ -187,5 +195,12 @@ It", "Bring Tha Noise", "Kix & Popz", "Mother the Drummer", "Grapefruit and Hone
 *House of Electronicus* patch book ("Baroque As A Joke", "Deep Bounce", "Lo-Fi"). The DFAM-only
 designs inspired by those titles carry our own names, and their descriptions credit the original.
 The remaining presets are well-known community techniques. There are 38 presets in `presets.ts`,
-including the Init patch. Each one was rendered offline and played in the browser (a run of 2.5 s,
-measured at the master) to confirm that it makes sound. Master peaks sit between 0.35 and 0.6.
+including the Init patch.
+
+Levels: each preset was rendered offline with the worklet (its own pattern and TEMPO, RUN on, 6 s)
+and measured at the instrument output with BS.1770 integrated loudness. VOLUME is set so every
+preset sits at about −25 LUFS with transient peaks at or below about −3 dBFS. The spread is 4.3 LU
+(−27.4 to −23.1 LUFS; the very short rimshot, clap and snappy snare sit lowest to keep their peak
+headroom, and Init is the spec default). Before this the presets spanned 21.3 LU (−33.9 to
+−12.6 LUFS): they had been balanced by peak level, which says little about how loud a pattern
+sounds. Re-measure after editing a preset (devices/dfam/REVIEW.md).

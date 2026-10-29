@@ -19,8 +19,9 @@ const step = (n: number) => String(n);
 const VCO_NOON_HZ = 130.8128;
 const formatVcoFreq = (oct: number) => {
   const hz = VCO_NOON_HZ * Math.pow(2, oct);
-  if (hz >= 1000) return `${(hz / 1000).toFixed(2)} kHz`;
-  return `${hz >= 100 ? hz.toFixed(0) : hz.toFixed(1)} Hz`;
+  // No-break space: the readout must stay on one line under the knob
+  if (hz >= 1000) return `${(hz / 1000).toFixed(2)} kHz`;
+  return `${hz >= 100 ? hz.toFixed(0) : hz.toFixed(1)} Hz`;
 };
 
 /** Sequencer PITCH knobs: volts (1 V = 1 octave), shown in semitones so steps can be tuned by eye */
