@@ -20,6 +20,7 @@ import {
 } from '@/lib/sequencer/elektron';
 import { SEQ_TRACKS, SYNTH_BY_KEY, FX_BY_KEY, V, dest, tid, fxid } from './params';
 import { SOUND_BY_ID, type SoundDef, type SoundParams } from './sounds';
+import { withPatternArp } from './arp';
 
 // Note-length indices (NOTE_LENGTHS): steps -> index
 export const LEN = { s1: LEN_1_STEP, s1_5: 22, s2: 30, s3: 38, s4: 46, s6: 54, s8: 62, s12: 70, s16: 78, s32: 94 } as const;
@@ -176,7 +177,7 @@ function nightDrive(): Project {
   const bassL: Record<number, Locks> = {};
   const bassAt: Record<number, Partial<Step>> = {};
   for (let b = 0; b < 4; b++) {
-    bassL[b * 16 + 6] = { flt1_frq: 58, flt1_ovr: 40 };
+    bassL[b * 16 + 6] = { flt1_frq: 58, flt1_ovr: 20 };
     bassAt[b * 16 + 10] = { len: LEN.s1_5 };
   }
 
@@ -211,7 +212,7 @@ function nightDrive(): Project {
   ];
   const leadS = Array.from({ length: 64 }, (_, i) => (melody.some(m => m[0] === i) ? 'x' : '.')).join('');
   const leadAt: Record<number, Partial<Step>> = Object.fromEntries(melody.map(([s, , l]) => [s, { len: l }]));
-  const leadLocks: Locks = { arp_mod: 0, amp_dec: 80, amp_sus: 90, amp_rel: 56, flt1_frq: 82, flt1_dep: 14, amp_del: 84, amp_rev: 50, osc_vib: 18, osc_vfa: -20 };
+  const leadLocks: Locks = { amp_dec: 80, amp_sus: 90, amp_rel: 56, flt1_frq: 82, flt1_dep: 14, amp_del: 84, amp_rev: 50, osc_vib: 18, osc_vfa: -20 };
 
   const intro = pat('INTRO', 64, [
     { s: rep('..x...x...x...x.', 3) + '..x...x...x.x.xx', L: (() => { const L = drumsL(4, false); [56, 58, 60].forEach(s => (L[s] = HH)); L[62] = SN; L[63] = SN; return L; })(), at: { 63: { vel: 80 } } },
@@ -225,13 +226,14 @@ function nightDrive(): Project {
     { s: rep(stabBar, 4), n: stabNotes, len: LEN.s2, L: stabsL() },
     { s: rep('x...............', 4), n: arpNotes, len: LEN.s16, L: arpL() },
   ]);
-  const breakdown = pat('BREAK', 64, [
+  // the arpeggiator is a pattern setting: the break turns T4's off for the lead melody (manual p.43)
+  const breakdown = withPatternArp(pat('BREAK', 64, [
     null,
     { s: rep('x...............', 4), n: CHORDS.map(c => c.root - 12), len: LEN.s16, all: { flt1_frq: 50, amp_sus: 110, amp_dec: 96, amp_rel: 60, flt1_dep: 4 } },
     { s: rep('x...............', 4), n: CHORDS.map(c => c.stab), len: LEN.s16, L: padL(70) },
     { s: leadS, n: melody.map(m => m[1]), all: leadLocks, at: leadAt },
-  ]);
-  const drop = pat('DROP', 64, [
+  ]), 3, { arp_mod: 0 });
+  const drop = withPatternArp(pat('DROP', 64, [
     { s: rep('xxxxx.xxxxxxx.xx', 4), L: (() => {
       const L: Record<number, Locks> = {};
       for (let b = 0; b < 4; b++) {
@@ -246,14 +248,14 @@ function nightDrive(): Project {
       for (let b = 0; b < 4; b++) { at[b * 16 + 7] = { cond: '1:2' }; at[b * 16 + 11] = { micro: 4, vel: 80 }; at[b * 16 + 3] = { cond: '!1ST' }; }
       return at;
     })() },
-    { s: rep(bassBar, 4), n: bassNotes, L: (() => { const L: Record<number, Locks> = {}; for (let b = 0; b < 4; b++) { L[b * 16] = { flt1_frq: 52, flt1_ovr: 30 }; L[b * 16 + 6] = { flt1_frq: 64, flt1_ovr: 70, flt1_res: 90 }; } return L; })(), at: bassAt },
+    { s: rep(bassBar, 4), n: bassNotes, L: (() => { const L: Record<number, Locks> = {}; for (let b = 0; b < 4; b++) { L[b * 16] = { flt1_frq: 52, flt1_ovr: 15 }; L[b * 16 + 6] = { flt1_frq: 64, flt1_ovr: 35, flt1_res: 90 }; } return L; })(), at: bassAt },
     { s: rep('..x..x.x..x..x..', 4), n: CHORDS.flatMap(c => [c.stab, c.stab, c.stab, c.stab, c.stab]), len: LEN.s2, L: (() => {
       const L: Record<number, Locks> = {};
       CHORDS.forEach((c, b) => [2, 5, 7, 10, 13].forEach(s => (L[b * 16 + s] = { osc2_tun: c.third, flt1_frq: s === 13 ? 76 : 64 })));
       return L;
     })() },
-    { s: rep('x...............', 4), n: arpNotes, len: LEN.s16, L: arpL(b => ({ arp_rng: 3, ...(b === 3 ? { arp_spd: 3 } : {}), flt1_frq: 76 })) },
-  ]);
+    { s: rep('x...............', 4), n: arpNotes, len: LEN.s16, L: arpL(() => ({ flt1_frq: 76 })) },
+  ]), 3, { arp_rng: 3 });
   return project(
     { A01: intro, A02: groove, A03: breakdown, A04: drop },
     {
@@ -282,7 +284,7 @@ function acid(): Project {
   const clap = { s: '....x.......x...' };
   const a1 = pat('ACID 1', 16, [{ s: line1, n: notes1, at: at1, L: L1 }, kick, hats, clap]);
   // filter rising over the pattern with parameter slides, more resonance
-  const a2 = pat('ACID 2', 16, [{ s: line1, n: notes1, at: at1, L: { 0: { flt1_frq: 44 }, 4: { flt1_frq: 50 }, 8: { flt1_frq: 58, flt1_res: 112, flt1_ovr: 70 }, 12: { flt1_frq: 66, flt1_res: 118, flt1_ovr: 86 } } }, kick, { s: 'x.x.x.x.x.x.x.xx', at: { 1: { vel: 50 }, 3: { vel: 50 } } }, clap]);
+  const a2 = pat('ACID 2', 16, [{ s: line1, n: notes1, at: at1, L: { 0: { flt1_frq: 44 }, 4: { flt1_frq: 50 }, 8: { flt1_frq: 58, flt1_res: 112, flt1_ovr: 35 }, 12: { flt1_frq: 66, flt1_res: 118, flt1_ovr: 43 } } }, kick, { s: 'x.x.x.x.x.x.x.xx', at: { 1: { vel: 50 }, 3: { vel: 50 } } }, clap]);
   const a3 = pat('ACID 3', 16, [{ s: line2, n: notes2, at: at2, L: { 12: { flt1_frq: 70, flt1_res: 118 } } }, kick, hats, { s: '....x.......x..x', at: { 15: { cond: 'FILL' } } }]);
   const brk = pat('BREAK', 16, [{ s: line2, n: notes2, at: at2, all: { flt1_frq: 40, amp_del: 60 } }, null, hats, null]);
   return project({ A01: a1, A02: a2, A03: a3, A04: brk }, {
@@ -357,11 +359,11 @@ function arps(): Project {
   const chordNotes = [60, 57, 53, 55];
   const third = [4, 3, 4, 4];
   const arpA = { s: rep('x...............', 4), n: chordNotes, len: LEN.s16, L: Object.fromEntries(third.map((t, b) => [b * 16, { arp_n2: t }])) };
-  const arpB = { s: rep('x.......x.......', 4), n: chordNotes.flatMap(n => [n + 12, n + 12]), len: LEN.s8, L: Object.fromEntries(third.flatMap((t, b) => [[b * 16, { arp_n2: t }], [b * 16 + 8, { arp_n2: t, arp_mod: 3 }]])) };
+  const arpB = { s: rep('x.......x.......', 4), n: chordNotes.flatMap(n => [n + 12, n + 12]), len: LEN.s8, L: Object.fromEntries(third.flatMap((t, b) => [[b * 16, { arp_n2: t }], [b * 16 + 8, { arp_n2: t + 3 }]])) };
   const pad = { s: rep('x...............', 4), n: chordNotes.map(n => n - 12), len: LEN.s16, L: Object.fromEntries(third.map((t, b) => [b * 16, { osc2_tun: 12 + t }])) };
   const kick = { s: rep('x...x...x...x...', 4) };
   const a = pat('GARDEN', 64, [arpA, null, pad, null]);
-  const b = pat('GARDEN FULL', 64, [arpA, arpB, pad, kick]);
+  const b = withPatternArp(pat('GARDEN FULL', 64, [arpA, arpB, pad, kick]), 1, { arp_mod: 3 });
   return project({ A01: a, A02: b }, { song: [{ pattern: 'A01', repeats: 2 }, { pattern: 'A02', repeats: 4 }], songName: 'ARP GARDEN', chain: ['A01', 'A02'] });
 }
 
@@ -382,7 +384,7 @@ export const KITS: KitDef[] = [
     id: 'acid', name: 'Kit / Acid Workout', tempo: 126,
     desc: 'A transistor-pulse acid line with accents and slides, kick, hats and clap. Pattern 2 sweeps the filter with parameter slides.',
     tracks: [
-      { sound: 'bass-acid', p: { amp_del: 24 } },
+      { sound: 'bass-acid', p: { amp_del: 24, amp_vol: 84 } },
       { sound: 'drum-kick' },
       { sound: 'drum-hat' },
       { sound: 'drum-clap' },

@@ -78,7 +78,8 @@ Object.assign(controls, {
     manualReference: 'Manual - Sequencer, SWING menu', format: (v: number) => `${Math.round(v)}%`,
   },
   main_volume: {
-    type: 'knob', label: 'MAIN VOLUME', min: 0, max: 127, default: 100, step: 1, units: 'none',
+    // a pot; drawn like the panel's, with its mark and no printed scale (hence `endless`)
+    type: 'knob', label: 'MAIN VOLUME', min: 0, max: 127, default: 100, step: 1, units: 'none', endless: true,
     description: 'Level of the main and headphone outputs.', manualReference: `${MAN}, MAIN VOLUME`,
   },
   ...Object.fromEntries('abcdefghij'.split('').map((c, i) => [`perf_${c}`, {
@@ -103,8 +104,8 @@ Object.assign(controls, {
     description: 'The PARAMETER page shown on the screen and DATA ENTRY knobs. Pressing a lit key again opens its second page.', manualReference: `${MAN}, [PARAMETER] keys`,
   },
   kb_oct: {
-    type: 'switch', label: 'OCTAVE', options: ['-3', '-2', '-1', '0', '+1', '+2', '+3'], default: 4,
-    description: 'Octave of the keyboard ([OCT-] / [OCT+]): +1 puts middle C on the first key.', manualReference: `${MAN}, [OCT-/+]`,
+    type: 'switch', label: 'OCTAVE', options: ['-5', '-4', '-3', '-2', '-1', '0', '+1', '+2', '+3', '+4', '+5'], default: 5,
+    description: 'Octave of the keyboard ([OCT-] / [OCT+], or UP / DOWN): -5..+5, the OCTAVE LEDs show -3..+3. At 0 the first key plays C5 (MIDI 72).', manualReference: `${MAN}, [OCT-/+] (manual p.36)`,
   },
   trns: {
     type: 'knob', label: 'TRANSPOSE', min: -24, max: 24, default: 0, step: 1, units: 'semitones', bipolar: true,

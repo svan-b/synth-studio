@@ -28,32 +28,42 @@ import {
 } from '@/components/sequencer';
 import { C as SC, Frame, Group, Overlay, SeqButton, UI, lessonFocus, seqStateOf, viewPattern } from '@/components/sequencer/shared';
 import {
-  CHANGE_MODES, TRIG_CONDITIONS, asProject, clearPattern, copyPattern, formatLength, formatNote, getPattern, parsePatternId,
+  CHANGE_MODES, TRIG_CONDITIONS, asProject, clearPattern, copyPattern, formatLength, formatNote, getPattern, parsePatternId, setStep as setStepFn,
   pastePattern, patternHasContent, patternId, setActive, setChain, setChangeMode, setPlayMode, trackLength, updateSteps, withTrack,
   type Pattern, type Project, type Step,
 } from '@/lib/sequencer/elektron';
 import {
-  FX_TRACK, PAGE_TITLE, PERF_MACROS, SEQ_TRACKS, SYNTH_TRACKS, TRACK_NAMES, V, VIEWS, keyOfView, levelControl, pageFor,
+  CV_BY_KEY, FX_BY_KEY, FX_TRACK, PAGE_TITLE, PERF_MACROS, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS, TRACK_NAMES, V, VIEWS, keyOfView, levelControl, pageFor,
   pageSlots, controlFor, routeOf, trackKind, viewAfterPress, type ParamDef,
 } from './params';
-import { KEYS, PX_PER_MM, TRIGS, KEYBOARD, BLACK_KEYS, WHITE_OFFSETS, MODE_LEDS, OCT_LEDS, PAGE_LEDS } from './geometry';
+import { KEYS, PX_PER_MM, TRIGS, TRIG_LEGENDS, KEYBOARD, KB_KEY, KB_KEYS, MODE_LEDS, OCT_LEDS, PAGE_LEDS, LOGO } from './geometry';
 import { SOUNDS, SOUND_CATEGORIES, type SoundDef } from './sounds';
 import { KITS, KIT_PROJECT_IDS, kitValues, projectFor, soundTrackValues } from './kits';
 
 const TRACKS = SEQ_TRACKS;
 const k = PX_PER_MM;
+/** MIDI note of the first keyboard key at octave 0 */
+const KB_C1 = 72;
 
 // ----------------------------------------------------------------------------
-// Colours (MKII Black edition)
+// Colours (the 2020 black finish, from a top-down image of the unit)
 // ----------------------------------------------------------------------------
 
 export const COL = {
-  panel: '#15171b',
-  key: '#26282d',
-  keyEdge: '#0d0e10',
-  keyText: '#e9eaec',
-  legend: '#8e939b',
-  label: '#c9ccd1',
+  panel: '#161618',
+  key: '#2a2b2e',
+  keyEdge: '#0e0e10',
+  keyText: '#9b9ea4',     // a key's legend while its LED is off
+  keyBright: '#eceef0',
+  legend: '#9a9da2',      // printed legends
+  legendDim: '#7b7e84',   // the rear connector names
+  label: '#e4e6e9',       // the white half of the two-tone knob names
+  func: '#b9bbbf',        // the light grey FUNC key
+  legendWhite: '#d9dbdf', // the FX / CV page names under the PARAMETER keys
+  lightBlue: '#7fd6ff',   // a key whose secondary function is used
+  ledOff: '#3b1612',      // an unlit LED behind the panel
+  amber: '#ff7a3c',       // the strip LEDs (pattern mode, octave, pattern page)
+  trigOff: '#8f9298',     // a trig key's number with its LED off
   red: '#ff3020',
   green: '#25d366',
   yellow: '#ffc21a',
@@ -78,6 +88,7 @@ const UIK = {
   msg: 'a4msg',
   recDown: 'a4recDown',
   clip: 'a4clip',
+  trnsLock: 'a4trnsLock',
 } as const;
 
 const num = (v: ControlValue | undefined, d = 0) => (typeof v === 'number' ? v : typeof v === 'boolean' ? (v ? 1 : 0) : d);
@@ -120,7 +131,14 @@ function toggleKitMenu(ctx: CustomRenderContext, menu: 'pattern' | 'song' | 'cha
   ctx.setUi({ [UI.menu]: open ? null : menu, [UIK.menu]: null });
 }
 
-function toggleA4Menu(ctx: CustomRenderContext, menu: 'sound' | 'kit' | 'global') {
+/** The tempo you hear: the studio's while synced (the A4 then follows its clock), else the A4's own */
+function setTempo(ctx: CustomRenderContext, bpm: number) {
+  const st = useStudioStore.getState();
+  if (st.studio.sync[ctx.instance] !== false) st.setBpm(bpm);
+  ctx.setValue('tempo', Math.round(bpm));
+}
+
+function toggleA4Menu(ctx: CustomRenderContext, menu: 'sound' | 'kit' | 'global' | 'tempo' | 'swing') {
   const open = liveUi(ctx)[UIK.menu] === menu;
   ctx.setUi({ [UIK.menu]: open ? null : menu, [UI.menu]: null });
 }
@@ -141,8 +159,10 @@ interface KeyEnv {
 
 interface KeyDef {
   label: ReactNode;
-  /** FUNC legend printed under the key (grey, underlined) */
+  /** Legend printed under the key: its FUNC function (underlined) */
   sub?: string;
+  /** The legend under the key is not a FUNC function (not underlined): YES, NO, the arrows */
+  subPlain?: boolean;
   /** White legend rows under the PARAMETER keys (FX track page, CV track page) */
   rows?: [string, string];
   /** LED colour (null = off); dim factor 0..1 */
@@ -151,7 +171,7 @@ interface KeyDef {
   release?: (e: KeyEnv) => void;
   /** Is this the key a lesson step points at? */
   target?: (control: string | undefined, value: unknown) => boolean;
-  icon?: 'rec' | 'play' | 'stop' | 'up' | 'down' | 'left' | 'right';
+  icon?: 'rec' | 'play' | 'stop' | 'up' | 'down' | 'left' | 'right' | 'gear' | 'metronome' | 'chain' | 'song';
   aria: string;
 }
 
@@ -160,9 +180,11 @@ const pageKey = (name: string, label: string, rows: [string, string]): KeyDef =>
   rows,
   aria: `${label} parameter key`,
   led: e => {
+    if (lockedKeys(e.ctx).has(name)) return [COL.red, 1];
+    // the open page's key: white on its first page, dimmed white on the second (manual p.12)
     const kv = keyOfView(e.view);
     if (!kv || kv.key !== name || !pageFor(e.track, e.view)) return null;
-    return kv.second ? [COL.green, 1] : [COL.red, 1];
+    return kv.second ? [COL.white, 0.5] : [COL.white, 1];
   },
   press: e => {
     if (e.func) { setView(e.ctx, V.SOUND); useFunc(e.ctx); return; }
@@ -179,7 +201,7 @@ const viewKey = (name: 'ARP' | 'NOTE' | 'PERF' | 'MIX' | 'TEMPO', label: string,
   label,
   sub,
   aria: `${label} key`,
-  led: e => (e.view === V[name] ? [COL.red, 1] : null),
+  led: e => (e.view === V[name] ? [COL.white, 1] : null),
   press: e => {
     if (e.func) { useFunc(e.ctx); if (funcFn) funcFn(e); return; }
     setView(e.ctx, V[name]);
@@ -187,15 +209,44 @@ const viewKey = (name: 'ARP' | 'NOTE' | 'PERF' | 'MIX' | 'TEMPO', label: string,
   target: (c, v) => c === 'page' && v === V[name],
 });
 
+const lastTrackPress = { t: -1, at: 0 };
+
+/** The held trig(s) of the active track, if any */
+function heldTrig(ctx: CustomRenderContext): { track: number; pattern: string; steps: number[]; first: Step | undefined } | null {
+  const u = ctx.ui;
+  const steps = Array.isArray(u[UI.heldSteps]) ? (u[UI.heldSteps] as number[]) : [];
+  if (!steps.length || typeof u[UI.heldTrack] !== 'number') return null;
+  const track = u[UI.heldTrack] as number;
+  const pr = project(ctx);
+  const pattern = (u[UI.heldPattern] as string) ?? pr.active;
+  return { track, pattern, steps, first: getPattern(pr, pattern).tracks[track]?.steps[steps[0]] };
+}
+
+/** PARAMETER keys whose pages hold locks of the held trig (they light red, manual p.50) */
+function lockedKeys(ctx: CustomRenderContext): Set<string> {
+  const out = new Set<string>();
+  const h = heldTrig(ctx);
+  if (!h?.first?.locks) return out;
+  for (const key of Object.keys(h.first.locks)) {
+    const r = routeOf(`${h.track < SYNTH_TRACKS ? `t${h.track + 1}_` : h.track === FX_TRACK ? 'fx_' : 'cv_'}${key}`);
+    const kv = r && r.view >= 0 ? keyOfView(r.view) : null;
+    if (kv) out.add(kv.key);
+  }
+  return out;
+}
+
 const trackKey = (t: number): KeyDef => ({
   label: TRACK_NAMES[t],
-  sub: 'MUTE',
+  sub: 'Mute',
   aria: `Track ${TRACK_NAMES[t]}`,
   led: e => {
     const pat = getPattern(project(e.ctx), viewPattern(e.ctx, project(e.ctx)));
     const muted = !!e.ctx.values[`t${t + 1}_mute`] || !!pat.tracks[t]?.mute;
-    if (e.track === t) return muted ? [COL.red, 0.35] : [COL.red, 1];
-    return muted ? null : [COL.green, 0.55];
+    // red = active, yellow = active and muted, green = audible, dark = muted; with the FX or CV
+    // track active, the synth track the keyboard still plays is half-bright red (manual p.13, p.36)
+    if (e.track === t) return muted ? [COL.yellow, 1] : [COL.red, 1];
+    if (trackKind(e.track) !== 'synth' && e.ctx.engine.kbTrack === t) return [COL.red, 0.4];
+    return muted ? null : [COL.green, 0.7];
   },
   press: e => {
     if (e.func) {
@@ -207,20 +258,26 @@ const trackKey = (t: number): KeyDef => ({
       return;
     }
     e.ctx.setUi({ [UI.heldSteps]: [], [UI.trigEditor]: null });
+    const now = performance.now();
+    const twice = lastTrackPress.t === t && now - lastTrackPress.at < 380 && t < SYNTH_TRACKS;
+    lastTrackPress.t = t; lastTrackPress.at = now;
     e.ctx.setValue('track', t);
+    if (twice) toggleA4Menu(e.ctx, 'sound');
   },
   target: (c, v) => (c === 'track' && v === t) || c === `t${t + 1}_mute`,
 });
 
 function bankKey(b: number): KeyDef {
   const letter = 'ABCDEFGH'[b];
-  const subs = ['', '', '', '', 'TRIG MUTE', 'ACCENT', 'NOTE SLD', 'PARAM SLD'];
+  const subs = ['', '', '', '', 'Trig Mute', 'Accent', 'Note Slide', 'Param Slide'];
   return {
     label: letter,
     sub: subs[b] || undefined,
     aria: `Bank ${letter}`,
     led: e => {
       const u = e.ctx.ui;
+      const h = b >= 5 ? heldTrig(e.ctx) : null;
+      if (h) return h.first?.[(['accent', 'slide', 'pslide'] as const)[b - 5]] ? [[COL.pink, COL.yellow, COL.cyan][b - 5], 1] : null;
       if (u[UIK.bank] === b) return [COL.red, 1];
       if (e.func && b >= 5) {
         const m = num(e.ctx.values.trig_mode);
@@ -249,6 +306,16 @@ function bankKey(b: number): KeyDef {
         say(e.ctx, cur === mode ? 'TRIGS' : ['', 'ACCENT: tap trigs to accent them', 'NOTE SLIDE: tap trigs to slide into them', 'PARAMETER SLIDE: tap trigs'][mode]);
         return;
       }
+      const h = b >= 4 ? heldTrig(e.ctx) : null;
+      if (h) {
+        if (b === 4) { say(e.ctx, 'TRIG MUTE: not modelled in the twin'); return; }
+        const flag = (['accent', 'slide', 'pslide'] as const)[b - 5];
+        const on = !h.first?.[flag];
+        e.ctx.updateData(d => updateSteps(asProject(d, TRACKS), h.pattern, h.track, h.steps, { [flag]: on ? true : null }, { create: false }));
+        e.ctx.setUi({ [UI.heldEdited]: true });
+        say(e.ctx, `${['ACCENT', 'NOTE SLIDE', 'PARAMETER SLIDE'][b - 5]} ${on ? 'ON' : 'OFF'}`, 1000);
+        return;
+      }
       const cur = liveUi(e.ctx)[UIK.bank];
       e.ctx.setUi({ [UIK.bank]: cur === b ? null : b, [UIK.qper]: false });
       if (cur !== b) say(e.ctx, `BANK ${letter}: CHOOSE PTN`, 1500);
@@ -259,13 +326,14 @@ function bankKey(b: number): KeyDef {
 
 const KEYDEFS: Record<string, KeyDef> = {
   GLOBAL: {
-    label: 'GLOBAL', sub: 'SAVE PROJECT', aria: 'Global settings',
+    label: '', icon: 'gear', sub: 'Save Project', aria: 'Global settings',
     led: e => (e.ctx.ui[UIK.menu] === 'global' ? [COL.red, 1] : null),
     press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'PROJECT SAVED (the studio keeps it)'); return; } toggleA4Menu(e.ctx, 'global'); },
   },
   QPER: {
-    label: 'QPER', sub: 'MUTE', aria: 'Quick performance',
-    led: e => (e.ctx.ui[UIK.qper] ? [COL.white, 1] : e.ctx.values.perf_mute ? [COL.red, 0.6] : null),
+    label: 'QPER', sub: 'Mute', aria: 'Quick performance',
+    // green while the performance macros act, dark while they are muted (manual p.27)
+    led: e => (e.ctx.ui[UIK.qper] ? [COL.white, 1] : e.ctx.values.perf_mute ? null : [COL.green, 0.75]),
     press: e => {
       if (e.func) { useFunc(e.ctx); const m = !e.ctx.values.perf_mute; e.ctx.setValue('perf_mute', m); say(e.ctx, m ? 'PERFORMANCE MACROS MUTED' : 'MACROS ON'); return; }
       const on = !liveUi(e.ctx)[UIK.qper];
@@ -274,27 +342,33 @@ const KEYDEFS: Record<string, KeyDef> = {
     },
     target: c => c === 'qper_sel' || c === 'perf_mute',
   },
-  TEMPO: viewKey('TEMPO', 'TEMPO', 'TAP TEMPO', e => {
-    const now = performance.now();
-    if (tapTimes.length && now - tapTimes[tapTimes.length - 1] > 2000) tapTimes.length = 0;
-    tapTimes.push(now);
-    if (tapTimes.length > 5) tapTimes.shift();
-    if (tapTimes.length >= 2) {
-      const span = (tapTimes[tapTimes.length - 1] - tapTimes[0]) / (tapTimes.length - 1);
-      const bpm = Math.round(Math.min(300, Math.max(30, 60000 / span)));
-      e.ctx.setValue('tempo', bpm);
-      say(e.ctx, `TAP ${bpm} BPM`, 1200);
-    } else say(e.ctx, 'TAP AGAIN', 1200);
-    e.ctx.setUi({ [UIK.func]: 'latched' }); // keep tapping
-  }),
+  TEMPO: {
+    label: '', icon: 'metronome', sub: 'Tap Tempo', aria: 'Tempo',
+    led: e => (e.ctx.ui[UIK.menu] === 'tempo' ? [COL.white, 1] : null),
+    press: e => {
+      if (!e.func) { toggleA4Menu(e.ctx, 'tempo'); return; }
+      const now = performance.now();
+      if (tapTimes.length && now - tapTimes[tapTimes.length - 1] > 2000) tapTimes.length = 0;
+      tapTimes.push(now);
+      if (tapTimes.length > 8) tapTimes.shift();
+      if (tapTimes.length >= 4) {
+        const span = (tapTimes[tapTimes.length - 1] - tapTimes[0]) / (tapTimes.length - 1);
+        const bpm = Math.round(Math.min(300, Math.max(30, 60000 / span)) * 10) / 10;
+        setTempo(e.ctx, bpm);
+        say(e.ctx, `TAP ${bpm.toFixed(1)} BPM`, 1200);
+      } else say(e.ctx, `TAP ${tapTimes.length}/4`, 1200);
+      e.ctx.setUi({ [UIK.func]: 'latched' }); // keep tapping
+    },
+    target: c => c === 'tempo',
+  },
   FUNC: { label: 'FUNC', aria: 'Function', press: () => undefined, target: () => false },
   KIT: {
-    label: 'KIT', sub: 'SAVE KIT', aria: 'Kit menu',
+    label: 'KIT', sub: 'Save Kit', aria: 'Kit menu',
     led: e => (e.ctx.ui[UIK.menu] === 'kit' ? [COL.red, 1] : null),
     press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'KIT SAVED (with the project)'); return; } toggleA4Menu(e.ctx, 'kit'); },
   },
   SND: {
-    label: 'SND', sub: 'SETTINGS', aria: 'Sound menu',
+    label: 'SND', sub: 'Settings', aria: 'Sound menu',
     led: e => (e.ctx.ui[UIK.menu] === 'sound' || e.view === V.SOUND || e.view === V.SOUND_2 ? [COL.red, 1] : null),
     press: e => {
       if (e.func) { useFunc(e.ctx); setView(e.ctx, viewAfterPress('SOUND', e.track, e.view)); return; }
@@ -302,32 +376,32 @@ const KEYDEFS: Record<string, KeyDef> = {
     },
     target: (c, v) => c === 'page' && (v === V.SOUND || v === V.SOUND_2),
   },
-  MIX: viewKey('MIX', 'MIX', 'POLY CONFIG', e => say(e.ctx, 'POLY CONFIG: each track keeps its own voice here')),
-  PERF: viewKey('PERF', 'PERF', 'SETUP', e => say(e.ctx, 'PERF SETUP: the macros are fixed; see the PERF page')),
+  MIX: viewKey('MIX', 'MIX', 'Poly Config', e => say(e.ctx, 'POLY CONFIG: each track keeps its own voice here')),
+  PERF: viewKey('PERF', 'PERF', 'Setup', e => say(e.ctx, 'PERF SETUP: the macros are fixed; see the PERF page')),
   TRK: {
-    label: 'TRK', sub: 'METRONOME', aria: 'Track menu',
+    label: 'TRK', sub: 'Metronome', aria: 'Track menu',
     led: e => (e.ctx.ui[UI.menu] === 'scale' ? [COL.red, 1] : null),
     press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'METRONOME: not modelled (use the studio click)'); return; } toggleKitMenu(e.ctx, 'scale'); },
   },
   PTN: {
-    label: 'PTN', sub: 'SWING', aria: 'Pattern menu',
+    label: 'PTN', sub: 'Swing', aria: 'Pattern menu',
     led: e => (e.ctx.ui[UI.menu] === 'pattern' ? [COL.red, 1] : null),
-    press: e => { if (e.func) { useFunc(e.ctx); toggleKitMenu(e.ctx, 'scale'); say(e.ctx, 'SWING is in the SCALE menu, and on the TEMPO page (knob B)'); return; } toggleKitMenu(e.ctx, 'pattern'); },
+    press: e => { if (e.func) { useFunc(e.ctx); toggleA4Menu(e.ctx, 'swing'); return; } toggleKitMenu(e.ctx, 'pattern'); },
     target: c => c === 'seq:menu:pattern',
   },
   SONG: {
-    label: 'SONG', sub: 'SAVE SONG', aria: 'Song menu',
+    label: 'SONG', sub: 'Save Song', aria: 'Song menu',
     led: e => (e.ctx.ui[UI.menu] === 'song' ? [COL.red, 1] : null),
     press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'SONG SAVED (with the project)'); return; } toggleKitMenu(e.ctx, 'song'); },
   },
-  YES: { label: 'YES', sub: 'SAVE', aria: 'Yes', press: e => { if (e.func) useFunc(e.ctx); closeMenus(e.ctx); } },
-  NO: { label: 'NO', sub: 'RELOAD', aria: 'No', press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'RELOAD: load the kit preset again'); return; } closeMenus(e.ctx); } },
+  YES: { label: 'YES', sub: 'Save', subPlain: true, aria: 'Yes', press: e => { if (e.func) useFunc(e.ctx); closeMenus(e.ctx); } },
+  NO: { label: 'NO', sub: 'Reload', subPlain: true, aria: 'No', press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'RELOAD: load the kit preset again'); return; } closeMenus(e.ctx); } },
   UP: { label: '', icon: 'up', aria: 'Up', press: e => arrow(e, 0, 1) },
   DOWN: { label: '', icon: 'down', aria: 'Down', press: e => arrow(e, 0, -1) },
-  LEFT: { label: '', icon: 'left', sub: 'TIME-', aria: 'Left', press: e => arrow(e, -1, 0) },
-  RIGHT: { label: '', icon: 'right', sub: 'TIME+', aria: 'Right', press: e => arrow(e, 1, 0) },
+  LEFT: { label: '', icon: 'left', sub: 'µTime -', subPlain: true, aria: 'Left', press: e => arrow(e, -1, 0), release: arrowUp },
+  RIGHT: { label: '', icon: 'right', sub: 'µTime +', subPlain: true, aria: 'Right', press: e => arrow(e, 1, 0), release: arrowUp },
   SONGMODE: {
-    label: 'SONG M', sub: 'EDIT SONG', aria: 'Song mode',
+    label: '', icon: 'song', sub: 'Edit Song', aria: 'Song mode',
     led: e => (project(e.ctx).mode === 'song' ? [COL.red, 1] : null),
     press: e => {
       if (e.func) { useFunc(e.ctx); toggleKitMenu(e.ctx, 'song'); return; }
@@ -339,7 +413,7 @@ const KEYDEFS: Record<string, KeyDef> = {
     target: c => c === 'seq:mode:song',
   },
   CHAIN: {
-    label: 'CHAIN', sub: 'NEW CHAIN', aria: 'Chain mode',
+    label: '', icon: 'chain', sub: 'New Chain', aria: 'Chain mode',
     led: e => (project(e.ctx).mode === 'chain' ? [COL.red, 1] : null),
     press: e => {
       if (e.func) { useFunc(e.ctx); e.ctx.updateData(d => setChain(asProject(d, TRACKS), [])); toggleKitMenu(e.ctx, 'chain'); say(e.ctx, 'NEW CHAIN: add patterns in order'); return; }
@@ -350,18 +424,19 @@ const KEYDEFS: Record<string, KeyDef> = {
     },
   },
   RECORD: {
-    label: '', icon: 'rec', sub: 'COPY', aria: 'Record',
+    label: '', icon: 'rec', sub: 'Copy', aria: 'Record',
     led: e => (e.ctx.values.live_rec ? [COL.red, 1] : e.ctx.values.rec ? [COL.red, 0.85] : null),
     press: e => {
       if (e.func) { useFunc(e.ctx); copyPaste(e, 'copy'); return; }
       e.ctx.setUi({ [UIK.recDown]: true });
+      if (e.ctx.values.live_rec) { e.ctx.setValue('live_rec', false); e.ctx.setValue('rec', true); say(e.ctx, 'GRID RECORDING'); return; }
       e.ctx.setValue('rec', !e.ctx.values.rec);
     },
     release: e => e.ctx.setUi({ [UIK.recDown]: false }),
     target: (c, v) => (c === 'rec' && typeof v === 'boolean') || c === 'live_rec',
   },
   PLAY: {
-    label: '', icon: 'play', sub: 'CLEAR', aria: 'Play',
+    label: '', icon: 'play', sub: 'Clear', aria: 'Play',
     led: e => (e.playing ? [COL.green, 1] : null),
     press: e => {
       if (e.func) { useFunc(e.ctx); copyPaste(e, 'clear'); return; }
@@ -372,12 +447,13 @@ const KEYDEFS: Record<string, KeyDef> = {
         say(e.ctx, 'LIVE RECORDING: play the keyboard');
         return;
       }
+      if (e.ctx.values.live_rec && e.playing) { e.ctx.setValue('live_rec', false); say(e.ctx, 'LIVE RECORDING OFF'); return; }
       e.ctx.setValue('play', !e.playing);
     },
     target: (c, v) => c === 'play' && v === true,
   },
   STOP: {
-    label: '', icon: 'stop', sub: 'PASTE', aria: 'Stop',
+    label: '', icon: 'stop', sub: 'Paste', aria: 'Stop',
     led: e => (!e.playing ? [COL.white, 0.5] : null),
     press: e => {
       if (e.func) { useFunc(e.ctx); copyPaste(e, 'paste'); return; }
@@ -386,44 +462,54 @@ const KEYDEFS: Record<string, KeyDef> = {
     },
     target: (c, v) => c === 'play' && v === false,
   },
-  ARP: viewKey('ARP', 'ARP', 'SETUP', e => setView(e.ctx, V.ARP)),
-  NOTE: viewKey('NOTE', 'NOTE', 'SETUP', e => setView(e.ctx, V.NOTE)),
-  OSC1: pageKey('OSC1', 'OSC 1', ['EXT IN', 'CV A']),
-  OSC2: pageKey('OSC2', 'OSC 2', ['', 'CV B']),
-  FLTR: pageKey('FLTR', 'FILTER', ['CHORUS', 'CV C']),
-  AMP: pageKey('AMP', 'AMP', ['DELAY', 'CV D']),
-  ENV: pageKey('ENV', 'ENV', ['REVERB', 'ENV']),
+  ARP: viewKey('ARP', 'ARP', 'Setup', e => setView(e.ctx, V.ARP)),
+  NOTE: viewKey('NOTE', 'NOTE', 'Setup', e => setView(e.ctx, V.NOTE)),
+  OSC1: pageKey('OSC1', 'OSC1', ['Ext In', 'CV A']),
+  OSC2: pageKey('OSC2', 'OSC2', ['', 'CV B']),
+  FLTR: pageKey('FLTR', 'FLTR', ['Chorus', 'CV C']),
+  AMP: pageKey('AMP', 'AMP', ['Delay', 'CV D']),
+  ENV: pageKey('ENV', 'ENV', ['Reverb', 'Env']),
   LFO: pageKey('LFO', 'LFO', ['LFO', 'LFO']),
   OCT_DOWN: {
     label: 'OCT-', aria: 'Octave down',
-    press: e => { const o = Math.max(0, num(e.ctx.values.kb_oct, 4) - 1); e.ctx.setValue('kb_oct', o); say(e.ctx, `OCTAVE ${o - 3 > 0 ? '+' : ''}${o - 3}`, 1000); },
-    target: (c, v) => c === 'kb_oct' && typeof v === 'number' && v < 4,
+    press: e => { const o = Math.max(0, num(e.ctx.values.kb_oct, 5) - 1); e.ctx.setValue('kb_oct', o); say(e.ctx, `OCTAVE ${o - 5 > 0 ? '+' : ''}${o - 5}`, 1000); },
+    target: (c, v) => c === 'kb_oct' && typeof v === 'number' && v < 5,
   },
   OCT_UP: {
     label: 'OCT+', aria: 'Octave up',
-    press: e => { const o = Math.min(6, num(e.ctx.values.kb_oct, 4) + 1); e.ctx.setValue('kb_oct', o); say(e.ctx, `OCTAVE ${o - 3 > 0 ? '+' : ''}${o - 3}`, 1000); },
-    target: (c, v) => c === 'kb_oct' && typeof v === 'number' && v > 4,
+    press: e => { const o = Math.min(10, num(e.ctx.values.kb_oct, 5) + 1); e.ctx.setValue('kb_oct', o); say(e.ctx, `OCTAVE ${o - 5 > 0 ? '+' : ''}${o - 5}`, 1000); },
+    target: (c, v) => c === 'kb_oct' && typeof v === 'number' && v > 5,
   },
   TRNS: {
-    label: 'TRNS', sub: 'LOCK', aria: 'Transpose',
-    led: e => (e.ctx.ui[UIK.trns] ? [COL.red, 1] : num(e.ctx.values.trns) !== 0 ? [COL.red, 0.45] : null),
+    label: 'TRNS', sub: 'Lock', aria: 'Transpose',
+    led: e => (e.ctx.ui[UIK.trnsLock] ? [COL.red, 1] : e.ctx.ui[UIK.trns] ? [COL.red, 0.8] : num(e.ctx.values.trns) !== 0 ? [COL.red, 0.35] : null),
     press: e => {
-      if (e.func) { useFunc(e.ctx); e.ctx.setValue('trns', 0); say(e.ctx, 'TRANSPOSE 0'); return; }
-      const on = !liveUi(e.ctx)[UIK.trns];
-      e.ctx.setUi({ [UIK.trns]: on });
-      if (on) say(e.ctx, `TRANSPOSE: PRESS A KEY (now ${num(e.ctx.values.trns) > 0 ? '+' : ''}${num(e.ctx.values.trns)})`, 2000);
+      if (e.func) {
+        useFunc(e.ctx);
+        const lock = !liveUi(e.ctx)[UIK.trnsLock];
+        e.ctx.setUi({ [UIK.trnsLock]: lock, [UIK.trns]: lock });
+        say(e.ctx, lock ? 'TRANSPOSE LOCK: THE KEYBOARD TRANSPOSES' : 'TRANSPOSE LOCK OFF', 1600);
+        return;
+      }
+      e.ctx.setUi({ [UIK.trns]: true });
+      say(e.ctx, `HOLD TRNS + A KEY (now ${num(e.ctx.values.trns) > 0 ? '+' : ''}${num(e.ctx.values.trns)})`, 1800);
     },
+    release: e => { if (!liveUi(e.ctx)[UIK.trnsLock]) e.ctx.setUi({ [UIK.trns]: false }); },
     target: c => c === 'trns',
   },
   T1: trackKey(0), T2: trackKey(1), T3: trackKey(2), T4: trackKey(3), FX: trackKey(4), CV: trackKey(5),
   FILL: {
-    label: 'FILL', sub: 'CUE FILL', aria: 'Fill',
+    label: 'FILL', sub: 'Cue Fill', aria: 'Fill',
     led: e => (seqStateOf(e.ctx.engine)?.fill ? [COL.red, 1] : null),
-    press: e => { if (e.func) { useFunc(e.ctx); e.ctx.sendEvent('seq:fill-cue'); say(e.ctx, 'FILL CUED for one cycle'); return; } e.ctx.sendEvent('seq:fill'); },
+    press: e => {
+      if (e.func) { useFunc(e.ctx); e.ctx.sendEvent('seq:fill-cue'); say(e.ctx, 'FILL CUED for one cycle'); return; }
+      if (e.ctx.values.rec) { say(e.ctx, 'FILL WORKS WITH GRID RECORDING OFF: PRESS REC', 1800); return; }
+      e.ctx.sendEvent('seq:fill');
+    },
     release: e => e.ctx.sendEvent('seq:fill:up'),
   },
   PAGE: {
-    label: 'PAGE', sub: 'SCALE', aria: 'Pattern page',
+    label: 'PAGE', sub: 'Scale', aria: 'Pattern page',
     press: e => {
       if (e.func) { useFunc(e.ctx); toggleKitMenu(e.ctx, 'scale'); return; }
       const pr = project(e.ctx);
@@ -462,15 +548,32 @@ function arrow(e: KeyEnv, dx: number, dy: number) {
     ctx.setUi({ [UI.heldEdited]: true });
     return;
   }
-  if (dy) {
-    ctx.setValue('track', Math.max(0, Math.min(TRACKS - 1, e.track - dy)));
+  if (dy && u[UIK.menu] === 'tempo') {
+    const st0 = useStudioStore.getState();
+    const cur = st0.studio.sync[ctx.instance] !== false ? st0.studio.bpm : num(ctx.values.tempo, 120);
+    setTempo(ctx, Math.max(30, Math.min(300, Math.round((cur + dy * 0.1) * 10) / 10)));
     return;
   }
-  const pr = project(ctx);
-  const len = trackLength(getPattern(pr, viewPattern(ctx, pr)), Math.min(e.track, TRACKS - 1));
-  const pages = Math.max(1, Math.ceil(len / 16));
-  const cur = Math.round(Number(ctx.ui[UI.stepPage]) || 0);
-  ctx.setUi({ [UI.stepPage]: (cur + dx + pages) % pages });
+  if (dy) {
+    const o = Math.max(0, Math.min(10, num(ctx.values.kb_oct, 5) + dy));
+    ctx.setValue('kb_oct', o);
+    say(ctx, `OCTAVE ${o - 5 > 0 ? '+' : ''}${o - 5}`, 900);
+    return;
+  }
+  const st = useStudioStore.getState();
+  const base = st.studio.sync[ctx.instance] !== false ? st.studio.bpm : num(ctx.values.tempo, 120);
+  tempoShift.base = base;
+  setTempo(ctx, Math.round(base * (dx > 0 ? 1.1 : 0.9) * 10) / 10);
+  say(ctx, `TEMPO SHIFT ${dx > 0 ? '+' : '-'}10%`, 900);
+}
+
+const tempoShift: { base: number | null } = { base: null };
+/** Releasing LEFT / RIGHT ends a tempo shift */
+function arrowUp(e: KeyEnv) {
+  if (tempoShift.base === null) return;
+  const b = tempoShift.base;
+  tempoShift.base = null;
+  setTempo(e.ctx, b);
 }
 
 /** [FUNC] + [REC] / [PLAY] / [STOP]: copy, clear, paste - the track in GRID RECORDING, else the pattern */
@@ -551,15 +654,30 @@ function keyFocus(ctx: CustomRenderContext, name: string, def: KeyDef, focusMode
   return { highlight: hit, dim: focusMode && anyFocus && !hit };
 }
 
-function Icon({ kind, color }: { kind: NonNullable<KeyDef['icon']>; color: string }) {
-  const s = 12;
+function Icon({ kind, color, size = 12 }: { kind: NonNullable<KeyDef['icon']>; color: string; size?: number }) {
+  const s = size;
+  const st = { fill: 'none', stroke: color, strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   switch (kind) {
-    case 'rec': return <svg width={s} height={s} viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.2" fill="none" stroke={color} strokeWidth="1.6" /></svg>;
-    case 'play': return <svg width={s} height={s} viewBox="0 0 12 12"><path d="M3 1.8 L10 6 L3 10.2 Z" fill="none" stroke={color} strokeWidth="1.6" strokeLinejoin="round" /></svg>;
-    case 'stop': return <svg width={s} height={s} viewBox="0 0 12 12"><rect x="2.3" y="2.3" width="7.4" height="7.4" fill="none" stroke={color} strokeWidth="1.6" /></svg>;
+    case 'rec': return <svg width={s} height={s} viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.2" {...st} strokeWidth={1.3} /></svg>;
+    case 'play': return <svg width={s} height={s} viewBox="0 0 12 12"><path d="M3.4 1.8 L10 6 L3.4 10.2 Z" {...st} strokeWidth={1.3} /></svg>;
+    case 'stop': return <svg width={s} height={s} viewBox="0 0 12 12"><rect x="2.4" y="2.4" width="7.2" height="7.2" rx="0.8" {...st} strokeWidth={1.3} /></svg>;
+    case 'gear': return (
+      <svg width={s} height={s} viewBox="0 0 12 12">
+        <circle cx="6" cy="6" r="1.7" {...st} strokeWidth={1.1} />
+        {Array.from({ length: 8 }, (_, i) => { const a = (i * Math.PI) / 4; return <line key={i} x1={6 + Math.cos(a) * 3.1} y1={6 + Math.sin(a) * 3.1} x2={6 + Math.cos(a) * 4.6} y2={6 + Math.sin(a) * 4.6} {...st} strokeWidth={1.3} />; })}
+        <circle cx="6" cy="6" r="3.2" {...st} strokeWidth={1} />
+      </svg>
+    );
+    case 'metronome': return <svg width={s} height={s} viewBox="0 0 12 12"><path d="M4.3 1.6 H7.7 L10 10.4 H2 Z" {...st} strokeWidth={1.1} /><path d="M6 8.6 L9.6 3" {...st} strokeWidth={1.1} /></svg>;
+    case 'chain': return <svg width={s} height={s} viewBox="0 0 12 12"><rect x="0.9" y="3.4" width="6" height="3.6" rx="1.8" {...st} strokeWidth={1.1} /><rect x="5.1" y="5" width="6" height="3.6" rx="1.8" {...st} strokeWidth={1.1} /></svg>;
+    case 'song': return (
+      <svg width={s} height={s} viewBox="0 0 12 12">
+        {[2.2, 5, 7.8, 10.6].map((y, i) => <g key={i}><line x1="1.4" y1={y} x2="3" y2={y} {...st} strokeWidth={1.2} /><line x1="4.6" y1={y} x2={i % 2 ? 8 : 10.6} y2={y} {...st} strokeWidth={1.2} /></g>)}
+      </svg>
+    );
     default: {
       const rot = { up: 0, right: 90, down: 180, left: 270 }[kind];
-      return <svg width={s} height={s} viewBox="0 0 12 12" style={{ transform: `rotate(${rot}deg)` }}><path d="M2.5 8 L6 4 L9.5 8" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+      return <svg width={s} height={s} viewBox="0 0 12 12" style={{ transform: `rotate(${rot}deg)` }}><path d="M2.3 8.2 L6 3.8 L9.7 8.2" {...st} strokeWidth={1.2} /></svg>;
     }
   }
 }
@@ -622,13 +740,16 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
     def.release?.({ ...env, func: funcActive(ctx) });
   };
 
-  const ledCol = lit ? lit[0] : null;
-  const amt = lit ? lit[1] : 0;
-  // FUNC has no LED. On the black (2020) finish it is a plain dark key like the others (the grey
-  // 2017 MKII had a green-grey cap); the ring shows a held / latched FUNC
-  const face = funcOn ? '#3a3d44' : down ? '#33363c' : COL.key;
-  const text = ledCol ? mix(COL.keyText, ledCol, 0.55 + 0.45 * amt) : COL.keyText;
-  const fs = name.startsWith('BANK') ? 12 : big ? 10 : 9.5;
+  // A key whose secondary function is being used lights up light blue (manual p.13)
+  const funcPress = down && !isFunc && !!def.sub && !def.subPlain && funcActive(ctx);
+  const led = funcPress ? ([COL.lightBlue, 1] as [string, number]) : lit;
+  const ledCol = led ? led[0] : null;
+  const amt = led ? led[1] : 0;
+  // FUNC: the light grey key (no LED); the ring shows a held / latched FUNC
+  const face = isFunc ? (funcOn ? '#d3d5d8' : COL.func) : down ? '#333438' : COL.key;
+  const text = isFunc ? '#3a3c40' : ledCol ? mix(COL.keyText, ledCol, 0.5 + 0.5 * amt) : COL.keyText;
+  const fs = name.startsWith('BANK') ? 10 : name === 'FUNC' ? 8.5 : big ? 10 : box.w >= 15 ? 8.5 : 7.5;
+  const iconSize = big ? 15 : 11;
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <button
@@ -643,32 +764,38 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
         onContextMenu={e => e.preventDefault()}
         className={highlight ? 'a4-target' : undefined}
         style={{
-          position: 'absolute', inset: 0, borderRadius: big ? 5 : 4, padding: 0, cursor: 'pointer',
-          background: ledCol ? `linear-gradient(180deg, ${mix(face, ledCol, 0.22 * amt)} 0%, ${mix(face, ledCol, 0.12 * amt)} 100%)` : `linear-gradient(180deg, ${face} 0%, ${mix(face, '#000000', 0.18)} 100%)`,
-          border: `1px solid ${ledCol ? mix(COL.keyEdge, ledCol, 0.7 * amt) : COL.keyEdge}`,
+          position: 'absolute', inset: 0, borderRadius: big ? 6 : 4.5, padding: 0, cursor: 'pointer',
+          background: ledCol
+            ? `linear-gradient(180deg, ${mix(face, ledCol, 0.1 * amt)} 0%, ${mix(mix(face, '#000000', 0.16), ledCol, 0.06 * amt)} 100%)`
+            : `linear-gradient(180deg, ${face} 0%, ${mix(face, '#000000', 0.16)} 100%)`,
+          border: `1px solid ${ledCol ? mix(COL.keyEdge, ledCol, 0.45 * amt) : COL.keyEdge}`,
           boxShadow: [
-            ledCol ? `0 0 ${3 + 7 * amt}px ${ledCol}${amt > 0.6 ? 'aa' : '55'}` : '0 2px 2px rgba(0,0,0,0.55)',
-            'inset 0 1px 0 rgba(255,255,255,0.07)',
+            '0 2px 2px rgba(0,0,0,0.6)',
+            isFunc ? 'inset 0 1px 0 rgba(255,255,255,0.35)' : 'inset 0 1px 0 rgba(255,255,255,0.06)',
+            ledCol ? `0 0 ${2 + 5 * amt}px ${ledCol}${amt > 0.6 ? '88' : '44'}` : '',
             funcOn ? '0 0 0 2px #e8eaee' : '',
           ].filter(Boolean).join(', '),
           transform: down ? 'translateY(1px)' : undefined,
           opacity: dim ? 0.3 : 1, transition: 'opacity 200ms',
-          color: text, fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 700, fontSize: fs, letterSpacing: 0.4,
+          color: text, fontFamily: '"Helvetica Neue", Arial, sans-serif', fontWeight: 600, fontSize: fs, letterSpacing: 0.3,
+          textShadow: ledCol && amt > 0.5 ? `0 0 4px ${ledCol}` : undefined,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           touchAction: 'none', WebkitTapHighlightColor: 'transparent', userSelect: 'none', WebkitUserSelect: 'none',
         }}
       >
-        {def.icon ? <Icon kind={def.icon} color={text} /> : def.label}
+        {def.icon ? <Icon kind={def.icon} color={text} size={iconSize} /> : isFunc ? <span style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>{def.label}</span> : def.label}
       </button>
       {(def.sub || def.rows) && (
-        <div style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', marginTop: 2.5, textAlign: 'center', whiteSpace: 'nowrap', pointerEvents: 'none', opacity: dim ? 0.3 : 1, lineHeight: '10px' }}>
+        <div style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', marginTop: 2.5, textAlign: 'center', whiteSpace: 'nowrap', pointerEvents: 'none', opacity: dim ? 0.3 : 1, lineHeight: '9.5px', fontFamily: '"Helvetica Neue", Arial, sans-serif' }}>
           {def.rows && (
             <>
-              <div style={{ fontSize: 8.5, fontWeight: 700, color: '#d8dade', minHeight: 10 }}>{def.rows[0] || ' '}</div>
-              <div style={{ fontSize: 8.5, fontWeight: 700, color: '#d8dade' }}>{def.rows[1]}</div>
+              <div style={{ fontSize: 7.5, fontWeight: 500, color: COL.legendWhite, minHeight: 9.5 }}>{def.rows[0] || ' '}</div>
+              <div style={{ fontSize: 7.5, fontWeight: 500, color: COL.legendWhite }}>{def.rows[1]}</div>
             </>
           )}
-          {def.sub && <div style={{ fontSize: 8.5, fontWeight: 700, color: COL.legend, textDecoration: 'underline', textUnderlineOffset: 2 }}>{def.sub}</div>}
+          {def.sub && (
+            <div style={{ fontSize: 8, fontWeight: 500, color: COL.legend, textDecoration: def.subPlain ? undefined : 'underline', textUnderlineOffset: 2.5 }}>{def.sub}</div>
+          )}
         </div>
       )}
     </div>
@@ -692,13 +819,17 @@ export function A4Styles() {
 // LED strips
 // ----------------------------------------------------------------------------
 
-function Dot({ on, color, x, y, label, labelBelow = true }: { on: number; color: string; x: number; y: number; label?: string; labelBelow?: boolean }) {
-  const d = 2.4 * k;
+function Dot({ on, color, x, y, label, labelBelow = true, underline = false, blink = false }: { on: number; color: string; x: number; y: number; label?: string; labelBelow?: boolean; underline?: boolean; blink?: boolean }) {
+  const d = 2 * k;
   return (
     <div style={{ position: 'absolute', left: x * k - d / 2, top: y * k - d / 2, width: d, height: d, pointerEvents: 'none' }}>
-      <div style={{ width: d, height: d, borderRadius: '50%', background: on > 0 ? color : '#2a2c30', opacity: on > 0 ? 0.35 + 0.65 * on : 1, boxShadow: on > 0 ? `0 0 ${4 + 6 * on}px ${color}` : 'inset 0 1px 1px rgba(0,0,0,0.8)' }} />
+      {/* an unlit LED still shows as a dark red dot behind the panel */}
+      <div
+        className={blink ? 'a4-blink' : undefined}
+        style={{ width: d, height: d, borderRadius: '50%', background: on > 0 ? color : COL.ledOff, opacity: on > 0 ? 0.45 + 0.55 * on : 1, boxShadow: on > 0 ? `0 0 ${3 + 5 * on}px ${color}` : 'inset 0 1px 1px rgba(0,0,0,0.7)' }}
+      />
       {label && (
-        <div style={{ position: 'absolute', left: '50%', [labelBelow ? 'top' : 'bottom']: '100%', transform: 'translateX(-50%)', marginTop: 2, fontSize: 8, fontWeight: 700, color: COL.label, whiteSpace: 'pre', textAlign: 'center', lineHeight: '9px' }}>
+        <div style={{ position: 'absolute', left: '50%', [labelBelow ? 'top' : 'bottom']: '100%', transform: 'translateX(-50%)', [labelBelow ? 'marginTop' : 'marginBottom']: 1.5, fontSize: 7.5, fontWeight: 500, color: COL.legend, whiteSpace: 'nowrap', textAlign: 'center', lineHeight: '9px', textDecoration: underline ? 'underline' : undefined, textUnderlineOffset: 2, fontFamily: '"Helvetica Neue", Arial, sans-serif' }}>
           {label}
         </div>
       )}
@@ -706,11 +837,14 @@ function Dot({ on, color, x, y, label, labelBelow = true }: { on: number; color:
   );
 }
 
+const MODE_NAMES = ['Sequential', 'Direct Start', 'Direct Jump', 'Temp Jump'];
+const OCT_NAMES = ['-3', '-2', '-1', '', '+1', '+2', '+3'];
+
 export function LedStrips({ ctx }: { ctx: CustomRenderContext }) {
   const pr = project(ctx);
   const st = seqStateOf(ctx.engine);
   const cm = CHANGE_MODES.indexOf(pr.changeMode);
-  const oct = Math.round(num(ctx.values.kb_oct, 4));
+  const oct = Math.round(num(ctx.values.kb_oct, 5)) - 5;
   const track = Math.max(0, Math.min(TRACKS - 1, Math.round(num(ctx.values.track))));
   const pat = viewPattern(ctx, pr);
   const len = trackLength(getPattern(pr, pat), track);
@@ -720,9 +854,14 @@ export function LedStrips({ ctx }: { ctx: CustomRenderContext }) {
   const playPage = playStep >= 0 ? Math.floor(playStep / 16) : -1;
   return (
     <div style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0 }}>
-      {MODE_LEDS.map((p, i) => <Dot key={`m${i}`} {...p} on={cm === i ? 1 : 0} color={COL.red} label={['SEQUENTIAL', 'DIRECT\nSTART', 'DIRECT\nJUMP', 'TEMP\nJUMP'][i]} labelBelow={false} />)}
-      {OCT_LEDS.map((p, i) => <Dot key={`o${i}`} {...p} on={oct === i ? 1 : 0} color={COL.red} label={['-3', '-2', '-1', '0', '+1', '+2', '+3'][i]} />)}
-      {PAGE_LEDS.map((p, i) => <Dot key={`p${i}`} {...p} on={i >= pages ? 0 : i === shown ? 1 : i === playPage ? 0.7 : 0.25} color={i === playPage && i !== shown ? COL.green : COL.red} label={`${i + 1}`} labelBelow={false} />)}
+      {/* PATTERN MODE: the LED above its (underlined, FUNC + BANK A-D) name */}
+      {MODE_LEDS.map((p, i) => <Dot key={`m${i}`} {...p} on={cm === i ? 1 : 0} color={COL.amber} label={MODE_NAMES[i]} underline />)}
+      {/* OCTAVE: -3 .. +3, the centre one unlabelled */}
+      {OCT_LEDS.map((p, i) => <Dot key={`o${i}`} {...p} on={Math.max(-3, Math.min(3, oct)) + 3 === i ? (Math.abs(oct) > 3 ? 0.4 : 1) : 0} color={COL.amber} label={OCT_NAMES[i] || undefined} />)}
+      {/* PATTERN PAGE: lit for the pattern's pages, full for the edited one, flashing for the playing one */}
+      {PAGE_LEDS.map((p, i) => (
+        <Dot key={`p${i}`} {...p} on={i >= pages ? 0 : i === shown ? 1 : 0.35} color={COL.amber} blink={i === playPage && pages > 1} label={`${i + 1}:4`} labelBelow={false} />
+      ))}
     </div>
   );
 }
@@ -738,7 +877,7 @@ export function MiniKeyboard({ ctx }: { ctx: CustomRenderContext }) {
   const f = lessonFocus(ctx);
   const target = !!f?.has('key:KB');
   const dim = !!(ctx.teaching && ctx.step && focusMode && (ctx.step.control || ctx.step.focus?.length) && !target && ctx.step.control !== 'kb_oct');
-  const oct = Math.round(num(ctx.values.kb_oct, 4)) - 3;
+  const oct = Math.round(num(ctx.values.kb_oct, 5)) - 5;
 
   const press = (offset: number, e: React.PointerEvent) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
@@ -756,7 +895,7 @@ export function MiniKeyboard({ ctx }: { ctx: CustomRenderContext }) {
     if (steps.length && typeof u[UI.heldTrack] === 'number' && trackKind(u[UI.heldTrack] as number) !== 'fx') {
       const track = u[UI.heldTrack] as number;
       const pat = (u[UI.heldPattern] as string) ?? project(ctx).active;
-      const note = Math.max(0, Math.min(127, 48 + 12 * oct + offset));
+      const note = Math.max(0, Math.min(127, KB_C1 + 12 * oct + offset));
       ctx.updateData(d => updateSteps(asProject(d, TRACKS), pat, track, steps, { note }, { create: 'note' }));
       ctx.setUi({ [UI.heldEdited]: true });
       say(ctx, `TRIG ${steps.map(s => s + 1).join(' ')}: NOTE ${formatNote(note)}`, 1100);
@@ -772,41 +911,35 @@ export function MiniKeyboard({ ctx }: { ctx: CustomRenderContext }) {
     setHeld(h => { const n = new Set(h); n.delete(off); return n; });
     ctx.sendEvent('kb:off', { offset: off });
   };
-  const W = KEYBOARD;
-  const keyStyle = (offset: number, black: boolean): CSSProperties => {
-    const on = held.has(offset);
-    return {
-      position: 'absolute', borderRadius: black ? 3 : 4, padding: 0, cursor: 'pointer', touchAction: 'none', userSelect: 'none', WebkitTapHighlightColor: 'transparent',
-      border: `1px solid ${black ? '#050505' : '#0f1012'}`,
-      background: black
-        ? (on ? `linear-gradient(180deg, #4a2a28, ${COL.red})` : 'linear-gradient(180deg, #1d1e21 0%, #0f1012 100%)')
-        : (on ? `linear-gradient(180deg, #d9dbe0 0%, #ffb3ad 100%)` : 'linear-gradient(180deg, #d4d7dc 0%, #b9bdc4 100%)'),
-      boxShadow: on ? `0 0 8px ${COL.red}` : black ? '0 2px 3px rgba(0,0,0,0.7)' : 'inset 0 -3px 0 rgba(0,0,0,0.18), 0 2px 2px rgba(0,0,0,0.5)',
-    };
-  };
-  const names = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C'];
+  // 13 discrete keys, sharps in the upper row, each with a slit LED (manual p.12)
   return (
     <div className={target ? 'a4-target' : undefined} style={{ position: 'relative', width: '100%', height: '100%', opacity: dim ? 0.3 : 1, borderRadius: 4 }} aria-label="Keyboard">
-      {WHITE_OFFSETS.map((off, i) => (
-        <button
-          key={`w${i}`}
-          type="button"
-          aria-label={`Key ${names[i]}${i === 7 ? ' (octave up)' : ''}`}
-          onPointerDown={e => press(off, e)} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release} onContextMenu={e => e.preventDefault()}
-          style={{ ...keyStyle(off, false), left: i * W.whitePitch * k, top: 0, width: W.whiteW * k, height: W.whiteH * k }}
-        >
-          <span style={{ position: 'absolute', bottom: 4, left: 0, right: 0, textAlign: 'center', fontSize: 8, fontWeight: 700, color: '#45484e' }}>{i === 0 ? `C${4 + oct - 1}` : ''}</span>
-        </button>
-      ))}
-      {BLACK_KEYS.map(b => (
-        <button
-          key={`b${b.slot}`}
-          type="button"
-          aria-label={`Key ${['C#', 'D#', '', 'F#', 'G#', 'A#'][b.slot]}`}
-          onPointerDown={e => press(b.offset, e)} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release} onContextMenu={e => e.preventDefault()}
-          style={{ ...keyStyle(b.offset, true), left: ((b.slot + 1) * W.whitePitch - W.blackW / 2 - (W.whitePitch - W.whiteW) / 2) * k, top: 0, width: W.blackW * k, height: W.blackH * k, zIndex: 2 }}
-        />
-      ))}
+      {KB_KEYS.map(kk => {
+        const on = held.has(kk.offset);
+        const left = (kk.x - KB_KEY.w / 2 - KEYBOARD.x) * k;
+        const top = (kk.y - KB_KEY.h / 2 - KEYBOARD.y) * k;
+        const note = KB_C1 + 12 * oct + kk.offset;
+        return (
+          <button
+            key={kk.offset}
+            type="button"
+            aria-label={`Key ${kk.name}${kk.offset === 12 ? ' (octave up)' : ''} (${formatNote(note)})`}
+            onPointerDown={e => press(kk.offset, e)} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release} onContextMenu={e => e.preventDefault()}
+            style={{
+              position: 'absolute', left, top, width: KB_KEY.w * k, height: KB_KEY.h * k, padding: 0, cursor: 'pointer',
+              borderRadius: 5, border: `1px solid ${COL.keyEdge}`, touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTapHighlightColor: 'transparent',
+              background: `linear-gradient(180deg, ${on ? '#36373b' : COL.key} 0%, ${on ? '#2a2b2f' : '#222326'} 100%)`,
+              boxShadow: '0 2px 2px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)',
+              transform: on ? 'translateY(1px)' : undefined,
+            }}
+          >
+            <span style={{
+              position: 'absolute', left: '50%', top: '50%', width: 2.2, height: 7.5, marginLeft: -1.1, marginTop: -3.75, borderRadius: 1.1,
+              background: on ? COL.red : '#cfd1d4', opacity: on ? 1 : 0.55, boxShadow: on ? `0 0 6px ${COL.red}` : undefined,
+            }} />
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -830,7 +963,7 @@ function Arc({ norm, bipolar, locked }: { norm: number; bipolar: boolean; locked
   const [xa, ya] = pt(0), [xb, yb] = pt(1);
   const [xn, yn] = pt(norm);
   return (
-    <svg width="18" height="16" viewBox="0 0 18 16" style={{ display: 'block', margin: '0 auto' }}>
+    <svg width="15" height="13" viewBox="0 0 18 16" style={{ display: 'block', margin: '0 auto' }}>
       <path d={`M ${xa} ${ya} A ${r} ${r} 0 1 1 ${xb} ${yb}`} fill="none" stroke={locked ? '#16181c' : '#39404d'} strokeWidth="2" />
       {Math.abs(norm - from) > 0.002 && <path d={`M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1}`} fill="none" stroke={locked ? '#050608' : OLED_ON} strokeWidth="2" />}
       <circle cx={xn} cy={yn} r="1.6" fill={locked ? '#050608' : OLED_ON} />
@@ -930,7 +1063,7 @@ export function Screen(props: PanelContext) {
           return (
             <div key={i} style={{ textAlign: 'center', width: 34 }}>
               <div style={{ height: 52, width: 10, margin: '0 auto', border: `1px solid ${OLED_DIM}`, position: 'relative' }}>
-                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${(v / 127) * 100}%`, background: muted ? OLED_DIM : OLED_ON }} />
+                <div style={{ position: 'absolute', inset: 0, transformOrigin: '50% 100%', transform: `scaleY(${v / 127})`, background: muted ? OLED_DIM : OLED_ON }} />
               </div>
               <div style={{ fontSize: 10, fontWeight: 700 }}>{TRACK_NAMES[i]}{muted ? ' M' : ''}</div>
             </div>
@@ -958,44 +1091,53 @@ export function Screen(props: PanelContext) {
       return (
         <div key={i} style={{ textAlign: 'center', minWidth: 0 }}>
           <Arc norm={slotNorm(p, v)} bipolar={!!p.bipolar} locked={false} />
-          <div style={{ fontSize: 9.5, color: OLED_DIM, letterSpacing: 0.3, lineHeight: '10px', fontWeight: 700 }}>{p.short}</div>
-          <div style={{ fontSize: 12.5, fontWeight: 700, lineHeight: '14px', whiteSpace: 'nowrap', overflow: 'hidden', color: locked ? '#050608' : OLED_ON, background: locked ? OLED_ON : 'transparent', borderRadius: 2, margin: '0 1px' }}>
+          <div style={{ fontSize: 8, color: OLED_DIM, letterSpacing: 0.2, lineHeight: '9px', fontWeight: 700 }}>{p.short}</div>
+          <div style={{ fontSize: 10.5, fontWeight: 700, lineHeight: '12px', whiteSpace: 'nowrap', overflow: 'hidden', color: locked ? '#050608' : OLED_ON, background: locked ? OLED_ON : 'transparent', borderRadius: 2, margin: '0 1px' }}>
             {txt}
           </div>
         </div>
       );
     };
     const s = pageSlots(page);
+    // NOTE page: TRC takes PRB's place while a trig is held (manual p.50)
+    if (heldOn && (page === 'note' || page === 'fxnote' || page === 'cvnote')) {
+      const cond = (trackKind(track) === 'synth' ? SYNTH_BY_KEY : trackKind(track) === 'fx' ? FX_BY_KEY : CV_BY_KEY).trig_cond;
+      if (cond) s[4] = cond;
+    }
     body = (
       <>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', marginTop: 3 }}>{s.slice(0, 5).map(cell)}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', marginTop: 3 }}>{s.slice(5).map(cell)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', marginTop: 2 }}>{s.slice(0, 5).map(cell)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', marginTop: 2 }}>{s.slice(5).map(cell)}</div>
       </>
     );
   }
 
-  const foot = msg || (heldOn ? `TRIG ${held.map(s => s + 1).join(',')} · TURN A KNOB TO LOCK` : trackKind(track) === 'cv' ? 'CV TRACK: SEQUENCED, NO OUTPUT JACKS' : view === V.OSC1 && trackKind(track) === 'fx' ? 'NO AUDIO INPUTS IN THE STUDIO' : '');
+  const note = msg || (heldOn ? `TRIG ${held.map(s => s + 1).join(',')}: TURN A KNOB TO LOCK` : trackKind(track) === 'cv' ? 'CV TRACK: NO OUTPUT JACKS HERE' : view === V.OSC1 && trackKind(track) === 'fx' ? 'NO AUDIO INPUTS IN THE STUDIO' : '');
+  const box = (inv: boolean): CSSProperties => ({ background: inv ? OLED_ON : 'transparent', color: inv ? '#050608' : OLED_ON, padding: '0 2px', borderRadius: 1.5 });
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', color: OLED_ON, fontFamily: '"Helvetica Neue", Arial, sans-serif', userSelect: 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'center', fontSize: 11, lineHeight: '13px', gap: 4 }}>
-        <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', fontWeight: 700 }}>{touched ? touched.name : kitName}</span>
-        <span>{bpm.toFixed(1)}</span>
-        <span style={{ minWidth: 18, textAlign: 'right' }}>{icon}</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', fontSize: 11, lineHeight: '14px', gap: 5, borderBottom: `1px solid ${OLED_DIM}`, paddingBottom: 1 }}>
-        <b style={{ background: OLED_ON, color: '#050608', padding: '0 3px', borderRadius: 2 }}>{TRACK_NAMES[track]}</b>
-        <b style={{ flex: 1 }}>{title}</b>
-        <span style={{ color: OLED_DIM }}>{songRow}</span>
-        <b>{shownPattern}</b>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', color: OLED_ON, fontFamily: '"Helvetica Neue", Arial, sans-serif', userSelect: 'none', WebkitUserSelect: 'none', position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', fontSize: 9.5, lineHeight: '11px', gap: 3, fontWeight: 700 }}>
+        <span style={{ ...box(true), flex: 1, whiteSpace: 'nowrap', overflow: 'hidden' }}>{touched ? touched.name : kitName}</span>
+        <span style={{ ...box(true), whiteSpace: 'nowrap' }}>{bpm.toFixed(1)} {icon}</span>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>{body}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, lineHeight: '12px' }}>
-        <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', color: msg ? '#050608' : OLED_DIM, background: msg ? OLED_ON : 'transparent', padding: msg ? '0 3px' : 0, borderRadius: 2 }}>{foot || ' '}</span>
-        {levelId && (
-          <span style={{ width: 36, height: 6, border: `1px solid ${OLED_DIM}`, position: 'relative' }} title="Track level">
-            <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(level / 127) * 100}%`, background: OLED_ON }} />
-          </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, lineHeight: '11px', fontWeight: 700 }}>
+        {note ? (
+          <span style={{ ...box(!!msg), flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', color: msg ? '#050608' : OLED_DIM }}>{note}</span>
+        ) : (
+          <>
+            <span style={box(true)}>{TRACK_NAMES[track]}</span>
+            <span style={{ color: OLED_DIM, whiteSpace: 'nowrap' }}>{title}</span>
+            {levelId && (
+              <span style={{ width: 30, height: 6, border: `1px solid ${OLED_DIM}`, position: 'relative' }} aria-label="Track level">
+                <span style={{ position: 'absolute', inset: 0, transformOrigin: '0 50%', transform: `scaleX(${level / 127})`, background: OLED_ON }} />
+              </span>
+            )}
+            <span style={{ flex: 1 }} />
+          </>
         )}
+        <span style={{ color: OLED_DIM }}>{songRow}</span>
+        <span style={box(true)}>{shownPattern}</span>
       </div>
     </div>
   );
@@ -1016,6 +1158,33 @@ function trigAreaDimmed(ctx: CustomRenderContext, focusMode: boolean): boolean {
   return !ids.some(id => /_trig_|^trig_mode$|_mute$|^seq:/.test(id));
 }
 
+/** The trig keys' look: a dark key, the number backlit in the LED colour over a short bar,
+ *  a printed frame round 1, 5, 9 and 13 (manual p.12). Restyles the kit's TrigKeys too. */
+function TrigStyles({ gap }: { gap: number }) {
+  return (
+    <style>{`
+.a4-trigs > div > div { gap: ${gap}px !important; }
+.a4-trigs [data-step] { border-radius: 6px !important; padding: 0 !important; }
+.a4-trigs [data-step] > span:first-child {
+  position: absolute !important; left: 0 !important; right: 0 !important; top: 50% !important; transform: translateY(-64%);
+  font-size: 15px !important; font-weight: 400 !important; line-height: 16px !important; text-align: center; color: inherit !important;
+}
+.a4-trigs [data-step]::after { content: ''; position: absolute; left: 36%; right: 36%; top: 67%; height: 2px; border-radius: 1px; background: currentColor; opacity: .9; }
+.a4-trigs [data-step]:nth-child(4n+1)::before { content: ''; position: absolute; left: 25%; right: 25%; top: 13%; bottom: 20%; border: 1px solid currentColor; border-radius: 2px; opacity: .55; }
+.a4-trigs.mode-trig [data-step] {
+  background: linear-gradient(180deg, #2c2d30 0%, #232427 100%) !important; border: 1px solid #111214 !important;
+  box-shadow: 0 2px 2px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06) !important; filter: none !important; color: ${COL.trigOff};
+}
+.a4-trigs.mode-trig [data-trig="note"] { color: ${COL.red} !important; text-shadow: 0 0 5px ${COL.red}; }
+.a4-trigs.mode-trig [data-trig="lock"] { color: ${COL.yellow} !important; text-shadow: 0 0 5px ${COL.yellow}; }
+.a4-trigs.mode-trig [data-playhead="1"] { color: #f2f3f5 !important; box-shadow: 0 0 0 2px rgba(242,243,245,.85), 0 0 8px rgba(255,255,255,.35) !important; }
+.a4-trigs.mode-trig [data-playhead="1"][data-trig="note"] { color: #ff8a80 !important; }
+.a4-trigs [data-held="1"] { box-shadow: 0 0 0 2px ${COL.amber} !important; }
+.a4-trigs [data-step][style*="cursor: default"] { opacity: .35 !important; }
+`}</style>
+  );
+}
+
 export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
   const focusMode = useFocusMode();
   const dim = trigAreaDimmed(ctx, focusMode);
@@ -1023,8 +1192,11 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
   const qper = !!ctx.ui[UIK.qper];
   const pr = project(ctx);
   const st = seqStateOf(ctx.engine);
+  const view = Math.round(num(ctx.values.page, V.OSC1));
+  const track = Math.max(0, Math.min(TRACKS - 1, Math.round(num(ctx.values.track))));
   const keyW = TRIGS.keyW * k;
   const pitch = TRIGS.pitch * k;
+  const chainHold = useRef<{ pointer: number; first: string; list: string[] } | null>(null);
   const dimStyle = { opacity: dim ? 0.35 : 1, transition: 'opacity 0.2s' } as const;
   const strip = (render: (i: number) => ReactNode) => (
     <div style={{ position: 'relative', width: '100%', height: '100%', ...dimStyle }}>
@@ -1032,63 +1204,180 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
       {Array.from({ length: 16 }, (_, i) => <div key={i} style={{ position: 'absolute', left: i * pitch, top: 0, width: keyW, height: '100%' }}>{render(i)}</div>)}
     </div>
   );
-  const keyBtn = (i: number, opts: { lit: string | null; amt?: number; label: string; sub?: string; blink?: boolean; outline?: boolean; onPress: () => void; aria: string }) => (
-    <button
-      type="button"
-      aria-label={opts.aria}
-      onPointerDown={e => { if (e.button !== 0 && e.pointerType === 'mouse') return; e.preventDefault(); e.stopPropagation(); opts.onPress(); }}
-      className={opts.blink ? 'a4-blink' : undefined}
-      style={{
-        position: 'absolute', inset: 0, borderRadius: 5, padding: 0, cursor: 'pointer', touchAction: 'none',
-        border: `${opts.outline ? 2 : 1}px solid ${opts.outline ? COL.white : COL.keyEdge}`,
-        background: opts.lit ? mix(COL.key, opts.lit, 0.25 + 0.6 * (opts.amt ?? 1)) : COL.key,
-        boxShadow: opts.lit ? `0 0 ${4 + 6 * (opts.amt ?? 1)}px ${opts.lit}` : '0 2px 2px rgba(0,0,0,0.55)',
-        color: opts.lit ? '#111' : COL.keyText, fontWeight: 800, fontSize: 11, fontFamily: '"Helvetica Neue", Arial, sans-serif',
-      }}
-    >
-      <span>{opts.label}</span>
-      {opts.sub && <span style={{ position: 'absolute', left: 2, right: 2, bottom: 2, fontSize: 8, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden' }}>{opts.sub}</span>}
-    </button>
-  );
+  const keyBtn = (i: number, opts: { lit: string | null; amt?: number; label: string; sub?: string; blink?: boolean; outline?: boolean; onPress: (e: React.PointerEvent) => void; onRelease?: (e: React.PointerEvent) => void; aria: string }) => {
+    const col = opts.lit ? mix(COL.trigOff, opts.lit, 0.35 + 0.65 * (opts.amt ?? 1)) : COL.trigOff;
+    return (
+      <button
+        type="button"
+        aria-label={opts.aria}
+        onPointerDown={e => { if (e.button !== 0 && e.pointerType === 'mouse') return; e.preventDefault(); e.stopPropagation(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* */ } opts.onPress(e); }}
+        onPointerUp={e => opts.onRelease?.(e)}
+        onPointerCancel={e => opts.onRelease?.(e)}
+        className={opts.blink ? 'a4-blink' : undefined}
+        style={{
+          position: 'absolute', inset: 0, borderRadius: 6, padding: 0, cursor: 'pointer', touchAction: 'none',
+          border: `1px solid ${opts.outline ? '#e8e9eb' : '#111214'}`,
+          background: 'linear-gradient(180deg, #2c2d30 0%, #232427 100%)',
+          boxShadow: `0 2px 2px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06)${opts.outline ? ', 0 0 0 1px #e8e9eb' : ''}`,
+          color: col, textShadow: opts.lit ? `0 0 5px ${opts.lit}` : undefined, fontFamily: '"Helvetica Neue", Arial, sans-serif',
+        }}
+      >
+        <span style={{ position: 'absolute', left: 0, right: 0, top: '22%', textAlign: 'center', fontSize: 14, fontWeight: 400, lineHeight: '15px' }}>{opts.label}</span>
+        <span style={{ position: 'absolute', left: '36%', right: '36%', top: '63%', height: 2, borderRadius: 1, background: col }} />
+        {opts.sub && <span style={{ position: 'absolute', left: 1, right: 1, bottom: 1.5, fontSize: 7, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'center', color: COL.trigOff }}>{opts.sub}</span>}
+      </button>
+    );
+  };
 
   if (typeof bank === 'number') {
+    // [BANK] + [TRIG]: pick a pattern. Keep the first trig held and press more: a quick chain (manual p.55)
     return strip(i => {
       const id = patternId(bank, i);
       const has = patternHasContent(pr.patterns[id]);
       const playing = st?.playing && st.pattern === id;
       const queued = st?.queued === id && !playing;
       return keyBtn(i, {
-        lit: playing ? COL.green : queued ? COL.yellow : has ? COL.red : null,
-        amt: playing || queued ? 1 : 0.5,
+        lit: playing ? COL.green : queued ? COL.yellow : pr.active === id ? COL.red : has ? COL.red : null,
+        amt: playing || queued || pr.active === id ? 1 : 0.45,
         label: `${i + 1}`,
         sub: pr.patterns[id]?.name || id,
         blink: queued,
-        outline: pr.active === id,
         aria: `Pattern ${id}${has ? '' : ' (empty)'}`,
-        onPress: () => {
+        onPress: e => {
+          const hold = chainHold.current;
+          if (hold && hold.pointer !== e.pointerId) {
+            hold.list.push(id);
+            ctx.updateData(d => setChain(asProject(d, TRACKS), hold.list.slice()));
+            say(ctx, `CHAIN ${hold.list.join(' ')}`, 1600);
+            return;
+          }
+          chainHold.current = { pointer: e.pointerId, first: id, list: [id] };
           ctx.updateData(d => setActive(asProject(d, TRACKS), id));
-          ctx.setUi({ [UIK.bank]: null });
           say(ctx, st?.playing ? `${id} CUED` : `PATTERN ${id}`, 1200);
+        },
+        onRelease: e => {
+          const hold = chainHold.current;
+          if (!hold || hold.pointer !== e.pointerId) return;
+          chainHold.current = null;
+          ctx.setUi({ [UIK.bank]: null });
+          if (hold.list.length > 1) say(ctx, `CHAIN ${hold.list.join(' ')} - [CHAIN MODE] plays it`, 2000);
         },
       });
     });
   }
   if (qper) {
     return strip(i => {
-      if (i >= PERF_MACROS.length) return keyBtn(i, { lit: null, label: '', aria: 'unused', onPress: () => undefined });
+      if (i >= PERF_MACROS.length) return keyBtn(i, { lit: null, label: `${i + 1}`, aria: 'unused', onPress: () => undefined });
       const sel = num(ctx.values.qper_sel) === i;
       return keyBtn(i, {
-        lit: sel ? COL.white : null, label: 'ABCDEFGHIJ'[i], sub: PERF_MACROS[i].name, aria: `Quick perf macro ${PERF_MACROS[i].name}`,
+        lit: sel ? COL.white : null, label: `${i + 1}`, sub: PERF_MACROS[i].name, aria: `Quick perf macro ${PERF_MACROS[i].name}`,
         onPress: () => { ctx.setValue('qper_sel', i); ctx.setUi({ [UIK.qper]: false }); say(ctx, `QUICK PERF: ${PERF_MACROS[i].name}`, 1200); },
       });
     });
   }
+  if (view === V.PERF) {
+    // PERFORMANCE mode: [TRIG 1-6] mute the tracks; audible = full bright, muted = dim red (manual p.27)
+    return strip(i => {
+      if (i >= TRACKS) return keyBtn(i, { lit: null, label: `${i + 1}`, aria: 'unused', onPress: () => undefined });
+      const id = `t${i + 1}_mute`;
+      const muted = !!ctx.values[id];
+      return keyBtn(i, {
+        lit: COL.red, amt: muted ? 0.25 : 1, label: `${i + 1}`, sub: `${TRACK_NAMES[i]}${muted ? ' -' : ''}`, aria: `Mute ${TRACK_NAMES[i]}`,
+        onPress: () => { ctx.setValue(id, !muted); say(ctx, `${TRACK_NAMES[i]} ${muted ? 'UNMUTED' : 'MUTED'}`, 900); },
+      });
+    });
+  }
   const mode = TRIG_MODES[Math.round(num(ctx.values.trig_mode))] ?? 'trig';
+  const editable = ctx.values.rec !== false;
+  // [FUNC] + [TRIG] in GRID RECORDING places (or removes) a lock trig (manual p.40)
+  const onFuncTrig = (e: React.PointerEvent) => {
+    if (!editable || mode !== 'trig' || !funcActive(ctx)) return;
+    const el = (e.target as HTMLElement).closest('[data-step]') as HTMLElement | null;
+    if (!el) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const step = Number(el.dataset.step);
+    const pat = viewPattern(ctx, pr);
+    const cur = getPattern(pr, pat).tracks[track]?.steps[step];
+    useFunc(ctx);
+    if (cur && !cur.trigless) { say(ctx, `TRIG ${step + 1} IS A NOTE TRIG`, 1200); return; }
+    ctx.updateData(d => (cur ? setStepFn(asProject(d, TRACKS), pat, track, step, null) : updateSteps(asProject(d, TRACKS), pat, track, [step], { trigless: true }, { create: 'lock' })));
+    say(ctx, cur ? `LOCK TRIG ${step + 1} REMOVED` : `LOCK TRIG ${step + 1}`, 1100);
+  };
   return (
-    <div style={{ width: '100%', height: '100%', ...dimStyle }}>
-      <TrigKeys ctx={ctx} tracks={TRACKS} mode={mode} editable={ctx.values.rec !== false} trackNames={[...TRACK_NAMES]} color={COL.red} />
+    <div className={`a4-trigs mode-${mode}`} onPointerDownCapture={onFuncTrig} style={{ width: '100%', height: '100%', ...dimStyle }}>
+      <TrigStyles gap={(TRIGS.pitch - TRIGS.keyW) * k} />
+      <TrigKeys ctx={ctx} tracks={TRACKS} mode={mode} editable={editable} trackNames={[...TRACK_NAMES]} color={COL.red} />
     </div>
   );
+}
+
+/** Printed under the trig keys: A-P, the track names under 1-6, the Quick Performance bracket under 1-10 */
+export function TrigLegends() {
+  const L = TRIG_LEGENDS;
+  const y0 = TRIGS.y + TRIGS.h;
+  const cx = (i: number) => (i * TRIGS.pitch + TRIGS.keyW / 2) * k;
+  const font = { fontFamily: '"Helvetica Neue", Arial, sans-serif', fontSize: 7.5, fontWeight: 500, color: COL.legend, whiteSpace: 'nowrap' as const, lineHeight: '9px' };
+  const x0 = 0, x1 = (9 * TRIGS.pitch + TRIGS.keyW) * k;
+  const by = (L.bracketY - y0) * k;
+  const textX = cx(7) + 6;
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', pointerEvents: 'none' }}>
+      {Array.from({ length: 16 }, (_, i) => (
+        <div key={i} style={{ ...font, position: 'absolute', left: cx(i), top: (L.letterY - y0) * k, transform: 'translate(-50%, -50%)' }}>{'ABCDEFGHIJKLMNOP'[i]}</div>
+      ))}
+      {TRACK_NAMES.map((n, i) => (
+        <div key={n} style={{ ...font, position: 'absolute', left: cx(i), top: (L.trackY - y0) * k, transform: 'translate(-50%, -50%)' }}>{n}</div>
+      ))}
+      <div style={{ position: 'absolute', left: x0, top: by - 2.5 * k, width: 1, height: 2.5 * k, background: COL.legend }} />
+      <div style={{ position: 'absolute', left: x1 - 1, top: by - 2.5 * k, width: 1, height: 2.5 * k, background: COL.legend }} />
+      <div style={{ position: 'absolute', left: x0, top: by, width: textX - 4 - x0, height: 1, background: COL.legend }} />
+      <div style={{ ...font, position: 'absolute', left: textX, top: by, transform: 'translateY(-50%)' }}>Quick Performance</div>
+      <div style={{ position: 'absolute', left: textX + 72, top: by, width: Math.max(0, x1 - textX - 72), height: 1, background: COL.legend }} />
+    </div>
+  );
+}
+
+/** Printed text in one or two tones ("Main" grey, "Volume" white; "Analog Four" bold, "MKII" light) */
+export function Legend({ parts, size = 8, align = 'center', light = false }: { parts: { text: string; strong?: boolean }[]; size?: number; align?: 'left' | 'center'; light?: boolean }) {
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: align === 'left' ? 'flex-start' : 'center', whiteSpace: 'nowrap', pointerEvents: 'none', fontFamily: '"Helvetica Neue", Arial, sans-serif', fontSize: size, letterSpacing: light ? -0.2 : 0.1 }}>
+      {parts.map((p, i) => (
+        <span key={i} style={{ fontWeight: p.strong ? (light ? 700 : 600) : light ? 300 : 500, color: p.strong ? COL.label : light ? '#a7aab0' : COL.legend, whiteSpace: 'pre' }}>{p.text}</span>
+      ))}
+    </div>
+  );
+}
+
+/** The maker's mark, top right: drawn as a simple outlined slanted square (not the trademark artwork) */
+export function LogoMark() {
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 24 18" style={{ display: 'block' }} aria-hidden>
+      <path d="M5 1.5 H22.5 L19 16.5 H1.5 Z" fill="none" stroke="#e9eaec" strokeWidth="2.2" strokeLinejoin="round" />
+      <path d="M7.5 12.5 H14 L16.5 5" fill="none" stroke="#e9eaec" strokeWidth="2.2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** The headphone symbol in the rear connector legend */
+export function RearIcons() {
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 12 12" aria-hidden>
+      <path d="M2 8 V6.5 A4 4 0 0 1 10 6.5 V8" fill="none" stroke={COL.legendDim} strokeWidth="1.2" />
+      <rect x="1.4" y="7.2" width="2" height="3.4" rx="0.8" fill={COL.legendDim} />
+      <rect x="8.6" y="7.2" width="2" height="3.4" rx="0.8" fill={COL.legendDim} />
+    </svg>
+  );
+}
+
+/** What TRACK LEVEL turns: the active track's level, or the TEMPO / SWING menu's value, or the accent in the ACCENT menu */
+export function trackLevelControl(c: { values: Record<string, ControlValue>; ui?: Record<string, unknown> }): string | null {
+  const m = c.ui?.[UIK.menu];
+  if (m === 'tempo') return 'tempo';
+  if (m === 'swing') return 'swing';
+  const t = Math.max(0, Math.min(TRACKS - 1, Math.round(num(c.values.track))));
+  if (num(c.values.trig_mode) === 1 && t < SYNTH_TRACKS) return `t${t + 1}_snd_acc`;
+  return levelControl(t);
 }
 
 // ----------------------------------------------------------------------------
@@ -1102,9 +1391,9 @@ export function SoundBrowserLegend({ ctx }: { ctx: CustomRenderContext }) {
       type="button"
       aria-label="Sound browser (TRACK LEVEL push)"
       onPointerDown={e => { e.preventDefault(); e.stopPropagation(); toggleA4Menu(ctx, 'sound'); }}
-      style={{ width: '100%', height: '100%', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: open ? COL.white : COL.legend, fontSize: 8.5, fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 2, fontFamily: '"Helvetica Neue", Arial, sans-serif', whiteSpace: 'nowrap' }}
+      style={{ width: '100%', height: '100%', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: open ? COL.white : COL.legend, fontSize: 8, fontWeight: 500, textDecoration: 'underline', textUnderlineOffset: 2.5, fontFamily: '"Helvetica Neue", Arial, sans-serif', whiteSpace: 'nowrap' }}
     >
-      SOUND BROWSER
+      Sound Browser
     </button>
   );
 }
@@ -1176,6 +1465,7 @@ function KitMenu({ ctx }: { ctx: CustomRenderContext }) {
   return (
     <Overlay portal portalSize={{ w: 680, h: 440 }}>
       <Frame title="KIT" sub="four sounds + the FX track" onClose={() => ctx.setUi({ [UIK.menu]: null })}>
+        <div style={{ fontSize: 11, color: SC.dim, marginBottom: 6 }}>LOAD SOUNDS keeps your patterns. WITH PATTERNS also loads the kit&apos;s patterns and song, replacing the pattern memory.</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {KITS.map((kit, i) => (
             <Group key={kit.id} label={kit.name.split(' / ')[1].toUpperCase()}>
@@ -1217,6 +1507,51 @@ const lockLabel = (key: string) => {
   return key.toUpperCase();
 };
 
+function TempoMenu({ ctx }: { ctx: CustomRenderContext }) {
+  const synced = useStudioStore(s => s.studio.sync[ctx.instance] !== false);
+  const studioBpm = useStudioStore(s => s.studio.bpm);
+  const tempo = num(ctx.values.tempo, 120);
+  const opened = useRef(false);
+  // the knob starts at the tempo you hear; turning it while synced moves the studio tempo
+  useEffect(() => {
+    if (!opened.current) { opened.current = true; if (synced && Math.round(studioBpm) !== tempo) ctx.setValue('tempo', Math.round(studioBpm)); return; }
+    if (synced && Math.abs(tempo - studioBpm) >= 0.5) useStudioStore.getState().setBpm(tempo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tempo]);
+  const bpm = synced ? studioBpm : tempo;
+  const nudge = (d: number) => setTempo(ctx, Math.max(30, Math.min(300, Math.round((bpm + d) * 10) / 10)));
+  return (
+    <Overlay portal portalSize={{ w: 380, h: 220 }}>
+      <Frame title="TEMPO" sub={synced ? 'synced: this is the studio tempo' : 'the project tempo'} onClose={() => ctx.setUi({ [UIK.menu]: null })}>
+        <div style={{ textAlign: 'center', fontSize: 40, fontWeight: 800, color: SC.text, lineHeight: '46px' }}>{bpm.toFixed(1)}</div>
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', margin: '6px 0' }}>
+          <SeqButton onPress={() => nudge(-1)}>-1</SeqButton>
+          <SeqButton onPress={() => nudge(-0.1)}>-0.1</SeqButton>
+          <SeqButton onPress={() => nudge(0.1)}>+0.1</SeqButton>
+          <SeqButton onPress={() => nudge(1)}>+1</SeqButton>
+        </div>
+        <div style={{ fontSize: 11, color: SC.dim, textAlign: 'center' }}>TRACK LEVEL sets the tempo; the DATA ENTRY knobs still edit the track. [FUNC] + [TEMPO] taps it; LEFT / RIGHT shift it 10% while held.</div>
+      </Frame>
+    </Overlay>
+  );
+}
+
+function SwingMenu({ ctx }: { ctx: CustomRenderContext }) {
+  const pr = project(ctx);
+  const swing = getPattern(pr, pr.active).swing;
+  return (
+    <Overlay portal portalSize={{ w: 360, h: 200 }}>
+      <Frame title="SWING" sub={`pattern ${pr.active}`} onClose={() => ctx.setUi({ [UIK.menu]: null })}>
+        <div style={{ textAlign: 'center', fontSize: 40, fontWeight: 800, color: SC.text, lineHeight: '46px' }}>{swing}%</div>
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', margin: '6px 0' }}>
+          {[50, 54, 58, 62, 66].map(v => <SeqButton key={v} active={swing === v} onPress={() => ctx.setValue('swing', v)}>{v}%</SeqButton>)}
+        </div>
+        <div style={{ fontSize: 11, color: SC.dim, textAlign: 'center' }}>TRACK LEVEL sets the swing: every second 16th note plays later. 50% is straight.</div>
+      </Frame>
+    </Overlay>
+  );
+}
+
 export function Menus({ ctx }: { ctx: CustomRenderContext }) {
   const m = ctx.ui[UIK.menu];
   return (
@@ -1230,6 +1565,8 @@ export function Menus({ ctx }: { ctx: CustomRenderContext }) {
       {m === 'sound' && <SoundMenu ctx={ctx} />}
       {m === 'kit' && <KitMenu ctx={ctx} />}
       {m === 'global' && <GlobalMenu ctx={ctx} />}
+      {m === 'tempo' && <TempoMenu ctx={ctx} />}
+      {m === 'swing' && <SwingMenu ctx={ctx} />}
     </>
   );
 }
@@ -1280,7 +1617,7 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
   }, [playing, ctx]);
 
   // LIVE RECORDING: the engine reports played notes with their quantised step
-  const rec = ctx.engine.recNote as { id: number; track: number; note: number; vel: number; step: number; pattern: string } | undefined;
+  const rec = ctx.engine.recNote as { id: number; track: number; note: number; vel: number; step: number; micro?: number; pattern: string } | undefined;
   const lastRec = useRef(0);
   useEffect(() => {
     if (!rec || rec.id === lastRec.current) return;
@@ -1288,7 +1625,7 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
     const pr = project(ctx);
     const len = trackLength(getPattern(pr, rec.pattern), rec.track);
     const step = ((rec.step % len) + len) % len;
-    ctx.updateData(d => updateSteps(asProject(d, TRACKS), rec.pattern, rec.track, [step], { note: rec.note, trigless: null }, { create: 'note' }));
+    ctx.updateData(d => updateSteps(asProject(d, TRACKS), rec.pattern, rec.track, [step], { note: rec.note, trigless: null, micro: rec.micro ? rec.micro : null }, { create: 'note' }));
   }, [rec, ctx]);
 
   // Shift on a computer keyboard works as FUNC

@@ -1403,7 +1403,7 @@ const p1: Lesson = {
       principle: 'The keyboard always plays the selected track\'s sound.',
     },
     {
-      kind: 'do', control: 'kb_oct', targetValue: 5, concept: 'oscillator-pitch',
+      kind: 'do', control: 'kb_oct', targetValue: 6, concept: 'oscillator-pitch',
       instruction: 'Press OCT+ once: the keyboard plays an octave higher.',
       principle: 'Octave keys move the keyboard\'s range without changing the sound.',
     },

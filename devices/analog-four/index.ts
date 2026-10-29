@@ -12,7 +12,8 @@ import { ANALOG_FOUR } from './spec';
 import { ANALOG_FOUR_LAYOUT } from './layout';
 import { ANALOG_FOUR_LESSONS } from './lessons';
 import { AnalogFourEngine } from './engine';
-import { CV_BY_KEY, FX_BY_KEY, SEQ_TRACKS, SYNTH_BY_KEY } from './params';
+import { CV_BY_KEY, FX_BY_KEY, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS } from './params';
+import { ARP_KEYS, isArpKey, patternArp, setPatternArp, type ArpSettings } from './arp';
 import { KIT_BY_ID } from './kits';
 
 const STEP_KEYS: Record<string, string> = { trig_note: 'note', trig_vel: 'vel', trig_len: 'len', trig_micro: 'micro', trig_cond: 'cond', trig_prob: 'prob' };
@@ -45,11 +46,6 @@ export const LOCKS: LockOptions = {
   tracks: SEQ_TRACKS,
 };
 
-const swingOf = (data: unknown) => {
-  const p = asProject(data, SEQ_TRACKS);
-  return getPattern(p, p.active).swing;
-};
-
 const base = projectData({ tracks: SEQ_TRACKS, defaults: { note: 60, vel: 100 } });
 
 const analogFour: DeviceModule = {
@@ -57,7 +53,7 @@ const analogFour: DeviceModule = {
   layout: ANALOG_FOUR_LAYOUT,
   lessons: ANALOG_FOUR_LESSONS,
   createEngine: () => new AnalogFourEngine(),
-  keyboard: { lowNote: 48 },
+  keyboard: { lowNote: 72 },
   transportControl: 'play',
   uiControls: ['track', 'page', 'kb_oct', 'qper_sel'],
   worklets: ['/worklets/analog-four-processors.js'],
@@ -72,13 +68,38 @@ const analogFour: DeviceModule = {
       return true;
     }
     // micro timing and conditions belong to a held trig: without one there is nothing to set
-    if (/^t\d_trig_(micro|cond)$/.test(id) && !heldSteps(api.ui).length) return true;
+    if (/^t\d_trig_(micro|cond|envf|env2|lfo1|lfo2)$/.test(id) && !heldSteps(api.ui).length) return true;
+    // the ARP page belongs to the pattern (manual p.43); with a trig held only NO2-NO4 lock (p.44)
+    const arp = /^t([1-4])_(arp_\w+)$/.exec(id);
+    if (arp && isArpKey(arp[2]) && typeof value === 'number') {
+      const track = Number(arp[1]) - 1;
+      const key = arp[2];
+      if (heldSteps(api.ui).length) return /^arp_n[234]$/.test(key) ? interceptForLocks(id, value, api, LOCKS) : true;
+      api.updateData(d => {
+        const p = asProject(d, SEQ_TRACKS);
+        const current: ArpSettings = {};
+        ARP_KEYS.forEach(k => { const v = api.values[`t${track + 1}_${k}`]; if (typeof v === 'number') current[k] = v; });
+        return setPatternArp(p, p.active, track, key, value, current);
+      });
+      return true;
+    }
     return interceptForLocks(id, value, api, LOCKS);
   },
   displayValues: api => {
-    const v = displayWithLocks(api, LOCKS);
-    const sw = swingOf(api.data);
-    return v.swing === sw ? v : { ...v, swing: sw };
+    let v = displayWithLocks(api, LOCKS);
+    const p = asProject(api.data, SEQ_TRACKS);
+    const sw = getPattern(p, p.active).swing;
+    if (v.swing !== sw) v = { ...v, swing: sw };
+    // the ARP page shows the selected pattern's arpeggiator (or the track's values when it has none)
+    for (let t = 0; t < SYNTH_TRACKS; t++) {
+      const a = patternArp(p, p.active, t);
+      if (!a) continue;
+      for (const k of ARP_KEYS) {
+        const id = `t${t + 1}_${k}`;
+        if (a[k] !== undefined && v[id] !== a[k] && !(heldSteps(api.ui).length && /^arp_n[234]$/.test(k))) v = { ...v, [id]: a[k] as number };
+      }
+    }
+    return v;
   },
   studio: {
     midiSync: true,

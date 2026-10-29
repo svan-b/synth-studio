@@ -32,11 +32,13 @@ import {
   CV_TRACK, FX_BY_KEY, FX_DESTS, FX_KEYS, FX_TRACK, MOD_DESTS, PERF_MACROS, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS,
   VOICE_KEYS,
 } from './params';
+import { ARP_KEYS, patternArp, type ArpKey } from './arp';
 
 const VI: Record<string, number> = Object.fromEntries(VOICE_KEYS.map((k, i) => [k, i]));
 const FI: Record<string, number> = Object.fromEntries(FX_KEYS.map((k, i) => [k, i]));
-const ARP_KEYS = ['arp_mod', 'arp_spd', 'arp_rng', 'arp_nlen', 'arp_leg', 'arp_n2', 'arp_n3', 'arp_n4'] as const;
-type ArpKey = (typeof ARP_KEYS)[number];
+/** MIDI note of the first keyboard key at octave 0 (EMU, measured on OS 1.56) */
+const KB_C1 = 72;
+
 
 /** a4-fxmod output channels driving the shared processors (must match the worklet) */
 const FXC = { CHO_RATE: 0, CHO_DEPTH: 1, CHO_DELAY: 2, CHO_FB: 3, CHO_WIDTH: 4, REV_PRE: 5, REV_DECAY: 6, REV_SIZE: 7, REV_DAMP: 8, REV_WIDTH: 9, REV_VOL: 23 };
@@ -87,12 +89,15 @@ export class AnalogFourEngine extends BaseEngine {
   private reverb!: AudioWorkletNode;
   private main!: GainNode;
   private seq!: ElektronSequencer;
+  private lastSynth = 0;
   private locks = new LockTracker(SEQ_TRACKS);
   /** Track (kit) values of the voice parameters, per synth track */
   private base: Float64Array[] = [];
   private fxBase = new Float64Array(FX_KEYS.length);
   private arpBase: Record<ArpKey, number>[] = [];
   private arpLock: Partial<Record<ArpKey, number>>[] = [];
+  /** The pattern whose ARP settings each track's arpeggiator follows (they belong to the pattern) */
+  private arpPattern: (string | null)[] = [null, null, null, null];
   private pending = new Map<MessagePort, number[]>();
   private flushQueued = false;
   private arps: (ArpState | null)[] = [null, null, null, null];
@@ -159,7 +164,7 @@ export class AnalogFourEngine extends BaseEngine {
       v.connect(this.fx, 0, 2);   // dry
       v.connect(this.fx, 1, 0);   // sends
       v.connect(sendSplit, 1);
-      if (t > 0) v.connect(this.voices[t - 1], 2, 0); // NEI: track t feeds track t-1's OSC 2
+      if (t < SYNTH_TRACKS - 1) v.connect(this.voices[t + 1], 2, 0); // NEI: each voice feeds the next track's OSC 2 (manual p.88, p.110)
     });
     sendSplit.connect(this.chorus, 0, 0);
     this.chorus.connect(this.fx, 0, 1);
@@ -194,7 +199,7 @@ export class AnalogFourEngine extends BaseEngine {
       if (this.arpTimer) clearInterval(this.arpTimer);
       [...this.voices, this.fxmod, this.fx, this.chorus, this.reverb].forEach(n => { try { n.disconnect(); n.port.close(); } catch { /* */ } });
     });
-    this.emit({ playing: false, seq: this.seq.getState() });
+    this.emit({ playing: false, seq: this.seq.getState(), kbTrack: this.lastSynth });
   }
 
   // --------------------------------------------------------------------------
@@ -272,6 +277,12 @@ export class AnalogFourEngine extends BaseEngine {
       case 'play':
         if (!this.transport) { if (value) this.seq.start(); else this.seq.stop(); }
         break;
+      case 'track': {
+        // with the FX or CV track active, the keyboard keeps playing the last synth track (manual p.36)
+        const t = Math.round(v);
+        if (t >= 0 && t < SYNTH_TRACKS && t !== this.lastSynth) { this.lastSynth = t; this.emit({ kbTrack: t }); }
+        break;
+      }
     }
   }
 
@@ -388,13 +399,21 @@ export class AnalogFourEngine extends BaseEngine {
       });
       if (ramp.length) v.port.postMessage({ t: 'ramp', time: e.time, t1: to.time, list: ramp });
     }
-    if (e.trigless) return;
+    // NOTE page retrig switches (lock only): on for note trigs and off for lock trigs unless locked (manual p.45)
+    const sw = (k: string, d: number) => { const x = e.locks[k]; return x === undefined ? d : x >= 0.5 ? 1 : 0; };
+    if (e.trigless) {
+      const rt = sw('trig_envf', 0) | (sw('trig_env2', 0) << 1) | (sw('trig_lfo1', 0) << 2) | (sw('trig_lfo2', 0) << 3);
+      if (rt) v.port.postMessage({ t: 'rtrg', time: e.time, rt });
+      return;
+    }
+    const rt = sw('trig_envf', 1) | (sw('trig_env2', 1) << 1) | (sw('trig_lfo1', 1) << 2) | (sw('trig_lfo2', 1) << 3);
     const note = Math.max(0, Math.min(127, e.note + Math.round(this.num('trns', 0))));
+    this.arpPattern[t] = e.pattern;
     if (this.arpOn(t)) {
       this.startArp(t, [note, ...this.arpOffsets(t).map(o => note + o)], e.time, e.duration, e.velocity, e.accent, false);
       return;
     }
-    v.port.postMessage({ t: 'on', time: e.time, note, vel: e.velocity, acc: e.accent ? 1 : 0, slide: e.slide });
+    v.port.postMessage({ t: 'on', time: e.time, note, vel: e.velocity, acc: e.accent ? 1 : 0, slide: e.slide, rt });
   }
 
   private gateOff(track: number, time: number) {
@@ -409,7 +428,10 @@ export class AnalogFourEngine extends BaseEngine {
   // --------------------------------------------------------------------------
 
   private arpVal(t: number, k: ArpKey): number {
-    return this.arpLock[t][k] ?? this.arpBase[t][k];
+    const lock = this.arpLock[t][k];
+    if (lock !== undefined) return lock;
+    const p = asProject(this.data, SEQ_TRACKS);
+    return patternArp(p, this.arpPattern[t] ?? p.active, t)?.[k] ?? this.arpBase[t][k];
   }
 
   private arpOn(t: number): boolean {
@@ -495,12 +517,14 @@ export class AnalogFourEngine extends BaseEngine {
   // Live play: the keyboard (panel keys, computer keyboard) plays the active track
   // --------------------------------------------------------------------------
 
+  /** The synth track the keyboard plays: the active track, or the last synth track while FX / CV is active */
   private activeTrack(): number {
-    return Math.max(0, Math.min(SEQ_TRACKS - 1, Math.round(this.num('track', 0))));
+    const t = Math.max(0, Math.min(SEQ_TRACKS - 1, Math.round(this.num('track', 0))));
+    return t < SYNTH_TRACKS ? t : this.lastSynth;
   }
 
   private octave(): number {
-    return Math.round(this.num('kb_oct', 4)) - 3;
+    return Math.round(this.num('kb_oct', 5)) - 5;
   }
 
   private trackVel(t: number): number {
@@ -528,6 +552,7 @@ export class AnalogFourEngine extends BaseEngine {
     if (!held.includes(n)) held.push(n);
     const vel = this.trackVel(t);
     this.recordLive(t, n, vel);
+    this.arpPattern[t] = this.seq.getState().pattern ?? null;
     if (this.arpOn(t)) {
       const notes = [...held];
       held.length === 1 && this.arpOffsets(t).forEach(o => notes.push(n + o));
@@ -571,10 +596,13 @@ export class AnalogFourEngine extends BaseEngine {
     if (!st.playing || !st.pattern) return;
     const ls = this.lastStep[t];
     if (ls.step < 0) return;
+    // LIVE RECORDING places trigs micro-timed: the nearest step plus a µTM offset in 1/24 steps (manual p.40)
     const stepSec = 60 / this.bpm() / 4;
-    const late = this.ctx.currentTime - ls.time;
-    const step = late > stepSec / 2 ? ls.step + 1 : ls.step;
-    this.emit({ recNote: { id: ++this.recSerial, track: t, note, vel, step, pattern: st.pattern } });
+    const frac = (this.ctx.currentTime - ls.time) / stepSec;
+    const next = frac > 0.5;
+    const step = next ? ls.step + 1 : ls.step;
+    const micro = Math.max(-23, Math.min(23, Math.round((next ? frac - 1 : frac) * 24)));
+    this.emit({ recNote: { id: ++this.recSerial, track: t, note, vel, step, micro, pattern: st.pattern } });
   }
 
   event(name: string, payload?: unknown): void {
@@ -582,8 +610,8 @@ export class AnalogFourEngine extends BaseEngine {
     if (this.seq.handleEvent(name, payload)) return;
     const p = (payload ?? {}) as { offset?: number };
     switch (name) {
-      case 'kb:on': this.liveOn(48 + 12 * this.octave() + (p.offset ?? 0)); break;
-      case 'kb:off': this.liveOff(48 + 12 * this.octave() + (p.offset ?? 0)); break;
+      case 'kb:on': this.liveOn(KB_C1 + 12 * this.octave() + (p.offset ?? 0)); break;
+      case 'kb:off': this.liveOff(KB_C1 + 12 * this.octave() + (p.offset ?? 0)); break;
       case 'panic':
         for (let t = 0; t < SYNTH_TRACKS; t++) { this.held[t] = []; this.liveNote[t] = null; this.stopArp(t, this.ctx.currentTime); this.voices[t].port.postMessage({ t: 'reset' }); }
         break;

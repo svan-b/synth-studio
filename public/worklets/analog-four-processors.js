@@ -105,10 +105,16 @@ function addBlamp(W, k, d, s) {
 const FIR_C = 1.24, FIR_S = -0.12;
 const LAT = 4;
 
+// The saw's waveshape: a second saw whose phase offset grows from the PW centre and returns at
+// either extreme, so a single saw sounds at all three (manual p.72)
+const sawOff = pw => Math.abs(pw - 0.5) * 2;
+const sawSplit = pw => { const o = Math.abs(pw - 0.5) * 2; return o > 0.008 && o < 0.992; };
+
 // Hardware units -> seconds for envelope stages (0 -> 1 ms, 64 -> 0.13 s, 127 -> 16 s)
 const envTime = v => 0.001 * exp2((clamp(v, 0, 127) * 14) / 127);
-// Filter frequency 0..127 (one semitone a step): 13 Hz .. 20 kHz
-const fltHz = v => 13.0 * exp2(v / 12);
+// Filter frequency 0..127, a semitone a step with 440 Hz at 60: 13.75 Hz .. 21 kHz (the Rytm MKII's
+// measured law; the A4's own is not published)
+const fltHz = v => 13.75 * exp2(v / 12);
 
 const LFO_MUL = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048];
 function lfoHz(spd, mulIdx, bpm) {
@@ -116,17 +122,18 @@ function lfoHz(spd, mulIdx, bpm) {
   return ((spd * m) / 128) * ((mulIdx < 12 ? bpm : 120) / 240);
 }
 
-// Envelope shapes (shape >> 1): [attack curve, decay/release curve, full]
-//   attack 0 linear, 1 analog RC (fast start), 2 exponential (slow start)
-//   decay/release 0 linear, 1 exponential
-const SHAPES = [[0, 0, false], [1, 1, false], [2, 0, false], [2, 1, false], [1, 1, true], [0, 1, true]];
+// Envelope shapes (shape >> 1), manual p.74-75: [attack, decay/release]
+//   attack 0 linear, 1 standard (analog RC), 2 exponential (rises faster and faster),
+//          3 full (jumps to full level and stays there for the ATK time)
+//   decay/release 0 linear, 1 exponential (snappy, with a tail)
+const SHAPES = [[0, 0], [1, 1], [2, 0], [2, 1], [3, 0], [3, 1]];
 
 class Env {
   constructor() { this.stage = 0; this.v = 0; this.gate = false; this.pending = false; this.gateEnd = Infinity; this.x = 0; }
   trig(shape, now, lenSec) {
     if (shape & 1) this.v = 0;            // (R): restart from zero
     this.stage = 1;
-    this.x = Math.cbrt(this.v);           // exponential attack continues from the current level
+    this.x = SHAPES[shape >> 1][0] === 3 ? 0 : Math.cbrt(this.v); // full: count the ATK time; exponential: continue from the level
     this.gate = true;
     this.pending = false;
     this.gateEnd = lenSec > 0 ? now + lenSec : Infinity;
@@ -134,7 +141,6 @@ class Env {
   release(shape) {
     this.gate = false;
     if (this.stage === 0) return;
-    if (SHAPES[shape >> 1][2] && (this.stage === 1 || this.stage === 2)) { this.pending = true; return; }
     this.stage = 4;
   }
   tick(dt, atk, dec, sus, rel, shape, now, inf) {
@@ -144,6 +150,7 @@ class Env {
       case 1: {
         if (atk <= 0.00105) { this.v = 1; this.stage = 2; break; }
         const inc = dt / atk;
+        if (s[0] === 3) { this.v = 1; this.x += inc; if (this.x >= 1) this.stage = 2; break; } // full: hold for ATK
         if (s[0] === 0) this.v += inc;
         else if (s[0] === 1) this.v += (1.32 - this.v) * (1 - Math.exp(-inc * 1.4));
         else { this.x += inc; this.v = this.x * this.x * this.x; }
@@ -276,6 +283,7 @@ class A4Voice extends AudioWorkletProcessor {
     this.nb = nb;
     const f = () => new Float64Array(nb + 1);
     this.bDt1 = f(); this.bDt2 = f(); this.bPw1 = f(); this.bPw2 = f(); this.bG1 = f(); this.bG2 = f();
+    this.bInDrive = f().fill(1); this.bInComp = f().fill(1);
     this.bGain = f(); this.bPanL = f(); this.bPanR = f(); this.bSC = f(); this.bSD = f(); this.bSR = f();
     this.bK1 = f(); this.bComp = f(); this.bDrive = f(); this.bOvr = f(); this.bK2 = f(); this.bPk = f();
     this.bLev1 = f(); this.bLev2 = f(); this.bNLev = f(); this.bNHold = f(); this.bNCol = f(); this.bNHpMix = f();
@@ -322,18 +330,28 @@ class A4Voice extends AudioWorkletProcessor {
     const legato = wasGate && ((ev.slide) || ev.leg || (P[I.snd_leg] >= 0.5 && ev.live));
     this.gate = true;
     if (!legato) {
-      const lsec = v => (v > 0 ? 0.125 * exp2(((v - 1) / 126) * 10) * this.stepSec : 0);
+      // ev.rt: the NOTE page retrig switches (1 ENV F, 2 ENV 2, 4 LFO 1, 8 LFO 2; all on by default)
+      const rt = ev.rt === undefined ? 15 : ev.rt;
       this.envA.trig(Math.round(P[I.amp_shp]), now, 0);
-      this.envF.trig(Math.round(P[I.envf_shp]), now, lsec(P[I.envf_len]));
-      this.env2.trig(Math.round(P[I.env2_shp]), now, lsec(P[I.env2_len]));
-      this.lfo1.trig(Math.round(P[I.lfo1_mod]), this.E(I.lfo1_sph) / 128, P[I.lfo1_fad]);
-      this.lfo2.trig(Math.round(P[I.lfo2_mod]), this.E(I.lfo2_sph) / 128, P[I.lfo2_fad]);
+      this.retrig(rt, now);
       this.vibFade = P[I.osc_vfa] < 0 ? 0 : 1;
       this.noiseFade = P[I.noise_fad] < 0 ? 0 : 1;
       if (P[I.osc_trg] >= 0.5) { this.p1 = 0; this.p2 = 0; this.c1 = 0; this.c2 = 0; this.s1 = 1; this.s2 = 1; }
     }
     this.velMod = this.vel;
     this.idle = false;
+  }
+
+  /** Restart the modulators a trig asks for (a note, or a lock trig with retrig switches locked on) */
+  retrig(rt, now) {
+    const P = this.P, I = this.I;
+    const lsec = v => (v > 0 ? 0.125 * exp2(((v - 1) / 126) * 10) * this.stepSec : 0);
+    // without a sounding note, a retrigged envelope runs for one step
+    const gate = v => lsec(v) || (this.gate ? 0 : this.stepSec);
+    if (rt & 1) this.envF.trig(Math.round(P[I.envf_shp]), now, gate(P[I.envf_len]));
+    if (rt & 2) this.env2.trig(Math.round(P[I.env2_shp]), now, gate(P[I.env2_len]));
+    if (rt & 4) this.lfo1.trig(Math.round(P[I.lfo1_mod]), this.E(I.lfo1_sph) / 128, P[I.lfo1_fad]);
+    if (rt & 8) this.lfo2.trig(Math.round(P[I.lfo2_mod]), this.E(I.lfo2_sph) / 128, P[I.lfo2_fad]);
   }
 
   noteOff() {
@@ -413,8 +431,9 @@ class A4Voice extends AudioWorkletProcessor {
     // PWM LFOs (triangle) and pulse widths
     this.pwm1 += 0.1 * exp2(this.E(I.osc1_spd) / 16) * dt; if (this.pwm1 >= 1) this.pwm1 -= 1;
     this.pwm2 += 0.1 * exp2(this.E(I.osc2_spd) / 16) * dt; if (this.pwm2 >= 1) this.pwm2 -= 1;
-    this.bPw1[b + 1] = clamp(0.5 + (this.E(I.osc1_pw) / 64) * 0.47 + triLfo(this.pwm1) * (this.E(I.osc1_pwm) / 127) * 0.45, 0.03, 0.97);
-    this.bPw2[b + 1] = clamp(0.5 + (this.E(I.osc2_pw) / 64) * 0.47 + triLfo(this.pwm2) * (this.E(I.osc2_pwm) / 127) * 0.45, 0.03, 0.97);
+    // PW shapes every waveform; 0 is the plain wave, the extremes mute the pulses (manual p.72, p.87)
+    this.bPw1[b + 1] = clamp(0.5 + (this.E(I.osc1_pw) / 64) * 0.5 + triLfo(this.pwm1) * (this.E(I.osc1_pwm) / 127) * 0.45, 0.002, 0.998);
+    this.bPw2[b + 1] = clamp(0.5 + (this.E(I.osc2_pw) / 64) * 0.5 + triLfo(this.pwm2) * (this.E(I.osc2_pwm) / 127) * 0.45, 0.002, 0.998);
     this.bLev1[b] = this.E(I.osc1_lev) / 127;
     this.bLev2[b] = this.E(I.osc2_lev) / 127;
 
@@ -439,9 +458,12 @@ class A4Voice extends AudioWorkletProcessor {
     const k1 = 4.3 * Math.pow(r1, 1.3);
     this.bK1[b] = k1;
     this.bComp[b] = P[I.snd_bst] >= 0.5 ? 1 + k1 * 0.45 : 1 + k1 * 0.08;
-    const ovr = this.E(I.flt1_ovr) / 127;
-    this.bDrive[b] = 1 + ovr * ovr * 24;
-    this.bOvr[b] = Math.min(1, ovr * 12);
+    const ovr = this.E(I.flt1_ovr);
+    const op = ovr > 0 ? Math.min(1, ovr / 63) : 0, on = ovr < 0 ? Math.min(1, -ovr / 64) : 0;
+    this.bDrive[b] = 1 + op * op * 24;
+    this.bOvr[b] = Math.min(1, op * 12);
+    this.bInDrive[b] = 1 + on * on * 7;
+    this.bInComp[b] = 1 / Math.sqrt(1 + on * on * 2.5);
     // Filter 2: multimode
     const f2 = this.E(I.flt2_frq) + (this.E(I.flt2_trk) / 32) * semis + this.E(I.flt2_dep) * 2 * ef;
     this.bG2[b + 1] = tanF((Math.PI * Math.min(sr * 0.45, fltHz(clamp(f2, -24, 140)))) / sr);
@@ -470,13 +492,20 @@ class A4Voice extends AudioWorkletProcessor {
     return ea;
   }
 
-  // Naive waveform value / slope (per unit phase) at phase p
+  // Naive waveform value / slope (per unit phase) at phase p. Every wave has a variable shape (PW):
+  //   SAW  a second, phase-offset saw joins the first (64 = one saw, the ends = an octave up)
+  //   TRP  the transistor pulse's width          PUL  the pulse width
+  //   TRI  the symmetry (64 = triangle, the ends = ramps)
   static wave(w, p, pw) {
     switch (w) {
-      case 0: return 2 * p - 1;
+      case 0: {
+        if (!sawSplit(pw)) return 2 * p - 1;
+        let q = p + sawOff(pw); if (q >= 1) q -= 1;
+        return p + q - 1;
+      }
       case 1: return p < pw ? 1 - 0.7 * (p / pw) - (pw * 0.65 - (1 - pw)) : -1 - (pw * 0.65 - (1 - pw)); // TRP, DC removed
       case 2: return (p < pw ? 1 : -1) - (2 * pw - 1);                                                   // PUL, DC removed
-      case 3: return p < 0.5 ? 4 * p - 1 : 3 - 4 * p;
+      case 3: return p < pw ? -1 + (2 * p) / pw : 1 - (2 * (p - pw)) / (1 - pw);
       default: return 0;
     }
   }
@@ -484,7 +513,7 @@ class A4Voice extends AudioWorkletProcessor {
     switch (w) {
       case 0: return 2;
       case 1: return p < pw ? -0.7 / pw : 0;
-      case 3: return p < 0.5 ? 4 : -4;
+      case 3: return p < pw ? 2 / pw : -2 / (1 - pw);
       default: return 0;
     }
   }
@@ -535,19 +564,33 @@ class A4Voice extends AudioWorkletProcessor {
         q1 = pn + dt1 * r1;
         d1 = r1;
       } else if (edged1) {
+        const split1 = w1 === 0 && sawSplit(pw1);
+        const ep1 = split1 ? 1 - sawOff(pw1) : pw1;          // the second edge / corner
+        const pulse1 = w1 === 1 || w1 === 2 || split1;
+        const corner1 = w1 === 3 ? (2 / pw1 + 2 / (1 - pw1)) * dt1 : 0;
+        const eh1 = w1 === 1 ? -1.3 : w1 === 2 ? -2 : -1;
+        const es1 = w1 === 1 ? (0.7 / pw1) * dt1 : 0;
         if (d1 >= 0) {
-          if (w1 === 0) this.push(e++, i, d1, E_WRAP, -2, 0, 1);
-          else if (w1 === 3) this.push(e++, i, d1, E_WRAP, 0, 8 * dt1, 1);
+          if (w1 === 0) this.push(e++, i, d1, E_WRAP, split1 ? -1 : -2, 0, 1);
+          else if (w1 === 3) this.push(e++, i, d1, E_WRAP, 0, corner1, 1);
           else this.push(e++, i, d1, E_WRAP, 2, w1 === 1 ? (-0.7 / pw1) * dt1 : 0, 1);
-          if ((w1 === 1 || w1 === 2) && q1 >= pw1) this.push(e++, i, (q1 - pw1) / dt1, E_PW, w1 === 1 ? -1.3 : -2, w1 === 1 ? (0.7 / pw1) * dt1 : 0, 1);
-          if (w1 === 3 && q1 >= 0.5) this.push(e++, i, (q1 - 0.5) / dt1, E_HALF, 0, -8 * dt1, 1);
-        } else if ((w1 === 1 || w1 === 2) && p1 < pw1 && q1 >= pw1) {
-          this.push(e++, i, (q1 - pw1) / dt1, E_PW, w1 === 1 ? -1.3 : -2, w1 === 1 ? (0.7 / pw1) * dt1 : 0, 1);
-        } else if (w1 === 3 && p1 < 0.5 && q1 >= 0.5) {
-          this.push(e++, i, (q1 - 0.5) / dt1, E_HALF, 0, -8 * dt1, 1);
+          if (pulse1 && q1 >= ep1) this.push(e++, i, (q1 - ep1) / dt1, E_PW, eh1, es1, 1);
+          if (w1 === 3 && q1 >= ep1) this.push(e++, i, (q1 - ep1) / dt1, E_HALF, 0, -corner1, 1);
+        } else if (pulse1 && p1 < ep1 && q1 >= ep1) {
+          this.push(e++, i, (q1 - ep1) / dt1, E_PW, eh1, es1, 1);
+        } else if (w1 === 3 && p1 < ep1 && q1 >= ep1) {
+          this.push(e++, i, (q1 - ep1) / dt1, E_HALF, 0, -corner1, 1);
         }
       }
-      if (sub1 && d1 >= 0) {
+      if (sub1 === 4) {
+        // half-cycle steps: high for one of every three (2/3 f, 33%)
+        const hd = d1 >= 0 ? d1 : p1 < 0.5 && q1 >= 0.5 ? (q1 - 0.5) / dt1 : -1;
+        if (hd >= 0) {
+          cnt1 = (cnt1 + 1) % 3;
+          const ns = cnt1 === 0 ? 1 : -1;
+          if (ns !== s1) { this.push(e++, i, hd, E_WRAP, (ns - s1) * SUB, 0, 3); s1 = ns; }
+        }
+      } else if (sub1 && d1 >= 0) {
         cnt1 = (cnt1 + 1) % div1;
         const ns = subHi(sub1, cnt1) ? 1 : -1;
         if (ns !== s1) { this.push(e++, i, d1, E_WRAP, (ns - s1) * SUB, 0, 3); s1 = ns; }
@@ -561,19 +604,33 @@ class A4Voice extends AudioWorkletProcessor {
         q2 = pn + dt2 * r2;
         d2 = r2;
       } else if (edged2) {
+        const split2 = w2 === 0 && sawSplit(pw2);
+        const ep2 = split2 ? 1 - sawOff(pw2) : pw2;          // the second edge / corner
+        const pulse2 = w2 === 1 || w2 === 2 || split2;
+        const corner2 = w2 === 3 ? (2 / pw2 + 2 / (1 - pw2)) * dt2 : 0;
+        const eh2 = w2 === 1 ? -1.3 : w2 === 2 ? -2 : -1;
+        const es2 = w2 === 1 ? (0.7 / pw2) * dt2 : 0;
         if (d2 >= 0) {
-          if (w2 === 0) this.push(e++, i, d2, E_WRAP, -2, 0, 2);
-          else if (w2 === 3) this.push(e++, i, d2, E_WRAP, 0, 8 * dt2, 2);
+          if (w2 === 0) this.push(e++, i, d2, E_WRAP, split2 ? -1 : -2, 0, 2);
+          else if (w2 === 3) this.push(e++, i, d2, E_WRAP, 0, corner2, 2);
           else this.push(e++, i, d2, E_WRAP, 2, w2 === 1 ? (-0.7 / pw2) * dt2 : 0, 2);
-          if ((w2 === 1 || w2 === 2) && q2 >= pw2) this.push(e++, i, (q2 - pw2) / dt2, E_PW, w2 === 1 ? -1.3 : -2, w2 === 1 ? (0.7 / pw2) * dt2 : 0, 2);
-          if (w2 === 3 && q2 >= 0.5) this.push(e++, i, (q2 - 0.5) / dt2, E_HALF, 0, -8 * dt2, 2);
-        } else if ((w2 === 1 || w2 === 2) && p2 < pw2 && q2 >= pw2) {
-          this.push(e++, i, (q2 - pw2) / dt2, E_PW, w2 === 1 ? -1.3 : -2, w2 === 1 ? (0.7 / pw2) * dt2 : 0, 2);
-        } else if (w2 === 3 && p2 < 0.5 && q2 >= 0.5) {
-          this.push(e++, i, (q2 - 0.5) / dt2, E_HALF, 0, -8 * dt2, 2);
+          if (pulse2 && q2 >= ep2) this.push(e++, i, (q2 - ep2) / dt2, E_PW, eh2, es2, 2);
+          if (w2 === 3 && q2 >= ep2) this.push(e++, i, (q2 - ep2) / dt2, E_HALF, 0, -corner2, 2);
+        } else if (pulse2 && p2 < ep2 && q2 >= ep2) {
+          this.push(e++, i, (q2 - ep2) / dt2, E_PW, eh2, es2, 2);
+        } else if (w2 === 3 && p2 < ep2 && q2 >= ep2) {
+          this.push(e++, i, (q2 - ep2) / dt2, E_HALF, 0, -corner2, 2);
         }
       }
-      if (sub2 && d2 >= 0) {
+      if (sub2 === 4) {
+        // half-cycle steps: high for one of every three (2/3 f, 33%)
+        const hd = d2 >= 0 ? d2 : p2 < 0.5 && q2 >= 0.5 ? (q2 - 0.5) / dt2 : -1;
+        if (hd >= 0) {
+          cnt2 = (cnt2 + 1) % 3;
+          const ns = cnt2 === 0 ? 1 : -1;
+          if (ns !== s2) { this.push(e++, i, hd, E_WRAP, (ns - s2) * SUB, 0, 4); s2 = ns; }
+        }
+      } else if (sub2 && d2 >= 0) {
         cnt2 = (cnt2 + 1) % div2;
         const ns = subHi(sub2, cnt2) ? 1 : -1;
         if (ns !== s2) { this.push(e++, i, d2, E_WRAP, (ns - s2) * SUB, 0, 4); s2 = ns; }
@@ -622,6 +679,7 @@ class A4Voice extends AudioWorkletProcessor {
         const ev = q.shift();
         if (ev.t === 'at') { const l = ev.list; for (let k = 0; k < l.length; k += 2) P[l[k]] = l[k + 1]; }
         else if (ev.t === 'on') this.noteOn(ev, now);
+        else if (ev.t === 'rtrg') { this.retrig(ev.rt, now); this.idle = false; }
         else if (ev.t === 'off') this.noteOff();
         else if (ev.t === 'ramp') { const l = ev.list; for (let k = 0; k < l.length; k += 3) this.ramps.push({ i: l[k], from: l[k + 1], to: l[k + 2], t0: ev.time, t1: ev.t1 }); }
       }
@@ -684,8 +742,11 @@ class A4Voice extends AudioWorkletProcessor {
       let o2 = w2 <= 3 || this.sub2 ? FIR_C * W2[i + 1] + FIR_S * (W2[i] + W2[i + 2]) : 0;
       if (w1 === 6) o1 += fb * 1.6;                          // FDB: filter 1 output fed back
       if (w2 === 6) o2 += nbIn ? nbIn[i] * 2.5 : 0;          // NEI: the neighbour track
-      if (am1) o1 *= 0.5 + 0.5 * o2;
-      if (am2) o2 *= 0.5 + 0.5 * o1;
+      if (am1 || am2) {
+        const g1 = 0.5 + 0.5 * tanhF(o1 * 8), g2 = 0.5 + 0.5 * tanhF(o2 * 8);
+        if (am1) o1 *= g2;
+        if (am2) o2 *= g1;
+      }
       // noise
       let nz = 0;
       const nLev = this.bNLev[b];
@@ -706,25 +767,19 @@ class A4Voice extends AudioWorkletProcessor {
       const G2 = G * G, G3 = G2 * G, G4 = G3 * G;
       const sigma = G3 * l0 * ig + G2 * l1 * ig + G * l2 * ig + l3 * ig;
       const k1 = this.bK1[b];
-      const xin = x * this.bComp[b];
+      const xin = x * this.bComp[b] * this.bInDrive[b];
       const u = tanhF(xin - (k1 * (G4 * xin + sigma)) / (1 + k1 * G4));
       let v = (u - l0) * G; const a1 = v + l0; l0 = a1 + v;
       v = (a1 - l1) * G; const a2 = v + l1; l1 = a2 + v;
       v = (a2 - l2) * G; const a3 = v + l2; l2 = a3 + v;
       v = (a3 - l3) * G; const a4 = v + l3; l3 = a4 + v;
       fb = a4;
-      let y = a4 * 1.9;
+      let y = a4 * 1.9 * this.bInComp[b];
       // Overdrive between the filters
       const om = this.bOvr[b];
       if (om > 0) { const dr = this.bDrive[b]; y += (tanhF(y * dr) * (1.4 / (1 + 0.04 * (dr - 1))) - y) * om; }
       // Filter 2: multimode
-      if (type2 === 1 || type2 === 3) {
-        const Gp = g2 / (1 + g2);
-        const vv = (y - lp1) * Gp;
-        const lo = vv + lp1;
-        lp1 = lo + vv;
-        y = type2 === 1 ? lo : y - lo;
-      } else {
+      {
         const k2 = this.bK2[b];
         const A1 = 1 / (1 + g2 * (g2 + k2)), A2 = g2 * A1, A3 = g2 * A2;
         const v3 = y - ic2;
@@ -734,7 +789,9 @@ class A4Voice extends AudioWorkletProcessor {
         ic2 = 2 * v2 - ic2;
         switch (type2) {
           case 0: y = v2; break;
+          case 1: y = v2 + v1; break;                      // LP1: low + band
           case 2: y = v1 * k2; break;
+          case 3: y = y - k2 * v1 - v2 + v1; break;        // HP1: high + band
           case 4: y = y - k2 * v1 - v2; break;
           case 5: y = y - k2 * v1; break;
           case 6: y = y + this.bPk[b] * k2 * v1; break;
@@ -750,7 +807,7 @@ class A4Voice extends AudioWorkletProcessor {
         SD[i] = vo * (bSD[b] + (bSD[b + 1] - bSD[b]) * f);
         SRv[i] = vo * (bSR[b] + (bSR[b + 1] - bSR[b]) * f);
       }
-      if (MO) MO[i] = vo;
+      if (MO) MO[i] = y;
     }
     // carry the oscillator work buffers (latency history and BLEP taps)
     W1[0] = W1[n]; W1[1] = W1[n + 1]; W1[2] = W1[n + 2]; W1[3] = W1[n + 3]; W1[4] = W1[n + 4];

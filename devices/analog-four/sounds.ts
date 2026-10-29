@@ -51,7 +51,7 @@ export const SOUNDS: SoundDef[] = [
   {
     id: 'bass-acid', name: 'Bass / Acid Squelch', category: 'Bass', recreates: 'a TB-303 style acid line, the job the A4 manual gives the transistor pulse',
     desc: 'Transistor pulse into a screaming ladder with overdrive. Accent and slide trigs make it talk.',
-    p: { osc1_wav: 1, osc1_pw: -10, flt1_frq: 46, flt1_res: 106, flt1_ovr: 52, flt1_dep: 30, envf_dec: 50, envf_sus: 0, amp_dec: 60, amp_sus: 60, amp_rel: 18, osc_sli: 40, snd_acc: 96 },
+    p: { osc1_wav: 1, osc1_pw: -10, flt1_frq: 46, flt1_res: 106, flt1_ovr: 26, flt1_dep: 30, envf_dec: 50, envf_sus: 0, amp_dec: 60, amp_sus: 60, amp_rel: 18, osc_sli: 40, snd_acc: 96 },
     oct: -1, demo: BASS_DEMO,
   },
   {
@@ -63,7 +63,7 @@ export const SOUNDS: SoundDef[] = [
   {
     id: 'bass-reese', name: 'Bass / Reese', category: 'Bass', recreates: 'the drum & bass "Reese" detuned-saw bass',
     desc: 'Two saws a few hertz apart beat against each other; a slow LFO on the cutoff keeps it moving.',
-    p: { osc2_lev: 100, osc2_det: 7, osc2_fin: 10, flt1_frq: 70, flt1_res: 40, flt1_ovr: 34, amp_sus: 127, amp_rel: 30, lfo1_spd: 8, lfo1_mul: 2, lfo1_depa: 14 },
+    p: { osc2_lev: 100, osc2_det: 7, osc2_fin: 10, flt1_frq: 70, flt1_res: 40, flt1_ovr: 17, amp_sus: 127, amp_rel: 30, lfo1_spd: 8, lfo1_mul: 2, lfo1_depa: 14 },
     oct: -1, demo: BASS_DEMO,
   },
   {
@@ -107,7 +107,7 @@ export const SOUNDS: SoundDef[] = [
   {
     id: 'lead-scream', name: 'Lead / Screamer', category: 'Lead',
     desc: 'Detuned saws into high resonance and heavy overdrive between the filters.',
-    p: { osc2_lev: 100, osc2_det: 10, flt1_frq: 70, flt1_res: 110, flt1_ovr: 92, flt1_dep: 20, envf_dec: 70, envf_sus: 40, amp_sus: 120, amp_del: 40 },
+    p: { osc2_lev: 100, osc2_det: 10, flt1_frq: 70, flt1_res: 110, flt1_ovr: 46, flt1_dep: 20, envf_dec: 70, envf_sus: 40, amp_sus: 120, amp_del: 40 },
     demo: LEAD_DEMO,
   },
   {

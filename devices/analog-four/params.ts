@@ -132,7 +132,7 @@ export const LFO_MULTS = [
   'x1', 'x2', 'x4', 'x8', 'x16', 'x32', 'x64', 'x128', 'x256', 'x512', 'x1K', 'x2K',
   '.1', '.2', '.4', '.8', '.16', '.32', '.64', '.128', '.256', '.512', '.1K', '.2K',
 ];
-export const LFO_MODES = ['FREE', 'TRIG', 'HOLD', 'ONE', 'HALF'];
+export const LFO_MODES = ['FRE', 'TRG', 'HLD', 'ONE', 'HLF'];
 export const LFO_WAVES = ['TRI', 'SIN', 'SQR', 'SAW', 'EXP', 'RMP', 'RND'];
 export const ARP_MODES = ['OFF', 'TRU', 'UP', 'DWN', 'CYC', 'SHF', 'RND'];
 export const PORTA_MODES = ['OFF', 'ON', 'LEG'];
@@ -172,7 +172,7 @@ export const MOD_DESTS: ModDest[] = [
   { name: 'NOI LEV', long: 'Noise level', keys: ['noise_lev'], range: 127 },
   { name: 'F1 FRQ', long: 'Filter 1 frequency', keys: ['flt1_frq'], range: 127 },
   { name: 'F1 RES', long: 'Filter 1 resonance', keys: ['flt1_res'], range: 127 },
-  { name: 'F1 OVR', long: 'Filter 1 overdrive', keys: ['flt1_ovr'], range: 127 },
+  { name: 'F1 OVR', long: 'Filter 1 overdrive', keys: ['flt1_ovr'], range: 128 },
   { name: 'F1 DEP', long: 'Filter 1 env depth', keys: ['flt1_dep'], range: 128 },
   { name: 'F2 FRQ', long: 'Filter 2 frequency', keys: ['flt2_frq'], range: 127 },
   { name: 'F2 RES', long: 'Filter 2 resonance', keys: ['flt2_res'], range: 127 },
@@ -278,9 +278,9 @@ function oscPage(n: 1 | 2): ParamDef[] {
     { key: `${o}lev`, page, slot: 4, short: 'LEV', name: `Osc ${n} level`, min: 0, max: 127, def: n === 1 ? 100 : 0, fmt: int, manual: M, desc: 'Level of the oscillator and its sub oscillator into the filters.' },
     { key: `${o}wav`, page, slot: 5, short: 'WAV', name: `Osc ${n} waveform`, min: 0, max: 7, def: 0, options: waves, fmt: opt(waves), manual: M, desc: n === 1
       ? 'SAW sawtooth, TRP transistor pulse, PUL pulse, TRI triangle, INL/INR the audio inputs, FDB filter feedback, OFF.'
-      : 'SAW sawtooth, TRP transistor pulse, PUL pulse, TRI triangle, INL/INR the audio inputs, NEI the neighbour track (track to the right), OFF.' },
+      : 'SAW sawtooth, TRP transistor pulse, PUL pulse, TRI triangle, INL/INR the audio inputs, NEI the previous track\'s sound (T2 hears T1), OFF.' },
     { key: `${o}sub`, page, slot: 6, short: 'SUB', name: `Osc ${n} sub oscillator`, min: 0, max: 4, def: 0, options: SUBS, fmt: opt(SUBS), manual: M, desc: '1OCT square one octave down, 2OCT square two octaves down, 2PUL 25% pulse two octaves down, 5TH 33% pulse at a third of the frequency.' },
-    { key: `${o}pw`, page, slot: 7, short: 'PW', name: `Osc ${n} pulse width`, min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: M, desc: 'Width of the pulse waves: 0 is a square, either end a thin pulse.' },
+    { key: `${o}pw`, page, slot: 7, short: 'PW', name: `Osc ${n} pulse width`, min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: `${M} (manual p.72, p.87)`, desc: 'Reshapes every wave; 0 is the plain one. PUL / TRP: the pulse width (the extremes mute them). TRI: towards a reversed saw. SAW: a second, phase-shifted saw (single again at the extremes).' },
     { key: `${o}spd`, page, slot: 8, short: 'SPD', name: `Osc ${n} PWM speed`, min: 0, max: 127, def: n === 1 ? 10 : 37, fmt: int, manual: M, desc: 'Speed of the oscillator\'s own pulse-width LFO.' },
     { key: `${o}pwm`, page, slot: 9, short: 'PWM', name: `Osc ${n} PWM depth`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'How far that LFO sweeps the pulse width: a moving, chorus-like thickness.' },
   ];
@@ -337,9 +337,18 @@ export function notePage(page: 'note' | 'fxnote' | 'cvnote'): ParamDef[] {
     { key: 'trig_vel', page, slot: 1, short: 'VEL', name: 'Velocity', min: 1, max: 127, def: 100, fmt: int, manual: SEQM, desc: 'Velocity of trigs: louder notes, and the VELOCITY MOD routings.' },
     { key: 'trig_len', page, slot: 2, short: 'LEN', name: 'Note length', min: 0, max: NOTE_LENGTHS.length - 1, def: 14, fmt: v => formatLength(v), manual: SEQM, desc: 'How long the gate stays open (1/16 = one step). Sustain and release depend on it.' },
     { key: 'trig_micro', page, slot: 3, short: 'µTM', name: 'Micro timing', min: -23, max: 23, def: 0, bipolar: true, fmt: v => formatMicro(v), manual: SEQM, desc: 'Nudges a held trig early or late in 1/384 steps of a whole note. Only on held trigs.' },
-    { key: 'trig_cond', page, slot: 4, short: 'TRC', name: 'Trig condition', min: 0, max: TRIG_CONDITIONS.length - 1, def: 0, fmt: condFmt, manual: SEQM, desc: 'A rule that decides whether a held trig plays: 1:2 every second loop, 50% a coin toss, FILL only in fill mode...' },
-    { key: 'trig_prob', page, slot: 5, short: 'PRB', name: 'Track trig probability', min: 0, max: 100, def: 100, fmt: v => `${Math.round(v)}%`, manual: SEQM, desc: 'Chance that each plain trig of this track plays (trigs with a condition ignore it).' },
+    // TRC takes PRB's place (knob E) while a trig is held (manual p.45, p.50): slot -2 marks it
+    { key: 'trig_cond', page, slot: -2, short: 'TRC', name: 'Trig condition', min: 0, max: TRIG_CONDITIONS.length - 1, def: 0, fmt: condFmt, manual: `${SEQM} (manual p.50)`, desc: 'A rule that decides whether a held trig plays: 1:2 every second loop, 50% a coin toss, FILL only in fill mode...' },
+    { key: 'trig_prob', page, slot: 4, short: 'PRB', name: 'Track trig probability', min: 0, max: 100, def: 100, fmt: v => `${Math.round(v)}%`, manual: `${SEQM} (manual p.45)`, desc: 'Chance that each plain trig of this track plays (trigs with a condition ignore it). Hold a trig and the knob becomes TRC.' },
   );
+  if (page === 'note') {
+    // retrigger switches, lock only: on for note trigs, off for lock trigs unless locked on (manual p.45)
+    const rt = (key: string, slot: number, short: string, what: string): ParamDef => ({
+      key, page, slot, short, name: `${what} retrig`, min: 0, max: 1, def: 1, options: ONOFF, fmt: opt(ONOFF), manual: `${SEQM} (manual p.45)`,
+      desc: `Hold a trig and set whether it retriggers ${what}: switch it off on a note trig to let ${what} run on, or on on a lock trig to restart it without a note.`,
+    });
+    out.push(rt('trig_envf', 5, 'ENVF', 'ENV F'), rt('trig_env2', 6, 'ENV2', 'ENV 2'), rt('trig_lfo1', 7, 'LFO1', 'LFO 1'), rt('trig_lfo2', 8, 'LFO2', 'LFO 2'));
+  }
   return out;
 }
 
@@ -348,11 +357,11 @@ export const SYNTH_PARAMS: ParamDef[] = [
   ...notePage('note'),
 
   // ARPEGGIATOR
-  { key: 'arp_mod', page: 'arp', slot: 0, short: 'MOD', name: 'Arpeggiator mode', min: 0, max: ARP_MODES.length - 1, def: 0, options: ARP_MODES, fmt: opt(ARP_MODES), manual: 'Manual - Arpeggiator', desc: 'OFF, TRU (order played), UP, DWN, CYC (up and down), SHF (shuffle), RND.' },
-  { key: 'arp_spd', page: 'arp', slot: 1, short: 'SPD', name: 'Arpeggiator speed', min: 1, max: 48, def: 6, fmt: int, manual: 'Manual - Arpeggiator', desc: 'Time between arpeggio notes in 1/24 beats: 6 = 16th notes, 12 = 8th notes, 4 = 16th triplets.' },
-  { key: 'arp_rng', page: 'arp', slot: 2, short: 'RNG', name: 'Arpeggiator range', min: 1, max: 4, def: 1, fmt: v => `${Math.round(v)}OCT`, manual: 'Manual - Arpeggiator', desc: 'Octaves the pattern climbs before it starts again.' },
-  { key: 'arp_nlen', page: 'arp', slot: 3, short: 'NLEN', name: 'Arpeggio note length', min: 0, max: 46, def: 12, fmt: v => formatLength(v), manual: 'Manual - Arpeggiator', desc: 'Gate length of each arpeggiated note.' },
-  { key: 'arp_leg', page: 'arp', slot: 4, short: 'LEG', name: 'Legato', min: 0, max: 1, def: 0, options: ONOFF, fmt: opt(ONOFF), manual: 'Manual - Arpeggiator', desc: 'ON: overlapping notes glide without retriggering the envelopes.' },
+  { key: 'arp_mod', page: 'arp', slot: 0, short: 'MOD', name: 'Arpeggiator mode', min: 0, max: ARP_MODES.length - 1, def: 0, options: ARP_MODES, fmt: opt(ARP_MODES), manual: 'Manual p.43-44, ARPEGGIATOR', lock: false, desc: 'OFF, TRU (order played), UP, DWN, CYC (up and down), SHF (shuffle), RND.' },
+  { key: 'arp_spd', page: 'arp', slot: 1, short: 'SPD', name: 'Arpeggiator speed', min: 1, max: 48, def: 6, fmt: int, manual: 'Manual p.43-44, ARPEGGIATOR', lock: false, desc: 'Time between arpeggio notes in 1/24 beats: 6 = 16th notes, 12 = 8th notes, 4 = 16th triplets.' },
+  { key: 'arp_rng', page: 'arp', slot: 2, short: 'RNG', name: 'Arpeggiator range', min: 1, max: 4, def: 1, fmt: v => `${Math.round(v)}OCT`, manual: 'Manual p.43-44, ARPEGGIATOR', lock: false, desc: 'Octaves the pattern climbs before it starts again.' },
+  { key: 'arp_nlen', page: 'arp', slot: 4, short: 'LEN', name: 'Arpeggio note length', min: 0, max: 46, def: 12, fmt: v => formatLength(v), manual: 'Manual p.44, ARPEGGIATOR', lock: false, desc: 'Gate length of each arpeggiated note.' },
+  { key: 'arp_leg', page: 'arp', slot: 3, short: 'LEG', name: 'Legato', min: 0, max: 1, def: 0, options: ONOFF, fmt: opt(ONOFF), manual: 'Manual p.44, ARPEGGIATOR', lock: false, desc: 'ON: overlapping notes glide without retriggering the envelopes.' },
   { key: 'arp_n2', page: 'arp', slot: 5, short: 'NO2', name: 'Arp note 2 offset', min: 0, max: 24, def: 0, fmt: v => (v ? `+${Math.round(v)}` : '---'), manual: 'Manual - Arpeggiator setup', desc: 'Adds a note this many semitones above the played note (0 = none).' },
   { key: 'arp_n3', page: 'arp', slot: 6, short: 'NO3', name: 'Arp note 3 offset', min: 0, max: 24, def: 0, fmt: v => (v ? `+${Math.round(v)}` : '---'), manual: 'Manual - Arpeggiator setup', desc: 'A third note, in semitones above the played note.' },
   { key: 'arp_n4', page: 'arp', slot: 7, short: 'NO4', name: 'Arp note 4 offset', min: 0, max: 24, def: 0, fmt: v => (v ? `+${Math.round(v)}` : '---'), manual: 'Manual - Arpeggiator setup', desc: 'A fourth note, in semitones above the played note.' },
@@ -379,8 +388,8 @@ export const SYNTH_PARAMS: ParamDef[] = [
 
   // FILTERS: filter 1 (4-pole ladder low-pass), filter 2 (2-pole multimode)
   { key: 'flt1_frq', page: 'filters', slot: 0, short: 'FRQ', name: 'Filter 1 frequency', min: 0, max: 127, def: 127, fmt: int, manual: `${APX}, FILTERS page`, desc: 'Cutoff of the 24 dB/octave ladder low-pass, one semitone a step: 0 = 13 Hz, 64 = 520 Hz, 127 = 20 kHz.' },
-  { key: 'flt1_res', page: 'filters', slot: 1, short: 'RES', name: 'Filter 1 resonance', min: 0, max: 127, def: 20, fmt: int, manual: `${APX}, FILTERS page`, desc: 'Feedback around the ladder: a peak at the cutoff that rings, and whistles near the top.' },
-  { key: 'flt1_ovr', page: 'filters', slot: 2, short: 'OVR', name: 'Overdrive', min: 0, max: 127, def: 0, fmt: int, manual: `${APX}, FILTERS page`, desc: 'Analog overdrive between the two filters: adds harmonics and grit.' },
+  { key: 'flt1_res', page: 'filters', slot: 1, short: 'RES', name: 'Filter 1 resonance', min: 0, max: 127, def: 25, fmt: int, manual: `${APX}, FILTERS page (manual p.73: about 25 is the default and the flattest response)`, desc: 'Feedback around the ladder: a peak at the cutoff that rings, and whistles near the top.' },
+  { key: 'flt1_ovr', page: 'filters', slot: 2, short: 'OVR', name: 'Overdrive', min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: `${APX}, FILTERS page (manual p.89)`, desc: '0 is clean. Positive values clip the signal after filter 1; negative values drive it more softly inside the filter.' },
   { key: 'flt1_trk', page: 'filters', slot: 3, short: 'TRK', name: 'Filter 1 keytracking', min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: `${APX}, FILTERS page`, desc: 'How much the cutoff follows the note: 32 tracks it exactly, so high notes stay as bright as low ones.' },
   { key: 'flt1_dep', page: 'filters', slot: 4, short: 'DEP', name: 'Filter 1 env depth', min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: `${APX}, FILTERS page`, desc: 'How far ENV F sweeps filter 1 (64 = the full range).' },
   { key: 'flt2_frq', page: 'filters', slot: 5, short: 'FRQ', name: 'Filter 2 frequency', min: 0, max: 127, def: 0, fmt: int, manual: `${APX}, FILTERS page`, desc: 'Cutoff of the 2-pole multimode filter (same scale as filter 1).' },
@@ -438,11 +447,11 @@ export const FX_PARAMS: ParamDef[] = [
     const base = si * 5;
     const M = `${APB}, EXT IN page`;
     return [
-      { key: `ext${s}_cho`, page: 'extin', slot: base, short: `${S}CHO`, name: `Input ${S} chorus send`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Sends the audio input to the chorus.' },
-      { key: `ext${s}_del`, page: 'extin', slot: base + 1, short: `${S}DEL`, name: `Input ${S} delay send`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Sends the audio input to the delay.' },
-      { key: `ext${s}_rev`, page: 'extin', slot: base + 2, short: `${S}REV`, name: `Input ${S} reverb send`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Sends the audio input to the reverb.' },
-      { key: `ext${s}_pan`, page: 'extin', slot: base + 3, short: `${S}PAN`, name: `Input ${S} pan`, min: -64, max: 63, def: si ? 63 : -64, bipolar: true, fmt: signed, manual: M, desc: 'Position of the input in the stereo field.' },
-      { key: `ext${s}_lev`, page: 'extin', slot: base + 4, short: `${S}LEV`, name: `Input ${S} level`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Level of the input mixed into the main outputs.' },
+      { key: `ext${s}_cho`, page: 'extin', slot: base, short: 'CHO', name: `Input ${S} chorus send`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Sends the audio input to the chorus.' },
+      { key: `ext${s}_del`, page: 'extin', slot: base + 1, short: 'DEL', name: `Input ${S} delay send`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Sends the audio input to the delay.' },
+      { key: `ext${s}_rev`, page: 'extin', slot: base + 2, short: 'REV', name: `Input ${S} reverb send`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Sends the audio input to the reverb.' },
+      { key: `ext${s}_pan`, page: 'extin', slot: base + 3, short: 'PAN', name: `Input ${S} pan`, min: -64, max: 63, def: si ? 63 : -64, bipolar: true, fmt: signed, manual: M, desc: 'Position of the input in the stereo field.' },
+      { key: `ext${s}_lev`, page: 'extin', slot: base + 4, short: 'VOL', name: `Input ${S} level`, min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Level of the input mixed into the main outputs.' },
     ];
   }),
   // CHORUS
@@ -450,7 +459,7 @@ export const FX_PARAMS: ParamDef[] = [
   { key: 'cho_spd', page: 'chorus', slot: 1, short: 'SPD', name: 'Chorus speed', min: 0, max: 127, def: 40, fmt: int, manual: `${APB}, CHORUS page`, desc: 'Speed of the delay-time modulation.' },
   { key: 'cho_dep', page: 'chorus', slot: 2, short: 'DEP', name: 'Chorus depth', min: 0, max: 127, def: 64, fmt: int, manual: `${APB}, CHORUS page`, desc: 'How far the delay time is swept: the amount of shimmer.' },
   { key: 'cho_wid', page: 'chorus', slot: 3, short: 'WID', name: 'Chorus width', min: 0, max: 127, def: 127, fmt: int, manual: `${APB}, CHORUS page`, desc: 'Stereo spread of the chorus voices.' },
-  { key: 'cho_fb', page: 'chorus', slot: 4, short: 'FB', name: 'Chorus feedback', min: 0, max: 127, def: 0, fmt: int, manual: `${APB}, CHORUS page`, desc: 'Feeds the chorus back into itself: metallic, flanged colours.' },
+  { key: 'cho_fb', page: 'chorus', slot: 4, short: 'FDB', name: 'Chorus feedback', min: 0, max: 127, def: 0, fmt: int, manual: `${APB}, CHORUS page`, desc: 'Feeds the chorus back into itself: metallic, flanged colours.' },
   { key: 'cho_hpf', page: 'chorus', slot: 5, short: 'HPF', name: 'Chorus high-pass', min: 0, max: 127, def: 0, fmt: int, manual: `${APB}, CHORUS page`, desc: 'High-pass on the chorus signal: keeps the bass in the middle.' },
   { key: 'cho_lpf', page: 'chorus', slot: 6, short: 'LPF', name: 'Chorus low-pass', min: 0, max: 127, def: 127, fmt: int, manual: `${APB}, CHORUS page`, desc: 'Low-pass on the chorus signal.' },
   { key: 'cho_del', page: 'chorus', slot: 7, short: 'DEL', name: 'Chorus to delay', min: 0, max: 127, def: 0, fmt: int, manual: `${APB}, CHORUS page`, desc: 'Sends the chorus on into the delay.' },
@@ -460,7 +469,7 @@ export const FX_PARAMS: ParamDef[] = [
   { key: 'del_tim', page: 'delay', slot: 0, short: 'TIM', name: 'Delay time', min: 1, max: 128, def: 24, fmt: delayTimeFmt, manual: `${APB}, DELAY page`, desc: 'Delay time in 1/128 notes, locked to the tempo: 16 = 1/8, 24 = dotted 1/8, 32 = 1/4.' },
   { key: 'del_x', page: 'delay', slot: 1, short: 'X', name: 'Ping pong', min: 0, max: 1, def: 0, options: ONOFF, fmt: opt(ONOFF), manual: `${APB}, DELAY page`, desc: 'ON: the echoes bounce between left and right.' },
   { key: 'del_wid', page: 'delay', slot: 3, short: 'WID', name: 'Delay stereo width', min: -64, max: 63, def: 63, bipolar: true, fmt: signed, manual: `${APB}, DELAY page`, desc: 'Stereo spread of the echoes (negative swaps the sides).' },
-  { key: 'del_fb', page: 'delay', slot: 4, short: 'FB', name: 'Delay feedback', min: 0, max: 127, def: 50, fmt: int, manual: `${APB}, DELAY page`, desc: 'How much of each echo is fed back: the number of repeats. Above 100 it builds up (with saturation).' },
+  { key: 'del_fb', page: 'delay', slot: 4, short: 'FDB', name: 'Delay feedback', min: 0, max: 127, def: 50, fmt: int, manual: `${APB}, DELAY page`, desc: 'How much of each echo is fed back: the number of repeats. Above 100 it builds up (with saturation).' },
   { key: 'del_hpf', page: 'delay', slot: 5, short: 'HPF', name: 'Delay high-pass', min: 0, max: 127, def: 0, fmt: int, manual: `${APB}, DELAY page`, desc: 'High-pass in the feedback loop: echoes get thinner.' },
   { key: 'del_lpf', page: 'delay', slot: 6, short: 'LPF', name: 'Delay low-pass', min: 0, max: 127, def: 110, fmt: int, manual: `${APB}, DELAY page`, desc: 'Low-pass in the feedback loop: each echo gets darker, like tape.' },
   { key: 'del_ovr', page: 'delay', slot: 7, short: 'OVR', name: 'Delay overdrive', min: 0, max: 127, def: 0, fmt: int, manual: `${APB}, DELAY page`, desc: 'Saturation inside the delay loop.' },
@@ -497,7 +506,7 @@ export const FX_PARAMS: ParamDef[] = [
 
 export function delayTimeFmt(v: number): string {
   const r = Math.round(v);
-  const names: Record<number, string> = { 4: '1/32', 8: '1/16', 16: '1/8', 24: '1/8.', 32: '1/4', 48: '1/4.', 64: '1/2', 128: '1/1', 12: '1/16.', 6: '1/32.' };
+  const names: Record<number, string> = { 1: '1/128', 2: '1/64', 3: '1/64.', 4: '1/32', 6: '1/32.', 8: '1/16', 12: '1/16.', 16: '1/8', 24: '1/8.', 32: '1/4', 48: '1/4.', 64: '1/2', 96: '1/2.', 128: '1' };
   return names[r] ?? String(r);
 }
 
@@ -563,7 +572,7 @@ export const PERF_MACROS: { name: string; synth: [string, number][]; fx?: [strin
   { name: 'LP SWEEP', synth: [['flt1_frq', -90]] },
   { name: 'HP SWEEP', synth: [['flt2_frq', 80]] },
   { name: 'RESONANCE', synth: [['flt1_res', 90]] },
-  { name: 'DRIVE', synth: [['flt1_ovr', 110]] },
+  { name: 'DRIVE', synth: [['flt1_ovr', 55]] },
   { name: 'ENV DEPTH', synth: [['flt1_dep', 48]] },
   { name: 'DECAY', synth: [['amp_dec', 48], ['envf_dec', 48]] },
   { name: 'CHORUS', synth: [['amp_cho', 110]] },
@@ -597,16 +606,18 @@ export function routeOf(id: string): { track: number | null; view: number } | nu
 }
 
 /** Encoder slot -> control for the active track and view */
-export function encoderControl(track: number, view: number, slot: number, perfMuted = false): string | null {
+export function encoderControl(track: number, view: number, slot: number, perfMuted = false, held = false): string | null {
   const page = pageFor(track, view);
   if (!page) return null;
   void perfMuted;
+  // NOTE page: knob E is TRC (the trig condition) while a trig is held, PRB otherwise
+  if (held && slot === 4 && (page === 'note' || page === 'fxnote' || page === 'cvnote')) return tid(track, 'trig_cond');
   if (page === 'tempo') return slot === 0 ? 'tempo' : slot === 1 ? 'swing' : null;
   if (page === 'perf') return `perf_${'abcdefghij'[slot]}`;
+  // the PERFORMANCE MIXER: the track levels on knobs A-E (manual p.28)
   if (page === 'mix') {
     if (slot < SYNTH_TRACKS) return tid(slot, 'level');
     if (slot === 4) return fxid('level');
-    if (slot === 9) return 'main_volume';
     return null;
   }
   const p = pageSlots(page)[slot];
