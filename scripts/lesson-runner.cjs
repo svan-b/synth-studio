@@ -15,6 +15,9 @@
 //                  cables, transport; and through the lesson runtime, in device lessons
 //                  too: routes, the arranger, other instruments, the mixer, Elektron
 //                  pattern settings and trigs) when the step has one
+//   demo recordings (info.play, listen.demo) -> play them as the coach does (both sides
+//                  of an A/B) and check each one sounds, decodes and stops; a silent or
+//                  missing recording fails the step
 // Any step still not satisfied is searched: single moves a learner could make
 // (studio transport, a cable between instruments, an internal cable, a switch or
 // button, a press) are tried one at a time and kept when they help. A step solved
@@ -26,6 +29,7 @@
 // bounce or record for real - the runner waits for the meters, like a learner.
 // ============================================================================
 const { chromium } = require('playwright');
+const { serveDemoRecordings } = require('./e2e/demoRecordings.cjs');
 
 (async () => {
   // An optional third argument runs only the lessons whose id contains it
@@ -35,6 +39,8 @@ const { chromium } = require('playwright');
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  // The demo recordings are AAC; this Chromium can't decode it, so it gets them as WAV
+  await serveDemoRecordings(page);
   await page.addInitScript(d => {
     if (!sessionStorage.getItem('seeded')) {
       localStorage.setItem('synth-studio-storage', JSON.stringify({ state: { currentDevice: d, devices: {}, completedLessons: [], review: {}, focusMode: true,
@@ -73,6 +79,48 @@ const { chromium } = require('playwright');
       : (step.control || step.event || step.play) ? 'do'
       : (step.checklist && step.checklist.length) ? 'challenge' : 'info');
     const lessonInstanceOf = () => S().lessonInstance || device;
+    /**
+     * A step's demo recordings, played through the app's player like the coach's ▶ Hear it
+     * and A/B: each must load, make sound and stop again. Returns what was heard, or why not.
+     */
+    const playDemos = async (lesson, i, step) => {
+      const da = window.__synthDemoAudio;
+      if (!da) return { error: 'no demo player in the page (window.__synthDemoAudio)' };
+      const owner = `lesson:${lesson.id}:${i}`;
+      const heard = [];
+      // after the coach has moved to the step (leaving a step stops its recordings)
+      await wait(200);
+      const listen = async what => {
+        let peak = 0, playing = false;
+        for (let k = 0; k < 80; k++) {
+          await wait(100);
+          const pb = da.getPlayback();
+          if (pb && pb.status === 'error') return { what, error: pb.error };
+          if (pb && pb.status === 'playing') playing = true;
+          peak = Math.max(peak, da.outputLevel());
+          if (playing && peak > 0.02 && k >= 10) break;
+        }
+        return { what, peak: Math.round(peak * 1000) / 1000, playing };
+      };
+      if (step.info && step.info.play) {
+        const clips = da.clipsOf(step.info.play);
+        da.play(owner, step.info.play);
+        heard.push(await listen(clips.map(c => c.file).join(' + ')));
+      }
+      const d = step.listen && step.listen.demo;
+      if (d) {
+        const a = { demo: d.demo, excerpt: d.excerpt, variation: d.a }, b = { demo: d.demo, excerpt: d.excerpt, variation: d.b };
+        da.playSide(owner, a, b, 'a');
+        heard.push(await listen(`A ${d.a}`));
+        da.playSide(owner, a, b, 'b');
+        heard.push(await listen(`B ${d.b}`));
+      }
+      da.stop();
+      await wait(150);
+      const after = da.getPlayback();
+      const bad = heard.filter(h => h.error || !h.playing || !(h.peak > 0.02));
+      return { heard, stopped: !after, error: bad.length ? `silent or failed: ${JSON.stringify(bad)}` : !after ? undefined : 'did not stop' };
+    };
     /** A step's instance: an instance id, or a device's first instance in the rack */
     const resolveRef = ref => {
       const rack = S().studio.rack;
@@ -221,7 +269,9 @@ const { chromium } = require('playwright');
         const kind = kindOf(step);
         const inst = instanceOfStep(step);
         let how = '';
+        let demo = null;
         try {
+          if ((step.info && step.info.play) || (step.listen && step.listen.demo)) demo = await playDemos(lesson, i, step);
           if (kind === 'predict' && step.predict) S().answerStep(step.predict.answer);
           if (kind === 'quiz' && step.quiz) S().answerStep(step.quiz.answer);
           if (kind === 'listen' && step.listen && step.listen.question) S().answerStep(step.listen.question.answer);
@@ -283,6 +333,10 @@ const { chromium } = require('playwright');
         // Live checks (meters, takes) settle a moment later: give them a second
         if (liveRt) { liveRt.publish(); for (let k = 0; k < 8 && !satisfied(); k++) { await wait(150); liveRt.publish(); } }
         let ok = satisfied();
+        if (demo && demo.error) {
+          stepResults.push({ i: i + 1, kind, ok: false, why: `demo recording: ${demo.error}`, demo: demo.heard });
+          continue;
+        }
         // What a failing studio check saw, before any search moves change it
         let seen;
         if (!ok && studio) {
@@ -302,7 +356,7 @@ const { chromium } = require('playwright');
         // An open challenge with no `solution` that no single move solves needs a human
         const manual = !ok && kind === 'challenge' && !step.solution;
         stepResults.push({
-          i: i + 1, kind, ok: ok || manual, manual, how, auto: auto && auto.length ? auto : undefined, seen,
+          i: i + 1, kind, ok: ok || manual, manual, how, auto: auto && auto.length ? auto : undefined, seen, demo: demo ? demo.heard : undefined,
           why: ok ? '' : manual ? 'challenge needs a manual/solution check' : 'not satisfied after performing the action (and no single learner move solved it)',
         });
       }
@@ -316,6 +370,7 @@ const { chromium } = require('playwright');
         manual: stepResults.filter(r => r.manual).length,
         auto: stepResults.filter(r => r.auto).map(r => ({ step: r.i, kind: r.kind, moves: r.auto })),
         presses: stepResults.filter(r => r.how).map(r => ({ step: r.i, how: r.how })),
+        demos: stepResults.filter(r => r.demo).map(r => ({ step: r.i, heard: r.demo })),
       });
     }
     return results;
@@ -333,6 +388,9 @@ const { chromium } = require('playwright');
     autoSteps,
     auto: report.filter(r => r.auto.length).map(r => ({ id: r.id, auto: r.auto })),
     presses: report.filter(r => r.presses.length).map(r => ({ id: r.id, presses: r.presses })),
+    // Demo recordings played (info.play, listen.demo): every one sounded and stopped
+    demoSteps: report.reduce((n, r) => n + r.demos.length, 0),
+    demos: report.filter(r => r.demos.length).map(r => ({ id: r.id, demos: r.demos })),
     errors: errors.slice(0, 10),
   }, null, 2));
   await browser.close();

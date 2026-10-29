@@ -6,6 +6,8 @@ import { BUILD_PATHS, MORE_SETS, currentStage, loadStudioSet, type StudioSet } f
 import { DEMOS, DEMO_SECTION, demoBars, demoSeconds, loadDemo, playDemo, restartDemo, studioDemo, studioHasWork, type DemoMeta } from '@/lib/studio/demos';
 import { arranger } from '@/lib/studio/arranger';
 import { downloadProject } from '@/lib/studio/project';
+import { FULL, play as playRecording, resolveClip } from '@/lib/studio/demoAudio';
+import { DemoProgress, useDemoPlayback } from '@/components/teaching/DemoClips';
 import { transport } from '@/lib/audio/transport';
 import { DEVICES } from '@/devices';
 import { hub } from '@/lib/studio/hub';
@@ -19,7 +21,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).
 export const demoInstruments = (d: DemoMeta) => d.instruments.map(nameOf).join(' · ');
 
 /**
- * "Build a track": the demo tracks (finished songs to play and take apart), then
+ * "Build a track": the demo tracks (finished songs to listen to, play and take apart), then
  * two paths of five stages - one instrument, + a clock, + a mixer, + a second
  * instrument, the full set. Each stage is a complete, wired and mixed studio, and
  * loading one keeps your patterns and sounds.
@@ -72,7 +74,7 @@ function DemoTracks() {
         <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 text-sm font-bold text-white" aria-expanded={open}>
           {open ? '▾' : '▸'} Demo tracks
         </button>
-        <span className="text-[11px] text-gray-400">Finished songs made in this studio: play one, then take it apart.</span>
+        <span className="text-[11px] text-gray-400">Finished songs made in this studio: listen to one, then load it and take it apart.</span>
       </div>
       {open && (
         <ul className="grid sm:grid-cols-3 gap-2 mt-2">
@@ -86,22 +88,26 @@ function DemoTracks() {
                 </div>
                 <p className="text-[11px] text-gray-300 mt-1 leading-snug flex-1">{d.description}</p>
                 <p className="text-[10px] text-gray-500 mt-1 leading-snug">{demoInstruments(d)}</p>
-                <div className="flex gap-1.5 mt-2">
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  <ListenButton demo={d} />
                   <button
                     onClick={() => ask(d, true)}
                     disabled={!!busy}
-                    className="px-3 h-8 rounded text-xs font-bold text-black disabled:opacity-50"
-                    style={{ background: d.accent }}
-                    aria-label={`Play the demo track ${d.title}`}
+                    className="px-3 h-11 rounded-lg bg-[#2a2a2a] text-white text-xs font-bold disabled:opacity-50 border border-[#3a3a3a]"
+                    aria-label={active ? `Play the demo track ${d.title} from bar 1` : `Load and play the demo track ${d.title}`}
                   >
-                    {busy === d.id ? 'Loading…' : '▶ Play'}
+                    {busy === d.id ? 'Loading…' : active ? '▶ Play from bar 1' : 'Load and play'}
                   </button>
                   {!active && (
-                    <button onClick={() => ask(d, false)} disabled={!!busy} className="px-3 h-8 rounded bg-[#2a2a2a] text-white text-xs font-bold disabled:opacity-50" aria-label={`Load the demo track ${d.title}`}>
+                    <button onClick={() => ask(d, false)} disabled={!!busy} className="px-3 h-11 rounded-lg bg-[#2a2a2a] text-white text-xs font-bold disabled:opacity-50 border border-[#3a3a3a]" aria-label={`Load the demo track ${d.title}`}>
                       Load
                     </button>
                   )}
                 </div>
+                <ListenProgress demo={d} />
+                <p className="text-[11px] text-gray-400 mt-1.5 leading-snug">
+                  Listen plays a recording, so your studio stays as it is. Load opens the real instruments, every pattern and sound, to play and take apart.
+                </p>
               </li>
             );
           })}
@@ -114,6 +120,37 @@ function DemoTracks() {
         void run(pending.demo, pending.play);
       }} />
     </section>
+  );
+}
+
+/** ▶ Listen: the whole demo, a recording (public/demos), played without loading anything */
+function ListenButton({ demo }: { demo: DemoMeta }) {
+  const owner = `card:${demo.id}`;
+  const pb = useDemoPlayback(owner);
+  const clip = resolveClip({ demo: demo.id, excerpt: FULL });
+  if (!clip) return null;
+  const status = pb?.status;
+  return (
+    <button
+      onClick={() => playRecording(owner, { demo: demo.id, excerpt: FULL })}
+      aria-pressed={status === 'playing' || status === 'loading'}
+      className="px-3.5 h-11 rounded-lg text-xs font-bold text-black"
+      style={{ background: demo.accent }}
+      aria-label={status === 'playing' ? `Stop listening to ${demo.title}` : `Listen to the demo track ${demo.title} without loading it`}
+    >
+      {status === 'loading' ? 'Loading…' : status === 'playing' ? '■ Stop' : '▶ Listen'}
+    </button>
+  );
+}
+
+/** While a card's recording plays: how far, and the time (the row is kept, so the cards' buttons stay in line) */
+function ListenProgress({ demo }: { demo: DemoMeta }) {
+  const pb = useDemoPlayback(`card:${demo.id}`);
+  if (pb?.status === 'error') return <p className="text-[11px] text-orange-200 mt-1.5 min-h-4 leading-4" role="status">Couldn&apos;t play the recording: {pb.error}.</p>;
+  return (
+    <div className="mt-2 h-4">
+      {pb && <DemoProgress playing={pb.status === 'playing'} color={demo.accent} label={`How far the recording of ${demo.title} has played`} time />}
+    </div>
   );
 }
 

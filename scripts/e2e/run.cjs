@@ -6,8 +6,9 @@
 // Always: the iPad journey, the studio (clock cable, record, reload), rapid
 // instrument switching, saved-settings upgrades and touch gestures (fine adjust,
 // value bubble, double-tap reset, no page scroll, a momentary lesson step, the
-// spectrum scope), and the Producer path on iPad (a whole-studio lesson; First
-// beat by touch on the Analog Rytm and Groove's pattern SWING).
+// spectrum scope), the Producer path on iPad (a whole-studio lesson; First
+// beat by touch on the Analog Rytm and Groove's pattern SWING), and the demo
+// recordings (a hook's level and stop, a loudness-matched demo A/B, the cards' Listen).
 // --full: also scripts/smoke.cjs and scripts/lesson-runner.cjs for every
 // instrument in devices/index.ts.
 // Exits non-zero if anything fails, so it can gate merges.
@@ -117,6 +118,19 @@ check('producer path: iPad walkthrough of a whole-studio lesson', !pp.__error &&
 const pe = run(path.join(__dirname, 'producer-elektron.cjs'), [base, path.join(outDir, 'producer-elektron')], 600_000);
 check('producer path: iPad walkthrough of First beat by touch, and Groove\'s pattern SWING', !pe.__error && pe.total > 0 && (pe.failed ?? []).length === 0 && (pe.errs ?? []).length === 0,
   pe.__error ?? { passed: pe.passed, total: pe.total, failed: pe.failed });
+
+// ---- Demo recordings on iPad (lib/studio/demoAudio.ts) ----------------------------
+const da = run(path.join(__dirname, 'demo-audio.cjs'), [base, path.join(outDir, 'demo-audio')], 300_000);
+const dal = da.log ?? {};
+const daOk = name => (da.failed ?? []).every(f => !f.name.startsWith(name));
+check('demo recordings: runs without errors', !da.__error && da.total > 0 && (da.errs ?? []).length === 0, da.__error ?? da.errs);
+check('demo recordings: a hook plays at the expected level (manifest loudness + trim, ±1 LU)', !da.__error && daOk('hook: it plays at the expected level'), dal.hook);
+check('demo recordings: Next stops the hook (silent within 300 ms)', !da.__error && daOk('hook: Next stops it'), dal.afterNext);
+check('demo recordings: a demo A/B plays both sides at the same loudness, near the studio\'s level', !da.__error && daOk('A/B: A and B') && daOk('A/B: it plays near'), dal.ab);
+check('demo recordings: the studio keeps running underneath, held back from the speakers', !da.__error && daOk('A/B: the speakers'), dal.ab && { a: dal.ab.a, speakersA: dal.ab.speakersA, studio: dal.ab.studioPlaying });
+check('demo recordings: a second press, the studio\'s ▶ and ■ stop it', !da.__error && daOk('A/B: pressing the lit side') && daOk('A/B: the studio'), { second: dal.secondPress, stop: dal.studioStop, play: dal.studioPlay });
+check('demo recordings: the demo cards\' Listen plays the song without loading it', !da.__error && daOk('cards:'), dal.listen);
+check('demo recordings: every check', !da.__error && (da.failed ?? []).length === 0, da.__error ?? { passed: da.passed, total: da.total, failed: da.failed });
 
 // ---- Demo tracks (--demos, or --full) -------------------------------------------
 // Each demo loaded from the studio, played from bar 1 to its end, its mix measured and bounced

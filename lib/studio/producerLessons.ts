@@ -11,6 +11,9 @@
 // comes back with one press. Checks use lib/studio/checks.ts and the live studio
 // state (meters, takes, history) of Lesson API v3 (docs/PEDAGOGY.md).
 //
+// The hooks play recordings of the demo tracks (`info.play`, `listen.demo`:
+// public/demos, rendered by scripts/render-demos.cjs), never the studio.
+//
 // Loaded on demand (lib/studio/producerIndex.ts lists the ids up front).
 // ============================================================================
 
@@ -49,9 +52,10 @@ const oneClock: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'timing-tempo',
-      instruction: 'Drums and bass from the Xone:96\'s decks, percussion from the DFAM: machines with no shared brain. One clock makes them play as one band.',
+      instruction: 'Three instruments with no shared brain, perfectly in time: press ▶ Hear it. The secret is one clock, and in this lesson you wire one.',
       principle: 'Music is organised time; one clock divides it into beats every instrument agrees on.',
-      explanation: 'In this lesson\'s studio the Xone:96\'s built-in decks play the drums, the bass and the stabs of "Tide Pool", a deep-house sketch in A minor. Your DFAM plays a knock-and-tick percussion loop on Xone channel 4.',
+      explanation: 'The recording is the demo "Three Clocks": a DFAM, a Mother-32 and a Subharmonicon stepped by one 16th-note clock, in loops of different lengths. In this lesson\'s studio the Xone:96\'s built-in decks play the drums, the bass and the stabs of "Tide Pool", a deep-house sketch in A minor. Your DFAM plays a knock-and-tick percussion loop on Xone channel 4.',
+      info: { play: { demo: 'three-clocks', excerpt: 'low-end-17-20' } },
     },
     {
       kind: 'quiz', concept: 'timing-tempo',
@@ -231,20 +235,16 @@ const frequencySlots: Lesson = {
     {
       kind: 'listen', concept: 'mixing', scope: 'spectrum',
       instruction: 'Same parts, same levels. One mix is clear, one is muddy. Play A, then B, and switch a few times.',
-      explanation: 'The coach plays both at the same loudness, so the difference you hear is the balance of frequencies, not level. "Tide Pool" is this lesson\'s session: drums, bass and stabs on Xone:96 channels 1 to 3, and your DFAM percussion on channel 4.',
+      explanation: 'Both are the first drop of the demo "Low Tide Lights", played at the same loudness, so the difference you hear is the balance of frequencies, not level: watch the spectrum below 300 Hz. This lesson\'s session is "Tide Pool": drums, bass and stabs on Xone:96 channels 1 to 3, and your DFAM percussion on channel 4.',
       listen: {
         a: {}, b: {},
         labels: ['Mix A', 'Mix B'],
-        matchLoudness: true,
-        parts: {
-          a: { [XONE]: CP_SLOTTED.xone, dfam: { vcf_mode: 0, vcf_cutoff: 220 } },
-          b: { [XONE]: CP_MUDDY.xone, dfam: { vcf_mode: 1, vcf_cutoff: 6000 } },
-        },
+        demo: { demo: 'low-tide-lights', excerpt: 'drop-17-20', a: 'as-made', b: 'muddy' },
         question: {
           question: 'What makes B muddy?',
-          options: ['Too many parts pile up in the low end and the low mids', 'The tempo is slower', 'The DFAM plays more notes'],
+          options: ['Too many parts pile up in the low end and the low mids', 'The tempo is slower', 'The hook is too loud'],
           answer: 0,
-          explain: 'In B the stabs keep their lows and have boosted low mids, and the DFAM rings like a low tom: all of it lands on top of the kick and bass. The tempo and the notes are identical in both mixes.',
+          explain: 'In B every high-pass is off and the low mids are boosted: the stabs, the clap, the hats and the effect returns keep their lows, and all of it lands on top of the kick and the bass. The tempo and the parts are identical, and both play at the same loudness.',
         },
       },
     },
@@ -404,17 +404,17 @@ const spaceDepth: Lesson = {
   steps: [
     {
       kind: 'listen', concept: 'effects',
-      instruction: 'The same mix twice, at the same loudness: once dry, once with space.',
+      instruction: 'The same break twice, at the same loudness: once dry, once with space.',
+      explanation: 'Both are the break of the demo "Low Tide Lights": pads and the hook over a few drums.',
       listen: {
         a: {}, b: {},
         labels: ['Mix A', 'Mix B'],
-        matchLoudness: true,
-        parts: { a: { [XONE]: CP_DRY.xone }, b: { [XONE]: CP_SPACED.xone } },
+        demo: { demo: 'low-tide-lights', excerpt: 'break-33-36', a: 'dry', b: 'as-made' },
         question: {
           question: 'What does B add?',
           options: ['Depth: some parts sound further away than others', 'A faster tempo', 'More bass'],
           answer: 0,
-          explain: 'B sends the perc into a delay and the stabs into a reverb, while the drums and bass stay dry. Distance is mostly reflections, so the wet parts move back and the dry ones stay in front. The tempo and the low end are the same.',
+          explain: 'B is the break as made: the pads and the hook go into reverb and delay, the one deep kick into a long reverb. Distance is mostly reflections, so the wet parts move back and the dry ones stay in front. The tempo and the low end are the same; A has every effect return off.',
         },
       },
     },
@@ -714,16 +714,17 @@ const arrangement: Lesson = {
   steps: [
     {
       kind: 'listen', concept: 'mixing',
-      instruction: 'The loop with everything, and the same loop with only the drums and perc.',
+      instruction: 'The drop with everything, and the same drop with only the drums.',
+      explanation: 'Both are the first drop of the demo "Low Tide Lights", at the same loudness.',
       listen: {
         a: {}, b: {},
-        labels: ['Everything', 'Drums and perc'],
-        parts: { a: { [XONE]: { ch2_src: SRC.BASS, ch3_src: SRC.STABS } }, b: { [XONE]: { ch2_src: SRC.NONE, ch3_src: SRC.NONE } } },
+        labels: ['Everything', 'Drums only'],
+        demo: { demo: 'low-tide-lights', excerpt: 'drop-17-20', a: 'as-made', b: 'drums' },
         question: {
           question: 'A track plays B for 16 bars, then switches to A. How does A feel when it arrives?',
           options: ['Bigger: the bass and the chords arrive', 'Smaller', 'The same as if it had played all along'],
           answer: 0,
-          explain: 'Energy is relative. After 16 bars without them, the bass and stabs arriving on a downbeat is an event; played all along they become wallpaper.',
+          explain: 'Energy is relative. After 16 bars without them, the bass and the chords arriving on a downbeat is an event; played all along they become wallpaper.',
         },
       },
     },
@@ -904,9 +905,10 @@ const transitions: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'sequencer-pattern', area: 'arranger',
-      instruction: 'Your song is in the arranger. Press "▶ from here" on the Build and listen into Drop 2: the change just happens.',
+      instruction: '▶ Hear it: a finished build tells you the drop is coming. Then press "▶ from here" on your Build: yours just changes.',
       principle: 'A transition tells the listener a change is near.',
-      explanation: 'Right now the Build simply becomes Drop 2. The last bar of the Build is its own 1-bar section, Fill, ready for a transition. In this lesson you make the end of the Build rise, thin out and breathe.',
+      explanation: 'The recording is the end of the build into Drop 2 in the demo "Low Tide Lights": a denser, higher snare roll, a noise riser, the drums thinned out, a last bar without a kick. In your song the Build simply becomes Drop 2. The last bar of the Build is its own 1-bar section, Fill, ready for a transition. In this lesson you make the end of the Build rise, thin out and breathe.',
+      info: { play: { demo: 'low-tide-lights', excerpt: 'build-45-49' } },
     },
     {
       kind: 'quiz', concept: 'sequencer-pattern',
@@ -1082,16 +1084,16 @@ const mixdown: Lesson = {
     {
       kind: 'listen', concept: 'mixing',
       instruction: 'Two balances of the same drop, at the same loudness. Which one is wrong?',
+      explanation: 'Both are the second drop of the demo "Low Tide Lights".',
       listen: {
         a: {}, b: {},
         labels: ['Mix A', 'Mix B'],
-        matchLoudness: true,
-        parts: { a: { [XONE]: MIX_LEVELS }, b: { [XONE]: { ...MIX_LEVELS, ch1_fader: 8 } } },
+        demo: { demo: 'low-tide-lights', excerpt: 'drop2-49-52', a: 'as-made', b: 'drums-down' },
         question: {
           question: 'In B, what is wrong?',
-          options: ['The stabs are too quiet', 'The drums are buried, so the groove loses its push', 'The tempo dragged'],
+          options: ['The chords are too quiet', 'The drums are buried, so the groove loses its push', 'The tempo dragged'],
           answer: 1,
-          explain: 'Only channel 1 moved, about 10 dB down. With the loudness matched everything else even sounds louder, yet the groove sags: a dance mix is built on the kick. The tempo can\'t change with a fader.',
+          explain: 'Only the drums moved, 6 dB down. With the loudness matched everything else even sounds louder, yet the groove sags: a dance mix is built on the kick. The tempo can\'t change with a fader.',
         },
       },
     },
@@ -1296,18 +1298,17 @@ const masterBounce: Lesson = {
   steps: [
     {
       kind: 'listen', concept: 'gain-staging',
-      instruction: 'Two masters of the drop, played at the same loudness, the way a streaming service plays them. Which hits harder?',
+      instruction: 'Two masters of the same drop, played at the same loudness, the way a streaming service plays them. Which hits harder?',
+      explanation: 'Both are the second drop of the demo "Low Tide Lights": its own master, and the same mix pushed much harder into the limiter.',
       listen: {
         a: {}, b: {},
         labels: ['Master A', 'Master B'],
-        matchLoudness: true,
-        from: 'Drop',
-        master: { a: { gain: 4 }, b: { gain: 14 } },
+        demo: { demo: 'low-tide-lights', excerpt: 'drop2-49-52', a: 'as-made', b: 'crushed' },
         question: {
           question: 'Which one sounds punchier when both are equally loud?',
           options: ['A', 'B', 'They sound identical'],
           answer: 0,
-          explain: 'B was driven 10 dB harder into the limiter: its extra loudness came from squashing every peak. Played at the same loudness, A keeps its kick transients and B sounds flat and tired.',
+          explain: 'B was driven 9 dB harder into the limiter: its extra loudness came from squashing every peak. Played at the same loudness, A keeps its kick transients and B sounds flat and tired.',
         },
       },
     },

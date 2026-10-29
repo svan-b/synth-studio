@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getAudioContext, getMasterAnalyser, getRecordTap } from '@/lib/audio/context';
+import { getAudioContext, getMasterAnalyser, getSpeakerBus } from '@/lib/audio/context';
 
 export type ScopeMode = 'wave' | 'spectrum' | 'both';
 
@@ -17,9 +17,9 @@ const DB_LABELS = new Set([-24, -48, -72]);
 const xOfFreq = (f: number, w: number) => (Math.log(f / F_MIN) / Math.log(F_MAX / F_MIN)) * w;
 
 /**
- * Oscilloscope + spectrum of the studio output. Seeing a filter remove harmonics
- * *while* hearing it is the fastest way to understand timbre (dual coding: the same
- * idea through ear and eye).
+ * Oscilloscope + spectrum of what the speakers play: the studio output, or a demo
+ * recording while one plays. Seeing a filter remove harmonics *while* hearing it is
+ * the fastest way to understand timbre (dual coding: the same idea through ear and eye).
  *
  *   wave      the waveform, triggered on a rising zero crossing so it stands still
  *   spectrum  level by frequency: log frequency axis (20 Hz - 20 kHz), dB scale,
@@ -49,7 +49,7 @@ export default function Scope({ height = 120, mode: initial = 'both', stepMode }
       // A dedicated high-resolution analyser (8192-point FFT: ~6 Hz bins, so bass is readable)
       try {
         const ctx = getAudioContext();
-        tap = getRecordTap();
+        tap = getSpeakerBus();
         spec = ctx.createAnalyser();
         spec.fftSize = 8192;
         spec.smoothingTimeConstant = 0.72;

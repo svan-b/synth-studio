@@ -10,9 +10,9 @@
 // patterns wherever they are. Trigs are numbered 1..64 like the trig keys, in the
 // text, the checks (lib/studio/checks.ts) and the solutions.
 //
-// Demo excerpts (`info.play`, `listen.demo`) wait for the demo tracks
-// (wip/demo-tracks): until they merge, the hooks play the instruments' own
-// auditions and the A/B steps compare the learner's own track.
+// The hooks play recordings of the demo track "Low Tide Lights" (`info.play`,
+// `listen.demo`: public/demos, rendered by scripts/render-demos.cjs), so the
+// learner hears where the lesson is going without the studio being touched.
 // ============================================================================
 
 import type { Lesson, LessonCheckState, MultipleChoice } from '@/types';
@@ -74,9 +74,10 @@ const firstBeat: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'timing-tempo', instance: RYTM,
-      instruction: 'This path ends with a finished track of your own. It starts with the pulse: press ▶ Hear it for four kicks, one on every beat.',
+      instruction: 'This path ends with a finished track of your own, like this one. Press ▶ Hear it and listen for the kick on every beat.',
       principle: 'A steady kick on every beat gives listeners a pulse to move to.',
-      explanation: 'Your studio for the path: the Analog Rytm (drums) plays into channel 1 of the Xone:96 mixer, and the Analog Four waits on channel 2 for the bass and chords. Both follow the studio clock at 124 BPM.',
+      explanation: 'The recording is the drums of "Low Tide Lights", a demo track made in this studio. Your studio for the path: the Analog Rytm (drums) plays into channel 1 of the Xone:96 mixer, and the Analog Four waits on channel 2 for the bass and chords. Both follow the studio clock at 124 BPM.',
+      info: { play: { demo: 'low-tide-lights', excerpt: 'drop-17-20', variation: 'drums' } },
     },
     {
       kind: 'do', concept: 'timing-tempo', instance: RYTM, focus: ['seq:trig:1', 'seq:trig:5', 'seq:trig:9', 'seq:trig:13', 'key:play'],
@@ -174,10 +175,16 @@ const groove: Lesson = {
   start: { studio: elektronStudio({ ...CP_01, ownStudio: 'your beat from First beat: a studio with an Analog Rytm' }) },
   steps: [
     {
-      kind: 'info', concept: 'timing-tempo', instance: RYTM,
-      instruction: 'Same drums, different feel: groove lives in the small notes between the beats, in how loud they are and exactly when they land.',
+      kind: 'listen', concept: 'timing-tempo', instance: RYTM,
+      instruction: 'Same drums, two feels. Play A, then B: which one makes you want to move?',
       principle: 'Groove is timing and loudness, not more notes.',
-      explanation: 'Your beat from the last lesson is loaded. In this lesson you add 16th-note hats, make some of them quiet (ghost notes), swing the pattern and nudge the clap.',
+      explanation: 'Both are the drums of the demo "Low Tide Lights". Your beat from the last lesson is loaded: in this lesson you add 16th-note hats, make some of them quiet (ghost notes), swing the pattern and nudge the clap.',
+      listen: {
+        a: {}, b: {}, labels: ['Feel A', 'Feel B'],
+        demo: { demo: 'low-tide-lights', excerpt: 'drop-17-20', a: 'drums-straight', b: 'drums' },
+        question: mc('What is different about B?', ['It is louder', 'It has more drums', 'The timing and loudness of the small notes'], 2,
+          'The same drums play in both, at the same loudness. B delays every second 16th a little (swing, 54 %) and plays the in-between notes softly (ghost notes); A is straight, with its ghost notes at velocity 1, so you barely hear them.'),
+      },
     },
     {
       kind: 'quiz', concept: 'timing-tempo', instruction: 'Warm-up.',
@@ -308,9 +315,10 @@ const bassKick: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'sequencer-pattern', instance: A4,
-      instruction: 'Kick and bass take turns: boom, dum, boom, dum. That is the engine of a dance track. Press ▶ Hear it for the bass sound.',
+      instruction: 'Kick and bass take turns: boom, dum, boom, dum. That is the engine of a dance track. Press ▶ Hear it.',
       principle: 'In dance music the kick and the bass share the low end by taking turns.',
-      explanation: 'The Analog Four is a four-voice analog synth with the same kind of sequencer as the Rytm. Its track 1 holds a deep bass: a saw wave with a sub-oscillator an octave below, through a low-pass filter. It plays into the Xone\'s channel 2.',
+      explanation: 'The recording is the kick and the bass of the demo "Low Tide Lights" on their own: the bass plays between the kicks, never on them. The Analog Four is a four-voice analog synth with the same kind of sequencer as the Rytm. Its track 1 holds a deep bass: a saw wave with a sub-oscillator an octave below, through a low-pass filter. It plays into the Xone\'s channel 2.',
+      info: { play: { demo: 'low-tide-lights', excerpt: 'groove-9-12', variation: 'kick-bass' } },
     },
     {
       kind: 'quiz', concept: 'timing-tempo', instruction: 'Warm-up.',
@@ -448,9 +456,10 @@ const chords: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'oscillator-pitch', instance: A4,
-      instruction: 'Drums and bass make a groove. Chords give it a mood: the same groove can feel hopeful, dark or dreamy.',
+      instruction: 'Drums and bass make a groove; chords give it a mood. Press ▶ Hear it: at the drop the chords arrive, and the track suddenly has one.',
       principle: 'Harmony is notes sounding together; chords set the emotional colour of a track.',
-      explanation: 'Your groove and bassline are loaded. Tracks 2 and 3 of the Analog Four are set up for chords: two saw oscillators each, a little filter envelope, into the A4\'s chorus, delay and reverb.',
+      explanation: 'The recording is the end of the groove and the start of the drop in the demo "Low Tide Lights". Your groove and bassline are loaded. Tracks 2 and 3 of the Analog Four are set up for chords: two saw oscillators each, a little filter envelope, into the A4\'s chorus, delay and reverb.',
+      info: { play: { demo: 'low-tide-lights', excerpt: 'into-drop-15-18' } },
     },
     {
       kind: 'quiz', concept: 'timing-tempo', instruction: 'Warm-up.',
@@ -610,9 +619,10 @@ const hook: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'sequencer-pattern', instance: A4,
-      instruction: 'One short line, repeated with a twist. That is a hook: the part people hum on the way home.',
+      instruction: 'One short line, repeated with a twist. That is a hook: the part people hum on the way home. Press ▶ Hear it.',
       principle: 'A hook is a short, memorable idea that repeats with a small change.',
-      explanation: 'Your four bars of chords and bass are loaded. Track 4 of the Analog Four is a glass-like pluck, a pulse and a triangle an octave up, into the A4\'s delay. The Sub 37 waits on Xone channel 3 for later in the lesson.',
+      explanation: 'The recording is the second drop of the demo "Low Tide Lights": the hook over the chords. Your four bars of chords and bass are loaded. Track 4 of the Analog Four is a glass-like pluck, a pulse and a triangle an octave up, into the A4\'s delay. The Sub 37 waits on Xone channel 3 for later in the lesson.',
+      info: { play: { demo: 'low-tide-lights', excerpt: 'drop2-49-52' } },
     },
     {
       kind: 'quiz', concept: 'oscillator-pitch', instruction: 'Warm-up.',
@@ -759,9 +769,10 @@ const movement: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'sequencer-pattern', instance: A4,
-      instruction: 'Eight bars of the same loop get tiring: in yours, every bar is exactly the same. Small changes every few bars keep it alive.',
+      instruction: 'Eight bars of the same loop: press ▶ Hear it and listen for the small changes that keep it alive. In yours, every bar is exactly the same.',
       principle: 'The ear tires of exact repetition; small changes every few bars hold attention.',
-      explanation: 'Three tools, three time scales: a parameter lock changes one step, a trig condition changes some loops, and a slow LFO changes everything a little, all the time. None of them adds a part.',
+      explanation: 'The recording is the first drop of the demo "Low Tide Lights": trig conditions add a rim and a tom on some loops, a snare fill closes the eighth bar, and a slow LFO moves the chords\' filter. Three tools, three time scales: a parameter lock changes one step, a trig condition changes some loops, and a slow LFO changes everything a little, all the time. None of them adds a part.',
+      info: { play: { demo: 'low-tide-lights', excerpt: 'drop-17-24' } },
     },
     {
       kind: 'quiz', concept: 'filter-cutoff', instruction: 'Warm-up.',
@@ -1001,9 +1012,16 @@ const capstone: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'sequencer-pattern', area: 'arranger',
-      instruction: 'The brief: two minutes or more, 100 to 140 BPM, one key, a clear energy curve, mixed and mastered. It can be any style.',
+      instruction: 'Three tracks from this studio (▶ Hear it). Yours is next: two minutes or more, 100 to 140 BPM, one key, a clear energy curve, mixed and mastered.',
       principle: 'A finished track is many small decisions, made one at a time and checked by ear.',
-      explanation: 'This studio holds the course track as a bank of patterns: Rytm A01 GROOVE, A02 BREAK (no kick), A03 FILL, A04 INTRO; Analog Four A01 FULL, A02 BASS, A03 BREAK. The Sub 37 is a guest on channel 3. Or press "Use my own studio" and bring your own track. Each milestone saves as you go: do one a session.',
+      explanation: 'The recordings are the peaks of the three demo tracks: Low Tide Lights (deep house), Three Clocks (a polyrhythmic Moog jam) and Copper Wire (electro breaks). It can be any style. This studio holds the course track as a bank of patterns: Rytm A01 GROOVE, A02 BREAK (no kick), A03 FILL, A04 INTRO; Analog Four A01 FULL, A02 BASS, A03 BREAK. The Sub 37 is a guest on channel 3. Or press "Use my own studio" and bring your own track. Each milestone saves as you go: do one a session.',
+      info: {
+        play: [
+          { demo: 'low-tide-lights', excerpt: 'drop2-49-52' },
+          { demo: 'three-clocks', excerpt: 'return-49-52' },
+          { demo: 'copper-wire', excerpt: 'final-57-60' },
+        ],
+      },
     },
     {
       kind: 'reflect', instruction: 'Plan it.',

@@ -6,8 +6,9 @@
 //                 catches AudioWorklet processor errors. Observes only.
 //   installTap    window.__demoTap.start(ids) / stop(): one AudioWorklet node taps
 //                 instrument channel strips (post-fader, before any mixer device they
-//                 are routed into), a mixer device's strip ('xone96') or the master
-//                 ('master'), sample-aligned. Per render quantum (128 frames) and tap
+//                 are routed into), a mixer device's strip ('xone96'), the master
+//                 ('master': everything that reaches the speakers) or the demo
+//                 recordings' player ('demo'), sample-aligned. Per render quantum (128 frames) and tap
 //                 it keeps the K-weighted power (BS.1770), the sample peak and, for
 //                 the master and the Xone, the 4x true peak.
 //   startPolling  window.__demoLog: the demo caption, the transport's bar ticks
@@ -157,6 +158,7 @@ async function installTap(page) {
         const st = { ids, n, chunks: [], started: null, node, sink };
         ids.forEach((id, i) => {
           if (id === 'master') QA.feeds.forEach(f => { try { f.connect(node, 0, i); } catch (e) { /* */ } });
+          else if (id === 'demo') window.__synthDemoAudio.output().connect(node, 0, i);
           else { const o = S.hub.getStripOutput(id); if (o) o.connect(node, 0, i); }
         });
         node.port.onmessage = e => {

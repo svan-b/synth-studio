@@ -34,6 +34,7 @@ import { setLessonLive, setLessonStudioHooks } from './lessonLive';
 import { sectionsFromStart } from './lessonStudio';
 import { bounceSong, isBouncing, isRecording, startRecording, stopRecording, type BounceProgress } from './bounce';
 import { dbToGain, masterOf } from './mixerDoc';
+import { isLessonOwner, stop as stopDemoAudio } from './demoAudio';
 import { getAudioContext, getRecordTap, onMasterMeter, setMasterSettings, type MasterMeterFrame } from '@/lib/audio/context';
 import { transport, PPQN } from '@/lib/audio/transport';
 
@@ -431,6 +432,8 @@ class StudioAB {
     const key = `${lesson.id}:${stepIndex}`;
     if (key !== this.key) { this.stop(); this.key = key; this.est = { a: { e: 0, n: 0 }, b: { e: 0, n: 0 } }; }
     if (this.side === side) { this.stop(); return; }
+    // One thing at a time: a demo recording stops for the studio
+    stopDemoAudio();
     this.clearOverrides();
     this.match = !!listen.matchLoudness;
     const s = useStudioStore.getState();
@@ -865,7 +868,7 @@ function install() {
       takeCount = 0;
       ab.reset();
     }
-    if (s.currentStep !== prev.currentStep || s.currentLesson !== prev.currentLesson) ab.reset();
+    if (s.currentStep !== prev.currentStep || s.currentLesson !== prev.currentLesson) { ab.reset(); stopDemoAudio(isLessonOwner); }
     const automation = historyPaused();
     if (s.devices !== prev.devices) {
       Object.keys(s.devices).forEach(inst => {
