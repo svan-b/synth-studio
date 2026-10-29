@@ -63,9 +63,11 @@ const fs = require('fs');
       for (let i = 0; i < n; i++) {
         const b = buttons.nth(i);
         try {
-          await b.dispatchEvent('pointerdown', { button: 0, pointerId: 1, pointerType: 'mouse', isPrimary: true });
+          // Paged panels (the Elektrons) add and remove buttons as menus open and close:
+          // skip one that has gone instead of waiting Playwright's default 30 s for it
+          await b.dispatchEvent('pointerdown', { button: 0, pointerId: 1, pointerType: 'mouse', isPrimary: true }, { timeout: 1000 });
           await page.waitForTimeout(30);
-          await b.dispatchEvent('pointerup', { button: 0, pointerId: 1, pointerType: 'mouse', isPrimary: true });
+          await b.dispatchEvent('pointerup', { button: 0, pointerId: 1, pointerType: 'mouse', isPrimary: true }, { timeout: 1000 });
           loudest = Math.max(loudest, await peak(120));
         } catch { /* hidden */ }
       }
