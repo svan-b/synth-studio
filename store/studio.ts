@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ControlValue, DeviceSpec, Lesson, LessonCheckState, LessonStep, PatchConnection } from '@/types';
+import type { ControlValue, DeviceSpec, Lesson, LessonCheckState, LessonStep, MultipleChoice, PatchConnection } from '@/types';
 import type { RackSlot, StudioCable } from '@/devices/types';
 import { isStepSatisfied, isValueOnTarget, valueToNorm, defaultOf } from '@/lib/controls/mapping';
 import { transport } from '@/lib/audio/transport';
 import { STORE_VERSION, upgradeDevices } from '@/lib/studio/upgrades';
 import type { ChannelDoc, DelayDoc, MasterDoc, MixerDoc, ReverbDoc } from '@/lib/studio/mixerDoc';
 import { throttledLocalStorage } from '@/lib/studio/persistStorage';
+import { STUDIO_LESSONS } from '@/lib/studio/lessons';
 
 // ============================================================================
 // Synth Studio store
@@ -75,6 +76,10 @@ export interface ReviewItem {
   wrong: number;
   /** Where it came from, for display */
   lesson: string;
+  /** Short fingerprint of the question text: a rebuilt lesson with a different question at this index starts the box again */
+  fp?: string;
+  /** Device of the lesson, so an item can be recognised as orphaned once that device's lessons are known */
+  device?: string;
 }
 
 export interface StepSession {
@@ -82,11 +87,26 @@ export interface StepSession {
   answer?: number;
   /** match: number of Check presses and the last result */
   attempts?: number;
-  match?: { score: number; off: { id: string; dir: 'higher' | 'lower' | 'different' }[] };
+  match?: { score: number; off: { id: string; dir: 'higher' | 'lower' | 'different'; far?: boolean }[] };
   /** reflect: self-rating once the model answer was shown */
   rating?: 'got-it' | 'partly' | 'not-yet';
   revealed?: boolean;
   hints?: number;
+  /** UI presses during the step: instance -> control id / event name -> count */
+  events?: Record<string, Record<string, number>>;
+  /** Notes played during the step: instance -> MIDI notes, oldest first */
+  notes?: Record<string, number[]>;
+  /** "Show me" was used on this step (the summary reports it honestly) */
+  shown?: boolean;
+  /** The step was completed at least once (the end-of-lesson summary) */
+  done?: boolean;
+}
+
+/** A "show me" demonstration in progress: the coach is moving a control (or showing a cable) */
+export interface LessonDemo {
+  instance: string;
+  control?: string;
+  patch?: { from: string; to: string };
 }
 
 interface LessonSessionState {
@@ -102,6 +122,8 @@ interface LessonSessionState {
   lessonSnapshot?: { instance: string; state: InstanceState };
   /** Spotlight: dim everything except what the step is about */
   focusMode: boolean;
+  /** "Show me" demonstration in progress (auto-advance waits until it ends) */
+  lessonDemo: LessonDemo | null;
 }
 
 interface StudioStoreState extends LessonSessionState {
@@ -173,9 +195,26 @@ interface StudioStore extends StudioStoreState {
   showHint: () => void;
   setFocusMode: (on: boolean) => void;
   reevaluate: () => void;
+  /** A press on the panel (momentary button, pad, trig key, transport key): control ids and/or event names */
+  lessonPress: (instance: string, ids: string[]) => void;
+  /** A note played on an instrument (on-screen keys, computer keyboard, MIDI) */
+  lessonNote: (instance: string, note: number) => void;
+  /** Start or end a "show me" demonstration */
+  setLessonDemo: (demo: LessonDemo | null) => void;
+  /** Mark the current step as shown by the coach (it counts as help in the summary) */
+  markStepShown: () => void;
+  /** Check state of the current step's instrument (coach, lesson runner) */
+  lessonCheckState: () => LessonCheckState | null;
 
   // ---- spaced review --------------------------------------------------------
-  recordReview: (itemId: string, correct: boolean, lesson: string) => void;
+  recordReview: (itemId: string, correct: boolean, lesson: string, meta?: { fp?: string; device?: string }) => void;
+  /**
+   * Bring the review queue in line with the lessons that exist now: drop items whose
+   * question no longer exists, and restart items whose question text changed.
+   * `complete: true` means every device's lessons are registered, so an item whose
+   * lesson is unknown is an orphan too.
+   */
+  reconcileReview: (opts?: { complete?: boolean }) => void;
 }
 
 /** The browser save of the studio (throttled; see lib/studio/persistStorage.ts) */
@@ -184,6 +223,86 @@ export const studioStorage = throttledLocalStorage<unknown>();
 // Device specs registered at runtime (module scope - not persisted)
 const specs: Record<string, DeviceSpec> = {};
 let advanceTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ---- Lesson registry (module scope, not persisted) ---------------------------
+// The lessons of every device module that has loaded (plus the studio curriculum),
+// so the review queue can tell a question that still exists from one whose lesson
+// was rebuilt or removed - without loading every module up front.
+const lessonIndex = new Map<string, Lesson>();
+const lessonDevices = new Set<string>();
+STUDIO_LESSONS.forEach(l => lessonIndex.set(l.id, l));
+lessonDevices.add('studio');
+
+/** Live engine state for lesson checks (the hub registers it; the store cannot import the hub) */
+let engineReader: ((instance: string) => Record<string, unknown>) | null = null;
+
+/** Let lesson checks read the engine's live state (current step, LEDs...) */
+export function setLessonEngineReader(fn: ((instance: string) => Record<string, unknown>) | null) {
+  engineReader = fn;
+}
+
+/** Item kinds Daily Review can ask: r = lesson review question, q = quiz step, p = prediction */
+const REVIEWABLE = new Set(['r', 'q', 'p']);
+
+/** Short, stable fingerprint of a question (FNV-1a of the question and its right answer) */
+export function questionFingerprint(mc: MultipleChoice): string {
+  const s = `${mc.question}\u0001${mc.options[mc.answer] ?? ''}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/** The multiple-choice question behind a review ref ('r2', 'q5', 'p3') */
+export function reviewQuestionOf(lesson: Lesson, ref: string): MultipleChoice | undefined {
+  const kind = ref[0];
+  const n = Number(ref.slice(1));
+  if (!Number.isInteger(n) || n < 0) return undefined;
+  if (kind === 'r') return lesson.review?.[n];
+  const st = lesson.steps[n];
+  if (!st) return undefined;
+  if (kind === 'q') return stepKind(st) === 'quiz' ? st.quiz : undefined;
+  if (kind === 'p') return stepKind(st) === 'predict' ? st.predict : undefined;
+  return undefined;
+}
+
+function splitReviewId(id: string): [string, string] {
+  const i = id.lastIndexOf(':');
+  return i < 0 ? [id, ''] : [id.slice(0, i), id.slice(i + 1)];
+}
+
+/**
+ * Resolve a review item against the registered lessons.
+ *   { lesson, mc }  the question exists
+ *   null            it cannot exist any more (orphan)
+ *   undefined       unknown: its device's lessons have not loaded yet
+ */
+export function resolveReviewItem(id: string, item?: Pick<ReviewItem, 'device'>, complete = false): { lesson: Lesson; mc: MultipleChoice } | null | undefined {
+  const [lessonId, ref] = splitReviewId(id);
+  if (!REVIEWABLE.has(ref[0])) return null;
+  const lesson = lessonIndex.get(lessonId);
+  if (!lesson) {
+    if (complete || (item?.device && lessonDevices.has(item.device))) return null;
+    return undefined;
+  }
+  const mc = reviewQuestionOf(lesson, ref);
+  return mc ? { lesson, mc } : null;
+}
+
+/**
+ * Tell the review queue which lessons a device has now. Items of that device whose
+ * question is gone are dropped, and items whose question changed start again.
+ */
+export function registerLessons(device: string, lessons: Lesson[]) {
+  const fresh = !lessonDevices.has(device) || lessons.some(l => lessonIndex.get(l.id) !== l);
+  if (!fresh) return;
+  lessons.forEach(l => lessonIndex.set(l.id, l));
+  lessonDevices.add(device);
+  // Deferred: callers are often in the middle of a render or module load
+  setTimeout(() => useStudioStore.getState().reconcileReview(), 0);
+}
 
 const ADVANCE_DELAY_MS = 750;
 const PREDICT_REVEAL_MS = 2200;
@@ -248,9 +367,14 @@ export function getSpec(device: string): DeviceSpec | undefined {
 export function stepKind(step: LessonStep): NonNullable<LessonStep['kind']> {
   if (step.kind) return step.kind;
   if (step.patchFrom && step.patchTo) return 'patch';
-  if (step.control) return 'do';
+  if (step.control || step.event || step.play) return 'do';
   if (step.checklist?.length) return 'challenge';
   return 'info';
+}
+
+/** The instance a lesson step acts on */
+export function stepInstance(step: LessonStep | undefined, lesson: Lesson | undefined, lessonInstance?: string): string {
+  return step?.instance ?? lessonInstance ?? lesson?.device ?? '';
 }
 
 export const useStudioStore = create<StudioStore>()(
@@ -269,7 +393,7 @@ export const useStudioStore = create<StudioStore>()(
 
       const valuesOf = (instance: string) => ({ ...specDefaults(deviceOf(instance)), ...(get().devices[instance]?.controlValues ?? {}) });
 
-      const checkState = (instance: string, engine: Record<string, unknown> = {}): LessonCheckState => {
+      const checkState = (instance: string, engine?: Record<string, unknown>): LessonCheckState => {
         const s = get();
         const instances: LessonCheckState['instances'] = {};
         s.studio.rack.forEach(r => {
@@ -280,29 +404,42 @@ export const useStudioStore = create<StudioStore>()(
             data: s.devices[r.id]?.data,
           };
         });
+        const sess = s.isTeachingMode ? s.session[s.currentStep] : undefined;
+        let eng = engine;
+        if (!eng) {
+          try { eng = engineReader?.(instance) ?? {}; } catch { eng = {}; }
+        }
         return {
           values: valuesOf(instance),
           patches: s.devices[instance]?.patchConnections ?? [],
           data: s.devices[instance]?.data,
-          engine,
+          engine: eng,
           instances,
           studioCables: s.studio.cables,
           routes: s.studio.routes,
           sync: s.studio.sync,
           transport: { playing: transport.playing, bpm: s.studio.bpm },
           arrangement: s.studio.arrangement,
+          events: sess?.events?.[instance] ?? {},
+          notesPlayed: sess?.notes?.[instance] ?? [],
+          eventsByInstance: sess?.events ?? {},
         };
       };
 
       /** Is the current step's *action* done (ignores answer requirements) */
       const actionDone = (lesson: Lesson, step: LessonStep, instance: string): boolean => {
         const kind = stepKind(step);
-        const st = get().devices[instance] ?? initInstance();
+        const s = get();
+        const st = s.devices[instance] ?? initInstance();
         const device = deviceOf(instance);
         let ok = true;
-        if (step.control || (step.patchFrom && step.patchTo)) {
+        if (step.control || (step.patchFrom && step.patchTo) || step.event || step.play) {
           const spec = step.control ? specs[device]?.controls[step.control] : undefined;
-          ok = isStepSatisfied(step, spec, valuesOf(instance), st.patchConnections);
+          const sess = s.session[s.currentStep];
+          ok = isStepSatisfied(step, spec, valuesOf(instance), st.patchConnections, {
+            events: sess?.events?.[instance],
+            notesPlayed: sess?.notes?.[instance],
+          });
         }
         if (ok && step.check) {
           try { ok = step.check(checkState(instance)); } catch { ok = false; }
@@ -321,10 +458,13 @@ export const useStudioStore = create<StudioStore>()(
       const evaluate = () => {
         const s = get();
         if (!s.isTeachingMode || !s.currentLesson || s.lessonFinished) return;
+        // A "show me" demonstration moves controls for the learner: it must not finish the step
+        if (s.lessonDemo) return;
         const lesson = s.currentLesson;
-        const instance = s.lessonInstance ?? lesson.device;
         const step = lesson.steps[s.currentStep];
         if (!step) return;
+        // A step can act on another instrument in the rack (studio lessons)
+        const instance = stepInstance(step, lesson, s.lessonInstance);
         const kind = stepKind(step);
         const sess = s.session[s.currentStep] ?? {};
         let ok: boolean;
@@ -367,6 +507,7 @@ export const useStudioStore = create<StudioStore>()(
           clearAdvance();
           return;
         }
+        if (!sess.done) setSession({ done: true });
         if (s.stepSatisfied && advanceTimer) return;
         set({ stepSatisfied: true });
         if (!auto) return;
@@ -390,8 +531,13 @@ export const useStudioStore = create<StudioStore>()(
         clearAdvance();
         const i = Math.max(0, Math.min(lesson.steps.length - 1, index));
         const step = lesson.steps[i];
-        const instance = s.lessonInstance ?? lesson.device;
-        set({ currentStep: i, stepSatisfied: false, lessonFinished: false });
+        const instance = stepInstance(step, lesson, s.lessonInstance);
+        // Presses and notes count afresh every time a step begins
+        const prevSess = s.session[i];
+        const session = prevSess && (prevSess.events || prevSess.notes)
+          ? { ...s.session, [i]: { ...prevSess, events: undefined, notes: undefined } }
+          : s.session;
+        set({ currentStep: i, stepSatisfied: false, lessonFinished: false, session, lessonDemo: null });
         if (step?.setup || step?.setupPatches || (stepKind(step) === 'match' && step.match)) {
           const values: Record<string, ControlValue> = { ...(step.setup ?? {}) };
           // Ear training: everything except the controls being tested starts at the target
@@ -454,6 +600,7 @@ export const useStudioStore = create<StudioStore>()(
         session: {},
         lessonSnapshot: undefined,
         focusMode: true,
+        lessonDemo: null,
 
         // ---- focus / rack -------------------------------------------------------
         setCurrentDevice: id => {
@@ -729,6 +876,8 @@ export const useStudioStore = create<StudioStore>()(
               };
             });
           }
+          // The review queue can resolve this lesson's questions from now on
+          if (!lessonIndex.has(lesson.id)) lessonIndex.set(lesson.id, lesson);
           set({
             currentLesson: lesson,
             lessonInstance: instance,
@@ -738,6 +887,7 @@ export const useStudioStore = create<StudioStore>()(
             stepSatisfied: false,
             session: {},
             lessonSnapshot: snapshot,
+            lessonDemo: null,
             currentDevice: lesson.device === 'studio' ? s.currentDevice : instance,
           });
           enterStep(0);
@@ -760,7 +910,7 @@ export const useStudioStore = create<StudioStore>()(
 
         resetLesson: () => {
           clearAdvance();
-          set({ currentLesson: undefined, currentStep: 0, isTeachingMode: false, lessonFinished: false, stepSatisfied: false, session: {} });
+          set({ currentLesson: undefined, currentStep: 0, isTeachingMode: false, lessonFinished: false, stepSatisfied: false, session: {}, lessonDemo: null });
         },
 
         completeLesson: () => {
@@ -770,16 +920,24 @@ export const useStudioStore = create<StudioStore>()(
           const lesson = s.currentLesson;
           const review = { ...s.review };
           const now = Date.now();
-          // Seed the spaced-review queue: due tomorrow
-          (lesson.review ?? []).forEach((_, i) => {
-            const id = `${lesson.id}:r${i}`;
-            if (!review[id]) review[id] = { box: 1, due: now + BOX_INTERVALS[1], last: now, right: 0, wrong: 0, lesson: lesson.id };
-          });
-          lesson.steps.forEach((st, i) => {
-            if (stepKind(st) === 'quiz' && st.quiz) {
-              const id = `${lesson.id}:q${i}`;
-              if (!review[id]) review[id] = { box: 1, due: now + BOX_INTERVALS[1], last: now, right: 0, wrong: 0, lesson: lesson.id };
+          // Seed the spaced-review queue: due tomorrow. Questions answered during the
+          // lesson already have an item (a miss is due tomorrow, so it comes first).
+          const seed = (ref: string, mc: MultipleChoice | undefined) => {
+            if (!mc) return;
+            const id = `${lesson.id}:${ref}`;
+            const fp = questionFingerprint(mc);
+            const prev = review[id];
+            if (prev && (!prev.fp || prev.fp === fp)) {
+              if (!prev.fp || !prev.device) review[id] = { ...prev, fp, device: lesson.device };
+              return;
             }
+            review[id] = { box: 1, due: now + BOX_INTERVALS[1], last: now, right: 0, wrong: 0, lesson: lesson.id, fp, device: lesson.device };
+          };
+          (lesson.review ?? []).forEach((mc, i) => seed(`r${i}`, mc));
+          lesson.steps.forEach((st, i) => {
+            const kind = stepKind(st);
+            if (kind === 'quiz') seed(`q${i}`, st.quiz);
+            if (kind === 'predict') seed(`p${i}`, st.predict);
           });
           set({
             completedLessons: s.completedLessons.includes(lesson.id) ? s.completedLessons : [...s.completedLessons, lesson.id],
@@ -790,6 +948,7 @@ export const useStudioStore = create<StudioStore>()(
             lessonFinished: false,
             stepSatisfied: false,
             session: {},
+            lessonDemo: null,
           });
         },
 
@@ -808,9 +967,13 @@ export const useStudioStore = create<StudioStore>()(
           const step = lesson.steps[s.currentStep];
           const prev = s.session[s.currentStep]?.answer;
           if (prev !== undefined) return; // first answer counts (retrieval honesty)
-          setSession({ answer });
+          const kind = stepKind(step);
+          // A prediction is committed before the action: presses made earlier don't count
+          setSession(kind === 'predict' ? { answer, events: undefined, notes: undefined } : { answer });
           const mc = step.quiz ?? step.predict ?? step.listen?.question;
-          if (mc && stepKind(step) === 'quiz') get().recordReview(`${lesson.id}:q${s.currentStep}`, answer === mc.answer, lesson.id);
+          if (mc && (kind === 'quiz' || kind === 'predict')) {
+            get().recordReview(`${lesson.id}:${kind === 'quiz' ? 'q' : 'p'}${s.currentStep}`, answer === mc.answer, lesson.id, { fp: questionFingerprint(mc), device: lesson.device });
+          }
           evaluate();
         },
 
@@ -820,7 +983,7 @@ export const useStudioStore = create<StudioStore>()(
           if (!lesson) return;
           const step = lesson.steps[s.currentStep];
           if (!step.match) return;
-          const instance = s.lessonInstance ?? lesson.device;
+          const instance = stepInstance(step, lesson, s.lessonInstance);
           const device = deviceOf(instance);
           const values = valuesOf(instance);
           const tol = step.match.tolerance ?? 0.08;
@@ -831,8 +994,10 @@ export const useStudioStore = create<StudioStore>()(
             const v = values[id];
             let ok: boolean;
             if (spec && (spec.type === 'knob' || spec.type === 'slider') && typeof v === 'number' && typeof target === 'number') {
-              ok = Math.abs(valueToNorm(spec, v) - valueToNorm(spec, target)) <= tol;
-              if (!ok) off.push({ id, dir: v < target ? 'higher' : 'lower' });
+              const err = Math.abs(valueToNorm(spec, v) - valueToNorm(spec, target));
+              ok = err <= tol;
+              // "far" lets the feedback say "a lot" or "a little" once direction is revealed
+              if (!ok) off.push({ id, dir: v < target ? 'higher' : 'lower', far: err > tol * 2.5 });
             } else {
               ok = isValueOnTarget(spec, v, target);
               if (!ok) off.push({ id, dir: 'different' });
@@ -841,7 +1006,6 @@ export const useStudioStore = create<StudioStore>()(
           const score = (step.match.controls.length - off.length) / Math.max(1, step.match.controls.length);
           const attempts = (s.session[s.currentStep]?.attempts ?? 0) + 1;
           setSession({ attempts, match: { score, off } });
-          if (attempts === 1) get().recordReview(`${lesson.id}:m${s.currentStep}`, score >= 1, lesson.id);
           evaluate();
         },
 
@@ -861,11 +1025,49 @@ export const useStudioStore = create<StudioStore>()(
 
         reevaluate: () => evaluate(),
 
+        lessonPress: (instance, ids) => {
+          const s = get();
+          if (!s.isTeachingMode || !s.currentLesson || s.lessonFinished || s.lessonDemo) return;
+          const keys = [...new Set(ids.filter(id => !!id && !id.endsWith(':up')))];
+          if (!keys.length) return;
+          const sess = s.session[s.currentStep] ?? {};
+          const mine = { ...(sess.events?.[instance] ?? {}) };
+          keys.forEach(id => { mine[id] = (mine[id] ?? 0) + 1; });
+          setSession({ events: { ...(sess.events ?? {}), [instance]: mine } });
+          evaluate();
+        },
+
+        lessonNote: (instance, note) => {
+          const s = get();
+          if (!s.isTeachingMode || !s.currentLesson || s.lessonFinished || s.lessonDemo) return;
+          const sess = s.session[s.currentStep] ?? {};
+          const mine = [...(sess.notes?.[instance] ?? []), note].slice(-64);
+          setSession({ notes: { ...(sess.notes ?? {}), [instance]: mine } });
+          evaluate();
+        },
+
+        setLessonDemo: demo => {
+          set({ lessonDemo: demo });
+          if (!demo) evaluate();
+        },
+
+        markStepShown: () => setSession({ shown: true }),
+
+        lessonCheckState: () => {
+          const s = get();
+          if (!s.currentLesson) return null;
+          const step = s.currentLesson.steps[s.currentStep];
+          return checkState(stepInstance(step, s.currentLesson, s.lessonInstance));
+        },
+
         // ---- spaced review --------------------------------------------------------
-        recordReview: (itemId, correct, lesson) => {
+        recordReview: (itemId, correct, lesson, meta) => {
           const now = Date.now();
           set(state => {
-            const prev = state.review[itemId] ?? { box: 0, due: now, last: now, right: 0, wrong: 0, lesson };
+            const fresh: ReviewItem = { box: 0, due: now, last: now, right: 0, wrong: 0, lesson };
+            const old = state.review[itemId];
+            // A different question under the same id (a rebuilt lesson) starts from scratch
+            const prev = old && !(meta?.fp && old.fp && old.fp !== meta.fp) ? old : fresh;
             const box = correct ? Math.min(5, prev.box + 1) : 1;
             return {
               review: {
@@ -878,10 +1080,36 @@ export const useStudioStore = create<StudioStore>()(
                   right: prev.right + (correct ? 1 : 0),
                   wrong: prev.wrong + (correct ? 0 : 1),
                   lesson,
+                  ...(meta?.fp ? { fp: meta.fp } : {}),
+                  ...(meta?.device ? { device: meta.device } : {}),
                 },
               },
             };
           });
+        },
+
+        reconcileReview: (opts = {}) => {
+          const s = get();
+          const now = Date.now();
+          let changed = false;
+          const next: Record<string, ReviewItem> = {};
+          Object.entries(s.review).forEach(([id, item]) => {
+            const r = resolveReviewItem(id, item, !!opts.complete);
+            if (r === null) { changed = true; return; } // the question no longer exists
+            if (r === undefined) { next[id] = item; return; } // its lessons haven't loaded yet
+            const fp = questionFingerprint(r.mc);
+            if (item.fp && item.fp !== fp) {
+              // Same id, different question: the old Leitner box says nothing about this one
+              next[id] = { ...item, box: 0, due: now, last: now, right: 0, wrong: 0, fp, device: r.lesson.device };
+              changed = true;
+            } else if (!item.fp || !item.device) {
+              next[id] = { ...item, fp, device: item.device ?? r.lesson.device };
+              changed = true;
+            } else {
+              next[id] = item;
+            }
+          });
+          if (changed) set({ review: next });
         },
       };
     },
@@ -929,30 +1157,43 @@ export const useStudioStore = create<StudioStore>()(
 );
 
 /** Lesson check state for an instance (used by live checklists in the coach) */
-export function buildCheckState(instance: string, engine: Record<string, unknown> = {}): LessonCheckState {
+export function buildCheckState(instance: string, engine?: Record<string, unknown>): LessonCheckState {
   const s = useStudioStore.getState();
   const valuesOf = (id: string) => ({ ...specDefaults(s.deviceOf(id)), ...(s.devices[id]?.controlValues ?? {}) });
   const instances: LessonCheckState['instances'] = {};
   s.studio.rack.forEach(r => {
     instances[r.id] = { device: r.device, values: valuesOf(r.id), patches: s.devices[r.id]?.patchConnections ?? [], data: s.devices[r.id]?.data };
   });
+  const sess = s.isTeachingMode ? s.session[s.currentStep] : undefined;
+  let eng = engine;
+  if (!eng) {
+    try { eng = engineReader?.(instance) ?? {}; } catch { eng = {}; }
+  }
   return {
     values: valuesOf(instance),
     patches: s.devices[instance]?.patchConnections ?? [],
     data: s.devices[instance]?.data,
-    engine,
+    engine: eng,
     instances,
     studioCables: s.studio.cables,
     routes: s.studio.routes,
     sync: s.studio.sync,
     transport: { playing: transport.playing, bpm: s.studio.bpm },
     arrangement: s.studio.arrangement,
+    events: sess?.events?.[instance] ?? {},
+    notesPlayed: sess?.notes?.[instance] ?? [],
+    eventsByInstance: sess?.events ?? {},
   };
 }
 
-/** Review items due now, oldest first */
+/**
+ * Review items due now, oldest first. Items Daily Review could never ask - match
+ * results, or questions whose lesson is known to have changed - are left out, so the
+ * badge never promises questions that aren't there. Items of devices whose lessons
+ * haven't loaded yet still count; Daily Review settles them when it opens.
+ */
 export function dueReviewItems(review: Record<string, ReviewItem>, now = Date.now()) {
   return Object.entries(review)
-    .filter(([, r]) => r.due <= now)
+    .filter(([id, r]) => r.due <= now && resolveReviewItem(id, r) !== null)
     .sort((a, b) => a[1].due - b[1].due);
 }

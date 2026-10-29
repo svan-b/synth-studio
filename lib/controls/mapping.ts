@@ -124,19 +124,66 @@ export function isValueOnTarget(
   return Math.abs(value - target) <= Math.max(Math.abs(target) * 0.05, 0.1);
 }
 
+/** What the learner did during a step, beyond the panel's values (from the lesson session) */
+export interface StepActivity {
+  /** Presses by control id and by event name */
+  events?: Record<string, number>;
+  /** Notes played, oldest first */
+  notesPlayed?: number[];
+}
+
+/**
+ * The control id or event name whose presses a step counts, or null for a value step.
+ * Momentary buttons (TRIGGER, ADVANCE, TAP) have no lasting value, so a step about one
+ * is done once it has been pressed; `presses` makes a toggle button count presses too.
+ */
+export function pressTargetOf(step: LessonStep, spec: ControlSpec | undefined): string | null {
+  if (step.event) return step.event;
+  if (step.control && spec?.type === 'button' && (spec.momentary || step.presses !== undefined)) return step.control;
+  return null;
+}
+
+/** Presses a step still needs (at least 1) */
+export function pressesNeeded(step: LessonStep): number {
+  return Math.max(1, Math.round(step.presses ?? 1));
+}
+
+/** Has the learner played what `play` asks for? Exact notes must appear in order, back to back. */
+export function isPlaySatisfied(play: NonNullable<LessonStep['play']>, played: number[] | undefined): boolean {
+  const notes = played ?? [];
+  const want = play.notes ?? [];
+  if (want.length) {
+    const norm = (n: number) => (play.anyOctave ? ((n % 12) + 12) % 12 : n);
+    for (let i = 0; i + want.length <= notes.length; i++) {
+      if (want.every((n, j) => norm(notes[i + j]) === norm(n))) return true;
+    }
+    return false;
+  }
+  return notes.length >= Math.max(1, play.count ?? 1);
+}
+
+/** How many presses of `id` a check state has seen this step - a helper for lesson checks */
+export function pressCount(s: { events?: Record<string, number> }, id: string): number {
+  return s.events?.[id] ?? 0;
+}
+
 export function isStepSatisfied(
   step: LessonStep,
   spec: ControlSpec | undefined,
   values: Record<string, ControlValue>,
   patches: { from: string; to: string }[],
+  activity?: StepActivity,
 ): boolean {
   if (step.patchFrom && step.patchTo) {
     return patches.some(
       c => (c.from === step.patchFrom && c.to === step.patchTo) || (c.from === step.patchTo && c.to === step.patchFrom),
     );
   }
-  if (!step.control) return true; // informational step
-  return isValueOnTarget(spec, values[step.control] ?? defaultOf(spec), step.targetValue, step.tolerance);
+  const playOk = !step.play || isPlaySatisfied(step.play, activity?.notesPlayed);
+  const press = pressTargetOf(step, spec);
+  if (press) return (activity?.events?.[press] ?? 0) >= pressesNeeded(step) && playOk;
+  if (!step.control) return playOk; // informational step (or a "play the keys" step)
+  return isValueOnTarget(spec, values[step.control] ?? defaultOf(spec), step.targetValue, step.tolerance) && playOk;
 }
 
 export function defaultOf(spec: ControlSpec | undefined): ControlValue | undefined {

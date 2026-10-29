@@ -3,13 +3,20 @@
 // reports any step that cannot be completed.
 //   node scripts/lesson-runner.cjs <baseUrl> <deviceId>
 // For each step it performs the intended action through the real store:
-//   do/predict  -> answer the prediction correctly, set the target value
+//   do/predict  -> answer the prediction correctly, then set the target value -
+//                  or, for a momentary button / `event` step, PRESS it through the
+//                  panel (pointer events on the real button, so the whole UI path is
+//                  tested), and play `play` notes
 //   patch       -> add the cable
 //   quiz/listen -> pick the correct answer
 //   match       -> set the target values, press Check
 //   reflect     -> reveal + self-rate
-//   challenge   -> needs a solver: provide `solution` values on the step if possible,
-//                  otherwise reported as "manual" (checks still must not throw)
+//   challenge   -> apply `solution` (values, patches, data, presses, notes, studio
+//                  cables, transport) when the step has one
+// Any step still not satisfied is searched: single moves a learner could make
+// (studio transport, a cable between instruments, an internal cable, a switch or
+// button, a press) are tried one at a time and kept when they help. A step solved
+// that way is reported as "auto" with the moves; one that cannot be solved fails.
 // ============================================================================
 const { chromium } = require('playwright');
 
@@ -36,56 +43,221 @@ const { chromium } = require('playwright');
     const { store, hub } = window.__synthStudio;
     const mod = await hub.loadModule(device);
     const wait = ms => new Promise(r => setTimeout(r, ms));
+    const S = () => store.getState();
     const results = [];
+
+    const kindOf = step => step.kind || (step.patchFrom && step.patchTo ? 'patch'
+      : (step.control || step.event || step.play) ? 'do'
+      : (step.checklist && step.checklist.length) ? 'challenge' : 'info');
+    const lessonInstanceOf = () => S().lessonInstance || device;
+    const instanceOfStep = step => step.instance || lessonInstanceOf();
+    const deviceOfInstance = inst => S().deviceOf(inst);
+    const specOf = inst => { const m = hub.getModule(deviceOfInstance(inst)); return m ? m.spec : null; };
+    const layoutOf = inst => { const m = hub.getModule(deviceOfInstance(inst)); return m ? m.layout : null; };
+    const pressTargetOf = (step, inst) => {
+      if (step.event) return step.event;
+      const c = step.control && specOf(inst) ? specOf(inst).controls[step.control] : null;
+      if (c && c.type === 'button' && (c.momentary || step.presses !== undefined)) return step.control;
+      return null;
+    };
+    const pressCount = (inst, id) => {
+      const sess = S().session[S().currentStep] || {};
+      return ((sess.events || {})[inst] || {})[id] || 0;
+    };
+    // Press a button the way a learner does: pointer down/up on the panel's own button.
+    // Falls back to the store API when that instrument isn't on screen.
+    const press = async (inst, id) => {
+      const before = pressCount(inst, id);
+      const el = document.querySelector(`[data-instance="${CSS.escape(inst)}"] button[data-control="${CSS.escape(id)}"]`);
+      if (el) {
+        const opts = { bubbles: true, cancelable: true, button: 0, buttons: 1, pointerId: 7, pointerType: 'mouse', isPrimary: true };
+        el.dispatchEvent(new PointerEvent('pointerdown', opts));
+        await wait(70);
+        el.dispatchEvent(new PointerEvent('pointerup', { ...opts, buttons: 0 }));
+        await wait(20);
+      }
+      if (pressCount(inst, id) === before) S().lessonPress(inst, [id]);
+      return el ? 'ui' : 'store';
+    };
+    const playNotes = async (inst, notes) => {
+      for (const n of notes) { S().lessonNote(inst, n); await wait(5); }
+    };
+    const resolveEnd = end => {
+      if (end.instance) return end.instance;
+      const r = S().studio.rack.find(x => x.device === end.device);
+      return r ? r.id : end.device;
+    };
+
+    // ---- search: single learner moves, kept when they help ----------------------
+    const satisfied = () => { S().reevaluate(); return S().stepSatisfied; };
+    const score = step => {
+      const cs = S().lessonCheckState();
+      if (!cs) return 0;
+      let n = 0;
+      (step.checklist || []).forEach(c => { try { if (!c.check || c.check(cs)) n++; } catch { /* */ } });
+      if (step.check) { try { if (step.check(cs)) n++; } catch { /* */ } }
+      return n;
+    };
+    const movesFor = step => {
+      const inst = instanceOfStep(step);
+      const rack = S().studio.rack.map(r => r.id);
+      const focus = new Set(step.focus || []);
+      const moves = [];
+      // Studio transport
+      moves.push({ desc: 'studio transport: play', apply: () => hub.startAll(), undo: () => hub.stopAll() });
+      // Cables between instruments (focused jacks first)
+      const cableMoves = [];
+      rack.forEach(a => rack.forEach(b => {
+        if (a === b) return;
+        const sa = specOf(a), sb = specOf(b);
+        if (!sa || !sb || !sa.patchBay || !sb.patchBay) return;
+        sa.patchBay.outputs.forEach(o => sb.patchBay.inputs.forEach(i => {
+          const cable = { from: { instance: a, jack: o.id }, to: { instance: b, jack: i.id } };
+          const rank = (focus.has(o.id) ? 0 : 1) + (focus.has(i.id) ? 0 : 1);
+          cableMoves.push({ rank, desc: `studio cable ${a}.${o.id} -> ${b}.${i.id}`, apply: () => S().addStudioCable(cable), undo: () => S().removeStudioCable(cable) });
+        }));
+      }));
+      cableMoves.sort((x, y) => x.rank - y.rank).forEach(m => moves.push(m));
+      // Internal cables on the step's instrument
+      const sp = specOf(inst);
+      if (sp && sp.patchBay) {
+        sp.patchBay.outputs.forEach(o => sp.patchBay.inputs.forEach(i => {
+          const exists = () => (S().devices[inst]?.patchConnections || []).some(c => (c.from === o.id && c.to === i.id) || (c.from === i.id && c.to === o.id));
+          moves.push({ desc: `cable ${inst}: ${o.id} -> ${i.id}`, apply: () => { if (!exists()) S().addPatchConnection(inst, o.id, i.id); }, undo: () => S().removePatchConnection(inst, o.id, i.id) });
+        }));
+      }
+      // Switches, toggle buttons and focused knobs on every instrument (the step's first)
+      const ordered = [inst, ...rack.filter(r => r !== inst)];
+      ordered.forEach(id => {
+        const spec = specOf(id);
+        if (!spec) return;
+        Object.entries(spec.controls).forEach(([cid, c]) => {
+          const cur = () => hub.valuesFor(id)[cid];
+          const setter = v => { let prev; return { apply: () => { prev = cur(); S().setControlValue(id, cid, v); }, undo: () => S().setControlValue(id, cid, prev) }; };
+          if (c.type === 'switch') c.options.forEach((opt, k) => moves.push({ desc: `${id}.${cid} = ${opt}`, ...setter(k) }));
+          else if (c.type === 'button' && !c.momentary) [true, false].forEach(v => moves.push({ desc: `${id}.${cid} = ${v}`, ...setter(v) }));
+          else if ((c.type === 'knob' || c.type === 'slider') && focus.has(cid) && id === inst) {
+            for (let k = 0; k <= 10; k++) moves.push({ desc: `${id}.${cid} = ${k * 10}%`, ...setter(c.min + ((c.max - c.min) * k) / 10) });
+          }
+        });
+      });
+      // Presses on the step's instrument
+      const pressIds = new Set();
+      if (sp) Object.entries(sp.controls).forEach(([cid, c]) => { if (c.type === 'button' && c.momentary) pressIds.add(cid); });
+      const lay = layoutOf(inst);
+      if (lay) lay.elements.forEach(el => { if (el.kind === 'button' && el.event) pressIds.add(el.event); });
+      pressIds.forEach(pid => moves.push({ desc: `press ${inst}.${pid}`, apply: async () => { await press(inst, pid); }, undo: () => undefined }));
+      return moves;
+    };
+    const search = async step => {
+      const applied = [];
+      let best = score(step);
+      const moves = movesFor(step);
+      for (let round = 0; round < 6; round++) {
+        let improved = false;
+        for (const m of moves) {
+          await m.apply();
+          await wait(2);
+          if (satisfied()) { applied.push(m.desc); return applied; }
+          const sc = score(step);
+          if (sc > best) { best = sc; applied.push(m.desc); improved = true; continue; }
+          await m.undo();
+        }
+        if (!improved) break;
+      }
+      return satisfied() ? applied : null;
+    };
+
     for (const lesson of mod.lessons) {
-      const s0 = store.getState();
-      s0.startLesson(lesson, device);
-      await wait(50);
+      S().startLesson(lesson, device);
+      await wait(60);
       const stepResults = [];
       for (let i = 0; i < lesson.steps.length; i++) {
-        const st = store.getState();
-        if (st.currentStep !== i) st.goToStep(i);
+        if (S().currentStep !== i) S().goToStep(i);
         await wait(20);
         const step = lesson.steps[i];
-        const kind = step.kind || (step.patchFrom && step.patchTo ? 'patch' : step.control ? 'do' : (step.checklist && step.checklist.length) ? 'challenge' : 'info');
-        const S = () => store.getState();
+        const kind = kindOf(step);
+        const inst = instanceOfStep(step);
+        let how = '';
         try {
           if (kind === 'predict' && step.predict) S().answerStep(step.predict.answer);
-          if ((kind === 'quiz') && step.quiz) S().answerStep(step.quiz.answer);
+          if (kind === 'quiz' && step.quiz) S().answerStep(step.quiz.answer);
           if (kind === 'listen' && step.listen && step.listen.question) S().answerStep(step.listen.question.answer);
-          if (step.control && step.targetValue !== undefined) S().setControlValue(device, step.control, step.targetValue);
-          if (step.patchFrom && step.patchTo) S().addPatchConnection(device, step.patchFrom, step.patchTo);
+          const pt = pressTargetOf(step, inst);
+          if (pt) {
+            const n = Math.max(1, Math.round(step.presses || 1));
+            for (let k = 0; k < n; k++) how = `pressed ${pt} via ${await press(inst, pt)}`;
+          } else if (step.control && step.targetValue !== undefined) {
+            S().setControlValue(inst, step.control, step.targetValue);
+          }
+          if (step.play) await playNotes(inst, step.play.notes && step.play.notes.length ? step.play.notes : Array.from({ length: Math.max(1, step.play.count || 1) }, (_, k) => 60 + k));
+          if (step.patchFrom && step.patchTo) S().addPatchConnection(inst, step.patchFrom, step.patchTo);
           if (kind === 'match' && step.match) {
             const v = {};
             step.match.controls.forEach(c => { v[c] = step.match.target[c]; });
-            S().setControlValues(device, v);
+            S().setControlValues(inst, v);
             S().checkMatch();
           }
           if (kind === 'reflect') { S().revealStep(); S().rateReflection('got-it'); }
-          if (step.solution) {
-            if (step.solution.values) S().setControlValues(device, step.solution.values);
-            if (step.solution.patches) step.solution.patches.forEach(p => S().addPatchConnection(device, p.from, p.to));
-            if (step.solution.data !== undefined) S().setDeviceData(device, step.solution.data);
+          const sol = step.solution;
+          if (sol) {
+            const si = sol.instance || inst;
+            if (sol.values) S().setControlValues(si, sol.values);
+            if (sol.patches) sol.patches.forEach(p => S().addPatchConnection(si, p.from, p.to));
+            if (sol.data !== undefined) S().setDeviceData(si, sol.data);
+            if (sol.studioCables) sol.studioCables.forEach(c => S().addStudioCable({ from: { instance: resolveEnd(c.from), jack: c.from.jack }, to: { instance: resolveEnd(c.to), jack: c.to.jack } }));
+            if (sol.transport === 'play') hub.startAll();
+            if (sol.transport === 'stop') hub.stopAll();
+            if (sol.presses) for (const p of sol.presses) await press(si, p);
+            if (sol.notes) await playNotes(si, sol.notes);
+            await wait(20);
           }
         } catch (e) {
           stepResults.push({ i: i + 1, kind, ok: false, why: 'threw: ' + e });
           continue;
         }
-        S().reevaluate();
         await wait(30);
-        const ok = S().stepSatisfied;
+        let ok = satisfied();
+        let auto = null;
+        if (!ok) {
+          auto = await search(step);
+          ok = !!auto;
+        }
+        // An open challenge with no `solution` that no single move solves needs a human
         const manual = !ok && kind === 'challenge' && !step.solution;
-        stepResults.push({ i: i + 1, kind, ok: ok || manual, manual, why: ok ? '' : manual ? 'challenge needs a manual/solution check' : 'not satisfied after performing the action' });
+        stepResults.push({
+          i: i + 1, kind, ok: ok || manual, manual, how, auto: auto && auto.length ? auto : undefined,
+          why: ok ? '' : manual ? 'challenge needs a manual/solution check' : 'not satisfied after performing the action (and no single learner move solved it)',
+        });
       }
       S().resetLesson();
-      results.push({ id: lesson.id, steps: lesson.steps.length, failed: stepResults.filter(r => !r.ok), manual: stepResults.filter(r => r.manual).length });
+      hub.stopAll();
+      S().clearStudioCables();
+      results.push({
+        id: lesson.id, steps: lesson.steps.length,
+        failed: stepResults.filter(r => !r.ok),
+        manual: stepResults.filter(r => r.manual).length,
+        auto: stepResults.filter(r => r.auto).map(r => ({ step: r.i, kind: r.kind, moves: r.auto })),
+        presses: stepResults.filter(r => r.how).map(r => ({ step: r.i, how: r.how })),
+      });
     }
-    function S() { return store.getState(); }
     return results;
   }, device);
 
   const failedLessons = report.filter(r => r.failed.length);
-  console.log(JSON.stringify({ device, lessons: report.length, failedLessons: failedLessons.length, details: failedLessons, manualSteps: report.reduce((n, r) => n + r.manual, 0), errors: errors.slice(0, 10) }, null, 2));
+  const autoSteps = report.reduce((n, r) => n + r.auto.length, 0);
+  console.log(JSON.stringify({
+    device,
+    lessons: report.length,
+    failedLessons: failedLessons.length,
+    details: failedLessons,
+    manualSteps: report.reduce((n, r) => n + r.manual, 0),
+    // Steps no scripted action completed, solved by a single learner move the runner found
+    autoSteps,
+    auto: report.filter(r => r.auto.length).map(r => ({ id: r.id, auto: r.auto })),
+    presses: report.filter(r => r.presses.length).map(r => ({ id: r.id, presses: r.presses })),
+    errors: errors.slice(0, 10),
+  }, null, 2));
   await browser.close();
   process.exit(failedLessons.length || errors.length ? 1 : 0);
 })();
