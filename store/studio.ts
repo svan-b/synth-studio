@@ -5,6 +5,8 @@ import type { RackSlot, StudioCable } from '@/devices/types';
 import { isStepSatisfied, isValueOnTarget, valueToNorm, defaultOf } from '@/lib/controls/mapping';
 import { transport } from '@/lib/audio/transport';
 import { STORE_VERSION, upgradeDevices } from '@/lib/studio/upgrades';
+import type { ChannelDoc, DelayDoc, MasterDoc, MixerDoc, ReverbDoc } from '@/lib/studio/mixerDoc';
+import { throttledLocalStorage } from '@/lib/studio/persistStorage';
 import { STUDIO_LESSONS } from '@/lib/studio/lessons';
 
 // ============================================================================
@@ -59,6 +61,10 @@ export interface StudioDoc {
   arrangement: Arrangement;
   /** instance -> powered off (engine freed to save CPU; settings kept) */
   off?: Record<string, boolean>;
+  /** Mixer: channel strips, returns, master section. Optional on disk: lib/studio/mixerDoc.ts fills defaults. */
+  mixer?: MixerDoc;
+  /** Metronome click and 1-bar count-in (a working preference: not undoable) */
+  metronome?: { click?: boolean; countIn?: boolean };
 }
 
 export interface ReviewItem {
@@ -164,6 +170,12 @@ interface StudioStore extends StudioStoreState {
   setBpm: (bpm: number) => void;
   setSwing: (swing: number) => void;
   setArrangement: (fn: (a: Arrangement) => Arrangement) => void;
+  /** Mixer channel of an instance (fader dB, pan, mute, solo, sends) */
+  setChannel: (instance: string, patch: Partial<ChannelDoc>) => void;
+  setReturn: (bus: 'delay' | 'reverb', patch: Partial<DelayDoc> | Partial<ReverbDoc>) => void;
+  setMasterSection: (patch: { gain?: number; eq?: Partial<MasterDoc['eq']>; glue?: Partial<MasterDoc['glue']> }) => void;
+  setMixer: (fn: (m: MixerDoc) => MixerDoc) => void;
+  setMetronome: (patch: { click?: boolean; countIn?: boolean }) => void;
   loadProject: (p: { devices: Record<string, InstanceState>; studio: StudioDoc; currentDevice?: string }) => void;
   newProject: () => void;
 
@@ -204,6 +216,9 @@ interface StudioStore extends StudioStoreState {
    */
   reconcileReview: (opts?: { complete?: boolean }) => void;
 }
+
+/** The browser save of the studio (throttled; see lib/studio/persistStorage.ts) */
+export const studioStorage = throttledLocalStorage<unknown>();
 
 // Device specs registered at runtime (module scope - not persisted)
 const specs: Record<string, DeviceSpec> = {};
@@ -315,6 +330,14 @@ const sameCable = (c: PatchConnection, a: string, b: string) =>
 const sameStudioCable = (c: StudioCable, d: StudioCable) =>
   (c.from.instance === d.from.instance && c.from.jack === d.from.jack && c.to.instance === d.to.instance && c.to.jack === d.to.jack) ||
   (c.from.instance === d.to.instance && c.from.jack === d.to.jack && c.to.instance === d.from.instance && c.to.jack === d.from.jack);
+
+/** The mixer without an instance's channel (it left the rack) */
+const withoutChannel = (m: MixerDoc | undefined, instance: string): MixerDoc | undefined => {
+  if (!m?.channels?.[instance]) return m;
+  const channels = { ...m.channels };
+  delete channels[instance];
+  return { ...m, channels };
+};
 
 /** Device type of an instance id when the rack doesn't know it ('mother32#2' -> 'mother32') */
 const stripInstance = (instance: string) => instance.split('#')[0];
@@ -637,6 +660,7 @@ export const useStudioStore = create<StudioStore>()(
               rack,
               routes,
               cables: s.studio.cables.filter(c => c.from.instance !== instance && c.to.instance !== instance),
+              mixer: withoutChannel(s.studio.mixer, instance),
             },
             currentDevice: id,
           });
@@ -657,6 +681,7 @@ export const useStudioStore = create<StudioStore>()(
               rack,
               routes,
               cables: s.studio.cables.filter(c => c.from.instance !== instance && c.to.instance !== instance),
+              mixer: withoutChannel(s.studio.mixer, instance),
             },
             currentDevice: s.currentDevice === instance ? rack[0].id : s.currentDevice,
           });
@@ -764,6 +789,41 @@ export const useStudioStore = create<StudioStore>()(
         },
 
         setArrangement: fn => updateStudio(st => ({ ...st, arrangement: fn(st.arrangement) })),
+
+        setChannel: (instance, patch) =>
+          updateStudio(st => {
+            const m = st.mixer ?? {};
+            const prev = m.channels?.[instance] ?? {};
+            return { ...st, mixer: { ...m, channels: { ...(m.channels ?? {}), [instance]: { ...prev, ...patch } } } };
+          }),
+
+        setReturn: (bus, patch) =>
+          updateStudio(st => {
+            const m = st.mixer ?? {};
+            return { ...st, mixer: { ...m, [bus]: { ...(m[bus] ?? {}), ...patch } } };
+          }),
+
+        setMasterSection: patch =>
+          updateStudio(st => {
+            const m = st.mixer ?? {};
+            const master = m.master ?? {};
+            return {
+              ...st,
+              mixer: {
+                ...m,
+                master: {
+                  ...master,
+                  ...(patch.gain !== undefined ? { gain: patch.gain } : {}),
+                  ...(patch.eq ? { eq: { ...(master.eq ?? {}), ...patch.eq } } : {}),
+                  ...(patch.glue ? { glue: { ...(master.glue ?? {}), ...patch.glue } } : {}),
+                },
+              },
+            };
+          }),
+
+        setMixer: fn => updateStudio(st => ({ ...st, mixer: fn(st.mixer ?? {}) })),
+
+        setMetronome: patch => set(state => ({ studio: { ...state.studio, metronome: { ...(state.studio.metronome ?? {}), ...patch } } })),
 
         loadProject: p => {
           get().resetLesson();
@@ -1056,6 +1116,8 @@ export const useStudioStore = create<StudioStore>()(
     {
       name: 'synth-studio-storage',
       version: STORE_VERSION,
+      // Written at most every 600 ms (and on hide / close), not on every knob move
+      storage: studioStorage,
       partialize: s => ({
         currentDevice: s.currentDevice,
         devices: s.devices,

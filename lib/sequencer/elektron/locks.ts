@@ -64,6 +64,12 @@ export interface LockOptions {
   fromLock?: (controlId: string, value: number, current: ControlValue) => ControlValue;
   /** Track count for asProject() when the data is missing */
   tracks?: number;
+  /**
+   * Most different parameters a pattern may lock (LOCK_LIMIT_A4 = 128,
+   * LOCK_LIMIT_RYTM = 72): a lock on one more parameter is refused (the turn is
+   * swallowed, as the hardware does once the pattern is full). Default: no limit.
+   */
+  lockLimit?: number;
 }
 
 const NONE: readonly number[] = Object.freeze([]);
@@ -133,7 +139,7 @@ export function interceptForLocks(id: string, value: ControlValue, api: DeviceUi
     return true;
   }
   const steps = held.slice();
-  api.updateData(d => setLock(asProject(d, opts.tracks), pattern, track, steps, key, v));
+  api.updateData(d => setLock(asProject(d, opts.tracks), pattern, track, steps, key, v, { limit: opts.lockLimit }));
   if (api.ui[UI_HELD_EDITED] !== true) api.setUi({ [UI_HELD_EDITED]: true });
   return true;
 }
