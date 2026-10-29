@@ -91,7 +91,10 @@ const PAGE_LIB = () => {
       Object.entries(mod.spec.controls).forEach(([id, c]) => { if ('default' in c && c.default !== undefined) eng.setParam(id, c.default); });
       Object.entries(settings).forEach(([k, v]) => eng.setParam(k, v));
       eng.start(ctx, ctx.destination);
+      // an offline context only hands port messages (the engine's notes) to the worklets while
+      // suspended: play the notes at the first suspend, and suspend now and then after it
       ctx.suspend(256 / SR).then(() => { notes.forEach(n => eng.noteOn(n, 1)); ctx.resume(); });
+      for (let f = 4096; f < ctx.length; f += 4096) ctx.suspend(f / SR).then(() => ctx.resume());
       const buf = await ctx.startRendering();
       try { eng.dispose(); } catch { /* */ }
       return { x: buf.getChannelData(0), sr: SR };
@@ -283,8 +286,13 @@ async function unlock(page) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [a, b] });
   await ipad.waitForTimeout(500);
   result.ipadChord = await ipad.evaluate(async () => {
-    const S = window.__s37;
-    const an = S.analyser();
+    const { hub, audio } = window.__synthStudio;
+    // a fine analyser (about 1.3 Hz per bin), so 131 Hz, 163 Hz and 196 Hz land in separate bins
+    const an = audio.getAudioContext().createAnalyser();
+    an.fftSize = 32768;
+    an.smoothingTimeConstant = 0;
+    hub.getStripInput('sub37').connect(an);
+    await new Promise(r => setTimeout(r, 800));
     const sr = an.context.sampleRate;
     const fb = new Float32Array(an.frequencyBinCount);
     const acc = new Float64Array(fb.length);

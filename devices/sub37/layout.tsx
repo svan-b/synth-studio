@@ -68,11 +68,20 @@ const box = (x0: number, x1: number, title: string): PanelElement[] => [
   { kind: 'section', x: x0, y: BOX_TOP, w: x1 - x0, h: BOX_BOTTOM - BOX_TOP, border: '1px solid #3a3a3a', background: '#121212', radius: 1.2 },
   label(title, (x0 + x1) / 2, BOX_TOP + 5, 9, { letterSpacing: 1.4 }),
 ];
+/**
+ * A legend on a knob's arc at `deg` (0 = top). Legends left of the knob end at their point and
+ * those to the right start there, so they grow away from the knob, never into it.
+ */
+const arcLabel = (text: string, cx: number, cy: number, r: number, deg: number, size = 6.5): PanelElement => {
+  const a = (deg * Math.PI) / 180;
+  const x = cx + r * Math.sin(a), y = cy - r * Math.cos(a);
+  if (deg < -15) return small(text, x + 1.6, y, { size, align: 'right' });
+  if (deg > 15) return small(text, x - 1.6, y, { size, align: 'left' });
+  return small(text, x, y, { size });
+};
 /** Position legends around a stepped knob, at the pointer's angles (-135 to +135 degrees) */
-const arc = (cx: number, cy: number, r: number, names: string[]): PanelElement[] => names.map((n, i) => {
-  const a = ((-135 + (270 * i) / Math.max(1, names.length - 1)) * Math.PI) / 180;
-  return small(n, cx + r * Math.sin(a), cy - r * Math.cos(a), { size: 6.5 });
-});
+const arc = (cx: number, cy: number, r: number, names: string[]): PanelElement[] => names.map((n, i) =>
+  arcLabel(n, cx, cy, r, -135 + (270 * i) / Math.max(1, names.length - 1)));
 /** A knob with its printed name above */
 const named = (name: string, control: KnobElement['control'], x: number, y: number, d = KN, extra: Partial<KnobElement> = {}): PanelElement[] => [
   label(name, x, y - d / 2 - 3.2),
@@ -111,17 +120,17 @@ function modBus(n: 1 | 2, x0: number, x1: number): PanelElement[] {
     ...named('PITCH AMT', `mod${n}_pitch_amt`, xl, ROW2),
     ...named('FILTER AMT', `mod${n}_filter_amt`, xr, ROW2),
     // OSC (PITCH AMT destination): LEDs 1 and 2 over the button
-    small('1', xl - 4, 91), small('2', xl + 4, 91),
-    led(xl - 4, 94.5, ctx => v(ctx, `mod${n}_pitch_dest`) !== 2),
-    led(xl + 4, 94.5, ctx => v(ctx, `mod${n}_pitch_dest`) !== 1),
-    capAt(xl, 100, ctx => <CycleButton ctx={ctx} control={`mod${n}_pitch_dest`} />),
-    small('OSC', xl, 106),
-    capAt(xr, 100, ctx => <ControllersButton ctx={ctx} bus={n} />),
-    small('CONTROLLERS', xr, 106),
+    small('1', xl - 4, 90), small('2', xl + 4, 90),
+    led(xl - 4, 93.5, ctx => v(ctx, `mod${n}_pitch_dest`) !== 2),
+    led(xl + 4, 93.5, ctx => v(ctx, `mod${n}_pitch_dest`) !== 1),
+    capAt(xl, 99, ctx => <CycleButton ctx={ctx} control={`mod${n}_pitch_dest`} />),
+    small('OSC', xl, 105.5),
+    capAt(xr, 99, ctx => <ControllersButton ctx={ctx} bus={n} />),
+    small('CONTROLLERS', xr, 105.5),
     // MOD DEST: six LEDs (the other LFO's RATE first) beside the DEST button
     ...DEST_LEDS.flatMap((name, i): PanelElement[] => [
-      led(x0 + 3.5, 111 + i * 5.5, ctx => destLit(v(ctx, `mod${n}_dest`, 1), i)),
-      small(i === 0 ? `LFO ${other} RATE` : name, x0 + 6, 111 + i * 5.5, { size: 6.5, align: 'left' }),
+      led(x0 + 3.5, 111.5 + i * 5.5, ctx => destLit(v(ctx, `mod${n}_dest`, 1), i)),
+      small(i === 0 ? `LFO ${other} RATE` : name, x0 + 6, 111.5 + i * 5.5, { size: 8, align: 'left' }),
     ]),
     small('DEST', xm + 3, 129.5),
     capAt(xm + 3, 135.5, ctx => <DestButton ctx={ctx} bus={n} />),
@@ -211,8 +220,8 @@ const elements: PanelElement[] = [
   small('LO', 297, 93), small('HI', 305, 93),
   led(297, 96.5, ctx => v(ctx, 'kb_ctrl', 2) === 1),
   led(305, 96.5, ctx => v(ctx, 'kb_ctrl', 2) === 2),
-  capAt(301, 102.5, ctx => <CycleButton ctx={ctx} control="kb_ctrl" />),
-  small('KB CTRL', 301, 108.5),
+  capAt(301, 101.5, ctx => <CycleButton ctx={ctx} control="kb_ctrl" />),
+  small('KB CTRL', 301, 109),
   ...namedBtn('DUO MODE', 'duo_mode', 340, 102.5),
   ...named('FREQUENCY', 'osc2_frequency', 305.9, ROW3),
   ...named('BEAT FREQ', 'beat_freq', 342.5, ROW3),
@@ -228,12 +237,8 @@ const elements: PanelElement[] = [
   // ===== FILTER (pp.28-29, drawing p.28) =====================================================
   ...box(421.9, 485.9, 'FILTER'),
   knob('cutoff', 453.8, 33, KN_BIG),
-  ...CUTOFF_LEGEND.map(([t, deg]) => {
-    const a = (deg * Math.PI) / 180;
-    const r = deg === 0 ? 16 : Math.abs(deg) < 90 ? 17 : 16.5;
-    return small(t, 453.8 + r * Math.sin(a), 33 - r * Math.cos(a), { size: 6.5 });
-  }),
-  label('CUTOFF', 453.8, 50.5),
+  ...CUTOFF_LEGEND.map(([t, deg]) => arcLabel(t, 453.8, 33, deg === 0 ? 16 : Math.abs(deg) < 90 ? 17 : Math.abs(deg) > 90 ? 15.5 : 16.5, deg)),
+  label('CUTOFF', 453.8, 52.5),
   ...named('RESONANCE', 'resonance', 437.3, ROW2),
   ...named('MULTIDRIVE', 'multidrive', 470.4, ROW2),
   // SLOPE: LEDs 6 12 | button | 18 24 in their own box
@@ -250,9 +255,9 @@ const elements: PanelElement[] = [
   // ===== ENVELOPE GENERATORS (pp.29-33) ======================================================
   ...box(486.8, 622.5, 'ENVELOPE GENERATORS'),
   label('FILTER', 490.6, 32, 7.5, { rotate: -90, letterSpacing: 1.2, color: '#cfcfcf' }),
-  ...envRow('feg', ROW1, 53.5),
-  label('KNOB SHIFT', 509.2, 65),
-  capAt(509.2, 71, ctx => <ShiftButton ctx={ctx} />),
+  ...envRow('feg', ROW1, 56),
+  label('KNOB SHIFT', 509.2, 66),
+  capAt(509.2, 72, ctx => <ShiftButton ctx={ctx} />),
   label('AMPLIFIER', 490.6, 109, 7.5, { rotate: -90, letterSpacing: 1.2, color: '#cfcfcf' }),
   ...envRow('aeg', 105.1, ROW3),
   label('SUB 37', 580, 69, 22, { weight: 900, letterSpacing: 1 }),

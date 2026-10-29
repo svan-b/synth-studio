@@ -92,6 +92,8 @@ export class Sub37Engine extends BaseEngine {
   private unsubTick: (() => void) | null = null;
   private unsubEvent: (() => void) | null = null;
   private burst = 0;
+  /** Bumped when the arpeggio / sequence stops: cancels step state scheduled ahead */
+  private stepGen = 0;
 
   protected build(): void {
     const ctx = this.ctx;
@@ -612,7 +614,7 @@ export class Sub37Engine extends BaseEngine {
     const note = this.arp.next(o);
     if (note === null) return;
     const step = this.stepCount++;
-    this.emitAt(t, { arpStep: step % 16 });
+    this.stepAt(t, { arpStep: step % 16 });
     if (gateFrac <= 0) { this.pitchOnly(t, note, note); return; }   // GATE LENGTH OFF: no gate at all
     const len = this.gateFor(stepDur, room);
     this.playStep(t, note, note, len === null ? null : t + len, false, this.arp.first);
@@ -628,7 +630,7 @@ export class Sub37Engine extends BaseEngine {
     if (i < 0) return;
     this.seqIndex = seqNextStep(flags, first, last, i);
     this.stepCount++;
-    this.emitAt(t, { seqStep: i, arpStep: i % 16 });
+    this.stepAt(t, { seqStep: i, arpStep: i % 16 });
     const f = charFlags(flags[i]);
     const n1 = charNote(p1[i]);
     const tiedIn = this.seqTieOpen;
@@ -637,7 +639,7 @@ export class Sub37Engine extends BaseEngine {
       if (this.arpGateOpen) this.postAt({ t: 'gate', time: t, on: 0 });
       this.arpGateOpen = false;
       this.arpGateUntil = t;
-      this.emitAt(t, { gate: false });
+      this.stepAt(t, { gate: false });
       return;
     }
     // transposition (GLOBAL REF NOTE, p.46): FIRST = the key pressed is the first note; MID C = note 48 plays as recorded
@@ -696,7 +698,7 @@ export class Sub37Engine extends BaseEngine {
       this.postAt({ t: 'gate', time: t, on: 1, vel: this.velocity, tf: tf ? 1 : 0, ta: ta ? 1 : 0, rf: this.bool('feg_reset') ? 1 : 0, ra: this.bool('aeg_reset') ? 1 : 0, kb: n1, lr: resets ? 1 : 0 });
     }
     this.arpGateOpen = true;
-    this.emitAt(t, { gate: true });
+    this.stepAt(t, { gate: true });
     if (offAt !== null) this.endGate(offAt);
     else this.arpGateUntil = Infinity;
   }
@@ -707,7 +709,19 @@ export class Sub37Engine extends BaseEngine {
     this.atTime(at, () => { if (this.arpGateUntil === at) { this.arpGateOpen = false; this.emit({ gate: false }); } });
   }
 
+  /** Engine state of a step, published when the step's audio time arrives (unless the pattern stopped first) */
+  private stepAt(t: number, partial: Record<string, unknown>) {
+    const gen = this.stepGen;
+    this.atTime(t, () => { if (gen === this.stepGen) this.emit(partial); });
+  }
+
+  /**
+   * The arpeggio / sequence stops now: steps already scheduled ahead (the clock looks ahead) are
+   * dropped from the control processor's queue and from the step LEDs, so nothing sounds after it.
+   */
   private stopArpSound(t: number) {
+    this.stepGen++;
+    this.ctl.port.postMessage({ t: 'clear' });
     this.postAt({ t: 'gate', time: t, on: 0 });
     this.arpGateOpen = false;
     this.arpGateUntil = 0;
