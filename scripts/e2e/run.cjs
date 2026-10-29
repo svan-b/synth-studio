@@ -106,6 +106,11 @@ check('touch: a momentary-button do-step counts taps and completes', tm.before?.
 check('touch: spectrum scope draws the output while it plays', sp.playing?.mode === 'spectrum' && sp.flippedTo === 'wave' && sp.playing?.sized && sp.quiet?.lit < 40 && sp.playing?.cols > 0.3 * (sp.playing?.W ?? 1e9),
   { quiet: sp.quiet?.lit, playingCols: sp.playing?.cols, width: sp.playing?.W, mode: sp.playing?.mode, flip: sp.flippedTo });
 
+// ---- Producer path on iPad ---------------------------------------------------
+const pp = run(path.join(__dirname, 'producer.cjs'), [base, path.join(outDir, 'producer')], 600_000);
+check('producer path: iPad walkthrough of a whole-studio lesson', !pp.__error && pp.total > 0 && (pp.failed ?? []).length === 0 && (pp.errs ?? []).length === 0,
+  pp.__error ?? { passed: pp.passed, total: pp.total, failed: pp.failed });
+
 // ---- Every instrument (--full) -----------------------------------------------
 if (full) {
   const registry = fs.readFileSync(path.join(root, 'devices', 'index.ts'), 'utf8');
