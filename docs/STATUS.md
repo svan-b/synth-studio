@@ -115,6 +115,14 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Covers smoke and every lesson for every instrument, the three real-time demo tracks, the demo recordings, both iPad Producer walkthroughs and the core checks.
   - Studio lessons: 20, 0 failed (2 manual steps in studio-5).
   - Audio-QA baseline at aa0a41a: 271 presets, medians −18.0 to −19.1 LUFS.
+- 40d0857: **separate outputs**, studio side.
+  - An instrument declares `studio.outputs` and implements `connectOutput(id, dest | null)`; the learner turns them on in the instrument strip's Outs menu.
+  - Each output becomes its own channel `<instance>/<id>`: fader, pan, sends, mute, solo, meter, route, stem and a map arrow. Arranger mutes follow the instrument.
+  - Checked with a stand-in output (`scripts/e2e/outputs.cjs`; e2e 47/47).
+  - The Rytm's eight TRACK OUTs and the A4's four stereo track outputs come after their feature branches merge. Each will act as "cable in the TRACK OUT, route-to-main off" (manuals: Rytm ROUTE TO MAIN, A4 VOICE ROUTING).
+- **Monkey tests** (`scripts/e2e/monkey.cjs`, `studio-monkey.cjs`, `run.cjs --monkey`): seeded random use.
+  - Every instrument, mouse and touch: about 6,700 actions, 0 page errors.
+  - The studio (tabs, instruments, sets, transport, mixer, routes, undo, lessons): about 900 actions, 0 page errors.
 - **Vercel build rate limit.** Previews from 49f3469 on failed with `build-rate-limit`, not a code error (local builds pass). Every push to any branch, the agents' `wip/*` included, starts a preview build. Pushes are now batched. Option for the user: disable preview builds for scratch branches with `vercel.json` → `"git": { "deploymentEnabled": { "wip/*": false } }`.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
@@ -150,7 +158,10 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 - Smoke test fix: buttons that a paged panel removed are skipped after 1 s; the Rytm smoke went from 498 s to 34 s (the app was never slow, at 67–125 ms per press).
 ## 2. In progress
 
-Nothing. All 22 `wip/*` branches on GitHub are fully merged into the working branch (checked with `git merge-base --is-ancestor`), so they can be deleted once the user agrees:
+- `wip/a4-tracks`: Analog Four POLY and chords, live knob-lock recording, step recording, trig and page copy, TRANSPOSABLE and kit per pattern.
+- `wip/rytm-tracks`: Rytm live lock recording, the sound pool and sound locks, the Euclidean sequencer, chromatic mode, step recording and user samples.
+
+Earlier work: nothing else in progress. All 22 `wip/*` branches on GitHub are fully merged into the working branch (checked with `git merge-base --is-ancestor`), so they can be deleted once the user agrees:
 `analog-four`, `analog-rytm`, `demo-excerpts`, `demo-tracks`, `dfam-review`, `elektron-sequencer`, `mother32`, `panel-teaching`, `perf-analog-four`, `perf-shared-fx`, `producer-path`, `producer-path-2`, `review-analog-four`, `review-analog-rytm`, `review-mother32`, `review-sub37`, `review-subharmonicon`, `review-xone96`, `studio`, `sub37`, `subharmonicon`, `xone96`.
 
 New work merges through the gate below. Before merging an instrument change, compare `specDefaults(<device>)` at both commits to find changed defaults and removed ids, then add an upgrade entry.
