@@ -1707,7 +1707,7 @@ const q5: Lesson = {
       check: s => { const p = proj(s), tr = getPattern(p, p.active).tracks[BD], l = frqLocks(s); return l.length >= 6 && l.some(i => !!tr.steps[i]?.trigless); },
       solution: { data: Q5_SWEEP },
       principle: 'A recorded sweep repeats exactly, so the filter move becomes part of the groove.',
-      explanation: 'Watch the trig keys: the bass notes (red) now hold locks, and the steps between them got yellow lock trigs. The sound follows your hand while you turn, and the kit keeps the last value.',
+      explanation: 'Watch the trig keys: each bass note now holds a lock (the dot on its key), and the steps between the notes got lock trigs. The sound follows your hand while you turn, and the kit keeps the last value.',
       manualReference: REF('p.47'),
     },
     {
@@ -1782,7 +1782,7 @@ const q6: Lesson = {
     },
     {
       kind: 'predict', focus: ['key:trig', 'euc_on', 'key:play'], concept: 'sequencer-pattern',
-      instruction: 'Press [TRIG] twice for TRIG page 2. Turn encoder D (EUC) to ON and press [PLAY].',
+      instruction: 'The TRIG page is shown: press [TRIG] again for its page 2. Turn encoder D (EUC) to ON and press [PLAY].',
       check: s => !!eucOf(s, RS)?.on && playing(s),
       solution: { values: { play: true }, data: Q6_ON },
       predict: {

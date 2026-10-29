@@ -170,3 +170,89 @@ detector's 2.5 threshold), and every kit's worst true peak over 12 random states
 - **One manual lesson step.** t2's arranger challenge has no `solution`: `LessonSolution` cannot set
   arranger sections (a framework change).
 - **SY DUAL VCO units** (manual p.103) and **BD HARD's two-sample TIC** (firmware notes), above.
+
+## Full-track features
+
+A second pass after this review built the features its ranking names, to the OS 1.72 manual. Page
+numbers are the manual's; where it leaves the behaviour open the twin's choice is marked **design**
+(REFERENCE.md has every row).
+
+### What was built
+
+| Feature | Manual | Code | What it does |
+|---|---|---|---|
+| Live recording of parameter locks | pp.40-41, 43, 47, 67 | `live.ts`, `engine.ts` (`liveTurn`, `liveHit`), `ui.tsx` (`LiveRec`), `index.ts` (`liveRecTurn`) | In LIVE RECORDING an encoder turn on the active track's PARAMETER pages locks the step the sequencer is at: note trigs get the lock, empty steps a lock trig. [FUNC] + [NO], [NO] + an encoder and [NO] + pads erase locks, one parameter's locks or trigs on the steps reached while held (sound locks stay). Pad hits now also record their length, their CHROMATIC pitch and, with [RTRG], the roll; [RECORD] + [PLAY] twice switches quantize |
+| Sound pool and sound locks | pp.24, 26, 31-35, 48 | `pool.ts`, `engine.ts` (`lockedSound`), `ui.tsx` (`SoundPoolPanel`, `SoundLockPicker`), the worklet's per-trig machine | A project pool of 128 Sounds: [YES] + [MUTE] or the SOUND menu stores the active track's Sound; the menu previews, loads, renames and deletes. Hold a note trig and turn TRACK LEVEL (or tap the list) to sound lock it; Sounds the track can't run are marked (!) |
+| Euclidean sequencer | p.44 | `euclid.ts`, TRIG page 2 (`EUC_PAGE` in `model.ts`, `index.ts`), the screen's map | [TRIG] twice: PL1, PL2, LEN, EUC, RO1, RO2, TRO, OP per track and pattern. The track's own trigs hide and come back; [FUNC] + EUC off keeps the generated ones; generated trigs take parameter and sound locks; [RECORD] lights purple |
+| CHROMATIC from keys and MIDI | pp.19, 22-23, 43 | `engine.ts` (`noteOn` / `noteOff`), `keyboard` in `index.ts` | The computer keyboard (A-K, Z / X) and MIDI notes from the studio's MIDI routing (`lib/midi`, unchanged): notes 0-11 play tracks 1-12, 12-59 the active track chromatically, and both record in LIVE and STEP RECORDING |
+| STEP RECORDING | pp.40-41 | `engine.ts` (`stepRec`), `ui.tsx` (`StepRecTrigs`) | [RECORD] + [STOP], STANDARD and JUMP; a trig key picks the active step, pads (several at once) place trigs, [NO] a rest, LEFT / RIGHT move, [YES] held times the length, a held trig key takes locks |
+| User samples | pp.35-36, 56, 58-59 | `samples.ts`, the SAMPLES menu, the worklet's `smp` message | A WAV or AIFF from the file picker (the iPad's Files app) replaces a sample slot's built-in one-shot for this project; IndexedDB holds the audio, the project only the reference; a missing sample falls back to the built-in one-shot and the screen says so |
+
+### Choices where the manual is silent (**design**)
+
+- **Live recording.** The turn is also an ordinary edit: the kit value follows the knob, so the change
+  is heard at once and the step locks hold what was heard. A turn lands on the step nearest to it (as
+  a hit does); turns of one encoder less than three steps apart also lock the steps in between to the
+  value that played there, so a slow sweep records without gaps. The touch stand-in for "[NO] + press
+  the encoder" is [NO] held while turning it. The panel reports turns to the engine (`ui.liveTurn`),
+  because only the engine knows where the sequencer is; the lag is taken off the turn's time.
+- **Sound locks** are the trig's `sound` lock (pool slot 1-128). It counts against the 72-parameter
+  budget as one parameter of its track. The engine plays the whole pool Sound as locks with the trig's
+  own locks on top (mapped to the Sound's machine) and switches the voice to its machine for that trig;
+  lock trigs that follow apply to that Sound. [NO] + pads leaves a sound-locked step as a silent lock
+  trig holding the lock, so "sound locks will not be erased" (p.47) and a later hit plays it again.
+- **Euclidean.** Bjorklund's algorithm, first pulse on step 1 (3 of 8 = x..x..x.); rotations run
+  -63..+63 within the track length. A generated trig on a step holding one of the track's own note
+  trigs plays that trig, our reading of p.44's "distributed according to the settings". Everything
+  that plays or shows trigs reads a view of the project (the sequencer, the trig keys, the trig editor,
+  live recording, the arranger list), and edits there are written back: lock edits to the track's
+  `euc.steps`, added or removed trigs refused with a message.
+- **Keys and MIDI.** Notes above 59 are ignored, as the manual lists no use for them on the active
+  track. A track plays one note at a time; only its latest note ends the gate.
+- **Step recording.** The active step moves on when the last pad of a chord is let go.
+- **User samples** are mixed to mono, cut at 33 s and normalized to the built-in one-shots' peak, so
+  they sit in the kits' calibrated mix. They stay in the browser that loaded them.
+
+### Measurements
+
+| Check | Result |
+|---|---|
+| Null test, engine | Message streams to both worklets recorded in a deterministic offline run (virtual timers, seeded `Math.random`) of the demo song (52 s) and all 20 kit patterns (9 s each), baseline build against this branch: 21 of 21 identical |
+| Null test, worklet | The same streams rendered sample-accurately through the baseline worklet and this branch's (Node harness: dry, delay return, reverb send, the 12 control channels, master): 21 of 21 bit-identical |
+| CPU | `/bench`, analog-rytm, 17 interleaved pairs on a shared machine (load 2-3): before 23.7× realtime mean (best 28.3×), after 23.2× (best 26.4×), median pair ratio 0.977 (-2.3 %). The worklet's CPU time alone (Node, the demo song, 5 runs each): new / old 0.993 best, 1.003 median |
+| Unit tests (scratch scripts) | Live recording edits 20, Euclidean 29 (E(3,8), E(5,8), E(7,16), the four operators, rotations, the view and write-back, EUC off and the [FUNC] convert), WAV / AIFF readers 13 (8 / 16 / 24-bit PCM, float, extensible WAV, AIFF, AIFC `sowt` and `fl32`) |
+| The real panel (Playwright, touch pointers, iPad viewport) | A 2.4 s FRQ drag in LIVE RECORDING at 120 BPM locked all 16 steps (4 note trigs, 12 lock trigs) and left the kit value at the end of the turn; [FUNC] + [NO] for 1.5 s erased 13 of them; a held trig + TRACK LEVEL sound locked it; STEP RECORDING placed SD on step 5 and moved to step 6; keys A and K played; a WAV loaded into slot 02; a missing sample showed its message |
+
+### Lessons
+
+- `analog-rytm-q5-live-locks` (sequencing): record a filter sweep on the Analog Toys bassline in LIVE
+  RECORDING, see the lock trigs it leaves, leave with [PLAY], then record a second move on the hats.
+- `analog-rytm-q6-euclidean` (sequencing): a clave from one pulse generator, five over sixteen, a
+  second generator with OR and then XOR, SUB in a quiz, and a three-track Euclidean groove.
+
+Every existing lesson id and check is unchanged; the lesson runner solves all 22.
+
+### Upgrade notes
+
+- No existing control id, range or default changed. New controls: `euc_pl1`, `euc_pl2`, `euc_len`,
+  `euc_on`, `euc_ro1`, `euc_ro2`, `euc_tro`, `euc_op` (TRIG page 2; in `uiControls`, never stored).
+- New optional data: `RytmProject.pool`, `RytmProject.samples`, `Track.euc` (with `euc.steps`) and the
+  `sound` lock key. Saves without them load unchanged; the migration carries them through older
+  formats too, so no version bump or conversion is needed.
+- Behaviour a learner may notice: [YES] + [MUTE] stores the track's Sound in the pool (it showed a
+  message before); a held trig + TRACK LEVEL picks a sound lock instead of changing the level;
+  [FUNC] + [NO] during LIVE RECORDING erases locks (elsewhere it still reloads the kit); keys A-K and
+  MIDI notes play the Rytm; live-recorded hits also record their length (and their pitch in CHRO).
+- The module now has `keyboard`. Audio QA and `/bench` don't change their excitation: the module's
+  audition and its transport control come first.
+
+### Left for later
+
+- Pad scales and the rest of the TRACK menu (pp.42, 110): CHROMATIC plays all twelve semitones.
+- Pad pressure recorded as lock trigs in LIVE RECORDING (p.41) and the click track's preroll (p.46).
+- In STEP RECORDING, [TRIG] + [YES] previews and [FUNC] for a fixed MIDI velocity (p.41).
+- The +Drive Sound library and the browser's sorting and tags (pp.31-33); sampling (pp.56-57).
+- User samples travel with the browser, not with an exported project: adding them to the studio's
+  project files is a studio-core change.
+- The live-lock edits (`live.ts`) and the Euclidean view are generic; they could move into
+  `lib/sequencer/elektron` for the Analog Four's live recording.

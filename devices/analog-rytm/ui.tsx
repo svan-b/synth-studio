@@ -843,22 +843,23 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
     const rot = (s: number) => ((s - Math.round(e.tro)) % len + len) % len;
     body = (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: '1fr 1fr', columnGap: '3%', rowGap: '2%', padding: '1% 0 1%' }}>
+        {/* the eight values as text, laid out like encoders A-D / E-H */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'auto auto', columnGap: '3%', rowGap: '1%', padding: '1% 0 0' }}>
           {cells.map((c, i) => (
-            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', minWidth: 0 }}>
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 0, lineHeight: 1.05 }}>
               {c ? (
                 <>
-                  {c.textual ? <div style={{ fontSize: '1.05em', fontWeight: 700, height: '1.6em', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{c.text}</div> : <Dial frac={c.frac} bipolar={c.bipolar} />}
-                  <div style={{ fontWeight: 700 }}>{c.label}</div>
+                  <div style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{c.text}</div>
+                  <div style={{ fontWeight: 700, opacity: 0.85 }}>{c.label}</div>
                 </>
               ) : <div style={{ opacity: 0.25 }}>-</div>}
             </div>
           ))}
         </div>
-        <div aria-label="Euclidean map: generator 1, generator 2 and the trigs they place" style={{ display: 'flex', flexDirection: 'column', gap: 1, padding: '0 0 2%' }}>
-          {[['1', (s: number) => g1.has(rot(s)), '0.35em'], ['2', (s: number) => g2.has(rot(s)), '0.35em'], ['=', (s: number) => res.has(s), '0.6em']].map(([lab, on, h]) => (
-            <div key={lab as string} style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <span style={{ width: '1.1em', fontSize: '0.8em', opacity: 0.8 }}>{lab as string}</span>
+        <div aria-label="Euclidean map: generator 1, generator 2 and the trigs they place" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
+          {[['1', (s: number) => g1.has(rot(s)), '0.4em'], ['2', (s: number) => g2.has(rot(s)), '0.4em'], ['=', (s: number) => res.has(s), '0.7em']].map(([lab, on, h]) => (
+            <div key={lab as string} style={{ display: 'flex', alignItems: 'center', gap: 1, height: '1em' }}>
+              <span style={{ width: '1.2em', opacity: 0.85, lineHeight: 1 }}>{lab as string}</span>
               {Array.from({ length: shown }, (_, s) => <React.Fragment key={s}>{mark((on as (s: number) => boolean)(s), h as string)}</React.Fragment>)}
             </div>
           ))}
@@ -908,7 +909,7 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
             {st?.mode === 'song' ? `${String((st?.songRow ?? 0) + 1).padStart(2, '0')}:` : '__:'}
             <span style={{ border: '1px solid #e8f0ff', padding: '0 2px', fontWeight: 700, marginLeft: 2 }} className={st?.queued ? 'rytm-blink' : undefined}>{st?.queued ?? patId}</span>
           </span>
-          <span style={{ fontSize: '0.85em', opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis' }}>{right || kitName(ctx)}</span>
+          <span style={{ fontSize: sr?.on || edit.startsWith('LIVE') ? '1em' : '0.85em', fontWeight: sr?.on || edit.startsWith('LIVE') ? 700 : undefined, opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis' }}>{right || kitName(ctx)}</span>
         </div>
       </div>
       <DataSync ctx={ctx} />
@@ -1403,7 +1404,7 @@ function SampleMenu({ ctx }: { ctx: CustomRenderContext }) {
   const missing = new Map(((ctx.engine.samplesMissing as { slot: number; name: string }[] | undefined) ?? []).map(m => [m.slot, m.name]));
   const file = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string>('');
-  const audition = (i: number) => { ctx.sendEvent('pad', { track, vel: 100 }); setTimeout(() => ctx.sendEvent('pad:up', { track }), 300); void i; };
+  const audition = () => { ctx.sendEvent('pad', { track, vel: 100 }); setTimeout(() => ctx.sendEvent('pad:up', { track }), 300); };
   const load = async (f: File) => {
     const slot = cur;
     if (slot <= 0) return;
@@ -1419,7 +1420,7 @@ function SampleMenu({ ctx }: { ctx: CustomRenderContext }) {
       });
       const secs = dec.data.length / dec.rate;
       setStatus(`${name} is in slot ${String(slot).padStart(2, '0')} (${secs.toFixed(secs < 10 ? 2 : 1)} s${dec.truncated ? `, cut to ${MAX_SECONDS} s` : ''}). It stays in this browser.`);
-      setTimeout(() => audition(slot), 250);
+      setTimeout(audition, 250);
     } catch (e) {
       setStatus(`Could not load ${f.name}: ${e instanceof Error ? e.message : String(e)}. Use a WAV or AIFF file.`);
     }
@@ -1441,7 +1442,7 @@ function SampleMenu({ ctx }: { ctx: CustomRenderContext }) {
         <Group label={cur > 0 ? `SLOT ${String(cur).padStart(2, '0')} (${t.name}'s SMP)` : `${t.name}'s SMP is OFF: tap a slot below first`}>
           <SeqButton color={C.green} disabled={cur <= 0} minWidth={150} onPress={() => file.current?.click()} title="Choose a WAV or AIFF file (on an iPad: from the Files app)">LOAD YOUR OWN SAMPLE</SeqButton>
           <SeqButton disabled={cur <= 0 || !user[cur]} onPress={restore}>BUILT-IN AGAIN</SeqButton>
-          <input ref={file} type="file" accept=".wav,.wave,.aif,.aiff,.aifc,audio/wav,audio/x-wav,audio/aiff,audio/x-aiff" style={{ display: 'none' }}
+          <input ref={file} type="file" data-rytm-sample-file="" aria-label="Choose a WAV or AIFF file" accept=".wav,.wave,.aif,.aiff,.aifc,audio/wav,audio/x-wav,audio/aiff,audio/x-aiff" style={{ display: 'none' }}
             onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void load(f); }} />
         </Group>
         {status && <div role="status" style={{ fontSize: 12, color: C.text, lineHeight: 1.4 }}>{status}</div>}
@@ -1456,7 +1457,7 @@ function SampleMenu({ ctx }: { ctx: CustomRenderContext }) {
             const gone = missing.has(i);
             return (
               <SeqButton key={i} active={i === cur} color={u && !gone ? C.green : C.white} minWidth={96} title={u ? `${u.name}${gone ? ' (missing here: plays the built-in one-shot)' : ' (your sample)'}` : undefined}
-                onPress={() => { ctx.setValue(`${t.id}_smp_slot`, i); ctx.setValue('page', PAGE.SMPL); audition(i); }}>
+                onPress={() => { ctx.setValue(`${t.id}_smp_slot`, i); ctx.setValue('page', PAGE.SMPL); audition(); }}>
                 {i === 0 ? 'OFF' : `${String(i).padStart(2, '0')} ${u ? `${gone ? '! ' : '* '}${u.name}` : name}`}
               </SeqButton>
             );
