@@ -1607,6 +1607,7 @@ const p2: Lesson = {
       kind: 'do', control: 'live_rec', targetValue: true, concept: 'parameter-locks', focus: ['key:RECORD', 'key:PLAY'],
       instruction: 'Hold RECORD and press PLAY: LIVE RECORDING. The RECORD key flashes.',
       principle: 'Live recording captures what you play and turn, in time with the sequencer.',
+      explanation: 'With a mouse, press TRK and choose LIVE RECORDING: ON, which does the same.',
       manualReference: 'Manual p.40, LIVE RECORDING MODE',
     },
     {

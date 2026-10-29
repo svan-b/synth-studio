@@ -2230,7 +2230,7 @@ function TrackMenu({ ctx }: { ctx: CustomRenderContext }) {
   const pat = getPattern(pr, id);
   const run = (fn: (p: Project) => Project, msg: string) => { ctx.updateData(d => fn(asProject(d, TRACKS))); say(ctx, msg, 1200); };
   return (
-    <Overlay portal portalSize={{ w: 600, h: 460 }}>
+    <Overlay portal portalSize={{ w: 600, h: 540 }}>
       <Frame title="TRACK" sub={`${TRACK_NAMES[t]} in ${id}`} onClose={() => ctx.setUi({ [UIK.menu]: null })}>
         <Group label="NOTES SETUP">
           <Stepper label="QUANTIZE" value={pat.tracks[t]?.quantize ?? 0} min={0} max={QUANTIZE_MAX} width={56}
@@ -2253,7 +2253,25 @@ function TrackMenu({ ctx }: { ctx: CustomRenderContext }) {
           <SeqButton onPress={() => run(p => saveTrack(p, t), `TRACK ${TRACK_NAMES[t]} SAVED`)} color={SC.green} title="[YES] + [TRK]">SAVE TRACK</SeqButton>
         </Group>
         <div style={{ height: 6 }} />
-        {/* the same as the key combinations, for a mouse (manual p.41, p.54) */}
+        {/* the same as the key combinations, for a mouse (manual p.40-41, p.54) */}
+        <Group label="LIVE RECORDING">
+          {(['OFF', 'ON', 'QUANTIZED'] as const).map(m => {
+            const cur = ctx.values.live_rec ? (ctx.ui[UIK.liveQuant] ? 'QUANTIZED' : 'ON') : 'OFF';
+            return (
+              <SeqButton key={m} height={40} active={cur === m} color={SC.red} highlight={!!focus?.has(`a4:live-rec:${m.toLowerCase()}`)}
+                title="[RECORD] + [PLAY]; [PLAY] twice quantizes" onPress={() => {
+                  if (m === 'OFF') { ctx.setValue('live_rec', false); return; }
+                  if (sr) setStepRec(ctx, null);
+                  ctx.setValue('rec', true);
+                  ctx.setValue('live_rec', true);
+                  ctx.setUi({ [UIK.liveQuant]: m === 'QUANTIZED' });
+                  ctx.sendEvent('a4:live-quant', { on: m === 'QUANTIZED' });
+                  if (!seqStateOf(ctx.engine)?.playing) pressPlay(ctx);
+                }}>{m}</SeqButton>
+            );
+          })}
+        </Group>
+        <div style={{ height: 6 }} />
         <Group label="STEP RECORDING">
           {(['OFF', 'STANDARD', 'JUMP'] as const).map(m => {
             const cur = sr ? (sr.jump ? 'JUMP' : 'STANDARD') : 'OFF';
