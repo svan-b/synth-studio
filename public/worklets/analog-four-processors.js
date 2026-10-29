@@ -357,6 +357,9 @@ class A4Voice extends AudioWorkletProcessor {
     this.fdbK = 1 - Math.exp((-TWO_PI * 25) / sampleRate);   // FDB AC coupling (25 Hz)
     // the modulation entries the last control tick wrote (the rest of M is zero)
     this.mIdx = new Int32Array(64); this.mN = 0;
+    // what the control tick's parts share (see control())
+    this.tNow = this.dtB = this.cEf = this.cEa = D;
+    this.tNow = 0; this.dtB = BLOCK / sampleRate; this.cEf = 0; this.cEa = 0;
     // the output arrays a silent quantum zeroed (process() skips zeroing them again while silent)
     this.zL = null; this.zC = null; this.zM = null;
     const o = (options && options.processorOptions) || {};
@@ -576,9 +579,24 @@ class A4Voice extends AudioWorkletProcessor {
     if (d) this.route(d, (this.E(iDep) / 128) * x);
   }
 
-  /** One control tick: modulation, envelopes, coefficients for block b */
+  /**
+   * One control tick: modulation, envelopes, coefficients for block b. In four parts, each its own
+   * (not inlined) function: V8 optimises them one by one, and a part that meets a path it has not
+   * seen run (a first glide, accent, noise fade...) is deoptimised and recompiled on its own.
+   * The doubles they share travel through fields (an argument would be boxed per call).
+   */
   control(now, dt, b) {
-    const P = this.P, sr = sampleRate;
+    this.tNow = now; this.dtB = dt;
+    this.modTick();
+    this.pitchTick(b);
+    this.toneTick(b);
+    this.ampTick(b);
+    return this.cEa;
+  }
+
+  /** Control tick, part 1: velocity routes, ENV F / ENV 2, LFO 2 / LFO 1 and their routes, the effective values, ENV A */
+  modTick() {
+    const P = this.P, dt = this.dtB, now = this.tNow;
     // clear last tick's modulation: only the entries it wrote are non-zero
     const M = this.M, mIdx = this.mIdx;
     for (let k = 0, n = this.mN; k < n; k++) M[mIdx[k]] = 0;
@@ -589,6 +607,7 @@ class A4Voice extends AudioWorkletProcessor {
       if (dep !== 0) this.route(Math.round(P[this.vmDst[n]]), (dep / 128) * vm);
     }
     const ef = this.envF.tick(dt, this, I.envf_atk, I.envf_dec, I.envf_sus, I.envf_rel, Math.round(P[I.envf_shp]), now, P[I.envf_rel] >= 127);
+    this.cEf = ef;
     const e2 = this.env2.tick(dt, this, I.env2_atk, I.env2_dec, I.env2_sus, I.env2_rel, Math.round(P[I.env2_shp]), now, P[I.env2_rel] >= 127);
     this.route2(I.envf_dsta, I.envf_depa, ef);
     this.route2(I.envf_dstb, I.envf_depb, ef);
@@ -610,8 +629,13 @@ class A4Voice extends AudioWorkletProcessor {
       EV[i] = v < lo ? lo : v > hi ? hi : v;
     }
 
-    const ea = this.envA.tick(dt, this, I.amp_atk, I.amp_dec, I.amp_sus, I.amp_rel, Math.round(P[I.amp_shp]), now, P[I.amp_rel] >= 127);
+    this.cEa = this.envA.tick(dt, this, I.amp_atk, I.amp_dec, I.amp_sus, I.amp_rel, Math.round(P[I.amp_shp]), now, P[I.amp_rel] >= 127);
 
+  }
+
+  /** Control tick, part 2: glide, vibrato, drift, BND, oscillator increments, PWM, levels */
+  pitchTick(b) {
+    const P = this.P, sr = sampleRate, EV = this.EV, dt = this.dtB;
     // Glide (constant time, smooth ends)
     if (this.glideTime > 0) {
       this.glideT += dt;
@@ -674,6 +698,11 @@ class A4Voice extends AudioWorkletProcessor {
     this.bLev1[b] = EV[I.osc1_lev] / 127;
     this.bLev2[b] = EV[I.osc2_lev] / 127;
 
+  }
+
+  /** Control tick, part 3: noise settings, filter coefficients */
+  toneTick(b) {
+    const P = this.P, sr = sampleRate, EV = this.EV, dt = this.dtB, ef = this.cEf;
     // Noise
     const fad = P[I.noise_fad];
     if (fad !== 0) {
@@ -733,6 +762,11 @@ class A4Voice extends AudioWorkletProcessor {
     this.bK2[b] = type2 === 6 ? 1.2 : this.cK2;
     this.bPk[b] = type2 === 6 ? r2 * 3 : 0;
 
+  }
+
+  /** Control tick, part 4: VCA, pan, sends, oscillator settings */
+  ampTick(b) {
+    const P = this.P, EV = this.EV, ea = this.cEa;
     // VCA: envelope x velocity x accent x volume x track level; pan; sends. The VCA's control
     // voltage is smoothed (as on the analog original), so no modulation steps the gain faster
     // than about half a millisecond - a square LFO on VOL gates without clicking.
@@ -754,7 +788,6 @@ class A4Voice extends AudioWorkletProcessor {
     this.smd = Math.round(P[I.osc_smd]);
     this.snc = EV[I.osc_snc] / 127;
     this.am1 = P[I.osc_am1] >= 0.5; this.am2 = P[I.osc_am2] >= 0.5;
-    return ea;
   }
 
   /** SLI 0..127 -> seconds (8 ms .. 4 s): note slides, portamento and the auto bend */
