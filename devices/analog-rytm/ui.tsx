@@ -169,8 +169,8 @@ export function Key(p: KeyProps) {
       </button>
       {(p.sub || p.sub2) && (
         <div style={{ marginTop: '6%', textAlign: 'center', lineHeight: 1.05, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
-          {p.sub2 && <div style={{ fontSize: 'var(--rytm-sub-font, 8px)', color: RY.sub, fontFamily: FONT }}>{p.sub2}</div>}
-          {p.sub && <div style={{ fontSize: 'var(--rytm-sub-font, 8px)', color: RY.sub, fontFamily: FONT, textDecoration: p.funcSub ? 'underline' : undefined, textUnderlineOffset: 2 }}>{p.sub}</div>}
+          {p.sub2 && <div style={{ fontSize: 'var(--rytm-sub-font, 10px)', color: RY.sub, fontFamily: FONT }}>{p.sub2}</div>}
+          {p.sub && <div style={{ fontSize: 'var(--rytm-sub-font, 10px)', color: RY.sub, fontFamily: FONT, textDecoration: p.funcSub ? 'underline' : undefined, textUnderlineOffset: 2 }}>{p.sub}</div>}
         </div>
       )}
     </div>
@@ -515,7 +515,7 @@ export function PlayTrigs({ ctx }: { ctx: CustomRenderContext }) {
               border: `${k % 4 === 0 ? 2 : 1}px solid ${k % 4 === 0 ? '#55585d' : RY.keyEdge}`,
               background: lv > 0 ? `radial-gradient(circle at 50% 40%, ${mix(RY.keyHi, RY.led, 0.3 + 0.6 * lv)} 0%, ${RY.key} 90%)` : `linear-gradient(180deg, ${RY.keyHi} 0%, ${RY.key} 60%)`,
               boxShadow: lv > 0 ? `0 2px 0 #000, 0 0 ${3 + 9 * lv}px ${RY.led}` : '0 2px 0 #000',
-              color: RY.sub, fontFamily: FONT, fontSize: 'var(--rytm-sub-font, 8px)', fontWeight: 700,
+              color: RY.sub, fontFamily: FONT, fontSize: 'var(--rytm-sub-font, 10px)', fontWeight: 700,
             }}>{k + 1}</button>
         );
       })}

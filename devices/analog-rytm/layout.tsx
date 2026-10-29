@@ -518,7 +518,8 @@ const sequencer: PanelElement[] = [
 // Decor: rear-panel legends, screen window, logo, the mode-key line
 // ----------------------------------------------------------------------------
 
-const REAR = ['Headphones', 'Main Out', 'Ext In', 'BD', 'SD', 'RS/CP', 'BT', 'LT', 'MT/HT', 'CH/OH', 'CY/CB', 'Audio In', 'MIDI In', 'MIDI Out / Sync A', 'MIDI Thru / Sync B', 'Control In', 'USB', 'DC In', 'Power'];
+// The two MIDI legends are on two lines so the fit keeps them at the legibility floor
+const REAR = ['Headphones', 'Main Out', 'Ext In', 'BD', 'SD', 'RS/CP', 'BT', 'LT', 'MT/HT', 'CH/OH', 'CY/CB', 'Audio In', 'MIDI In', 'MIDI Out\nSync A', 'MIDI Thru\nSync B', 'Control In', 'USB', 'DC In', 'Power'];
 
 const decor: PanelElement[] = [
   ...REAR.map((t, i): PanelElement => ({ kind: 'label', text: t, x: 12 + i * 19.0, y: 3.4, size: 6.5, color: '#6f7277', weight: 600, align: 'left' })),

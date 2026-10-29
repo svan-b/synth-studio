@@ -312,6 +312,8 @@ class Voice {
     this.quiet = 0;
     this.dts = new Float64Array(6);
     this.lastY = 0; this.dclArm = false; this.dcl = 0; this.dclN = 0;
+    // filter-input side of the retrigger declick (see renderVoice)
+    this.lastX = 0; this.dclIn = 0; this.dclInN = 0;
   }
 
   noise() { let x = this.rng; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.rng = x >>> 0; return (x | 0) * 4.656612873077393e-10; }
@@ -623,7 +625,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     if (!v.active || prevTrack !== tr) v.amp = v.active ? v.amp * 0.5 : 0;
     v.ampStage = 1;
     v.ampHoldLeft = -1;
-    if (!v.active) { v.ic1 = 0; v.ic2 = 0; v.lastY = 0; }
+    if (!v.active) { v.ic1 = 0; v.ic2 = 0; v.lastY = 0; v.lastX = 0; v.dclN = 0; v.dclInN = 0; }
     else { v.dclArm = true; v.fin = 0; }
     v.active = true;
     v.quiet = 0;
@@ -1559,6 +1561,13 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       // a retrigger: the new sound fades in, so a bright onset over a ringing voice is no step
       if (v.fin < RETRIG_FADE_N) { x *= FADE_W[v.fin]; v.fin++; }
       if (drv > 0) x = tanhF(x * drvG) * drvN;
+      // ...and the filter input carries on from the old sound's last value, fading out over the
+      // same 1.3 ms. Without this the input stepped to the new sound's first value and the open
+      // filter's 2-3 sample response to that step got past the output-side declick below (whose
+      // offset is taken on the first sample): a dip of about 40 % of the ringing level.
+      if (v.dclArm) { v.dclIn = v.lastX - x; v.dclInN = DECLICK_N; }
+      if (v.dclInN > 0) { x += v.dclIn * DECLICK_W[v.dclInN]; v.dclInN--; }
+      v.lastX = x;
       const v3 = x - ic2;
       const v1 = a1 * ic1 + a2 * v3;
       const v2 = ic2 + a2 * ic1 + a3 * v3;
