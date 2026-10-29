@@ -161,7 +161,7 @@ class Mother32Processor extends AudioWorkletProcessor {
     // The manual's default panel (p.9) until the engine sends the real values
     k[K_WAVE] = 1; k[K_PW] = 0.5; k[K_CUTOFF] = 350; k[K_RES] = 0.05; k[K_VCA_MODE] = 1; k[K_VOLUME] = 0.5;
     k[K_VMOD_SRC] = 1; k[K_VMOD_DEST] = 1; k[K_VCF_MODE] = 1; k[K_FMOD_AMT] = 0.5; k[K_TEMPO] = 120;
-    k[K_LFO_RATE] = 5.9; k[K_LFO_WAVE] = 1; k[K_ATTACK] = 0.00125; k[K_DECAY] = 0.06; k[K_VCMIX] = 0;
+    k[K_LFO_RATE] = 5.9; k[K_LFO_WAVE] = 1; k[K_ATTACK] = 0.00125; k[K_DECAY] = 0.18; k[K_VCMIX] = 0;
     k[K_SWING] = 0.5; k[K_DIV] = DIV_DEFAULT; k[K_SWDIV] = DIV_DEFAULT; k[K_ASSIGN] = 1; k[K_TEMPO_MODE] = 1;
     k[K_QUALITY] = 1; k[K_PPQN] = 4;
     this.k = k;

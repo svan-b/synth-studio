@@ -859,7 +859,7 @@ const sd2: Lesson = {
   source: 'Synth Studio · after Moog\'s first-edition Mother-32 patch examples; MULT, MIX CV and VCF CUTOFF from the manual v2 pp.47-51', estimatedMinutes: 8,
   prerequisites: ['mother32-f7-patching'],
   concepts: ['modulation-depth', 'noise', 'signal-routing', 'mixing'],
-  start: { reset: true, values: { vco_wave: 1, mix: 35, cutoff: 900, resonance: 20, vcf_mod_amount: 45, attack: 1.25, decay: 230, sustain: 1, vco_mod_source: 0, vco_mod_dest: 1, vco_mod_amount: 0, ...KIT } },
+  start: { reset: true, values: { vco_wave: 1, mix: 35, cutoff: 900, resonance: 20, vcf_mod_amount: 45, attack: 3, decay: 230, sustain: 1, vco_mod_source: 0, vco_mod_dest: 1, vco_mod_amount: 0, ...KIT } },
   steps: [
     run('A drum is a short sound with a fast pitch drop or a burst of noise.'),
     {

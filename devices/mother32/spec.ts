@@ -165,8 +165,8 @@ export const MOTHER32: DeviceSpec = {
       manualReference: `${M} p.16 - SUSTAIN`,
     },
     decay: knob({
-      label: 'DECAY', min: 1.25, max: 7000, default: 60, units: 'ms', curve: 'logarithmic',
-      description: 'How long the envelope takes to fall: after the attack (SUSTAIN OFF) or after the gate ends (SUSTAIN ON).',
+      label: 'DECAY', min: 10, max: 7000, default: 180, units: 'ms', curve: 'logarithmic',
+      description: 'How long the envelope takes to fall to silence: after the attack (SUSTAIN OFF) or after the gate ends (SUSTAIN ON). Short settings snap like a drum, long ones ring out.',
       manualReference: `${M} p.16 - DECAY`,
     }),
     vc_mix: knob({
