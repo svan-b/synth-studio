@@ -1620,6 +1620,15 @@ const st1: Lesson = {
       instruction: 'In the Studio tab, patch Studio Clock CLOCK into the DFAM\'s ADV / CLOCK.',
       checklist: [{ text: 'CLOCK → ADV / CLOCK cable', check: s => studioCable(s, 'out_clock', 'in_adv_clock', 'studio-clock', 'dfam') }],
       hints: ['Open the Studio tab at the top of the page.', 'Tap CLOCK on the Studio Clock, then tap ADV / CLOCK on the DFAM.'],
+      solution: { studioCables: [{ from: { device: 'studio-clock', jack: 'out_clock' }, to: { device: 'dfam', jack: 'in_adv_clock' } }] },
+    },
+    {
+      // ADVANCE steps the sequencer while it is stopped (DFAM manual p.23), so park it before arming
+      kind: 'info', concept: 'sequencer-pattern', focus: ['advance'],
+      instruction: 'While the DFAM is stopped, press ADVANCE until step 8\'s light is on.',
+      principle: 'The first pulse advances before it plays, so a sequencer parked on its last step starts on step 1.',
+      explanation: 'The DFAM has no reset input. Parking it on step 8 is how you make its step 1 land on the studio\'s downbeat.',
+      manualReference: 'Manual: Sequencer - ADVANCE',
     },
     {
       kind: 'predict', control: 'run_stop', targetValue: true, concept: 'timing-tempo',
@@ -1632,16 +1641,11 @@ const st1: Lesson = {
       principle: 'An external clock replaces the internal one; the follower must be armed before the leader starts.',
     },
     {
-      kind: 'info', concept: 'sequencer-pattern', focus: ['advance'],
-      instruction: 'Press ADVANCE until step 8\'s light is on.',
-      principle: 'The first pulse advances before it plays, so a sequencer parked on its last step starts on step 1.',
-      explanation: 'The DFAM has no reset input. Parking it on step 8 is how you make its step 1 land on the studio\'s downbeat.',
-    },
-    {
       kind: 'challenge', concept: 'timing-tempo',
       instruction: 'Press ▶ in the top bar. The DFAM now plays in time with the studio.',
       checklist: [{ text: 'Studio transport playing', check: s => s.transport.playing }],
       hints: ['The play button is at the top of the page, next to the tempo.'],
+      solution: { transport: 'play' },
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
@@ -1656,6 +1660,7 @@ const st1: Lesson = {
       instruction: 'Set the Studio Clock\'s CLOCK DIV to 1/8T. Hear the DFAM play triplets against the studio\'s beat.',
       checklist: [{ text: 'CLOCK DIV on 1/8T', check: s => Number(deviceValues(s, 'studio-clock').division) === 4 }],
       hints: ['CLOCK DIV is the selector on the Studio Clock.', 'Tap 1/8T: three pulses per beat instead of four.'],
+      solution: { values: { division: 4 } },
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',
@@ -1689,12 +1694,14 @@ const st2: Lesson = {
       instruction: 'In the Studio tab, patch the DFAM\'s PITCH into the Mother-32\'s VCO 1V/OCT.',
       checklist: [{ text: 'DFAM PITCH → Mother-32 VCO 1V/OCT', check: s => studioCable(s, 'out_pitch', 'in_vco_1voct', 'dfam', 'mother32') }],
       hints: ['Tap PITCH on the DFAM, then VCO 1V/OCT on the Mother-32.', 'Both use 1 volt per octave, so the notes match.'],
+      solution: { studioCables: [{ from: { device: 'dfam', jack: 'out_pitch' }, to: { device: 'mother32', jack: 'in_vco_1voct' } }] },
     },
     {
       kind: 'challenge', instance: 'mother32', focus: ['in_gate'], concept: 'signal-routing',
       instruction: 'Now patch the DFAM\'s TRIGGER output into the Mother-32\'s GATE.',
       checklist: [{ text: 'DFAM TRIGGER → Mother-32 GATE', check: s => studioCable(s, 'out_trigger', 'in_gate', 'dfam', 'mother32') }],
       hints: ['TRIGGER is the bottom-left output on the DFAM.', 'GATE replaces the Mother-32\'s own keyboard and sequencer gate.'],
+      solution: { studioCables: [{ from: { device: 'dfam', jack: 'out_trigger' }, to: { device: 'mother32', jack: 'in_gate' } }] },
     },
     {
       kind: 'predict', control: 'pitch_3', targetValue: 0.583, concept: 'oscillator-pitch',

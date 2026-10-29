@@ -55,8 +55,8 @@ const text = (t: string, x: number, y: number, size = LEGEND, extra: Partial<Ext
 });
 
 /** A large knob with its one-line legend above it */
-const main = (control: string, legend: string, x: number, y: number): PanelElement[] => [
-  knob(control, x, y, LARGE),
+const main = (control: string, legend: string, x: number, y: number, extra: KnobOpts = {}): PanelElement[] => [
+  knob(control, x, y, LARGE, extra),
   text(legend, x, y - LEGEND_DY),
 ];
 /** The bipolar AMOUNT knobs have (-) and (+) printed under them */
@@ -145,7 +145,9 @@ const elements: PanelElement[] = [
   // --- Transport ----------------------------------------------------------------
   text('TRIGGER', 18.9, 79.7, 8, { color: MUTED }),
   { kind: 'button', control: 'trigger', event: 'trigger', x: 18.9, y: 87.0, w: BUTTON, color: BUTTON_CAP, ledColor: BUTTON_PRESS, label: 'none' },
-  ring(46.4, 87.1), ...main('tempo', 'TEMPO', 46.4, 87.1),
+  // TEMPO's readout shows on hover / touch only: a permanent one would sit where the panel
+  // prints RUN / STOP and ADVANCE, just under the TEMPO ring (p.7)
+  ring(46.4, 87.1), ...main('tempo', 'TEMPO', 46.4, 87.1, { value: 'hover' }),
   { kind: 'led', x: 28.5, y: 100.6, size: 2.6, color: '#ff3333', on: ({ engine }) => !!engine.playing },
   text('RUN / STOP', 36.0, 100.6, SMALL, { color: MUTED }),
   { kind: 'button', control: 'run_stop', x: 36.9, y: 107.9, w: BUTTON, color: BUTTON_CAP, ledColor: BUTTON_PRESS, label: 'none', lit: () => false },

@@ -9,12 +9,13 @@
 //  - community: well-known DFAM techniques (kicks, snares, hats, toms, acid...).
 // Pitches are volts (1 V = 1 octave); `st()` converts semitones.
 //
-// Levels: each preset's VOLUME is set for the studio audio-QA target
-// (scripts/audio-qa.cjs --target -18): its audition (the pattern from step 1 at
-// its TEMPO) measures about -18.6 LUFS at the instrument output (FX 4 LU lower),
-// with sample peaks kept at or below -2.2 dBFS. The sparse, spiky hits (rimshot,
-// clap, snappy snare, closed and metallic hats) sit lower to keep that peak
-// headroom. Re-measure after editing a preset (devices/dfam/REVIEW.md).
+// Levels: each preset is set for the studio audio-QA target (scripts/audio-qa.cjs
+// --target -18): its audition (the pattern from step 1 at its TEMPO) measures
+// -18 to -21 LUFS at the instrument output (FX 4 LU lower), with true peaks at or
+// below -2 dBTP in every one of 12 renders (noise and oscillator phases differ per
+// render). The sparse, spiky hits (snares, clap, rimshot, hats, noise loops) are
+// peak-limited, so their loudness comes from a longer VCA DECAY (more body), not
+// from VOLUME. Re-measure after editing a preset (devices/dfam/REVIEW.md).
 // ============================================================================
 
 import type { PatchConnection, PresetSpec } from '@/types';
@@ -92,31 +93,31 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
   snare_snappy: preset('Snare / Snappy snare',
     'Two detuned triangles for the drum shell plus noise for the wires, with a short pitch drop. Snare on beat 2 with ghost notes.',
     'community', {
-      vco1_frequency: 0.25, vco1_eg_amount: 20, vco_decay: 35, vco1_level: 70,
+      vco1_frequency: 0.25, vco1_eg_amount: 20, vco_decay: 35, vco1_level: 80,
       vco2_frequency: 0.85, vco2_eg_amount: 15, vco2_level: 40, noise_level: 80,
-      vcf_cutoff: 6500, vcf_resonance: 10, vcf_eg_amount: 10, vcf_decay: 80, vca_decay: 260, volume: 97,
+      vcf_cutoff: 6500, vcf_resonance: 10, vcf_eg_amount: 10, vcf_decay: 80, vca_decay: 640, volume: 86,
       ...steps(FLAT, [0, 0, 25, 0, 100, 0, 0, 35]),
     }),
   snare_noise: preset('Snare / Bright noise snare',
     'Mostly noise through the high-pass filter, with a little tone underneath: a thin, cutting electro snare.',
     'community', {
       vco1_frequency: 0.6, vco1_eg_amount: 20, vco_decay: 25, vco1_level: 40, noise_level: 90,
-      vcf_mode: 0, vcf_cutoff: 900, vcf_resonance: 15, vca_decay: 220, volume: 75,
+      vcf_mode: 0, vcf_cutoff: 900, vcf_resonance: 15, vca_decay: 380, volume: 68,
       ...steps(FLAT, [0, 0, 0, 0, 100, 0, 30, 0]),
     }),
   snare_clap: preset('Snare / Hand clap',
     'Noise only, with VCA EG patched into NOISE LEVEL: the noise is loudest at the start and dies faster than the VCA, like the slap of a clap. A resonant low-pass centres it.',
     'community', {
       vco1_level: 0, noise_level: 35,
-      vcf_cutoff: 1800, vcf_resonance: 40, vcf_eg_amount: 30, vcf_decay: 60, vca_decay: 230, volume: 81,
+      vcf_cutoff: 1800, vcf_resonance: 40, vcf_eg_amount: 30, vcf_decay: 60, vca_decay: 520, volume: 80,
       ...steps(FLAT, [0, 0, 0, 0, 100, 0, 0, 0]),
     }, [{ from: 'out_vca_eg', to: 'in_noise_level' }]),
   snare_rim: preset('Snare / Rimshot',
-    'Two square waves far apart through the low-pass filter with a very short VCA DECAY (80 ms) - a woody click like a drum machine rim shot.',
+    'Two square waves far apart through the low-pass filter with a short VCA DECAY (170 ms) - a woody click like a drum machine rim shot.',
     'community', {
       vco1_frequency: 1.75, vco1_wave: 0, vco1_eg_amount: 8, vco_decay: 10, vco1_level: 70,
       vco2_frequency: 3.65, vco2_wave: 0, vco2_level: 60,
-      vcf_cutoff: 4000, vcf_resonance: 20, vca_decay: 80, volume: 95,
+      vcf_cutoff: 4000, vcf_resonance: 20, vca_decay: 170, volume: 95,
       ...steps(FLAT, [0, 0, 100, 0, 0, 70, 0, 100]),
     }),
 
@@ -129,10 +130,10 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
       ...steps([-1.5, -1, -1, -1.5, -1, -1, 1.5, 0], [90, 50, 40, 40, 90, 50, 65, 50]),
     }, [{ from: 'out_pitch', to: 'in_vca_decay' }]),
   hats_closed: preset('Hats / Closed hat',
-    'Pure noise, high-pass at 7.5 kHz with a little resonance and a 45 ms VCA DECAY. Accented 16ths.',
+    'Pure noise, high-pass at 7.5 kHz with a little resonance and a 90 ms VCA DECAY. Accented 16ths.',
     'community', {
       vco1_level: 0, noise_level: 100,
-      vcf_mode: 0, vcf_cutoff: 7500, vcf_resonance: 25, vca_decay: 45, volume: 83,
+      vcf_mode: 0, vcf_cutoff: 7500, vcf_resonance: 25, vca_decay: 90, volume: 76,
       ...steps(FLAT, [100, 55, 80, 55, 100, 55, 80, 55]),
     }),
   hats_open: preset('Hats / Open hat',
@@ -147,7 +148,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
     'community', {
       vco1_frequency: 2.3, vco1_wave: 0, vco1_level: 80, vco2_frequency: 3.1, vco2_wave: 0, vco2_level: 80,
       fm_amount: 40, noise_level: 55,
-      vcf_mode: 0, vcf_cutoff: 3500, vcf_resonance: 30, vca_decay: 110, volume: 98,
+      vcf_mode: 0, vcf_cutoff: 3500, vcf_resonance: 30, vca_decay: 220, volume: 94,
       ...steps(FLAT, [100, 60, 85, 60, 100, 60, 85, 70]),
     }),
   hats_shaker: preset('Hats / Shaker',
@@ -181,7 +182,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
     'community', {
       ...PITCHED,
       vco1_frequency: 1.4, vco1_eg_amount: 18, vco_decay: 25, vco1_level: 85,
-      vcf_cutoff: 3000, vcf_resonance: 30, vcf_eg_amount: 15, vcf_decay: 40, vca_decay: 120, volume: 100,
+      vcf_cutoff: 3000, vcf_resonance: 30, vcf_eg_amount: 15, vcf_decay: 40, vca_decay: 150, volume: 100,
       ...steps([0, st(7), 0, st(7), st(7), 0, st(7), 0], [100, 70, 80, 100, 60, 90, 70, 80]),
     }),
   toms_talking: preset('Toms / Vowel drum',
@@ -271,7 +272,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
       ...PITCHED,
       vco1_frequency: -2, vco1_wave: 0, vco1_level: 85, vco2_frequency: -1.98, vco2_wave: 0, vco2_level: 70,
       vco_decay: 60, vco1_eg_amount: 8, vco2_eg_amount: 8,
-      vcf_cutoff: 220, vcf_resonance: 55, vcf_eg_amount: 40, vcf_decay: 180, noise_vcf_mod: 45, vca_decay: 260, volume: 78, tempo: 120,
+      vcf_cutoff: 220, vcf_resonance: 55, vcf_eg_amount: 40, vcf_decay: 180, noise_vcf_mod: 45, vca_decay: 420, volume: 78, tempo: 120,
       ...steps([0, 0, 1, 0, 0.58, 0, 0.83, 0.25], [100, 35, 70, 35, 100, 30, 85, 45]),
     }, [{ from: 'out_velocity', to: 'in_vcf_mod' }]),
   bass_sub: preset('Bass / Rolling sub',
@@ -339,7 +340,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
     'community', {
       ...PITCHED,
       vco1_frequency: 0.2, vco1_eg_amount: 50, vco_decay: 22, vco1_level: 90, vco2_frequency: 1.1, vco2_wave: 0, vco2_level: 25,
-      noise_level: 20, vcf_cutoff: 2600, vcf_resonance: 35, vcf_eg_amount: 30, vcf_decay: 50, noise_vcf_mod: 10, vca_decay: 110, volume: 100, tempo: 128,
+      noise_level: 20, vcf_cutoff: 2600, vcf_resonance: 35, vcf_eg_amount: 30, vcf_decay: 50, noise_vcf_mod: 10, vca_decay: 200, volume: 100, tempo: 128,
       ...steps([0, st(7), st(12), 0, st(-5), st(7), st(12), st(3)], [0, 60, 100, 50, 0, 70, 100, 55]),
     }),
   loop_pops: preset('Loop / Pop percussion',
@@ -354,7 +355,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
     'Bursts of noise at changing brightness: PITCH patched into VCF MOD retunes the filter every step.',
     'community', {
       vco1_level: 0, noise_level: 90, seq_pitch_mod: 1,
-      vcf_cutoff: 1200, vcf_resonance: 45, vcf_eg_amount: 30, vcf_decay: 80, noise_vcf_mod: 80, vca_decay: 180, volume: 85, tempo: 120,
+      vcf_cutoff: 1200, vcf_resonance: 45, vcf_eg_amount: 30, vcf_decay: 80, noise_vcf_mod: 80, vca_decay: 360, volume: 76, tempo: 120,
       ...steps([0, 1.5, -1, 2.2, 0.5, -1.5, 2.8, 1], [100, 0, 70, 90, 0, 60, 100, 40]),
     }, [{ from: 'out_pitch', to: 'in_vcf_mod' }]),
   loop_bounce: preset('Loop / Deep bounce',
@@ -368,7 +369,7 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
     'Based on the manual\'s "Swing Time" patch notes (p.36): PITCH patched into TEMPO, with SEQ PITCH MOD off, so the PITCH knobs set how long each step lasts - lower is longer. Alternating long and short steps gives a swung, shuffling groove.',
     'manual', {
       vco1_level: 30, vco1_frequency: 1, vco1_eg_amount: 30, vco_decay: 20, noise_level: 80, seq_pitch_mod: 1,
-      vcf_mode: 0, vcf_cutoff: 3000, vcf_resonance: 30, vca_decay: 70, volume: 92, tempo: 110,
+      vcf_mode: 0, vcf_cutoff: 3000, vcf_resonance: 30, vca_decay: 130, volume: 84, tempo: 110,
       ...steps([-0.4, 0.4, -0.4, 0.4, -0.4, 0.4, -0.4, 0.4], [100, 55, 80, 55, 100, 55, 80, 65]),
     }, [{ from: 'out_pitch', to: 'in_tempo' }]),
 };
