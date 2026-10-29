@@ -12,7 +12,7 @@ import {
   interceptForLocks, migrateProject, patchStep, setChain, setLock, setPlayMode, setStep, songAddRow, toggleTrig,
   trigSteps, updatePatternSettings, updateSteps, setTrackScale, setTrackMute, compileCondition, conditionString,
   setChangeMode, getStep, setTrackDefault, mulberry32, clearPattern, copyPattern, pastePattern, songUpdateRow,
-  setTrackProb, projectData, arrangerPatterns, isProject,
+  setTrackProb, projectData, arrangerPatterns, isProject, addChordNote, cleanChord, formatChord, trigNotes,
   AB_CONDITIONS, LOCK_LIMIT_A4, LOCK_LIMIT_RYTM, LOGIC_CONDITIONS, PROBABILITIES, RETRIG_RATES, clearLocks, clearPage,
   clearTrack, copyPage, copyTrack, copyTrigs, formatRetrigRate, isSwingStep, lockedParamCount, pastePage, pasteTrack,
   pasteTrigs, patternFromProgram, programOfPattern, reloadPattern, reloadTrack, savePattern, saveTrack, setActive,
@@ -2543,6 +2543,52 @@ test('PATTERN tempo mode: each pattern brings its own tempo, PROJECT mode keeps 
 });
 
 // ============================================================================
+section('Manual: chord trigs (A4 MKII p.28, p.42) and live-recorded locks (p.50)');
+
+test('addChordNote builds a chord on a trig: offsets from its note, no repeats, at most four notes', () => {
+  let p = createProject({ tracks: 4 });
+  p = addChordNote(p, 'A01', 0, 0, 60);
+  eq(getStep(p, 'A01', 0, 0), { note: 60 }, 'an empty step gets a note trig with the note');
+  p = addChordNote(p, 'A01', 0, 0, 64);
+  p = addChordNote(p, 'A01', 0, 0, 67);
+  p = addChordNote(p, 'A01', 0, 0, 64);
+  eq(getStep(p, 'A01', 0, 0)?.chord, [4, 7], 'E and G join; E again is ignored');
+  p = addChordNote(p, 'A01', 0, 0, 55);
+  p = addChordNote(p, 'A01', 0, 0, 72);
+  eq(getStep(p, 'A01', 0, 0)?.chord, [4, 7, -5], 'a note below the root is a negative offset; a fifth note is refused');
+  eq(trigNotes(getStep(p, 'A01', 0, 0), 62), [62, 66, 69, 57], 'trigNotes: the (transposed) note, then the chord');
+  eq(formatChord(60, [4, 7]), 'C4 E4 G4', 'formatChord');
+  eq(addChordNote(p, 'A01', 0, 0, 61, { max: 1 }), p, 'max 1: a mono track keeps one note');
+});
+
+test('addChordNote on a lock trig makes it a note trig and keeps its locks; patchStep chord: null removes the chord', () => {
+  let p = setStep(createProject({ tracks: 4 }), 'A01', 0, 3, { trigless: true, locks: { flt1_frq: 40 } });
+  p = addChordNote(p, 'A01', 0, 3, 48, { init: { vel: 90 } });
+  eq(getStep(p, 'A01', 0, 3), { locks: { flt1_frq: 40 }, vel: 90, note: 48 }, 'note trig, locks kept');
+  p = addChordNote(p, 'A01', 0, 3, 52);
+  p = updateSteps(p, 'A01', 0, [3], { note: 50, chord: null });
+  eq(getStep(p, 'A01', 0, 3), { locks: { flt1_frq: 40 }, vel: 90, note: 50 }, 'a single note replaces the chord');
+});
+
+test('chords survive normalisation: cleanChord drops zeros, repeats and extra notes, clamps to 4 octaves', () => {
+  eq(cleanChord([4, 0, 4, 7.4, 99, 'x', -60, 3]), [4, 7, 48], 'clean');
+  eq(cleanChord([]), undefined, 'empty = none');
+  const p = migrateProject({ v: 1, tracks: 4, patterns: { A01: { tracks: [{ steps: { 0: { note: 60, chord: [3, 7] } } }] } } }, 4);
+  eq(getStep(p, 'A01', 0, 0)?.chord, [3, 7], 'migrateProject keeps chords');
+  eq(copyTrigs(p, 'A01', 0, [0])[0]?.chord, [3, 7], 'copies carry chords');
+});
+
+test('LockTracker.add: a live-recorded lock holds until the next trig, which reverts it', () => {
+  const lt = new LockTracker(2);
+  const reverted: string[] = [];
+  lt.apply(0, { a: 1 }, () => undefined, k => reverted.push(k));
+  lt.add(0, 'b', 70);
+  ok(lt.isLocked(0, 'b') && lt.lockedValue(0, 'b') === 70, 'locked on the playing trig');
+  lt.apply(0, { a: 2 }, () => undefined, k => reverted.push(k));
+  eq(reverted, ['b'], 'the next trig reverts it');
+  ok(!lt.isLocked(0, 'b'), 'and it is free again');
+});
+
 section('Hidden page (adaptive look-ahead)');
 
 /** A busy project: swing, micro timing both ways, retrigs, conditions (seeded), a 3-pattern chain */

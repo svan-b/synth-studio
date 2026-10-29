@@ -15,6 +15,7 @@
 // step, `at` any other step fields (len, cond, micro, vel) by step.
 // ============================================================================
 
+import type { ControlValue } from '@/types';
 import {
   createPattern, createProject, LEN_1_STEP, setSongLoop, type Locks, type Pattern, type Project, type SongRow, type Step,
 } from '@/lib/sequencer/elektron';
@@ -116,12 +117,26 @@ export interface KitDef {
   fx?: Record<string, number>;
   /** TRACK LEVEL of T1-T4 (default 100): sets the kit's loudness (about -18 LUFS for the demo) */
   level?: number;
+  /** POLY CONFIG (manual p.28-29): the voices in the pool and how they are allocated (default: every voice mono) */
+  poly?: Partial<PolyConfig>;
   project: () => Project;
 }
 
-/** Control values of a kit: every sound parameter of the 4 tracks, the FX track and the tempo */
-export function kitValues(kit: KitDef): Record<string, number> {
-  const out: Record<string, number> = { tempo: kit.tempo };
+/** A kit's POLY CONFIG, as control values */
+export interface PolyConfig { voices: [boolean, boolean, boolean, boolean]; alloc: number; trk: boolean; det: number; spr: number }
+
+/** The POLY CONFIG control values of a kit (a kit holds its polyphony settings, manual p.24) */
+export function polyValues(poly: Partial<PolyConfig> = {}): Record<string, ControlValue> {
+  const v = poly.voices ?? [false, false, false, false];
+  return {
+    poly_v1: v[0], poly_v2: v[1], poly_v3: v[2], poly_v4: v[3],
+    poly_alloc: poly.alloc ?? 0, poly_trk: poly.trk ?? false, poly_det: poly.det ?? 16, poly_spr: poly.spr ?? 64,
+  };
+}
+
+/** Control values of a kit: every sound parameter of the 4 tracks, the FX track, the POLY CONFIG and the tempo */
+export function kitValues(kit: KitDef): Record<string, ControlValue> {
+  const out: Record<string, ControlValue> = { tempo: kit.tempo, ...polyValues(kit.poly) };
   kit.tracks.forEach((kt, t) => {
     const params = soundParams(kt.sound, kt.p);
     for (const key in SYNTH_BY_KEY) {

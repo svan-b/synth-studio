@@ -51,7 +51,7 @@ import {
   ARP_PLY, CV_TRACK, FX_BY_KEY, FX_DESTS, FX_KEYS, FX_TRACK, MOD_DESTS, PERF_MACROS, POLY_UNISON, SEQ_TRACKS, SYNTH_BY_KEY,
   SYNTH_TRACKS, VOICE_KEYS,
 } from './params';
-import { ARP_KEYS, patternArp, type ArpKey } from './arp';
+import { ARP_KEYS, isArpKey, isTransposable, patternArp, type ArpKey } from './arp';
 
 const VI: Record<string, number> = Object.fromEntries(VOICE_KEYS.map((k, i) => [k, i]));
 const FI: Record<string, number> = Object.fromEntries(FX_KEYS.map((k, i) => [k, i]));
@@ -178,6 +178,11 @@ export class AnalogFourEngine extends BaseEngine {
   private lastStep: { step: number; time: number }[] = [];
   private transportUnsub: (() => void) | null = null;
   private recSerial = 0;
+  /** LIVE RECORDING quantized ([RECORD] + [PLAY][PLAY]): notes land on the grid, no micro timing (manual p.41) */
+  private liveQuant = false;
+  /** STEP RECORDING: report each key played (the panel writes it at the active step, manual p.41-42) */
+  private stepRec = false;
+  private kbSerial = 0;
   /** LIVE RECORDING: the step each track's last recorded note went to (POLY chords) */
   private lastRec: ({ step: number; pattern: string } | null)[] = [null, null, null, null];
   /** The audition in progress (a preview): its stop */
@@ -591,7 +596,7 @@ export class AnalogFourEngine extends BaseEngine {
       return;
     }
     const rt = sw('trig_envf', 1) | (sw('trig_env2', 1) << 1) | (sw('trig_lfo1', 1) << 2) | (sw('trig_lfo2', 1) << 3);
-    const note = Math.max(0, Math.min(127, e.note + Math.round(this.num('trns', 0))));
+    const note = this.trigNote(e);
     this.arpPattern[t] = e.pattern;
     if (this.arpOn(t)) {
       this.startArp(t, [note, ...this.arpOffsets(t).map(o => note + o)], e.time, e.duration, e.velocity, e.accent, false);
@@ -599,6 +604,17 @@ export class AnalogFourEngine extends BaseEngine {
     }
     // ARP LEG also makes the track's overlapping note trigs legato with the arpeggiator off (manual p.44)
     v.port.postMessage({ t: 'on', time: e.time, note, vel: e.velocity, acc: e.accent ? 1 : 0, slide: e.slide, rt, leg: this.arpVal(t, 'arp_leg') >= 0.5 });
+  }
+
+  /**
+   * A synth trig's note with [TRNS] added. A track with TRANSPOSABLE off (NOTES SETUP, manual p.47)
+   * keeps its own notes: no [TRNS], no song transpose (which works like a track transpose, p.57).
+   */
+  private trigNote(e: TrigEvent): number {
+    const p = asProject(this.data, SEQ_TRACKS);
+    if (isTransposable(p, e.pattern, e.track)) return clampNote(e.note + Math.round(this.num('trns', 0)));
+    const st = getStep(p, e.pattern, e.track, e.step);
+    return clampNote(st?.note ?? getPattern(p, e.pattern).tracks[e.track]?.note ?? e.note);
   }
 
   private gateOff(track: number, time: number) {
@@ -759,6 +775,8 @@ export class AnalogFourEngine extends BaseEngine {
     if (!held.includes(n)) held.push(n);
     const vel = this.trackVel(t);
     this.recordLive(t, n, vel);
+    // STEP RECORDING: `held` counts the keys down on the track, this one included (2+: a chord)
+    if (this.stepRec) this.emit({ kbNote: { id: ++this.kbSerial, track: t, note: n, held: held.length } });
     this.arpPattern[t] = this.seq.getState().pattern ?? null;
     if (this.arpOn(t)) {
       const notes = [...held];
@@ -779,6 +797,7 @@ export class AnalogFourEngine extends BaseEngine {
       const i = held.indexOf(note);
       if (i < 0) continue;
       held.splice(i, 1);
+      if (this.stepRec) this.emit({ kbOff: { id: ++this.kbSerial, track: t, note, held: held.length } });
       const st = this.arps[t];
       if (st?.live) {
         if (!held.length) this.stopArp(t, time);
@@ -810,7 +829,7 @@ export class AnalogFourEngine extends BaseEngine {
     const frac = (this.ctx.currentTime - ls.time) / stepSec;
     const next = frac > 0.5;
     const step = next ? ls.step + 1 : ls.step;
-    const micro = Math.max(-23, Math.min(23, Math.round((next ? frac - 1 : frac) * 24)));
+    const micro = this.liveQuant ? 0 : Math.max(-23, Math.min(23, Math.round((next ? frac - 1 : frac) * 24)));
     // POLY: a key pressed while another is held, on the same step, joins that trig's chord
     let add = false;
     if (this.pool[t] && this.held[t].length > 1) {
@@ -834,6 +853,10 @@ export class AnalogFourEngine extends BaseEngine {
         break;
       // POLY CONFIG open / closed: report the voices' activity for the TRIG 1-4 LEDs (manual p.29)
       case 'a4:poly-watch': this.setWatch(!!(payload as { on?: boolean } | undefined)?.on); break;
+      // LIVE RECORDING: a knob turn recorded as a lock sounds at once (the panel writes the lock)
+      case 'a4:live-lock': this.liveLock(payload as { track?: number; key?: string; value?: number } | undefined); break;
+      case 'a4:live-quant': this.liveQuant = !!(payload as { on?: boolean } | undefined)?.on; break;
+      case 'a4:step-rec': this.stepRec = !!(payload as { on?: boolean } | undefined)?.on; break;
       // [STOP][STOP] while stopped: the send effects fade out (manual p.38)
       case 'a4:fxfade': this.fadeFx(); break;
       // the A4's own [STOP] key: the stop it causes lets the send effects ring (manual p.38)
@@ -841,6 +864,42 @@ export class AnalogFourEngine extends BaseEngine {
       case 'a4:audition': this.startAudition(); break;
       case 'a4:audition:stop': this.auditionEnd?.(); break;
     }
+  }
+
+  /**
+   * LIVE RECORDING: a knob turned while the track plays is recorded as a lock on the step that plays
+   * (the panel writes it, manual p.50). It sounds at once, as a lock of the playing trig: the next
+   * trig returns it to the kit value unless it is locked there too.
+   */
+  private liveLock(p: { track?: number; key?: string; value?: number } | undefined) {
+    const t = p?.track, key = p?.key, val = p?.value;
+    if (typeof t !== 'number' || typeof key !== 'string' || typeof val !== 'number') return;
+    const now = this.ctx.currentTime;
+    if (t === FX_TRACK) {
+      const i = FI[key];
+      if (i === undefined) return;
+      this.locks.add(t, key, val);
+      this.fxmod.port.postMessage({ t: 'at', time: now, list: [i, val] });
+      this.toneAt(key, val, now);
+      return;
+    }
+    if (t < 0 || t >= SYNTH_TRACKS) return;
+    if (isArpKey(key)) { this.arpLock[t][key] = val; return; }
+    const i = VI[key];
+    if (i === undefined) return;
+    if (this.pool[t]) {
+      // every voice playing this track's notes
+      for (const u of this.poolVoices) {
+        if (this.book[u].track !== t) continue;
+        const k = this.segAt(u, now);
+        const s = k >= 0 ? this.segs[u][k] : null;
+        if (s) this.loadVoice(u, t, { ...s.locks, [key]: val }, now, s.uni);
+      }
+      return;
+    }
+    this.locks.add(t, key, val);
+    this.voices[t].port.postMessage({ t: 'at', time: now, list: [i, val] });
+    if (key === 'osc2_wav') { this.neiLock[t] = Math.round(val) === NEI_WAVE; this.updateFeed(t); }
   }
 
   // --------------------------------------------------------------------------
@@ -1089,7 +1148,7 @@ export class AnalogFourEngine extends BaseEngine {
     }
     const rt = sw('trig_envf', 1) | (sw('trig_env2', 1) << 1) | (sw('trig_lfo1', 1) << 2) | (sw('trig_lfo2', 1) << 3);
     const step = getStep(asProject(this.data, SEQ_TRACKS), e.pattern, t, e.step);
-    const notes = trigNotes(step, e.note + Math.round(this.num('trns', 0)));
+    const notes = trigNotes(step, this.trigNote(e));
     this.arpPattern[t] = e.pattern;
     if (this.arpOn(t)) {
       this.startArp(t, [...notes, ...this.arpOffsets(t).map(o => notes[0] + o)], e.time, e.duration, e.velocity, e.accent, false, e.locks);

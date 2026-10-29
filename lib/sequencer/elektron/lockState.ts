@@ -55,6 +55,18 @@ export class LockTracker {
     }
   }
 
+  /**
+   * Lock `key` on the trig that is playing now, e.g. a lock recorded live while the track plays:
+   * like the trig's own locks it holds until the next trig on the track, which reverts it unless
+   * it locks the key too
+   */
+  add(track: number, key: string, value: number): void {
+    const held = this.held[track];
+    if (!held) return;
+    held.add(key);
+    this.values[track].set(key, value);
+  }
+
   /** The playing trig holds a lock for `key` (a knob turn should not override it mid-note) */
   isLocked(track: number, key: string): boolean {
     return !!this.held[track]?.has(key);
