@@ -191,7 +191,7 @@ The shared Elektron sequencer (`lib/sequencer/elektron`, see
 | Feature | Fact | Source |
 |---|---|---|
 | Patterns | 8 banks × 16; up to 64 steps in pages of 16; [BANK] + [TRIG] selects; patterns change at the end in SEQUENTIAL mode | (A4 MKII manual, p.38-39, p.48) |
-| Pattern modes | SEQUENTIAL, DIRECT START, DIRECT JUMP, TEMP JUMP (FUNC + BANK A-D) | (A4 MKII manual, p.39-40) |
+| Pattern modes | SEQUENTIAL, DIRECT START, DIRECT JUMP (FUNC + BANK A-C); FUNC + BANK D arms TEMP JUMP once: its LED flashes while armed and lights while the jumped-to pattern plays, then the previous pattern returns | (A4 MKII manual, p.39-40) |
 | Trigs | Note trigs and lock trigs ([FUNC] + [TRIG]); hold a trig + KEYBOARD for its note; hold + LEFT/RIGHT for micro timing in 1/384 notes | (A4 MKII manual, p.40, p.45) |
 | Parameter locks | Hold a trig and turn a knob; at most 128 different parameters locked in a pattern (`LOCK_LIMIT_A4`) | (A4 MKII manual, p.49-50) |
 | Trig conditions | X %, FILL, !FILL, PRE, !PRE, NEI, !NEI, 1ST, !1ST, A:B | (A4 MKII manual, p.50-51) |
@@ -211,7 +211,7 @@ The shared Elektron sequencer (`lib/sequencer/elektron`, see
 - **One kit per project.** Patterns share the kit; there is no kit link per pattern (A4 MKII manual, p.38).
 - **No POLY mode** (A4 MKII manual, p.28-29): each track plays its own voice, so the PLY arp mode and chords on one track are absent.
 - **No CV or audio-input jacks.** The CV track is sequenced and shown; IN L / IN R and the EXT IN page are present but silent.
-- **No sound locks** (A4 MKII manual, p.50), no Euclidean NOTE page (p.46-47), no STEP RECORDING (p.41), no ARP SETUP step offsets (p.44), no KEY SCALE / KEY NOTE / TRANSPOSABLE (p.47), no control-all (p.18), no page randomise / revert (p.17).
+- **No sound locks** (A4 MKII manual, p.50), no Euclidean NOTE page (p.46-47), no STEP RECORDING (p.41), no ARP SETUP step offsets (p.44), no KEY SCALE / KEY NOTE / TRANSPOSABLE (p.47), no control-all (p.18), no page randomise / revert (p.17), no page playback ([PAGE] + [TRIG 1-4], p.39), and LIVE RECORDING records notes but not knob moves (p.50).
 - **Performance macros are fixed** (LP sweep, HP sweep, resonance ...): there is no PERFORMANCE SETUP (p.26-27); QPER picks one macro, not several (p.28).
 - **LFO multiplier**: the × and · groups (24 values); the tuning-fork group that syncs to an oscillator is left out (A4 MKII manual, p.92).
 - **Modulation destinations**: continuous parameters only (55 synth, 22 FX); discrete targets such as waveforms are left out.
@@ -229,6 +229,9 @@ The shared Elektron sequencer (`lib/sequencer/elektron`, see
 | DET | 0.125 Hz per step |
 | Oscillator drift, F1 resonance boost | Small random pitch drift; resonance compensation for the ladder's bass loss |
 | Noise COL | Pink and red by filtering white noise (equal RMS); positive values high-pass from 30 Hz up to 8 kHz |
+| Fastest envelope rise | 1.5 ms, also at ATK 0 (the original's envelopes run at about 1.5 kHz and reach the circuits through smoothed control voltages); the FULL shapes jump within that time |
+| VCA control | Smoothed with a 0.5 ms time constant, so a square LFO on VOL gates without a click |
+| Output noise floor | About -100 dBFS, never digital silence (the manual gives 102 dB S/N, p.85) |
 
 ## DSP implementation
 
@@ -236,3 +239,10 @@ The shared Elektron sequencer (`lib/sequencer/elektron`, see
 - `a4-fxmod` maps the FX track's values, locks and FX LFOs to channels; the shared `chorus` and `fdn-reverb` processors do the chorus and reverb; `a4-fx` holds the tempo-synced delay (feedback filters and saturation in the loop), the effect-to-effect sends and the dry + wet mix.
 - [STOP] sends `cut` (a 6 ms fade, nothing queued survives); [STOP][STOP] fades the send returns in 0.3 s and empties the delay and reverb.
 - Previews (lessons, the preset browser, audio QA) play the selected pattern, or a riff on the keyboard's track when it is empty, and end like [STOP][STOP].
+- A voice that feeds the next track (NEI) gets `feed`: it never sleeps, so its multimode output is always there.
+
+## Presets
+
+- **Kits** (6) load four sounds, the FX track and a project; each kit sets its track levels so its demo plays at about -18 LUFS (audio QA `--target -18`).
+- **Sounds** (40) load on T1 with a one-bar phrase in pattern A01 that shows the sound off: riffs for basses, a line for leads, held chords for pads, 8th-note lines for plucks, a 16th funk figure for keys, a held note for the arpeggios, grooves for drums (a 3-2 clave for the rim, a fill for the tom). VEL varies inside the phrase. Short percussive sounds carry a T1 level so every preset plays at about -18 LUFS (FX about -22); levels were set from the audio-QA suggestions.
+- Every preset is our own recreation by character, with a descriptive name (`sounds.ts`, `kits.ts`).

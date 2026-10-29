@@ -23,10 +23,11 @@
 // Track mutes live in the project (Project.mutes, applied by the sequencer).
 //
 // Transport (manual p.38-39): [PLAY] starts, [PLAY] while playing pauses
-// (sounding notes are released) and [PLAY] again resumes; [STOP] stops and
-// cuts the voices while the send effects ring on; [STOP][STOP] while stopped
-// fades the send effects. Following the studio transport, its start / stop
-// drive the sequencer instead (no pause, like MIDI clock).
+// (sounding notes are released) and [PLAY] again resumes (the kit's pressPlay:
+// seq:pause / seq:resume); [STOP] stops and cuts the voices while the send
+// effects ring on; [STOP][STOP] while stopped fades the send effects.
+// Following the studio transport, its start / stop drive the sequencer
+// instead (no pause, like MIDI clock).
 // ============================================================================
 
 import type { ControlValue } from '@/types';
@@ -308,10 +309,9 @@ export class AnalogFourEngine extends BaseEngine {
         break;
       }
       case 'play':
-        // Synced, the hub turns PLAY into the studio transport. Paused ([PLAY] while playing), PLAY resumes.
-        if (this.transport) break;
-        if (value) { if (!this.seq.resume()) this.seq.start(); }
-        else if (!this.seq.isPaused) this.seq.stop();
+        // Start / stop. Synced, the hub turns PLAY into the studio transport; [PLAY] while playing
+        // pauses and resumes through the kit's seq:pause / seq:resume events (pressPlay)
+        if (!this.transport) { if (value) this.seq.start(); else this.seq.stop(); }
         break;
       case 'track': {
         // with the FX or CV track active, the keyboard keeps playing the last synth track (manual p.36)
@@ -666,9 +666,6 @@ export class AnalogFourEngine extends BaseEngine {
       case 'panic':
         for (let t = 0; t < SYNTH_TRACKS; t++) { this.held[t] = []; this.liveNote[t] = null; this.stopArp(t, this.ctx.currentTime); this.voices[t].port.postMessage({ t: 'reset' }); }
         break;
-      // [PLAY] while playing pauses; [STOP] stops, also from a pause (manual p.38-39)
-      case 'a4:pause': if (!this.transport) this.seq.pause(); break;
-      case 'a4:stop': if (!this.transport) this.seq.stop(); break;
       // [STOP][STOP] while stopped: the send effects fade out (manual p.38)
       case 'a4:fxfade': this.fadeFx(); break;
       case 'a4:audition': this.startAudition(); break;

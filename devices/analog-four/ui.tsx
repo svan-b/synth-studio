@@ -24,11 +24,11 @@ import type { ControlValue } from '@/types';
 import { useStudioStore } from '@/store/studio';
 import { useUiStore } from '@/store/ui';
 import {
-  ChainBuilder, PatternPicker, ScaleMenu, SongEditor, TrigEditor, TrigKeys,
+  ChainBuilder, PatternPicker, ScaleMenu, SongEditor, TrigEditor, TrigKeys, pressPlay, pressStop,
 } from '@/components/sequencer';
 import { C as SC, Frame, Group, Overlay, SeqButton, Stepper, UI, lessonFocus, seqStateOf, viewPattern } from '@/components/sequencer/shared';
 import {
-  CHANGE_MODES, QUANTIZE_MAX, TRIG_CONDITIONS, asProject, clearPattern, copyPattern, formatLength, formatNote, getPattern, parsePatternId, reloadPattern,
+  CHANGE_MODES, LOCK_LIMIT_A4, QUANTIZE_MAX, TRIG_CONDITIONS, asProject, clearPattern, copyPattern, formatLength, formatNote, getPattern, parsePatternId, reloadPattern,
   reloadTrack, rowEntry, savePattern, saveTrack, setStep as setStepFn, pastePattern, patternHasContent, patternId, setActive, setChain, setChangeMode,
   setMasterMute, setMasterMutes, setPlayMode, setTrackQuantize, setTrigMute, trackLength, trackTrigDefaults, updatePatternSettings, updateSteps, withSteps,
   withTrack,
@@ -182,7 +182,7 @@ function applyPendingMutes(ctx: CustomRenderContext) {
 }
 
 /** After a FUNC combination: a latched FUNC is used up */
-function useFunc(ctx: CustomRenderContext) {
+function spendFunc(ctx: CustomRenderContext) {
   const u = liveUi(ctx);
   if (u[UIK.func] === 'latched') ctx.setUi({ [UIK.func]: null });
   else if (u[UIK.func] === 'held') ctx.setUi({ [UIK.funcUsed]: true });
@@ -235,8 +235,8 @@ interface KeyDef {
   subPlain?: boolean;
   /** White legend rows under the PARAMETER keys (FX track page, CV track page) */
   rows?: [string, string];
-  /** LED colour (null = off); dim factor 0..1 */
-  led?: (e: KeyEnv) => [string, number] | null;
+  /** LED colour (null = off); dim factor 0..1; blinking */
+  led?: (e: KeyEnv) => [string, number, boolean?] | null;
   press: (e: KeyEnv) => void;
   release?: (e: KeyEnv) => void;
   /** Is this the key a lesson step points at? */
@@ -257,7 +257,7 @@ const pageKey = (name: string, label: string, rows: [string, string]): KeyDef =>
     return kv.second ? [COL.white, 0.5] : [COL.white, 1];
   },
   press: e => {
-    if (e.func) { setView(e.ctx, V.SOUND); useFunc(e.ctx); return; }
+    if (e.func) { setView(e.ctx, V.SOUND); spendFunc(e.ctx); return; }
     if (!pageFor(e.track, V[name as keyof typeof V])) {
       say(e.ctx, `${TRACK_NAMES[e.track]} has no ${label} page`);
       return;
@@ -273,7 +273,7 @@ const viewKey = (name: 'ARP' | 'NOTE' | 'PERF' | 'MIX' | 'TEMPO', label: string,
   aria: `${label} key`,
   led: e => (e.view === V[name] ? [COL.white, 1] : null),
   press: e => {
-    if (e.func) { useFunc(e.ctx); if (funcFn) funcFn(e); return; }
+    if (e.func) { spendFunc(e.ctx); if (funcFn) funcFn(e); return; }
     setView(e.ctx, V[name]);
   },
   target: (c, v) => c === 'page' && v === V[name],
@@ -326,7 +326,7 @@ const trackKey = (t: number): KeyDef => ({
     if (e.func) {
       const m = !masterMuted(project(e.ctx), t);
       e.ctx.updateData(d => setMasterMute(asProject(d, TRACKS), t, m));
-      useFunc(e.ctx);
+      spendFunc(e.ctx);
       say(e.ctx, `${TRACK_NAMES[t]} ${m ? 'MUTED' : 'UNMUTED'}`, 1000);
       return;
     }
@@ -372,11 +372,17 @@ function bankKey(b: number): KeyDef {
     },
     press: e => {
       if (e.func) {
-        useFunc(e.ctx);
-        if (b < 4) {
+        spendFunc(e.ctx);
+        if (b === 3) {
+          // TEMP JUMP arms once: the next pattern plays to its end, then the previous one returns (manual p.40)
+          e.ctx.sendEvent('seq:temp-jump');
+          say(e.ctx, 'TEMP JUMP ARMED: PICK A PATTERN', 1400);
+          return;
+        }
+        if (b < 3) {
           const mode = CHANGE_MODES[b];
           e.ctx.updateData(d => setChangeMode(asProject(d, TRACKS), mode));
-          say(e.ctx, ['SEQUENTIAL', 'DIRECT START', 'DIRECT JUMP', 'TEMP JUMP'][b]);
+          say(e.ctx, ['SEQUENTIAL', 'DIRECT START', 'DIRECT JUMP'][b]);
           return;
         }
         const cur = num(e.ctx.values.trig_mode);
@@ -408,14 +414,14 @@ const KEYDEFS: Record<string, KeyDef> = {
   GLOBAL: {
     label: '', icon: 'gear', sub: 'Save Project', aria: 'Global settings',
     led: e => (e.ctx.ui[UIK.menu] === 'global' ? [COL.red, 1] : null),
-    press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'PROJECT SAVED (the studio keeps it)'); return; } toggleA4Menu(e.ctx, 'global'); },
+    press: e => { if (e.func) { spendFunc(e.ctx); say(e.ctx, 'PROJECT SAVED (the studio keeps it)'); return; } toggleA4Menu(e.ctx, 'global'); },
   },
   QPER: {
     label: 'QPER', sub: 'Mute', aria: 'Quick performance',
     // green while the performance macros act, dark while they are muted (manual p.27)
     led: e => (e.ctx.ui[UIK.qper] ? [COL.white, 1] : e.ctx.values.perf_mute ? null : [COL.green, 0.75]),
     press: e => {
-      if (e.func) { useFunc(e.ctx); const m = !e.ctx.values.perf_mute; e.ctx.setValue('perf_mute', m); say(e.ctx, m ? 'PERFORMANCE MACROS MUTED' : 'MACROS ON'); return; }
+      if (e.func) { spendFunc(e.ctx); const m = !e.ctx.values.perf_mute; e.ctx.setValue('perf_mute', m); say(e.ctx, m ? 'PERFORMANCE MACROS MUTED' : 'MACROS ON'); return; }
       const on = !liveUi(e.ctx)[UIK.qper];
       e.ctx.setUi({ [UIK.qper]: on, [UIK.bank]: null });
       if (on) say(e.ctx, 'QUICK PERF: PICK A MACRO (TRIG 1-10)', 1800);
@@ -445,13 +451,13 @@ const KEYDEFS: Record<string, KeyDef> = {
   KIT: {
     label: 'KIT', sub: 'Save Kit', aria: 'Kit menu',
     led: e => (e.ctx.ui[UIK.menu] === 'kit' ? [COL.red, 1] : null),
-    press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'KIT SAVED (with the project)'); return; } toggleA4Menu(e.ctx, 'kit'); },
+    press: e => { if (e.func) { spendFunc(e.ctx); say(e.ctx, 'KIT SAVED (with the project)'); return; } toggleA4Menu(e.ctx, 'kit'); },
   },
   SND: {
     label: 'SND', sub: 'Settings', aria: 'Sound menu',
     led: e => (e.ctx.ui[UIK.menu] === 'sound' || e.view === V.SOUND || e.view === V.SOUND_2 ? [COL.red, 1] : null),
     press: e => {
-      if (e.func) { useFunc(e.ctx); setView(e.ctx, viewAfterPress('SOUND', e.track, e.view)); return; }
+      if (e.func) { spendFunc(e.ctx); setView(e.ctx, viewAfterPress('SOUND', e.track, e.view)); return; }
       toggleA4Menu(e.ctx, 'sound');
     },
     target: (c, v) => c === 'page' && (v === V.SOUND || v === V.SOUND_2),
@@ -462,7 +468,7 @@ const KEYDEFS: Record<string, KeyDef> = {
     label: 'TRK', sub: 'Metronome', aria: 'Track menu',
     led: e => (e.ctx.ui[UIK.menu] === 'track' ? [COL.red, 1] : null),
     press: e => {
-      if (e.func) { useFunc(e.ctx); say(e.ctx, 'CLICK TRACK: use the studio metronome (Click)'); return; }
+      if (e.func) { spendFunc(e.ctx); say(e.ctx, 'CLICK TRACK: use the studio metronome (Click)'); return; }
       if (quickSaveReload(e, 'track')) return;
       toggleA4Menu(e.ctx, 'track');
     },
@@ -471,7 +477,7 @@ const KEYDEFS: Record<string, KeyDef> = {
     label: 'PTN', sub: 'Swing', aria: 'Pattern menu',
     led: e => (e.ctx.ui[UIK.menu] === 'pattern' || e.ctx.ui[UI.menu] === 'pattern' ? [COL.red, 1] : null),
     press: e => {
-      if (e.func) { useFunc(e.ctx); toggleA4Menu(e.ctx, 'swing'); return; }
+      if (e.func) { spendFunc(e.ctx); toggleA4Menu(e.ctx, 'swing'); return; }
       if (quickSaveReload(e, 'pattern')) return;
       toggleA4Menu(e.ctx, 'pattern');
     },
@@ -480,17 +486,17 @@ const KEYDEFS: Record<string, KeyDef> = {
   SONG: {
     label: 'SONG', sub: 'Save Song', aria: 'Song menu',
     led: e => (e.ctx.ui[UI.menu] === 'song' ? [COL.red, 1] : null),
-    press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'SONG SAVED (with the project)'); return; } toggleKitMenu(e.ctx, 'song'); },
+    press: e => { if (e.func) { spendFunc(e.ctx); say(e.ctx, 'SONG SAVED (with the project)'); return; } toggleKitMenu(e.ctx, 'song'); },
   },
   // Held, [YES] / [NO] + [PTN] or [TRK] quick-saves / quick-reloads (manual p.54)
   YES: {
     label: 'YES', sub: 'Save', subPlain: true, aria: 'Yes',
-    press: e => { if (e.func) useFunc(e.ctx); closeMenus(e.ctx); e.ctx.setUi({ [UIK.yesNo]: 'yes' }); },
+    press: e => { if (e.func) spendFunc(e.ctx); closeMenus(e.ctx); e.ctx.setUi({ [UIK.yesNo]: 'yes' }); },
     release: e => e.ctx.setUi({ [UIK.yesNo]: null }),
   },
   NO: {
     label: 'NO', sub: 'Reload', subPlain: true, aria: 'No',
-    press: e => { if (e.func) useFunc(e.ctx); closeMenus(e.ctx); e.ctx.setUi({ [UIK.yesNo]: 'no' }); },
+    press: e => { if (e.func) spendFunc(e.ctx); closeMenus(e.ctx); e.ctx.setUi({ [UIK.yesNo]: 'no' }); },
     release: e => e.ctx.setUi({ [UIK.yesNo]: null }),
   },
   UP: { label: '', icon: 'up', aria: 'Up', press: e => arrow(e, 0, 1) },
@@ -501,7 +507,7 @@ const KEYDEFS: Record<string, KeyDef> = {
     label: '', icon: 'song', sub: 'Edit Song', aria: 'Song mode',
     led: e => (project(e.ctx).mode === 'song' ? [COL.red, 1] : null),
     press: e => {
-      if (e.func) { useFunc(e.ctx); toggleKitMenu(e.ctx, 'song'); return; }
+      if (e.func) { spendFunc(e.ctx); toggleKitMenu(e.ctx, 'song'); return; }
       const pr = project(e.ctx);
       const on = pr.mode !== 'song';
       e.ctx.updateData(d => setPlayMode(asProject(d, TRACKS), on ? 'song' : 'pattern'));
@@ -513,7 +519,7 @@ const KEYDEFS: Record<string, KeyDef> = {
     label: '', icon: 'chain', sub: 'New Chain', aria: 'Chain mode',
     led: e => (project(e.ctx).mode === 'chain' ? [COL.red, 1] : null),
     press: e => {
-      if (e.func) { useFunc(e.ctx); e.ctx.updateData(d => setChain(asProject(d, TRACKS), [])); toggleKitMenu(e.ctx, 'chain'); say(e.ctx, 'NEW CHAIN: add patterns in order'); return; }
+      if (e.func) { spendFunc(e.ctx); e.ctx.updateData(d => setChain(asProject(d, TRACKS), [])); toggleKitMenu(e.ctx, 'chain'); say(e.ctx, 'NEW CHAIN: add patterns in order'); return; }
       const pr = project(e.ctx);
       const on = pr.mode !== 'chain';
       e.ctx.updateData(d => setPlayMode(asProject(d, TRACKS), on ? 'chain' : 'pattern'));
@@ -524,7 +530,7 @@ const KEYDEFS: Record<string, KeyDef> = {
     label: '', icon: 'rec', sub: 'Copy', aria: 'Record',
     led: e => (e.ctx.values.live_rec ? [COL.red, 1] : e.ctx.values.rec ? [COL.red, 0.85] : null),
     press: e => {
-      if (e.func) { useFunc(e.ctx); copyPaste(e, 'copy'); return; }
+      if (e.func) { spendFunc(e.ctx); copyPaste(e, 'copy'); return; }
       e.ctx.setUi({ [UIK.recDown]: true });
       if (e.ctx.values.live_rec) { e.ctx.setValue('live_rec', false); e.ctx.setValue('rec', true); say(e.ctx, 'GRID RECORDING'); return; }
       e.ctx.setValue('rec', !e.ctx.values.rec);
@@ -534,13 +540,14 @@ const KEYDEFS: Record<string, KeyDef> = {
   },
   PLAY: {
     label: '', icon: 'play', sub: 'Clear', aria: 'Play',
-    led: e => (e.playing ? [COL.green, 1] : null),
+    // green while playing; paused, it blinks
+    led: e => (e.playing ? [COL.green, 1] : seqStateOf(e.ctx.engine)?.paused ? [COL.green, 0.6, true] : null),
     press: e => {
-      if (e.func) { useFunc(e.ctx); copyPaste(e, 'clear'); return; }
+      if (e.func) { spendFunc(e.ctx); copyPaste(e, 'clear'); return; }
       if (liveUi(e.ctx)[UIK.recDown]) {
         e.ctx.setValue('rec', true);
         e.ctx.setValue('live_rec', true);
-        if (!e.playing) e.ctx.setValue('play', true);
+        if (!e.playing) pressPlay(e.ctx);
         say(e.ctx, 'LIVE RECORDING: play the keyboard');
         return;
       }
@@ -548,13 +555,8 @@ const KEYDEFS: Record<string, KeyDef> = {
       // [PLAY] while playing pauses, [PLAY] again resumes (manual p.39). Following the studio
       // transport (like MIDI clock) there is no pause: PLAY / STOP drive the studio transport.
       const st = seqStateOf(e.ctx.engine);
-      if (e.playing && !st?.following) {
-        e.ctx.sendEvent('a4:pause');
-        e.ctx.setValue('play', false);
-        say(e.ctx, 'PAUSED: PLAY RESUMES, STOP STOPS', 1400);
-        return;
-      }
-      e.ctx.setValue('play', !e.playing);
+      if (e.playing && !st?.following) say(e.ctx, 'PAUSED (PLAY RESUMES)', 1400);
+      pressPlay(e.ctx);
     },
     target: (c, v) => c === 'play' && v === true,
   },
@@ -562,15 +564,14 @@ const KEYDEFS: Record<string, KeyDef> = {
     label: '', icon: 'stop', sub: 'Paste', aria: 'Stop',
     led: e => (!e.playing ? [COL.white, 0.5] : null),
     press: e => {
-      if (e.func) { useFunc(e.ctx); copyPaste(e, 'paste'); return; }
+      if (e.func) { spendFunc(e.ctx); copyPaste(e, 'paste'); return; }
       const now = performance.now();
       const quick = now - lastStopPress.at < 500;
       lastStopPress.at = now;
-      // [STOP] cuts the sound, the send effects ring on; [STOP][STOP] fades them too (manual p.38)
-      if (!e.playing && quick) { e.ctx.sendEvent('a4:fxfade'); say(e.ctx, 'SEND FX FADED', 900); }
-      // a paused pattern stops too, so the next PLAY starts from the top
-      if (!seqStateOf(e.ctx.engine)?.following) e.ctx.sendEvent('a4:stop');
-      e.ctx.setValue('play', false);
+      // [STOP] cuts the sound, the send effects ring on; [STOP][STOP] fades them too (manual p.38).
+      // A paused pattern stops too, so the next PLAY starts from the top.
+      if (!e.playing && !seqStateOf(e.ctx.engine)?.paused && quick) { e.ctx.sendEvent('a4:fxfade'); say(e.ctx, 'SEND FX FADED', 900); }
+      pressStop(e.ctx);
       if (e.ctx.values.live_rec) e.ctx.setValue('live_rec', false);
     },
     target: (c, v) => c === 'play' && v === false,
@@ -598,7 +599,7 @@ const KEYDEFS: Record<string, KeyDef> = {
     led: e => (e.ctx.ui[UIK.trnsLock] ? [COL.red, 1] : e.ctx.ui[UIK.trns] ? [COL.red, 0.8] : num(e.ctx.values.trns) !== 0 ? [COL.red, 0.35] : null),
     press: e => {
       if (e.func) {
-        useFunc(e.ctx);
+        spendFunc(e.ctx);
         const lock = !liveUi(e.ctx)[UIK.trnsLock];
         e.ctx.setUi({ [UIK.trnsLock]: lock, [UIK.trns]: lock });
         say(e.ctx, lock ? 'TRANSPOSE LOCK: THE KEYBOARD TRANSPOSES' : 'TRANSPOSE LOCK OFF', 1600);
@@ -615,7 +616,7 @@ const KEYDEFS: Record<string, KeyDef> = {
     label: 'FILL', sub: 'Cue Fill', aria: 'Fill',
     led: e => (seqStateOf(e.ctx.engine)?.fill ? [COL.red, 1] : null),
     press: e => {
-      if (e.func) { useFunc(e.ctx); e.ctx.sendEvent('seq:fill-cue'); say(e.ctx, 'FILL CUED for one cycle'); return; }
+      if (e.func) { spendFunc(e.ctx); e.ctx.sendEvent('seq:fill-cue'); say(e.ctx, 'FILL CUED for one cycle'); return; }
       if (e.ctx.values.rec) { say(e.ctx, 'FILL WORKS WITH GRID RECORDING OFF: PRESS REC', 1800); return; }
       e.ctx.sendEvent('seq:fill');
     },
@@ -624,7 +625,7 @@ const KEYDEFS: Record<string, KeyDef> = {
   PAGE: {
     label: 'PAGE', sub: 'Scale', aria: 'Pattern page',
     press: e => {
-      if (e.func) { useFunc(e.ctx); toggleKitMenu(e.ctx, 'scale'); return; }
+      if (e.func) { spendFunc(e.ctx); toggleKitMenu(e.ctx, 'scale'); return; }
       const pr = project(e.ctx);
       const pat = viewPattern(e.ctx, pr);
       const len = trackLength(getPattern(pr, pat), Math.min(e.track, TRACKS - 1));
@@ -653,7 +654,7 @@ function arrow(e: KeyEnv, dx: number, dy: number) {
   const ctx = e.ctx;
   const u = liveUi(ctx);
   const held = Array.isArray(u[UI.heldSteps]) ? (u[UI.heldSteps] as number[]) : [];
-  if (e.func) useFunc(ctx);
+  if (e.func) spendFunc(ctx);
   if (held.length && typeof u[UI.heldTrack] === 'number') {
     const track = u[UI.heldTrack] as number;
     const pat = (u[UI.heldPattern] as string) ?? project(ctx).active;
@@ -869,7 +870,7 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
 
   // A key whose secondary function is being used lights up light blue (manual p.13)
   const funcPress = down && !isFunc && !!def.sub && !def.subPlain && funcActive(ctx);
-  const led = funcPress ? ([COL.lightBlue, 1] as [string, number]) : lit;
+  const led = funcPress ? ([COL.lightBlue, 1] as [string, number, boolean?]) : lit;
   const ledCol = led ? led[0] : null;
   const amt = led ? led[1] : 0;
   // FUNC: the light grey key (no LED); the ring shows a held / latched FUNC
@@ -889,7 +890,7 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
         onPointerCancel={onUp}
         onLostPointerCapture={onUp}
         onContextMenu={e => e.preventDefault()}
-        className={highlight ? 'a4-target' : undefined}
+        className={[highlight ? 'a4-target' : '', led?.[2] ? 'a4-blink' : ''].filter(Boolean).join(' ') || undefined}
         style={{
           position: 'absolute', inset: 0, borderRadius: big ? 6 : 4.5, padding: 0, cursor: 'pointer',
           background: ledCol
@@ -981,8 +982,13 @@ export function LedStrips({ ctx }: { ctx: CustomRenderContext }) {
   const playPage = playStep >= 0 ? Math.floor(playStep / 16) : -1;
   return (
     <div style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0 }}>
-      {/* PATTERN MODE: the LED above its (underlined, FUNC + BANK A-D) name */}
-      {MODE_LEDS.map((p, i) => <Dot key={`m${i}`} {...p} on={cm === i ? 1 : 0} color={COL.amber} label={MODE_NAMES[i]} underline />)}
+      {/* PATTERN MODE: the LED above its (underlined, FUNC + BANK A-D) name; TEMP JUMP flashes while
+          armed and lights while the jumped-to pattern plays (manual p.40) */}
+      {MODE_LEDS.map((p, i) => {
+        const tj = st?.tempJump;
+        const on = i === 3 ? (tj === 'armed' || tj === 'active' || cm === 3 ? 1 : 0) : tj === 'active' ? 0 : cm === i ? 1 : 0;
+        return <Dot key={`m${i}`} {...p} on={on} blink={i === 3 && tj === 'armed'} color={COL.amber} label={MODE_NAMES[i]} underline />;
+      })}
       {/* OCTAVE: -3 .. +3, the centre one unlabelled */}
       {OCT_LEDS.map((p, i) => <Dot key={`o${i}`} {...p} on={Math.max(-3, Math.min(3, oct)) + 3 === i ? (Math.abs(oct) > 3 ? 0.4 : 1) : 0} color={COL.amber} label={OCT_NAMES[i] || undefined} />)}
       {/* PATTERN PAGE: lit for the pattern's pages, full for the edited one, flashing for the playing one */}
@@ -1127,22 +1133,24 @@ export function Screen(props: PanelContext) {
   // Last-turned parameter: its full name replaces the kit name for a moment (as on the hardware)
   const prev = useRef<Record<string, unknown>>({});
   const [touched, setTouched] = useState<{ name: string; until: number } | null>(null);
-  const slots = page && !['perf', 'mix', 'tempo'].includes(page) ? pageSlots(page) : [];
   useEffect(() => {
+    const slots = page && !['perf', 'mix', 'tempo'].includes(page) ? pageSlots(page) : [];
     for (const p of slots) {
       if (!p) continue;
       const id = controlFor(track, p);
       if (prev.current[id] !== undefined && prev.current[id] !== values[id]) setTouched({ name: p.name.toUpperCase(), until: Date.now() + 1400 });
       prev.current[id] = values[id];
     }
-  });
+  }, [values, track, page]);
   useEffect(() => {
     if (!touched) return;
     const t = setTimeout(() => setTouched(null), touched.until - Date.now() + 20);
     return () => clearTimeout(t);
   }, [touched]);
 
-  const songRow = pr.mode === 'song' ? (st?.playing && pr.song.rows.length ? `${String((st.songRow ?? 0) + 1).padStart(2, '0')}:` : '__:') : '';
+  // the song row left of the pattern: only while the song plays (not while the studio arranger drives it)
+  const songMode = st?.playing ? st.mode === 'song' && !st.arranged : pr.mode === 'song';
+  const songRow = songMode ? (st?.playing && pr.song.rows.length ? `${String((st.songRow ?? 0) + 1).padStart(2, '0')}:` : '__:') : '';
   const shownPattern = st?.playing && st.pattern ? st.pattern : pr.active;
   const kitName = pr.song.name || getPattern(pr, shownPattern).name || 'KIT';
   const levelId = levelControl(track);
@@ -1276,9 +1284,8 @@ export function Screen(props: PanelContext) {
 // Trig area: trigs, or patterns (bank mode), or macros (QPER)
 // ----------------------------------------------------------------------------
 
-const TRIG_MODES = ['trig', 'accent', 'slide', 'pslide'] as const;
-/** trig_mode value of TRIG MUTE (the A4's own strip; the kit's TrigKeys has no trig-mute mode) */
-const TRIG_MUTE_MODE = 4;
+/** trig_mode values: TRIGS, ACCENT, NOTE SLIDE, PARAM SLIDE, TRIG MUTE */
+const TRIG_MODES = ['trig', 'accent', 'slide', 'pslide', 'trigmute'] as const;
 
 /** Lessons: the trig keys step back (dimmed) while a step is about the sound, not the sequencer */
 function trigAreaDimmed(ctx: CustomRenderContext, focusMode: boolean): boolean {
@@ -1311,6 +1318,7 @@ function TrigStyles({ gap }: { gap: number }) {
 .a4-trigs.mode-trig [data-playhead="1"] { color: #f2f3f5 !important; box-shadow: 0 0 0 2px rgba(242,243,245,.85), 0 0 8px rgba(255,255,255,.35) !important; }
 .a4-trigs.mode-trig [data-playhead="1"][data-trig="note"] { color: #ff8a80 !important; }
 .a4-trigs [data-held="1"] { box-shadow: 0 0 0 2px ${COL.amber} !important; }
+.a4-trigs.mode-trig [data-tmute="1"] { opacity: .45; }
 .a4-trigs [data-step][style*="cursor: default"] { opacity: .35 !important; }
 `}</style>
   );
@@ -1431,32 +1439,9 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
       });
     });
   }
-  if (Math.round(num(ctx.values.trig_mode)) === TRIG_MUTE_MODE) {
-    // TRIG MUTE ([FUNC] + [BANK E]): note and lock trigs light light green, muted ones darker
-    // green; tap a trig to mute or unmute it (manual p.51)
-    const pat = viewPattern(ctx, pr);
-    const ptn = getPattern(pr, pat);
-    const len = trackLength(ptn, track);
-    const page = Math.min(Math.max(0, Math.ceil(len / 16) - 1), Math.round(Number(ctx.ui[UI.stepPage]) || 0));
-    return strip(i => {
-      const step = page * 16 + i;
-      const s = ptn.tracks[track]?.steps[step];
-      const head = !!st?.playing && st.pattern === pat && st.steps[track] === step;
-      return keyBtn(i, {
-        lit: s && step < len ? COL.green : null, amt: s?.mute ? 0.3 : 1, outline: head, label: `${step + 1}`,
-        aria: `Trig mute, step ${step + 1}${s?.mute ? ' (muted)' : ''}`,
-        onPress: () => {
-          if (!s || step >= len) return;
-          ctx.updateData(d => setTrigMute(asProject(d, TRACKS), pat, track, [step], !s.mute));
-          say(ctx, `TRIG ${step + 1} ${s.mute ? 'UNMUTED' : 'MUTED'}`, 900);
-        },
-      });
-    });
-  }
+  // TRIGS, or the [FUNC] + [BANK E-H] menus: TRIG MUTE, ACCENT, NOTE SLIDE, PARAM SLIDE (manual p.51-53)
   const mode = TRIG_MODES[Math.round(num(ctx.values.trig_mode))] ?? 'trig';
   const editable = ctx.values.rec !== false;
-  // New trigs take the NOTE menu's NOT / VEL / LEN as they are placed (manual p.45)
-  const trigCtx: CustomRenderContext = { ...ctx, updateData: fn => ctx.updateData(d => { const p = asProject(d, TRACKS); return stampNewTrigs(p, asProject(fn(p), TRACKS)); }) };
   // [FUNC] + [TRIG] in GRID RECORDING places (or removes) a lock trig (manual p.40)
   const onFuncTrig = (e: React.PointerEvent) => {
     if (!editable || mode !== 'trig' || !funcActive(ctx)) return;
@@ -1467,7 +1452,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
     const step = Number(el.dataset.step);
     const pat = viewPattern(ctx, pr);
     const cur = getPattern(pr, pat).tracks[track]?.steps[step];
-    useFunc(ctx);
+    spendFunc(ctx);
     if (cur && !cur.trigless) { say(ctx, `TRIG ${step + 1} IS A NOTE TRIG`, 1200); return; }
     ctx.updateData(d => (cur ? setStepFn(asProject(d, TRACKS), pat, track, step, null) : updateSteps(asProject(d, TRACKS), pat, track, [step], { trigless: true }, { create: 'lock' })));
     say(ctx, cur ? `LOCK TRIG ${step + 1} REMOVED` : `LOCK TRIG ${step + 1}`, 1100);
@@ -1475,7 +1460,8 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
   return (
     <div className={`a4-trigs mode-${mode}`} onPointerDownCapture={onFuncTrig} style={{ width: '100%', height: '100%', ...dimStyle }}>
       <TrigStyles gap={(TRIGS.pitch - TRIGS.keyW) * k} />
-      <TrigKeys ctx={trigCtx} tracks={TRACKS} mode={mode} editable={editable} trackNames={[...TRACK_NAMES]} color={COL.red} />
+      {/* stampDefaults: a new trig takes the NOTE menu's NOT / VEL / LEN (manual p.45) */}
+      <TrigKeys ctx={ctx} tracks={TRACKS} mode={mode} editable={editable} trackNames={[...TRACK_NAMES]} color={COL.red} stampDefaults muteTarget="project" />
     </div>
   );
 }
@@ -1781,10 +1767,13 @@ export function Menus({ ctx }: { ctx: CustomRenderContext }) {
   return (
     <>
       <A4Styles />
-      <TrigEditor ctx={ctx} tracks={TRACKS} portal portalPlacement="top" features={{ retrig: false, accent: true, slide: true, pslide: true }} lockLabel={lockLabel} trackNames={[...TRACK_NAMES]} />
+      <TrigEditor ctx={ctx} tracks={TRACKS} portal portalPlacement="top" features={{ retrig: false, accent: true, slide: true, pslide: true, trigMute: true }}
+        stampDefaults lockLimit={LOCK_LIMIT_A4} lockLabel={lockLabel} trackNames={[...TRACK_NAMES]} />
       <PatternPicker ctx={ctx} tracks={TRACKS} portal />
       <ChainBuilder ctx={ctx} tracks={TRACKS} portal />
-      <SongEditor ctx={ctx} tracks={TRACKS} portal transpose trackNames={[...TRACK_NAMES]} />
+      {/* A4 song rows play whole patterns or chains, with repeats, mutes and transpose (manual p.55-57);
+          LOOP / END stays so the looping demo song can be made to end like the hardware's */}
+      <SongEditor ctx={ctx} tracks={TRACKS} portal transpose length={false} tempo={false} trackNames={[...TRACK_NAMES]} />
       <ScaleMenu ctx={ctx} tracks={TRACKS} portal trackNames={[...TRACK_NAMES]} />
       {m === 'sound' && <SoundMenu ctx={ctx} />}
       {m === 'kit' && <KitMenu ctx={ctx} />}

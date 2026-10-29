@@ -114,6 +114,8 @@ export interface KitDef {
   tempo: number;
   tracks: [KitTrack, KitTrack, KitTrack, KitTrack];
   fx?: Record<string, number>;
+  /** TRACK LEVEL of T1-T4 (default 100): sets the kit's loudness (about -18 LUFS for the demo) */
+  level?: number;
   project: () => Project;
 }
 
@@ -126,7 +128,7 @@ export function kitValues(kit: KitDef): Record<string, number> {
       if (key.startsWith('trig_') || key === 'level') continue;
       out[tid(t, key)] = params[key] ?? SYNTH_BY_KEY[key].def;
     }
-    out[tid(t, 'level')] = 100;
+    out[tid(t, 'level')] = kit.level ?? 100;
   });
   for (const key in FX_BY_KEY) {
     if (key.startsWith('trig_')) continue;
@@ -384,12 +386,13 @@ export const KITS: KitDef[] = [
     id: 'night-drive', name: 'Kit / Night Drive (demo song)', tempo: 122,
     desc: 'The demo song: intro, groove, breakdown and drop in A minor. Drums on one track with p-locked snare and hats, a slide bass, two-note chord stabs and an arpeggio.',
     tracks: [
-      { sound: 'drum-kick', p: { noise_col: 30 } },
+      { sound: 'drum-kick', p: { noise_col: 30, amp_vol: 110 } },
       { sound: 'bass-rubber', p: { flt1_frq: 46, flt1_res: 76, flt1_dep: 34, envf_dec: 48, amp_dec: 58, amp_rel: 26, amp_vol: 104 } },
       { sound: 'keys-brass', p: { osc2_det: 0, osc2_tun: 3, flt1_frq: 62, amp_dec: 70, amp_sus: 50, amp_del: 40, amp_rev: 50, amp_vol: 92 } },
-      { sound: 'arp-pulse', p: { arp_n4: 12, arp_rng: 2, amp_del: 70, amp_rev: 40, amp_vol: 88 } },
+      { sound: 'arp-pulse', p: { arp_n4: 12, arp_rng: 2, amp_del: 70, amp_rev: 40, amp_vol: 88, envf_dec: 44, amp_dec: 50 } },
     ],
     fx: { del_tim: 24, del_fb: 64, del_lpf: 96, rev_dec: 84, rev_pre: 10 },
+    level: 88,
     project: nightDrive,
   },
   {
@@ -397,47 +400,51 @@ export const KITS: KitDef[] = [
     desc: 'A transistor-pulse acid line with accents and slides, kick, hats and clap. Pattern 2 sweeps the filter with parameter slides.',
     tracks: [
       { sound: 'bass-acid', p: { amp_del: 24, amp_vol: 84 } },
-      { sound: 'drum-kick' },
-      { sound: 'drum-hat' },
-      { sound: 'drum-clap' },
+      { sound: 'drum-kick', p: { amp_vol: 110 } },
+      { sound: 'drum-hat', p: { amp_dec: 38, amp_vol: 90 } },
+      { sound: 'drum-clap', p: { noise_lev: 120, flt2_res: 40, lfo1_depa: -64, amp_dec: 52, amp_rel: 36, amp_vol: 100 } },
     ],
     fx: { del_tim: 24, del_fb: 56, del_lpf: 90, rev_dec: 56 },
+    level: 81,
     project: acid,
   },
   {
     id: 'dub', name: 'Kit / Dub Chords', tempo: 118,
     desc: 'Dub-techno minor chord stabs soaked in delay and reverb; FX track lock trigs "throw" the delay feedback.',
     tracks: [
-      { sound: 'drum-kick', p: { amp_dec: 82, flt1_frq: 64, env2_depa: 70 } },
+      { sound: 'drum-kick', p: { amp_dec: 82, flt1_frq: 64, env2_depa: 70, amp_vol: 110 } },
       { sound: 'keys-brass', p: { osc2_det: 0, osc2_tun: 3, osc1_sub: 1, flt1_frq: 56, flt1_res: 50, flt1_dep: 20, envf_dec: 56, envf_sus: 0, amp_dec: 66, amp_sus: 0, amp_rel: 40, amp_del: 100, amp_rev: 80, amp_vol: 96 } },
-      { sound: 'drum-hat', p: { amp_rev: 50, amp_vol: 70 } },
+      { sound: 'drum-hat', p: { amp_rev: 50, amp_vol: 70, amp_dec: 38 } },
       { sound: 'bass-sub', p: { amp_vol: 104 } },
     ],
     fx: { del_tim: 24, del_fb: 82, del_lpf: 80, del_hpf: 30, del_x: 1, rev_dec: 100, rev_gai: 70, cho_dep: 40 },
+    level: 79,
     project: dub,
   },
   {
     id: 'ambient', name: 'Kit / Ambient Drift', tempo: 84,
     desc: 'Slow string pad, glassy bells with trig conditions for a generative feel, sub bass and filtered wind noise.',
     tracks: [
-      { sound: 'pad-strings' },
-      { sound: 'pluck-glass', p: { amp_rev: 110, amp_del: 80, amp_vol: 84 } },
+      { sound: 'pad-strings', p: { amp_vol: 100 } },
+      { sound: 'pluck-glass', p: { amp_rev: 110, amp_del: 80, amp_vol: 84, flt1_frq: 60, flt1_dep: 40, envf_dec: 44, amp_dec: 60 } },
       { sound: 'bass-sub', p: { amp_atk: 50, amp_rel: 70, amp_vol: 96 } },
       { sound: 'fx-riser', p: { lfo1_mod: 0, lfo1_wav: 1, lfo1_spd: 3, lfo1_depa: 30, flt1_frq: 60, amp_vol: 70, amp_atk: 100, noise_col: -20 } },
     ],
-    fx: { rev_dec: 118, rev_pre: 30, rev_gai: 60, del_tim: 48, del_fb: 76, del_lpf: 80, cho_dep: 80 },
+    fx: { rev_dec: 104, rev_pre: 30, rev_gai: 60, del_tim: 32, del_fb: 64, del_lpf: 80, cho_dep: 80 },
+    level: 62,
     project: ambient,
   },
   {
     id: 'electro', name: 'Kit / Electro Funk', tempo: 112,
     desc: 'Swung drums with p-locked snare and hats, a sync bass with slides, clav stabs and a square lead.',
     tracks: [
-      { sound: 'drum-kick', p: { env2_depa: 90 } },
-      { sound: 'bass-sync' },
-      { sound: 'keys-clav', p: { amp_del: 30 } },
-      { sound: 'lead-square' },
+      { sound: 'drum-kick', p: { env2_depa: 90, amp_vol: 110 } },
+      { sound: 'bass-sync', p: { amp_vol: 100 } },
+      { sound: 'keys-clav', p: { amp_del: 30, flt1_res: 40, flt1_dep: 10, flt2_frq: 50, amp_dec: 52, envf_dec: 40, amp_vol: 100 } },
+      { sound: 'lead-square', p: { amp_vol: 100 } },
     ],
     fx: { del_tim: 16, del_fb: 40 },
+    level: 106,
     project: electro,
   },
   {
@@ -445,11 +452,12 @@ export const KITS: KitDef[] = [
     desc: 'Two arpeggiators in different modes over a PWM pad, chords changing every bar through note and offset locks.',
     tracks: [
       { sound: 'arp-bubble', p: { arp_n4: 12, amp_vol: 86 } },
-      { sound: 'arp-pulse', p: { osc1_wav: 3, amp_vol: 80, amp_pan: -20, arp_spd: 12, arp_n4: 0 } },
+      { sound: 'arp-pulse', p: { osc1_wav: 3, amp_vol: 80, amp_pan: -20, arp_spd: 12, arp_n4: 0, envf_dec: 44, amp_dec: 50 } },
       { sound: 'pad-pwm', p: { amp_vol: 84 } },
-      { sound: 'drum-kick' },
+      { sound: 'drum-kick', p: { amp_vol: 110 } },
     ],
     fx: { del_tim: 24, del_fb: 66, rev_dec: 90 },
+    level: 79,
     project: arps,
   },
 ];
@@ -464,7 +472,7 @@ export const SOUND_DEMO_BASE = 2 + KITS.length;
 export function soundDemoProject(s: SoundDef): Project {
   const p = createPattern(SEQ_TRACKS, { name: 'DEMO', length: 16, swing: 50 });
   const steps: Record<number, Step> = {};
-  for (const [step, note, len] of s.demo ?? [[0, 60, LEN_1_STEP]]) steps[step] = { note, vel: 100, len };
+  for (const [step, note, len, vel] of s.demo ?? [[0, 60, LEN_1_STEP]]) steps[step] = { note, vel: vel ?? 100, len };
   p.tracks[0].steps = steps;
   return project({ A01: p });
 }
@@ -488,6 +496,8 @@ export function projectFor(index: number): Project | null {
 export function soundPresetValues(s: SoundDef): Record<string, number> {
   const out: Record<string, number> = { track: 0, page: V.OSC1, kit_project: SOUND_DEMO_BASE + SOUNDS.indexOf(s) };
   for (const [k, v] of Object.entries(s.p)) out[tid(0, k)] = v;
+  // the preset's kit level for T1 (short percussive sounds sit higher so every preset plays at about -18 LUFS)
+  if (s.level !== undefined) out[tid(0, 'level')] = s.level;
   out.kb_oct = (s.oct ?? 1) + 3;
   return out;
 }
