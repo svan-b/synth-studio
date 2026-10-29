@@ -166,16 +166,19 @@ const EXPECT = {
       exp.sections.reduce((b, n) => { secs.push({ start: b, bars: n }); return b + n; }, 1);
       const inSong = secs.filter(s => s.start <= bars);
 
-      // every instrument makes sound; nothing clips at an instrument's output
+      // every instrument makes sound; nothing clips at an instrument's output. The taps are the studio
+      // channels after their faders, so the instrument's own output is the tap less its fader gain
+      // (the Xone's channel adds 6 dB on the way to the master; its own output is what can clip).
+      const fader = await page.evaluate(() => Object.fromEntries(Object.entries(window.__synthStudio.store.getState().studio.mixer?.channels ?? {}).map(([k, c]) => [k, c.gain ?? 0])));
       const sound = {};
       for (const inst of audible) {
         let best = -Infinity;
         inSong.forEach(s => { best = Math.max(best, T[inst].lufs(barT(s.start), Math.min(endT, barT(s.start + s.bars)))); });
-        sound[inst] = { lufs: r1(best), peakDb: r1(db(T[inst].peak(t0, endT + 2))) };
+        sound[inst] = { lufs: r1(best), peakDb: r1(db(T[inst].peak(t0, endT + 2)) - (fader[inst] ?? 0)) };
       }
       R.sound = sound;
       check(id, 'every instrument makes sound', audible.every(i => sound[i].lufs > -45), sound);
-      check(id, 'nothing clips at an instrument output (< 0 dBFS)', audible.every(i => sound[i].peakDb < 0), Object.fromEntries(audible.map(i => [i, sound[i].peakDb])));
+      check(id, 'nothing clips at an instrument output (< 0 dBFS before its studio fader)', audible.every(i => sound[i].peakDb < 0), Object.fromEntries(audible.map(i => [i, sound[i].peakDb])));
       const pkLit = Object.entries(log.xone).filter(([k, m]) => m.pk > 0 && /^[1-4ab]$/.test(k)).map(([k]) => k);
       R.xoneMaxDbu = Object.fromEntries(Object.entries(log.xone).filter(([, m]) => m.max > -100).map(([k, m]) => [k, r1(m.max)]));
       check(id, 'no Xone channel PK! lit', pkLit.length === 0, { pk: pkLit, maxDbu: R.xoneMaxDbu });
@@ -189,11 +192,11 @@ const EXPECT = {
       R.captionMs = capMs;
       check(id, 'the song plays through its sections (caption, ms after each section\'s bar line)', capMs.every(v => v !== null && v >= -200 && v < 450), capMs);
 
-      // the kick hits each section's first beat: a jump of 6 dB or more within 15 ms of the bar line
+      // the kick hits each section's first beat: a rise of 6 dB or more that starts within 12 ms of the bar line
       const kickSecs = inSong.map((s, i) => ({ ...s, i })).filter(s => s.i >= (exp.kickFrom ?? 1) - 1 && !(exp.kickSkip ?? []).includes(s.i + 1));
       const kicks = kickSecs.map(s => ({ section: s.i + 1, ...T[exp.kick].hitAt(barT(s.start)) }));
       R.kickHits = kicks;
-      check(id, 'section changes land on bar lines (the kick on each section\'s first beat)', kicks.every(k => k.db >= 6 && Math.abs(k.ms) <= 15), kicks);
+      check(id, 'section changes land on bar lines (the kick on each section\'s first beat)', kicks.every(k => k.db >= 6 && k.ms !== null && Math.abs(k.ms) <= 12), kicks);
 
       // a part the arranger unmutes comes in on its section's bar line (its first note on its step)
       const stepDur = barDur / 16;

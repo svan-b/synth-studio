@@ -268,15 +268,21 @@ function makeTap(t, sr, t0Audio) {
     truePeak(a, b) { let m = 0; for (let k = qAt(a); k < qAt(b); k++) m = Math.max(m, tq[k]); return m; },
     /** Mean power over [a, b) */
     meanPower(a, b) { const qa = qAt(a), qb = qAt(b); let s = 0; for (let k = qa; k < qb; k++) s += pw[k]; return qb > qa ? s / ((qb - qa) * Q) : 0; },
-    /** First quantum after `from` with sound, when the 50 ms before `from` were silent (an entry), as audio time */
+    /**
+     * When a part comes in after `from`: the first quantum within 20 dB of the part's mean level over
+     * [from, until) - so a release tail still ringing far below the part does not count - as audio time
+     */
     entryAfter(from, until) {
       const qa = qAt(from), qb = qAt(until);
-      for (let k = qa; k < qb; k++) if (pw[k] / Q > 1e-9) return timeOf(k);
+      let mean = 0; for (let k = qa; k < qb; k++) mean += pw[k];
+      const thr = Math.max(1e-9 * Q, (mean / Math.max(1, qb - qa)) * 0.01);
+      for (let k = qa; k < qb; k++) if (pw[k] > thr) return timeOf(k);
       return null;
     },
     /**
-     * A hit near `at`: the largest jump in power within [at - 10 ms, at + 25 ms] over the mean of the
-     * 60 ms before it, in dB, and when it happens (ms from `at`)
+     * A hit near `at`: how far the power rises within [at - 10 ms, at + 30 ms] over the mean of the
+     * 60 ms before it (dB), and when the rise starts - the first quantum 6 dB over that level (ms
+     * from `at`; a long, soft-edged hit peaks later than it starts)
      */
     hitAt(at) {
       const qT = qAt(at);
@@ -284,13 +290,14 @@ function makeTap(t, sr, t0Audio) {
       const a0 = Math.max(0, Math.round(qT - 60 * per)), a1 = Math.max(0, Math.round(qT - 12 * per));
       let pre = 0; for (let k = a0; k < a1; k++) pre += pw[k];
       pre = Math.max(1e-12, pre / Math.max(1, a1 - a0));
-      let best = -Infinity, bq = qT;
-      for (let k = Math.round(qT - 10 * per); k <= Math.round(qT + 25 * per); k++) {
+      let best = -Infinity, onset = null;
+      for (let k = Math.round(qT - 10 * per); k <= Math.round(qT + 30 * per); k++) {
         if (k < 0 || k >= pw.length) continue;
         const r = pw[k] / pre;
-        if (r > best) { best = r; bq = k; }
+        if (r > best) best = r;
+        if (onset === null && r >= 4) onset = k;
       }
-      return { db: r1(10 * Math.log10(best)), ms: Math.round((timeOf(bq) - at) * 1000) };
+      return { db: r1(10 * Math.log10(best)), ms: onset === null ? null : Math.round((timeOf(onset) - at) * 1000) };
     },
   };
 }

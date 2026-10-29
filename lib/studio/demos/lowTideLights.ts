@@ -324,7 +324,8 @@ const XONE: Values = {
   fx_time: 1, fx_fdbk: 4, fx_size: 2.2,
   f1_on: true, f1_type: XTYPE.hpf, f1_freq: 140, f1_res: 4, f1_crunch: 0,
   f2_on: true, f2_type: XTYPE.lpf, f2_freq: 900, f2_res: 2, f2_crunch: 0,
-  master: 8, monitor_out: 0, bpm: BPM, play: false,
+  // MASTER 9 (+3.4 dB over unity at 8): the Xone's output then peaks about -1.5 dBFS
+  master: 9, monitor_out: 0, bpm: BPM, play: false,
 };
 
 /** Xone snapshot: which channels are on a filter in this section */
