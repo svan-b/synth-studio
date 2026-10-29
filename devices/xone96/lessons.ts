@@ -1556,12 +1556,14 @@ const st1: Lesson = {
       instruction: 'In the Studio tab, set the Analog Rytm\'s Output to Xone:96 · CH 1 (LINE).',
       checklist: [{ text: 'Analog Rytm → CH 1 (LINE)', check: s => routedTo(s, 'analog-rytm', 'studio_1') }],
       hints: ['Open the Studio tab at the top of the page.', 'Find the Analog Rytm\'s header: it has an Output menu.', 'Choose "Xone:96 · CH 1 (LINE)". Channel 1 now shows STUDIO: Analog Rytm.'],
+      solution: { studio: { routes: { 'analog-rytm': 'xone96:studio_1' } } },
     },
     {
       kind: 'challenge', concept: 'signal-routing',
       instruction: 'Now set the DFAM\'s Output to Xone:96 · CH 4 (LINE).',
       checklist: [{ text: 'DFAM → CH 4 (LINE)', check: s => routedTo(s, 'dfam', 'studio_4') }],
       hints: ['Same place: the DFAM\'s Output menu in the Studio tab.', 'Choose "Xone:96 · CH 4 (LINE)".'],
+      solution: { studio: { routes: { dfam: 'xone96:studio_4' } } },
     },
     studioPlay,
     {
@@ -1598,6 +1600,7 @@ const st1: Lesson = {
       instruction: 'Unroute the DFAM (its Output back to Master out) and watch channel 4 go back to its deck.',
       checklist: [{ text: 'DFAM no longer routed into the Xone:96', check: s => !routedAnywhere(s, 'dfam') }],
       hints: ['The DFAM\'s Output menu again.', 'Choose "Master out". Channel 4\'s STUDIO label disappears and PERC plays.'],
+      solution: { studio: { routes: { dfam: 'master' } } },
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',
@@ -1639,6 +1642,7 @@ const st2: Lesson = {
         { text: 'Analog Four → CH 2', check: s => routedTo(s, 'analog-four', 'studio_2') },
       ],
       hints: ['Or load the "Elektron live" studio set: it routes both for you.', 'Each instrument header in the Studio tab has an Output menu.'],
+      solution: { studio: { routes: { 'analog-rytm': 'xone96:studio_1', 'analog-four': 'xone96:studio_2' } } },
     },
     studioPlay,
     {
@@ -1744,6 +1748,8 @@ const st3: Lesson = {
       instruction: 'Route at least two of your instruments into Xone:96 channels.',
       checklist: [{ text: 'Two or more instruments feed the Xone:96', check: s => routedCount(s) >= 2 }],
       hints: ['Studio tab: each instrument\'s Output menu.', 'Use CH 1-4 for your main parts and RTN C/D for extras.'],
+      // One way, with the Elektron pair of the last lesson (instruments not in the rack are skipped)
+      solution: { studio: { routes: { 'analog-rytm': 'xone96:studio_1', 'analog-four': 'xone96:studio_2', dfam: 'xone96:studio_4' } } },
     },
     studioPlay,
     {

@@ -111,7 +111,7 @@ export async function showMe(step: LessonStep, instance: string, labelOf: (id: s
     // An open challenge: one way to do it, left in place
     if (step.solution) {
       const sol = step.solution;
-      const target = sol.instance ?? instance;
+      const target = sol.instance ? resolveInstance(sol.instance) ?? sol.instance : instance;
       store.setLessonDemo({ instance: target });
       const tspec = getSpec(store.deviceOf(target));
       for (const [id, v] of Object.entries(sol.values ?? {})) await sweep(target, id, tspec?.controls[id], v, 450);
@@ -125,7 +125,19 @@ export async function showMe(step: LessonStep, instance: string, labelOf: (id: s
         for (const [id, v] of Object.entries(vals)) await sweep(inst, id, pspec?.controls[id], v, 350);
       }
       // The studio itself: the mix, the master, the song, snapshots, the transport
-      applyStudioSolution({ ...sol, parts: undefined });
+      applyStudioSolution({ ...sol, parts: undefined }, target);
+      // Notes, played on the instrument so they are heard (and counted, like the keys)
+      if (sol.notes?.length) {
+        hub.ensureAudio();
+        for (const n of sol.notes) {
+          if (useStudioStore.getState().lessonDemo === null) break;
+          hub.noteOn(target, n, 0.85);
+          await sleep(260);
+          hub.noteOff(target, n);
+          useStudioStore.getState().lessonNote(target, n);
+          await sleep(90);
+        }
+      }
       if (sol.transport === 'play') hub.startAll();
       // A button pressed until the step is done (parking a sequencer), slowly enough to follow
       if (sol.pressUntilDone) {

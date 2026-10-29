@@ -4,13 +4,78 @@
 // lessons or the panel at runtime. Exits non-zero on errors.
 // ============================================================================
 
-import type { ControlSpec, ControlValue, Lesson, LessonCheckState, MultipleChoice } from '../types';
+import type { ControlSpec, ControlValue, Lesson, LessonCheckState, LessonStep, MultipleChoice } from '../types';
 import { LESSON_PATHS } from '../types';
 import type { PanelElement } from '../types/panel';
 import { DEVICES } from '../devices';
 import type { DeviceModule } from '../devices/types';
+import { isProject } from '../lib/sequencer/elektron/project';
+import { MAX_STEPS } from '../lib/sequencer/elektron/types';
+import { patternPatchProblem } from '../lib/studio/elektronEdits';
 
 type Issue = { level: 'error' | 'warn'; msg: string };
+
+/** An instrument a lesson names (an instance id or a device): its device, data and module when known */
+type NamedInst = { device: string; data: unknown; mod?: DeviceModule };
+
+/**
+ * Lesson API v3 fields that name instruments, mixers and Elektron patterns: listen.patterns,
+ * match.pattern, and a solution's patterns, sequence, studio.routes and arrangement. `instOf`
+ * resolves a name; `stepInst` is the step's own instrument.
+ */
+function checkV3(s: LessonStep, w: string, ctx: { instOf: (name: string) => NamedInst | undefined; stepInst?: string }, out: Issue[]) {
+  const err = (m: string) => out.push({ level: 'error', msg: `${w}: ${m}` });
+  const elektron = (name: string | undefined, what: string): NamedInst | undefined => {
+    const i = name ? ctx.instOf(name) : undefined;
+    if (!i) { err(`${what} names "${name ?? '(none)'}", which is not in the studio`); return undefined; }
+    if (!isProject(i.data)) { err(`${what}: ${i.device} has no Elektron sequencer project`); return undefined; }
+    return i;
+  };
+  (['a', 'b'] as const).forEach(side => Object.entries(s.listen?.patterns?.[side] ?? {}).forEach(([k, patch]) => {
+    if (!elektron(k, `listen.patterns.${side}`)) return;
+    const p = patternPatchProblem(patch, 'listen');
+    if (p) err(`listen.patterns.${side}.${k} ${p}`);
+  }));
+  const mp = s.match?.pattern;
+  if (mp) {
+    elektron(ctx.stepInst, 'match.pattern');
+    const p = patternPatchProblem(mp.target, 'match') ?? (mp.start ? patternPatchProblem(mp.start, 'match') : null);
+    if (p) err(`match.pattern ${p}`);
+    if (mp.start && Math.abs(mp.start.swing - mp.target.swing) < 6) out.push({ level: 'warn', msg: `${w}: match.pattern starts within 6 % of the target: too close to hear` });
+  }
+  const sol = s.solution;
+  if (!sol) return;
+  Object.entries(sol.patterns ?? {}).forEach(([k, patch]) => {
+    if (!elektron(k, 'solution.patterns')) return;
+    const p = patternPatchProblem(patch, 'solution');
+    if (p) err(`solution.patterns.${k} ${p}`);
+  });
+  sol.sequence?.forEach((e, ei) => {
+    const i = elektron(e.instance ?? sol.instance ?? ctx.stepInst, `solution.sequence[${ei}]`);
+    if (!i || !isProject(i.data)) return;
+    if (!(Number.isInteger(e.track) && e.track >= 0 && e.track < i.data.tracks)) err(`solution.sequence[${ei}]: track ${e.track} outside 0..${i.data.tracks - 1}`);
+    Object.keys(e.trigs).forEach(k => {
+      const n = Number(k);
+      if (!(Number.isInteger(n) && n >= 1 && n <= MAX_STEPS)) err(`solution.sequence[${ei}]: trig ${k} outside 1..${MAX_STEPS} (trigs are numbered like the trig keys)`);
+    });
+  });
+  Object.entries(sol.studio?.routes ?? {}).forEach(([k, target]) => {
+    if (!ctx.instOf(k)) err(`solution.studio.routes names "${k}", which is not in the studio`);
+    if (target === 'master') return;
+    const [mixer, input] = target.split(':');
+    const m = mixer ? ctx.instOf(mixer) : undefined;
+    if (!m || !input) { err(`solution.studio.routes.${k}: "${target}" is not 'master' or '<mixer>:<input>'`); return; }
+    if (m.mod && !m.mod.studio?.mixerInputs?.some(x => x.id === input)) err(`solution.studio.routes.${k}: ${m.device} has no mixer input "${input}"`);
+  });
+  sol.studio?.rack?.forEach(r => {
+    if (!DEVICES.some(d => d.id === r.device)) err(`solution.studio.rack: unknown device "${r.device}"`);
+    if (r.count !== undefined && !(Number.isInteger(r.count) && r.count >= 1 && r.count <= 8)) err(`solution.studio.rack: count ${r.count} for ${r.device} is outside 1..8`);
+  });
+  sol.arrangement?.sections?.forEach((x, xi) => {
+    if (!(x.bars >= 1)) err(`solution.arrangement section ${xi + 1} needs at least 1 bar`);
+    Object.keys(x.parts ?? {}).forEach(k => { if (!ctx.instOf(k)) err(`solution.arrangement section "${x.name}" has a part for "${k}", which is not in the studio`); });
+  });
+}
 
 function checkValue(spec: ControlSpec, v: ControlValue, where: string, out: Issue[]) {
   const err = (m: string) => out.push({ level: 'error', msg: `${where}: ${m}` });
@@ -246,7 +311,7 @@ function validate(id: string, mod: DeviceModule): Issue[] {
         if (!s.match) err(`${sw}: match step without match`);
         else {
           checkValues(s.match.target, `${sw} match.target`);
-          if (!s.match.controls.length) err(`${sw}: match needs at least one control`);
+          if (!s.match.controls.length && !s.match.pattern) err(`${sw}: match needs at least one control (or a pattern setting)`);
           s.match.controls.forEach(cid => {
             if (!controls[cid]) err(`${sw}: match control "${cid}" unknown`);
             if (s.match!.target[cid] === undefined) err(`${sw}: match control "${cid}" has no target value`);
@@ -260,6 +325,16 @@ function validate(id: string, mod: DeviceModule): Issue[] {
         if (!s.solution) warn(`${sw}: challenge without solution`);
         if (!s.hints?.length) warn(`${sw}: challenge without hints`);
       }
+      // v3 fields: this device is the lesson's own instrument; others are named by device id
+      // (the lesson's `requires` puts them in the rack)
+      checkV3(s, sw, {
+        stepInst: id,
+        instOf: name => {
+          const dev = name.replace(/#\d+$/, '');
+          if (dev === id) return { device: id, data: mod.data?.initial(), mod };
+          return DEVICES.some(d => d.id === dev) ? { device: dev, data: undefined } : undefined;
+        },
+      }, out);
       // Run custom checks against the default state to catch crashes
       const st = fakeState({ ...defaults });
       if (s.check) { try { s.check(st); } catch (e) { err(`${sw}: check() throws on the default state: ${e}`); } }
@@ -445,7 +520,7 @@ async function validateStudioLessons(lessons: Lesson[]): Promise<Issue[]> {
         }
         if (s.match) {
           checkVals(m, s.match.target, `${w} match.target`);
-          if (!s.match.controls.length) err(`${w}: match needs at least one control`);
+          if (!s.match.controls.length && !s.match.pattern) err(`${w}: match needs at least one control (or a pattern setting)`);
           s.match.controls.forEach(cid => { if (s.match!.target[cid] === undefined) err(`${w}: match control "${cid}" has no target value`); });
           if (s.match.controls.length > 3) warn(`${w}: more than 3 controls in one ear challenge is very hard`);
         }
@@ -459,6 +534,13 @@ async function validateStudioLessons(lessons: Lesson[]): Promise<Issue[]> {
           });
           s.solution.capture?.forEach(c => { if (!stepMod(c.instance)) err(`${w}: solution.capture names "${c.instance}", which is not in the start studio`); });
         }
+        // v3 fields against the start studio's instruments and their data
+        const instOf = (name: string): NamedInst | undefined => {
+          const id = start.rack.find(r => r.id === name)?.id ?? start.rack.find(r => r.device === name)?.id;
+          const st = id ? startState?.instances[id] : undefined;
+          return id && st ? { device: st.device, data: st.data, mod: rackMods.get(id) } : undefined;
+        };
+        checkV3(s, w, { instOf, stepInst: s.instance ?? start.focus ?? start.rack[0]?.id }, out);
       }
       if (kind === 'challenge') {
         if (!s.solution) warn(`${w}: challenge without solution`);

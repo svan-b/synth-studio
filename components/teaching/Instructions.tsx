@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { ControlValue, DeviceSpec, Lesson, LessonStep, MultipleChoice } from '@/types';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
+import type { ControlValue, DeviceSpec, Lesson, LessonPatternPatch, LessonStep, MultipleChoice } from '@/types';
 import { useStudioStore, stepKind, buildCheckState, getSpec, type StepSession } from '@/store/studio';
 import { describeValue, pressTargetOf, pressesNeeded } from '@/lib/controls/mapping';
 import { hub } from '@/lib/studio/hub';
 import { getLessonLive, onLessonLive } from '@/lib/studio/lessonLive';
-import { captureInto, goTo, isStudioListen, studioAB } from '@/lib/studio/lessonRuntime';
+import { captureInto, goTo, isStudioListen, setPatternSettings, studioAB } from '@/lib/studio/lessonRuntime';
+import { withPatternPatch } from '@/lib/studio/elektronEdits';
 import { onProducerLessons, producerLessonsNow } from '@/lib/studio/producerIndex';
 import Scope from './Scope';
 import { canShowMe, cancelShowMe, showMe } from './coachActions';
@@ -54,8 +55,10 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
   const nextLesson = onNextLesson ?? (producerNext ? () => useStudioStore.getState().startLesson(producerNext) : undefined);
   const studioSaved = !!lessonStudio?.backupId && backups.some(b => b.id === lessonStudio.backupId);
   const [collapsed, setCollapsed] = useState(false);
-  // Touch screens: the coach floats over the panel, on the side the learner picks
+  // Touch screens: the coach floats over the panel, on the side the learner picks, and moves out
+  // of the way of what a step asks you to touch (useCoachPlacement)
   const [side, setSide] = useState<'right' | 'left'>('right');
+  const [top, setTop] = useState<number | null>(null);
   const asideRef = useRef<HTMLElement>(null);
   const [showScope, setShowScope] = useState(true);
   const [showList, setShowList] = useState(false);
@@ -64,6 +67,8 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
   const session = sessionAll[currentStep];
 
   useEffect(() => setRestored(false), [lesson?.id]);
+
+  useCoachPlacement(asideRef, { step: `${lesson?.id}:${currentStep}`, collapsed, finished }, { side, top }, setSide, setTop);
 
   // Autoplay demo phrase when a step asks for it
   useEffect(() => {
@@ -74,26 +79,6 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
 
   // A demonstration never outlives its step
   useEffect(() => () => cancelShowMe(), [currentStep, lesson?.id]);
-
-  // Touch screens: never float over the control the step points at. Once the step's spotlight
-  // has drawn, move to the other side if this one covers it and that one doesn't.
-  useEffect(() => {
-    if (!lesson || !window.matchMedia('(pointer: coarse) and (min-width: 1024px)').matches) return;
-    const t = setTimeout(() => {
-      const coach = asideRef.current?.getBoundingClientRect();
-      const targets = [...document.querySelectorAll('.ssc-spot-target')].map(e => e.getBoundingClientRect()).filter(r => r.width > 0);
-      if (!coach || !targets.length) return;
-      const covers = (at: 'left' | 'right') => {
-        const left = at === 'left' ? 12 : window.innerWidth - 12 - coach.width;
-        return targets.some(r => r.left < left + coach.width && r.right > left && r.top < coach.bottom && r.bottom > coach.top);
-      };
-      setSide(cur => {
-        const other = cur === 'left' ? 'right' : 'left';
-        return covers(cur) && !covers(other) ? other : cur;
-      });
-    }, 300);
-    return () => clearTimeout(t);
-  }, [lesson, currentStep]);
 
   // Screen readers: the new step, then whether it is done
   const step = lesson?.steps[currentStep];
@@ -133,6 +118,7 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
     <aside
       ref={asideRef}
       className={`w-full lg:w-[22rem] shrink-0 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 shadow-2xl lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] flex flex-col overflow-y-auto coarse-lg:fixed coarse-lg:top-auto coarse-lg:bottom-3 coarse-lg:z-30 coarse-lg:w-[20rem] coarse-lg:max-h-[58dvh] ${side === 'left' ? 'coarse-lg:left-3' : 'coarse-lg:right-3'}`}
+      style={top !== null ? { top, bottom: 'auto' } : undefined}
       aria-label="Lesson coach"
     >
       <div className="flex items-start justify-between gap-2">
@@ -242,6 +228,68 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
   );
 }
 
+// ---- placement on touch screens ------------------------------------------------
+
+/** Panel highlights of lesson targets (the instruments' own spotlight classes) */
+const TARGET_SELECTOR = '.rytm-target, .a4-target, .seq-target, .ssc-spot-target';
+
+/**
+ * On a touch screen the coach floats over the instrument. When a step begins, it moves to the
+ * corner (bottom or top, right or left) that hides the least of what the step highlights, so
+ * a trig key or pad the learner must tap is never under it. The top corners start below the
+ * instrument's toolbar, so ▶ and the tabs stay free.
+ */
+function useCoachPlacement(
+  ref: RefObject<HTMLElement>,
+  deps: { step: string; collapsed: boolean; finished: boolean },
+  now: { side: 'right' | 'left'; top: number | null },
+  setSide: (s: 'right' | 'left') => void,
+  setTop: (t: number | null) => void,
+) {
+  // where the coach is now (the learner may have moved it with ⇆)
+  const sideRef = useRef(now.side);
+  sideRef.current = now.side;
+  const topRef = useRef(now.top);
+  topRef.current = now.top;
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia?.('(pointer: coarse) and (min-width: 1024px)').matches) return;
+    if (deps.collapsed || deps.finished) { if (topRef.current !== null) setTop(null); return; }
+    const place = () => {
+      const el = ref.current;
+      if (!el) return;
+      const targets = Array.from(document.querySelectorAll(TARGET_SELECTOR))
+        .filter(t => !el.contains(t))
+        .map(t => t.getBoundingClientRect())
+        .filter(r => r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight);
+      if (!targets.length) return;
+      const r = el.getBoundingClientRect();
+      const w = r.width, h = r.height, m = 12, W = innerWidth, H = innerHeight;
+      const panel = document.querySelector('[data-instance]')?.getBoundingClientRect();
+      const topY = Math.max(m, Math.round(panel?.top ?? m));
+      const overlap = (x: number, y: number) => targets.reduce((a, t) =>
+        a + Math.max(0, Math.min(x + w, t.right) - Math.max(x, t.left)) * Math.max(0, Math.min(y + h, t.bottom) - Math.max(y, t.top)), 0);
+      const cands: { side: 'right' | 'left'; top: number | null; x: number; y: number }[] = [
+        { side: 'right', top: null, x: W - m - w, y: H - m - h },
+        { side: 'left', top: null, x: m, y: H - m - h },
+      ];
+      if (topY + h <= H - m) cands.push({ side: 'right', top: topY, x: W - m - w, y: topY }, { side: 'left', top: topY, x: m, y: topY });
+      const cur = cands.find(c => c.side === sideRef.current && (c.top === null) === (topRef.current === null)) ?? cands[0];
+      let best = cur, bestScore = overlap(cur.x, cur.y);
+      for (const c of cands) { const sc = overlap(c.x, c.y); if (sc < bestScore - 1) { best = c; bestScore = sc; } }
+      if (best !== cur) {
+        setSide(best.side);
+        setTop(best.top);
+      }
+    };
+    // after the step's instrument has come on screen and drawn its highlights
+    const t1 = setTimeout(place, 350);
+    const t2 = setTimeout(place, 1200);
+    window.addEventListener('resize', place);
+    return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener('resize', place); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deps.step, deps.collapsed, deps.finished]);
+}
+
 // ---- progress --------------------------------------------------------------
 
 /** One segment per step: done, current, still to come. Skipped steps show as gaps. */
@@ -315,6 +363,8 @@ function StepCard({ lesson, stepIndex, step, spec, satisfied, session, instance,
   };
   // A control's printed name; for an event (pads, trig keys) the button's own legend
   const labelOf = (id: string) => {
+    // An Elektron pattern setting being matched (v3): the pattern's SWING menu
+    if (id === 'pattern:swing') return 'SWING';
     const c = spec?.controls[id];
     if (c) return c.label;
     const el = hub.getModule(store.deviceOf(instance))?.layout.elements.find(e => e.kind === 'button' && e.event === id);
@@ -524,12 +574,14 @@ function MultipleChoiceView({ mc, answer, onAnswer, reveal, predict }: { mc: Mul
  * Switch between two sounds instantly, on the same phrase. Short echoic memory is
  * the limit in ear training: fast A/B switching is how producers compare.
  */
-function ABToggle({ instance, a, b, labels, patchesA }: {
+function ABToggle({ instance, a, b, labels, patchesA, patternA }: {
   instance: string;
   a: Record<string, ControlValue> | null;
   b: Record<string, ControlValue> | null;
   labels: [string, string];
   patchesA?: { from: string; to: string }[];
+  /** Side A plays these Elektron pattern settings (SWING) on every pattern, the learner's are kept */
+  patternA?: LessonPatternPatch;
 }) {
   const [side, setSide] = useState<'a' | 'b' | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -538,7 +590,12 @@ function ABToggle({ instance, a, b, labels, patchesA }: {
     if (timer.current) clearTimeout(timer.current);
     if (side === which) { hub.stopAudition(); setSide(null); return; }
     const ms = 3400;
-    hub.audition(instance, which === 'a' ? a : b, which === 'a' && patchesA ? { patches: patchesA, ms } : { ms });
+    const data = which === 'a' && patternA ? withPatternPatch(useStudioStore.getState().devices[instance]?.data, patternA, { all: true }) : undefined;
+    hub.audition(instance, which === 'a' ? a : b, {
+      ms,
+      ...(which === 'a' && patchesA ? { patches: patchesA } : {}),
+      ...(data !== undefined ? { data } : {}),
+    });
     setSide(which);
     timer.current = setTimeout(() => setSide(null), ms);
   };
@@ -752,7 +809,9 @@ function MatchView({ step, session, instance, labelOf, announce }: {
   const attempts = session?.attempts ?? 0;
   const result = session?.match;
   const solved = (result?.score ?? 0) >= 1;
-  const n = m.controls.length;
+  // The controls being matched, and an Elektron pattern setting (SWING) when the step has one
+  const tested = [...m.controls, ...(m.pattern ? ['pattern:swing'] : [])];
+  const n = tested.length;
   const right = result ? Math.round(result.score * n) : 0;
 
   // Feedback fades in: a count, then which control, then which way and how far
@@ -774,9 +833,9 @@ function MatchView({ step, session, instance, labelOf, announce }: {
   return (
     <div className="mt-2 space-y-2">
       <p className="text-[11px] text-gray-300">
-        Adjust {m.controls.map(labelOf).join(', ')} until yours sounds like the target. Everything else is already set.
+        Adjust {tested.map(labelOf).join(', ')} until yours sounds like the target. Everything else is already set.
       </p>
-      <ABToggle instance={instance} a={m.target} b={null} labels={['A · Target', 'B · Yours']} patchesA={m.patches} />
+      <ABToggle instance={instance} a={m.target} b={null} labels={['A · Target', 'B · Yours']} patchesA={m.patches} patternA={m.pattern?.target} />
       {!solved && (
         <button onClick={store.checkMatch} className="w-full py-2 rounded bg-teaching-target text-black font-bold text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300">
           Check my sound
@@ -792,6 +851,7 @@ function MatchView({ step, session, instance, labelOf, announce }: {
             m.controls.forEach(c => { vals[c] = m.target[c]; });
             store.markStepShown();
             store.setControlValues(instance, vals);
+            if (m.pattern) setPatternSettings(instance, m.pattern.target);
             setTimeout(store.checkMatch, 50);
           }}
           className="text-[11px] text-amber-300 underline"

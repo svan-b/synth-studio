@@ -163,8 +163,11 @@ export const CP_ROUGH = {
 export const CP_MIXED = {
   xone: {
     ...CP_ROUGH.xone,
-    ch1_gain: 0, ch2_gain: -1, ch3_gain: -2, ch4_gain: 5,
-    ch1_fader: 10, ch2_fader: 9.5, ch3_fader: 9, ch4_fader: 8.5, cha_fader: 7.5, chb_fader: 7.5,
+    // measured on the quasi-peak channel meters (Xone:96 review): drums +4, bass +4, stabs +4,
+    // perc +3 dBu; the perc and the stabs need more GAIN than the decks to read that high, so
+    // their faders sit lower for the same balance
+    ch1_gain: 0, ch2_gain: -1, ch3_gain: 2, ch4_gain: 10,
+    ch1_fader: 10, ch2_fader: 9.5, ch3_fader: 8.4, ch4_fader: 7.4, cha_fader: 7.5, chb_fader: 7.5,
     master: 7.75, booth: 8,
   } as Values,
   dfam: CP_SLOTTED.dfam,

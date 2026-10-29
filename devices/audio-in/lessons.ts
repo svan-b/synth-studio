@@ -20,7 +20,7 @@
 // ============================================================================
 
 import type { Lesson, LessonCheckState } from '@/types';
-import { asData as asSynthData } from '@/devices/midi-synth/config';
+import { PRACTICE_PORT, asData as asSynthData, initialData as initialSynthData } from '@/devices/midi-synth/config';
 import { TARGET_ZONE, asInputData, initialInputData, levelIsGood, type AudioInData } from './config';
 
 const O = (n: number) => n / 100;
@@ -329,6 +329,7 @@ const l4: Lesson = {
       instruction: 'Set OUTPUT to a Xone:96 channel, such as STUDIO 1.',
       checklist: [{ text: 'OUTPUT is a mixer channel', check: onMixer }],
       hints: ['OUTPUT is at the bottom left of this panel.', 'Pick "Xone:96 · STUDIO 1".', 'Only Master out listed? The mixer has no studio inputs yet: press Skip.'],
+      solution: { studio: { routes: { 'audio-in': 'xone96:studio_1' } } },
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'mixing',
@@ -404,6 +405,8 @@ const st1: Lesson = {
         { text: 'MIDI clock is sent to it', check: s => synths(s).some(x => x.clock && !!x.port) },
       ],
       hints: ['The Studio tab shows every instrument; Setup… is on Your synth\'s panel.', 'Send MIDI clock is under "Where the MIDI goes".', 'Come back with this tab (Audio input) at the top.'],
+      // One way without gear: the Practice synth as the output, with MIDI clock
+      solution: { data: { ...initialSynthData(), port: { ...PRACTICE_PORT }, clock: true } },
     },
     {
       kind: 'do', concept: 'signal-routing', focus: ['source', 'connect'],
@@ -430,6 +433,7 @@ const st1: Lesson = {
       instruction: 'Put it on the mixer: set OUTPUT to a Xone:96 channel, such as STUDIO 1.',
       checklist: [{ text: 'OUTPUT is a mixer channel', check: onMixer }],
       hints: ['OUTPUT is at the bottom left of this panel.', 'Pick "Xone:96 · STUDIO 1".', 'Only Master out listed? The mixer has no studio inputs yet: press Skip.'],
+      solution: { studio: { routes: { 'audio-in': 'xone96:studio_1' } } },
     },
     {
       kind: 'do', concept: 'mixing', focus: ['record'],
