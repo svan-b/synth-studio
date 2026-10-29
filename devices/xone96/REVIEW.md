@@ -99,7 +99,7 @@ Checked strip by strip; all **match** unless noted.
 
 | Set | Xone channels (meter mean / max) | LR MIX | Output |
 |---|---|---|---|
-| Elektron "Full set" (Rytm, A4, DFAM into CH 1, 2, 4; studio trims as the set) | -4.8 / +1.2, +2.3 / +8.5, -3.4 / -2.5 | +3.9 / +8.9 | -17.0 LUFS, -2.0 dBFS peak, no master limiting |
+| Elektron "Full set" (Rytm, A4, DFAM into CH 1, 2, 4; studio trims as the set; the Sub 37 on CH 3 plays no notes until you play it) | -4.8 / +1.2, +2.3 / +8.5, -3.4 / -2.5 | +3.9 / +8.9 | -17.0 LUFS, -2.0 dBFS peak, no master limiting |
 | Moog studio (DFAM, Mother-32, Subharmonicon into CH 1-3, all at unity) | +1.1 / +1.8, +6.3 / +9.3, +7.1 / +9.1 | +9.1 / +13.3, PK! lit | -14.1 LUFS, 1.5 dB of master limiting |
 
 Nothing clips inside the Xone (the channels have 6 dB above full-scale input, the LR MIX 7 dB
