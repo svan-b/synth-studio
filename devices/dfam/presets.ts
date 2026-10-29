@@ -199,14 +199,13 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
       ...steps([0, st(3), st(7), st(5), 0, st(10), st(7), st(12)], [100, 70, 85, 70, 100, 70, 85, 90]),
     }, [{ from: 'out_pitch', to: 'in_vcf_mod' }]),
   toms_rolling: preset('Toms / Rolling toms',
-    'Based on the manual\'s "Insane Toms" patch notes (p.36): VCO 2, slowed to a few cycles a second, is patched into TRIGGER, so it fires extra hits - rolls - inside every step. The PITCH knobs tune each tom and speed up its roll; VCO 2 EG AMOUNT bends the roll after each hit.',
+    'Based on the manual\'s "Insane Toms" patch notes (p.36): VCO 2, slowed to a dozen cycles a second, clocks ADV / CLOCK, so the toms roll through the pattern; every hit fires the VCO EG, and VCO 2 EG AMOUNT makes the roll stumble and speed up again. PITCH patched into VCA DECAY sets how each hit rings out. Press RUN / STOP to start it.',
     'manual', {
-      ...PITCHED,
       vco1_frequency: -0.4, vco1_eg_amount: 30, vco_decay: 60, vco1_level: 85,
-      vco2_frequency: -3.3, vco2_wave: 0, vco2_level: 0, vco2_eg_amount: -30,
-      vcf_cutoff: 1600, vcf_resonance: 20, vcf_eg_amount: 20, vcf_decay: 80, vca_decay: 160, volume: 73, tempo: 60,
-      ...steps([0, st(5), st(7), st(12), 0, st(3), st(10), st(-5)], [100, 70, 90, 60, 100, 80, 90, 70]),
-    }, [{ from: 'out_vco2', to: 'in_trigger' }]),
+      vco2_frequency: -3.4, vco2_wave: 0, vco2_level: 0, vco2_eg_amount: -25,
+      vcf_cutoff: 1600, vcf_resonance: 20, vcf_eg_amount: 20, vcf_decay: 80, vca_decay: 160, volume: 73,
+      ...steps([0, -1, 0.5, -1.5, 1, -1, 0, -2], [100, 60, 85, 55, 100, 70, 90, 60]),
+    }, [{ from: 'out_vco2', to: 'in_adv_clock' }, { from: 'out_pitch', to: 'in_vca_decay' }]),
 
   // ---------------------------------------------------------------- Metal and FM
   metal_fm_toys: preset('Metal / Clanky FM sequence',
@@ -251,10 +250,10 @@ export const DFAM_PRESETS: Record<string, PresetSpec> = {
 
   // ---------------------------------------------------------------- Bass
   bass_sequenced: preset('Bass / Soft unison bass',
-    'Based on the manual\'s "Sequenced Bass" patch notes (p.34): both VCOs tuned exactly together, a low-pass pluck from the VCF EG, and VCA EG on SLOW - the 100 ms attack softens each note like a little glide (p.20). PITCH 1-8 are the notes.',
+    'Based on the manual\'s "Sequenced Bass" patch notes (p.34): both VCOs tuned together by ear (a few cents apart, so they beat slowly), a low-pass pluck from the VCF EG, and VCA EG on SLOW - the 100 ms attack softens each note like a little glide (p.20). PITCH 1-8 are the notes.',
     'manual', {
       ...PITCHED,
-      vco1_frequency: -1, vco1_level: 75, vco2_frequency: -1, vco2_level: 60,
+      vco1_frequency: -1, vco1_level: 75, vco2_frequency: -0.994, vco2_level: 60,
       vcf_cutoff: 400, vcf_resonance: 30, vcf_eg_amount: 40, vcf_decay: 200, vca_attack_mode: 1, vca_decay: 320, volume: 55,
       ...steps([0, 0, st(12), 0, st(7), 0, st(10), st(3)], [100, 80, 90, 80, 100, 80, 90, 85]),
     }),

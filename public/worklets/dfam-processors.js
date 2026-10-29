@@ -205,6 +205,7 @@ class DfamProcessor extends AudioWorkletProcessor {
     this.trigHigh = false; this.advHigh = false;
     this.lastTrigAudio = -1; this.lastTrigEvent = -1;
     this.lastAdvAudio = -1; this.lastAdvEvent = -1; this.lastAdvAt = -1;
+    this.lastAdvEdgeAt = -1;       // last rising edge at ADV/CLOCK, played or not (is a clock live?)
     this.queue = [];
     this.trigOut = 0;              // samples left of the TRIGGER output pulse
     this.seqPitch = 0;             // volts on the internal pitch bus
@@ -312,8 +313,9 @@ class DfamProcessor extends AudioWorkletProcessor {
       case 'button-adv': this.advance(); break;
       case 'aud-on': {
         // Audition from step 1 when stopped - or when armed for an external clock that is not
-        // sending pulses (studio stopped): then the internal clock plays the phrase
-        const idleClock = this.running && this.patched[I_ADV] && currentTime - this.lastAdvAt > 0.5;
+        // sending pulses (studio stopped): then the internal clock plays the phrase. A clock that
+        // is running (a self-patched VCO, another DFAM) keeps clocking the audition.
+        const idleClock = this.running && this.patched[I_ADV] && currentTime - this.lastAdvEdgeAt > 0.5;
         if (!this.audition && (!this.running || idleClock)) {
           this.audition = true; this.auditionStep = this.step; this.step = NSTEP - 1;
           if (this.running) this.phase = 1;
@@ -336,8 +338,9 @@ class DfamProcessor extends AudioWorkletProcessor {
       case 'adv':
         if (Math.abs(ev.time - this.lastAdvAudio) < DEDUPE) break;
         this.lastAdvEvent = ev.time;
+        this.lastAdvEdgeAt = ev.time;
         // ADV/CLOCK only plays while the sequencer runs (press RUN/STOP first)
-        if (this.running && this.patched[I_ADV] && !this.audition) this.clockPulse();
+        if (this.running && this.patched[I_ADV]) this.clockPulse();
         break;
       case 'run': this.runEvent = ev.v > 0.5; break;
     }
@@ -437,11 +440,13 @@ class DfamProcessor extends AudioWorkletProcessor {
 
       // ---- clock: a cable in ADV/CLOCK replaces the internal clock ----
       // (before the TRIGGER jack, so one pulse patched into both advances first and then plays the new step)
-      const extClock = patched[I_ADV] && !this.audition;
+      // An audition uses the internal clock unless a clock is arriving at ADV/CLOCK
+      const extClock = patched[I_ADV] && (!this.audition || t - this.lastAdvEdgeAt < 0.5);
       if (patched[I_ADV]) {
         const gv = inV[I_ADV];
         if (!this.advHigh && gv > EDGE_ON) {
           this.advHigh = true;
+          this.lastAdvEdgeAt = t;
           if (Math.abs(t - this.lastAdvEvent) >= DEDUPE) {
             this.lastAdvAudio = t;
             if (this.running && extClock) this.clockPulse();
