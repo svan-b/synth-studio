@@ -12,7 +12,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Producer-grade studio | Clean unity master, −1 dBTP true-peak limiter, BS.1770 LUFS meters, mixer strips with sends to a tempo delay and Reverb2, undo/redo, stems, bounce, count-in, loop |
 | All seven instruments rebuilt to their manuals | DFAM, Xone:96, Sub 37, Analog Four MKII, Mother-32, Subharmonicon, Analog Rytm MKII. Each passes audio QA at −18 LUFS with 0 flagged presets and plays all its lessons |
 | Independent expert reviews | A second agent re-checked each instrument against its manual and fixed what it found. All seven are merged: DFAM, Subharmonicon, Xone:96, Analog Four, Mother-32, Sub 37, Analog Rytm. Each writes `devices/<id>/REVIEW.md` |
-| Producer path | Lesson API v3 studio state (whole-studio starts, saved learner studios, loudness-matched A/B, master/channel meters, bounces, mixer and arranger checks) and the first 8 Producer path lessons. See "Lesson API v3" in `docs/PEDAGOGY.md` |
+| Producer path | Lesson API v3 studio state (whole-studio starts, saved learner studios, loudness-matched A/B, master/channel meters, bounces, mixer and arranger checks, pattern SWING) and all 15 Producer path lessons, from a first beat to a mastered, bounced track. See "Lesson API v3" in `docs/PEDAGOGY.md` |
 | Clock chip | Every instrument that can follow the studio clock shows **Clock: studio / own tempo** above its panel. One tap lets a patch sheet play at its drawn TEMPO |
 | Stale-module fix | `useDeviceModule` reads the hub cache on every render, so switching never pairs one instrument's layout with another's data |
 | 60 ms minimum note gate | A quick tap on an on-screen key always sounds |
@@ -22,7 +22,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Elektron sequencer library + UI kit | `docs/ELEKTRON_SEQUENCER.md` (233 tests) |
 | Bring your own gear | Web MIDI, Practice synth (works on iPad without hardware), audio input, Web Audio plugins, 16 lessons, Safari guidance. See `docs/EXTERNAL_GEAR.md` |
 | Audio QA tool | `scripts/audio-qa.cjs`, see `docs/AUDIO_QA.md`: LUFS, true peak, DC, clicks, stuck tails per preset. The baseline in `docs/audio-qa-baseline/` predates the rebuilds and needs regenerating |
-| E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs), 37 checks including the iPad producer walkthrough. `--full` adds smoke and lessons for every instrument: 87/87 at the last full run |
+| E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs), 38 checks including two iPad producer walkthroughs. `--full` adds smoke and lessons for every instrument: 87/87 at the last full run |
 | iPad | Home-screen install, floating lesson coach, 44 px touch targets, fine-adjust gestures, value bubble. Fit may shrink a panel up to 20 % so it ends above the bottom of the screen (the whole Xone:96 at 87 %, the A4 at 90 %), and the control readout shares the toolbar row. First-load JS 198 kB (MIDI, studio view and coach load on demand) |
 | Research notes | `docs/research/<device>/` (sources, signal-flow, presets, lessons) from the official manuals, in our own words. See `docs/research/COPYRIGHT-RULES.md` |
 
@@ -80,6 +80,13 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Audio QA 0/20 in both modes (median −18.8 / −18.9 LUFS); lessons 20, 0 failed, 1 manual (t2, the arranger; the producer-path agent is adding its solution).
   - No ids or defaults changed. Saved projects keep their old copies of the factory kits, which the user can reload from the kit menu.
   - **All seven independent reviews are now merged.**
+- a7e1e07: merged the **complete Producer path** (15 lessons).
+  - New: First beat, Groove, Bass locked to the kick, Chords and pads, A hook, Movement and the Capstone, on the Rytm, Analog Four and Sub 37 into the Xone:96.
+  - Listen and match steps can set Elektron pattern SWING.
+  - Lesson solutions can set routes, the arranger and rack counts. Manual steps left: Xone 0 (was 4), A4 0 (2), Rytm 0 (1), audio input 0 (3), Your synth 1 (MIDI learn needs a real controller), and studio-5 2.
+  - In Producer lessons the app follows the step's instrument. The iPad coach picks the corner that hides least of the step's highlight, replacing the left/right version.
+  - A second iPad walkthrough (First beat by touch, Groove's SWING) joins the gate: **e2e 38/38**.
+  - The demo-excerpt hooks (`info.play`, `listen.demo`) wait for the demo tracks.
 - **Vercel build rate limit.** Previews from 49f3469 on failed with `build-rate-limit`, not a code error (local builds pass). Every push to any branch, the agents' `wip/*` included, starts a preview build. Pushes are now batched. Option for the user: disable preview builds for scratch branches with `vercel.json` → `"git": { "deploymentEnabled": { "wip/*": false } }`.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
@@ -118,7 +125,6 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Branch | What | Checkpoint |
 |---|---|---|
 | `wip/demo-tracks` | The three designed songs ("Low Tide Lights", "Three Clocks", "Copper Wire") as one-click studios | 0876305 |
-| `wip/producer-path-2` | The remaining Producer path lessons (Elektron and Sub 37 tracks), Elektron pattern swing, and lesson solutions for routes, the arranger and rack counts (0 manual steps left on the Xone, A4 and audio-in; 1 on Your synth, where MIDI learn needs a real controller) | 867e6fc |
 | `wip/perf-analog-four` | Analog Four DSP performance pass, null-tested against the current sound | — |
 
 Each merges through the gate below. Before merging, run `defaults-tool/diff.sh <device> HEAD origin/wip/<branch>` (in the scratchpad) to find changed defaults and removed ids, then add an upgrade entry.
@@ -152,7 +158,6 @@ Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Su
 
 ## 4. Follow-ups (owner: integrator)
 
-- **Lesson solution API**: add `route` and `arranger` fields, so the lesson runner can solve the Xone routing challenges (st1–st3, 4 manual steps) and the Analog Four song step (st2, 2 manual steps) by itself.
 - **Shared controls**, raised by several reviews:
   - a cap variant in `components/controls/Knob.tsx` (the A4 restyles its caps with a scoped stylesheet)
   - a legend-above/below option in `components/controls/Switch.tsx` (Mother-32)
