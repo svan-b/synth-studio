@@ -251,8 +251,10 @@ function pickPage(c: C, page: number) {
 // SHIFT: tap = latch (lets go after the next button); hold = classic modifier
 // ----------------------------------------------------------------------------
 
-const live = new Map<string, { shiftHeld: boolean; used: boolean }>();
-const liveOf = (c: C) => { let x = live.get(c.instance); if (!x) { x = { shiftHeld: false, used: false }; live.set(c.instance, x); } return x; };
+const live = new Map<string, { shiftHeld: boolean; used: boolean; snap: string }>();
+const liveOf = (c: C) => { let x = live.get(c.instance); if (!x) { x = { shiftHeld: false, used: false, snap: '' }; live.set(c.instance, x); } return x; };
+/** What a held SHIFT changes through a knob: SWING (TEMPO), live and step ratchets (GLIDE) */
+const shiftSnap = (v: Record<string, ControlValue>) => `${v.swing}|${v.live_ratchet}|${v.seq_ratchet}`;
 
 function consumeShift(c: C): boolean {
   const on = !!c.values.shift;
@@ -284,20 +286,31 @@ interface CapProps {
 
 function Cap({ id, w, h: ht, lit, color, label, shape = 'pad', blink, target, onDown, onUp }: CapProps) {
   const pressed = useRef(false);
-  const clip = shape === 'left' ? 'polygon(32% 0, 100% 0, 100% 100%, 32% 100%, 0 50%)'
-    : shape === 'right' ? 'polygon(0 0, 68% 0, 100% 50%, 68% 100%, 0 100%)' : undefined;
   const glow = lit > 0 ? `0 0 ${4 + 8 * lit}px ${color}` : 'none';
   const ring = target === 'off' ? '0 0 0 2px #f97316, 0 0 10px #f97316' : target === 'on' ? '0 0 0 2px #22c55e' : '';
-  const style: CSSProperties = {
+  const face = lit > 0
+    ? `radial-gradient(circle at 50% 45%, ${color} 0%, ${mixDark(color)} 75%)`
+    : 'linear-gradient(180deg, #343434 0%, #1d1d1d 100%)';
+  const base: CSSProperties = {
     position: 'absolute', left: 0, top: 0, width: w, height: ht, touchAction: 'none', padding: 0,
-    borderRadius: shape === 'pad' ? 3 : 2, clipPath: clip, WebkitClipPath: clip,
-    border: shape === 'pad' ? '1px solid #4a4a4a' : 'none',
-    background: lit > 0
-      ? `radial-gradient(circle at 50% 45%, ${color} 0%, ${mixDark(color)} 75%)`
-      : 'linear-gradient(180deg, #343434 0%, #1d1d1d 100%)',
-    boxShadow: [lit > 0 ? glow : 'inset 0 -2px 3px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 3px rgba(0,0,0,0.6)', ring].filter(Boolean).join(', '),
     cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none',
   };
+  // The (KB) and (STEP) arrows are triangles (manual p.9). The triangle is an inner face, so the
+  // button keeps its whole rectangle as the touch target; the glow and lesson ring follow the shape.
+  const clip = shape === 'left' ? 'polygon(0 50%, 100% 0, 100% 100%)' : shape === 'right' ? 'polygon(0 0, 100% 50%, 0 100%)' : '';
+  const style: CSSProperties = shape === 'pad'
+    ? {
+      ...base, borderRadius: 3, border: '1px solid #4a4a4a', background: face,
+      boxShadow: [lit > 0 ? glow : 'inset 0 -2px 3px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 3px rgba(0,0,0,0.6)', ring].filter(Boolean).join(', '),
+    }
+    : {
+      ...base, border: 'none', background: 'transparent',
+      filter: target === 'off' ? 'drop-shadow(0 0 3px #f97316)' : target === 'on' ? 'drop-shadow(0 0 2px #22c55e)'
+        : lit > 0 ? `drop-shadow(0 0 ${3 + 5 * lit}px ${color})` : 'drop-shadow(0 2px 2px rgba(0,0,0,0.6))',
+    };
+  const inner = shape === 'pad' ? null : h('span', {
+    style: { position: 'absolute', inset: 0, clipPath: clip, WebkitClipPath: clip, background: face, pointerEvents: 'none' },
+  });
   return h('button', {
     'data-control': id,
     'aria-label': label,
@@ -315,7 +328,7 @@ function Cap({ id, w, h: ht, lit, color, label, shape = 'pad', blink, target, on
     onPointerUp: () => { if (pressed.current) { pressed.current = false; onUp?.(); } },
     onPointerCancel: () => { if (pressed.current) { pressed.current = false; onUp?.(); } },
     onContextMenu: (e: ReactMouseEvent) => e.preventDefault(),
-  });
+  }, inner);
 }
 
 const mixDark = (c: string) => (c === '#ffffff' || c === '#f5f5f5' ? '#6b6b6b' : '#2a1010');
@@ -356,7 +369,7 @@ function FnButton({ c, kind, w, h: ht }: { c: C; kind: FnKind; w: number; h: num
         const l = liveOf(cur);
         if (cv.shift) { cur.setValue('shift', false); l.shiftHeld = false; return; }
         cur.setValue('shift', true);
-        l.shiftHeld = true; l.used = false;
+        l.shiftHeld = true; l.used = false; l.snap = shiftSnap(cv);
         return;
       }
       case 'run': {
@@ -480,7 +493,9 @@ function FnButton({ c, kind, w, h: ht }: { c: C; kind: FnKind; w: number; h: num
     if (kind === 'shift') {
       const l = liveOf(cur);
       l.shiftHeld = false;
-      if (l.used) { l.used = false; cur.setValue('shift', false); }
+      // Held while another button was pressed or a knob was turned (SHIFT + TEMPO, SHIFT + GLIDE),
+      // SHIFT lets go on release like the hardware's; a plain tap still latches it
+      if (l.used || (cur.values.shift && l.snap !== shiftSnap(cur.values))) { l.used = false; cur.setValue('shift', false); }
     }
     if (momentary.current) { cur.sendEvent(`${momentary.current}:up`); momentary.current = null; }
   };

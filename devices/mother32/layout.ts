@@ -4,12 +4,14 @@
 // All x/y in millimetres from the faceplate's top-left; controls use their
 // centre, boxes (section / custom) their top-left.
 //
-// Positions: the panel drawing in the v2 manual (p.68) as measured at 200 dpi by
-// the patchscore project (see REFERENCE.md "PD"), moved into faceplate
-// coordinates. Three rows of identical black knobs and bat toggles, two rows of
-// square pads (the 13-note keyboard and the sequencer keys), MIDI IN bottom left,
-// and the 4 x 8 patch bay on the right under its IN / OUT legend. The panel
-// prints no section boxes.
+// Positions: a blank patch-sheet drawing in the v2 manual (p.68) as measured at
+// 200 dpi by the patchscore project, moved into faceplate coordinates; the screws,
+// the button legends and the bottom band follow the default-panel drawing (p.9),
+// measured from a 200 dpi render (see REFERENCE.md). Three rows of identical black
+// knobs and bat toggles, two rows of square pads (the 13-note keyboard and the
+// sequencer keys) with every legend printed under its button, MIDI IN bottom left,
+// and the 4 x 8 patch bay on the right under its IN / OUT legend. The panel prints
+// no section boxes.
 // ============================================================================
 
 import type { ReactNode } from 'react';
@@ -89,40 +91,43 @@ const BLACK_X = [134.1, 149.3, 179.9, 195.3, 210.5];
 const pad = (x: number, y: number, w: number, hgt: number, render: (c: CustomRenderContext) => ReactNode): PanelElement =>
   ({ kind: 'custom', x: x - w / 2, y: y - hgt / 2, w, h: hgt, render });
 
+/** A button legend, printed under its button (manual p.9) in the panel's condensed type */
 const keyLegend = (text: string, x: number, y: number): PanelElement =>
-  ({ kind: 'label', text, x, y, size: 7, color: '#e8e8e8', letterSpacing: 0.2 });
+  ({ kind: 'label', text, x, y, size: 7, color: '#e8e8e8', font: 'condensed', letterSpacing: 0.2 });
+const UNDER = 5.4;          // legend centre below a pad's centre (the arrows: 7.6)
 
 const sequencer: PanelElement[] = [
   // upper row: HOLD / REST, PATTERN (BANK), OCTAVE / LOCATION LEDs, the five black keys
-  keyLegend('HOLD / REST', 40.0, UP_Y - 6.1),
   pad(40.0, UP_Y, PAD_W, PAD_H, renderFn('hold', PAD_W, PAD_H, K)),
+  keyLegend('HOLD / REST', 40.0, UP_Y + UNDER),
   // the Tempo LED sits directly above (SHIFT) (manual p.18)
   { kind: 'custom', x: 55.3 - 1.1, y: UP_Y - 1.1, w: 2.2, h: 2.2, render: renderTempoLed(2.2, K) },
-  keyLegend('PATTERN\n(BANK)', 70.6, UP_Y - 6.9),
   pad(70.6, UP_Y, PAD_W, PAD_H, renderFn('pattern', PAD_W, PAD_H, K)),
+  keyLegend('PATTERN (BANK)', 70.6, UP_Y + UNDER),
   keyLegend('OCTAVE / LOCATION', 98.1, UP_Y - 4.4),
   { kind: 'custom', x: 98.1 - 18, y: UP_Y - 1.1, w: 36, h: 2.2, render: renderOctLeds(4.5, 2.2, K) },
   ...['1', '2', '3', '4', '5', '6', '7', '8'].map((n, i): PanelElement => ({ kind: 'label', text: n, x: 98.1 - 18 + 2.25 + i * 4.5, y: UP_Y + 2.8, size: 5, color: '#9a9a9a' })),
-  ...['1-8', '9-16', '17-24', '25-32', 'SET END'].map((t, j) => keyLegend(t, BLACK_X[j], UP_Y - 6.1)),
   ...BLACK.map((ki, j) => pad(BLACK_X[j], UP_Y, PAD_W, PAD_H, renderKey(ki, PAD_W, PAD_H, K))),
+  ...['1-8', '9-16', '17-24', '25-32', 'SET END'].map((t, j) => keyLegend(t, BLACK_X[j], UP_Y + UNDER)),
 
-  // lower row: RESET / ACCENT, (SHIFT), RUN / STOP (REC), the two arrows, the eight step pads
-  keyLegend('RESET /\nACCENT', 40.0, LO_Y - 6.9),
+  // lower row: RESET / ACCENT, (SHIFT), RUN / STOP (REC), the two arrows, the eight step pads;
+  // each step number is printed under its pad, with the step LED under the number
   pad(40.0, LO_Y, PAD_W, PAD_H, renderFn('reset', PAD_W, PAD_H, K)),
-  keyLegend('(SHIFT)', 55.3, LO_Y - 6.1),
+  keyLegend('RESET / ACCENT', 40.0, LO_Y + UNDER),
   pad(55.3, LO_Y, PAD_W, PAD_H, renderFn('shift', PAD_W, PAD_H, K)),
-  keyLegend('RUN / STOP\n(REC)', 70.7, LO_Y - 6.9),
+  keyLegend('(SHIFT)', 55.3, LO_Y + UNDER),
   pad(70.7, LO_Y, PAD_W, PAD_H, renderFn('run', PAD_W, PAD_H, K)),
-  keyLegend('(KB)', 89.4, LO_Y - 7.0),
+  keyLegend('RUN / STOP (REC)', 70.7, LO_Y + UNDER),
   pad(89.4, LO_Y, ARROW_W, ARROW_H, renderFn('kb', ARROW_W, ARROW_H, K)),
-  keyLegend('(STEP)', 106.7, LO_Y - 7.0),
+  keyLegend('(KB)', 89.4, LO_Y + 7.6),
   pad(106.7, LO_Y, ARROW_W, ARROW_H, renderFn('step', ARROW_W, ARROW_H, K)),
-  ...WHITE.map((ki, k) => keyLegend(String(k + 1), STEP_X(k), LO_Y - 6.1)),
+  keyLegend('(STEP)', 106.7, LO_Y + 7.6),
   ...WHITE.map((ki, k) => pad(STEP_X(k), LO_Y, PAD_W, PAD_H, renderKey(ki, PAD_W, PAD_H, K))),
-  { kind: 'custom', x: STEP_X(0) - 7.65, y: LO_Y + 5.2, w: 15.3 * 8, h: 2.0, render: renderStepLeds(15.3, 2.0, K) },
+  ...WHITE.map((ki, k) => keyLegend(String(k + 1), STEP_X(k), LO_Y + UNDER)),
+  { kind: 'custom', x: STEP_X(0) - 7.65, y: LO_Y + 7.2, w: 15.3 * 8, h: 2.0, render: renderStepLeds(15.3, 2.0, K) },
 
-  // teaching readout (not on the hardware) and the Setup page
-  { kind: 'custom', x: 120.2, y: 118.4, w: 124, h: 4, render: renderReadout(124, K) },
+  // teaching readout (not on the hardware), in the blank band above the keys, and the Setup page
+  { kind: 'custom', x: 120.2, y: 88.0, w: 124, h: 4, render: renderReadout(124, K) },
   { kind: 'custom', x: 262, y: 121.1, w: 22, h: 5, render: renderSetup(K) },
 ];
 
@@ -130,8 +135,9 @@ const editing = (values: CustomRenderContext['values'], u: Record<string, unknow
   editTarget(values, ui({ ui: u })) >= 0;
 
 const elements: PanelElement[] = [
-  // --- Frame details ------------------------------------------------------------------
-  screw(7.5, 3.0), screw(297.1, 3.0), screw(7.5, 125.5), screw(297.1, 125.5),
+  // --- Frame details: the eight M3 panel screws (manual p.63), where the default-panel drawing
+  // puts them (p.9): four along the top rail and four along the bottom ---------------------
+  ...[12.2, 103.9, 200.9, 292.6].flatMap(x => [screw(x, 3.0), screw(x, 125.5)]),
 
   // --- Row 1: FREQUENCY, VCO WAVE, PULSE WIDTH, MIX, CUTOFF, RESONANCE, VCA MODE, VOLUME --
   ...scaleRing(21.7, ROW1), ...scaleRing(80.8, ROW1), ...scaleRing(41.0, ROW3), ...scaleRing(80.8, ROW3),
@@ -177,7 +183,9 @@ const elements: PanelElement[] = [
   ...toggle('vcf_mod_polarity', 'VCF MOD\nPOLARITY', 228.6, ROW2, 3),
 
   // --- Row 3: TEMPO / GATE LENGTH (SWING), LFO RATE, LFO WAVE, ATTACK, SUSTAIN, DECAY, VC MIX --
-  legend('TEMPO / GATE LENGTH\n(SWING)', 41.0, ROW3, 7.2),
+  legend('TEMPO / GATE LENGTH', 41.0, ROW3, 7.2),
+  // the second function is printed under the knob (manual p.9)
+  { kind: 'label', text: '(SWING)', x: 41.0, y: ROW3 + 12.7, size: 6.4, color: '#e8e8e8', font: 'condensed', letterSpacing: 0.3 },
   {
     kind: 'knob',
     // TEMPO is GATE LENGTH while a step is edited and SWING with SHIFT. Otherwise (firmware 2.0) it
@@ -208,8 +216,12 @@ const elements: PanelElement[] = [
   { kind: 'custom', x: 14.3 - 1.4, y: 77.4 - 1.4, w: 2.8, h: 2.8, render: renderMidiLed(2.8, K) },
   { kind: 'label', text: 'MIDI IN', x: 14.3, y: 89.0, size: 6.4, color: '#e8e8e8' },
   { kind: 'custom', x: 13.8 - 7.8, y: 107.8 - 7.8, w: 15.6, h: 15.6, render: renderDin(15.6, K) },
-  { kind: 'label', text: 'moog', x: 6.4, y: 122.3, size: 17, font: 'serif', italic: true, weight: 400, align: 'left' },
-  { kind: 'label', text: 'MOTHER-32', x: 26.6, y: 122.6, size: 10.5, weight: 800, align: 'left', letterSpacing: 1.4 },
+  // --- Bottom band (manual p.9): "MOTHER-32 | SEMI-MODULAR ANALOG SYNTHESIZER" at the left and
+  // the maker's name centred on the panel, set in type as a stand-in (not the logo artwork) --
+  { kind: 'label', text: 'MOTHER-32', x: 26.4, y: 121.3, size: 18, weight: 800, font: 'condensed', align: 'left', letterSpacing: 0.4, fixed: true },
+  { kind: 'section', x: 53.2, y: 119.0, w: 0.45, h: 4.6, background: '#f2f2f2' },
+  { kind: 'label', text: 'SEMI-MODULAR\nANALOG SYNTHESIZER', x: 55.2, y: 121.3, size: 7.4, weight: 700, font: 'condensed', align: 'left', letterSpacing: 0.3, fixed: true },
+  { kind: 'label', text: 'moog', x: 152.4, y: 121.0, size: 26, font: 'serif', italic: true, weight: 400, fixed: true },
 
   ...sequencer,
   ...patchBay,

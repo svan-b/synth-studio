@@ -16,7 +16,7 @@
 // ============================================================================
 
 import type { ControlValue, Lesson, LessonCheckState, LessonStep } from '@/types';
-import { type StepSpec, lengthOf, patternOf, sequence, stepAt } from './sequence';
+import { type StepSpec, initPattern, lengthOf, patternOf, sequence, stepAt } from './sequence';
 import { DIVISIONS } from './model';
 
 const O = (n: number) => n / 100;
@@ -34,10 +34,8 @@ const studioCable = (s: LessonCheckState, fromJack: string, toJack: string, from
   });
 const deviceValues = (s: LessonCheckState, device: string) => Object.values(s.instances).find(i => i.device === device)?.values ?? {};
 const step = (s: LessonCheckState, i: number) => stepAt(s.values, i);
-const recorded = (s: LessonCheckState) => {
-  const n = typeof s.values.seq_notes === 'string' ? s.values.seq_notes.indexOf('.') : -1;
-  return n < 0 ? lengthOf(s.values) : n;
-};
+/** The steps of the pattern, up to its length */
+const steps = (s: LessonCheckState) => Array.from({ length: lengthOf(s.values) }, (_, i) => step(s, i));
 const div = (name: string) => DIVISIONS.findIndex(d => d.name === name);
 
 /** Pattern lanes as control values */
@@ -53,7 +51,7 @@ const run = (principle = 'A step sequencer plays a list of notes in time, one pe
   instruction: 'Press RUN / STOP to start the pattern.',
   principle,
   explanation: 'In the studio the Mother-32 follows the studio clock, so RUN / STOP also starts ▶ in the top bar. Leave it running while you turn knobs - every change is heard on the next note.',
-  manualReference: 'Manual v2 p.54 - RUN / STOP',
+  manualReference: 'Manual v2 p.18, p.28 - RUN / STOP',
 });
 
 // ============================================================================
@@ -162,7 +160,7 @@ const f2: Lesson = {
   name: 'The mixer: VCO, noise and EXT. AUDIO',
   description: 'One knob crossfades the oscillator against noise - and a cable swaps the noise for anything else.',
   objective: 'Blend the oscillator with noise, and use EXT. AUDIO to replace the noise with another signal.',
-  source: 'Synth Studio · Mother-32 manual v2 pp.11, 47-48 (MIX, EXT. AUDIO)', estimatedMinutes: 6,
+  source: 'Synth Studio · Mother-32 manual v2 pp.11, 13, 47-48 (MIX, EXT. AUDIO, NOISE)', estimatedMinutes: 6,
   prerequisites: ['mother32-f1-vco'],
   concepts: ['mixing', 'noise', 'signal-routing'],
   start: { reset: true, values: { cutoff: 5000, resonance: 0, vcf_mod_amount: 15, decay: 300, sustain: 0, ...BASS } },
@@ -177,7 +175,7 @@ const f2: Lesson = {
         explain: 'White noise is random: every frequency at once and no repeating pattern, so you cannot sing it. Fully clockwise, MIX passes only the noise, so the notes keep their rhythm but lose their pitch.',
       },
       principle: 'White noise has energy at every frequency and no pitch: the raw material of snares and wind.',
-      manualReference: 'Manual v2 p.48 - NOISE, MIX',
+      manualReference: 'Manual v2 p.13 - MIX; p.48 - NOISE',
     },
     {
       kind: 'do', control: 'mix', targetValue: 50, concept: 'mixing',
@@ -255,7 +253,7 @@ const f3: Lesson = {
   name: 'The ladder filter: brightness, ring and HI PASS',
   description: 'CUTOFF and RESONANCE on the Moog ladder, the filter singing by itself, and the Mother-32\'s unusual high-pass.',
   objective: 'Use CUTOFF and RESONANCE to shape the tone, make the filter sing by itself, and know when HI PASS helps.',
-  source: 'Synth Studio · Mother-32 manual v2 p.14 (VCF) and the preset PLAY THE FILTER', estimatedMinutes: 8,
+  source: 'Synth Studio · Mother-32 manual v2 p.14 (VCF, and its tip on the filter as a sine source)', estimatedMinutes: 8,
   prerequisites: ['mother32-f2-mixer'],
   concepts: ['filter-cutoff', 'filter-resonance', 'filter-type'],
   start: { reset: true, values: { vco_wave: 1, cutoff: 8000, resonance: 0, vcf_mod_amount: 0, decay: 500, sustain: 0, ...BASS } },
@@ -305,7 +303,7 @@ const f3: Lesson = {
       predict: {
         question: 'Past about 3 o\'clock the filter whistles on its own. What is it doing?',
         options: ['Oscillating - it has become a sine-wave source', 'Distorting the VCO', 'Echoing the last note'], answer: 0,
-        explain: 'With enough feedback the ladder feeds itself and oscillates at the cutoff frequency with no input at all. The manual\'s preset PLAY THE FILTER uses it as a second oscillator.',
+        explain: 'With enough feedback the ladder feeds itself and oscillates at the cutoff frequency with no input at all. The manual (p.14) suggests playing it as a sine oscillator.',
       },
       principle: 'With enough feedback a filter oscillates by itself, producing a sine at the cutoff frequency.',
       manualReference: 'Manual v2 p.14 - TIP: the VCF as a sine source',
@@ -324,7 +322,7 @@ const f3: Lesson = {
       predict: {
         question: 'High-pass keeps what is above CUTOFF. What happens to this bass line?',
         options: ['It gets thinner - the lows drop away', 'It gets deeper', 'Nothing changes'], answer: 0,
-        explain: 'High-pass throws away the fundamental and the lowest harmonics, the body of the sound. On the Mother-32 it is a gentle slope, so some bass always remains.',
+        explain: 'High-pass throws away the fundamental and the lowest harmonics, the body of the sound, so the line turns thin and buzzy. The lower the CUTOFF, the more of the body comes back.',
       },
       principle: 'A high-pass filter removes what is below the cutoff, leaving the thin, bright top.',
       manualReference: 'Manual v2 p.14 - VCF MODE',
@@ -335,7 +333,7 @@ const f3: Lesson = {
       predict: {
         question: 'What will RESONANCE do in HI PASS on the Mother-32?',
         options: ['Bring the bass back instead of ringing', 'Ring like the low-pass', 'Make it silent'], answer: 0,
-        explain: 'The manual warns that HI PASS is non-resonant: turning RESONANCE up "reintroduces bottom end", so the filter stops working as a high-pass. For a ringing high-pass the manual patches VCF back into EXT. AUDIO and uses MIX as the resonance.',
+        explain: 'HI PASS is non-resonant, and the manual warns that any RESONANCE will "reintroduce bottom end into a sound" (p.14), so the filter stops working as a high-pass. For a ringing high-pass it patches VCF back into EXT. AUDIO and uses MIX as the resonance.',
       },
       principle: 'Every filter design has its own character; read the manual, then trust your ears.',
     },
@@ -579,9 +577,9 @@ const f5: Lesson = {
 const f6: Lesson = {
   id: 'mother32-f6-sequencer', device: 'mother32', path: 'foundations', order: O(6), difficulty: 'beginner',
   name: 'The sequencer: record, play and transpose',
-  description: 'Record a pattern in KB mode, hear it loop and transpose it from the keyboard.',
-  objective: 'Record a pattern in KB mode, play it, and transpose it from the keyboard.',
-  source: 'Synth Studio · Mother-32 manual v2 pp.19-26 (Creating a pattern in KB mode)', estimatedMinutes: 8,
+  description: 'Clear the pattern, record a new one step by step in KB mode, hear it loop and transpose it from the keyboard.',
+  objective: 'Initialize a pattern, step-record a new one in KB mode, play it, and transpose it from the keyboard.',
+  source: 'Synth Studio · Mother-32 manual v2 pp.24-29, 32, 42 (creating a pattern in KB mode)', estimatedMinutes: 9,
   prerequisites: ['mother32-f4-eg-vca'],
   concepts: ['sequencer-pattern', 'timing-tempo'],
   start: { reset: true, values: { cutoff: 600, resonance: 35, vcf_mod_amount: 45, decay: 250, sustain: 1 } },
@@ -601,64 +599,76 @@ const f6: Lesson = {
       principle: 'Recording on the Mother-32 happens with the sequencer stopped, one step at a time.',
     },
     {
+      kind: 'do', concept: 'sequencer-pattern', focus: ['shift', 'm32_reset', 'm32_pattern'],
+      instruction: 'Clear the pattern: tap (SHIFT), then RESET / ACCENT, then PATTERN. The pattern shrinks to a single step.',
+      check: s => lengthOf(s.values) === 1,
+      principle: 'Recording writes over the pattern that is already there, so a new idea starts from a cleared one.',
+      explanation: 'SHIFT + RESET + PATTERN initializes the working pattern: one step of C3 at half gate. The 64 saved patterns are untouched, but unsaved edits are lost.',
+      hints: ['It is a three-button gesture, pressed in order here.', 'SHIFT first, then RESET / ACCENT (lower row, far left), then PATTERN (upper row).', 'Watch the readout: SHIFT + RESET asks you to press PATTERN.'],
+      solution: { values: { ...initPattern() } },
+      manualReference: 'Manual v2 p.24, p.32 - Initializing a pattern',
+    },
+    {
       kind: 'do', control: 'rec', targetValue: true, concept: 'sequencer-pattern',
-      instruction: 'Start recording: tap (SHIFT), then RUN / STOP. The RUN / STOP light blinks.',
-      principle: 'Step recording stores one note per key press, in order, so you never have to play in time.',
-      explanation: 'The old pattern is cleared and the record position starts at step 1. The readout under the keys counts the steps.',
-      manualReference: 'Manual v2 p.19 - Creating a pattern in KB mode',
+      instruction: 'Start recording: tap (SHIFT), then RUN / STOP. The TEMPO light turns solid yellow and step 1 blinks.',
+      principle: 'Step recording stores one step per key press, in order, so you never have to play in time.',
+      explanation: 'This is "step-write": the first note or rest goes into step 1, the next into step 2, and so on. The step you just wrote keeps blinking, so its gate, accent and glide can still be changed.',
+      manualReference: 'Manual v2 p.24, p.42 - KB record mode',
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern',
-      instruction: 'Play four keys - C, E♭, G and the high C - then add a rest with HOLD / REST.',
+      instruction: 'Play four keys - C, E♭, G and the high C - then press HOLD / REST for a rest.',
       checklist: [
-        { text: 'At least 5 steps recorded', check: s => recorded(s) >= 5 },
-        { text: 'At least three different notes', check: s => new Set(Array.from({ length: recorded(s) }, (_, i) => step(s, i)).filter(x => !x.rest).map(x => x.note)).size >= 3 },
-        { text: 'A rest in the pattern', check: s => Array.from({ length: recorded(s) }, (_, i) => step(s, i)).some(x => x.rest) },
+        { text: 'Five steps written', check: s => lengthOf(s.values) >= 5 },
+        { text: 'At least three different notes', check: s => new Set(steps(s).filter(x => !x.rest).map(x => x.note)).size >= 3 },
+        { text: 'A rest in the pattern', check: s => steps(s).some(x => x.rest) },
       ],
-      hints: ['Each key press is one step.', 'The black keys are on the upper row.', 'Press the C, E♭, G and high C pads, then HOLD / REST.'],
-      solution: { values: { ...patternOf({ ...seq([C3, Eb3, G3, C4, null]) }), seq_notes: seq([C3, Eb3, G3, C4, null]).seq_notes.toString().slice(0, 5).padEnd(32, '.') } },
+      hints: ['Each key press writes one step and moves on.', 'The black keys are on the upper row; E♭ is the second one.', 'Press the C, E♭, G and high C pads, then HOLD / REST.'],
+      solution: { values: { ...seq([C3, Eb3, G3, C4, null]) } },
     },
     {
       kind: 'do', control: 'rec', targetValue: false, concept: 'sequencer-pattern',
       instruction: 'Press RUN / STOP to finish recording.',
-      principle: 'The pattern is as long as the number of steps you recorded.',
+      principle: 'Writing past the end of a pattern moves its end, so the pattern grows as you record.',
     },
     {
       kind: 'predict', control: 'run_stop', targetValue: true, concept: 'sequencer-pattern',
       instruction: 'Press RUN / STOP to hear your pattern loop.',
       predict: {
-        question: 'You recorded five steps: four notes and a rest. How long will the loop be?',
-        options: ['Five steps - as many as I recorded', 'Always 32 steps', 'Four steps - the rest does not count'], answer: 0,
-        explain: 'Recording sets the pattern length to the number of steps you entered, and a rest is a step too. SET END in STEP mode changes the length later.',
+        question: 'You wrote five steps - four notes and a rest - into a one-step pattern. How long will the loop be?',
+        options: ['Five steps - every step I wrote', 'Always 32 steps', 'One step - recording never changes the length'], answer: 0,
+        explain: 'Each step written past the end extends the pattern, and a rest is a step too. Recording over a longer pattern would replace its first steps and keep its length; SET END changes the length.',
       },
       principle: 'A loop turns a short phrase into a groove: the same notes, again and again, in time.',
     },
     {
       kind: 'info', concept: 'sequencer-pattern', focus: ['run_stop'],
-      instruction: 'While it plays, press the E♭ key: the whole pattern now starts on E♭. The lowest C takes it home.',
+      instruction: 'While it plays, press the E♭ key: the whole pattern now starts on E♭. The low C takes it home.',
       principle: 'Transposing moves every note by the same interval, so the melody keeps its shape.',
-      explanation: 'In KB mode the keys transpose the running pattern. The readout shows TRANSPOSE +3: three semitones up.',
-      manualReference: 'Manual v2 p.34 - KB mode panel functions',
+      explanation: 'In KB mode the keys transpose the running pattern. The readout shows TRANSPOSE +3: three semitones up. Transposition is not stored with the pattern.',
+      manualReference: 'Manual v2 p.29, p.42 - Transposing a pattern',
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
       quiz: {
         question: 'While the sequencer runs in KB mode, pressing a key…',
         options: ['Transposes the pattern', 'Records a new note', 'Stops the sequencer'], answer: 0,
-        explain: 'Recording only happens in REC (SHIFT + RUN / STOP). While playing, a key moves the whole pattern to start on that note.',
+        explain: 'Recording only happens in REC (SHIFT + RUN / STOP), with the sequencer stopped. While playing, a key moves the whole pattern to start on that note.',
       },
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',
       reflect: {
-        prompt: 'How do you record a pattern on the Mother-32, and how long will it be?',
-        model: 'SHIFT + RUN / STOP starts recording; each key press stores one note (HOLD / REST a rest) and RUN / STOP ends it. The pattern has as many steps as I recorded.',
+        prompt: 'How do you record a new pattern on the Mother-32, and how long will it be?',
+        model: 'Clear it with SHIFT + RESET + PATTERN, start REC with SHIFT + RUN / STOP, and each key (or REST) writes the next step; RUN / STOP ends it. The pattern grows to the last step I wrote.',
       },
     },
   ],
   review: [
     { question: 'SHIFT + RUN / STOP on the Mother-32 starts…', options: ['Recording (REC)', 'Swing', 'Pattern save'], answer: 0, explain: 'REC is RUN / STOP\'s second function.' },
     { question: 'While recording, HOLD / REST…', options: ['Stores a rest', 'Repeats a step', 'Stops recording'], answer: 0, explain: 'It is the REST half of HOLD / REST.' },
+    { question: 'You record three notes over a 16-step pattern without clearing it first. The pattern now has…', options: ['16 steps, the first three new', '3 steps', '19 steps'], answer: 0, explain: 'Step-write overwrites from step 1 and only moves the end when you write past it.' },
+    { question: 'SHIFT + RESET + PATTERN…', options: ['Initializes the working pattern to one step', 'Saves the pattern', 'Starts the sequencer'], answer: 0, explain: 'The saved patterns are untouched.' },
     { question: 'At 120 BPM with 16th-note steps, a step lasts…', options: ['0.125 s', '0.5 s', '1 s'], answer: 0, explain: 'A beat is 0.5 s; a 16th is a quarter of it.' },
   ],
 };
@@ -844,9 +854,9 @@ const KIT = seq([24, null, null, 24, 84, null, null, 24, null, 24, null, null, 8
 const sd2: Lesson = {
   id: 'mother32-sd2-kick-snare', device: 'mother32', path: 'sound-design', order: O(9), difficulty: 'intermediate',
   name: 'Kick and snare from one voice',
-  description: 'The manual\'s SIMPLEST KICK & SNARE: one keyboard voltage chooses between a kick and a snare.',
+  description: 'One keyboard voltage chooses between a kick and a snare - an idea from Moog\'s first Mother-32 patch examples ("Simplest Kick & Snare").',
   objective: 'Turn one voice into a kick and a snare: low notes are pitch-swept tone, high notes are bright noise.',
-  source: 'Synth Studio · Mother-32 manual Presets: SIMPLEST KICK & SNARE', estimatedMinutes: 8,
+  source: 'Synth Studio · after Moog\'s first-edition Mother-32 patch examples; MULT, MIX CV and VCF CUTOFF from the manual v2 pp.47-51', estimatedMinutes: 8,
   prerequisites: ['mother32-f7-patching'],
   concepts: ['modulation-depth', 'noise', 'signal-routing', 'mixing'],
   start: { reset: true, values: { vco_wave: 1, mix: 35, cutoff: 900, resonance: 20, vcf_mod_amount: 45, attack: 1.25, decay: 230, sustain: 1, vco_mod_source: 0, vco_mod_dest: 1, vco_mod_amount: 0, ...KIT } },
@@ -873,8 +883,8 @@ const sd2: Lesson = {
       instruction: 'Patch MULT 1 into MIX CV.',
       predict: {
         question: 'Low notes send a negative KB voltage, high notes a positive one, and MIX CV adds it to MIX. What do the high notes become?',
-        options: ['Mostly noise - a snare', 'Mostly VCO - a tom', 'Silent'], answer: 0,
-        explain: 'Positive voltage pushes MIX toward the noise end, negative toward the VCO. The kick notes sit at the bottom of the keyboard, the snare notes near the top.',
+        options: ['Noisier - a snare', 'Purer VCO - a tom', 'Silent'], answer: 0,
+        explain: 'Positive voltage pushes MIX toward the noise end, negative toward the VCO: +/-5 V covers the whole knob. The kick notes sit at the bottom of the keyboard (C1, -3 V), the snare notes near the top (C6, +2 V).',
       },
       principle: 'A voltage that rises with pitch can steer any control - here, the mixer.',
     },
@@ -919,7 +929,7 @@ const sd2: Lesson = {
   review: [
     { question: 'A kick\'s punch comes from…', options: ['A fast downward pitch sweep', 'Noise', 'A long attack'], answer: 0, explain: 'The EG on pitch.' },
     { question: 'A MULT…', options: ['Copies one signal to two outputs', 'Mixes two signals', 'Inverts a signal'], answer: 0, explain: 'The manual says: only as a CV splitter.' },
-    { question: 'In this patch the snare is mostly…', options: ['Noise through an open filter', 'A low VCO', 'The LFO'], answer: 0, explain: 'High notes push MIX to noise.' },
+    { question: 'In this patch a high note becomes a snare because…', options: ['MIX moves toward noise and the filter opens', 'A second VCO takes over', 'The LFO speeds up'], answer: 0, explain: 'High notes push MIX toward noise and open the cutoff.' },
   ],
 };
 
@@ -1273,7 +1283,7 @@ const sq1: Lesson = {
   name: 'Step mode: rests, gate lengths, ties and accents',
   description: 'Edit a pattern step by step: switch steps on and off, and set gate length, ties and accents.',
   objective: 'Edit steps in STEP mode: switch them on and off, and set gate length, ties and accents.',
-  source: 'Synth Studio · Mother-32 manual v2 pp.24-31 (Step mode)', estimatedMinutes: 9,
+  source: 'Synth Studio · Mother-32 manual v2 pp.32-36, 44-45 (Step mode)', estimatedMinutes: 9,
   prerequisites: ['mother32-f6-sequencer'],
   concepts: ['sequencer-pattern', 'velocity-dynamics', 'envelope-sustain'],
   start: { reset: true, values: { cutoff: 500, resonance: 30, vcf_mod_amount: 40, decay: 200, sustain: 0, ...ROOT8 } },
@@ -1284,7 +1294,7 @@ const sq1: Lesson = {
       instruction: 'Enter STEP mode: tap (SHIFT), then the (STEP) arrow.',
       principle: 'Step mode turns the keyboard into one button per step.',
       explanation: 'The eight lower pads are now steps 1-8; the 1-8, 9-16, 17-24 and 25-32 keys choose which page of steps they show.',
-      manualReference: 'Manual v2 p.31 - Step mode',
+      manualReference: 'Manual v2 p.32, p.36 - Step mode',
     },
     {
       kind: 'do', concept: 'sequencer-pattern',
@@ -1315,7 +1325,7 @@ const sq1: Lesson = {
       explanation: 'While a step is edited the OCTAVE / LOCATION LEDs show its gate length as a bar; all eight lit is a tie. SUSTAIN must be ON for gate lengths to be heard.',
       hints: ['First select the step: SHIFT, then the pad.', 'TEMPO becomes GATE LENGTH while a step blinks.', 'Turn it all the way up: the readout says TIE.'],
       solution: { values: { seq_gate: '33833333'.padEnd(32, '4') } },
-      manualReference: 'Manual v2 p.25 - Gate Length',
+      manualReference: 'Manual v2 p.25, p.45 - Gate Length',
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-sustain',
@@ -1366,7 +1376,7 @@ const sq2: Lesson = {
   name: 'Ratchets, glide, swing and pattern memory',
   description: 'Rolls inside a step, slides between steps, a swung groove, and saving it to one of 64 memories.',
   objective: 'Add a ratchet and a glide, swing the groove, and save the pattern to a memory slot.',
-  source: 'Synth Studio · Mother-32 manual v2 pp.19, 24-26, 32 (ratchet, glide, swing, memory)', estimatedMinutes: 9,
+  source: 'Synth Studio · Mother-32 manual v2 pp.19-21, 26-28, 31, 34-35, 38 (ratchet, glide, swing, saving)', estimatedMinutes: 9,
   prerequisites: ['mother32-sq1-step-edit'],
   concepts: ['sequencer-pattern', 'glide', 'timing-tempo'],
   start: { reset: true, values: { vco_wave: 1, cutoff: 300, resonance: 60, vcf_mod_amount: 50, decay: 220, sustain: 1, glide: 80, seq_mode: 1, ...SQ2 } },
@@ -1374,13 +1384,13 @@ const sq2: Lesson = {
     run(),
     {
       kind: 'do', concept: 'sequencer-pattern',
-      instruction: 'Edit step 3 (SHIFT, then pad 3). Then tap (SHIFT) and turn GLIDE up: a ratchet of 3.',
+      instruction: 'Edit step 3 (SHIFT, then pad 3). Then tap (SHIFT), turn GLIDE up to a ratchet of 3, and tap (SHIFT) again to let go.',
       check: s => step(s, 2).ratchet === 3,
       principle: 'A ratchet repeats a note inside one step: a quick roll that adds energy.',
-      explanation: 'While a step is edited GLIDE turns its glide on and off; with SHIFT it sets the ratchet, 1-4 (yellow on the OCTAVE / LOCATION LEDs).',
+      explanation: 'While a step is edited GLIDE turns its glide on and off; with SHIFT it sets the ratchet, 1-4 (yellow on the OCTAVE / LOCATION LEDs). On the hardware you hold SHIFT while turning; here a tap latches it.',
       hints: ['The step must be blinking first.', 'SHIFT + GLIDE is the ratchet.', 'Turn GLIDE until the readout says RATCHET 3.'],
       solution: { values: { seq_ratchet: '113'.padEnd(32, '1') } },
-      manualReference: 'Manual v2 p.26 - Ratchet',
+      manualReference: 'Manual v2 p.27, p.35 - Ratchet',
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
@@ -1397,28 +1407,29 @@ const sq2: Lesson = {
       principle: 'Glide on a step makes the pitch slide into that note instead of jumping.',
       hints: ['Select step 5 the same way as step 3.', 'Without SHIFT, GLIDE switches the step\'s glide.', 'Any clockwise position turns it on.'],
       solution: { values: { seq_glide: '00001'.padEnd(32, '0') } },
+      manualReference: 'Manual v2 p.26, p.34 - Glide on / off',
     },
     {
       kind: 'predict', control: 'glide', targetValue: 300, concept: 'glide',
-      setup: { seq_mode: 0 },
-      instruction: 'Back in KB mode, turn GLIDE up to about 300 ms.',
+      instruction: 'Stop editing (SHIFT + pad 5 again), then turn GLIDE up to about 300 ms.',
       predict: {
         question: 'Only step 5 has glide switched on. What changes when you turn GLIDE up?',
         options: ['Step 5 slides more slowly; the others still jump', 'Every step slides', 'Nothing - GLIDE only works on the keyboard'], answer: 0,
         explain: 'GLIDE sets the slide time; the per-step switch decides which steps slide. Played from the keyboard, every note slides.',
       },
       principle: 'The amount of glide and where it happens are separate decisions.',
+      explanation: 'While a step is being edited, GLIDE is that step\'s glide switch. Once editing ends it is the slide time again, for every step that glides.',
     },
     {
       kind: 'do', control: 'swing', targetValue: 62, concept: 'timing-tempo',
-      instruction: 'Tap (SHIFT), then turn TEMPO - now SWING - to about 62 %.',
+      instruction: 'Tap (SHIFT), turn TEMPO - now SWING - to about 62 %, then tap (SHIFT) again.',
       principle: 'Swing delays every second step: long-short pairs feel like a shuffle.',
-      explanation: '50 % is straight. Around 66 % the second step lands on a triplet, the shuffle of house and hip-hop.',
-      manualReference: 'Manual v2 p.19 - (SWING)',
+      explanation: '50 % is straight. Around 66 % the second step lands on a triplet, the shuffle of house and hip-hop. Swing is stored with the pattern.',
+      manualReference: 'Manual v2 p.19, p.28 - (SWING)',
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern',
-      instruction: 'Save it to pattern 1-2: hold (SHIFT) on RUN / STOP for a second, tap pad 2, then SHIFT + RUN / STOP.',
+      instruction: 'Save it to pattern 1-2: hold (SHIFT) on RUN / STOP for a second, pick slot 2 (SHIFT + pad 2, or the STEP arrow), then SHIFT + RUN / STOP.',
       checklist: [
         { text: 'Pattern 1-2 holds this pattern', check: s => { const d = s.data as { bank?: unknown[] } | undefined; const p = d?.bank?.[1] as Record<string, unknown> | null | undefined; return !!p && p.seq_ratchet === patternOf(s.values).seq_ratchet && p.seq_glide === patternOf(s.values).seq_glide; } },
       ],
@@ -1458,7 +1469,7 @@ const p1: Lesson = {
   name: 'Play it live: transpose, hold, accent and filter rides',
   description: 'Perform over a running pattern: key changes from the keyboard, holds, live accents and filter rides.',
   objective: 'Perform over a running pattern with transposition, HOLD, live accents and filter rides.',
-  source: 'Synth Studio · Mother-32 manual v2 p.34 (KB mode while running) and performance practice', estimatedMinutes: 7,
+  source: 'Synth Studio · Mother-32 manual v2 pp.28-29, 41-42 (performance functions) and performance practice', estimatedMinutes: 7,
   prerequisites: ['mother32-f6-sequencer'],
   concepts: ['sequencer-pattern', 'filter-cutoff', 'velocity-dynamics'],
   start: { reset: true, values: { vco_wave: 1, cutoff: 900, resonance: 45, vcf_mod_amount: 45, decay: 220, sustain: 1, ...ACID } },
@@ -1468,8 +1479,8 @@ const p1: Lesson = {
       kind: 'info', concept: 'sequencer-pattern',
       instruction: 'Press the F key, then the G key, then the low C: the pattern follows each key - a chord change.',
       principle: 'Moving a bass line to new roots outlines a chord progression.',
-      explanation: 'In KB mode the keys transpose the running pattern and the readout shows TRANSPOSE. The lowest C (at the octave you are on) takes it home.',
-      manualReference: 'Manual v2 p.34 - transposing',
+      explanation: 'In KB mode the keys transpose the running pattern and the readout shows TRANSPOSE. The low C at the power-up octave (4) is home; the same key at another octave transposes by octaves.',
+      manualReference: 'Manual v2 p.29, p.42 - Transposing a pattern',
     },
     {
       kind: 'do', control: 'kb_octave', targetValue: 2, concept: 'sequencer-pattern',
@@ -1480,12 +1491,14 @@ const p1: Lesson = {
       kind: 'info', concept: 'sequencer-pattern', focus: ['m32_hold'],
       instruction: 'Press and hold HOLD / REST: the current step repeats until you let go.',
       principle: 'Repeating one step is a fill: it builds tension, and letting go releases it.',
-      manualReference: 'Manual v2 p.56 - HOLD',
+      manualReference: 'Manual v2 p.28, p.41 - HOLD',
     },
     {
       kind: 'info', concept: 'velocity-dynamics',
       instruction: 'Tap (SHIFT), then hold RESET / ACCENT: every step is accented while you hold it.',
       principle: 'Accenting every step pushes the energy up for a moment, like a drummer leaning on every hit.',
+      explanation: 'Live accent overrides the stored accents only while it is held, and is never saved. SHIFT + HOLD / REST is its twin: a live mute.',
+      manualReference: 'Manual v2 p.29, p.41 - Live accent',
     },
     {
       kind: 'do', control: 'cutoff', targetValue: 200, concept: 'filter-cutoff',
@@ -1562,6 +1575,7 @@ const st1: Lesson = {
       instruction: 'Press ▶ in the top bar.',
       checklist: [{ text: 'Studio transport playing', check: s => s.transport.playing }],
       hints: ['The play button is at the top of the page, next to the tempo.'],
+      solution: { transport: 'play' },
     },
     {
       kind: 'predict', control: 'step_div', targetValue: div('1/8'), concept: 'timing-tempo',
@@ -1592,13 +1606,14 @@ const st1: Lesson = {
       instruction: 'In the Studio tab, patch Studio Clock CLOCK into the Mother-32\'s TEMPO jack.',
       checklist: [{ text: 'CLOCK -> TEMPO cable', check: s => studioCable(s, 'out_clock', 'in_tempo', 'studio-clock', 'mother32') }],
       hints: ['Open the Studio tab at the top of the page.', 'Tap CLOCK on the Studio Clock, then TEMPO on the Mother-32 (bottom-left of its patch bay).'],
+      solution: { studioCables: [{ from: { device: 'studio-clock', jack: 'out_clock' }, to: { device: 'mother32', jack: 'in_tempo' } }] },
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
       quiz: {
         question: 'With a clock in TEMPO, which clock does the Mother-32 follow?',
         options: ['The pulses at TEMPO - an analog clock overrides MIDI clock', 'Only the studio transport', 'Its TEMPO knob'], answer: 0,
-        explain: 'The manual ranks them: analog clock at TEMPO first, then MIDI clock, then the internal clock. In its default mode (CLOCK ADVANCE) each rising edge plays one step.',
+        explain: 'The manual ranks them: analog clock at TEMPO first, then MIDI clock, then the internal clock. In the TEMPO input\'s default mode, SINGLE CLOCK ADVANCE, each rising edge plays one step.',
       },
     },
     {
@@ -1606,6 +1621,7 @@ const st1: Lesson = {
       instruction: 'Set the Studio Clock\'s CLOCK DIV to 1/8T and hear the Mother-32 step on every pulse - triplets.',
       checklist: [{ text: 'CLOCK DIV on 1/8T', check: s => Number(deviceValues(s, 'studio-clock').division) === 4 }],
       hints: ['CLOCK DIV is the selector on the Studio Clock.', 'Tap 1/8T: three pulses per beat.'],
+      solution: { values: { division: 4 } },
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',
@@ -1618,7 +1634,7 @@ const st1: Lesson = {
   review: [
     { question: 'Under MIDI clock, the Mother-32\'s TEMPO knob…', options: ['Selects the step division', 'Sets the BPM', 'Does nothing'], answer: 0, explain: 'The tempo comes from the clock.' },
     { question: 'Which clock wins on the Mother-32?', options: ['An analog clock at TEMPO', 'MIDI clock', 'The internal clock'], answer: 0, explain: 'Analog, then MIDI, then internal.' },
-    { question: 'In CLOCK ADVANCE mode, a pulse at TEMPO…', options: ['Plays the next step', 'Resets to step 1', 'Changes the tempo'], answer: 0, explain: 'One step per rising edge.' },
+    { question: 'In SINGLE CLOCK ADVANCE mode (the default), a pulse at TEMPO…', options: ['Plays the next step', 'Resets to step 1', 'Changes the tempo'], answer: 0, explain: 'One step per rising edge.' },
   ],
 };
 
@@ -1627,7 +1643,7 @@ const st2: Lesson = {
   name: 'The Mother-32 clocks the DFAM',
   description: 'Moog\'s own recipe: ASSIGN (clock) into the DFAM\'s ADV / CLOCK, and the bass line tuning the drums.',
   objective: 'Clock the DFAM from the Mother-32\'s ASSIGN output, and let the bass line tune the drums through KB.',
-  source: 'Synth Studio · Moog "Syncing DFAM with Mother-32" and Mother-32 manual v2 p.52 (ASSIGN)', estimatedMinutes: 9,
+  source: 'Synth Studio · DFAM manual p.31 ("Syncing DFAM with a Mother-32") and Mother-32 manual v2 pp.52, 59 (ASSIGN)', estimatedMinutes: 9,
   requires: ['dfam'],
   prerequisites: ['mother32-st1-studio-clock'],
   concepts: ['signal-routing', 'timing-tempo', 'sequencer-pattern'],
@@ -1638,7 +1654,7 @@ const st2: Lesson = {
       instruction: 'Moog\'s recipe: the Mother-32\'s ASSIGN jack sends one clock pulse per step into the DFAM\'s ADV / CLOCK, so both step together.',
       principle: 'A clock pulse per step is all two sequencers need to stay locked.',
       explanation: 'ASSIGN can send 16 different things (Setup page 1). Its factory setting is the sequencer clock.',
-      manualReference: 'Manual v2 p.52 - ASSIGN; Moog: Syncing DFAM with Mother-32',
+      manualReference: 'Manual v2 p.52 - ASSIGN; DFAM manual p.31 - Syncing DFAM with a Mother-32',
     },
     {
       kind: 'do', control: 'assign_source', targetValue: 1, concept: 'signal-routing',
@@ -1651,18 +1667,21 @@ const st2: Lesson = {
       instruction: 'In the Studio tab, patch the Mother-32\'s ASSIGN into the DFAM\'s ADV / CLOCK.',
       checklist: [{ text: 'Mother-32 ASSIGN -> DFAM ADV / CLOCK', check: s => studioCable(s, 'out_assign', 'in_adv_clock', 'mother32', 'dfam') }],
       hints: ['Tap ASSIGN on the Mother-32 (column 4, row 6), then ADV / CLOCK on the DFAM.'],
+      solution: { studioCables: [{ from: { device: 'mother32', jack: 'out_assign' }, to: { device: 'dfam', jack: 'in_adv_clock' } }] },
     },
     {
       kind: 'challenge', instance: 'dfam', focus: ['run_stop'], concept: 'timing-tempo',
       instruction: 'Press RUN / STOP on the DFAM first: with a cable in ADV / CLOCK it waits for pulses.',
       checklist: [{ text: 'DFAM running', check: s => deviceValues(s, 'dfam').run_stop === true }],
       hints: ['Moog\'s order: start the DFAM, then the Mother-32.'],
+      solution: { values: { run_stop: true } },
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern',
       instruction: 'Now start the Mother-32 (its RUN / STOP, or ▶): both sequencers play in step.',
       checklist: [{ text: 'Mother-32 playing', check: s => s.transport.playing || s.values.run_stop === true }],
       hints: ['In the studio, RUN / STOP and ▶ do the same thing.'],
+      solution: { transport: 'play' },
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
@@ -1677,6 +1696,7 @@ const st2: Lesson = {
       instruction: 'Patch the Mother-32\'s KB into the DFAM\'s VCO 1 CV: the drums now follow the bass line.',
       checklist: [{ text: 'Mother-32 KB -> DFAM VCO 1 CV', check: s => studioCable(s, 'out_kb', 'in_vco1_cv', 'mother32', 'dfam') }],
       hints: ['KB is on row 7 of the Mother-32\'s patch bay.', 'Both use 1 volt per octave.'],
+      solution: { studioCables: [{ from: { device: 'mother32', jack: 'out_kb' }, to: { device: 'dfam', jack: 'in_vco1_cv' } }] },
     },
     {
       kind: 'predict', control: 'assign_source', targetValue: 2, concept: 'timing-tempo',
