@@ -1,27 +1,55 @@
-# Synth Studio: status and next actions (parked 2026-10-29)
+# Synth Studio: status and next actions (updated 2026-10-29)
 
 Working branch: `claude/dfam-documentation-review-iYhxN` (PR #54). Everything below
-marked **merged** is on this branch, built and verified. Everything marked **WIP** is on
-its own `wip/*` branch on GitHub, committed but **not yet merged or browser-verified**.
+marked **merged** is on this branch, built and verified. Everything marked **in progress** is on
+its own `wip/*` branch on GitHub, committed but **not yet merged**.
 
 ## 1. Merged and verified on the working branch
 
 | What | Notes |
 |---|---|
 | Studio v2 | Rack, cables, routing, sync, arranger, recorder, projects, Review, lesson coach v2 |
+| Producer-grade studio | Clean unity master, −1 dBTP true-peak limiter, BS.1770 LUFS meters, mixer strips with sends to a tempo delay and Reverb2, undo/redo, stems, bounce, count-in, loop |
+| All seven instruments rebuilt to their manuals | DFAM, Xone:96, Sub 37, Analog Four MKII, Mother-32, Subharmonicon, Analog Rytm MKII. Each passes audio QA at −18 LUFS with 0 flagged presets and plays all its lessons |
+| Independent expert reviews | A second agent re-checked each instrument against its manual and fixed what it found. Merged: DFAM, Subharmonicon, Xone:96, Analog Four, Mother-32. Each writes `devices/<id>/REVIEW.md` |
+| Producer path | Lesson API v3 studio state (whole-studio starts, saved learner studios, loudness-matched A/B, master/channel meters, bounces, mixer and arranger checks) and the first 8 Producer path lessons. See "Lesson API v3" in `docs/PEDAGOGY.md` |
+| Clock chip | Every instrument that can follow the studio clock shows **Clock: studio / own tempo** above its panel. One tap lets a patch sheet play at its drawn TEMPO |
 | Stale-module fix | `useDeviceModule` reads the hub cache on every render, so switching never pairs one instrument's layout with another's data |
 | 60 ms minimum note gate | A quick tap on an on-screen key always sounds |
-| DFAM rebuild | Hardware-accurate single-worklet engine, 38 presets, 20 v2 lessons |
 | Play starts clocked gear | The studio ▶ presses RUN on every unsynced instrument, cable-clocked ones included, before the clock starts |
-| Saved-settings upgrades | `lib/studio/upgrades.ts`: store v5 / project v2. First entry: DFAM TEMPO ÷ 4 (it became 16th-note BPM) |
+| Saved-settings upgrades | `lib/studio/upgrades.ts`: store v12 / project v9. Untouched controls keep their old defaults; completed lessons carry over to rebuilt successors. Table in section 3 |
 | DSP core v2 | Band-limited VCO, 2× ladder, DAHDSR env, SVF, Reverb2 (FDN), Chorus. `/bench` page; see `docs/DSP.md` |
-| Elektron sequencer library + UI kit | `docs/ELEKTRON_SEQUENCER.md` |
+| Elektron sequencer library + UI kit | `docs/ELEKTRON_SEQUENCER.md` (233 tests) |
 | Bring your own gear | Web MIDI, Practice synth (works on iPad without hardware), audio input, Web Audio plugins, 16 lessons, Safari guidance. See `docs/EXTERNAL_GEAR.md` |
-| Audio QA tool | `scripts/audio-qa.cjs`, see `docs/AUDIO_QA.md`: LUFS, true peak, DC, clicks, stuck tails per preset. Baseline in `docs/audio-qa-baseline/` |
-| E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs), 23 checks. `--full` adds smoke and lessons for every instrument: 70/70 at last full run |
-| Validator lesson checks | Challenges need a solution and hints; lesson ids follow `<device>-`; v2 lessons need a path |
-| iPad home-screen install | Manifest (standalone), icons, Apple web-app meta |
+| Audio QA tool | `scripts/audio-qa.cjs`, see `docs/AUDIO_QA.md`: LUFS, true peak, DC, clicks, stuck tails per preset. The baseline in `docs/audio-qa-baseline/` predates the rebuilds and needs regenerating |
+| E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs), 36 checks including the iPad producer walkthrough. `--full` adds smoke and lessons for every instrument |
+| iPad | Home-screen install, floating lesson coach, 44 px touch targets, fine-adjust gestures, value bubble. First-load JS 198 kB (MIDI, studio view and coach load on demand) |
 | Research notes | `docs/research/<device>/` (sources, signal-flow, presets, lessons) from the official manuals, in our own words. See `docs/research/COPYRIGHT-RULES.md` |
+
+## Live log (session 3, 2026-10-29, after a usage-limit pause)
+
+- All agents stopped at a usage limit. Their worktrees were checkpointed as `WIP (checkpoint by coordinator …)` commits, pushed to their `wip/*` branches, and the agents resumed from there after the reset.
+- f671920: merged the **producer path** engine and its first 8 lessons (lesson runner 13 studio lessons, 0 failed; iPad walkthrough 24/24).
+- 8bb8143: merged the **Subharmonicon review**: the EG-off behaviour is explained, the panel is legible on iPad, and the output has a DC servo.
+- 4e0a2cb: the iPad producer walkthrough is part of the e2e gate (35/35).
+- ac26e30: merged the **Xone:96 review**.
+  - Meters behave like LED ladders, so the decks read as the guide says: average 0 to +3, peaks +4 to +6.
+  - The compact view works by touch, PHONES 2 is fed straight after the EQ as in the block diagram, and the mid EQ follows the p.10 graph.
+  - Audio QA 0/21; lessons 18, 0 failed.
+- 9874026: merged the **Analog Four review**.
+  - The panel looks like the black unit.
+  - BND, FDB self-oscillation and the accent filter depth now work as in the manual.
+  - Portamento applies to played notes only, and a studio stop fades the delay and reverb tails.
+  - Transport audio QA went from 8/47 flagged to 0/47; lessons 20, 0 failed.
+- d067af2: merged the **Mother-32 review**.
+  - HI PASS no longer rings, and RESONANCE brings the bass back (p.14).
+  - DECAY spans 10 ms – 7 s, so the patch sheets play as drawn.
+  - The output and VCF jack are capped near the manual's levels.
+  - Audition audio QA went from 3/43 flagged to 0/43; lessons 19, 0 failed, 0 manual.
+- 76d4c40: upgrade store v12 / project v9 keeps an untouched Mother-32 DECAY at 60 ms (the default became 180 ms) and is checked in e2e (36 checks).
+- Clock chip: the Subharmonicon's patch sheets played 1.5–6× slow while it followed the studio clock.
+  - Sync stays on by default, so ▶ keeps everything in time, as hardware would on MIDI clock.
+  - Each syncable instrument now has a **Clock** chip above its panel to switch to its own tempo in one tap.
 
 ## Live log (session 2, 2026-10-29)
 
@@ -53,83 +81,69 @@ its own `wip/*` branch on GitHub, committed but **not yet merged or browser-veri
 - 7a606eb: merged **Subharmonicon** (QA 0/36 for audition and transport, lessons 20/20, in-app check passing). Upgrade store v10 covers TEMPO 240, EG AMT ×0.625 and the 5 ms decay floor.
 - c05786b: merged **Analog Rytm MKII** (QA 0/20 for audition and transport, lessons 20/20, in-app check 29/29). 391 of 421 ids were replaced, so **old Rytm settings start fresh** by design; completed rytm-* lessons carry over. Upgrade store v11. **All seven instrument rebuilds are now merged.**
 - Smoke test fix: buttons that a paged panel removed are skipped after 1 s; the Rytm smoke went from 498 s to 34 s (the app was never slow, at 67–125 ms per press).
-- Still running:
-  - the **producer-path** agent (lesson-engine hooks and first studio lessons)
-  - **independent expert reviews** against the manuals, as was done for the DFAM, for the Analog Four, Sub 37, Mother-32, Subharmonicon, Xone:96 and now the **Analog Rytm**, each pushing to `wip/review-<id>`
-  - the **demo tracks** agent, building the three designed songs as one-click studios (`wip/demo-tracks`)
-- Next:
-  - merge each review through the gate, with upgrade entries for any changed defaults
-  - add the producer-path lessons for the Elektrons and Sub 37
-  - regenerate the audio-QA baseline for every instrument
-  - run the final full e2e and push there after each milestone: analog-four, analog-rytm, xone96, mother32, subharmonicon, sub37, elektron-sequencer (UI kit), dfam-review (verification), panel-teaching (touch e2e and perf). Each merges 01a09bc before its final gate.
-- **Next:** merge each finisher as it passes the gate (section 3). Then add upgrades.ts entries, run audio QA for every instrument, implement the producer path and demo tracks, run independent reviews, do and lazy-load the MIDI code in DeviceHost.
+## 2. In progress (each on `wip/<name>`, not merged)
 
-## 2. Work in progress (each on `wip/<name>`, not merged)
+| Branch | What | Checkpoint |
+|---|---|---|
+| `wip/review-sub37` | Independent Sub 37 review against the manual | bd3b349 |
+| `wip/review-analog-rytm` | Independent Analog Rytm MKII review against the manual | a0c2d10 |
+| `wip/demo-tracks` | The three designed songs ("Low Tide Lights", "Three Clocks", "Copper Wire") as one-click studios | 0876305 |
+| `wip/producer-path-2` | The remaining Producer path lessons (Elektron and Sub 37 tracks) | — |
 
-Merge each in this order, with the gate in section 3. Bases: most were branched from `ec79288`. Panel/teaching started from `ec79288`, the sequencer from `89801d8` and DFAM-review from `cfed080`.
-
-| Branch | Done | Left | Known breakage / risk |
-|---|---|---|---|
-| `wip/elektron-sequencer` (698d3f1) | Library checked against both manuals; 225/225 tests; Safari: hidden-page look-ahead 1.8 s, `WebkitUserSelect` | UI kit additions (TrigKeys modes, trig mute, SAVE/RELOAD, song chain rows); manual-cited docs; lint, validate, build | Changed behaviour: `!PRE`/`!NEI`, swing trigs, master change OFF by default, songs stop at end (`song.loop=false`), TEMP JUMP. **Merge before the A4 and Rytm** |
-| `wip/panel-teaching` (f8b7751) | Memoised panel (no re-render storm), legibility (9/10 px minimum, Roboto Condensed stands in for Arial Narrow), touch fine-adjust, value bubble, status strip, coach v3 (A/B, Show me, summary), spectrum scope, `s.events`/`s.notesPlayed`, review-queue pruning | Touch e2e tests; perf before/after; iPad coach docking (wide panels drop to ~58%) | Final commit not built or run in a browser (CSS module → JS style module change). Validate's fake state needs `events: {}`, `notesPlayed: []` |
-| `wip/studio` (eb2aa1f, final) | Clean unity master and true-peak limiter (−1 dBTP, 1.5 ms; Breakbeat +2.5 → −1.02 dBTP), BS.1770 LUFS meters (−14 tone reads −13.99), mixer strips (fader/pan/mute/solo/sends to tempo delay and Reverb2), undo/redo (`lib/studio/history.ts`), stems, bounce song, −14 LUFS normalise, count-in, loop, latency popover, 5-stage build paths (Elektron, Moog), and the Safari items B1, M1, M2 (store written at most every 600 ms, plus a storage-full message), M4–M7, m1, m4, m9–m12, n3, n7 | Smoke for every device on the final build (only the Rytm was re-run); review the final Studio desktop and iPad screenshots; a /bench scenario for the master | None known. tsc, lint, build, validate, journey, studio-test, upgrade-e2e and lesson runners for dfam and sub37 all pass. New optional state `studio.mixer`/`metronome` (no upgrade needed). Instrument trims stay at unity, so instruments must reach −18 LUFS at the source |
-| `wip/dfam-review` (f8156d9) | Output limiter (was +6.8 dBFS), panel geometry from the manual drawing, presets from the manual patch sheets (10), HP self-oscillation at ~1 kHz, sequencer self-patch timing, no allocations per quantum. See `devices/dfam/REVIEW.md` | Build; smoke, e2e, lesson runner; audio QA `--target -18`; REFERENCE.md page cites | Preset loudness not yet measured with audio QA (spiky drum presets may flag) |
-| `wip/analog-four` (c73095c) | Manual pass: panel geometry from the manual, NOTE retrig, arp per pattern, signed PW, octaves −5..+5, STOP/STOP-STOP behaviour, demo pattern per preset | Audio QA at −18; smoke, lesson runner, a4check, screenshots; REFERENCE.md cites; ARP label TRU→THR (p.43) | Stop/fade, audition and demo-pattern changes never run in a browser |
-| `wip/analog-rytm` (db74bac) | SRC pages match the manual for all machines; voice sharing (right-hand track wins); SMPL/LFO/FX details; FX track level; panel keys per manual | **Kit loudness calibration** (−18 LUFS, ≤ −1 dBTP); comp settings for kits 01/02; REFERENCE.md; **20 lessons (lessons.ts empty)**; all checks | Kit levels uncalibrated (voice gain changed to 0.55, unmeasured) |
-| `wip/xone96` (e97f252) | Follows the official block diagram: VCA channel, post-VCA filter buses, CRUNCH, measured fader/crossfader curves, Q to the +7.6 dB WILD spec, A/B clean feed, PK!, MASTER 2, PHONES 2, ADD MIX, LATCH CUE; 21 presets | Restore the original 11 lesson ids (progress); fix stale lesson facts; REFERENCE.md; build, smoke, lessons, audio QA (shorten FX tails), unity check, screenshots | Layout not visually checked; levels not measured. **Upgrade entries needed** (see below) |
-| `wip/mother32` (eeb2f62) | Rebuilt to the v2 manual: sequencer (pause, swing, 24 divisions, directions, ratchet, delay pattern change), manual ±5 V ASSIGN ranges, AC-coupled mixer, HP peaking, 43 presets including the 9 manual sheets, 19 lessons | Lesson f6 (new Record behaviour); REFERENCE.md; lint, build, smoke, lessons, Playwright, screenshots, bench, audio QA (keys and transport) | f6 likely fails in the lesson runner; nothing browser-checked since the rewrite |
-| `wip/subharmonicon` (5abb208) | One-worklet engine, 21 patch sheets read (in `devices/subharmonicon/wip/`), trigger/held/PWM/SEQ ASSIGN fixes, clock counted in the worklet, DC blocker and soft output | TEMPO linear in spec; held-mode controls; Safari items; layout details; presets.ts from readings; **v2 lessons**; REFERENCE.md; all checks; remove `wip/` notes folder | lessons.ts still v1; studio sync untested; levels uncalibrated |
-| `wip/sub37` (91434b2) | Rewritten to the Subsequent 37 manual: worklet, model, engine, spec, arp, new 64-step seq, 64 presets, panel (Safari fixes) | **index.ts** (uiControls, `studio.midiSync`, audition, interceptChange); **v2 lessons**; REFERENCE.md; all checks | **Not compiled since the rewrite**: lessons.ts uses old ids, so validate/tsc will fail until replaced. `scripts/checks/sub37.cjs` expects old preset names |
-
-### Saved-settings upgrades to add when merging (`lib/studio/upgrades.ts`)
-
-- **Xone:96**
-  - master/booth unity moved to 8: `v = 8·(v/7.5)^0.644`
-  - xf_curve option 1 DIPPED → TRANSITION: map 1 → 0
-  - `send1_pre` → per-channel `ch*_pre`; `cha_xf`/`chb_xf` removed
-  - snd1/snd2 max +6 dB: `v = 0.707·v`
-  - phones range 0–11
-- **Sub 37**
-  - `arp_mode` → `arp_pattern`
-  - `arp_range` → `arp_oct_range` (5 → 7 states; 0 is now index 3)
-  - `osc2_kb_ctrl` → `kb_ctrl` (3 states)
-  - filter/env `kb_amt` 0–100 → 0–200 (100 = 1:1)
-  - `arp_sync` default false
-  - PGM_DESTS indices are new
-- **DFAM review:** none needed.
+Each merges through the gate below. Before merging, run `defaults-tool/diff.sh <device> HEAD origin/wip/<branch>` (in the scratchpad) to find changed defaults and removed ids, then add an upgrade entry.
 
 ## 3. Merge gate (run for every merge)
 
-1. `git merge --no-ff wip/<name>`, then `npx tsc --noEmit -p .` and `npm run validate`, which must give 0 errors.
-2. Build: `flock /tmp/synth-studio-build.lock env NODE_OPTIONS=--max-old-space-size=2048 npx next build`.
+1. `git merge --no-ff wip/<name>`, then `npx tsc --noEmit -p .`, `npm run lint` and `npm run validate`, which must give 0 errors.
+2. Build: `flock /tmp/synth-studio-build.lock env NODE_OPTIONS=--max-old-space-size=1536 npm run build`.
 3. Start the server with `npx next start -p 3100`, then run:
-   - `node scripts/e2e/run.cjs http://localhost:3100 --full` (all pass)
+   - `node scripts/e2e/run.cjs http://localhost:3100` (all pass; add `--full` at milestones)
+   - `node scripts/lesson-runner.cjs http://localhost:3100 <device>` (0 failed)
    - `node scripts/audio-qa.cjs http://localhost:3100 <device> --target -18 --suggest` (exit 0)
 4. Read the desktop and iPad screenshots against `devices/<id>/REFERENCE.md` and `docs/research/<id>/`.
 5. Push. Vercel builds a preview per push.
 
-## 4. Cross-cutting follow-ups (owner: integrator)
+### Saved-settings upgrades so far (`lib/studio/upgrades.ts`)
 
-- Audio-input contract `globalThis.__synthCaptureCount`: the gear side is merged and the studio side is in `wip/studio`. After merging both, verify on iPad that recording keeps the play-and-record session.
-- `scripts/validate-devices.ts` fake state: add `events: {}`, `notesPlayed: []`, needed for panel-teaching.
-- `components/sequencer/*`: add `WebkitUserSelect` (done in wip/elektron-sequencer).
-- (done) iPad: dock or stack the lesson coach for wide panels (`app/page.tsx`). With the side coach they drop to about 58% zoom.
-- Performance: dragging a knob while a sequencer runs costs extra compositing. It comes from the value bubble's fixed layer plus 4 `will-change: transform` layers in the studio meters; drop `will-change` and throttle the meters.
-- (done) Split `@/lib/midi` behind a light entry point for DeviceHost, saving about 44 kB of first-load JS.
+| Store / project | Instrument | What it converts |
+|---|---|---|
+| 5 / 2 | DFAM | TEMPO ÷ 4 (it became 16th-note BPM) |
+| 6 / 3 | Xone:96 | MASTER/BOOTH law, crossfader curve, per-channel PRE, sends × 0.707 |
+| 7 / 4 | Sub 37 | Arp, KB CTRL and duo, key-tracking pivot, mod-bus mapping, glide |
+| 7 / 4 | Analog Four | Clean reset (about 500 ids redefined) |
+| 8 / 5 | Mother-32 | Flipped switches, VCF MOD amount and polarity, ranges, per-step gate |
+| 9 / 6 | DFAM | Untouched SEQ PITCH MOD keeps VCO 1&2 |
+| 10 / 7 | Subharmonicon | TEMPO default, EG AMT × 0.625, 5 ms decay floor |
+| 11 / 8 | Analog Rytm | Clean reset (391 of 421 ids replaced) |
+| 12 / 9 | Mother-32 | Untouched DECAY keeps 60 ms; times under 10 ms clamp |
+
+Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Subharmonicon) and 11 (Analog Rytm). **Next free versions: store 13, project 10.**
+
+## 4. Follow-ups (owner: integrator)
+
+- **Lesson solution API**: add `route` and `arranger` fields, so the lesson runner can solve the Xone routing challenges (st1–st3, 4 manual steps) and the Analog Four song step (st2, 2 manual steps) by itself.
+- **Shared controls**, raised by several reviews:
+  - a cap variant in `components/controls/Knob.tsx` (the A4 restyles its caps with a scoped stylesheet)
+  - knob travel to match the hardware (about 300°, against 270° now)
+  - a legend-above/below option in `components/controls/Switch.tsx` (Mother-32)
+- **iPad fold**: the header and preset rows take about 220 px. On the Xone the crossfader starts below the fold; on the A4 at 95 % fit, so does the last legend row.
+- **Studio sets** (`lib/studio/sets.ts`): the Moog sets would start at the guide's level with the Mother-32 and Subharmonicon about 5 dB down.
+- **Old Analog Four and Rytm saves** start fresh. The A4 review suggests keeping the old values under a legacy key and showing a one-time notice.
+- **Full-track gaps on the A4**: POLY, a kit per pattern, separate track outputs, live recording of knob moves, TRANSPOSABLE, and trig/page/sound copy.
+- Mother-32: with a clock in TEMPO the knob shows CLOCK DIV; the engine already ignores it, so only the display is off.
+- Regenerate `docs/audio-qa-baseline/` for every instrument.
 - `scripts/checks/xone96.cjs` is stale: it doesn't set synth-studio-welcomed and uses the old button colour. It isn't part of the gate.
-- StudioView: hide "Output" for Your synth (no audio). `hub.push()` must apply data before values. (Toolbar 44 px: done.)
+- StudioView: hide "Output" for Your synth when it has no audio. `hub.push()` should apply data before values.
 - Optional "Hardware synth" studio set (Your synth + Audio input + Xone:96).
-- First-load JS is 181 kB: lazy-load the MIDI and gear code.
-- After the device merges:
-  - run audio QA for every instrument at `--target -18`
-  - an independent manual-based review per instrument (the DFAM one is done)
-  - implement the **producer path** (`docs/research/producer-path/curriculum.md`, 15 lessons) and the **three demo tracks** (`demo-tracks.md`: "Low Tide Lights", "Three Clocks", "Copper Wire"). They need the engine hooks listed in curriculum §7.
-- Rewrite the README for the studio, gear, tests and install.
-- Delete the `wip/*` branches after their work is merged.
+- Delete the `wip/*` branches after their work is merged (ask first).
+- **To confirm on real hardware** (each review lists its own; the main ones):
+  - A4: the FRQ-to-Hz law, envelope times, BND and DET scales, accent depth and FDB loop gain
+  - Mother-32: DECAY at noon and 11 o'clock, the HI PASS slope, LIN FM depth and the mixer's AC-coupling corner
+  - Xone:96: the filter's FREQ range (the guide's text and graph disagree)
 
 ## 5. Safari / iPad audit
 
-The full report is `docs/research/safari-audit/report.md`. Each item is routed to an owner in the table above. On iPad, test over HTTPS (the Vercel preview): on plain `http://` there is no AudioWorklet, so no sound.
+The full report is `docs/research/safari-audit/report.md`. On iPad, test over HTTPS (the Vercel preview): on plain `http://` there is no AudioWorklet, so no sound.
 
 ## 6. Resuming in a new session
 
@@ -138,5 +152,5 @@ The full report is `docs/research/safari-audit/report.md`. Each item is routed t
    - Allen & Heath: Xone:96 guide, block diagram, spec sheet.
    - Moog: Sub 37 / Subsequent 37 manuals and preset lists; Mother-32, Subharmonicon (+ Patching with Intention, Exploration Patchbook), DFAM (+ Electronicus).
    - Extract them outside the repo.
-2. Check out the working branch, then for each `wip/*` branch in the order above: finish its "Left" column on a branch, run the gate, and merge.
+2. Check out the working branch. For each branch in section 2: finish it on its branch, run the gate, and merge.
 3. Follow `docs/research/COPYRIGHT-RULES.md` for anything drawn from the manuals.
