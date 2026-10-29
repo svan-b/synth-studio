@@ -26,7 +26,7 @@ can now mix on the iPad by touch (measured with real touch events below).
 | # | Severity | Finding | Evidence / source | Change |
 |---|---|---|---|---|
 | 1 | Medium | **Meters contradicted the lessons and the guide's operating level.** The LED ladders were sample-peak. At GAIN 0 dB the decks read +3 to +6 on average with peaks at +9 to +10 (TRACK B: mean +5.9, max +9.6), while lesson f2 said "its meter averages around 0, with peaks near +6", the target the guide gives (UG p.9, p.11, p.16, p.39). Following the guide's rule would have put every normalised source 3-4 dB under the studio's -18 LUFS norm | meter snapshots every 32 ms over 4 s per deck; offline models of five ballistics on captured deck audio | The ladders are now quasi-peak, like an analogue LED driver: 1 ms attack, the same 20 dB / 1.5 s release. The PK! indicators stay sample-peak: the channel PK! at +15 dBu, and the LR MIX meters' top LED (printed PK!) now also on sample peaks at its +10 legend, 3 dB before the studio's master limiter. Decks at GAIN 0 now read about 0 to +3 with peaks at +4 to +6 (TRACK A 2.0 / 4.0, TRACK B 3.4 / 6.3, FULL MIX 1.3 / 3.6). Steady tones read within 0.1 dB as before, so every LED threshold is unchanged |
-| 2 | Medium | **iPad (compact) view: small targets and illegible legends.** FILTER and XFADER assign segments were 17 x 15 px with 4.3 px legends, INPUT buttons 12 px tall with 6.9 px text, curve switches 15 px, POST EQ / SPLIT 14 px, PHONES 2 positions 13 px, YOU HEAR five 34 x 14 px buttons at 5.3 px, meter legends 5 px, PRE 4.4 px. 187 of the 345 visible texts were under 9 px | DOM audit at 1180 x 820 with `hasTouch`; `elementFromPoint` hit probe | FILTER and XFADER assigns are full-width rows of 9.5 x 6 mm buttons (29 x 25 px hit areas); INPUT is a 2 x 2 grid of position buttons; curve switches 5 mm on a 9 mm pitch (25 px hits); POST EQ / SPLIT / MONO / PRE bigger; PHONES 2 ring 10.5 mm with 5.2 mm buttons; YOU HEAR is a native menu (both views); meter legends and the LR MIX captions 9 px; PRE, MUTE and SEND legends moved where they can grow. The CUE, meter and fader moved into the empty band above the crossfader. Texts under 9 px: 48 (the twin-only FX / LATCH CUE strip and some condensed caps) |
+| 2 | Medium | **iPad (compact) view: small targets and illegible legends.** FILTER and XFADER assign segments were 17 x 15 px with 4.3 px legends, INPUT buttons 12 px tall with 6.9 px text, curve switches 15 px, POST EQ / SPLIT 14 px, PHONES 2 positions 13 px, YOU HEAR five 34 x 14 px buttons at 5.3 px, meter legends 5 px, PRE 4.4 px. 187 of the 345 visible texts were under 9 px | DOM audit at 1180 x 820 with `hasTouch`; `elementFromPoint` hit probe | FILTER and XFADER assigns are full-width rows of 9.5 x 6 mm buttons (29 x 25 px hit areas); INPUT is a 2 x 2 grid of position buttons; curve switches 5 mm on a 9 mm pitch (25 px hits); POST EQ / SPLIT / MONO / PRE bigger; PHONES 2 ring 10.5 mm with 5.2 mm buttons; YOU HEAR is a native menu (both views); meter legends and the LR MIX captions 9 px; PRE, MUTE and SEND legends moved where they can grow. The CUE, meter and fader moved into the empty band above the crossfader. Texts under 9 px: 32 of 340 (some condensed button caps and the printed USB legends); in the full view 23 of 288 on the iPad and 35 of 331 on the desktop, from 110 and 122 |
 | 3 | Low | **PHONES 2 followed the POST EQ switch.** In the diagram each channel's CUE 2 switch is fed straight from the post-EQ line; the POST EQ logic reaches only the CUE 1 pre/post selectors | BD (channel strips, all three kinds) | CUE 2 always post-EQ, pre-fader. Measured: CH 2 LO killed, PHONES 2 on CH 2 reads -2.7 dB at 300 Hz with POST EQ on and off; the MONITOR cue still switches |
 | 4 | Low | **4-band mid bells too wide boosting and too narrow cutting.** LO MID at -27 dB was 3.6 dB shallow at 500 Hz and 3 dB shallow at 1 kHz; HI MID at +10 dB was 1.3 dB wide at 1.5 kHz | traces of the UG p.10 graph against in-app sweeps | Q fitted to the graph: 1.65 at +10 dB, 0.70 at -27 dB (linear in dB between). HI MID now within 0.5 dB of the graph at 250 Hz, 500 Hz, 1.5, 2 and 6 kHz; LO MID within 0.6 dB below 350 Hz and 2 dB above it (the graph's LO MID cut is lopsided) |
 | 5 | Low | **Lesson e4's closing challenge taught the opposite of the guide.** "Set channel 1 hot but clean: GAIN up for more level" against the guide's operating-levels page ("Peaking simply results in signal distortion, not more volume", UG p.39) and lesson f2 | UG p.39 | Now "set channel 1 the way the guide asks: the meter averaging around 0 with the loudest peaks near +6", GAIN 0 to +4 dB (FULL MIX reads +1 / +3.6 at 0 dB); hint and solution updated |
@@ -93,7 +93,7 @@ Checked strip by strip; all **match** unless noted.
 | SEND 1 / SEND 2 | off .. +6 (panel legend) | +6.0 dB at 10, unity at 7.07 |
 | BOOTH / MASTER 2 | independent of MST (UG p.16-17) | BOOTH unity at 8, MID -8 dB reads -8.0 at 1 kHz, MUTE silent; MASTER 2 at 6 is -7.8 dB |
 | Switching | soft-switched (UG p.14) | no clicks: filter ON/OFF, type change, assign changes, kills, CUE, YOU HEAR and input changes are 5 ms ramps (largest second difference 26x a steady 80 Hz tone; a step would be about 7700x) |
-| CPU | - | 21.3x realtime offline with the decks playing (`scripts/bench.cjs`, four worklet nodes; the machine was shared by about seven agents) |
+| CPU | - | 21.3x realtime offline with the decks playing before the review, 19.4x after (`scripts/bench.cjs`, four worklet nodes, the same scenario; the machine was shared by about seven agents, so the difference is within its noise; the quasi-peak meters add a compare per sample per meter) |
 
 ### Gain staging with real studio instruments
 
@@ -197,4 +197,19 @@ and saved PHONES 2 sources now ignore POST EQ (finding 3); no conversion is need
 
 ## Gate
 
-GATE_SUMMARY
+On the final build (`next start` on port 3145):
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit`, `next lint` | clean |
+| `npm run validate xone96` | 0 errors (5 warnings: the routing challenges without a `solution`, as before) |
+| `npm run build` | passes |
+| `node scripts/smoke.cjs` | no errors; no horizontal scroll at 1440 x 900 or 1180 x 820; transport and buttons sound |
+| `node scripts/lesson-runner.cjs` | 18 lessons, 0 failed, 4 manual steps |
+| `node scripts/e2e/run.cjs` | 34 / 34 passed |
+| audio QA, audition | median -18.6 LUFS, spread 5.6 LU, 0 of 21 flagged, exit 0 |
+| audio QA, `--excite xone96=transport` | median -19.3 LUFS, spread 5.5 LU, 0 of 21 flagged, exit 0 |
+| `node scripts/bench.cjs` | 19.4x realtime |
+
+The audio-QA spreads move by 0.3 LU between runs of the same build on the shared machine; the
+before / after table above compares runs taken minutes apart.
