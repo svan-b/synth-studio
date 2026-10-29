@@ -7,25 +7,11 @@ import { describeValue, pressTargetOf, pressesNeeded } from '@/lib/controls/mapp
 import { hub } from '@/lib/studio/hub';
 import Scope from './Scope';
 import { canShowMe, cancelShowMe, showMe } from './coachActions';
+import { conceptLabel } from './concepts';
 
 interface InstructionsProps {
   spec: DeviceSpec | null;
   onNextLesson?: () => void;
-}
-
-const CONCEPT_LABELS: Record<string, string> = {
-  'oscillator-pitch': 'Pitch', 'oscillator-waveform': 'Waveforms', 'oscillator-sync': 'Hard sync',
-  'frequency-modulation': 'FM', subharmonics: 'Subharmonics', noise: 'Noise', mixing: 'Mixing',
-  'envelope-attack': 'Attack', 'envelope-decay': 'Decay', 'envelope-sustain': 'Sustain', 'envelope-release': 'Release',
-  'envelope-shape': 'Envelope shape', 'filter-cutoff': 'Filter cutoff', 'filter-resonance': 'Resonance',
-  'filter-type': 'Filter type', lfo: 'LFO', 'modulation-source': 'Mod sources', 'modulation-depth': 'Mod depth',
-  'signal-routing': 'Patching', 'velocity-dynamics': 'Velocity', glide: 'Glide', 'timing-tempo': 'Tempo',
-  'sequencer-pattern': 'Sequencing', polyrhythm: 'Polyrhythm', 'parameter-locks': 'Parameter locks',
-  effects: 'Effects', equalization: 'EQ', 'dj-mixing': 'DJ mixing', 'gain-staging': 'Gain staging',
-};
-
-export function conceptLabel(c: string) {
-  return CONCEPT_LABELS[c] ?? c;
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -52,6 +38,8 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
   const instance = useStudioStore(s => s.lessonInstance);
   const store = useStudioStore.getState();
   const [collapsed, setCollapsed] = useState(false);
+  // Touch screens: the coach floats over the panel, on the side the learner picks
+  const [side, setSide] = useState<'right' | 'left'>('right');
   const [showScope, setShowScope] = useState(true);
   const [showList, setShowList] = useState(false);
   const [restored, setRestored] = useState(false);
@@ -96,7 +84,7 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
     return (
       <button
         onClick={() => setCollapsed(false)}
-        className="w-full lg:w-12 lg:h-full bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-2 text-teaching-current text-xs font-bold lg:[writing-mode:vertical-rl]"
+        className={`w-full lg:w-12 lg:h-full bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-2 text-teaching-current text-xs font-bold lg:[writing-mode:vertical-rl] coarse-lg:fixed coarse-lg:bottom-3 coarse-lg:z-30 coarse-lg:w-auto coarse-lg:h-auto coarse-lg:rounded-full coarse-lg:px-4 coarse-lg:py-3 coarse-lg:shadow-2xl coarse-lg:[writing-mode:horizontal-tb] ${side === 'left' ? 'coarse-lg:left-3' : 'coarse-lg:right-3'}`}
         aria-label={`Show the lesson coach: ${lesson.name}, ${finished ? 'done' : `step ${currentStep + 1} of ${steps.length}`}`}
       >
         {lesson.name} · {finished ? 'done' : `step ${currentStep + 1}/${steps.length}`} - show
@@ -106,7 +94,7 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
 
   return (
     <aside
-      className="w-full lg:w-[22rem] shrink-0 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 shadow-2xl lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] flex flex-col overflow-y-auto"
+      className={`w-full lg:w-[22rem] shrink-0 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 shadow-2xl lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] flex flex-col overflow-y-auto coarse-lg:fixed coarse-lg:top-auto coarse-lg:bottom-3 coarse-lg:z-30 coarse-lg:w-[20rem] coarse-lg:max-h-[58dvh] ${side === 'left' ? 'coarse-lg:left-3' : 'coarse-lg:right-3'}`}
       aria-label="Lesson coach"
     >
       <div className="flex items-start justify-between gap-2">
@@ -115,6 +103,7 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
           {lesson.objective && <p className="text-[11px] text-gray-300 mt-1 leading-snug"><span className="text-gray-400">Goal:</span> {lesson.objective}</p>}
         </div>
         <div className="flex gap-1 shrink-0">
+          <button onClick={() => setSide(s => (s === 'right' ? 'left' : 'right'))} className="hidden coarse-lg:inline-block text-gray-400 hover:text-white px-2 py-1 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300" aria-label="Move the lesson coach to the other side" title="Move to the other side">⇆</button>
           <button onClick={() => setCollapsed(true)} className="text-gray-400 hover:text-white px-2 py-1 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300" aria-label="Collapse lesson panel" title="Collapse">—</button>
           <button onClick={store.resetLesson} className="text-gray-400 hover:text-white px-2 py-1 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300" aria-label="Stop lesson" title="Stop lesson">✕</button>
         </div>

@@ -11,7 +11,8 @@ import { useDeviceModule } from '@/lib/studio/useHub';
 import { describeValue } from '@/lib/controls/mapping';
 import SynthPanel, { type EngineSource, type PatchController } from '@/components/panel/SynthPanel';
 import ResponsiveDeviceContainer from '@/components/ui/ResponsiveDeviceContainer';
-import { midiLearnTouch, useMidiFocus } from '@/lib/midi'; // external gear: MIDI learn + MIDI input
+import { prefetchTeaching } from '@/components/teaching/onDemand';
+import { midiLearnTouch, useMidiFocus } from '@/lib/midi/lite'; // external gear: MIDI learn + MIDI input (stack loads after first paint)
 
 const NO_ENGINE: EngineState = {};
 
@@ -122,6 +123,8 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
   // learns this instrument's lessons so it can tell rebuilt questions from current ones
   useEffect(() => { setLessonEngineReader(id => hub.getState(id) as Record<string, unknown>); }, []);
   useEffect(() => { registerLessons(device, mod.lessons); }, [device, mod]);
+  // The instrument is up: fetch the lesson UI (loaded on demand) while the page idles
+  useEffect(() => { prefetchTeaching(); }, []);
 
   const heldRef = useRef(held);
   heldRef.current = held;
@@ -267,7 +270,7 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
           <select
             value={preset}
             onChange={e => applyPreset(e.target.value)}
-            className="bg-[#232323] border border-[#3a3a3a] text-white rounded-full px-3 py-1.5 text-xs max-w-[240px]"
+            className="bg-[#232323] border border-[#3a3a3a] text-white rounded-full px-3 py-1.5 text-xs max-w-[240px] coarse:min-h-[44px]"
             aria-label="Load preset"
           >
             <option value="">Presets ({presets.length})…</option>
@@ -290,10 +293,10 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
         )}
         {!zoomOverride && (
           <div className="flex items-center rounded-full border border-[#3a3a3a] overflow-hidden">
-            <button className={`px-2.5 py-1.5 text-xs ${zoom === 'fit' ? 'bg-[#3a3a3a] text-white' : 'text-gray-400'}`} onClick={() => setZoom('fit')}>Fit</button>
-            <button className="px-2.5 py-1.5 text-xs text-gray-300 border-l border-[#3a3a3a]" onClick={() => setZoom(Math.max(0.35, +(scaleInfo.scale - 0.15).toFixed(2)))} aria-label="Zoom out">−</button>
+            <button className={`px-2.5 py-1.5 text-xs coarse:min-h-[44px] coarse:min-w-[44px] ${zoom === 'fit' ? 'bg-[#3a3a3a] text-white' : 'text-gray-400'}`} onClick={() => setZoom('fit')}>Fit</button>
+            <button className="px-2.5 py-1.5 text-xs text-gray-300 border-l border-[#3a3a3a] coarse:min-h-[44px] coarse:min-w-[44px]" onClick={() => setZoom(Math.max(0.35, +(scaleInfo.scale - 0.15).toFixed(2)))} aria-label="Zoom out">−</button>
             <span className="px-1.5 text-[11px] text-gray-400 tabular-nums w-10 text-center">{Math.round(scaleInfo.scale * 100)}%</span>
-            <button className="px-2.5 py-1.5 text-xs text-gray-300 border-l border-[#3a3a3a]" onClick={() => setZoom(Math.min(1.5, +(scaleInfo.scale + 0.15).toFixed(2)))} aria-label="Zoom in">+</button>
+            <button className="px-2.5 py-1.5 text-xs text-gray-300 border-l border-[#3a3a3a] coarse:min-h-[44px] coarse:min-w-[44px]" onClick={() => setZoom(Math.min(1.5, +(scaleInfo.scale + 0.15).toFixed(2)))} aria-label="Zoom in">+</button>
           </div>
         )}
         {!compact && mod.keyboard && keyboardActive && (
@@ -370,7 +373,8 @@ function ControlStatus({ spec, values, touched }: { spec: DeviceSpec; values: Va
     if (c) {
       name = c.label;
       const v = values[id] ?? ('default' in c ? (c.default as ControlValue) : undefined);
-      value = c.type === 'jack' || c.type === 'pattern' ? '' : describeValue(c, v);
+      // A momentary button (TRIGGER, TAP) has no lasting state worth showing
+      value = c.type === 'jack' || c.type === 'pattern' || (c.type === 'button' && c.momentary) ? '' : describeValue(c, v);
       about = firstSentence(c.description);
     }
   } else if (touched?.kind === 'jack') {
@@ -418,7 +422,7 @@ function ToolButton({ children, onClick, title, disabled }: { children: React.Re
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="px-3 py-1.5 text-xs bg-[#2d2d2d] hover:bg-[#3a3a3a] text-white rounded-full border border-[#3a3a3a] disabled:opacity-40 transition-colors"
+      className="px-3 py-1.5 text-xs bg-[#2d2d2d] hover:bg-[#3a3a3a] text-white rounded-full border border-[#3a3a3a] disabled:opacity-40 transition-colors coarse:min-h-[44px] coarse:min-w-[44px]"
     >
       {children}
     </button>

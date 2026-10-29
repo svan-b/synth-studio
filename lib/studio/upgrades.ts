@@ -32,10 +32,37 @@ const UPGRADES: Upgrade[] = [
     device: 'dfam',
     apply: v => (typeof v.tempo === 'number' ? { ...v, tempo: Math.min(10500, Math.max(10.5, v.tempo / 4)) } : v),
   },
+  {
+    // Xone:96 rebuild to the User Guide: MASTER and BOOTH have unity at 8 on a new
+    // law (it was 7.5), the crossfader's second curve is TRANSITION (DIPPED is gone),
+    // SEND 1 PRE became a switch per channel, and the sends gained +6 dB of travel.
+    store: 6,
+    project: 3,
+    device: 'xone96',
+    apply: v => {
+      const out: Values = { ...v };
+      const law = (x: ControlValue) =>
+        typeof x === 'number' ? Math.min(10, Math.max(0, 8 * Math.pow(Math.max(0, x) / 7.5, 0.644))) : x;
+      if (out.master !== undefined) out.master = law(out.master);
+      if (out.booth !== undefined) out.booth = law(out.booth);
+      if (out.xf_curve === 1) out.xf_curve = 0;
+      if (out.send1_pre !== undefined) {
+        for (const ch of ['ch1', 'ch2', 'ch3', 'ch4', 'cha', 'chb']) {
+          if (out[`${ch}_pre`] === undefined) out[`${ch}_pre`] = out.send1_pre;
+        }
+        delete out.send1_pre;
+      }
+      for (const k of Object.keys(out)) {
+        const x = out[k];
+        if (/_snd[12]$/.test(k) && typeof x === 'number') out[k] = x * 0.707;
+      }
+      return out;
+    },
+  },
 ];
 
-export const STORE_VERSION = 5;
-export const PROJECT_VERSION = 2;
+export const STORE_VERSION = 6;
+export const PROJECT_VERSION = 3;
 
 /**
  * Upgrade the control values of every instance saved before version `from`

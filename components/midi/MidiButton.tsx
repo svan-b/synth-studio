@@ -5,15 +5,18 @@
 // touch controls).
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
 import { useMidiLearn } from '@/store/midi';
-import { initMidi, useMidiSnapshot, instanceLabel, controlLabel } from '@/lib/midi';
-import MidiSettings from './MidiSettings';
+import { loadMidi, useMidiSnapshot, instanceLabel, controlLabel } from '@/lib/midi/lite';
+
+// The settings dialog loads when it is first opened
+const MidiSettings = dynamic(() => import('./MidiSettings'), { ssr: false });
 
 export default function MidiButton() {
   const [open, setOpen] = useState(false);
   const snap = useMidiSnapshot();
-  useEffect(() => { initMidi(); }, []);
+  useEffect(() => { void loadMidi(); }, []);
 
   const ready = snap.status === 'ready';
   const color = !snap.support.supported ? '#4b5563' : ready ? '#22c55e' : snap.status === 'denied' || snap.status === 'error' ? '#ef4444' : '#6b7280';
@@ -35,7 +38,7 @@ export default function MidiButton() {
         <span className="w-2 h-2 rounded-full" style={{ background: color, boxShadow: ready ? `0 0 5px ${color}` : undefined }} />
         MIDI{ready && ports ? <span className="text-[10px] text-gray-500 tabular-nums">{ports}</span> : null}
       </button>
-      <MidiSettings open={open} onOpenChange={setOpen} />
+      {open && <MidiSettings open={open} onOpenChange={setOpen} />}
       <LearnBanner onOpenSettings={() => setOpen(true)} />
     </>
   );
