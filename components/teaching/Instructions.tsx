@@ -269,7 +269,8 @@ function StepCard({ step, spec, satisfied, session, instance, announce }: {
   const pressCount = session?.events?.[instance]?.[press ?? ''] ?? 0;
   const notes = session?.notes?.[instance] ?? [];
   // Live value of the step's control, for "now → target"
-  const liveValue = useStudioStore(s => (step.control ? s.devices[instance]?.controlValues[step.control] : undefined));
+  const storedValue = useStudioStore(s => (step.control ? s.devices[instance]?.controlValues[step.control] : undefined));
+  const liveValue = storedValue ?? (control && 'default' in control ? (control.default as ControlValue) : undefined);
 
   const jackLabel = (id?: string) => {
     if (!id || !spec?.patchBay) return id ?? '';

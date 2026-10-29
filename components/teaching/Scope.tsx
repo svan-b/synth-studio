@@ -202,7 +202,7 @@ export default function Scope({ height = 120, mode: initial = 'both', stepMode }
           g.stroke();
         }
 
-        // Axis labels
+        // Axis labels (level labels only where there is room for them)
         g.fillStyle = 'rgba(226,232,240,0.62)';
         FREQ_GRID.forEach(f => {
           if (!FREQ_LABELS.has(f) && w < 420) return;
@@ -210,11 +210,15 @@ export default function Scope({ height = 120, mode: initial = 'both', stepMode }
           g.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, x + 2, h - 3);
         });
         g.fillText('Hz', w - 16, h - 3);
+        const tall = plotH >= 70;
+        let lastY = -Infinity;
         DB_GRID.forEach(db => {
-          if (!DB_LABELS.has(db)) return;
-          g.fillText(`${db}`, 2, yOf(db) - 2);
+          if (!DB_LABELS.has(db) && !tall) return;
+          const y = yOf(db) - 2;
+          if (y - lastY < 11 || y < plotTop + 8) return;
+          g.fillText(`${db} dB`, 2, y);
+          lastY = y;
         });
-        g.fillText('dB', 2, plotTop + 9);
       }
     };
     raf = requestAnimationFrame(draw);
