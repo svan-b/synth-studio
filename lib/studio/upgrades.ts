@@ -148,6 +148,40 @@ const UPGRADES: Upgrade[] = [
     device: 'analog-four',
     apply: () => ({}),
   },
+  {
+    // Mother-32 rebuild to the v2 Owner's Manual: three switches list their
+    // positions in panel order, VCF MOD became AMOUNT plus a POLARITY switch,
+    // FREQUENCY spans ±1 octave and PW 2-98 %, and the global gate length became
+    // a gate per step (SEQ GATE, 1-8 eighths of a step).
+    store: 8,
+    project: 5,
+    device: 'mother32',
+    oldDefaults: {
+      seq_notes: 'mmym0pmtmmwmr0tp................', gate_length: 50,
+      vco_wave: 0, vco_mod_dest: 0, lfo_wave: 0, vcf_mod_amount: 40,
+      cutoff: 1200, resonance: 15, volume: 70, attack: 2, decay: 400, lfo_rate: 4, vc_mix: 50, assign_source: 0,
+    },
+    apply: v => {
+      const o: Values = { ...v };
+      const flip = (k: string) => { if (typeof o[k] === 'number') o[k] = 1 - (o[k] as number); };
+      flip('vco_wave');
+      flip('vco_mod_dest');
+      flip('lfo_wave');
+      if (typeof o.vcf_mod_amount === 'number') {
+        const a = o.vcf_mod_amount;
+        o.vcf_mod_amount = Math.abs(a);
+        o.vcf_mod_polarity = a < 0 ? 1 : 0;
+      }
+      if (typeof o.frequency === 'number') o.frequency = Math.min(1, Math.max(-1, o.frequency));
+      if (typeof o.pulse_width === 'number') o.pulse_width = Math.min(98, Math.max(2, o.pulse_width));
+      if (typeof o.gate_length === 'number') {
+        const step = Math.min(8, Math.max(1, Math.round(o.gate_length / 12.5)));
+        o.seq_gate = String(step).repeat(32);
+        delete o.gate_length;
+      }
+      return o;
+    },
+  },
 ];
 
 /** Lessons replaced by a rebuild: completing the old one counts for its successor */
@@ -169,6 +203,20 @@ const LESSON_RENAMES: { store: number; map: Record<string, string> }[] = [
       'sub37-multidrive': 'sub37-sd3-grit',
     },
   },
+  {
+    store: 8,
+    map: {
+      'm32-first-sound': 'mother32-f1-vco',
+      'm32-waveforms-pwm': 'mother32-f1-vco',
+      'm32-filter': 'mother32-f3-filter',
+      'm32-envelopes': 'mother32-f4-eg-vca',
+      'm32-lfo': 'mother32-f5-modulation',
+      'm32-sequence': 'mother32-f6-sequencer',
+      'm32-patching-basics': 'mother32-f7-patching',
+      'm32-mults-attenuators': 'mother32-f7-patching',
+      'm32-external-clock': 'mother32-st1-studio-clock',
+    },
+  },
 ];
 
 /** Carry lesson completions over to the lessons that replaced them */
@@ -180,8 +228,8 @@ export function upgradeCompletedLessons(done: string[], from: number): string[] 
   return [...out];
 }
 
-export const STORE_VERSION = 7;
-export const PROJECT_VERSION = 4;
+export const STORE_VERSION = 8;
+export const PROJECT_VERSION = 5;
 
 /**
  * Upgrade the control values of every instance saved before version `from`
