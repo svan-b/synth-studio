@@ -1,22 +1,32 @@
 // ============================================================================
 // Allen & Heath Xone:96 - AudioWorklet processors (devices/xone96)
 //
-//   'xone96-strips'  up to four channel strips per node: input select, GAIN,
-//                    Xone EQ (LR4 isolator kills + peaking mids), +20 dBu soft
-//                    clip, the post-EQ pre-fader meter, channel fader, the
-//                    crossfader VCA, FILTER assign, SEND 1 (pre/post), SEND 2,
-//                    CUE (pre/post EQ) - and the twin's built-in decks, which
-//                    are synthesised here so they cost no native nodes.
-//   'xone96-master'  LR MIX summing (+21 dBu clip), MASTER 1 (+24 dBu clip),
-//                    BOOTH (3-band EQ, mono, mute, +18 dBu clip), MONITOR
-//                    headphones (CUE/MST blend, SPLIT CUE), the LR meters and
-//                    the twin's YOU HEAR selector.
+// The signal flow follows the block diagram in the Xone:96 User Guide (p.34):
+//
+//   'xone96-strips'  up to four channel strips per node: input select, GAIN
+//                    (+20 dBu clip, the PK! LED), the Xone EQ (12 dB/oct kill
+//                    bands and mid bells, as the guide's graphs), the post-EQ
+//                    pre-fader meter, the VCA (fader x crossfader; CH A/B an
+//                    analogue fader), FILTER SELECT to the LR MIX / FILTER 1 /
+//                    FILTER 2 buses (a MIC on A/B goes to the clean feed
+//                    instead), AUX 1 (PRE or post) and AUX 2 (post), CUE 1
+//                    (pre/post EQ) and the PHONES 2 source - and the twin's
+//                    built-in decks, synthesised here so they cost no nodes.
+//   'xone96-master'  the two Xone:VCF sections (CRUNCH into a 2-pole
+//                    state-variable filter whose HPF / BPF / LPF outputs are
+//                    summed by the lit switches), LR MIX summing (+21 dBu),
+//                    MASTER 1 / MASTER 2 (LR MIX + mic clean feed, +24 / +18
+//                    dBu), BOOTH (music only: 3-band EQ, MONO, MUTE, +18 dBu),
+//                    MONITOR (CUE 1 + ADD MIX, SPLIT CUE), PHONES 2, the LR
+//                    meters and the twin's YOU HEAR selector.
 //
 // Every setting is a port message: no AudioParams, which cost CPU on every
 // render quantum. Gains glide over ~5 ms (per-block targets, linear inside the
 // block), so nothing zips or clicks. Nothing looks ahead: zero added latency.
-// Levels: 0.1 = 0 dBu. Meters: DIN-style ballistics (instant attack, 20 dB in
-// 1.5 s release) and a 1 s PK! hold, reported every 32 ms.
+// Nothing allocates in process(): voices come from pre-filled pools and the
+// meter messages reuse one object. Levels: 0.1 = 0 dBu. Meters: DIN-style
+// ballistics (instant attack, 20 dB in 1.5 s release) and a 1 s PK! hold,
+// reported every 32 ms.
 // ============================================================================
 
 const SR = sampleRate;
@@ -482,12 +492,20 @@ const MAX_VOICES = 40;
 const scratchL = new Float32Array(BLOCK);
 const scratchR = new Float32Array(BLOCK);
 
+/** Voices kept ready per class, so the audio thread never allocates once running */
+const POOL_SIZES = [[Kick, 6], [Clap, 4], [Hiss, 14], [Tone, 8], [Bass, 6], [Chord, 6], [Lead, 4]];
+
 class Deck {
   constructor(seed) {
     this.src = S_NONE;
     this.voices = [];
     this.n = ((seed * 2654435761) >>> 0) || 1;
     this.pools = new Map();
+    for (const [Cls, n] of POOL_SIZES) {
+      const pool = [];
+      for (let i = 0; i < n; i++) pool.push(new Cls(this));
+      this.pools.set(Cls, pool);
+    }
     this.L = new Float32Array(BLOCK);
     this.R = new Float32Array(BLOCK);
   }
@@ -506,8 +524,9 @@ class Deck {
     return v;
   }
   free(i) {
-    const v = this.voices[i];
-    this.voices.splice(i, 1);
+    const vs = this.voices, v = vs[i], n = vs.length - 1;
+    for (let j = i; j < n; j++) vs[j] = vs[j + 1];
+    vs.length = n;
     this.pools.get(v.constructor).push(v);
   }
   releaseAll() { for (const v of this.voices) v.release(); }
@@ -523,9 +542,7 @@ class Deck {
   crash(f, level = 1) { this.get(Hiss).set(f, 0.05 * level, 0.002, 0.002, 0.4, 2.2, 4500, false, 0); }
   rim(f, level = 1) { this.get(Tone).set(f, 0.22 * level, 0.0005, 0.0075, 0.1, 1700, 1700, 0, true, 1800, 3, -0.2); }
   conga(f, hz, level = 1, pan = -0.3) { this.get(Tone).set(f, 0.14 * level, 0.001, 0.045, 0.4, hz * 1.5, hz, 0.03, false, 0, 0, pan); }
-  bass(f, note, dur, o) {
-    this.get(Bass).set(f, note, dur, o.level ?? 1, o.cutoff ?? 380, o.res ?? 4, o.envAmt ?? 3, !!o.square);
-  }
+  bass(f, note, dur, level, cutoff, res, envAmt, square) { this.get(Bass).set(f, note, dur, level, cutoff, res, envAmt, square); }
   stab(f, notes, level = 1) { this.get(Chord).setStab(f, notes, level); }
   pad(f, notes, dur, level = 1) { this.get(Chord).setPad(f, notes, dur, level); }
   lead(f, note, dur, level = 1) { this.get(Lead).set(f, note, dur, level); }
@@ -546,7 +563,7 @@ class Deck {
         if (arrBar >= 8 && (step === 4 || step === 12)) this.clap(f, 0.8);
         if (arrBar >= 8 && arrBar < 30) {
           const p = BASS_A[step];
-          if (p) this.bass(f, root + p[0], d16 * p[1], { cutoff: 420, envAmt: 2.5 });
+          if (p) this.bass(f, root + p[0], d16 * p[1], 1, 420, 4, 2.5, false);
         }
         if (arrBar >= 16 && (step === 3 || step === 10) && bar % 2 === 0) this.stab(f, chord, 0.9);
         break;
@@ -560,7 +577,7 @@ class Deck {
         if (arrBar >= 16 && (step === 4 || step === 12)) this.clap(f, 0.9);
         if (arrBar >= 8 && arrBar < 30) {
           const p = BASS_B[step];
-          if (p !== undefined) this.bass(f, 33 + p, d16 * 0.8, { cutoff: 300 + (150 * (arrBar % 8)) / 8, res: 9, envAmt: 5, square: true, level: 0.75 });
+          if (p !== undefined) this.bass(f, 33 + p, d16 * 0.8, 0.75, 300 + (150 * (arrBar % 8)) / 8, 9, 5, true);
         }
         break;
       }
@@ -593,7 +610,7 @@ class Deck {
   }
   bassline(f, step, root, d16, lv) {
     const p = BASS_A[step];
-    if (p) this.bass(f, root + p[0], d16 * p[1], { cutoff: 420, envAmt: 2.5, level: lv });
+    if (p) this.bass(f, root + p[0], d16 * p[1], lv, 420, 4, 2.5, false);
   }
   stabs(f, step, chord, lv) {
     if (step === 3 || step === 10) this.stab(f, chord, lv);
@@ -643,24 +660,51 @@ class Deck {
 // Parameter slots: the engine posts all of them for a channel in one message
 const P_DECK = 0, P_STUDIO = 1, P_FILE = 2, P_RTN = 3, P_TRIM = 4, P_LO = 5, P_HI = 6, P_MIDA = 7, P_MIDB = 8, P_MIDF = 9;
 const P_FADER = 10, P_XF = 11, P_DIRECT = 12, P_F1 = 13, P_F2 = 14, P_S1PRE = 15, P_S1POST = 16, P_S2 = 17, P_CUE = 18, P_CUEPOST = 19;
-const NP = 20;
+const P_CF = 20, P_CUE2 = 21;
+const NP = 22;
+
+// Strip outputs (stereo each): LR MIX, FILTER 1 MIX, FILTER 2 MIX, AUX 1, AUX 2, CUE 1, CUE 2, CLEANFEED MIX
+const O_DIRECT = 0, O_F1 = 1, O_F2 = 2, O_S1 = 3, O_S2 = 4, O_CUE = 5, O_CUE2 = 6, O_CF = 7;
 
 // Strip kinds: stereo channel 1-4 (4-band EQ), aux A/B (3-band, swept MID), RTN C/D (level only)
 const K_MAIN = 0, K_AUX = 1, K_RTN = 2;
 
 // EQ coefficient slots (5 each)
-const C_LP1 = 0, C_LP2 = 5, C_HP1 = 10, C_HP2 = 15, C_HP3 = 20, C_HP4 = 25, C_LP3 = 30, C_LP4 = 35, C_AP = 40, C_PKA = 45, C_PKB = 50;
-const NC = 55;
+const C_LP1 = 0, C_HP1 = 5, C_LP2 = 10, C_HP2 = 15, C_PKA = 20, C_PKB = 25;
+const NC = 30;
+const LO_HZ = 180, HI_HZ = 3000;
+/** First-order all-pass coefficient at HI_HZ (keeps the low band in phase with the upper split) */
+const AP_C = (() => { const k = Math.tan((Math.PI * HI_HZ) / SR); return (k - 1) / (k + 1); })();
 
+/**
+ * Kill bands: a 2nd-order Linkwitz-Riley split at 180 Hz and 3 kHz (12 dB/oct skirts, as in the
+ * guide's EQ graphs, p.8 / p.10). Low = LP(180) then an all-pass at 3 kHz, rest = -HP(180),
+ * mid = LP(3k) of rest, high = -HP(3k) of rest: at unity the three bands sum to an all-pass.
+ */
 function fixedCoefs(c) {
-  const Q = Math.SQRT1_2;
-  // LR4 split at 180 Hz and 3 kHz; the low band gets the 3 kHz all-pass so all bands sum flat
-  bqLowpass(c, C_LP1, 180, Q); bqLowpass(c, C_LP2, 180, Q);
-  bqHighpass(c, C_HP1, 180, Q); bqHighpass(c, C_HP2, 180, Q);
-  bqHighpass(c, C_HP3, 3000, Q); bqHighpass(c, C_HP4, 3000, Q);
-  bqLowpass(c, C_LP3, 3000, Q); bqLowpass(c, C_LP4, 3000, Q);
-  bqAllpass(c, C_AP, 3000, Q);
-  bqPeak(c, C_PKA, 350, 0.9, 0); bqPeak(c, C_PKB, 1100, 0.9, 0);
+  bqLowpass(c, C_LP1, LO_HZ, 0.5); bqHighpass(c, C_HP1, LO_HZ, 0.5);
+  bqLowpass(c, C_LP2, HI_HZ, 0.5); bqHighpass(c, C_HP2, HI_HZ, 0.5);
+  bqPeak(c, C_PKA, 350, 1, 0); bqPeak(c, C_PKB, 1100, 1, 0);
+}
+
+/**
+ * Mid-band bell width against gain, measured from the guide's EQ graphs (p.8, p.10): CH 1-4 about
+ * Q 1.4 at +10 dB and 0.88 at -27 dB; the A/B parametric band about 2.4 boosting and 1.2 cutting.
+ */
+const midQ = (db, aux) => (aux ? (db >= 0 ? 1.4 + 0.1 * db : 1.4 + 0.0083 * db) : (db >= 0 ? 1 + 0.04 * db : 1 + 0.0045 * db));
+
+/** First-order all-pass y = c x + x1 - c y1 over buf in place (state z[zo] = x1, z[zo + 1] = y1) */
+function apRun(buf, c, z, zo) {
+  let x1 = z[zo], y1 = z[zo + 1];
+  for (let i = 0; i < BLOCK; i++) {
+    const x = buf[i];
+    const y = c * x + x1 - c * y1;
+    x1 = x; y1 = y;
+    buf[i] = y;
+  }
+  if (!(y1 === y1) || y1 > 1e6 || y1 < -1e6) { x1 = 0; y1 = 0; }
+  if (y1 < 1e-20 && y1 > -1e-20) y1 = 0;
+  z[zo] = x1; z[zo + 1] = y1;
 }
 
 class Strip {
@@ -671,12 +715,12 @@ class Strip {
     this.cur = new Float64Array(NP);
     this.prev = new Float64Array(NP);
     for (const p of [P_TRIM, P_LO, P_HI, P_FADER, P_XF, P_DIRECT]) this.tgt[p] = this.cur[p] = 1;
-    this.tgt[P_MIDF] = this.cur[P_MIDF] = 700;
+    this.tgt[P_MIDF] = this.cur[P_MIDF] = 650;
     this.tgt[P_CUEPOST] = this.cur[P_CUEPOST] = 1;
     this.coef = new Float64Array(NC);
     fixedCoefs(this.coef);
     this.midA = 0; this.midB = 0; this.midF = 350;
-    this.z = new Float64Array(44); // 11 sections x 2 states x 2 sides
+    this.z = new Float64Array(28); // 7 sections x 2 states x 2 sides
     this.tail = 0;
     this.meter = 0; this.pk = 0;
     this.deck = kind === K_RTN ? null : new Deck(seed);
@@ -702,32 +746,33 @@ class Strip {
     // Mid-band coefficients follow the glided gains / frequency
     const cf = this.coef;
     if (this.kind === K_MAIN) {
-      if (c[P_MIDA] !== this.midA) { this.midA = c[P_MIDA]; bqPeak(cf, C_PKA, 350, 0.9, this.midA); }
-      if (c[P_MIDB] !== this.midB) { this.midB = c[P_MIDB]; bqPeak(cf, C_PKB, 1100, 0.9, this.midB); }
+      if (c[P_MIDA] !== this.midA) { this.midA = c[P_MIDA]; bqPeak(cf, C_PKA, 350, midQ(this.midA, false), this.midA); }
+      if (c[P_MIDB] !== this.midB) { this.midB = c[P_MIDB]; bqPeak(cf, C_PKB, 1100, midQ(this.midB, false), this.midB); }
     } else if (this.kind === K_AUX && (c[P_MIDA] !== this.midA || c[P_MIDF] !== this.midF)) {
       this.midA = c[P_MIDA]; this.midF = c[P_MIDF];
-      bqPeak(cf, C_PKA, this.midF, 1.0, this.midA);
+      bqPeak(cf, C_PKA, this.midF, midQ(this.midA, true), this.midA);
     }
   }
 
   /** EQ one side: x -> y (side 0 = L, 1 = R) */
   eq(x, y, side) {
-    const c = this.coef, z = this.z, zb = side * 22, p = this.prev, q = this.cur;
+    const c = this.coef, z = this.z, zb = side * 14, p = this.prev, q = this.cur;
     const lo = this.lo, mid = this.mid, hi = this.hi;
     lo.set(x); mid.set(x);
-    bqRun(lo, c, C_LP1, z, zb); bqRun(lo, c, C_LP2, z, zb + 2); bqRun(lo, c, C_AP, z, zb + 4);
-    bqRun(mid, c, C_HP1, z, zb + 6); bqRun(mid, c, C_HP2, z, zb + 8);
+    bqRun(lo, c, C_LP1, z, zb); apRun(lo, AP_C, z, zb + 2);
+    bqRun(mid, c, C_HP1, z, zb + 4);           // -(rest)
     hi.set(mid);
-    bqRun(hi, c, C_HP3, z, zb + 10); bqRun(hi, c, C_HP4, z, zb + 12);
-    bqRun(mid, c, C_LP3, z, zb + 14); bqRun(mid, c, C_LP4, z, zb + 16);
-    bqRun(mid, c, C_PKA, z, zb + 18);
-    if (this.kind === K_MAIN) bqRun(mid, c, C_PKB, z, zb + 20);
+    bqRun(hi, c, C_HP2, z, zb + 6);            // high = HP(HP(x))
+    bqRun(mid, c, C_LP2, z, zb + 8);           // -(mid)
     const dl = (q[P_LO] - p[P_LO]) / BLOCK, dh = (q[P_HI] - p[P_HI]) / BLOCK;
     let gl = p[P_LO], gh = p[P_HI];
     for (let i = 0; i < BLOCK; i++) {
-      y[i] = lo[i] * gl + mid[i] + hi[i] * gh;
+      y[i] = lo[i] * gl - mid[i] + hi[i] * gh;
       gl += dl; gh += dh;
     }
+    // The mid bells act on the whole channel (flat bells on a flat response, guide p.8 / p.10)
+    bqRun(y, c, C_PKA, z, zb + 10);
+    if (this.kind === K_MAIN) bqRun(y, c, C_PKB, z, zb + 12);
   }
 }
 
@@ -740,7 +785,7 @@ class XoneStripsProcessor extends AudioWorkletProcessor {
     this.strips = kinds.map((k, i) => new Strip(k, maps[i] || {}, (o.seed || 1) * 31 + i * 7 + 1));
     this.steps = [];
     this.blocks = 0;
-    this.meterMsg = new Array(this.strips.length * 2).fill(0);
+    this.meterMsg = { t: 'm', v: new Array(this.strips.length * 2).fill(0) };
     this.port.onmessage = e => this.onMessage(e.data);
   }
 
@@ -787,7 +832,8 @@ class XoneStripsProcessor extends AudioWorkletProcessor {
     }
 
     for (let o = 0; o < outputs.length; o++) for (let ch = 0; ch < outputs[o].length; ch++) outputs[o][ch].fill(0);
-    const oD = outputs[0], oF1 = outputs[1], oF2 = outputs[2], oS1 = outputs[3], oS2 = outputs[4], oC = outputs[5];
+    const oD = outputs[O_DIRECT], oF1 = outputs[O_F1], oF2 = outputs[O_F2], oS1 = outputs[O_S1], oS2 = outputs[O_S2];
+    const oC = outputs[O_CUE], oC2 = outputs[O_CUE2], oCF = outputs[O_CF];
 
     for (let si = 0; si < this.strips.length; si++) {
       const s = this.strips[si];
@@ -821,7 +867,20 @@ class XoneStripsProcessor extends AudioWorkletProcessor {
       }
       if (!live && s.tail === 0) s.z.fill(0);
 
-      // --- EQ, +20 dBu soft clip, post-EQ pre-fader meter ------------------
+      // --- GAIN stage: +20 dBu soft clip, the PK! LED (post-GAIN, pre-EQ) --
+      let pkx = 0;
+      for (let i = 0; i < BLOCK; i++) {
+        let l = xL[i], r = xR[i];
+        if (l > 0.8 || l < -0.8) xL[i] = l = clip(l, 1);
+        if (r > 0.8 || r < -0.8) xR[i] = r = clip(r, 1);
+        if (l < 0) l = -l;
+        if (r < 0) r = -r;
+        if (l > pkx) pkx = l;
+        if (r > pkx) pkx = r;
+      }
+      if (pkx >= PK_LIN) s.pk = PK_HOLD; else if (s.pk > 0) s.pk--;
+
+      // --- EQ, +20 dBu soft clip, the post-EQ pre-fader meter ---------------
       let yL = s.yL, yR = s.yR;
       if (s.kind === K_RTN) { yL = xL; yR = xR; }
       else { s.eq(xL, yL, 0); s.eq(xR, yR, 1); }
@@ -837,25 +896,105 @@ class XoneStripsProcessor extends AudioWorkletProcessor {
       }
       s.meter = peak > s.meter ? peak : s.meter * METER_REL;
       if (s.meter < 1e-7) s.meter = 0;
-      if (peak >= PK_LIN) s.pk = PK_HOLD; else if (s.pk > 0) s.pk--;
 
-      // --- fader, crossfader VCA, FILTER assign, sends, CUE -----------------
-      const fx0 = c0[P_FADER] * c0[P_XF], fx1 = c1[P_FADER] * c1[P_XF];
-      route(oD, yL, yR, fx0 * c0[P_DIRECT], fx1 * c1[P_DIRECT]);
-      route(oF1, yL, yR, fx0 * c0[P_F1], fx1 * c1[P_F1]);
-      route(oF2, yL, yR, fx0 * c0[P_F2], fx1 * c1[P_F2]);
-      route(oS1, yL, yR, c0[P_S1PRE] + c0[P_FADER] * c0[P_S1POST], c1[P_S1PRE] + c1[P_FADER] * c1[P_S1POST]);
-      route(oS2, yL, yR, c0[P_FADER] * c0[P_S2], c1[P_FADER] * c1[P_S2]);
+      // --- the channel VCA (fader x crossfader; A/B: the analogue fader) ---------
+      const v0 = c0[P_FADER] * c0[P_XF], v1 = c1[P_FADER] * c1[P_XF];
+      // FILTER SELECT after the VCA: LR MIX, FILTER 1 MIX or FILTER 2 MIX; a MIC on the clean feed instead
+      route(oD, yL, yR, v0 * c0[P_DIRECT], v1 * c1[P_DIRECT]);
+      route(oF1, yL, yR, v0 * c0[P_F1], v1 * c1[P_F1]);
+      route(oF2, yL, yR, v0 * c0[P_F2], v1 * c1[P_F2]);
+      route(oCF, yL, yR, v0 * c0[P_CF], v1 * c1[P_CF]);
+      // AUX 1: PRE (post-EQ, pre-VCA) or post-VCA; AUX 2 post-VCA. Both before FILTER SELECT.
+      route(oS1, yL, yR, c0[P_S1PRE] + v0 * c0[P_S1POST], c1[P_S1PRE] + v1 * c1[P_S1POST]);
+      route(oS2, yL, yR, v0 * c0[P_S2], v1 * c1[P_S2]);
+      // CUE 1 (pre- or post-EQ, pre-fader) and the PHONES 2 source (post-EQ, pre-fader)
       route(oC, yL, yR, c0[P_CUE] * c0[P_CUEPOST], c1[P_CUE] * c1[P_CUEPOST]);
       route(oC, xL, xR, c0[P_CUE] * (1 - c0[P_CUEPOST]), c1[P_CUE] * (1 - c1[P_CUEPOST]));
+      route(oC2, yL, yR, c0[P_CUE2], c1[P_CUE2]);
     }
 
     if (++this.blocks % METER_EVERY === 0) {
-      const mm = this.meterMsg;
+      const mm = this.meterMsg.v;
       for (let i = 0; i < this.strips.length; i++) { mm[2 * i] = this.strips[i].meter; mm[2 * i + 1] = this.strips[i].pk > 0 ? 1 : 0; }
-      this.port.postMessage({ t: 'm', v: mm });
+      this.port.postMessage(this.meterMsg);
     }
     return true;
+  }
+}
+
+// ============================================================================
+// Xone:VCF: a stereo 2-pole state-variable filter with its three outputs
+// summed by the lit HPF / BPF / LPF switches (guide p.14), CRUNCH before it
+// ============================================================================
+
+const VCF_GLIDE = 1 - Math.exp(-BLOCK / (0.012 * SR));
+const VCF_TAIL = Math.round((0.5 * SR) / BLOCK);
+/** CRUNCH works on the level the guide asks for (+/-6 dB around 0 dBu): +12 dBu meets the knee at 0 drive */
+const CRUNCH_IN = 2.5, CRUNCH_OUT = 0.4;
+
+class Vcf {
+  constructor() {
+    this.f = 1000; this.tf = 1000; this.q = 1; this.tq = 1; this.d = 0; this.td = 0;
+    this.gh = 1; this.gb = 0; this.gl = 0; this.th = 1; this.tb = 0; this.tl = 0;
+    this.s = new Float64Array(4);
+    this.g = Math.tan((Math.PI * this.f) / SR);
+    this.tail = 0;
+  }
+  set(mask, freq, q, driveDb) {
+    this.th = mask & 1 ? 1 : 0; this.tb = mask & 2 ? 1 : 0; this.tl = mask & 4 ? 1 : 0;
+    this.tf = Math.max(16, Math.min(22000, freq)); this.tq = Math.max(0.3, Math.min(5, q)); this.td = Math.max(0, driveDb);
+  }
+  /** Filter the stereo bus inL / inR and add the result into outL / outR (the LR MIX) */
+  run(inL, inR, outL, outR, live) {
+    if (live) this.tail = VCF_TAIL;
+    else if (this.tail > 0) this.tail--;
+    else {
+      // Asleep: no input and the ringing is over. Settings jump straight to their targets.
+      if (this.s[0] !== 0 || this.s[1] !== 0 || this.s[2] !== 0 || this.s[3] !== 0) this.s.fill(0);
+      this.f = this.tf; this.q = this.tq; this.d = this.td; this.gh = this.th; this.gb = this.tb; this.gl = this.tl;
+      return;
+    }
+    // per-block glides: FREQ (log), Q, drive; switch gains soft-switch over ~5 ms
+    const f0 = this.f, q0 = this.q, d0 = this.d, h0 = this.gh, b0 = this.gb, l0 = this.gl;
+    this.f = this.f * Math.pow(this.tf / this.f, VCF_GLIDE);
+    if (Math.abs(this.f - this.tf) < 0.01) this.f = this.tf;
+    this.q += (this.tq - this.q) * VCF_GLIDE;
+    this.d += (this.td - this.d) * VCF_GLIDE;
+    this.gh += (this.th - this.gh) * GLIDE; this.gb += (this.tb - this.gb) * GLIDE; this.gl += (this.tl - this.gl) * GLIDE;
+    if (Math.abs(this.th - this.gh) < 1e-4) this.gh = this.th;
+    if (Math.abs(this.tb - this.gb) < 1e-4) this.gb = this.tb;
+    if (Math.abs(this.tl - this.gl) < 1e-4) this.gl = this.tl;
+    const ga = Math.tan((Math.PI * Math.min(f0, SR * 0.45)) / SR), gz = Math.tan((Math.PI * Math.min(this.f, SR * 0.45)) / SR);
+    const dg = (gz - ga) / BLOCK, k0 = 1 / q0, dk = (1 / this.q - k0) / BLOCK;
+    const dh = (this.gh - h0) / BLOCK, db = (this.gb - b0) / BLOCK, dl = (this.gl - l0) / BLOCK;
+    // CRUNCH: drive into a tanh, about equal loudness across the range; 0 dB bypasses it
+    const drA = Math.pow(10, d0 / 20), drB = Math.pow(10, this.d / 20);
+    const crunch = d0 > 0.01 || this.d > 0.01;
+    const mA = Math.min(1, d0 / 2.4), mB = Math.min(1, this.d / 2.4);
+    let s1L = this.s[0], s2L = this.s[1], s1R = this.s[2], s2R = this.s[3];
+    let g = ga, k = k0, wh = h0, wb = b0, wl = l0;
+    let dr = drA, mx = mA, mk = CRUNCH_OUT / Math.sqrt(drA);
+    const ddr = (drB - drA) / BLOCK, dmx = (mB - mA) / BLOCK, dmk = (CRUNCH_OUT / Math.sqrt(drB) - mk) / BLOCK;
+    for (let i = 0; i < BLOCK; i++) {
+      let xl = inL[i], xr = inR[i];
+      if (crunch) {
+        xl += mx * (mk * tanhF(CRUNCH_IN * dr * xl) - xl);
+        xr += mx * (mk * tanhF(CRUNCH_IN * dr * xr) - xr);
+        dr += ddr; mx += dmx; mk += dmk;
+      }
+      const a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
+      // left
+      let v3 = xl - s2L, v1 = a1 * s1L + a2 * v3, v2 = s2L + a2 * s1L + a3 * v3;
+      s1L = 2 * v1 - s1L; s2L = 2 * v2 - s2L;
+      outL[i] += wh * (xl - k * v1 - v2) + wb * v1 + wl * v2;
+      // right
+      v3 = xr - s2R; v1 = a1 * s1R + a2 * v3; v2 = s2R + a2 * s1R + a3 * v3;
+      s1R = 2 * v1 - s1R; s2R = 2 * v2 - s2R;
+      outR[i] += wh * (xr - k * v1 - v2) + wb * v1 + wl * v2;
+      g += dg; k += dk; wh += dh; wb += db; wl += dl;
+    }
+    if (!(s1L === s1L) || !(s2L === s2L) || !(s1R === s1R) || !(s2R === s2R)) { s1L = s2L = s1R = s2R = 0; }
+    this.s[0] = s1L; this.s[1] = s2L; this.s[2] = s1R; this.s[3] = s2R;
   }
 }
 
@@ -864,9 +1003,22 @@ class XoneStripsProcessor extends AudioWorkletProcessor {
 // ============================================================================
 
 const M_MASTER = 0, M_BOOTH = 1, M_MONO = 2, M_MUTE = 3, M_BLO = 4, M_BMID = 5, M_BHI = 6, M_PHONES = 7, M_CUEMIX = 8;
-const M_SPLIT = 9, M_MONITOR = 10, M_F1 = 11, M_F2 = 12, M_OUT = 13, M_CUEON = 14;
-const NM = 15;
-const BOOTH_CLIP = 0.1 * Math.pow(10, 18 / 20);
+const M_SPLIT = 9, M_MONITOR = 10, M_OUT = 11, M_CUEON = 12, M_MASTER2 = 13, M_P2 = 14, M_P2MIX = 15, M_P2MST = 16;
+const NM = 17;
+const MON_MST1 = 0, MON_BOOTH = 1, MON_PHONES = 2, MON_PHONES2 = 3, MON_MST2 = 4;
+// Inputs: LR MIX (direct channels), FILTER 1 MIX, FILTER 2 MIX, CUE 1, CUE 2 (PHONES 2 source), CLEANFEED MIX
+const I_DIRECT = 0, I_F1 = 1, I_F2 = 2, I_CUE = 3, I_CUE2 = 4, I_CF = 5;
+// Output stages (guide p.35): LR MIX +21 dBu, MASTER 1 +24 dBu, MASTER 2 and BOOTH +18 dBu
+const MIX_CLIP = 0.1 * Math.pow(10, 21 / 20), MST1_CLIP = 0.1 * Math.pow(10, 24 / 20), MST2_CLIP = 0.1 * Math.pow(10, 18 / 20);
+const BOOTH_CLIP = MST2_CLIP;
+
+/** Peak of a (possibly missing) stereo input over one block */
+function inputLive(inp) {
+  if (!inp || !inp.length) return false;
+  const l = inp[0], r = inp[1] || inp[0];
+  for (let i = 0; i < BLOCK; i += 4) if (l[i] > 1e-6 || l[i] < -1e-6 || r[i] > 1e-6 || r[i] < -1e-6) return true;
+  return false;
+}
 
 class XoneMasterProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -874,21 +1026,25 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
     this.tgt = new Float64Array(NM);
     this.cur = new Float64Array(NM);
     this.prev = new Float64Array(NM);
-    for (const i of [M_MASTER, M_BOOTH, M_PHONES]) this.tgt[i] = this.cur[i] = 1;
+    for (const i of [M_MASTER, M_BOOTH, M_PHONES, M_MASTER2, M_P2]) this.tgt[i] = this.cur[i] = 1;
     this.tgt[M_OUT] = this.cur[M_OUT] = 1.25;
+    this.vcf = [new Vcf(), new Vcf()];
     this.bq = new Float64Array(15);
     this.bz = new Float64Array(12);
     this.beq = [NaN, NaN, NaN];
     this.mL = new Float32Array(BLOCK); this.mR = new Float32Array(BLOCK);
     this.bL = new Float32Array(BLOCK); this.bR = new Float32Array(BLOCK);
+    this.zero = new Float32Array(BLOCK);
     this.meters = new Float64Array(4); // mix L, mix R, cue L, cue R
     this.pk = new Int32Array(4);
     this.peaks = new Float64Array(4);
-    this.meterMsg = new Array(8).fill(0);
+    this.meterMsg = { t: 'm', v: new Array(8).fill(0) };
     this.blocks = 0;
     this.port.onmessage = e => {
       const m = e.data;
-      if (m && m.t === 'p') for (let i = 0; i < NM && i < m.v.length; i++) if (Number.isFinite(m.v[i])) this.tgt[i] = m.v[i];
+      if (!m) return;
+      if (m.t === 'p') { for (let i = 0; i < NM && i < m.v.length; i++) if (Number.isFinite(m.v[i])) this.tgt[i] = m.v[i]; }
+      else if (m.t === 'f' && this.vcf[m.f]) this.vcf[m.f].set(m.v[0], m.v[1], m.v[2], m.v[3]);
     };
   }
 
@@ -899,27 +1055,30 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
     c0.set(c);
     for (let i = 0; i < NM; i++) {
       if (t[i] === c[i]) continue;
-      if (i === M_MONITOR || i === M_SPLIT || i === M_MONO) { c[i] = t[i]; continue; }
+      if (i === M_MONITOR || i === M_SPLIT || i === M_MONO || i === M_P2MST) { c[i] = t[i]; continue; }
       c[i] += (t[i] - c[i]) * GLIDE;
       if (Math.abs(t[i] - c[i]) < 1e-5) c[i] = t[i];
     }
 
-    // LR MIX: direct channels + both filter returns
-    const mL = this.mL, mR = this.mR;
+    // LR MIX: the direct channels plus both Xone:VCF sections
+    const mL = this.mL, mR = this.mR, zero = this.zero;
     mL.fill(0); mR.fill(0);
-    addInput(mL, mR, inputs[0], 1, 1);
-    addInput(mL, mR, inputs[1], c0[M_F1], c[M_F1]);
-    addInput(mL, mR, inputs[2], c0[M_F2], c[M_F2]);
-    const cue = inputs[3];
+    addInput(mL, mR, inputs[I_DIRECT], 1, 1);
+    for (let f = 0; f < 2; f++) {
+      const inp = inputs[I_F1 + f];
+      const has = !!(inp && inp.length);
+      this.vcf[f].run(has ? inp[0] : zero, has ? inp[1] || inp[0] : zero, mL, mR, has && inputLive(inp));
+    }
+    const cue = inputs[I_CUE];
     const cL = cue && cue.length ? cue[0] : null, cR = cue && cue.length ? cue[1] || cue[0] : null;
 
-    // Summing amplifier (+21 dBu) and the pre-MASTER meters
+    // Summing amplifier (+21 dBu) and the pre-MASTER meters (music only: no clean feed)
     const pk = this.peaks;
     pk[0] = pk[1] = pk[2] = pk[3] = 0;
     for (let i = 0; i < BLOCK; i++) {
       let l = mL[i], r = mR[i];
-      if (l > 0.89 || l < -0.89) mL[i] = l = clip(l, 1.122);
-      if (r > 0.89 || r < -0.89) mR[i] = r = clip(r, 1.122);
+      if (l > 0.89 || l < -0.89) mL[i] = l = clip(l, MIX_CLIP);
+      if (r > 0.89 || r < -0.89) mR[i] = r = clip(r, MIX_CLIP);
       if (l < 0) l = -l;
       if (r < 0) r = -r;
       if (l > pk[0]) pk[0] = l;
@@ -939,8 +1098,9 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
     }
 
     const mon = Math.round(c[M_MONITOR]);
-    if (mon === 1) {
-      // BOOTH: 3-band EQ (+/-8 dB), MONO, MUTE, level, +18 dBu output stage
+    const o0 = c0[M_OUT], dO = (c[M_OUT] - o0) / BLOCK;
+    if (mon === MON_BOOTH) {
+      // BOOTH: music only, 3-band EQ (+/-8 dB), STEREO/MONO, MUTE, level, +18 dBu output stage (guide p.17)
       const bq = this.bq;
       if (c[M_BLO] !== this.beq[0]) { this.beq[0] = c[M_BLO]; bqShelf(bq, 0, 100, c[M_BLO], false); }
       if (c[M_BMID] !== this.beq[1]) { this.beq[1] = c[M_BMID]; bqPeak(bq, 5, 1000, 0.8, c[M_BMID]); }
@@ -950,7 +1110,7 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
       for (let k = 0; k < 3; k++) { bqRun(bL, bq, 5 * k, this.bz, 2 * k); bqRun(bR, bq, 5 * k, this.bz, 6 + 2 * k); }
       const mono = c[M_MONO] > 0.5;
       const g0 = c0[M_BOOTH] * (1 - c0[M_MUTE]), g1 = c[M_BOOTH] * (1 - c[M_MUTE]);
-      const dg = (g1 - g0) / BLOCK, o0 = c0[M_OUT], dO = (c[M_OUT] - o0) / BLOCK;
+      const dg = (g1 - g0) / BLOCK;
       let g = g0, og = o0;
       for (let i = 0; i < BLOCK; i++) {
         let l = bL[i], r = bR[i];
@@ -959,43 +1119,60 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
         oR[i] = clip(r * g, BOOTH_CLIP) * og;
         g += dg; og += dO;
       }
-    } else if (mon === 2) {
-      // MONITOR headphones: CUE/MST blend, or SPLIT CUE (cue left, LR MIX right)
+    } else if (mon === MON_PHONES) {
+      // MONITOR: the CUE 1 sum with the LR MIX added (CUE/MST), or SPLIT CUE: cue left, LR MIX right.
+      // Nothing cued: the LR MIX (guide p.16-17; block diagram)
       const split = c[M_SPLIT] > 0.5;
-      const g0 = c0[M_PHONES] * c0[M_OUT], g1 = c[M_PHONES] * c[M_OUT];
-      const a0 = Math.cos(c0[M_CUEMIX] * HALF_PI), a1 = Math.cos(c[M_CUEMIX] * HALF_PI);
-      const b0 = Math.sin(c0[M_CUEMIX] * HALF_PI), b1 = Math.sin(c[M_CUEMIX] * HALF_PI);
-      const dg = (g1 - g0) / BLOCK, da = (a1 - a0) / BLOCK, db = (b1 - b0) / BLOCK;
-      // Nothing cued: the headphones hear the master mix (w glides 0 -> 1 when a CUE goes on)
+      const g0 = c0[M_PHONES] * o0, g1 = c[M_PHONES] * c[M_OUT];
+      const a0 = c0[M_CUEMIX], da = (c[M_CUEMIX] - a0) / BLOCK;
+      const dg = (g1 - g0) / BLOCK;
       const w0 = c0[M_CUEON], dw = (c[M_CUEON] - w0) / BLOCK;
-      let g = g0, ga = a0, gb = b0, w = w0;
+      let g = g0, a = a0, w = w0;
       for (let i = 0; i < BLOCK; i++) {
         const ql = cL ? cL[i] : 0, qr = cR ? cR[i] : 0;
         let l, r;
         if (split) { l = 0.5 * (ql + qr); r = 0.5 * (mL[i] + mR[i]); }
-        else { l = ql * ga + mL[i] * gb; r = qr * ga + mR[i] * gb; }
+        else { l = ql + mL[i] * a; r = qr + mR[i] * a; }
         l = w * l + (1 - w) * mL[i];
         r = w * r + (1 - w) * mR[i];
         oL[i] = l * g; oR[i] = r * g;
-        g += dg; ga += da; gb += db; w += dw;
+        g += dg; a += da; w += dw;
+      }
+    } else if (mon === MON_PHONES2) {
+      // PHONES 2: the 9-way source (MST or one channel, post-EQ pre-fader) plus the LR MIX (CUE/MST)
+      const q2 = inputs[I_CUE2];
+      const pL = q2 && q2.length ? q2[0] : zero, pR = q2 && q2.length ? q2[1] || q2[0] : zero;
+      const mst = c[M_P2MST] > 0.5;
+      const g0 = c0[M_P2] * o0, g1 = c[M_P2] * c[M_OUT], dg = (g1 - g0) / BLOCK;
+      const a0 = c0[M_P2MIX], da = (c[M_P2MIX] - a0) / BLOCK;
+      let g = g0, a = a0;
+      for (let i = 0; i < BLOCK; i++) {
+        const sl = mst ? mL[i] : pL[i], sr = mst ? mR[i] : pR[i];
+        oL[i] = (sl + mL[i] * a) * g; oR[i] = (sr + mR[i] * a) * g;
+        g += dg; a += da;
       }
     } else {
-      // MASTER 1, +24 dBu output stage
-      const m0 = c0[M_MASTER], dm = (c[M_MASTER] - m0) / BLOCK, o0 = c0[M_OUT], dO = (c[M_OUT] - o0) / BLOCK;
+      // MASTER 1 (+24 dBu) or MASTER 2 (+18 dBu): the LR MIX after the insert plus the mic clean feed
+      const cf = inputs[I_CF];
+      const fL = cf && cf.length ? cf[0] : zero, fR = cf && cf.length ? cf[1] || cf[0] : zero;
+      const two = mon === MON_MST2;
+      const lim = two ? MST2_CLIP : MST1_CLIP, knee = 0.8 * lim;
+      const gi = two ? M_MASTER2 : M_MASTER;
+      const m0 = c0[gi], dm = (c[gi] - m0) / BLOCK;
       let m = m0, og = o0;
       for (let i = 0; i < BLOCK; i++) {
-        let l = mL[i] * m, r = mR[i] * m;
-        if (l > 1.26 || l < -1.26) l = clip(l, 1.585);
-        if (r > 1.26 || r < -1.26) r = clip(r, 1.585);
+        let l = (mL[i] + fL[i]) * m, r = (mR[i] + fR[i]) * m;
+        if (l > knee || l < -knee) l = clip(l, lim);
+        if (r > knee || r < -knee) r = clip(r, lim);
         oL[i] = l * og; oR[i] = r * og;
         m += dm; og += dO;
       }
     }
 
     if (++this.blocks % METER_EVERY === 0) {
-      const mm = this.meterMsg, v = this.meters, p = this.pk;
+      const mm = this.meterMsg.v, v = this.meters, p = this.pk;
       for (let k = 0; k < 4; k++) { mm[k] = v[k]; mm[4 + k] = p[k] > 0 ? 1 : 0; }
-      this.port.postMessage({ t: 'm', v: mm });
+      this.port.postMessage(this.meterMsg);
     }
     return true;
   }

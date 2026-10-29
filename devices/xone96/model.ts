@@ -57,12 +57,15 @@ export const CH_CLIP = dbuToLin(20);
 export const MIX_CLIP = dbuToLin(21);
 export const MST_CLIP = dbuToLin(24);
 
-/** Channel meter: 9 LEDs, -20 .. +10 dBu, the ninth is PK! (5 dB below clipping) */
-export const CH_METER_DBU = [-20, -12, -6, -3, 0, 3, 6, 10, 15];
-export const CH_METER_LABELS = ['-20', '-12', '-6', '-3', '0', '+3', '+6', '+10', 'PK!'];
-/** LR MIX meters: 11 LEDs, -35 .. +10 dBu */
+/** Channel meter: 9 LEDs, -20 .. +10 dBu, post-GAIN / post-EQ / pre-fader (guide p.9, p.35) */
+export const CH_METER_DBU = [-20, -15, -10, -6, -3, 0, 3, 6, 10];
+export const CH_METER_LABELS = ['-20', '-15', '-10', '-6', '-3', '0', '+3', '+6', '+10'];
+/** LR MIX meters: 11 LEDs, -35 .. +10 dBu; the top one is printed PK! (guide p.7, p.35) */
 export const MASTER_METER_DBU = [-35, -25, -20, -15, -10, -6, -3, 0, 3, 6, 10];
-export const MASTER_METER_LABELS = ['-35', '-25', '-20', '-15', '-10', '-6', '-3', '0', '+3', '+6', '+10'];
+export const MASTER_METER_LABELS = ['-35', '-25', '-20', '-15', '-10', '-6', '-3', '0', '+3', '+6', 'PK!'];
+/** LED colours as on the panel render (guide p.7): green up to -3, blue at 0 and +3, red from +6 */
+export const meterColor = (db: number) => (db >= 6 ? '#ff3b30' : db >= 0 ? '#38b6ff' : '#2fd158');
+/** The channel PK! LED beside GAIN reads after GAIN, before the EQ (block diagram); it lights 5 dB below the +20 dBu clip */
 export const PK_DBU = 15;
 /** RTN C/D SIG LED: green above -30 dBu, red above +15 dBu */
 export const SIG_DBU = -30;
@@ -91,23 +94,43 @@ export const MID_CUT_AUX = -24;
 /** EQ turnover / centre frequencies (Hz) */
 export const EQ = { lo: 180, loMid: 350, hiMid: 1100, hi: 3000, midQ: 0.9, auxMidQ: 1.0 };
 
-/** SEND 1 / SEND 2: 0..10, unity at 10 */
-export const sendLaw = (v: number) => Math.pow(Math.max(0, v) / 10, 2);
+/** SEND 1 / SEND 2: 0..10 on the dial, off to +6 dB (legend on the panel, guide p.7); 0 dB at 7.1 */
+export const sendLaw = (v: number) => 2 * Math.pow(Math.max(0, v) / 10, 2);
+
+/**
+ * Fader and crossfader responses as breakpoints [travel 0..1, dB], read off the curve graphs in
+ * the guide (p.12) to within about 1 dB. dB is interpolated linearly between breakpoints; the
+ * first segment rises from silence. Our own measurement of the published graphs, nothing copied.
+ */
+type Breakpoints = readonly (readonly [number, number])[];
+
+function breakpointGain(bp: Breakpoints, pos: number): number {
+  const p = Math.max(0, Math.min(1, pos));
+  let i = 1;
+  while (i < bp.length - 1 && bp[i][0] < p) i++;
+  const [p0, d0] = bp[i - 1], [p1, d1] = bp[i];
+  const t = p1 > p0 ? (p - p0) / (p1 - p0) : 1;
+  if (d0 === -Infinity) return t * Math.pow(10, d1 / 20);
+  return Math.pow(10, (d0 + (d1 - d0) * t) / 20);
+}
 
 export type Curve = 'const' | 'dipped' | 'cut';
 export const FADER_CURVES: Curve[] = ['const', 'dipped', 'cut'];
 export const FADER_CURVE_NAMES = ['CONST PWR', 'DIPPED', 'FAST CUT'];
 
-/**
- * Channel fader law (position 0..1 -> gain, unity at the top).
- * CONST PWR: the smooth Xone:92-style taper, most of the change near the top.
- * DIPPED: more linear. FAST CUT: full level within the first 5 mm of travel.
- */
+/** CHANNEL FADER curves for CH 1-4 (guide p.12): constant power (curve 1), dipped (2), fast-cut (3) */
+export const FADER_TABLES: Record<Curve, Breakpoints> = {
+  const: [[0, -Infinity], [0.05, -82], [0.1, -76], [0.15, -64.5], [0.2, -53.5], [0.25, -45], [0.3, -38], [0.35, -32], [0.4, -28.5],
+    [0.45, -25], [0.5, -22], [0.55, -20], [0.6, -18], [0.65, -16], [0.7, -14.5], [0.75, -12.5], [0.8, -10], [0.85, -8], [0.9, -4.5], [0.95, -2], [1, 0]],
+  dipped: [[0, -Infinity], [0.05, -81], [0.1, -70], [0.15, -50.5], [0.2, -39], [0.25, -31], [0.3, -25.5], [0.35, -21.5], [0.4, -19],
+    [0.45, -16.5], [0.5, -14], [0.55, -12.5], [0.6, -11.5], [0.65, -11], [0.7, -10], [0.75, -9], [0.8, -8], [0.85, -6], [0.9, -3.5], [0.95, -1.5], [1, 0]],
+  cut: [[0, -Infinity], [0.05, -80.5], [0.1, -68], [0.15, -47], [0.2, -33.5], [0.25, -25], [0.3, -19], [0.35, -15], [0.4, -12],
+    [0.45, -10], [0.5, -8.5], [0.55, -7], [0.6, -5.5], [0.65, -4.5], [0.7, -3.5], [0.75, -3], [0.8, -2], [0.85, -1], [0.9, -0.5], [0.95, 0], [1, 0]],
+};
+
+/** Channel fader law: position 0..1 -> gain, off at the bottom, unity at the top */
 export function faderLaw(pos: number, curve: Curve): number {
-  const p = Math.max(0, Math.min(1, pos));
-  if (curve === 'cut') return p >= 0.08 ? 1 : Math.sin((p / 0.08) * (Math.PI / 2));
-  if (curve === 'dipped') return Math.pow(p, 1.5);
-  return Math.pow(p, 2.5);
+  return breakpointGain(FADER_TABLES[curve] ?? FADER_TABLES.const, pos);
 }
 
 export type XCurve = 'const' | 'transition' | 'cut';
@@ -115,64 +138,70 @@ export const XFADER_CURVES: XCurve[] = ['const', 'transition', 'cut'];
 export const XFADER_CURVE_NAMES = ['CONST PWR', 'TRANSITION', 'FAST CUT'];
 
 /**
- * Crossfader law: position 0 (X) .. 1 (Y) -> [gain X, gain Y].
- * CONST PWR: equal-power blend, -3 dB each in the middle.
- * TRANSITION: both sides stay at full level up to the middle, then fade out.
- * FAST CUT: both full until the last ~1.4 mm at each end (cutting and scratching).
+ * XFADER curves (guide p.12): the level of one side against the distance travelled from its own
+ * closed end. CONST PWR: -3 dB each in the middle, full from about 3/4 of the way. TRANSITION:
+ * both sides full over the middle 60 %, fading in the last fifth. FAST CUT: full within the first
+ * 7 % (about 3 mm of the 45 mm innoFADER).
  */
+export const XFADER_TABLES: Record<XCurve, Breakpoints> = {
+  const: [[0, -Infinity], [0.025, -64], [0.05, -51], [0.075, -41], [0.1, -31.5], [0.125, -22], [0.15, -17.5], [0.175, -13.5], [0.2, -10.5],
+    [0.25, -8], [0.3, -7], [0.35, -5.8], [0.4, -5], [0.45, -4], [0.5, -3], [0.55, -2.4], [0.6, -1.8], [0.65, -0.9], [0.7, -0.5], [0.75, 0], [1, 0]],
+  transition: [[0, -Infinity], [0.025, -47], [0.05, -17.5], [0.075, -6.5], [0.1, -4.5], [0.125, -2.5], [0.15, -1.2], [0.175, -0.6], [0.2, 0], [1, 0]],
+  cut: [[0, -Infinity], [0.025, -51], [0.05, -20], [0.075, 0], [1, 0]],
+};
+
+/** Crossfader law: position 0 (X) .. 1 (Y) -> [gain X, gain Y] */
 export function xfaderLaw(pos: number, curve: XCurve): [number, number] {
+  const t = XFADER_TABLES[curve] ?? XFADER_TABLES.const;
   const p = Math.max(0, Math.min(1, pos));
-  if (curve === 'cut') return [Math.min(1, (1 - p) / 0.03), Math.min(1, p / 0.03)];
-  if (curve === 'transition') {
-    const fade = (q: number) => (q <= 0.5 ? 1 : Math.cos(((q - 0.5) / 0.5) * (Math.PI / 2)));
-    return [fade(p), fade(1 - p)];
-  }
-  return [Math.cos((p * Math.PI) / 2), Math.sin((p * Math.PI) / 2)];
+  return [breakpointGain(t, 1 - p), breakpointGain(t, p)];
 }
 
 // ---------------------------------------------------------------------------
 // Output section
 // ---------------------------------------------------------------------------
 
-/** MASTER 1 and BOOTH: unity at 8 on the dial (about 3 o'clock), +6 dB at 10 */
+/** MASTER 1, MASTER 2 and BOOTH: unity at 8 on the dial (about 3 o'clock), +6 dB at 10 */
 export const MASTER_UNITY = 8;
 const MASTER_K = Math.log(2) / Math.log(10 / MASTER_UNITY);
 export const masterLaw = (v: number) => (v <= 0 ? 0 : Math.pow(v / MASTER_UNITY, MASTER_K));
-/** MONITOR headphones LEVEL: 7.5 = unity, 10 = +5 dB */
+/** MONITOR and PHONES 2 LEVEL (dial 0..11, guide p.7): 7.5 = unity, 11 = +6.7 dB */
 export const phonesLaw = (v: number) => Math.pow(Math.max(0, v) / 7.5, 2);
+/** CUE/MST is an ADD MIX control (block diagram): the cue stays, the LR MIX is added up to unity */
+export const addMixLaw = (v: number) => Math.pow(Math.max(0, Math.min(10, v)) / 10, 2);
 /** RTN C/D LEVEL: -40 (off) .. +10 dB, like GAIN */
 export const returnLevelLin = gainLin;
+
+/** PHONES 2 9-way source select (guide p.7, p.16): the LR MIX or one channel's post-EQ, pre-fader signal */
+export const PHONES2_SOURCES = ['MST', '1', '2', '3', '4', 'A', 'B', 'C', 'D'];
 
 // ---------------------------------------------------------------------------
 // Xone:VCF filter sections
 // ---------------------------------------------------------------------------
 
-/** f*_type options. HPF/BPF/LPF are the switches; pressing two or three together combines them. */
+/**
+ * f*_type options. The filters are state-variable with three simultaneous outputs, and any
+ * combination of the HPF / BPF / LPF switches can be pressed together (guide p.14):
+ * HPF+LPF is a notch, all three an all-pass.
+ */
 export const FILTER_TYPES = ['HPF', 'BPF', 'LPF', 'HPF+BPF', 'BPF+LPF', 'NOTCH', 'ALL PASS'];
 /** Bit mask of lit switches per option: HPF 1, BPF 2, LPF 4 */
 export const TYPE_MASK = [1, 2, 4, 3, 6, 5, 7];
 export const typeOfMask = (mask: number) => Math.max(0, TYPE_MASK.indexOf(mask));
+
 /**
- * The shared Svf modes (lib/audio/dsp.ts order) that sum the same state-variable taps
- * as the hardware's switch combinations: LP2 0, LP1 1 (low+band), BP 2, HP1 3 (high+band),
- * HP2 4, notch 5 (high+low), peak 6 (stands in for high+band+low, see REFERENCE.md)
+ * RES 0 (MILD) .. 10 (WILD) -> Q of the 2-pole filter, fitted to the response graphs (guide p.14):
+ * MILD about Q 0.5 (-6 dB at FREQ), 12 o'clock Q 1 (all three switches on = flat), WILD Q 2.4
+ * (a +7.6 dB peak). The guide's "just short of self-oscillation" describes the sound; the graphs
+ * show the size of the peak.
  */
-export const SVF_MODE_OF_TYPE = [4, 2, 0, 3, 1, 5, 6];
-
-/** RES 0 (MILD, Butterworth: FREQ is the -3 dB point) .. 10 (WILD, Q 20, just short of oscillation) */
-export const resToQ = (res: number) => 0.7071 * Math.pow(28, Math.max(0, Math.min(10, res)) / 10);
-/** Q -> the shared Svf's resonance param (k = 2 - 1.96 r, Q = 1/k) */
-export const qToSvf = (q: number) => Math.max(0, Math.min(1, (2 - 1 / q) / 1.96));
-
-/** The filter buses run 14 dB hot so CRUNCH bites around 0 dBu, as the manual asks (+/-6 dB) */
-export const FILTER_BUS = 5;
-/** CRUNCH 0..10 -> the Svf's input drive (0..10) */
-export const crunchDrive = (c: number) => Math.max(0, Math.min(10, c));
-/** Level make-up after CRUNCH (the saturator adds gain at low drive and squashes at high drive) */
-export const crunchMakeup = (c: number) => {
-  const d = crunchDrive(c);
-  return 1 / (1 + 0.32 * d) + 0.1 * Math.min(1, d);
+export const resToQ = (res: number) => {
+  const r = Math.max(0, Math.min(10, res)) / 10;
+  return 0.5 * Math.exp(1.204 * r + 0.365 * r * r);
 };
+
+/** CRUNCH 0..10: drive into the pre-filter saturator, 0 to +24 dB (2.4 dB a step); 0 is clean (guide p.13) */
+export const crunchDriveDb = (c: number) => 2.4 * Math.max(0, Math.min(10, c));
 
 // ---------------------------------------------------------------------------
 // Twin-only: the built-in decks and the stand-in FX unit
@@ -197,4 +226,6 @@ export const AUDITION_START_16TH = 16 * 16;
 export const FX_TIMES = ['1/8', '3/16', '1/4'];
 export const FX_BEATS = [0.5, 0.75, 1];
 
-export const MONITOR_OUTS = ['MASTER', 'BOOTH', 'PHONES'];
+/** YOU HEAR (twin only): which output the browser plays. Index 0-2 kept from earlier versions. */
+export const MONITOR_OUTS = ['MASTER', 'BOOTH', 'PHONES', 'PHONES 2', 'MST 2'];
+export const MON = { MST1: 0, BOOTH: 1, PHONES: 2, PHONES2: 3, MST2: 4 } as const;

@@ -1,12 +1,14 @@
 // ============================================================================
-// Xone:96 audio engine
+// Xone:96 audio engine. The signal flow follows the block diagram in the
+// Xone:96 User Guide (p.34); REFERENCE.md lists every source.
 //
-//  studio_1..4 (LINE) ┐                          ┌─ direct ───────────────────────┐
-//  deck / USB file    ├─► 'xone96-strips' 1-4 ──┼─ FILTER 1 bus ─► Svf L/R ──────┤
-//                     ┘   (GAIN, EQ, meter,     ├─ FILTER 2 bus ─► Svf L/R ──────┼─► 'xone96-master' ─► out
-//  studio_a/b (RTN)   ┐    fader, XF VCA,       ├─ SEND 1 ─► delay ─► RTN A ─┐   │   (LR MIX, MASTER 1,
-//  FX returns, deck,  ├─► 'xone96-strips' A-D ──┤  SEND 2 ─► reverb ─► RTN B ─┤   │    BOOTH, MONITOR,
-//  file, RTN C/D      ┘    assign, sends, cue)  └─ CUE bus ──────────────────────┘    YOU HEAR)
+//  studio_1..4 (LINE) ┐                          ┌─ LR MIX ─────────────────────────┐
+//  deck / USB file    ├─► 'xone96-strips' 1-4 ──┼─ FILTER 1 MIX ───────────────────┤
+//                     ┘   (GAIN, EQ, meter,     ├─ FILTER 2 MIX ───────────────────┼─► 'xone96-master' ─► out
+//  studio_a/b (RTN)   ┐    VCA = fader x XF,    ├─ AUX 1 ─► delay ─► RTN A ─┐      │   (Xone:VCF x 2, LR MIX,
+//  FX returns, deck,  ├─► 'xone96-strips' A-D ──┤  AUX 2 ─► reverb ─► RTN B ─┤      │    MASTER 1 / 2, BOOTH,
+//  file, RTN C/D      ┘    FILTER SELECT, CUE)  ├─ CUE 1, CUE 2 (PHONES 2) ──────────┤    MONITOR, PHONES 2,
+//                                               └─ CLEANFEED (MIC A/B) ─────────────┘    YOU HEAR)
 //
 // Channels 1-4 and A-D run in two worklet nodes, so the FX returns (fed by the
 // 1-4 sends) reach A/B without a feedback cycle. Studio instruments arrive on
@@ -21,24 +23,28 @@
 
 import type { ControlValue } from '@/types';
 import { BaseEngine, Clock } from '@/lib/audio/engine';
-import { Delay, Reverb2, Svf, smooth } from '@/lib/audio/dsp';
+import { Delay, Reverb2, smooth } from '@/lib/audio/dsp';
 import type { Transport } from '@/lib/audio/transport';
 import {
-  AUDITION_START_16TH, CHANNELS, type ChannelId, FILE_IN, FILTER_BUS, FADER_CURVES, FX_BEATS, OUT_SCALE, PK_DBU, RETURNS,
-  type ReturnId, SOURCE_TRIM_DB, SRC, STUDIO_IN, STUDIO_INPUTS, STUDIO_POSITION, SVF_MODE_OF_TYPE, XFADER_CURVES,
-  crunchDrive, crunchMakeup, faderLaw, gainLin, isAux, killBandGain, linToDbu, masterLaw, midBandDb, MID_CUT_AUX,
-  MID_CUT_MAIN, phonesLaw, qToSvf, resToQ, returnLevelLin, sendLaw, xfaderLaw,
+  AUDITION_START_16TH, CHANNELS, type ChannelId, FILE_IN, FADER_CURVES, FX_BEATS, MON, OUT_SCALE, PHONES2_SOURCES,
+  RETURNS, type ReturnId, SOURCE_TRIM_DB, SRC, STUDIO_IN, STUDIO_INPUTS, STUDIO_POSITION, TYPE_MASK, XFADER_CURVES,
+  addMixLaw, crunchDriveDb, faderLaw, gainLin, isAux, killBandGain, linToDbu, masterLaw, midBandDb, MID_CUT_AUX,
+  MID_CUT_MAIN, phonesLaw, resToQ, returnLevelLin, sendLaw, xfaderLaw,
 } from './model';
 
 // Strip parameter slots (keep in sync with public/worklets/xone96-processors.js)
 const P = {
   DECK: 0, STUDIO: 1, FILE: 2, RTN: 3, TRIM: 4, LO: 5, HI: 6, MIDA: 7, MIDB: 8, MIDF: 9,
-  FADER: 10, XF: 11, DIRECT: 12, F1: 13, F2: 14, S1PRE: 15, S1POST: 16, S2: 17, CUE: 18, CUEPOST: 19,
+  FADER: 10, XF: 11, DIRECT: 12, F1: 13, F2: 14, S1PRE: 15, S1POST: 16, S2: 17, CUE: 18, CUEPOST: 19, CF: 20, CUE2: 21,
 } as const;
-const NP = 20;
+const NP = 22;
 const K_MAIN = 0, K_AUX = 1, K_RTN = 2;
-/** f*_type index of HPF+BPF+LPF (model.FILTER_TYPES) */
-const ALL_PASS = 6;
+/** Strip outputs (stereo): LR MIX, FILTER 1 MIX, FILTER 2 MIX, AUX 1, AUX 2, CUE 1, CUE 2, CLEANFEED MIX */
+const O = { DIRECT: 0, F1: 1, F2: 2, S1: 3, S2: 4, CUE: 5, CUE2: 6, CF: 7 } as const;
+/** Master inputs */
+const I = { DIRECT: 0, F1: 1, F2: 2, CUE: 3, CUE2: 4, CF: 5 } as const;
+/** INPUT position of the mic on CH A/B */
+const MIC = 1;
 
 export type StripId = ChannelId | ReturnId;
 /** The worklet node and slot of each strip */
@@ -60,7 +66,6 @@ export class Xone96Engine extends BaseEngine {
   private studioIn = {} as Record<StripId, GainNode>;
   private fileIn = {} as Record<ChannelId, GainNode>;
   private players = {} as Record<ChannelId, { buffer?: AudioBuffer; node?: AudioBufferSourceNode }>;
-  private filters: [Svf, Svf][] = [];
   private delay!: Delay;
   private reverb!: Reverb2;
   private routed = {} as Record<StripId, boolean>;
@@ -97,8 +102,8 @@ export class Xone96Engine extends BaseEngine {
     // --- channel strips: 1-4 in one node, A, B and the RTN C/D returns in another ---
     const opts = (kinds: number[], inputs: { studio?: number; file?: number; rtn?: number }[], seed: number): AudioWorkletNodeOptions => ({
       numberOfInputs: 8,
-      numberOfOutputs: 6,
-      outputChannelCount: [2, 2, 2, 2, 2, 2],
+      numberOfOutputs: 8,
+      outputChannelCount: [2, 2, 2, 2, 2, 2, 2, 2],
       processorOptions: { kinds, inputs, seed },
     });
     const s14 = new AudioWorkletNode(ctx, 'xone96-strips', opts([K_MAIN, K_MAIN, K_MAIN, K_MAIN],
@@ -116,27 +121,19 @@ export class Xone96Engine extends BaseEngine {
     rtnA.connect(sAD, 0, 6);
     rtnB.connect(sAD, 0, 7);
 
-    // --- master section ------------------------------------------------------------
-    this.master = new AudioWorkletNode(ctx, 'xone96-master', { numberOfInputs: 4, numberOfOutputs: 1, outputChannelCount: [2] });
+    // --- master section: the buses, both Xone:VCF sections and the outputs -----------
+    // The VCFs run inside the master worklet: a state-variable filter whose three outputs are
+    // summed by the lit type switches (guide p.14), so every combination is exact.
+    this.master = new AudioWorkletNode(ctx, 'xone96-master', { numberOfInputs: 6, numberOfOutputs: 1, outputChannelCount: [2] });
     this.master.connect(this.out);
     for (const s of this.strips) {
-      s.connect(this.master, 0, 0); // direct to the LR MIX
-      s.connect(this.master, 5, 3); // cue bus
+      s.connect(this.master, O.DIRECT, I.DIRECT);
+      s.connect(this.master, O.F1, I.F1);
+      s.connect(this.master, O.F2, I.F2);
+      s.connect(this.master, O.CUE, I.CUE);
+      s.connect(this.master, O.CUE2, I.CUE2);
     }
-
-    // --- Xone:VCF sections: a stereo pair of the shared Svf each ----------------------
-    for (let f = 0; f < 2; f++) {
-      const split = ctx.createChannelSplitter(2);
-      const merge = ctx.createChannelMerger(2);
-      const pair: [Svf, Svf] = [new Svf(ctx, 1000, 'lp2'), new Svf(ctx, 1000, 'lp2')];
-      for (const s of this.strips) s.connect(split, 1 + f);
-      split.connect(pair[0].input, 0);
-      split.connect(pair[1].input, 1);
-      pair[0].output.connect(merge, 0, 0);
-      pair[1].output.connect(merge, 0, 1);
-      merge.connect(this.master, 0, 1 + f);
-      this.filters.push(pair);
-    }
+    sAD.connect(this.master, O.CF, I.CF); // only MIC A / MIC B use the clean feed
 
     // --- the stand-in FX unit: SND 1 -> delay -> RTN A, SND 2 -> reverb -> RTN B -----
     // Every channel has sends, A and B included, so a return can feed its own effect
@@ -148,8 +145,8 @@ export class Xone96Engine extends BaseEngine {
     this.reverb = new Reverb2(ctx, 2.5, { lowCut: 120, highCut: 12000 });
     this.reverb.damping.value = 6000;
     for (const s of this.strips) {
-      s.connect(this.delay.input, 3);
-      s.connect(this.reverb.input, 4);
+      s.connect(this.delay.input, O.S1);
+      s.connect(this.reverb.input, O.S2);
     }
     const loopGuard = ctx.createDelay(0.01);
     this.delay.output.connect(rtnA);
@@ -220,18 +217,26 @@ export class Xone96Engine extends BaseEngine {
     this.strips[s.node].port.postMessage({ t: 'ch', c: s.i, v });
   }
 
-  /** FILTER assign: a channel on a section that is OFF goes straight to the LR MIX */
-  private filterAssign(id: ChannelId) {
+  /**
+   * FILTER SELECT, after the VCA: LR MIX, FILTER 1 MIX or FILTER 2 MIX. A section that is OFF
+   * passes its bus dry, so its channels go straight to the LR MIX (CRUNCH out of circuit).
+   * With MIC selected on A/B the clean feed takes the channel instead (block diagram).
+   */
+  private filterAssign(id: ChannelId, cleanFeed: boolean) {
+    if (cleanFeed) return { direct: 0, f1: 0, f2: 0, cf: 1 };
     const a = this.num(`ch${id}_filter`, 1);
     const on1 = this.bool('f1_on'), on2 = this.bool('f2_on');
     return {
       direct: a === 1 || (a === 0 && !on1) || (a === 2 && !on2) ? 1 : 0,
-      f1: a === 0 && on1 ? FILTER_BUS : 0,
-      f2: a === 2 && on2 ? FILTER_BUS : 0,
+      f1: a === 0 && on1 ? 1 : 0,
+      f2: a === 2 && on2 ? 1 : 0,
+      cf: 0,
     };
   }
 
+  /** The crossfader's share of the channel VCA. Only CH 1-4 have an XFADER assign (guide p.11-12). */
   private xfGain(id: ChannelId): number {
+    if (isAux(id)) return 1;
     const assign = this.num(`ch${id}_xf`, 1);
     if (assign === 1) return 1;
     const curve = XFADER_CURVES[this.num('xf_curve', 0)] ?? 'const';
@@ -245,9 +250,14 @@ export class Xone96Engine extends BaseEngine {
     const file = input === 0 || input === 3;
     const studio = input === STUDIO_POSITION && this.routed[id];
     const aux = isAux(id);
-    const deck = !file && !studio && (aux ? input === 1 : true) && this.num(`ch${id}_src`, SRC.NONE) !== SRC.NONE;
+    const deck = !file && !studio && (aux ? input === MIC : true) && this.num(`ch${id}_src`, SRC.NONE) !== SRC.NONE;
     const rtn = aux && input === 2 && !studio;
-    return { deck, studio, file, rtn };
+    return { deck, studio, file, rtn, cleanFeed: aux && input === MIC };
+  }
+
+  /** PHONES 2 9-way source: 0 = MST, else the channel or return it listens to */
+  private phones2Of(id: StripId): number {
+    return PHONES2_SOURCES[this.num('phones2_src', 0)]?.toLowerCase() === id ? 1 : 0;
   }
 
   private updateStrip(id: ChannelId) {
@@ -265,20 +275,23 @@ export class Xone96Engine extends BaseEngine {
     v[P.HI] = killBandGain(this.num(`ch${id}_hi`, 0));
     if (aux) {
       v[P.MIDA] = midBandDb(this.num(`ch${id}_mid`, 0), MID_CUT_AUX);
-      v[P.MIDF] = this.num(`ch${id}_midf`, 700);
+      v[P.MIDF] = this.num(`ch${id}_midf`, 650);
     } else {
       v[P.MIDA] = midBandDb(this.num(`ch${id}_lomid`, 0), MID_CUT_MAIN);
       v[P.MIDB] = midBandDb(this.num(`ch${id}_himid`, 0), MID_CUT_MAIN);
-      v[P.MIDF] = 700;
+      v[P.MIDF] = 650;
     }
+    // CH 1-4: a VCA set by the fader (through the CHANNEL FADER curve) and the crossfader.
+    // CH A/B: an analogue fader, not on the curve switch or the crossfader (guide p.9, p.12).
     const curve = aux ? 'const' : FADER_CURVES[this.num('fader_curve', 0)] ?? 'const';
     v[P.FADER] = faderLaw(this.num(`ch${id}_fader`, 10) / 10, curve);
     v[P.XF] = this.xfGain(id);
-    const fx = this.filterAssign(id);
+    const fx = this.filterAssign(id, src.cleanFeed);
     v[P.DIRECT] = fx.direct;
     v[P.F1] = fx.f1;
     v[P.F2] = fx.f2;
-    // SEND 1: pre- or post-fader per channel (PRE button); SEND 2: always post-fader
+    v[P.CF] = fx.cf;
+    // SEND 1: PRE (post-EQ, pre-VCA) or post-VCA per channel; SEND 2: always post-VCA (the worklet applies the VCA)
     const s1 = sendLaw(this.num(`ch${id}_snd1`, 0));
     const pre = this.bool(`ch${id}_pre`);
     v[P.S1PRE] = pre ? s1 : 0;
@@ -286,6 +299,7 @@ export class Xone96Engine extends BaseEngine {
     v[P.S2] = sendLaw(this.num(`ch${id}_snd2`, 0));
     v[P.CUE] = this.bool(`ch${id}_cue`) ? 1 : 0;
     v[P.CUEPOST] = this.bool('cue_post_eq') ? 1 : 0;
+    v[P.CUE2] = this.phones2Of(id);
     this.sendStrip(id, v);
     const deck = src.deck ? deckSrc : SRC.NONE;
     if (this.sentSrc.get(id) !== deck) {
@@ -295,41 +309,33 @@ export class Xone96Engine extends BaseEngine {
     }
   }
 
-  /** RTN C / RTN D: LEVEL, ON and CUE, straight to the LR MIX */
+  /** RTN C / RTN D: LEVEL, then ON into the LR MIX; CUE and PHONES 2 listen before ON (block diagram) */
   private updateReturn(id: ReturnId) {
     if (!this.started) return;
     const v = new Array<number>(NP).fill(0);
     v[P.STUDIO] = 1;
-    v[P.TRIM] = this.bool(`rtn${id}_on`) ? returnLevelLin(this.num(`rtn${id}_level`, 0)) : 0;
-    v[P.LO] = 1; v[P.HI] = 1; v[P.FADER] = 1; v[P.XF] = 1; v[P.DIRECT] = 1;
+    v[P.TRIM] = returnLevelLin(this.num(`rtn${id}_level`, 0));
+    v[P.LO] = 1; v[P.HI] = 1; v[P.FADER] = 1; v[P.XF] = 1;
+    v[P.DIRECT] = this.bool(`rtn${id}_on`) ? 1 : 0;
     v[P.CUE] = this.bool(`rtn${id}_cue`) ? 1 : 0;
     v[P.CUEPOST] = 1;
+    v[P.CUE2] = this.phones2Of(id);
     this.sendStrip(id, v);
   }
 
+  /** A Xone:VCF section: lit switch mask, FREQ, Q (from RES), CRUNCH drive in dB */
   private updateFilter(f: 0 | 1) {
     if (!this.started) return;
     const p = `f${f + 1}_`;
-    const type = this.num(`${p}type`, f === 0 ? 0 : 2);
-    const mode = SVF_MODE_OF_TYPE[type] ?? 0;
-    const rv = this.num(`${p}res`, 2);
-    // All three switches on (HPF+BPF+LPF): neutral with RES at noon, a resonant peak above
-    const res = type === ALL_PASS ? Math.max(0, (rv - 5) / 5) : qToSvf(resToQ(rv));
-    const freq = this.num(`${p}freq`, f === 0 ? 20 : 20000);
-    const drive = crunchDrive(this.num(`${p}crunch`, 0));
-    const now = this.ctx.currentTime;
-    this.filters[f].forEach(s => {
-      s.mode.setValueAtTime(mode, now);
-      smooth(s.cutoff, freq, this.ctx, 0.012);
-      smooth(s.resonance, res, this.ctx, 0.02);
-      smooth(s.drive, drive, this.ctx, 0.02);
+    const mask = TYPE_MASK[this.num(`${p}type`, f === 0 ? 0 : 2)] ?? 1;
+    this.master.port.postMessage({
+      t: 'f', f,
+      v: [mask, this.num(`${p}freq`, f === 0 ? 20 : 20000), resToQ(this.num(`${p}res`, 2)), crunchDriveDb(this.num(`${p}crunch`, 0))],
     });
-    this.updateMaster();
   }
 
   private updateMaster() {
     if (!this.started) return;
-    const ret = (f: 1 | 2) => crunchMakeup(this.num(`f${f}_crunch`, 0)) / FILTER_BUS;
     this.master.port.postMessage({
       t: 'p',
       v: [
@@ -339,13 +345,16 @@ export class Xone96Engine extends BaseEngine {
         this.bool('booth_mute') ? 1 : 0,
         this.num('booth_lo', 0), this.num('booth_mid', 0), this.num('booth_hi', 0),
         phonesLaw(this.num('phones', 6)),
-        this.num('cue_mix', 0) / 10,
+        addMixLaw(this.num('cue_mix', 0)),
         this.bool('split_cue') ? 1 : 0,
-        this.num('monitor_out', 0),
-        ret(1), ret(2),
+        this.num('monitor_out', MON.MST1),
         OUT_SCALE,
-        // With nothing cued the headphones hear the master mix
+        // With nothing cued the MONITOR headphones hear the LR MIX
         CHANNELS.some(c => this.bool(`ch${c}_cue`)) || RETURNS.some(r => this.bool(`rtn${r}_cue`)) ? 1 : 0,
+        masterLaw(this.num('master2', 8)),
+        phonesLaw(this.num('phones2', 6)),
+        addMixLaw(this.num('phones2_mix', 0)),
+        this.num('phones2_src', 0) === 0 ? 1 : 0,
       ],
     });
   }
@@ -384,8 +393,13 @@ export class Xone96Engine extends BaseEngine {
       case 'f1_on': case 'f2_on': case 'xfader': case 'xf_curve': case 'fader_curve': case 'cue_post_eq':
         CHANNELS.forEach(c => this.updateStrip(c));
         break;
-      case 'master': case 'booth': case 'booth_mono': case 'booth_mute': case 'booth_lo': case 'booth_mid': case 'booth_hi':
-      case 'phones': case 'cue_mix': case 'split_cue': case 'monitor_out':
+      case 'phones2_src':
+        CHANNELS.forEach(c => this.updateStrip(c));
+        RETURNS.forEach(r => this.updateReturn(r));
+        this.updateMaster();
+        break;
+      case 'master': case 'master2': case 'booth': case 'booth_mono': case 'booth_mute': case 'booth_lo': case 'booth_mid': case 'booth_hi':
+      case 'phones': case 'cue_mix': case 'split_cue': case 'monitor_out': case 'phones2': case 'phones2_mix':
         this.updateMaster();
         break;
       case 'play': this.setPlaying(!!value); break;
@@ -583,7 +597,7 @@ export class Xone96Engine extends BaseEngine {
     const put = (k: string, lin: number | undefined, pk: number | undefined) => {
       const m = meters[k] ?? (meters[k] = { db: -120, pk: false });
       m.db = linToDbu(lin);
-      m.pk = !!pk || m.db >= PK_DBU;
+      m.pk = !!pk; // PK!: post-GAIN, pre-EQ on the channels (block diagram); +15 dBu
     };
     (['1', '2', '3', '4'] as const).forEach((id, i) => put(id, a?.[2 * i], a?.[2 * i + 1]));
     (['a', 'b', 'c', 'd'] as const).forEach((id, i) => put(id, b?.[2 * i], b?.[2 * i + 1]));
