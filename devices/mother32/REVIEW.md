@@ -83,7 +83,7 @@ Status: **complete** on `review/mother32` (pushed to `wip/review-mother32`). The
 | Levels | VCF out about +/-5 V max (M p.48) | VCF jack <= 5.75 V; main <= -0.0 dBFS at VOLUME 100 |
 | DC | - | presets: abs(mean) under 0.001; VOLUME 100: under 0.001 |
 | Retrigger | - | from the current level (3.0 V -> 3.16 V on the first sample; no drop to zero) |
-| CPU | - | CPU_RESULT |
+| CPU | - | 31x realtime for one instance, one worklet node (`scripts/bench.cjs`, `devices=mother32`, on a machine shared with other agents). Against the bench's first-build variant the ratio is 1.12x, as in the builder's 42x run on a quieter machine (1.13x): the rails and the second blocker cost nothing measurable |
 
 ## Patch sheets: do they sound as the manual intends?
 
@@ -114,8 +114,10 @@ same way) - left for the integrator.
 
 - Before, audition: `[mother32] median -18.0 LUFS, spread 11.3 LU, 3 of 43 flagged (clicks 1, loudness 2)`, exit 1.
 - Before, transport: `[mother32] median -17.7 LUFS, spread 9.9 LU, 0 of 43 flagged (none)`, exit 0.
-- After, audition: QA_AFTER_AUD
-- After, transport: QA_AFTER_TP
+- After, audition: `[mother32] median -18.0 LUFS, spread 8.9 LU, 0 of 43 flagged (none)`, exit 0.
+- After, transport: `[mother32] median -17.8 LUFS, spread 9.1 LU, 0 of 43 flagged (none)`, exit 0.
+- The offline harness, using the QA tool's own meter, agreed with the browser runs to 0.1 LU,
+  so the volumes were set offline and confirmed in the app.
 
 | Preset | VOLUME | Why |
 |---|---|---|
@@ -160,4 +162,15 @@ same way) - left for the integrator.
 
 ## Gate
 
-GATE_RESULTS
+All on the final code (production build, `next start -p 3143`):
+
+- `tsc --noEmit`: 0 errors. `next lint`: no warnings or errors. `npm run validate mother32`:
+  0 errors (1 warning, unchanged: too many UI-state combinations to check every binding).
+- `npm run build`: passes.
+- `node scripts/smoke.cjs http://localhost:3143 mother32 <scratch>`: no errors; no horizontal
+  overflow at 1440 x 900 or 1180 x 820; notes, transport and all 21 buttons make sound.
+- `node scripts/lesson-runner.cjs http://localhost:3143 mother32`: 19 lessons, 0 failed,
+  0 manual steps, 0 auto steps.
+- `node scripts/e2e/run.cjs http://localhost:3143`: 34 / 34 passed.
+- Audio QA `--target -18 --suggest`, audition and `--excite mother32=transport`: both exit 0,
+  0 of 43 flagged.
