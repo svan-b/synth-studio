@@ -323,7 +323,7 @@ const bassKick: Lesson = {
       solution: { sequence: [{ track: T1, trigs: on([3, 7, 11, 15]) }], transport: 'play' },
       hints: ['The A4\'s trig keys are along its bottom edge.', 'Tap 3, 7, 11 and 15: the off-beats.', 'Then ▶ in the top bar.'],
       principle: 'A bass on the off-beats answers the kick instead of fighting it.',
-      explanation: 'The kick owns the beat and the bass speaks in between. A bassline is the low melody that holds the harmony and the groove together. Each trig plays the NOTE page\'s note, A2.',
+      explanation: 'The kick owns the beat and the bass speaks in between. A bassline is the low melody that holds the harmony and the groove together. Each trig plays the NOTE page\'s note, A2. The A4\'s pattern swings 56 %, like the Rytm\'s, so the bass and the hats lean the same way.',
     },
     {
       kind: 'predict', concept: 'sequencer-pattern', instance: A4, focus: ['seq:trig:1'],

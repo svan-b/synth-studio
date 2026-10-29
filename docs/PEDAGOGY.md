@@ -154,9 +154,10 @@ well as quiz steps and `review` questions.
 Studio lessons (`device: 'studio'`) teach the whole studio: the mix, the master, the song and
 the bounce. These fields are additive; every earlier lesson keeps working. The Producer path
 (`path: 'producer'`, ids `studio-producer-…`, `docs/research/producer-path/curriculum.md`) is
-built on them. Its lessons live in `lib/studio/producerLessons.ts` and load on demand
-(`lib/studio/producerIndex.ts` lists their ids up front, so Daily Review keeps their questions
-while they load).
+built on them: all 15 lessons, L1 First beat to L15 the Capstone. They live in
+`lib/studio/producerLessons.ts` (which also takes in `producerElektronLessons.ts`) and load on
+demand (`lib/studio/producerIndex.ts` lists their ids up front, so Daily Review keeps their
+questions while they load).
 
 ### A whole studio to start from
 
