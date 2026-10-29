@@ -68,6 +68,11 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
   const focusMode = useStudioStore(s => s.focusMode);
   const stepSatisfied = useStudioStore(s => s.stepSatisfied);
   const lessonDemo = useStudioStore(s => s.lessonDemo);
+  // Clock source, as on hardware with MIDI clock plugged in or not
+  const canSync = !!mod.studio?.midiSync && !!mod.transportControl && device !== 'studio-clock';
+  const synced = useStudioStore(s => s.studio.sync[instance] !== false);
+  const studioBpm = useStudioStore(s => s.studio.bpm);
+  const setSync = useStudioStore(s => s.setSync);
   const ui = useUiStore(selectUi(instance));
   const setUiStore = useUiStore(s => s.setUi);
   // Engine state goes straight to the elements that show it (LEDs, screens, playheads):
@@ -291,6 +296,17 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
             Clear cables{patches.length ? ` (${patches.length})` : ''}
           </ToolButton>
         )}
+        {!compact && canSync && (
+          <ToolButton
+            onClick={() => setSync(instance, !synced)}
+            title={synced
+              ? `Follows the studio clock (${studioBpm} BPM), like MIDI clock: Play keeps it in time with everything else. Tap to run it on its own tempo instead.`
+              : 'Runs on its own tempo, like hardware with no clock plugged in. Tap to follow the studio clock again.'}
+            pressed={!synced}
+          >
+            Clock: {synced ? `studio ${studioBpm}` : 'own tempo'}
+          </ToolButton>
+        )}
         {!zoomOverride && (
           <div className="flex items-center rounded-full border border-[#3a3a3a] overflow-hidden">
             <button className={`px-2.5 py-1.5 text-xs coarse:min-h-[44px] coarse:min-w-[44px] ${zoom === 'fit' ? 'bg-[#3a3a3a] text-white' : 'text-gray-400'}`} onClick={() => setZoom('fit')}>Fit</button>
@@ -416,13 +432,14 @@ function groupPresets(presets: PresetEntry[]): [string, PresetEntry[]][] {
   return [...groups.entries()];
 }
 
-function ToolButton({ children, onClick, title, disabled }: { children: React.ReactNode; onClick: () => void; title?: string; disabled?: boolean }) {
+function ToolButton({ children, onClick, title, disabled, pressed }: { children: React.ReactNode; onClick: () => void; title?: string; disabled?: boolean; pressed?: boolean }) {
   return (
     <button
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="px-3 py-1.5 text-xs bg-[#2d2d2d] hover:bg-[#3a3a3a] text-white rounded-full border border-[#3a3a3a] disabled:opacity-40 transition-colors coarse:min-h-[44px] coarse:min-w-[44px]"
+      aria-pressed={pressed}
+      className="px-3 py-1.5 text-xs bg-[#2d2d2d] hover:bg-[#3a3a3a] text-white rounded-full border border-[#3a3a3a] aria-pressed:border-amber-500/70 aria-pressed:text-amber-200 disabled:opacity-40 transition-colors coarse:min-h-[44px] coarse:min-w-[44px]"
     >
       {children}
     </button>
