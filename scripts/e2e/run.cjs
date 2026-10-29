@@ -6,7 +6,8 @@
 // Always: the iPad journey, the studio (clock cable, record, reload), rapid
 // instrument switching, saved-settings upgrades and touch gestures (fine adjust,
 // value bubble, double-tap reset, no page scroll, a momentary lesson step, the
-// spectrum scope).
+// spectrum scope), and the Producer path on iPad (a whole-studio lesson; First
+// beat by touch on the Analog Rytm and Groove's pattern SWING).
 // --full: also scripts/smoke.cjs and scripts/lesson-runner.cjs for every
 // instrument in devices/index.ts.
 // Exits non-zero if anything fails, so it can gate merges.
@@ -111,6 +112,9 @@ check('touch: spectrum scope draws the output while it plays', sp.playing?.mode 
 const pp = run(path.join(__dirname, 'producer.cjs'), [base, path.join(outDir, 'producer')], 600_000);
 check('producer path: iPad walkthrough of a whole-studio lesson', !pp.__error && pp.total > 0 && (pp.failed ?? []).length === 0 && (pp.errs ?? []).length === 0,
   pp.__error ?? { passed: pp.passed, total: pp.total, failed: pp.failed });
+const pe = run(path.join(__dirname, 'producer-elektron.cjs'), [base, path.join(outDir, 'producer-elektron')], 600_000);
+check('producer path: iPad walkthrough of First beat by touch, and Groove\'s pattern SWING', !pe.__error && pe.total > 0 && (pe.failed ?? []).length === 0 && (pe.errs ?? []).length === 0,
+  pe.__error ?? { passed: pe.passed, total: pe.total, failed: pe.failed });
 
 // ---- Every instrument (--full) -----------------------------------------------
 if (full) {

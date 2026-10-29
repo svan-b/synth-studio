@@ -79,7 +79,7 @@ const firstBeat: Lesson = {
       explanation: 'Your studio for the path: the Analog Rytm (drums) plays into channel 1 of the Xone:96 mixer, and the Analog Four waits on channel 2 for the bass and chords. Both follow the studio clock at 124 BPM.',
     },
     {
-      kind: 'do', concept: 'timing-tempo', instance: RYTM, focus: ['seq:trig:1', 'seq:trig:5', 'seq:trig:9', 'seq:trig:13'],
+      kind: 'do', concept: 'timing-tempo', instance: RYTM, focus: ['seq:trig:1', 'seq:trig:5', 'seq:trig:9', 'seq:trig:13', 'key:play'],
       instruction: 'BD (the kick) is selected and GRID RECORDING is on. Tap trig keys 1, 5, 9 and 13, then press ▶.',
       check: s => hasTrigs(s, RYTM, BD, BEATS) && playing(s),
       solution: { sequence: [{ track: BD, trigs: on(BEATS) }], transport: 'play' },
@@ -185,7 +185,7 @@ const groove: Lesson = {
         'One beat every four steps. Steps 4, 8, 12 and 16 sit just before each beat.'),
     },
     {
-      kind: 'do', concept: 'sequencer-pattern', instance: RYTM, focus: ['seq:trigs'],
+      kind: 'do', concept: 'sequencer-pattern', instance: RYTM, focus: ['seq:trig:2', 'seq:trig:4', 'seq:trig:6', 'seq:trig:8', 'seq:trig:10', 'seq:trig:12', 'seq:trig:14', 'seq:trig:16'],
       instruction: 'The CH track is selected. Add trigs on 2, 4, 6, 8, 10, 12, 14 and 16.',
       check: s => hasTrigs(s, RYTM, CH, [2, 4, 6, 8, 10, 12, 14, 16]),
       solution: { values: { track: CH }, sequence: [{ track: CH, trigs: on([2, 4, 6, 8, 10, 12, 14, 16]) }] },
@@ -193,7 +193,7 @@ const groove: Lesson = {
       explanation: 'Now the hat plays on every step, 16 per bar. All of them are equally loud, which sounds like a machine.',
     },
     {
-      kind: 'do', concept: 'velocity-dynamics', instance: RYTM, focus: ['seq:trig:2', 'seq:trig:6', 'seq:trig:10', 'seq:trig:14'],
+      kind: 'do', concept: 'velocity-dynamics', instance: RYTM, focus: ['seq:trig:2', 'seq:trig:6', 'seq:trig:10', 'seq:trig:14', 'ch_trig_vel'],
       instruction: 'Hold CH trig 2 and turn VEL (TRIG page, encoder B) down to about 45. Repeat on 6, 10 and 14.',
       check: s => [2, 6, 10, 14].every(n => (velOf(s, RYTM, CH, n) ?? 127) <= 70),
       solution: { sequence: [{ track: CH, trigs: on([2, 6, 10, 14], { vel: 45 }) }] },
@@ -204,14 +204,14 @@ const groove: Lesson = {
     },
     {
       kind: 'predict', concept: 'timing-tempo', instance: RYTM, focus: ['key:func', 'key:bank:G', 'key:up'],
-      instruction: 'Set the pattern\'s SWING to 58 %: [FUNC] + [BANK G], then [UP] until it reads 58.',
+      instruction: 'Set the pattern\'s SWING to 58 %: [FUNC] + [BANK G], then [UP] until it reads 58. [FUNC] + [BANK G] again closes the menu.',
       check: s => between(pswing(s, RYTM), 55, 62),
       solution: { patterns: { [RYTM]: { swing: 58 } } },
-      hints: ['SWING belongs to the pattern, not to a knob.', 'Tap [FUNC], then [BANK G]: the SWING menu opens.', '[UP] raises it one percent at a time.'],
+      hints: ['SWING belongs to the pattern, not to a knob.', 'Tap [FUNC], then [BANK G]: the SWING menu opens. While it is open the trig keys pick the swing steps.', '[UP] raises it one percent at a time.'],
       predict: mc('Swing delays every second 16th. What will you hear?', ['The hats get louder', 'A bouncier, shuffled feel at the same tempo', 'A faster tempo'], 1,
         'Only the timing of steps 2, 4, 6… moves later, so the groove lopes while the beats stay put. Loudness is velocity, not swing.'),
       principle: 'Delaying every second 16th turns straight time into a shuffle.',
-      explanation: 'SWING runs from 50 % (straight) to 80 %. At 58 % every even step plays 16 % of a step late: about 19 ms at 124 BPM.',
+      explanation: 'SWING runs from 50 % (straight) to 80 %. At 58 % every even step plays 16 % of a step late: about 19 ms at 124 BPM. The SWING in the top bar is the studio\'s: it would swing every synced instrument on top of this, so leave it at 50 %.',
       manualReference: 'Rytm MKII manual p.50: SWING',
     },
     {
@@ -241,7 +241,7 @@ const groove: Lesson = {
     },
     {
       kind: 'match', concept: 'timing-tempo', instance: RYTM, focus: ['key:func', 'key:bank:G'],
-      instruction: 'Recreate the target groove by ear: set the SWING ([FUNC] + [BANK G], then [UP] and [DOWN]).',
+      instruction: 'Recreate the target groove by ear with the SWING menu ([FUNC] + [BANK G], then [UP] and [DOWN]). Close it again when you are done.',
       match: { target: {}, controls: [], pattern: { target: { swing: 64 }, start: { swing: 50 } }, tolerance: 0.1 },
       hints: ['Is the target straighter or more shuffled than yours?', 'It is quite shuffled.', 'Try the low 60s.'],
     },
@@ -262,7 +262,7 @@ const groove: Lesson = {
         { text: 'SWING between 52 and 62 %', check: s => between(pswing(s, RYTM), 52, 62) },
         { text: 'The kick is still on every beat', check: s => hasTrigs(s, RYTM, BD, BEATS) },
       ],
-      hints: ['Loud on the off-beats, soft in between.', 'Set 3, 7, 11 and 15 to about 96, 4, 8, 12 and 16 to about 60, and keep the ghosts at 45.', 'House usually swings 54-58 %.'],
+      hints: ['Loud on the off-beats, soft in between. The SWING menu must be closed so the trig keys hold trigs: [FUNC] + [BANK G].', 'Set 3, 7, 11 and 15 to about 96, 4, 8, 12 and 16 to about 60, and keep the ghosts at 45.', 'House usually swings 54-58 %.'],
       solution: { sequence: [{ track: CH, trigs: HATS_GROOVE }], patterns: { [RYTM]: { swing: SWING } } },
     },
     {
@@ -778,7 +778,7 @@ const movement: Lesson = {
       manualReference: 'A4 MKII manual p.50: parameter locks',
     },
     {
-      kind: 'predict', concept: 'sequencer-pattern', instance: RYTM, focus: ['pad:ch', 'seq:trig:16'],
+      kind: 'predict', concept: 'sequencer-pattern', instance: RYTM, focus: ['pad:ch', 'seq:trig:16', 'ch_trig_cond'],
       instruction: 'On the Rytm, tap the CH pad. Hold trig 16 and turn TRC (TRIG page, encoder D) to 1:2.',
       check: s => trig(s, RYTM, CH, 16)?.cond === '1:2',
       solution: { values: { track: CH }, sequence: [{ track: CH, trigs: { 16: { cond: '1:2' } } }] },
@@ -788,7 +788,7 @@ const movement: Lesson = {
       manualReference: 'Rytm MKII manual p.48: trig conditions',
     },
     {
-      kind: 'do', concept: 'sequencer-pattern', instance: RYTM, focus: ['pad:sd', 'seq:trig:14', 'seq:trig:15', 'seq:trig:16'],
+      kind: 'do', concept: 'sequencer-pattern', instance: RYTM, focus: ['pad:sd', 'seq:trig:14', 'seq:trig:15', 'seq:trig:16', 'sd_trig_cond'],
       instruction: 'Add a fill at the end of every four bars: tap the SD pad, add trigs 14, 15 and 16, and set each one\'s TRC to 4:4.',
       check: s => [14, 15, 16].every(n => trig(s, RYTM, SD, n)?.cond === '4:4'),
       solution: { values: { track: SD }, sequence: [{ track: SD, trigs: { 14: { vel: 70, cond: '4:4' }, 15: { vel: 86, cond: '4:4' }, 16: { vel: 104, cond: '4:4' } } }] },

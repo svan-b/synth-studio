@@ -181,11 +181,21 @@ dialog lists every saved studio. Bringing one back swaps: the studio you have th
 its place. `restoreStudioBackup(id)`, `deleteStudioBackup(id)` and `useOwnStudio()` are the
 store actions.
 
-`lib/studio/producerStudio.ts` builds the Producer path's studio, "Tide Pool": the Studio
-Clock, a DFAM percussion loop clocked by cable, and the Xone:96, whose built-in decks play the
-stems (drums, bass, stabs, pad, perc) and follow the studio clock like MIDI-synced machines.
-Each lesson's checkpoint is that studio plus its changes (`CP_MUDDY`, `CP_SPACED`, `CP_ROUGH`,
-`CP_MIXED`, `songSections()`...).
+The Producer path has two studios. `lib/studio/producerElektron.ts` builds the learner's own
+track, "Low Tide" (L1-L3, L5, L6, L8 and the Capstone, `producerElektronLessons.ts`): the
+Studio Clock, an Analog Rytm on Xone:96 channel 1 and an Analog Four on channel 2, both synced,
+with Demo 1's sounds (the Rytm kit and the A4 kit PRODUCER) and, from L6, the Sub 37 on
+channel 3. Its checkpoints (`CP_00` … `CP_08`, `CP_CAPSTONE`) are written in the instruments'
+own data formats: Elektron patterns from `rytmPattern` / `a4Pattern` with trigs numbered like
+the trig keys. `lib/studio/producerStudio.ts` builds "Tide Pool" for the studio lessons (L4,
+L7, L9-L14): the Studio Clock, a DFAM percussion loop clocked by cable, and the Xone:96, whose
+built-in decks play the stems (drums, bass, stabs, pad, perc) and follow the studio clock like
+MIDI-synced machines (`CP_MUDDY`, `CP_SPACED`, `CP_ROUGH`, `CP_MIXED`, `songSections()`...).
+
+In the Producer path the app follows the steps: when a step begins, a step with an `instance`
+shows that instrument and a step with an `area` shows the studio. On a touch screen the coach
+floats over the panel; when a step begins it moves to the corner that hides the least of what
+the step highlights (its `focus`), so a trig key or pad the learner must tap is never under it.
 
 ### What checks can read
 

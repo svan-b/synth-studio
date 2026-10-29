@@ -129,6 +129,22 @@ function App() {
     }, 15 * 60_000);
     return () => clearTimeout(t);
   }, []);
+  // The Producer path follows its steps: a step on an instrument shows that instrument, a step
+  // about the mixer, the master, the arranger or the rack shows the studio. Only when a step
+  // begins, so the learner can still look around within a step.
+  const currentStep = useStudioStore(s => s.currentStep);
+  useEffect(() => {
+    if (!isTeaching || !currentLesson || currentLesson.path !== 'producer') return;
+    const step = currentLesson.steps[currentStep];
+    if (!step) return;
+    if (step.area && step.area !== 'transport') { setView('studio'); return; }
+    const ref = step.instance;
+    if (!ref || ref === 'studio') return;
+    const now = useStudioStore.getState().studio.rack;
+    const inst = now.find(r => r.id === ref)?.id ?? now.find(r => r.device === ref)?.id;
+    if (inst) { setCurrentDevice(inst); setView('instrument'); }
+  }, [isTeaching, currentLesson, currentStep, setCurrentDevice]);
+
   const closeWelcome = () => {
     setWelcomeOpen(false);
     try { localStorage.setItem('synth-studio-welcomed', '1'); } catch { /* ignore */ }
