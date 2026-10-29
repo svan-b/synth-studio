@@ -74,6 +74,8 @@ export function buildLessonStudio(
       : { enabled: false, loop: true, sections: [] },
     off: {},
     mixer,
+    // A lesson studio starts on main outputs only: its checks know nothing of the learner's separate outs
+    outputs: {},
   };
   const focus = start.focus && start.rack.some(r => r.id === start.focus) ? start.focus : start.rack[0]?.id ?? prev.studio.rack[0]?.id ?? 'dfam';
   return { devices, studio, currentDevice: focus };

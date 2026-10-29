@@ -85,6 +85,13 @@ export interface DeviceModule {
     /** Stereo/mono main output (default mono) */
     stereo?: boolean;
     /**
+     * Separate outputs, like the hardware's individual outs (the Rytm's voice outputs). Each one
+     * the learner turns on in the mixer gets its own channel, '<instance>/<id>', with its own
+     * fader, sends and route (into the master or a mixer's input). While an output is connected
+     * the engine takes that part out of its main output (SynthEngine.connectOutput).
+     */
+    outputs?: { id: string; label: string; stereo?: boolean }[];
+    /**
      * Pattern-based instruments: list the patterns that have content, for the
      * song arranger. The engine must handle event('arranger:pattern', { id, time })
      * by switching to that pattern at audio time `time` (a bar boundary).

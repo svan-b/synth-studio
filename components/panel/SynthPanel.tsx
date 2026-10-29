@@ -758,6 +758,7 @@ const SwitchEl = memo(function SwitchEl({ el, spec, value, onChange, x, y, label
         labelText={el.labelText}
         labelColor={labelColor}
         scale={el.scale}
+        legends={el.legends}
         highlighted={highlighted}
         targetValue={targetValue}
         labelFit={labelFit}

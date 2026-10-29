@@ -19,6 +19,7 @@ import { transport, PPQN } from '@/lib/audio/transport';
 import { useStudioStore } from '@/store/studio';
 import { DEVICES } from '@/devices';
 import { hub } from './hub';
+import { outputChannelId } from './mixerDoc';
 import { arranger } from './arranger';
 import { withoutHistory } from './historyGate';
 import { makeZip, zipSize, ZIP_LIMIT, type ZipEntry } from './zip';
@@ -42,10 +43,20 @@ export function stemTaps(): TakeTap[] {
   const rack = useStudioStore.getState().studio.rack;
   const taps: TakeTap[] = [];
   let n = 1;
+  const outputs = useStudioStore.getState().studio.outputs ?? {};
   rack.forEach(r => {
     const node = hub.getStripOutput(r.id);
     if (!node) return;
     taps.push({ id: r.id, name: `${String(n++).padStart(2, '0')} ${safe(instanceName(r.id))}`, node });
+    // its separate outputs in use, each its own stem
+    const outs = hub.getModule(r.device)?.studio?.outputs ?? [];
+    (outputs[r.id] ?? []).forEach(o => {
+      const id = outputChannelId(r.id, o);
+      const out = hub.getStripOutput(id);
+      if (!out) return;
+      const label = outs.find(x => x.id === o)?.label ?? o;
+      taps.push({ id, name: `${String(n++).padStart(2, '0')} ${safe(`${instanceName(r.id)} - ${label}`)}`, node: out });
+    });
   });
   mixer.taps().forEach(t => {
     if (t.id === '__delay') taps.push({ id: t.id, name: `${String(n++).padStart(2, '0')} Return A - Delay`, node: t.node });

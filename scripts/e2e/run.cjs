@@ -1,7 +1,7 @@
 // ============================================================================
 // End-to-end regression suite. Run against a production build:
 //   npm run build && npx next start -p 3100
-//   node scripts/e2e/run.cjs http://localhost:3100 [--out <dir>] [--full] [--demos]
+//   node scripts/e2e/run.cjs http://localhost:3100 [--out <dir>] [--full] [--demos] [--monkey]
 //
 // Always: the iPad journey, the studio (clock cable, record, reload), rapid
 // instrument switching, saved-settings upgrades and touch gestures (fine adjust,
@@ -22,6 +22,7 @@ const base = args.find(a => !a.startsWith('--')) ?? 'http://localhost:3100';
 const outIdx = args.indexOf('--out');
 const outDir = path.resolve(outIdx >= 0 ? args[outIdx + 1] : fs.mkdtempSync('/tmp/synth-e2e-'));
 const full = args.includes('--full');
+const monkey = args.includes('--monkey');
 fs.mkdirSync(outDir, { recursive: true });
 
 const root = path.join(__dirname, '..', '..');
@@ -111,6 +112,11 @@ check('touch: a momentary-button do-step counts taps and completes', tm.before?.
 check('touch: spectrum scope draws the output while it plays', sp.playing?.mode === 'spectrum' && sp.flippedTo === 'wave' && sp.playing?.sized && sp.quiet?.lit < 40 && sp.playing?.cols > 0.3 * (sp.playing?.W ?? 1e9),
   { quiet: sp.quiet?.lit, playingCols: sp.playing?.cols, width: sp.playing?.W, mode: sp.playing?.mode, flip: sp.flippedTo });
 
+// ---- Separate outputs (DeviceModule.studio.outputs) ---------------------------
+const so = run(path.join(__dirname, 'outputs.cjs'), [base, path.join(outDir, 'outputs')]);
+check('separate outputs: a channel of its own that routes, mutes, shows in the mixer and goes when off', !so.__error && so.ok && (so.errs ?? []).length === 0,
+  so.__error ?? { on: so.on && { strip: so.on.strip, rms: so.on.rms }, ui: so.ui, mute: so.mute, off: so.off && { strip: so.off.strip } });
+
 // ---- Producer path on iPad ---------------------------------------------------
 const pp = run(path.join(__dirname, 'producer.cjs'), [base, path.join(outDir, 'producer')], 600_000);
 check('producer path: iPad walkthrough of a whole-studio lesson', !pp.__error && pp.total > 0 && (pp.failed ?? []).length === 0 && (pp.errs ?? []).length === 0,
@@ -159,6 +165,18 @@ if (full) {
     const l = run(path.join(root, 'scripts', 'lesson-runner.cjs'), [base, d], 900_000);
     if (l.lessons) check(`lessons ${d}: all ${l.lessons} complete`, l.failedLessons === 0 && (l.errors ?? []).length === 0, l.failedLessons ? l.details : l.errors);
   }
+}
+
+// ---- Monkey tests (--monkey): random use, no page errors allowed ---------------
+if (monkey) {
+  const registry = fs.readFileSync(path.join(root, 'devices', 'index.ts'), 'utf8');
+  const devices = [...registry.matchAll(/^\s+id: '([^']+)'/gm)].map(m => m[1]);
+  for (const d of devices) {
+    const m = run(path.join(__dirname, 'monkey.cjs'), [base, d, '30', '7'], 180_000);
+    check(`monkey ${d}: 30 s of random use without a page error`, !m.__error && m.errors === 0, m.__error ?? (m.errors ? m.first : { actions: m.actions }));
+  }
+  const sm = run(path.join(__dirname, 'studio-monkey.cjs'), [base, '120', '5'], 400_000);
+  check('monkey studio: 2 min of random studio use without a page error', !sm.__error && sm.errors === 0, sm.__error ?? (sm.errors ? sm.first : { actions: sm.actions, rack: sm.end?.rack }));
 }
 
 const failed = results.filter(r => !r.ok);

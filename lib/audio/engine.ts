@@ -77,6 +77,11 @@ export interface SynthEngine {
   followTransport(transport: Transport | null): void;
   /** Structured device data (patterns, songs...) - see DeviceModule.data */
   setData(data: unknown): void;
+  /**
+   * A separate output (DeviceModule.studio.outputs): send that part to `destination` and take
+   * it out of the main output; null puts it back in the main output.
+   */
+  connectOutput?(id: string, destination: AudioNode | null): void;
 }
 
 interface ActiveCable {

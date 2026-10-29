@@ -25,6 +25,8 @@ export interface SwitchProps {
   /** Position legends' size and condense */
   legendFit?: TextFit;
   spot?: 'target' | 'focus' | null;
+  /** Vertical toggle: position legends beside the lever, or at its ends (first above, last below) */
+  legends?: 'side' | 'ends';
 }
 
 /** Native sizes the switch draws at (shared with the panel's legibility pass) */
@@ -55,6 +57,7 @@ function Switch({
   labelFit,
   legendFit,
   spot,
+  legends = 'side',
 }: SwitchProps) {
   const { options } = spec;
   const current = Math.max(0, Math.min(options.length - 1, Math.round(value)));
@@ -235,9 +238,25 @@ function Switch({
     select((current + 1) % positions);
   };
 
+  const legend = (opt: string, i: number, origin: string) => (
+    <span
+      key={opt + i}
+      {...radio(i)}
+      onClick={() => select(i)}
+      className={`relative cursor-pointer whitespace-nowrap ${styles.focusable}`}
+      style={{ color: i === current ? '#fff' : '#8f8f8f', transform: legendTransform, transformOrigin: origin }}
+    >
+      {/* Bigger invisible target than the tiny legend */}
+      <span className={styles.hit} style={{ inset: '-3px -4px' }} />
+      {opt}
+    </span>
+  );
+  const ends = vertical && legends === 'ends' && positions >= 2;
+
   return (
     <div className="flex flex-col items-center select-none" {...group}>
       {header}
+      {ends && <div className="font-bold leading-none mb-0.5" style={{ fontSize: legendFont }}>{legend(options[0], 0, 'center bottom')}</div>}
       <div className={`flex ${vertical ? 'flex-row' : 'flex-col'} items-center gap-0.5`}>
         <button
           onPointerDown={onLeverDown}
@@ -268,25 +287,19 @@ function Switch({
             }}
           />
         </button>
-        <div
-          className={`flex ${vertical ? 'flex-col' : 'flex-row gap-1'} justify-between font-bold leading-none`}
-          style={vertical ? { height: legendSpan, fontSize: legendFont } : { fontSize: legendFont }}
-        >
-          {options.map((opt, i) => (
-            <span
-              key={opt + i}
-              {...radio(i)}
-              onClick={() => select(i)}
-              className={`relative cursor-pointer whitespace-nowrap ${styles.focusable}`}
-              style={{ color: i === current ? '#fff' : '#8f8f8f', transform: legendTransform, transformOrigin: 'left center' }}
-            >
-              {/* Bigger invisible target than the tiny legend */}
-              <span className={styles.hit} style={{ inset: '-3px -4px' }} />
-              {opt}
-            </span>
-          ))}
-        </div>
+        {ends ? (
+          // a three-way switch keeps its middle legend beside the lever
+          positions === 3 && <div className="font-bold leading-none" style={{ fontSize: legendFont }}>{legend(options[1], 1, 'left center')}</div>
+        ) : (
+          <div
+            className={`flex ${vertical ? 'flex-col' : 'flex-row gap-1'} justify-between font-bold leading-none`}
+            style={vertical ? { height: legendSpan, fontSize: legendFont } : { fontSize: legendFont }}
+          >
+            {options.map((opt, i) => legend(opt, i, 'left center'))}
+          </div>
+        )}
       </div>
+      {ends && <div className="font-bold leading-none mt-0.5" style={{ fontSize: legendFont }}>{legend(options[positions - 1], positions - 1, 'center top')}</div>}
       {hint}
     </div>
   );

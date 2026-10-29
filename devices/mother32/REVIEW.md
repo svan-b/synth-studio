@@ -150,15 +150,19 @@ same way) - left for the integrator.
 3. **Self-oscillation onset** at about 2:40 instead of "above 3 o'clock" - left: moving it shifts
    every resonant preset, for a quarter-hour of knob travel.
 4. **Switch legends** beside the lever and **knob travel** 270° instead of about 300°: both live in
-   shared components (`components/controls/Switch.tsx`, `Knob.tsx`).
+   shared components (`components/controls/Switch.tsx`, `Knob.tsx`). Both fixed after the review:
+   the panel sets `knobTravel: 300`, and its toggles use `legends: 'ends'`, which puts one position
+   above the lever and the other below, as on p.9.
 5. **LIN FM depth** (+5 V doubles the frequency) is a guess; Octave Bounce Back's drawn VC MIX hints
    that the hardware's is stronger (about +3.5 V per octave).
 6. **Mixer AC coupling** (4 Hz) is a guess, and it sets how loud the pulse's DC thump is under a
    fast pulse-width sweep (Short Brass).
 7. Not modelled (documented in REFERENCE.md): MIDI velocity >= 96 setting accents while recording,
    Setup page 2 and 5 and page 8 options 1-3, the LED sweep animations.
-8. Under SINGLE CLOCK ADVANCE the TEMPO knob shows CLOCK DIV although the manual says the knob is
-   ignored in that mode; the engine does ignore it, so only the display is misleading.
+8. Under SINGLE CLOCK ADVANCE the TEMPO knob showed CLOCK DIV although the manual says the knob is
+   ignored in that mode (p.55). Fixed after the review: with a TEMPO-jack clock in SINGLE CLOCK
+   ADVANCE or STEP ADDRESS CV the knob stays on TEMPO (the internal tempo it returns to); only
+   an ANALOG CLOCK or the studio's MIDI clock make it the clock division.
 
 ## Gate
 
