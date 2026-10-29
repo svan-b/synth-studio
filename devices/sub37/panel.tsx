@@ -1,15 +1,90 @@
 'use client';
 // ============================================================================
-// Sub 37 custom panel parts: pitch & mod wheels, the 16-button preset bank and
-// the LCD. Rendered through `custom` / `display` layout elements.
+// Sub 37 custom panel parts (Subsequent 37 manual pages in brackets):
+//   Wheel          PITCH (spring-loaded) and MOD wheels
+//   Lcd            the 128 x 64 display: preset name / BNK / PRESET / CAT, the
+//                  last control touched, PRESET EDIT / CONTROLLERS / GLOBAL menus,
+//                  step record and step edit status; it also writes recorded notes
+//                  into the sequence (step record and step edit, pp.17-19)
+//   ProgButtons    < > CURSOR, COMPARE / SAVE, MIDI / GLOBAL, PRESET / PANEL (pp.13-14)
+//   PresetRow      KB OCTAVE, BANK and PRESET 1-16, which double as the 16 step
+//                  buttons in STEP EDIT (pp.12, 14, 18-20)
+//   CycleButton    one button stepping through LED-marked positions
+//   DestButton     MOD DEST: press cycles, hold + move a control assigns it (p.24)
+//   RangeButtons   arpeggiator RANGE < > (and BANK + RANGE = rotate, p.19)
+//   SyncTapButton  SYNC, or hold 1 s for tap tempo (p.15)
+//   ShiftButton    KNOB SHIFT, blinking while shifted (p.30)
+// Touch and mouse alike: pointer events only, no hover-only information.
 // ============================================================================
 
-import { useRef } from 'react';
-import type { ControlValue } from '@/types';
-import type { PanelContext } from '@/types/panel';
+import { useEffect, useRef } from 'react';
+import type { ControlSpec, ControlValue, PresetSpec } from '@/types';
+import type { CustomRenderContext } from '@/types/panel';
+import { describeValue } from '@/lib/controls/mapping';
+import { useStudioStore } from '@/store/studio';
+import { useUiStore } from '@/store/ui';
+import { MOD_DESTS, PATTERN_REC, PATTERN_SEQ, noteName } from './model';
 import { SUB37 } from './spec';
+import {
+  readSeq, recNote, rotate, seqDiff, setFirstStep, setLastStep, setStepPitch, stepLit, tieGroup, toggleRest,
+  type SeqStrings,
+} from './seq';
 
-const UI_CONTROLS = new Set(['knob_shift', 'pitch_bend', 'mod_wheel', 'preset_number']);
+export const UI_CONTROLS = ['knob_shift', 'pitch_bend', 'mod_wheel', 'preset_number', 'preset_bank', 'kb_octave', 'seq_ref', 'latch_restart'];
+const UI = new Set(UI_CONTROLS);
+const DOUBLE_TAP_MS = 320;
+const HOLD_MS = 1000;
+const RED = '#ff2d2d';
+
+type Ctx = CustomRenderContext;
+type SetValue = (id: string, v: ControlValue) => void;
+
+const uiOf = (instance: string) => useUiStore.getState().ui[instance] ?? {};
+const noSelect: React.CSSProperties = { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', touchAction: 'none' };
+
+// ---------------------------------------------------------------------------
+// Presets by bank and slot (16 banks x 16, p.12)
+// ---------------------------------------------------------------------------
+
+const BY_SLOT = new Map<string, [string, PresetSpec]>();
+Object.entries(SUB37.presets ?? {}).forEach(([k, p]) => {
+  const b = Number(p.settings.preset_bank ?? 1), n = Number(p.settings.preset_number ?? 0);
+  if (n > 0) BY_SLOT.set(`${b}.${n}`, [k, p]);
+});
+export const presetAt = (bank: number, slot: number) => BY_SLOT.get(`${bank}.${slot}`)?.[1] ?? null;
+
+/** Load bank / slot like the toolbar's preset menu: unspecified sound controls return to default */
+export function loadSlot(instance: string, bank: number, slot: number) {
+  const entry = BY_SLOT.get(`${bank}.${slot}`);
+  const base: Record<string, ControlValue> = {};
+  Object.entries(SUB37.controls).forEach(([id, c]) => {
+    if (UI.has(id) || c.type === 'jack' || (c.type === 'button' && c.momentary)) return;
+    base[id] = (c as Exclude<ControlSpec, { type: 'jack' }>).default as ControlValue;
+  });
+  const values = entry ? { ...base, ...entry[1].settings } : { ...base, preset_bank: bank, preset_number: slot };
+  useStudioStore.getState().loadPreset(instance, values, entry?.[1].patchConnections ?? []);
+}
+
+/** PANEL / INIT held: every sound control back to its default (p.14) */
+export function initPanel(instance: string) {
+  const base: Record<string, ControlValue> = {};
+  Object.entries(SUB37.controls).forEach(([id, c]) => {
+    if (UI.has(id) || c.type === 'jack' || (c.type === 'button' && c.momentary)) return;
+    base[id] = (c as Exclude<ControlSpec, { type: 'jack' }>).default as ControlValue;
+  });
+  base.preset_number = 0;
+  useStudioStore.getState().loadPreset(instance, base);
+}
+
+const splitName = (p: PresetSpec | null) => {
+  if (!p) return { cat: 'INIT', name: 'Init Preset' };
+  const [cat, ...rest] = p.name.split(' / ');
+  return rest.length ? { cat: cat.toUpperCase(), name: rest.join(' / ') } : { cat: 'MISC', name: p.name };
+};
+
+function applySeq(setValue: SetValue, before: SeqStrings, after: SeqStrings) {
+  Object.entries(seqDiff(before, after)).forEach(([k, v]) => setValue(k, v as ControlValue));
+}
 
 // ---------------------------------------------------------------------------
 // Wheels
@@ -17,6 +92,7 @@ const UI_CONTROLS = new Set(['knob_shift', 'pitch_bend', 'mod_wheel', 'preset_nu
 
 interface WheelProps {
   label: string;
+  control: string;
   value: number;
   min: number;
   max: number;
@@ -24,9 +100,10 @@ interface WheelProps {
   onChange: (v: number) => void;
 }
 
-/** A vertical performance wheel: drag up/down; the pitch wheel springs back to centre */
-export function Wheel({ label, value, min, max, spring, onChange }: WheelProps) {
+/** A vertical performance wheel: drag up / down; the PITCH wheel springs back to centre; double-tap resets */
+export function Wheel({ label, control, value, min, max, spring, onChange }: WheelProps) {
   const drag = useRef<{ y: number; v: number; id: number; h: number } | null>(null);
+  const lastTap = useRef(0);
   const norm = (value - min) / (max - min);
   const offset = (norm - 0.5) * 2; // -1..1
 
@@ -34,7 +111,14 @@ export function Wheel({ label, value, min, max, spring, onChange }: WheelProps) 
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     e.preventDefault();
     e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    const now = performance.now();
+    if (now - lastTap.current < DOUBLE_TAP_MS) {
+      lastTap.current = 0;
+      onChange(spring ? 0 : min);
+      return;
+    }
+    lastTap.current = now;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     drag.current = { y: e.clientY, v: value, id: e.pointerId, h: e.currentTarget.getBoundingClientRect().height };
   };
   const move = (e: React.PointerEvent) => {
@@ -52,7 +136,7 @@ export function Wheel({ label, value, min, max, spring, onChange }: WheelProps) 
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', flex: 1, minWidth: 0, userSelect: 'none' }}>
+    <div style={{ ...noSelect, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', width: '100%' }}>
       <div
         role="slider"
         aria-label={`${label} wheel`}
@@ -60,134 +144,582 @@ export function Wheel({ label, value, min, max, spring, onChange }: WheelProps) 
         aria-valuemax={max}
         aria-valuenow={value}
         data-wheel={label}
+        data-control={control}
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={up}
         onPointerCancel={up}
-        onDoubleClick={() => onChange(spring ? 0 : min)}
         style={{
-          position: 'relative', flex: 1, width: '100%', borderRadius: 6, overflow: 'hidden',
-          touchAction: 'none',
-          cursor: 'ns-resize',
-          background: '#050505',
-          border: '2px solid #2b2b2b',
-          boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.9)',
+          ...noSelect,
+          position: 'relative', flex: 1, width: '100%', borderRadius: 6, overflow: 'hidden', cursor: 'ns-resize',
+          background: '#050505', border: '2px solid #2b2b2b', boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.9)',
         }}
       >
-        {/* Ridged rubber wheel; the ridges scroll with the value */}
         <div
           style={{
             position: 'absolute', left: '12%', right: '12%', top: '3%', bottom: '3%', borderRadius: 4,
-            background: `repeating-linear-gradient(180deg, #2a2a2a 0px, #2a2a2a 3px, #121212 3px, #121212 6px)`,
+            background: 'repeating-linear-gradient(180deg, #2a2a2a 0px, #2a2a2a 3px, #121212 3px, #121212 6px)',
             backgroundPositionY: `${-offset * 40}px`,
             boxShadow: 'inset 0 18px 18px -8px rgba(0,0,0,0.95), inset 0 -18px 18px -8px rgba(0,0,0,0.95)',
           }}
         />
-        {/* White index line */}
-        <div
-          style={{ position: 'absolute', left: '12%', right: '12%', pointerEvents: 'none', top: `${50 - offset * 38}%`, height: 3, background: '#e5e5e5', boxShadow: '0 0 3px rgba(255,255,255,0.6)' }}
-        />
+        <div style={{ position: 'absolute', left: '12%', right: '12%', pointerEvents: 'none', top: `${50 - offset * 38}%`, height: 3, background: '#e5e5e5', boxShadow: '0 0 3px rgba(255,255,255,0.6)' }} />
       </div>
-      <div style={{ fontWeight: 700, marginTop: 4, fontSize: 8, color: '#d4d4d4', letterSpacing: '0.6px' }}>{label}</div>
+      <div style={{ fontWeight: 700, marginTop: 4, fontSize: 9, color: '#d4d4d4', letterSpacing: '0.6px' }}>{label}</div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Preset bank (bank 1, buttons 1-16)
+// Buttons
 // ---------------------------------------------------------------------------
 
-const PRESET_LIST = Object.values(SUB37.presets ?? {}).sort(
-  (a, b) => Number(a.settings.preset_number) - Number(b.settings.preset_number),
-);
-
-export function presetName(slot: number): string | null {
-  return PRESET_LIST.find(p => p.settings.preset_number === slot)?.name ?? null;
+interface CapProps {
+  lit: number;
+  blink?: boolean;
+  label?: string;
+  control?: string;
+  preset?: number;
+  title?: string;
+  aria: string;
+  onDown: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onUp?: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  w?: number;
+  h?: number;
+  highlighted?: boolean;
 }
 
-type SetValue = (id: string, v: ControlValue) => void;
+/** The Sub 37's lit rectangular button cap (w / h in px) */
+function Cap({ lit, blink, label, control, preset, title, aria, onDown, onUp, w = 17, h = 10, highlighted }: CapProps) {
+  const on = lit > 0.02;
+  return (
+    <button
+      type="button"
+      data-control={control}
+      data-preset={preset}
+      title={title}
+      aria-label={aria}
+      aria-pressed={on}
+      onPointerDown={e => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        e.preventDefault();
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        onDown(e);
+      }}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+      onContextMenu={e => e.preventDefault()}
+      className={blink ? 'animate-pulse' : undefined}
+      style={{
+        ...noSelect,
+        width: w, height: h, borderRadius: 2, cursor: 'pointer', padding: 0,
+        border: highlighted ? '2px solid #f97316' : '1px solid #4a4a4a',
+        background: on ? `linear-gradient(${RED}, #b3201b)` : 'linear-gradient(#2c2c2c, #151515)',
+        opacity: on ? 0.45 + 0.55 * Math.min(1, lit) : 1,
+        boxShadow: on ? `0 0 ${3 + 5 * lit}px ${RED}` : 'inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 3px rgba(0,0,0,0.6)',
+        color: on ? '#160303' : '#cfcfcf', fontSize: 7.5, fontWeight: 800, lineHeight: 1,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
 
-function loadSlot(slot: number, values: PanelContext['values'], setValue: SetValue) {
-  const p = PRESET_LIST.find(x => x.settings.preset_number === slot);
-  if (!p) {
-    setValue('preset_number', slot);
+const targeted = (ctx: Ctx, id: string) => !!(ctx.teaching && ctx.step?.control === id);
+
+/** One button stepping a switch through its positions; the positions show on separate LEDs */
+export function CycleButton({ ctx, control, order, reverse }: { ctx: Ctx; control: string; order?: number[]; reverse?: boolean }) {
+  const spec = SUB37.controls[control];
+  const n = spec?.type === 'switch' ? spec.options.length : 1;
+  const seq = order ?? Array.from({ length: n }, (_, i) => i);
+  const cur = Math.round(Number(ctx.values[control] ?? (spec && 'default' in spec ? spec.default : 0)));
+  const next = () => {
+    const i = seq.indexOf(cur);
+    const j = reverse ? (i - 1 + seq.length) % seq.length : (i + 1) % seq.length;
+    ctx.setValue(control, seq[j < 0 ? 0 : j]);
+  };
+  const label = spec?.type === 'switch' ? spec.options[cur] : '';
+  return <Cap lit={0} control={control} aria={`${spec?.label ?? control}: ${label}`} onDown={next} highlighted={targeted(ctx, control)} />;
+}
+
+/** MOD DEST (p.23-24): press steps through the seven destinations; hold it and move a control to assign that control */
+export function DestButton({ ctx, bus }: { ctx: Ctx; bus: 1 | 2 }) {
+  const control = `mod${bus}_dest`;
+  const down = () => ctx.setUi({ destHeld: bus, destAssigned: false });
+  const up = () => {
+    const ui = uiOf(ctx.instance);
+    ctx.setUi({ destHeld: 0 });
+    if (ui.destAssigned) return;
+    const cur = Math.round(Number(ctx.values[control] ?? 1));
+    ctx.setValue(control, (cur + 1) % MOD_DESTS.length);
+  };
+  const held = Number(ctx.ui.destHeld ?? 0) === bus;
+  return <Cap lit={held ? 1 : 0} control={control} aria={`MOD ${bus} DEST: ${MOD_DESTS[Math.round(Number(ctx.values[control] ?? 1))]}`} onDown={down} onUp={up} highlighted={targeted(ctx, control)} />;
+}
+
+/** CONTROLLERS: opens the bus's MOD CONTROL menu on the LCD (p.50) */
+export function ControllersButton({ ctx, bus }: { ctx: Ctx; bus: 1 | 2 }) {
+  const open = ctx.ui.menu === `mod${bus}`;
+  return (
+    <Cap
+      lit={open ? 1 : 0}
+      control={`mod${bus}_controllers`}
+      aria={`MOD ${bus} CONTROLLERS`}
+      onDown={() => ctx.setUi(open ? { menu: null } : { menu: `mod${bus}`, menuRow: 0, menuEdit: false })}
+    />
+  );
+}
+
+/** Arpeggiator RANGE < and > (7 states, p.15); with BANK held they rotate the sequence (p.19) */
+export function RangeButton({ ctx, dir }: { ctx: Ctx; dir: -1 | 1 }) {
+  const press = () => {
+    const ui = uiOf(ctx.instance);
+    if (ui.bankHeld) {
+      const s = readSeq(ctx.values);
+      applySeq(ctx.setValue, s, rotate(s, dir));
+      ctx.setUi({ bankUsed: true });
+      return;
+    }
+    const cur = Math.round(Number(ctx.values.arp_oct_range ?? 3));
+    ctx.setValue('arp_oct_range', Math.max(0, Math.min(6, cur + dir)));
+  };
+  return <Cap lit={0} control="arp_oct_range" aria={dir < 0 ? 'RANGE down' : 'RANGE up'} label={dir < 0 ? '◀' : '▶'} onDown={press} highlighted={targeted(ctx, 'arp_oct_range')} />;
+}
+
+/** SYNC: press toggles; hold one second for TAP tempo, where taps set the internal clock (p.15) */
+export function SyncTapButton({ ctx }: { ctx: Ctx }) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const held = useRef(false);
+  const taps = useRef<number[]>([]);
+  const tapMode = !!ctx.ui.tapMode;
+  const down = () => {
+    held.current = false;
+    timer.current = setTimeout(() => {
+      held.current = true;
+      const on = !uiOf(ctx.instance).tapMode;
+      ctx.setUi({ tapMode: on });
+      taps.current = [];
+      if (on) ctx.setValue('arp_sync', false);
+    }, HOLD_MS);
+  };
+  const up = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    if (held.current) return;
+    if (uiOf(ctx.instance).tapMode) {
+      const now = performance.now();
+      const t = taps.current.filter(x => now - x < 5000);
+      t.push(now);
+      taps.current = t.slice(-8);
+      if (taps.current.length >= 3) {
+        const d = taps.current.slice(1).map((x, i) => x - taps.current[i]);
+        const bpm = 60000 / (d.reduce((a, b) => a + b, 0) / d.length);
+        ctx.setValue('arp_rate', Math.round(Math.max(2, Math.min(280, bpm))));
+      }
+      return;
+    }
+    ctx.setValue('arp_sync', !ctx.values.arp_sync);
+  };
+  return <Cap lit={ctx.values.arp_sync ? 1 : 0} blink={tapMode} control="arp_sync" aria={tapMode ? 'TAP tempo' : 'ARP SYNC'} onDown={down} onUp={up} highlighted={targeted(ctx, 'arp_sync')} />;
+}
+
+/** KNOB SHIFT: blinks while the envelope knobs are shifted (p.30) */
+export function ShiftButton({ ctx }: { ctx: Ctx }) {
+  const on = !!ctx.values.knob_shift;
+  return <Cap lit={on ? 1 : 0} blink={on} control="knob_shift" aria="KNOB SHIFT" onDown={() => ctx.setValue('knob_shift', !on)} highlighted={targeted(ctx, 'knob_shift')} />;
+}
+
+// ---------------------------------------------------------------------------
+// Programming section (pp.13-14) and the LCD menus (pp.39-52)
+// ---------------------------------------------------------------------------
+
+type MenuItem = string | { header: string };
+const MENUS: Record<string, { title: string; items: MenuItem[] }> = {
+  preset: {
+    title: 'PRESET EDIT',
+    items: [
+      { header: 'ARPEGGIATOR' }, 'arp_gate', 'arp_div', 'arp_swing', 'arp_step1_reset', 'arp_end_notes',
+      { header: 'SEQUENCER' }, 'seq_ratchet', 'seq_first', 'seq_len',
+      { header: 'FILTER EG' }, 'feg_gate_src', 'feg_attack_exp', 'feg_sync_div',
+      { header: 'AMP EG' }, 'aeg_gate_src', 'aeg_attack_exp', 'aeg_sync_div',
+      { header: 'KEYS / WHEELS' }, 'kb_transpose', 'key_priority', 'bend_up', 'bend_down', 'bend_dest', 'preset_volume',
+    ],
+  },
+  mod1: { title: 'MOD 1 CONTROL', items: ['mod1_wheel', 'mod1_vel', { header: 'MOD 1 EDIT' }, 'mod1_pgm_src', 'mod1_pgm_dst', 'mod1_lfo_kb'] },
+  mod2: { title: 'MOD 2 CONTROL', items: ['mod2_wheel', 'mod2_vel', { header: 'MOD 2 EDIT' }, 'mod2_pgm_src', 'mod2_pgm_dst', 'mod2_lfo_kb'] },
+  global: { title: 'GLOBAL', items: [{ header: 'SEQ OPTIONS' }, 'seq_ref', 'latch_restart'] },
+};
+const menuRows = (menu: string) => (MENUS[menu]?.items ?? []).filter((x): x is string => typeof x === 'string');
+
+/** One step of a menu value with < > (p.39) */
+function stepValue(id: string, value: ControlValue | undefined, dir: -1 | 1): ControlValue | undefined {
+  const s = SUB37.controls[id];
+  if (!s) return undefined;
+  if (s.type === 'button') return !value;
+  if (s.type === 'switch') return Math.max(0, Math.min(s.options.length - 1, Math.round(Number(value ?? s.default)) + dir));
+  if (s.type === 'knob') {
+    const st = s.step ?? (s.max - s.min > 20 ? 1 : 0.1);
+    const v = Number(value ?? s.default) + dir * st;
+    return Math.max(s.min, Math.min(s.max, Math.round(v / st) * st));
+  }
+  return undefined;
+}
+
+function menuMove(ctx: Ctx, dir: -1 | 1) {
+  const ui = uiOf(ctx.instance);
+  const menu = ui.menu as string | null | undefined;
+  if (!menu) {
+    // outside the menus, < > step through the presets of the bank (p.12)
+    const bank = Math.round(Number(ctx.values.preset_bank ?? 1));
+    const slot = Math.round(Number(ctx.values.preset_number ?? 0));
+    let b = bank, s = slot + dir;
+    if (s > 16) { s = 1; b = bank >= 16 ? 1 : bank + 1; }
+    if (s < 1) { s = 16; b = bank <= 1 ? 16 : bank - 1; }
+    loadSlot(ctx.instance, b, s);
     return;
   }
-  // Same rule as the toolbar's preset menu: unspecified sound controls return to default
-  const next: Record<string, ControlValue> = {};
-  Object.entries(SUB37.controls).forEach(([id, c]) => {
-    if (UI_CONTROLS.has(id) || c.type === 'button' || !('default' in c)) return;
-    next[id] = c.default as ControlValue;
-  });
-  Object.assign(next, p.settings);
-  Object.entries(next).forEach(([id, v]) => { if (values[id] !== v) setValue(id, v); });
+  const rows = menuRows(menu);
+  const row = Math.max(0, Math.min(rows.length - 1, Number(ui.menuRow ?? 0)));
+  if (ui.menuEdit) {
+    const id = rows[row];
+    const v = stepValue(id, ctx.values[id], dir);
+    if (v !== undefined) ctx.setValue(id, v);
+  } else {
+    ctx.setUi({ menuRow: Math.max(0, Math.min(rows.length - 1, row + dir)) });
+  }
 }
 
-export function PresetBank({ values, setValue }: { values: PanelContext['values']; setValue: SetValue }) {
-  const current = Number(values.preset_number ?? 0);
+export function ProgButtons({ ctx }: { ctx: Ctx }) {
+  const hold = useRef<{ id: string; timer: ReturnType<typeof setTimeout>; fired: boolean } | null>(null);
+  const menu = ctx.ui.menu as string | null | undefined;
+  const flash = (msg: string) => ctx.setUi({ note: msg, noteAt: Date.now() });
+
+  const press = (id: string) => {
+    if (id === 'dec') return menuMove(ctx, -1);
+    if (id === 'inc') return menuMove(ctx, 1);
+    if (id === 'cursor') { if (menu) ctx.setUi({ menuEdit: !uiOf(ctx.instance).menuEdit }); return; }
+    if (id === 'global') return ctx.setUi(menu === 'global' ? { menu: null } : { menu: 'global', menuRow: 0, menuEdit: false });
+    if (id === 'compare') return flash('COMPARE: not in the twin');
+    if (id === 'save') return flash('SAVE: use the studio project');
+    if (id === 'midi') return flash('MIDI: set in the studio');
+  };
+  const holdable = (id: string, onHold: () => void, onTap: () => void) => ({
+    onDown: () => {
+      const st = { id, fired: false, timer: setTimeout(() => { st.fired = true; onHold(); }, HOLD_MS) };
+      hold.current = st;
+    },
+    onUp: () => {
+      const st = hold.current;
+      hold.current = null;
+      if (!st || st.id !== id) return;
+      clearTimeout(st.timer);
+      if (!st.fired) onTap();
+    },
+  });
+  const presetBtn = holdable(
+    'preset',
+    () => ctx.setUi({ menu: 'preset', menuRow: 0, menuEdit: false }),
+    () => ctx.setUi({ menu: null, bankMode: false }),
+  );
+  const panelBtn = holdable('panel', () => { initPanel(ctx.instance); flash('PANEL INITIALIZED'); }, () => flash('PANEL: hold to initialize'));
+  const cell = (id: string, label: string, lit: boolean, h?: ReturnType<typeof holdable>) => (
+    <div key={id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+      <span style={{ fontSize: 8, fontWeight: 800, color: '#e5e5e5', letterSpacing: '0.4px', whiteSpace: 'nowrap' }}>{label}</span>
+      <Cap lit={lit ? 1 : 0} control={`prog_${id}`} aria={label} onDown={h ? h.onDown : () => press(id)} onUp={h?.onUp} />
+    </div>
+  );
   return (
-    <div style={{ display: 'grid', height: '100%', width: '100%', gridTemplateColumns: 'repeat(8, 1fr)', gridTemplateRows: 'repeat(2, 1fr)', gap: 4 }}>
-      {Array.from({ length: 16 }, (_, i) => {
-        const slot = i + 1;
-        const lit = current === slot;
-        const name = presetName(slot);
+    <div style={{ ...noSelect, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', rowGap: 6, columnGap: 2, width: '100%', justifyItems: 'center' }}>
+      {cell('dec', '◀', false)}
+      {cell('inc', '▶', false)}
+      {cell('cursor', 'CURSOR', !!ctx.ui.menuEdit)}
+      {cell('compare', 'COMPARE', false)}
+      {cell('midi', 'MIDI', false)}
+      {cell('preset', 'PRESET', !menu || menu === 'preset', presetBtn)}
+      {cell('save', 'SAVE', false)}
+      {cell('global', 'GLOBAL', menu === 'global')}
+      {cell('panel', 'PANEL', false, panelBtn)}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LCD (128 x 64, blue backlight)
+// ---------------------------------------------------------------------------
+
+const TRUNC: React.CSSProperties = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
+const recSeen = new Map<string, number>();
+
+interface KeyNote { sid: string; n: number; note: number; legato: boolean }
+
+/** Writes keys into the sequence: step record (PATTERN REC, p.17) and a selected step in step edit (p.19) */
+function useNoteWriter(ctx: Ctx) {
+  const key = ctx.engine.keyNote as KeyNote | null | undefined;
+  const id = key ? `${key.sid}:${key.n}` : '';
+  useEffect(() => {
+    if (!key) return;
+    const seen = recSeen.get(key.sid) ?? -1;
+    if (key.n <= seen) return;
+    recSeen.set(key.sid, key.n);
+    const ui = uiOf(ctx.instance);
+    const values = useStudioStore.getState().devices[ctx.instance]?.controlValues ?? ctx.values;
+    const pattern = Math.round(Number(values.arp_pattern ?? 0));
+    const s = readSeq(values);
+    const sel = ui.stepEdit ? (ui.stepSel as number | null | undefined) : null;
+    if (sel !== null && sel !== undefined && (pattern === PATTERN_SEQ || pattern === PATTERN_REC)) {
+      // a non-legato key sets pitch 1 of the selected step, a legato key pitch 2
+      applySeq(ctx.setValue, s, setStepPitch(s, sel, key.note, key.legato));
+      return;
+    }
+    if (pattern !== PATTERN_REC) return;
+    const r = { pos: Number(ui.recPos ?? 0), tie: !!ui.recTie };
+    const out = recNote(s, r, key.note, key.legato, !!values.duo_mode);
+    applySeq(ctx.setValue, s, out.seq);
+    ctx.setUi({ recPos: out.rec.pos, recTie: out.rec.tie });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+}
+
+function MenuView({ ctx, menu }: { ctx: Ctx; menu: string }) {
+  const m = MENUS[menu];
+  const rows = menuRows(menu);
+  const row = Math.max(0, Math.min(rows.length - 1, Number(ctx.ui.menuRow ?? 0)));
+  const edit = !!ctx.ui.menuEdit;
+  // show four lines around the selection
+  const start = Math.max(0, Math.min(rows.length - 4, row - 1));
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, opacity: 0.9 }}>
+        <span>{m.title}</span>
+        <span>{row + 1}/{rows.length}</span>
+      </div>
+      {rows.slice(start, start + 4).map((id, k) => {
+        const i = start + k;
+        const s = SUB37.controls[id];
+        const sel = i === row;
         return (
-          <button
-            key={slot}
-            data-preset={slot}
-            title={name ?? 'Empty slot'}
-            aria-label={`Preset ${slot}${name ? `: ${name}` : ''}`}
-            onPointerDown={e => { if (e.button !== 0 && e.pointerType === 'mouse') return; e.preventDefault(); loadSlot(slot, values, setValue); }}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); loadSlot(slot, values, setValue); } }}
-            style={{
-              position: 'relative', borderRadius: 3, fontWeight: 700, lineHeight: 1, cursor: 'pointer',
-              touchAction: 'none',
-              fontSize: 9,
-              color: lit ? '#111' : name ? '#d4d4d4' : '#6b6b6b',
-              background: lit ? 'radial-gradient(circle at 50% 40%, #ff6a5c 0%, #c0271b 85%)' : 'linear-gradient(#2a2a2a, #161616)',
-              border: '1px solid #444',
-              boxShadow: lit ? '0 0 8px #ff3b30' : 'inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 3px rgba(0,0,0,0.6)',
-            }}
+          <div
+            key={id}
+            onPointerDown={e => { e.preventDefault(); ctx.setUi({ menuRow: i, menuEdit: sel ? !edit : true }); }}
+            style={{ ...TRUNC, display: 'flex', justifyContent: 'space-between', gap: 4, fontSize: 9, lineHeight: 1.3, padding: '0 2px', cursor: 'pointer',
+              background: sel ? (edit ? '#e8f0ff' : 'rgba(232,240,255,0.25)') : undefined, color: sel && edit ? '#13307a' : undefined }}
           >
-            {slot}
-          </button>
+            <span style={TRUNC}>{s?.label ?? id}</span>
+            <span style={{ fontWeight: 700 }}>{describeValue(s, ctx.values[id] ?? (s && 'default' in s ? s.default as ControlValue : undefined))}</span>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+export function Lcd({ ctx }: { ctx: Ctx }) {
+  useNoteWriter(ctx);
+  const v = ctx.values;
+  const bank = Math.round(Number(v.preset_bank ?? 1));
+  const slot = Math.round(Number(v.preset_number ?? 0));
+  const p = slot ? presetAt(bank, slot) : null;
+  const { cat, name } = slot ? splitName(p) : { cat: 'PANEL', name: 'Panel' };
+  const lcd = ctx.engine.lcd as { title: string; value: string } | null | undefined;
+  const menu = ctx.ui.menu as string | null | undefined;
+  const pattern = Math.round(Number(v.arp_pattern ?? 0));
+  const note = ctx.ui.note as string | undefined;
+  const noteFresh = note && Date.now() - Number(ctx.ui.noteAt ?? 0) < 2500;
+  const s = readSeq(v);
+  let status = '';
+  if (ctx.ui.stepEdit) {
+    const cur = Number(ctx.engine.seqStep ?? -1);
+    const sel = ctx.ui.stepSel as number | null | undefined;
+    const page = Number(ctx.ui.seqPage ?? 0) + 1;
+    status = `${ctx.engine.gate ? '▶' : '■'} EDIT ${String((sel ?? Math.max(0, cur)) + 1).padStart(2, '0')}/${s.seq_len} P${page}`;
+  } else if (pattern === PATTERN_REC) {
+    const pos = Number(ctx.ui.recPos ?? 0);
+    status = pos ? `REC ${String(pos).padStart(2, '0')} / ${String(s.seq_len).padStart(2, '0')}${ctx.ui.recTie ? ' TIE' : ''}` : 'REC: PLAY A KEY TO START';
+  } else if (ctx.engine.clockWait) {
+    status = 'SYNC: WAITING FOR ▶ CLOCK';
+  } else if (ctx.ui.tapMode) {
+    status = `TAP TEMPO ${Math.round(Number(v.arp_rate ?? 120))} BPM`;
+  } else if (ctx.ui.bankMode) {
+    status = 'BANK: PRESS 1-16';
+  }
+  const flags: string[] = [];
+  if (v.knob_shift) flags.push('SHIFT');
+  if (v.arp_on && pattern !== PATTERN_REC) flags.push(pattern === PATTERN_SEQ ? 'SEQ' : 'ARP');
+  if (v.duo_mode) flags.push('DUO');
+  return (
+    <div
+      style={{
+        ...noSelect,
+        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        fontFamily: 'ui-monospace, Menlo, monospace', background: 'linear-gradient(180deg, #1b3d8f 0%, #13307a 100%)',
+        color: '#e8f0ff', padding: '4px 6px', textShadow: '0 0 3px rgba(190,215,255,0.55)', boxShadow: 'inset 0 0 10px rgba(0,0,20,0.7)',
+        border: '2px solid #111', borderRadius: 3,
+      }}
+      data-control="lcd"
+    >
+      {menu && MENUS[menu] ? (
+        <MenuView ctx={ctx} menu={menu} />
+      ) : (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, opacity: 0.9 }}>
+            <span>BNK {String(bank).padStart(2, '0')} PRESET {slot ? String(slot).padStart(2, '0') : '--'}</span>
+            <span>{flags.join(' ')}</span>
+          </div>
+          <div style={{ ...TRUNC, fontWeight: 700, fontSize: 11, lineHeight: 1.2, marginTop: 1 }}>{name.toUpperCase()}</div>
+          <div style={{ ...TRUNC, fontSize: 8, opacity: 0.9, borderBottom: '1px solid rgba(232,240,255,0.35)', paddingBottom: 2 }}>CAT: {cat}</div>
+          <div style={{ ...TRUNC, fontSize: 8, marginTop: 2, opacity: 0.9 }}>{noteFresh ? '' : lcd ? lcd.title : 'READY'}</div>
+          <div style={{ ...TRUNC, fontWeight: 700, fontSize: 11, lineHeight: 1.15 }}>{noteFresh ? note : lcd ? lcd.value : ''}</div>
+        </>
+      )}
+      <div style={{ ...TRUNC, marginTop: 'auto', fontSize: 8, fontWeight: 700, color: status.startsWith('SYNC') ? '#ffd27a' : undefined }}>{status}</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// KB OCTAVE, BANK and PRESET 1-16 (pp.12, 14, 18-20)
+// ---------------------------------------------------------------------------
+
+export function KbOctave({ ctx }: { ctx: Ctx }) {
+  const downs = useRef(new Set<number>());
+  const both = useRef<{ timer: ReturnType<typeof setTimeout> | null; used: boolean }>({ timer: null, used: false });
+  const oct = Math.round(Number(ctx.values.kb_octave ?? 0));
+  const press = (dir: -1 | 1) => {
+    downs.current.add(dir);
+    if (downs.current.size === 2) {
+      // both together: back to the standard octave; held for a second: MIDI panic (p.14)
+      both.current.used = true;
+      ctx.setValue('kb_octave', 0);
+      both.current.timer = setTimeout(() => { ctx.sendEvent('panic'); ctx.setUi({ note: 'MIDI PANIC', noteAt: Date.now() }); }, HOLD_MS);
+    }
+  };
+  const release = (dir: -1 | 1) => {
+    const wasBoth = downs.current.size === 2 || both.current.used;
+    downs.current.delete(dir);
+    if (both.current.timer) { clearTimeout(both.current.timer); both.current.timer = null; }
+    if (wasBoth) { if (!downs.current.size) both.current.used = false; return; }
+    const ui = uiOf(ctx.instance);
+    if (ui.stepEdit && ui.stepHeld !== null && ui.stepHeld !== undefined) {
+      // hold a step + KB OCTAVE down / up: FIRST / LAST step (p.19)
+      const s = readSeq(ctx.values);
+      applySeq(ctx.setValue, s, dir < 0 ? setFirstStep(s, ui.stepHeld as number) : setLastStep(s, ui.stepHeld as number));
+      ctx.setUi({ stepHeldUsed: true });
+      return;
+    }
+    if (ui.bankHeld && ui.stepEdit) {
+      // BANK + KB OCTAVE: sequence page (p.18)
+      ctx.setUi({ seqPage: Math.max(0, Math.min(3, Number(ui.seqPage ?? 0) + dir)), bankUsed: true, pageChase: false });
+      return;
+    }
+    ctx.setValue('kb_octave', Math.max(-2, Math.min(2, oct + dir)));
+  };
+  const lit = (dir: -1 | 1) => (Math.sign(oct) === dir ? (Math.abs(oct) === 2 ? 1 : 0.45) : 0);
+  return (
+    <div style={{ ...noSelect, display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+      {([-1, 1] as const).map(d => (
+        <div key={d} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <Cap lit={lit(d)} control={d < 0 ? 'kb_octave_down' : 'kb_octave_up'} aria={d < 0 ? 'KB OCTAVE down' : 'KB OCTAVE up'} label={d < 0 ? '▼' : '▲'} onDown={() => press(d)} onUp={() => release(d)} w={20} highlighted={targeted(ctx, 'kb_octave')} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function BankButton({ ctx }: { ctx: Ctx }) {
+  const down = () => ctx.setUi({ bankHeld: true, bankUsed: false });
+  const up = () => {
+    const ui = uiOf(ctx.instance);
+    ctx.setUi({ bankHeld: false });
+    if (ui.bankUsed) return;
+    if (ui.stepEdit) { ctx.setUi({ stepSel: null }); return; }   // deselect the step (p.18)
+    ctx.setUi({ bankMode: !ui.bankMode, menu: null });
+  };
+  const lit = ctx.ui.bankMode || ctx.ui.bankHeld ? 1 : ctx.ui.stepEdit ? 0.5 : 0;
+  return <Cap lit={lit} blink={!!ctx.ui.stepEdit && ctx.ui.stepSel == null} control="preset_bank" aria="BANK" onDown={down} onUp={up} w={22} />;
+}
+
+export function PresetRow({ ctx }: { ctx: Ctx }) {
+  const v = ctx.values;
+  const bank = Math.round(Number(v.preset_bank ?? 1));
+  const slot = Math.round(Number(v.preset_number ?? 0));
+  const stepEdit = !!ctx.ui.stepEdit;
+  const playing = Number(ctx.engine.seqStep ?? -1);
+  const chase = ctx.ui.pageChase !== false;
+  const page = stepEdit ? (chase && playing >= 0 ? Math.floor(playing / 16) : Number(ctx.ui.seqPage ?? 0)) : 0;
+  const s = readSeq(v);
+
+  const down = (i: number) => {
+    const ui = uiOf(ctx.instance);
+    if (!stepEdit) {
+      // BANK then a PRESET button picks the bank; otherwise the button loads that preset (p.12)
+      if (ui.bankMode) { ctx.setUi({ bankMode: false }); ctx.setValue('preset_bank', i + 1); return; }
+      loadSlot(ctx.instance, bank, i + 1);
+      return;
+    }
+    const step = page * 16 + i;
+    if (ui.bankHeld) { ctx.setUi({ stepSel: step, bankUsed: true, stepHeld: null }); return; }   // select for editing
+    const held = ui.stepHeld as number | null | undefined;
+    if (held !== null && held !== undefined && held !== step) {
+      // hold one step and press another: tie them and the steps between (p.19)
+      applySeq(ctx.setValue, s, tieGroup(s, held, step));
+      ctx.setUi({ stepHeldUsed: true });
+      return;
+    }
+    if (ui.stepSel !== null && ui.stepSel !== undefined) { ctx.setUi({ stepSel: step }); return; }
+    ctx.setUi({ stepHeld: step, stepHeldUsed: false });
+  };
+  const up = (i: number) => {
+    const ui = uiOf(ctx.instance);
+    if (!stepEdit) return;
+    const step = page * 16 + i;
+    if (ui.stepHeld === step) {
+      if (!ui.stepHeldUsed) applySeq(ctx.setValue, s, toggleRest(s, step));   // a tap toggles the rest (p.19)
+      ctx.setUi({ stepHeld: null, stepHeldUsed: false });
+    }
+  };
+
+  return (
+    <div style={{ ...noSelect, display: 'grid', gridTemplateColumns: 'repeat(16, 1fr)', gap: 4, width: '100%', height: '100%', alignItems: 'end' }}>
+      {Array.from({ length: 16 }, (_, i) => {
+        const step = page * 16 + i;
+        let lit = 0, blink = false;
+        if (stepEdit) {
+          lit = playing === step ? 1 : stepLit(s, step) ? 0.4 : 0;
+          blink = ctx.ui.stepSel === step;
+        } else if (ctx.ui.bankMode) lit = bank === i + 1 ? 1 : 0;
+        else lit = slot === i + 1 ? 1 : 0;
+        const p = !stepEdit ? presetAt(bank, i + 1) : null;
+        const stepNote = stepEdit ? s.arp_seq[step] : '';
+        return (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <Cap
+              lit={lit}
+              blink={blink}
+              control={`preset_${i + 1}`}
+              preset={i + 1}
+              title={stepEdit ? `Step ${step + 1}` : p?.name ?? 'Init Preset'}
+              aria={stepEdit ? `Step ${step + 1}` : `Preset ${i + 1}${p ? `: ${p.name}` : ''}`}
+              label={String(i + 1)}
+              onDown={() => down(i)}
+              onUp={() => up(i)}
+              w={26}
+              h={12}
+            />
+            <span style={{ fontSize: 6.5, color: '#9a9a9a', height: 7, lineHeight: 1, ...TRUNC, maxWidth: 34 }}>
+              {stepEdit && stepNote ? stepLabel(s, step) : ''}
+            </span>
+          </div>
         );
       })}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// LCD (128 x 64 backlit)
-// ---------------------------------------------------------------------------
-
-const TRUNC: React.CSSProperties = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
-
-export function Lcd({ values, engine }: PanelContext) {
-  const slot = Number(values.preset_number ?? 0);
-  const name = slot ? presetName(slot) ?? 'EMPTY' : 'PANEL';
-  const lcd = engine.lcd as { title: string; value: string } | null | undefined;
-  const arp = values.arp_on ? 'ARP' : '';
-  const shift = values.knob_shift ? 'SHIFT' : '';
-  return (
-    <div
-      style={{
-        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        fontFamily: 'ui-monospace, Menlo, monospace',
-        background: 'linear-gradient(180deg, #1b3d8f 0%, #13307a 100%)',
-        color: '#e8f0ff',
-        padding: '4px 6px',
-        textShadow: '0 0 3px rgba(190,215,255,0.55)',
-        boxShadow: 'inset 0 0 10px rgba(0,0,20,0.7)',
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, opacity: 0.85 }}>
-        <span>B01 P{String(slot).padStart(2, '0')}</span>
-        <span>{[shift, arp].filter(Boolean).join(' ')}</span>
-      </div>
-      <div style={{ ...TRUNC, fontWeight: 700, fontSize: 10, borderBottom: '1px solid rgba(232,240,255,0.4)', paddingBottom: 2 }}>{name.toUpperCase()}</div>
-      <div style={{ ...TRUNC, fontSize: 8, marginTop: 3, opacity: 0.9 }}>{lcd ? lcd.title : 'SUB 37 TRIBUTE'}</div>
-      <div style={{ ...TRUNC, fontWeight: 700, fontSize: 13, lineHeight: 1.1 }}>{lcd ? lcd.value : 'READY'}</div>
-    </div>
-  );
+function stepLabel(s: SeqStrings, i: number): string {
+  if (!stepLit(s, i)) return i + 1 > s.seq_len ? '' : 'rest';
+  const c = s.arp_seq.charCodeAt(i);
+  return Number.isFinite(c) ? noteName(12 + (c - 34)) : '';
 }
+
+/** data-preset hooks for tests and lessons: the visible PRESET buttons */
+export const PRESET_COUNT = 16;
