@@ -95,19 +95,23 @@ sets KB TRANSPOSE (middle C = 0); the LCD prompts and confirms.
 
 At the 82 % fit many legends rendered at 5.5-8 CSS px, and sets of them at mixed sizes (the ten
 envelope button names from 5.7 to 9.6 px, OCTAVE footages 5.5-9.6, SLOPE 6.7-9.6). **Fixes**: the
-shifted envelope names and the ten envelope button names are authored at 9 and now all fit at about
-9.5 px; OCTAVE footages, the RANGE octaves and the SLOPE poles are one size each (7.0, 7.4, 7.8 px);
-section titles moved 1 mm so they reach 9.5 px; glide LCR / LCT / EXP are spaced 10 mm apart (8.1 px);
-the LCD and PROGRAMMING names use the iPadOS condensed faces when Arial Narrow is missing, and the
-PRESET / step labels are larger. What is left is structural (below).
+shifted envelope names and the ten envelope button names are authored at 9 and now all fit at
+8.8-9.4 px; OCTAVE footages, the RANGE octaves and the SLOPE poles are one size each (7.0, 7.4,
+7.8 px); section titles moved 1 mm, so most reach 9.5 px (OSCILLATORS and PROGRAMMING 8.7, MOD 1 and
+MOD 2 8.1 and 7.4, beside their SOURCE legends); glide LCR / LCT / EXP are spaced 10 mm apart
+(8.7 px); the LCD and PROGRAMMING names use the iPadOS condensed faces when Arial Narrow is missing,
+and the PRESET / step labels are larger (8.6 px). What is left is structural (below). The numbers are
+at the review base's 82 % iPad fit; the newer Fit, which may shrink a panel to keep it on screen,
+should leave the Sub 37 at that width fit, as the panel already ends about 610 px down the 820 px
+screen.
 
 ### P3. Side-panel jacks out of order
 
 The manual puts EXT IN "just above the AUDIO OUT jack" (p.8); the twin had it at the opposite corner,
-and KB GATE beside AUDIO OUT, so the two longest names shared a row and both shrank to 6.1 px on the
-iPad. **Fix**: PITCH, FILTER and VOLUME in one column; KB GATE, EXT IN and AUDIO OUT in the other
-(EXT IN above AUDIO OUT). KB GATE now fits at 7.3 px, the smallest jack name at 6.5 px. Jack ids are
-unchanged, so saved cables still connect.
+with KB GATE beside AUDIO OUT, the two longest names in one row (both 5.9 px on the iPad). **Fix**:
+PITCH, FILTER and VOLUME in one column; KB GATE, EXT IN and AUDIO OUT in the other (EXT IN above
+AUDIO OUT). KB GATE now reads at 7.2 px; AUDIO OUT, in its output box, stays the smallest at 5.9 px
+(VOLUME beside it too). Jack ids are unchanged, so saved cables still connect.
 
 ### P3. Boom-Bah Arp: a clipped edge read as a click, and a level that wandered
 
@@ -255,9 +259,14 @@ falls back to its own audition and is a second pass of the same captures):
 | Run | Before | After |
 |---|---|---|
 | audition | median −18.1 LUFS, spread 4.5 LU, 0 of 64 flagged (exit 0) | median −18.0 LUFS, spread 5.0 LU, 0 of 64 flagged (exit 0) |
-| `--excite sub37=transport` | median −18.0 LUFS, spread 5.7 LU, 1 of 64 flagged: Boom-Bah Arp, 1 click (exit 1) | AFTER_TR |
+| `--excite sub37=transport` | median −18.0 LUFS, spread 5.7 LU, 1 of 64 flagged: Boom-Bah Arp, 1 click (exit 1) | median −18.0 LUFS, spread 5.4 LU, 0 of 64 flagged (exit 0) |
 
-GATE_LINE
+The rest of the gate on the final build: tsc and `next lint` clean; `npm run validate sub37` 0 errors
+(42 warnings, the same as before: controls set by the twin's own caps or its LCD menus, which the
+validator cannot see); the build passes; smoke: no console errors, no horizontal scroll on desktop or
+iPad; lesson runner: 20 lessons, 0 failed, 0 manual steps; e2e 34/34. CPU (`scripts/bench.cjs`): the
+whole instrument renders at 9.4× real time with the current DSP core (about 11 % of one core on this
+shared machine), 17.5× with the legacy core; the difference is mostly the 2× oversampled ladder.
 
 ## Upgrade notes
 
