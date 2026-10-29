@@ -112,3 +112,37 @@ Aim for 14–20 lessons per instrument, with at least 4 in ear-training. Use `pr
   review: [ { question: 'Turning CUTOFF down on a low-pass filter…', options: ['Removes high harmonics', 'Lowers the pitch', 'Adds distortion'], answer: 0 } ],
 }
 ```
+
+## Lesson API v3: presses, notes, scope, help (framework)
+
+These fields are additive; every existing lesson keeps working.
+
+| Field | What it does |
+|---|---|
+| `kind: 'do', control: '<momentary button>'` | Completes when the learner presses it (TRIGGER, ADVANCE, TAP). No `targetValue` needed. |
+| `presses: n` | Presses needed (default 1). Also makes a toggle button count presses ("press RUN / STOP twice"). |
+| `event: '<layout event>'` | A `do` step about a button with no control of its own (pads, trig keys, transport keys). The button is spotlit. |
+| `play: { count }` / `play: { notes, anyOctave }` | Complete after `count` notes, or the exact notes in order (MIDI numbers), from the on-screen keys, computer keyboard or MIDI. |
+| `scope: 'spectrum' \| 'wave' \| 'both'` | The coach's scope switches to this view when the step begins. Use `spectrum` for EQ and filter steps. |
+| `solution.presses / notes / studioCables / transport / instance` | One way to finish the step: "show me one way" and the lesson runner use it. |
+
+Checks receive `s.events` (presses this step, by control id and event name), `s.notesPlayed`
+(notes this step, oldest first) and `s.eventsByInstance`. They are always set while a lesson
+runs, but optional in the type: write `(s.events?.advance ?? 0) >= 3`. `s.engine` is now the
+instrument's live engine state (current step, LEDs), and checks re-run as it changes, so
+"press ADVANCE until step 8 is lit" can be `check: s => s.engine.step === 7`. Presses made
+before a prediction is committed don't count.
+
+**Feedback and help.** Hints are a ladder (vague → specific); after the last hint the coach
+offers "Show me": it turns the knob to the target while the instrument plays, holds it so the
+learner hears it, then puts it back - the learner makes the move (worked example → faded
+guidance). For cables it draws a ghost cable; for momentary buttons it presses once; for a
+challenge with a `solution` it applies that solution and leaves it. Using it is reported
+honestly in the end-of-lesson summary. Ear challenges have an A/B toggle (target / yours on
+the same phrase) and feedback that fades in: a count, then which control, then direction and
+"a little / a lot", then "Show me the answer" after four tries.
+
+**End of lesson.** The summary lists first-guess predictions, quick checks, ear matches,
+challenges, self-ratings and help used, and says how many questions come back in Daily
+Review and when (missed ones first). Predictions now join the review queue (`p` items) as
+well as quiz steps and `review` questions.
