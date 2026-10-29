@@ -69,7 +69,9 @@ GENERATORS · OUTPUT. **verified** for the sections and their contents (Subseque
 pp.12-34); positions are from the Quickstart legend (S2, **likely**). The twin draws a 660 mm face
 at 2 px/mm. PROGRAMMING is widened from 41 to 50 mm so the LCD can be read on an iPad, and the top
 knob row sits 4 mm lower than on the hardware, so the legible-size legends above the stepped knobs
-have room. The jacks of the left cheek sit beside the wheels.
+have room. The jacks of the left side panel sit beside the wheels: the PITCH, FILTER and VOLUME CV
+inputs in one column, KB GATE, EXT IN and AUDIO OUT in the other, EXT IN just above AUDIO OUT as on
+the hardware (p.8).
 
 ### PROGRAMMING (Subsequent 37 manual, pp.12-14)
 
@@ -222,7 +224,7 @@ mono on both sides. **verified** (Subsequent 37 manual, p.34).
 
 | Control | Twin | Behaviour | Confidence |
 |---|---|---|---|
-| KB OCTAVE ▼ ▲ | `kb_octave` -2..+2 | Dim LED one octave, bright two; both together: back to 0; both held 1 s: MIDI panic | **verified** (Subsequent 37 manual, p.14) |
+| KB OCTAVE ▼ ▲ | `kb_octave` -2..+2 | Dim LED one octave, bright two; both together: back to 0; both held 1 s: MIDI panic; both held + a key in the lower two octaves: KB TRANSPOSE (middle C = 0) | **verified** (Subsequent 37 manual, p.14) |
 | BANK, PRESET 1-16 | `preset_bank`, `preset_number` | BANK then a PRESET button picks the bank, then a PRESET button the preset | **verified** (Subsequent 37 manual, p.12) |
 | PITCH wheel | `pitch_bend`; `bend_up`, `bend_down`, `bend_dest` | Springs back; BEND UP / DOWN 0-24 semitones, default 2; BEND DEST NONE / OSC1 / OSC2 / BOTH | **verified** (Subsequent 37 manual, p.42) |
 | MOD wheel | `mod_wheel` | MOD 1 depth by default | **verified** (Subsequent 37 manual, p.22) |
@@ -250,13 +252,13 @@ mono on both sides. **verified** (Subsequent 37 manual, p.34).
 | Quantity | Twin value |
 |---|---|
 | WAVE morph | Crossfades tri → saw (0-33 %), saw → square (33-67 %), then the pulse narrows from 50 % to 10 % (67-100 %); the square, pulse and sub sit at 0.85 of the saw's peak |
-| Mixer law | (level / 5)^1.5: unity at 5, +9 dB at 10, into the ladder's saturating input |
+| Mixer law | (level / 5)^1.5: unity at 5, +9 dB at 10. The mixer amp is clean to 1.5× unity, then soft-limits towards 4.5× (it holds the FDBK loop); the overdrive happens at the ladder's input (input scale 0.36): one source at 5 measures about 1 % THD at the output, at 7 about 3 %, at 10 about 8 %, two hot sources about 20 % |
 | FDBK | The mixer output fed back through an AC-coupled (25 Hz), 5 kHz band-limited path; loop gain 1.25 × (level / 10)^1.3, so the top of the knob turns unstable |
-| RESONANCE | The ladder self-oscillates from 7.0 on the dial (feedback 0.985 of the core's threshold), up to 1.16 at 10 |
-| CUTOFF taper | 20 Hz × 1000^travel: the knob's centre is 632 Hz (the legend prints 500 Hz there) |
+| RESONANCE | The ladder self-oscillates from 7.1 on the dial ("above 7"; 7.0 still only rings), feedback 0.985 of the core's threshold there, up to 1.16 at 10 |
+| CUTOFF taper | 20 Hz × 1000^travel: the knob's centre is 632 Hz. The legend is the hardware's (20, 80, 320, 500, 1.2k, 5k, 20k Hz at −140, −90, −40, 0, 40, 90 and 140° on the p.28 drawing), which implies a taper compressed around noon that the shared knob mapping (linear / log / exponential only) cannot draw, so the printed marks read 0.3-0.7 octave off the value (the LCD and readout always show the true value) |
 | FILTER EG AMT | ±6 octaves at ±5 |
-| MULTIDRIVE | Pre-gain 1 to 40 (square law) into an asymmetric soft clipper, 2× oversampled, with a post gain of 1 / (1 + 0.009 × %) |
-| MOD amounts | PITCH AMT ±2 octaves at ±5 (squared taper, for fine vibrato); FILTER AMT ±5 octaves; MOD AMT: the other LFO's rate ±4 octaves, VCA gain 0-2, WAVE ±100 % of travel, NOISE ±10 on the dial, EG TIME ±3 octaves |
+| MULTIDRIVE | Drive 0.5 at 0 (clean) to 40 at 10 (square law) into an asymmetric soft clipper, 2× oversampled. Low settings add even and odd harmonics about equally (1.8 % THD at 1, 5 % at 2), 10 is hard clipping (42 %, odd). Its make-up rides on the VCA gain (2× at 0, falling to 0.46× as the stages saturate), so a saw at the mixer's 5 gains 5 dB by 2 and 7 dB by 4, then levels off (8.5 dB at 10) as the clipping squares it off: grit more than level |
+| MOD amounts | PITCH AMT ±2 octaves at ±5 (squared taper, for fine vibrato); FILTER AMT ±5 octaves; MOD AMT: the other LFO's rate ±4 octaves, VCA gain 0-2, WAVE ±100 % of travel, NOISE ±10 on the dial, EG TIME ±3 octaves. A modulated parameter stays inside its own control's range: mixer levels 0-10, WAVE triangle to the narrowest pulse, EG AMT ±5, FREQUENCY ±7 (±36 as a drone), BEAT FREQ ±3.5 Hz |
 | CONTROLLERS | Depth = wheel × MOD WHEEL + velocity × VELOCITY, clamped to ±1; with both OFF, full depth |
 | LFO | SAW falls, RAMP rises; S&H takes a new value each cycle; the SINE and NOISE LFO sources follow the bus's LFO clock; LFO KBTRACK doubles the rate per octave at 100 % around MIDI 48 |
 | Envelopes | Linear attack (EXP. ATTACK: exponential); decay and release fall 60 dB in the stage time; VEL AMT: peak = 1 − amount + amount × velocity; KB TRACK: decay and release × 2^(−amount × (note − 48) / 12) |
@@ -264,7 +266,7 @@ mono on both sides. **verified** (Subsequent 37 manual, p.34).
 | ARP without SYNC | Steps at CLOCK DIV (default 1/16) of RATE |
 | Oscillators | 1.5 cents of slow drift (about 0.2 Hz); OSC 2 tolerance ±2 cents |
 | Output | −6 dB output trim after the VCA (`OUTPUT_TRIM_DB`); VOLUME law (dial / 10)^2 × 0.9; HEADPHONES unity at 7 against VOLUME. A fresh panel plays about −15 LUFS at VOLUME 7; the presets are levelled to −18 LUFS with PRESET VOL |
-| Sound of the two models | The twin has one voicing: the Subsequent 37's cleaner mixer headroom is the 5-is-unity law above |
+| Sound of the two models | The twin has one voicing, the Subsequent 37's: the mixer amp's headroom (clean to 1.5× unity) and the overdrive at the ladder's input above 5 |
 
 ## Where the twin differed from the hardware, and how it was resolved
 
@@ -299,8 +301,7 @@ The fix list from `docs/research/sub37/sources.md` §6, checked against the rebu
 - COMPARE, SAVE and naming (the studio project stores presets and edits), the MIDI menu, CV MAPPING,
   POT MODE, GLOBAL VARIANCE and the global KB PRIORITY override, PHASE RESET, DLAY PGM CHG and MIDI
   OUT, LFO SWING, the MIDI-only middle LFO range.
-- The hold-both-KB OCTAVE-and-press-a-key transpose shortcut (set KB TRANSPOSE in PRESET EDIT), and
-  holding DUO MODE to enter pitch 2 in STEP EDIT (play a legato key instead).
+- Holding DUO MODE to enter pitch 2 in STEP EDIT (play a legato key instead).
 
 ## Presets
 
