@@ -125,8 +125,8 @@ Positions for FILTER 1 (column 97.5); FILTER 2 mirrors them at 276.5.
 | Printed label | Twin position | Range / positions | Twin control | Source |
 |---|---|---|---|---|
 | X · crossfader · Y | (187, 369), 45 mm horizontal | X fully left, Y fully right | `xfader` | **verified** UG p.12, p.35-36: mini innoFADER, 45 mm VCA, user-replaceable |
-| CHANNEL FADER curve | (315.5, 211), 3-way, with icons above | constant power · dipped · fast-cut | `fader_curve` | **verified** UG p.12 (CH 1-4 only) |
-| XFADER curve | (315.5, 225), 3-way, with icons above | constant power · transition · fast-cut | `xf_curve` | **verified** UG p.12 |
+| CHANNEL FADER curve | (315.5, 210): three positions marked by curve icons; the twin draws a small radio button under each icon | constant power · dipped · fast-cut | `fader_curve` | **verified** UG p.12 (CH 1-4 only; icons only on the panel) |
+| XFADER curve | (315.5, 224), as above | constant power · transition · fast-cut | `xf_curve` | **verified** UG p.12 |
 
 - The crossfader is a VCA that fades CH 1-4 assigned to X or Y, and it also sets the level of
   those channels into the filters. **verified** (Xone:96 User Guide, p.12). In the block diagram
@@ -188,9 +188,9 @@ No EQ, filter, sends or fader: LEVEL, then ON into the LR MIX; both cue systems 
 | CUE/MST | (315.5, 284), 11 mm | cue only … cue plus the LR MIX | `cue_mix` | **verified** UG p.17; ADD MIX in BD |
 | LEVEL | (315.5, 310.5), 12 mm | 0 … 11 | `phones` | **verified** UG p.17, legend UG p.7 |
 | phones jacks | (314, 337) 1/4", (306.5, 356.5) 3.5 mm | decoration | - | **verified** UG p.17 |
-| PHONES 2 select | (22.5, 369.5), 9-way, with position buttons | MST, 1, 2, 3, 4, A, B, C, D | `phones2_src` | **verified** UG p.16, legends UG p.7 |
-| PHONES 2 CUE/MST | (46.5, 369.5), 10.5 mm | the source plus the LR MIX | `phones2_mix` | **verified** UG p.16; ADD MIX in BD |
-| PHONES 2 LEVEL | (69, 369.5), 10.5 mm | 0 … 11 | `phones2` | **verified** UG p.16, legend UG p.7 |
+| PHONES 2 select | (22, 369.5), 9-way, with a position button for each source (MST printed outside the ring) | MST, 1, 2, 3, 4, A, B, C, D | `phones2_src` | **verified** UG p.16, legends UG p.7 |
+| PHONES 2 CUE/MST | (47.5, 369.5), 10.5 mm | the source plus the LR MIX | `phones2_mix` | **verified** UG p.16; ADD MIX in BD |
+| PHONES 2 LEVEL | (72, 369.5), 10.5 mm | 0 … 11 | `phones2` | **verified** UG p.16, legend UG p.7 |
 
 - **Main meters** follow the monitor source: the LR MIX before MASTER 1 when nothing is cued, the
   sum of the cued channels while a CUE is on, and in SPLIT CUE the cue on the left and the mix on
