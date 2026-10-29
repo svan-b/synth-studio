@@ -189,6 +189,26 @@ const panR = p => (p < 0 ? 1 + p : 1);
 
 const KILL_SAMPLES = Math.round(0.02 * SR);
 
+/**
+ * A deck plays like a CDJ with a mastered record: its line output can't pass 0 dBFS, which is
+ * +8 dBu (2 V rms). Each deck's output (after its trim) is soft-limited there - linear up to
+ * about +6 dBu, then a tanh knee - so the loudest peaks sit around +6 to +8 on the channel meter
+ * at GAIN 0 dB, as the guide asks (p.9, p.11).
+ */
+const DECK_CEIL = 0.1 * Math.pow(10, 8 / 20);
+
+/** Deck output in place: trim ramp a0 -> a1 across the block, then the +8 dBu ceiling */
+function deckOut(L, R, a0, a1) {
+  const da = (a1 - a0) / BLOCK, k = 0.8 * DECK_CEIL;
+  let a = a0;
+  for (let i = 0; i < BLOCK; i++) {
+    const l = L[i] * a, r = R[i] * a;
+    L[i] = l > k || l < -k ? clip(l, DECK_CEIL) : l;
+    R[i] = r > k || r < -k ? clip(r, DECK_CEIL) : r;
+    a += da;
+  }
+}
+
 class Voice {
   constructor(deck) { this.deck = deck; this.start = 0; this.end = 0; this.t = 0; this.kill = false; this.killG = 1; }
   begin(start, len) { this.start = start; this.end = start + Math.round(len * SR); this.t = 0; this.kill = false; this.killG = 1; }
@@ -577,7 +597,7 @@ class Deck {
         if (arrBar >= 16 && (step === 4 || step === 12)) this.clap(f, 0.9);
         if (arrBar >= 8 && arrBar < 30) {
           const p = BASS_B[step];
-          if (p !== undefined) this.bass(f, 33 + p, d16 * 0.8, 0.75, 300 + (150 * (arrBar % 8)) / 8, 9, 5, true);
+          if (p !== undefined) this.bass(f, 33 + p, d16 * 0.8, 0.55, 300 + (150 * (arrBar % 8)) / 8, 9, 5, true);
         }
         break;
       }
@@ -845,9 +865,9 @@ class XoneStripsProcessor extends AudioWorkletProcessor {
 
       // --- source select x GAIN -------------------------------------------
       if (s.deck && s.deck.voices.length) {
-        const g0 = c0[P_DECK] * c0[P_TRIM], g1 = c1[P_DECK] * c1[P_TRIM];
-        if (s.deck.render(f0) && (g0 !== 0 || g1 !== 0)) {
-          addRamp(xL, s.deck.L, g0, g1); addRamp(xR, s.deck.R, g0, g1);
+        if (s.deck.render(f0) && (c0[P_DECK] !== 0 || c1[P_DECK] !== 0)) {
+          deckOut(s.deck.L, s.deck.R, c0[P_DECK], c1[P_DECK]);
+          addRamp(xL, s.deck.L, c0[P_TRIM], c1[P_TRIM]); addRamp(xR, s.deck.R, c0[P_TRIM], c1[P_TRIM]);
           live = true;
         }
         if (s.tgt[P_DECK] <= 0 && s.cur[P_DECK] < 1e-4) s.deck.clear();
@@ -1027,7 +1047,8 @@ class XoneMasterProcessor extends AudioWorkletProcessor {
     this.cur = new Float64Array(NM);
     this.prev = new Float64Array(NM);
     for (const i of [M_MASTER, M_BOOTH, M_PHONES, M_MASTER2, M_P2]) this.tgt[i] = this.cur[i] = 1;
-    this.tgt[M_OUT] = this.cur[M_OUT] = 1.25;
+    // The studio line-up, 0 dBu = -14 dBFS (devices/xone96/model.ts OUT_SCALE); the engine posts it too
+    this.tgt[M_OUT] = this.cur[M_OUT] = 1 / (0.1 * Math.pow(10, 14 / 20));
     this.vcf = [new Vcf(), new Vcf()];
     this.bq = new Float64Array(15);
     this.bz = new Float64Array(12);

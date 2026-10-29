@@ -43,14 +43,16 @@ export const dbuToLin = (dbu: number) => REF * Math.pow(10, dbu / 20);
 export const linToDbu = (a: number | undefined) => (a && a > 1e-7 ? 20 * Math.log10(a / REF) : -120);
 
 /**
- * Studio alignment: 0 dBu = -18 dBFS (EBU R68), so +18 dBu = full scale. The studio's
- * instruments peak around -12 dBFS, so they arrive with peaks near +6 dBu: the manual's
- * target at GAIN 0 dB. In and out scale cancel, so the Xone at unity is unity overall.
+ * Studio alignment: the Xone's own digital line-up, 0 dBu = -14 dBFS (guide p.35, the USB
+ * soundcards), for everything digital that meets the mixer: studio instruments in, the
+ * studio output, files on USB. +14 dBu is full scale, 6 dB under the channels' +20 dBu
+ * clip. An instrument normalised to -18 LUFS arrives a few dB under the guide's meter
+ * target, so GAIN does its job. In and out scale cancel: the Xone at unity is unity overall.
  */
-export const STUDIO_IN = 0.8;
-/** A loaded file at 0 dBFS arrives at +8 dBu, like a CDJ line output (2 V rms) */
-export const FILE_IN = 0.25;
-/** LR MIX at 0 dBu leaves the mixer at -18 dBFS with MASTER 1 at its unity mark */
+export const STUDIO_IN = dbuToLin(14);
+/** Files play on the USB positions at the same line-up: 0 dBFS arrives at +14 dBu */
+export const FILE_IN = STUDIO_IN;
+/** LR MIX at 0 dBu leaves the mixer at -14 dBFS with MASTER 1 at its unity mark */
 export const OUT_SCALE = 1 / STUDIO_IN;
 /** Clip points (soft knee from 80 %): channel +20 dBu, LR MIX +21 dBu, MASTER 1 output +24 dBu */
 export const CH_CLIP = dbuToLin(20);
@@ -213,11 +215,13 @@ export const SRC = { TRACK_A: 0, TRACK_B: 1, DRUMS: 2, BASS: 3, STABS: 4, PERC: 
 /** Menu order of the deck sources (NONE last) */
 export const SOURCE_MENU = [SRC.TRACK_A, SRC.TRACK_B, SRC.FULL, SRC.DRUMS, SRC.BASS, SRC.STABS, SRC.PERC, SRC.PAD, SRC.LEAD, SRC.NONE];
 /**
- * Output trim per deck source (dB) so each one reads around 0 on the channel meter with
- * peaks near +6 at GAIN 0 dB (measured offline), like the studio's instruments. TRACK B is
- * ~1.5 dB hotter than TRACK A on purpose: matching them with GAIN is a DJ's first move.
+ * Output trim per deck source (dB), before the deck's +8 dBu ceiling (a CDJ's full scale; the
+ * worklet's deckOut), so each one reads around 0 on the channel meter with its loudest peaks
+ * around +6 to +8 at GAIN 0 dB, as the guide asks (measured offline). At unity a full track then
+ * leaves the mixer near -18 LUFS. TRACK B is ~1.5 dB hotter than TRACK A on purpose: matching
+ * them with GAIN is a DJ's first move.
  */
-export const SOURCE_TRIM_DB = [-4, -5, -1, -1.5, -4, 2.5, -4, 6.5, 0, -5.5];
+export const SOURCE_TRIM_DB = [-2, -2.5, -1, -1.5, -4, 2.5, -4, 6.5, 0, -4.5];
 /** Bars in the TRACK A / TRACK B arrangement (four 8-bar phrases) */
 export const ARRANGEMENT_BARS = 32;
 /** Lesson auditions start at bar 17: every element of the tracks is playing */

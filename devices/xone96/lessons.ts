@@ -225,7 +225,7 @@ const f2: Lesson = {
       predict: {
         question: 'What will the meter show?',
         options: ['The +10 LED and the PK! LED flash: little headroom is left', 'It stays the same', 'It switches off'], answer: 0,
-        explain: '+10 dB of gain lifts the peaks to around +16 dBu, close to the channel\'s +20 dBu ceiling. PK! sits right after GAIN and warns you (the twin lights it from +15 dBu); the guide\'s fix for a lit PK! is to turn that channel\'s GAIN down.',
+        explain: '+10 dB of gain lifts the peaks to around +18 dBu, right under the channel\'s +20 dBu ceiling. PK! sits right after GAIN and warns you (the twin lights it from +15 dBu); the guide\'s fix for a lit PK! is to turn that channel\'s GAIN down.',
       },
       principle: 'Headroom is the space between your normal level and the point where the circuit clips.',
       manualReference: REF.gain,
@@ -1510,7 +1510,7 @@ const e4: Lesson = {
         { text: 'No EQ boosts', check: s => ['ch1_hi', 'ch1_himid', 'ch1_lomid', 'ch1_lo'].every(c => num(s, c) <= 0.05) },
         { text: 'MASTER 1 back at unity (8)', check: s => Math.abs(num(s, 'master') - 8) <= 0.3 },
       ],
-      hints: ['Start with the EQ flat.', 'At 0 dB the FULL MIX peaks near +6; the twin\'s PK! lights from +15.', 'GAIN about +3 dB, all EQ centred, MASTER 1 at 8.'],
+      hints: ['Start with the EQ flat.', 'At 0 dB the FULL MIX peaks around +7; the twin\'s PK! lights from +15.', 'GAIN about +3 dB, all EQ centred, MASTER 1 at 8.'],
       solution: { values: { ch1_gain: 3, ch1_hi: 0, ch1_himid: 0, ch1_lomid: 0, ch1_lo: 0, master: 8 } },
     },
     {
