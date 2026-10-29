@@ -1279,7 +1279,10 @@ export const useStudioStore = create<StudioStore>()(
           completedLessons: upgradeCompletedLessons((old.completedLessons as string[]) ?? [], version),
           review: (old.review as Record<string, ReviewItem>) ?? {},
           focusMode: (old.focusMode as boolean) ?? true,
-          lessonBackups: Array.isArray(old.lessonBackups) ? (old.lessonBackups as LessonBackup[]) : [],
+          // Studios saved before lessons get the same upgrades, so bringing one back sounds as it did
+          lessonBackups: Array.isArray(old.lessonBackups)
+            ? (old.lessonBackups as LessonBackup[]).map(b => ({ ...b, devices: upgradeDevices(b.devices ?? {}, b.studio?.rack ?? [], 'store', version) }))
+            : [],
         } as unknown as StudioStore;
       },
     },
