@@ -17,7 +17,7 @@ import {
   clearTrack, copyPage, copyTrack, copyTrigs, formatRetrigRate, isSwingStep, lockedParamCount, pastePage, pasteTrack,
   pasteTrigs, patternFromProgram, programOfPattern, reloadPattern, reloadTrack, savePattern, saveTrack, setActive,
   setMasterMute, setMasterMutes, setSongLoop, setSwingTrigs, setTempoMode, setTrackQuantize, setTrigMute, shiftTrigs,
-  songAddEntry, songRemoveEntry, songToggleEntryMute, songUpdateEntry, toggleSwingTrig, trackTrigDefaults,
+  songAddEntry, songMoveEntry, songRemoveEntry, songToggleEntryMute, songUpdateEntry, toggleSwingTrig, trackTrigDefaults,
   type ChangeMode, type LockOptions, type Pattern, type PatternId, type Project, type SequencerOptions, type Speed,
   type Step, type TimerApi, type TransportLike, type TrigEvent, type VisibilitySource,
 } from '../lib/sequencer/elektron';
@@ -29,7 +29,8 @@ import * as ReactNS from 'react';
 import { createElement, type ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  ChainBuilder, MenuKey, PagePicker, PatternPicker, ScaleMenu, SongEditor, TrigEditor, TrigKeys,
+  ChainBuilder, MenuKey, PagePicker, PatternPicker, ScaleMenu, SongEditor, TransportKeys, TrigEditor, TrigKeys, TrigModeKey,
+  pressPlay, pressStop, type TrigKeysMode, type TrigKeysProps,
 } from '../components/sequencer';
 
 // The UI kit's .tsx files use Next's automatic JSX runtime; tsx compiles them with
@@ -1486,6 +1487,8 @@ test('every component renders empty, busy and playing projects (open, in its box
       html(PatternPicker, { ctx, open: true }), html(ChainBuilder, { ctx, open: true }), html(SongEditor, { ctx, open: true, transpose: true }),
       html(ScaleMenu, { ctx, open: true }), html(MenuKey, { ctx, menu: 'pattern' as const }),
       html(TrigEditor, { ctx: { ...ctx, ui: { trigEditor: { track: 0, pattern: 'A01', steps: [5] } } } }),
+      ...(['trigmute', 'swing', 'solo', 'accent'] as const).map(mode => html(TrigKeys, { ctx, mode, muteTarget: 'project' as const, stampDefaults: true })),
+      html(TransportKeys, { ctx }), html(TrigModeKey, { ctx, mode: 'trigmute' as const }),
     ];
     parts.forEach((h, i) => ok(h.length > 20, `${name}: component ${i} rendered`));
   }
@@ -1526,6 +1529,186 @@ test('PatternPicker / SongEditor reflect playing, cued and song state', () => {
   const song = html(SongEditor, { ctx: uiCtx(p), open: true, transpose: true });
   ok(song.includes('×2') && song.includes('>99<') && song.includes('+3') && song.includes('>8<'), 'row values');
   ok(song.includes('aria-label="Unmute T2 in row 1"'), 'row mutes');
+});
+
+// ============================================================================
+section('UI kit: trig modes, trig mute, SAVE / RELOAD / UNDO, TEMP JUMP, song chains, page copies, PLAY / pause');
+
+/** The opening tag of trig key `step` in rendered TrigKeys markup */
+const keyOf = (h: string, step: number) => (h.match(/<button[^>]*>/g) ?? []).find(t => t.includes(`data-step="${step}"`)) ?? '';
+/** A rendered button whose whole text is `label` */
+const buttonWith = (h: string, label: string) => (h.match(/<button[^>]*>[^<]*<\/button>/g) ?? []).find(b => b.endsWith(`>${label}</button>`)) ?? '';
+
+test('TrigKeys modes: TRIG MUTE lights muted trigs, SWING the swing trigs, MUTE the project mutes, SOLO the soloed tracks', () => {
+  let p = proj(4, { 0: { 0: {}, 4: { mute: true }, 6: { trigless: true } }, 2: { 0: {} } });
+  p = setMasterMute(p, 2, true);
+  const keys = (mode: TrigKeysMode, extra: Partial<TrigKeysProps> = {}, engine: Record<string, unknown> = {}, ui: Record<string, unknown> = {}) =>
+    html(TrigKeys, { ctx: uiCtx(p, ui, engine), mode, ...extra });
+  const tm = keys('trigmute');
+  ok(keyOf(tm, 4).includes('data-flag="1"') && keyOf(tm, 4).includes('data-tmute="1"'), 'TRIG MUTE: the muted trig is lit');
+  ok(!keyOf(tm, 0).includes('data-flag') && keyOf(tm, 0).includes('trig, trig mute off'), 'TRIG MUTE: an unmuted trig is not');
+  const sw = keys('swing');
+  eq([1, 3, 5, 0, 2].map(s => keyOf(sw, s).includes('data-flag="1"')), [true, true, true, false, false], 'SWING: the default swing trigs, keys 2, 4, 6');
+  const sw2 = html(TrigKeys, { ctx: uiCtx(setSwingTrigs(p, 'A01', [0, 2])), mode: 'swing' as const });
+  eq([0, 1, 2].map(s => keyOf(sw2, s).includes('data-flag="1"')), [true, false, true], 'SWING: moved swing trigs');
+  const mp = keys('mute', { muteTarget: 'project' });
+  ok(mp.includes('aria-label="Mute track 3" aria-pressed="true"') && mp.includes('aria-label="Mute track 1" aria-pressed="false"'), 'MUTE: the project (global) mutes');
+  ok(keys('mute').includes('aria-label="Mute track 3" aria-pressed="false"'), 'MUTE: the pattern mutes by default');
+  const solo = keys('solo', {}, { seq: { steps: [-1, -1, -1, -1], playing: false, solos: [false, true, false, false], mutes: [] } });
+  ok(solo.includes('aria-label="Solo track 2 (soloed)" aria-pressed="true"') && solo.includes('aria-label="Solo track 1" aria-pressed="false"'), 'SOLO');
+  // TRIG mode: a muted trig keeps its trig LED, dimmed, with an M; a track the project mutes is dimmed
+  const trig = keys('trig');
+  ok(keyOf(trig, 4).includes('data-trig="note"') && keyOf(trig, 4).includes('data-tmute="1"') && keyOf(trig, 4).includes('trig on muted'), 'muted trig');
+  ok(trig.includes('>M<'), 'trig mute marker');
+  ok(html(TrigKeys, { ctx: uiCtx(p), track: 2 }).includes('opacity:0.42'), 'a track the project mutes dims its keys');
+  // Without a mode prop the keys follow ui.seqTrigMode (TrigModeKey)
+  ok(keyOf(html(TrigKeys, { ctx: uiCtx(p, { seqTrigMode: 'trigmute' }) }), 4).includes('data-flag="1"'), 'ui.seqTrigMode');
+  ok(html(TrigModeKey, { ctx: uiCtx(p, { seqTrigMode: 'swing' }), mode: 'swing' as const }).includes('aria-pressed="true"'), 'TrigModeKey lit');
+  ok(html(TrigModeKey, { ctx: uiCtx(p), mode: 'swing' as const }).includes('aria-pressed="false"'), 'TrigModeKey unlit');
+});
+
+test('TrigEditor: the MUTE key mutes the trig (TRIG MUTE, A4 p.51, Rytm p.49); lockLimit shows the pattern\'s lock budget', () => {
+  let p = proj(4, { 0: { 0: { mute: true, locks: { cut: 1 } }, 1: {} }, 1: { 3: { locks: { cut: 2, res: 3 } } } });
+  const ed = (steps: number[], extra: Record<string, unknown> = {}) => html(TrigEditor, { ctx: uiCtx(p, { trigEditor: { track: 0, pattern: 'A01', steps } }), ...extra });
+  ok(buttonWith(ed([0]), 'MUTE').includes('aria-pressed="true"') && ed([0]).includes('Trig mute: this trig is silent'), 'muted trig');
+  ok(buttonWith(ed([1]), 'MUTE').includes('aria-pressed="false"') && !ed([1]).includes('Trig mute: this trig is silent'), 'unmuted trig');
+  ok(!buttonWith(ed([0], { features: { trigMute: false } }), 'MUTE'), 'features.trigMute false hides it');
+  ok(!buttonWith(ed([5]), 'MUTE'), 'an empty step has nothing to mute');
+  ok(ed([0], { lockLimit: LOCK_LIMIT_RYTM }).includes('PATTERN 3/72 PARAMETERS'), 'budget: (track 1, cut), (track 2, cut), (track 2, res)');
+  for (let i = 0; i < 69; i++) p = setLock(p, 'A01', 2, [0], `k${i}`, 1);
+  ok(ed([0], { lockLimit: LOCK_LIMIT_RYTM }).includes('its limit'), 'a full pattern says so');
+});
+
+test('PatternPicker: SAVE / RELOAD follow the restore point, UNDO / REDO the last PASTE or CLEAR, TEMP JUMP blinks while armed (A4 p.40, p.43, p.54; Rytm p.39, p.42-43, p.51)', () => {
+  const open = (p: Project, ui: Record<string, unknown> = {}, engine: Record<string, unknown> = {}) => html(PatternPicker, { ctx: uiCtx(p, ui, engine), open: true });
+  const keyHtml = buttonWith;
+  const fresh = proj(2, { 0: { 0: {} } });
+  ok(keyHtml(open(fresh), 'RELOAD').includes('disabled') && keyHtml(open(fresh), 'RELOAD').includes('No restore point yet'), 'no restore point: RELOAD off');
+  const selected = setActive(setActive(fresh, 'A02'), 'A01');
+  ok(keyHtml(open(selected), 'RELOAD').includes('disabled'), 'just selected: nothing to reload');
+  const edited = toggleTrig(selected, 'A01', 0, 4);
+  ok(!keyHtml(open(edited), 'RELOAD').includes('disabled'), 'edited: RELOAD on');
+  const saved = savePattern(edited);
+  ok(keyHtml(open(saved), 'RELOAD').includes('disabled'), 'saved: RELOAD off again');
+  const reloaded = migrateProject(JSON.parse(JSON.stringify(saved)), 2);
+  ok(keyHtml(open(reloaded), 'RELOAD').includes('disabled'), 'a saved and loaded project compares by content');
+  ok(keyHtml(open(fresh), 'UNDO').includes('disabled'), 'nothing to undo');
+  const undo = keyHtml(open(fresh, { seqUndo: { id: 'A01', pattern: null, what: 'paste' } }), 'UNDO');
+  ok(!undo.includes('disabled') && undo.includes('aria-label="UNDO PASTE"'), 'UNDO after a paste');
+  ok(keyHtml(open(fresh, { seqUndo: { id: 'A01', pattern: null, what: 'clear', undone: true } }), 'REDO').includes('aria-label="REDO CLEAR"'), 'REDO after an undo');
+  ok(keyHtml(open(fresh, { seqUndo: { id: 'B07', pattern: null, what: 'paste' } }), 'UNDO').includes('disabled'), 'an undo for another slot waits');
+  const state = (tempJump: string) => ({ seq: { steps: [-1, -1], playing: true, pattern: 'A01', tempJump, changeMode: 'sequential', mutes: [] } });
+  const tj = (s: string) => keyHtml(open(fresh, {}, state(s)), 'TEMP JUMP');
+  ok(tj('armed').includes('seq-blink') && tj('armed').includes('aria-pressed="true"'), 'armed: blinks');
+  ok(!tj('active').includes('seq-blink') && tj('active').includes('aria-pressed="true"'), 'active: lit');
+  ok(tj('off').includes('aria-pressed="false"'), 'off');
+  ok(keyHtml(open(setChangeMode(fresh, 'temp-jump')), 'SEQUENTIAL').includes('aria-pressed="true"'), 'an older saved TEMP JUMP mode shows the mode it falls back to');
+  const lesson = html(PatternPicker, { ctx: { ...uiCtx(fresh), teaching: true, step: { instruction: 'Arm TEMP JUMP', event: 'seq:temp-jump' } }, open: true });
+  ok(keyHtml(lesson, 'TEMP JUMP').includes('seq-target'), 'a lesson step with event seq:temp-jump lights the key');
+});
+
+test('SongEditor chain rows: each pattern position has its pattern, transpose, song mutes, cue, move and remove (A4 p.56-57, Rytm p.54-55)', () => {
+  let p = proj(2, { 0: { 0: {} } });
+  p = songAddRow(p, { pattern: 'A01', repeats: 2 });
+  p = songAddEntry(songAddEntry(p, 0, 'A02'), 0, 'B03');
+  p = songUpdateEntry(songUpdateEntry(p, 0, 1, { mutes: [1] }), 0, 2, { transpose: 2 });
+  p = songAddRow(p, { pattern: 'A04' });
+  const song = (extra: Record<string, unknown> = {}, engine: Record<string, unknown> = {}) => html(SongEditor, { ctx: uiCtx(p, {}, engine), open: true, transpose: true, ...extra });
+  const h = song();
+  for (const label of ['Play from row 1, pattern 2', 'Unmute T2 in row 1, pattern 2', 'Mute T1 in row 1, pattern 1', 'Remove row 1, pattern 3', 'Move row 1, pattern 3 later', 'Add a pattern to row 1', 'Remove pattern 1 of row 1', 'Delete row 2', 'row 1, pattern 3 transpose']) {
+    ok(h.includes(label), label);
+  }
+  ok(h.includes('>+2<') && h.includes('>B03<') && /▶ (<!-- -->)?1(<!-- -->)?\.(<!-- -->)?3/.test(h), 'position values');
+  const playing = song({}, { seq: { steps: [-1, -1], playing: true, mode: 'song', songRow: 0, songPos: 2, songRepeat: 1, mutes: [] } });
+  ok(/aria-label="Play from row 1, pattern 3"[^>]*aria-pressed="true"/.test(playing), 'the playing pattern position is lit');
+  ok(/aria-label="Play from row 1, pattern 2"[^>]*aria-pressed="false"/.test(playing), 'the others are not');
+  ok(/>2(<!-- -->)?\/(<!-- -->)?2</.test(playing) && playing.includes('row 1, pattern 3/3'), 'repeat and position counters');
+  const plain = song({ chains: false, loop: false, length: false, tempo: false });
+  ok(!plain.includes('+ PTN') && !plain.includes('LOOP') && !plain.includes('END') && !plain.includes('Loop back') && !plain.includes('>LENGTH<') && !plain.includes('>BPM<'), 'hardware-style options');
+});
+
+test('songMoveEntry: a pattern position moves within its row with its song mutes and transpose (A4 p.56, Rytm p.54)', () => {
+  let p = songAddRow(proj(2), { pattern: 'A01', repeats: 3, mutes: [0] });
+  p = songAddEntry(songAddEntry(p, 0, 'A02'), 0, 'B03');
+  p = songUpdateEntry(p, 0, 2, { transpose: 5 });
+  /** Key order doesn't matter */
+  const canon = (x: unknown): unknown => (Array.isArray(x) ? x.map(canon) : x && typeof x === 'object'
+    ? Object.fromEntries(Object.keys(x).sort().map(k => [k, canon((x as Record<string, unknown>)[k])])) : x);
+  const moved = songMoveEntry(p, 0, 2, 0);
+  eq(canon(moved.song.rows[0]), canon({ pattern: 'B03', repeats: 3, transpose: 5, chain: [{ pattern: 'A01', mutes: [0] }, { pattern: 'A02' }] }));
+  eq(canon(songMoveEntry(moved, 0, 0, 2).song.rows[0]), canon({ pattern: 'A01', repeats: 3, mutes: [0], chain: [{ pattern: 'A02' }, { pattern: 'B03', transpose: 5 }] }), 'and back');
+  ok(songMoveEntry(p, 0, 1, 1) === p && songMoveEntry(p, 0, 0, 3) === p && songMoveEntry(p, 4, 0, 1) === p, 'no-ops keep the project');
+});
+
+test('ScaleMenu says a longer length copies the pages (A4 p.49, Rytm p.46); copyPages false turns it off', () => {
+  const p = proj(2, { 0: { 0: {} } });
+  ok(html(ScaleMenu, { ctx: uiCtx(p), open: true }).includes('new pages start as copies'), 'on by default');
+  ok(!html(ScaleMenu, { ctx: uiCtx(p), open: true, copyPages: false }).includes('new pages start as copies'), 'off');
+});
+
+/** A ctx wired to a live sequencer: `play` drives start / stop (an engine's onParam), events go to handleEvent */
+function transportCtx(project: Project, follow?: FakeTransport) {
+  const r = rig(project);
+  if (follow) r.seq.follow(follow);
+  const box = { values: { track: 0, play: false } as Record<string, ControlValue>, calls: [] as string[] };
+  const ctx = (): CustomRenderContext => ({
+    ...uiCtx(project, {}, { seq: r.seq.getState() }, box.values),
+    setValue: (id, v) => {
+      box.calls.push(`${id}=${v}`);
+      box.values = { ...box.values, [id]: v };
+      if (id === 'play') { if (follow) { if (v) follow.start(r.clock.currentTime); else follow.stop(); } else if (v) r.seq.start(); else r.seq.stop(); }
+    },
+    sendEvent: (name, payload) => { box.calls.push(name); r.seq.handleEvent(name, payload); },
+  });
+  return { r, box, ctx };
+}
+
+test('pressPlay / pressStop: PLAY plays, PLAY while playing pauses, PLAY again resumes where it was, STOP stops; the next PLAY starts over (A4 p.13, p.38-39; Rytm p.37)', () => {
+  const { r, box, ctx } = transportCtx(proj(1, { 0: Object.fromEntries([0, 2, 4, 6, 8, 10, 12, 14].map(s => [s, {}])) }));
+  pressPlay(ctx());
+  eq([box.values.play, r.seq.playing], [true, true], 'plays');
+  r.clock.advance(T0 + 5 * STEP120);
+  pressPlay(ctx());
+  eq([r.seq.playing, r.seq.isPaused, box.values.play], [false, true, true], 'paused; the transport control stays on');
+  const n = r.trigs.length;
+  r.clock.advance(2);
+  eq(r.trigs.length, n, 'silent while paused');
+  ok(html(TransportKeys, { ctx: ctx() }).includes('aria-label="Play (paused)"') && html(TransportKeys, { ctx: ctx() }).includes('seq-blink'), 'PLAY blinks while paused');
+  pressPlay(ctx());
+  r.clock.advance(0.5);
+  eq(r.trigs[n].step, r.trigs[n - 1].step + 2, 'resumed with the next step');
+  ok(html(TransportKeys, { ctx: ctx() }).includes('aria-label="Pause"'), 'playing: PLAY reads Pause');
+  pressStop(ctx());
+  eq([box.values.play, r.seq.playing, r.seq.isPaused], [false, false, false], 'stopped');
+  const m = r.trigs.length;
+  pressPlay(ctx());
+  r.clock.advance(0.2);
+  eq([r.trigs[m].step, r.trigs[m].loop], [0, 0], 'from the top');
+  // STOP while paused ends the pause
+  pressPlay(ctx());
+  eq(r.seq.isPaused, true);
+  pressStop(ctx());
+  eq([r.seq.isPaused, r.seq.playing, box.values.play], [false, false, false], 'STOP ends a pause');
+  eq(box.calls, ['play=true', 'seq:pause', 'seq:resume', 'play=false', 'seq:stop', 'play=true', 'seq:pause', 'play=false', 'seq:stop']);
+});
+
+test('pressPlay: a song that ended by itself starts again; synced to the studio PLAY / STOP drive the studio transport (no pause)', () => {
+  let song = songAddRow(proj(1, { 0: { 0: {} } }, { length: 4 }), { pattern: 'A01', repeats: 1 });
+  song = setPlayMode(song, 'song');
+  const ended = transportCtx(song);
+  pressPlay(ended.ctx());
+  ended.r.clock.advance(2);
+  eq([ended.r.seq.playing, ended.box.values.play], [false, true], 'the song stopped at its end, the control is still on');
+  pressPlay(ended.ctx());
+  ok(ended.r.seq.playing && ended.box.calls[ended.box.calls.length - 1] === 'seq:start', 'PLAY starts it again');
+  const tr = new FakeTransport();
+  const synced = transportCtx(proj(1, { 0: { 0: {} } }), tr);
+  pressPlay(synced.ctx());
+  ok(tr.playing && synced.box.values.play === true, 'PLAY starts the studio transport');
+  tr.run(30);
+  pressPlay(synced.ctx());
+  ok(!tr.playing && !synced.r.seq.isPaused, 'PLAY while synced stops it: the studio transport has no pause');
+  eq(synced.box.calls, ['play=true', 'play=false']);
 });
 
 // ============================================================================
