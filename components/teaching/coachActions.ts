@@ -125,7 +125,7 @@ export async function showMe(step: LessonStep, instance: string, labelOf: (id: s
         for (const [id, v] of Object.entries(vals)) await sweep(inst, id, pspec?.controls[id], v, 350);
       }
       // The studio itself: the mix, the master, the song, snapshots, the transport
-      applyStudioSolution({ ...sol, parts: undefined });
+      applyStudioSolution({ ...sol, parts: undefined }, target);
       if (sol.transport === 'play') hub.startAll();
       // A button pressed until the step is done (parking a sequencer), slowly enough to follow
       if (sol.pressUntilDone) {

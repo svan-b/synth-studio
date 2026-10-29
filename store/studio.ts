@@ -12,7 +12,6 @@ import { STUDIO_LESSONS } from '@/lib/studio/lessons';
 import { getLessonLive, lessonStudioHooks } from '@/lib/studio/lessonLive';
 import { isProducerLessonId, producerLessonsNow, setProducerRegister } from '@/lib/studio/producerIndex';
 import { buildLessonStudio, newBackupId, pushBackup, sameStudio, type LessonBackup } from '@/lib/studio/lessonStudio';
-import { SWING_RANGE, patternSwing, withPatternPatch } from '@/lib/studio/elektronEdits';
 import { LIMITER_CEILING_DB } from '@/lib/audio/context';
 
 // ============================================================================
@@ -342,6 +341,22 @@ const PRESET_COLORS = ['#22c55e', '#f97316', '#ef4444', '#06b6d4', '#a855f7', '#
 
 const initInstance = (): InstanceState => ({ controlValues: {}, patchConnections: [] });
 
+// Elektron pattern SWING for match steps (Lesson API v3 `match.pattern`): read and set on
+// the active pattern of an Elektron project. Inline, so the first download doesn't carry the
+// sequencer library (lib/studio/elektronEdits.ts has the full helpers).
+type SwingData = { active?: unknown; patterns?: Record<string, { swing?: unknown } | undefined> } | null;
+function activeSwing(data: unknown): number | undefined {
+  const d = data as SwingData;
+  if (!d || typeof d !== 'object' || typeof d.active !== 'string' || !d.patterns || typeof d.patterns !== 'object') return undefined;
+  const sw = d.patterns[d.active]?.swing;
+  return typeof sw === 'number' ? sw : 50;
+}
+function withActiveSwing(data: unknown, swing: number): unknown {
+  const d = data as SwingData;
+  if (!d || typeof d !== 'object' || typeof d.active !== 'string' || !d.patterns?.[d.active]) return data;
+  return { ...d, patterns: { ...d.patterns, [d.active]: { ...d.patterns[d.active], swing: Math.max(50, Math.min(80, Math.round(swing))) } } };
+}
+
 const defaultStudio = (focus = 'dfam'): StudioDoc => ({
   rack: [{ id: focus, device: focus }],
   cables: [],
@@ -633,7 +648,7 @@ export const useStudioStore = create<StudioStore>()(
                   ...d,
                   controlValues: { ...d.controlValues, ...values },
                   patchConnections: step.setupPatches ?? step.match?.patches ?? d.patchConnections,
-                  ...(patternStart ? { data: withPatternPatch(d.data, patternStart) } : {}),
+                  ...(patternStart ? { data: withActiveSwing(d.data, patternStart.swing) } : {}),
                 },
               },
             };
@@ -1137,8 +1152,8 @@ export const useStudioStore = create<StudioStore>()(
           // An Elektron pattern setting (v3): SWING of the active pattern, in knob travel too
           const pm = step.match.pattern;
           if (pm) {
-            const v = patternSwing(s.devices[instance]?.data);
-            const err = v === undefined ? Infinity : Math.abs(v - pm.target.swing) / SWING_RANGE;
+            const v = activeSwing(s.devices[instance]?.data);
+            const err = v === undefined ? Infinity : Math.abs(v - pm.target.swing) / 30;
             if (!(err <= tol)) off.push({ id: 'pattern:swing', dir: v === undefined ? 'different' : v < pm.target.swing ? 'higher' : 'lower', far: err > tol * 2.5 });
           }
           const tested = step.match.controls.length + (pm ? 1 : 0);

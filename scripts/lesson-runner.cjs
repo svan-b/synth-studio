@@ -12,7 +12,9 @@
 //   match       -> set the target values, press Check
 //   reflect     -> reveal + self-rate
 //   challenge   -> apply `solution` (values, patches, data, presses, notes, studio
-//                  cables, transport) when the step has one
+//                  cables, transport; and through the lesson runtime, in device lessons
+//                  too: routes, the arranger, other instruments, the mixer, Elektron
+//                  pattern settings and trigs) when the step has one
 // Any step still not satisfied is searched: single moves a learner could make
 // (studio transport, a cable between instruments, an internal cable, a switch or
 // button, a press) are tried one at a time and kept when they help. A step solved
@@ -202,7 +204,10 @@ const { chromium } = require('playwright');
       S().startLesson(lesson, studio ? undefined : device);
       await wait(60);
       const ownStudio = !!(lesson.start && lesson.start.studio);
-      const rt = studio ? await runtime() : undefined;
+      // The lesson runtime applies studio-level solutions (routes, the arranger, other
+      // instruments, Elektron patterns) in device lessons too; meters only matter in studio ones
+      const rt = await runtime();
+      const liveRt = studio ? rt : undefined;
       if (ownStudio) await waitForStudio();
       const stepResults = [];
       for (let i = 0; i < lesson.steps.length; i++) {
@@ -229,6 +234,8 @@ const { chromium } = require('playwright');
             const v = {};
             step.match.controls.forEach(c => { v[c] = step.match.target[c]; });
             S().setControlValues(inst, v);
+            // An Elektron pattern setting (SWING) to match: set it like the SWING menu does
+            if (step.match.pattern && rt) rt.setPatternSettings(inst, step.match.pattern.target);
             S().checkMatch();
           }
           if (kind === 'reflect') { S().revealStep(); S().rateReflection('got-it'); }
@@ -242,8 +249,11 @@ const { chromium } = require('playwright');
             if (sol.patches) sol.patches.forEach(p => S().addPatchConnection(si, p.from, p.to));
             if (sol.data !== undefined) S().setDeviceData(si, sol.data);
             if (sol.studioCables) sol.studioCables.forEach(c => S().addStudioCable({ from: { instance: resolveEnd(c.from), jack: c.from.jack }, to: { instance: resolveEnd(c.to), jack: c.to.jack } }));
-            // v3: other instruments, the mixer, the master, tempo and routing, the song and its snapshots
-            if (rt && (sol.parts || sol.channels || sol.master || sol.studio || sol.arrangement || sol.capture)) rt.applyStudioSolution(sol);
+            // v3: other instruments, the mixer, the master, tempo and routing, the song and its
+            // snapshots, Elektron pattern settings and trigs (cables were added above)
+            if (rt && (sol.parts || sol.channels || sol.master || sol.studio || sol.arrangement || sol.capture || sol.patterns || sol.sequence)) {
+              rt.applyStudioSolution({ ...sol, studioCables: undefined }, si);
+            }
             if (sol.transport === 'play') hub.startAll();
             if (sol.transport === 'stop') hub.stopAll();
             if (sol.presses) for (const p of sol.presses) await press(si, p);
@@ -256,9 +266,9 @@ const { chromium } = require('playwright');
               for (let k = 0; k < 16 && !satisfied(); k++) { hub.event(si, id); S().lessonPress(si, [id]); await wait(150); }
             }
             // Play, bounce or record for real, until the step is satisfied (meters need time)
-            if (rt && rt.isTimedSolution(sol)) {
+            if (liveRt && liveRt.isTimedSolution(sol)) {
               how = `timed: ${['play', 'bounce', 'record'].filter(k => sol[k]).join(', ')}`;
-              await rt.runTimedSolution(sol, { until: () => !sol.bounce && !sol.record && satisfied() });
+              await liveRt.runTimedSolution(sol, { until: () => !sol.bounce && !sol.record && satisfied() });
             }
           }
         } catch (e) {
@@ -267,7 +277,7 @@ const { chromium } = require('playwright');
         }
         await wait(30);
         // Live checks (meters, takes) settle a moment later: give them a second
-        if (rt) { rt.publish(); for (let k = 0; k < 8 && !satisfied(); k++) { await wait(150); rt.publish(); } }
+        if (liveRt) { liveRt.publish(); for (let k = 0; k < 8 && !satisfied(); k++) { await wait(150); liveRt.publish(); } }
         let ok = satisfied();
         // What a failing studio check saw, before any search moves change it
         let seen;
@@ -281,7 +291,7 @@ const { chromium } = require('playwright');
         }
         let auto = null;
         // Single learner moves can't fix a measurement: timed steps stand on their own solution
-        if (!ok && !(rt && rt.isTimedSolution(step.solution))) {
+        if (!ok && !(liveRt && liveRt.isTimedSolution(step.solution))) {
           auto = await search(step);
           ok = !!auto;
         }

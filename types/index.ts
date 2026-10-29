@@ -492,10 +492,16 @@ export interface LessonSolution {
   master?: LessonMasterPatch;
   /** Studio mixer channel strips: { [instance or device]: fader dB, pan, sends... } */
   channels?: Record<string, { gain?: number; pan?: number; mute?: boolean; solo?: boolean; sendA?: number; sendB?: number }>;
-  /** Studio tempo, swing and routing */
+  /**
+   * Studio tempo, swing and routing. `routes`: { [instance or device]: 'master' or
+   * '<mixer instance or device>:<input>' } - an instrument's Output, e.g. 'xone96:studio_1'
+   */
   studio?: { bpm?: number; swing?: number; routes?: Record<string, string>; sync?: Record<string, boolean> };
-  /** Replace the song (same shape as a start state's arrangement) */
-  arrangement?: LessonStudioStart['arrangement'];
+  /**
+   * The song arranger: `sections` replace the song (same shape as a start state's, parts by
+   * instance or device); `enabled` and `loop` switch it, keeping the sections when none are given
+   */
+  arrangement?: { enabled?: boolean; loop?: boolean; sections?: NonNullable<LessonStudioStart['arrangement']>['sections'] };
   /**
    * Arranger snapshots to capture, in order: the instrument's current knobs (or only
    * `controls`) become the snapshot of that section (by name, case-insensitive)

@@ -1582,12 +1582,23 @@ const st2: Lesson = {
         { text: 'The A4 plays A01, A02, A03, A04 in that order', check: s => { const i = instanceOf(s, 'analog-four'); return !!i && isSubsequence(s.arrangement.sections.map(x => x.parts[i]?.pattern), ['A01', 'A02', 'A03', 'A04']); } },
       ],
       hints: ['Open the Studio tab and find the arranger.', 'Each section has a pattern picker for every instrument.', 'Give the groove and the drop more bars than the intro.'],
+      solution: {
+        arrangement: {
+          sections: [
+            { name: 'Intro', bars: 4, parts: { 'analog-four': { pattern: 'A01' } } },
+            { name: 'Groove', bars: 8, parts: { 'analog-four': { pattern: 'A02' } } },
+            { name: 'Break', bars: 4, parts: { 'analog-four': { pattern: 'A03' } } },
+            { name: 'Drop', bars: 8, parts: { 'analog-four': { pattern: 'A04' } } },
+          ],
+        },
+      },
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern',
       instruction: 'Turn the arranger on.',
       checklist: [{ text: 'The arranger is on', check: s => s.arrangement.enabled }],
       hints: ['The arranger has an on/off switch at the top.'],
+      solution: { arrangement: { enabled: true } },
     },
     {
       kind: 'predict', control: 'play', targetValue: true, concept: 'sequencer-pattern',
