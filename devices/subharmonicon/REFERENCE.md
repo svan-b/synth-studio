@@ -70,7 +70,8 @@ Faceplate positions are millimetres from its top-left corner (x, y = centre).
   each RHYTHM knob to its SEQ 1 button and on to its SEQ 2 button; a vertical divider at x 135.0
   broken by the SEQ OCT and QUANTIZE groups (6.4-14.1, 40.7-58.6, 91.1-117.5 mm); `IN / OUT` over
   the patchbay (y 4.1). **verified** (measured off a 400 dpi render of the drawing, Subharmonicon
-  manual, p.50).
+  manual, p.50). The twin draws the three headings 0.8 mm higher, so the STEP and RHYTHM legends
+  under them can reach the panel's legibility floor like their neighbours.
 - **Nameplate and logo.** `SUBHARMONICON` bold condensed from x 31.5 to 73.7 (cap height 4.7 mm,
   y 124.0), a vertical bar at x 75.5, then two lines `SEMI-MODULAR ANALOG` / `POLYRHYTHMIC
   SYNTHESIZER` from x 77.1 to 109.9; the moog logo centred at x 152.6, y 123.5, about 25 mm wide.
