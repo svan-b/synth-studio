@@ -122,7 +122,7 @@ export default function ChainBuilder(props: ChainBuilderProps) {
                   position: 'relative', minWidth: 48, height: 34, padding: '0 6px', borderRadius: 4, cursor: 'pointer',
                   border: `2px solid ${isSel ? C.white : i === cueIdx ? C.amber : C.border}`,
                   background: isPlaying ? C.green : C.key, color: isPlaying ? '#0d1a10' : C.text,
-                  fontFamily: MONO, fontSize: 11, fontWeight: 700, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none',
+                  fontFamily: MONO, fontSize: 11, fontWeight: 700, touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.05,
                 }}
               >

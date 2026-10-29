@@ -4,10 +4,11 @@
 // ============================================================================
 
 import {
-  BANKS, CHANGE_MODES, LEN_DEFAULT, MASTER_MAX, MAX_STEPS, NOTE_LENGTHS, PATTERNS_PER_BANK, PLAY_MODES,
-  RETRIG_RATES, RETRIG_VEL_MAX, RETRIG_VEL_MIN, SPEEDS, SWING_MAX, SWING_MIN, TEMPO_MAX, TEMPO_MIN,
+  BANKS, CHANGE_MODES, CHANGE_OFF, LEN_DEFAULT, MASTER_MAX, MAX_STEPS, NOTE_LENGTHS, PAGE_SIZE, PATTERNS_PER_BANK,
+  PLAY_MODES, QUANTIZE_MAX, RETRIG_RATES, RETRIG_VEL_MAX, RETRIG_VEL_MIN, SPEEDS, SWING_MAX, SWING_MIN, TEMPO_MAX,
+  TEMPO_MIN,
   type ChangeMode, type Locks, type Pattern, type PatternId, type PlayMode, type Project, type Retrig,
-  type Song, type SongRow, type Speed, type Step, type Track, type TrackDefaults,
+  type Song, type SongEntry, type SongRow, type Speed, type Step, type Track, type TrackDefaults,
 } from './types';
 import { normalizeCondition } from './conditions';
 
@@ -62,7 +63,8 @@ export function createPattern(defaults: number | readonly Partial<TrackDefaults>
     speed: init.speed ?? '1x',
     scaleMode: init.scaleMode ?? 'pattern',
     master: init.master ?? 16,
-    change: init.change ?? 16,
+    // CHNG OFF: a cued pattern change happens at the end of the pattern (A4 MKII manual p.49)
+    change: init.change ?? CHANGE_OFF,
     swing: init.swing ?? SWING_MIN,
     kit: init.kit ?? '',
     tracks: list.map(d => createTrack(d)),
@@ -93,7 +95,8 @@ export function createProject(opts: CreateProjectOptions): Project {
     active: opts.active ?? 'A01',
     patterns: opts.patterns ?? {},
     chain: [],
-    song: { name: '', rows: [], loop: true },
+    // A song plays its rows once and stops, as on the hardware (setSongLoop for a loop)
+    song: { name: '', rows: [], loop: false },
     mode: opts.mode ?? 'pattern',
     changeMode: opts.changeMode ?? 'sequential',
   };
@@ -137,12 +140,14 @@ export function normalizeStep(x: unknown): Step | undefined {
   if (x.slide === true) s.slide = true;
   if (x.pslide === true) s.pslide = true;
   if (x.accent === true) s.accent = true;
+  if (x.mute === true) s.mute = true;
   const l = cleanLocks(x.locks);
   if (l) s.locks = l;
   return s;
 }
 
-function normalizeTrack(x: unknown, d: TrackDefaults): Track {
+/** Normalise one saved track (steps, defaults, scale, mutes, probability, quantize) */
+export function normalizeTrack(x: unknown, d: TrackDefaults): Track {
   const t = createTrack(d);
   if (!isObj(x)) return t;
   t.note = int(x.note, 0, 127, d.note);
@@ -160,7 +165,15 @@ function normalizeTrack(x: unknown, d: TrackDefaults): Track {
   if (typeof x.speed === 'string' && (SPEEDS as readonly string[]).includes(x.speed)) t.speed = x.speed as Speed;
   if (x.mute === true) t.mute = true;
   if (typeof x.prob === 'number') { const pr = int(x.prob, 0, 100, 100); if (pr < 100) t.prob = pr; }
+  if (typeof x.quantize === 'number') { const q = int(x.quantize, 0, QUANTIZE_MAX, 0); if (q) t.quantize = q; }
   return t;
+}
+
+/** Sorted, unique step / track indices in [0, n) */
+function indexList(x: unknown, n: number): number[] | undefined {
+  if (!Array.isArray(x)) return undefined;
+  const v = x.filter((t): t is number => typeof t === 'number' && Number.isInteger(t) && t >= 0 && t < n);
+  return Array.from(new Set(v)).sort((a, b) => a - b);
 }
 
 export function normalizePattern(x: unknown, defaults: TrackDefaults[]): Pattern {
@@ -171,24 +184,38 @@ export function normalizePattern(x: unknown, defaults: TrackDefaults[]): Pattern
   if (typeof x.speed === 'string' && (SPEEDS as readonly string[]).includes(x.speed)) p.speed = x.speed as Speed;
   p.scaleMode = x.scaleMode === 'track' ? 'track' : 'pattern';
   p.master = int(x.master, 0, MASTER_MAX, 16);
-  p.change = int(x.change, 0, MASTER_MAX, 16);
+  p.change = int(x.change, 0, MASTER_MAX, CHANGE_OFF);
   p.swing = int(x.swing, SWING_MIN, SWING_MAX, SWING_MIN);
+  const sw = indexList(x.swingTrigs, MAX_STEPS);
+  if (sw) p.swingTrigs = sw;
   if (typeof x.kit === 'string') p.kit = x.kit;
+  if (typeof x.tempo === 'number' && Number.isFinite(x.tempo)) p.tempo = num(x.tempo, TEMPO_MIN, TEMPO_MAX, 120);
+  if (typeof x.quantize === 'number') { const q = int(x.quantize, 0, QUANTIZE_MAX, 0); if (q) p.quantize = q; }
   const tracks = Array.isArray(x.tracks) ? x.tracks : [];
   p.tracks = defaults.map((d, i) => normalizeTrack(tracks[i], d));
   return p;
 }
 
+/** Song mutes and transpose of a pattern position (row or chain entry) */
+function cleanEntry<T extends SongEntry>(out: T, x: Record<string, unknown>, n: number): T {
+  const m = indexList(x.mutes, n);
+  if (m) out.mutes = m;
+  if (typeof x.transpose === 'number') { const tr = int(x.transpose, -48, 48, 0); if (tr) out.transpose = tr; }
+  return out;
+}
+
 function normalizeRow(x: unknown, n: number): SongRow | null {
   if (!isObj(x) || !isPatternId(x.pattern)) return null;
-  const r: SongRow = { pattern: x.pattern, repeats: int(x.repeats, 1, 99, 1) };
+  const r: SongRow = cleanEntry({ pattern: x.pattern, repeats: int(x.repeats, 1, 99, 1) }, x, n);
+  if (Array.isArray(x.chain)) {
+    const chain = x.chain
+      .filter((e): e is Record<string, unknown> => isObj(e) && isPatternId(e.pattern))
+      .slice(0, 255)
+      .map(e => cleanEntry({ pattern: e.pattern as PatternId }, e, n));
+    if (chain.length) r.chain = chain;
+  }
   if (typeof x.length === 'number') r.length = int(x.length, 1, MASTER_MAX, 16);
   if (typeof x.tempo === 'number') r.tempo = num(x.tempo, TEMPO_MIN, TEMPO_MAX, 120);
-  if (Array.isArray(x.mutes)) {
-    const m = x.mutes.filter((t): t is number => typeof t === 'number' && Number.isInteger(t) && t >= 0 && t < n);
-    r.mutes = Array.from(new Set(m)).sort((a, b) => a - b);
-  }
-  if (typeof x.transpose === 'number') { const tr = int(x.transpose, -48, 48, 0); if (tr) r.transpose = tr; }
   return r;
 }
 
@@ -216,12 +243,19 @@ export function migrateProject(saved: unknown, tracks: number, defaults?: Partia
   if (isObj(src.song)) {
     const s = src.song;
     const rows = Array.isArray(s.rows) ? s.rows.map(r => normalizeRow(r, n)).filter((r): r is SongRow => !!r) : [];
-    const song: Song = { name: typeof s.name === 'string' ? s.name.slice(0, 16) : '', rows, loop: s.loop !== false };
+    const song: Song = { name: typeof s.name === 'string' ? s.name.slice(0, 16) : '', rows, loop: s.loop === true };
     if (typeof s.loopRow === 'number') song.loopRow = int(s.loopRow, 0, Math.max(0, rows.length - 1), 0);
     base.song = song;
   }
   if (typeof src.mode === 'string' && (PLAY_MODES as readonly string[]).includes(src.mode)) base.mode = src.mode as PlayMode;
   if (typeof src.changeMode === 'string' && (CHANGE_MODES as readonly string[]).includes(src.changeMode)) base.changeMode = src.changeMode as ChangeMode;
+  const mutes = indexList(src.mutes, n);
+  if (mutes?.length) base.mutes = mutes;
+  if (src.tempoMode === 'pattern' || src.tempoMode === 'project') base.tempoMode = src.tempoMode;
+  if (isObj(src.restore) && isPatternId(src.restore.id)) {
+    const rp = src.restore.pattern;
+    base.restore = { id: src.restore.id, pattern: isObj(rp) ? normalizePattern(rp, base.defaults) : null };
+  }
   return base;
 }
 
@@ -358,4 +392,102 @@ export function lockedSteps(p: Project, id: PatternId, track: number, key: strin
   const out: number[] = [];
   for (const k in t.steps) if (t.steps[k].locks && key in t.steps[k].locks!) out.push(Number(k));
   return out.sort((a, b) => a - b);
+}
+
+/** Steps of the track that carry a trig mute */
+export function mutedSteps(p: Project, id: PatternId, track: number): number[] {
+  const t = p.patterns[id]?.tracks[track];
+  if (!t) return [];
+  const out: number[] = [];
+  for (const k in t.steps) if (t.steps[k].mute) out.push(Number(k));
+  return out.sort((a, b) => a - b);
+}
+
+// ----------------------------------------------------------------------------
+// Swing trigs
+// ----------------------------------------------------------------------------
+
+/** The default swing trigs: every second step (keys 2, 4, 6 ... 64) */
+export const DEFAULT_SWING_TRIGS: readonly number[] = Object.freeze(Array.from({ length: MAX_STEPS / 2 }, (_, i) => i * 2 + 1));
+
+/** The pattern's swing trigs (step indices 0..63) */
+export function swingTrigs(pattern: Pattern): readonly number[] {
+  return pattern.swingTrigs ?? DEFAULT_SWING_TRIGS;
+}
+
+/** Does `step` (0..63) carry a swing trig in this pattern? */
+export function isSwingStep(pattern: Pattern, step: number): boolean {
+  return pattern.swingTrigs ? pattern.swingTrigs.includes(step) : (step & 1) === 1;
+}
+
+// ----------------------------------------------------------------------------
+// Song rows: a pattern, or a chain of patterns
+// ----------------------------------------------------------------------------
+
+/** Pattern positions in a song row (1 + its chain) */
+export function rowSize(row: SongRow): number {
+  return 1 + (row.chain?.length ?? 0);
+}
+
+/** Pattern position `pos` of a song row (0 = the row's own pattern, mutes and transpose) */
+export function rowEntry(row: SongRow, pos: number): SongEntry {
+  const n = row.chain?.length ?? 0;
+  if (pos <= 0 || !n) return row;
+  return row.chain![Math.min(pos, n) - 1];
+}
+
+// ----------------------------------------------------------------------------
+// Pages, trig defaults, lock budget, program changes
+// ----------------------------------------------------------------------------
+
+/** Step indices of a page (0..3): [first, end) */
+export function pageSteps(page: number): [number, number] {
+  const p = Math.max(0, Math.min(MAX_STEPS / PAGE_SIZE - 1, Math.round(page)));
+  return [p * PAGE_SIZE, (p + 1) * PAGE_SIZE];
+}
+
+/**
+ * NOTE / VEL / LEN a trig gets when it is placed. On the Analog Four the NOTE
+ * menu values are copied into each new trig, so changing them later only
+ * affects trigs placed afterwards (A4 MKII manual p.45): pass this as the trig's
+ * `init` (TrigKeys `stampDefaults`). The Rytm's TRIG page is a live default for
+ * every unlocked trig (Rytm MKII manual p.43), so it places empty trigs.
+ */
+export function trackTrigDefaults(p: Project, id: PatternId, track: number): Step {
+  const t = getPattern(p, id).tracks[track];
+  const d = t ?? p.defaults[track] ?? DEFAULT_TRACK;
+  return { note: d.note, vel: d.vel, len: d.len };
+}
+
+/**
+ * Different parameters locked in a pattern: each (track, parameter) pair
+ * counts once, however many trigs lock it (A4 MKII manual p.50: 128 at most,
+ * Rytm MKII manual p.47: 72). NOTE / VEL / LEN / micro timing and conditions
+ * are trig settings, not locks.
+ */
+export function lockedParamCount(pattern: Pattern | undefined): number {
+  if (!pattern) return 0;
+  let n = 0;
+  for (const t of pattern.tracks) {
+    const keys = new Set<string>();
+    for (const k in t.steps) {
+      const l = t.steps[k].locks;
+      if (l) for (const key in l) keys.add(key);
+    }
+    n += keys.size;
+  }
+  return n;
+}
+
+/** MIDI program change 0..127 -> pattern A01..H16 (Rytm MKII manual p.22), null when out of range */
+export function patternFromProgram(program: number): PatternId | null {
+  const n = Math.round(program);
+  if (!(n >= 0 && n < BANKS.length * PATTERNS_PER_BANK)) return null;
+  return patternId(Math.floor(n / PATTERNS_PER_BANK), n % PATTERNS_PER_BANK);
+}
+
+/** Pattern -> MIDI program change 0..127 (PRG CH SEND), -1 for an invalid id */
+export function programOfPattern(id: PatternId): number {
+  const p = parsePatternId(id);
+  return p ? p.bank * PATTERNS_PER_BANK + p.index : -1;
 }

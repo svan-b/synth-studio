@@ -2,6 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Condensed panel legends: the real Arial Narrow where it is installed, and Roboto
+   Condensed (SIL OFL 1.1, self-hosted in /fonts) everywhere else - iPadOS has no Arial
+   Narrow, and falling back to the much wider Arial makes legends collide. */
+@font-face {
+  font-family: 'Arial Narrow';
+  src: local('Arial Narrow'), local('ArialNarrow'), url(/fonts/roboto-condensed-latin-400-normal.woff2) format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Arial Narrow';
+  src: local('Arial Narrow Bold'), local('ArialNarrow-Bold'), url(/fonts/roboto-condensed-latin-700-normal.woff2) format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Roboto Condensed';
+  src: local('Roboto Condensed'), local('RobotoCondensed-Regular'), url(/fonts/roboto-condensed-latin-400-normal.woff2) format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Roboto Condensed';
+  src: local('Roboto Condensed Bold'), local('RobotoCondensed-Bold'), url(/fonts/roboto-condensed-latin-700-normal.woff2) format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* No double-tap zoom on panel switches and no rubber-banding (Home Screen mode on iPad).
+   Panel controls set touch-action: none themselves. */
+html {
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
 :root {
   --foreground-rgb: 255, 255, 255;
   --background-start-rgb: 26, 26, 26;

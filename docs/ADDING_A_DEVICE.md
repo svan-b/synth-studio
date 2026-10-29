@@ -88,6 +88,15 @@ noteOn(note, vel) / noteOff(note)      // keyboards (DeviceModule.keyboard enabl
   informational (neither — waits for Next; end lessons with one that invites experimenting).
 - Targets must be reachable: in range, valid switch index, existing jack ids. Paged UIs:
   first set `track`/`page` (radio buttons), then the parameter.
+- Momentary buttons and pads: `{ kind: 'do', control: 'trigger' }` completes on a press;
+  `presses: 3` asks for three; `event: 'pad:1'` targets a button that only sends an event;
+  `play: { count: 4 }` or `play: { notes: [60, 64, 67] }` asks for notes. Checks can read
+  `s.events?.<id>`, `s.notesPlayed` and live `s.engine`. `scope: 'spectrum'` opens the
+  spectrum for EQ/filter steps. See docs/PEDAGOGY.md, "Lesson API v3".
+- `solution` can also hold `presses`, `notes`, `studioCables` (ends named by `device` or
+  `instance`), `transport: 'play'` and `instance`. `node scripts/lesson-runner.cjs` performs
+  presses through the real panel buttons, and solves solution-less steps by trying single
+  learner moves (a cable, the transport, a switch); it reports those as `auto`.
 
 ## Verify
 ```

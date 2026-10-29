@@ -27,7 +27,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        label: ['"Arial Narrow"', 'Arial', 'sans-serif'],
+        label: ['"Arial Narrow"', '"Roboto Condensed"', 'Arial', 'sans-serif'],
       },
     },
   },
