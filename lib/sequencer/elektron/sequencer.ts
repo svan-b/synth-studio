@@ -57,6 +57,17 @@ export interface TimerApi {
   clearTimeout(handle: unknown): void;
 }
 
+/**
+ * Page visibility (a `document`, or a fake in tests). While the page is hidden
+ * the internal clock schedules further ahead: WebKit runs the timers of a
+ * hidden page about once a second, even while audio plays.
+ */
+export interface VisibilitySource {
+  readonly hidden: boolean;
+  addEventListener(type: 'visibilitychange', listener: () => void): void;
+  removeEventListener(type: 'visibilitychange', listener: () => void): void;
+}
+
 /** The parts of lib/audio/transport's Transport the sequencer uses */
 export interface TransportLike {
   onTick(listener: (t: TransportTick) => void): () => void;
@@ -92,6 +103,14 @@ export interface SequencerOptions {
   neighbor?: (track: number) => number;
   /** Internal clock: seconds scheduled ahead (default 0.12) */
   lookahead?: number;
+  /**
+   * Internal clock: seconds scheduled ahead while the page is hidden (default
+   * 1.8). Hidden WebKit pages run timers about once a second, so the normal
+   * look-ahead would stutter. Back to `lookahead` as soon as the page is visible.
+   */
+  hiddenLookahead?: number;
+  /** Page visibility to adapt the look-ahead to (default: `document` in a browser, none elsewhere; null = always visible) */
+  visibility?: VisibilitySource | null;
   /** Internal clock: pump interval in seconds (default 0.02) */
   interval?: number;
   timers?: TimerApi;
@@ -163,7 +182,8 @@ const UI_STEP = 1;
 const UI_PATTERN = 2;
 const UI_ROW = 3;
 const UI_CHAIN = 4;
-const UI_CAP = 1024;
+// Room for a hidden page's long look-ahead (13 tracks at 2x, 300 BPM: ~1000 steps in 1.8 s)
+const UI_CAP = 4096;
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -187,6 +207,8 @@ export class ElektronSequencer {
   private readonly ctx: TimeSource;
   private readonly timers: TimerApi;
   private readonly lookahead: number;
+  private readonly hiddenLookahead: number;
+  private readonly visibility: VisibilitySource | null;
   private readonly interval: number;
   private rng: Rng;
   private project: Project;
@@ -313,6 +335,9 @@ export class ElektronSequencer {
     this.ctx = opts.ctx;
     this.timers = opts.timers ?? defaultTimers;
     this.lookahead = opts.lookahead ?? 0.12;
+    this.hiddenLookahead = Math.max(this.lookahead, opts.hiddenLookahead ?? 1.8);
+    this.visibility = opts.visibility !== undefined ? opts.visibility : typeof document !== 'undefined' ? document : null;
+    this.visibility?.addEventListener('visibilitychange', this.onVisibility);
     this.interval = opts.interval ?? 0.02;
     this.rng = opts.rng ?? mulberry32(opts.seed ?? randomSeed());
     this.bpmValue = clamp(opts.bpm ?? 120, TEMPO_MIN, TEMPO_MAX);
@@ -671,7 +696,8 @@ export class ElektronSequencer {
     const now = this.ctx.currentTime;
     // Throttled tab: skip ahead instead of firing a burst of stale ticks
     if (this.nextTime < now - 0.25) this.nextTime = now + 0.01;
-    const horizon = now + this.lookahead;
+    // Hidden page: timers run about once a second, so schedule well past the next one
+    const horizon = now + (this.visibility?.hidden ? this.hiddenLookahead : this.lookahead);
     let guard = 0;
     while (this.running && this.nextTime < horizon && guard++ < 4096) {
       const dur = 60 / this.bpmValue / SEQ_PPQN;
@@ -682,6 +708,7 @@ export class ElektronSequencer {
   }
 
   dispose(): void {
+    this.visibility?.removeEventListener('visibilitychange', this.onVisibility);
     this.follow(null);
     if (this.running) {
       this.running = false;
@@ -724,6 +751,11 @@ export class ElektronSequencer {
         break;
     }
   }
+
+  /** The page was hidden (schedule the long look-ahead now, before the timers slow down) or shown again */
+  private onVisibility = (): void => {
+    if (this.running && !this.transport) this.pump();
+  };
 
   private clearClock(): void {
     if (this.timer !== null) this.timers.clearInterval(this.timer);

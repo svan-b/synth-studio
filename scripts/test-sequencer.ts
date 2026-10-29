@@ -14,7 +14,7 @@ import {
   setChangeMode, getStep, setTrackDefault, mulberry32, clearPattern, copyPattern, pastePattern, songUpdateRow,
   setTrackProb, projectData, arrangerPatterns, isProject,
   type LockOptions, type Pattern, type PatternId, type Project, type SequencerOptions, type Step, type TimerApi,
-  type TransportLike, type TrigEvent,
+  type TransportLike, type TrigEvent, type VisibilitySource,
 } from '../lib/sequencer/elektron';
 import { Transport, type TransportEvent, type TransportTick } from '../lib/audio/transport';
 import type { DeviceUiApi } from '../devices/types';
@@ -93,21 +93,39 @@ class FakeClock implements TimerApi {
     return id;
   }
   clearTimeout(h: unknown) { this.timers.delete(h as number); }
+  /** When a timer due at `at` really runs (HiddenPageClock delays it) */
+  protected due(at: number) { return at; }
   advance(sec: number) {
     const end = this.currentTime + sec;
     for (let guard = 0; guard < 1e6; guard++) {
       let id = -1;
       let at = Infinity;
-      this.timers.forEach((t, k) => { if (t.at < at) { at = t.at; id = k; } });
+      this.timers.forEach((t, k) => { const d = this.due(t.at); if (d < at) { at = d; id = k; } });
       if (id < 0 || at > end) break;
       this.currentTime = Math.max(this.currentTime, at);
       const t = this.timers.get(id)!;
-      if (t.every > 0) t.at += t.every;
+      // A late interval runs once, not once per missed period (like browsers)
+      if (t.every > 0) t.at = Math.max(t.at + t.every, this.currentTime + t.every);
       else this.timers.delete(id);
       t.fn();
     }
     this.currentTime = end;
   }
+}
+
+/** Timers like a hidden WebKit page: while `hidden`, they only run on whole seconds */
+class HiddenPageClock extends FakeClock {
+  hidden = false;
+  protected due(at: number) { return this.hidden ? Math.ceil(at - 1e-9) : at; }
+}
+
+/** document.hidden + visibilitychange stand-in */
+class FakeVisibility implements VisibilitySource {
+  hidden = false;
+  readonly listeners = new Set<() => void>();
+  addEventListener(_type: 'visibilitychange', fn: () => void) { this.listeners.add(fn); }
+  removeEventListener(_type: 'visibilitychange', fn: () => void) { this.listeners.delete(fn); }
+  set(hidden: boolean) { this.hidden = hidden; this.listeners.forEach(f => f()); }
 }
 
 /** Studio-transport stand-in: emits 24-PPQN ticks with exact times on demand */
@@ -1489,6 +1507,84 @@ test('PatternPicker / SongEditor reflect playing, cued and song state', () => {
   const song = html(SongEditor, { ctx: uiCtx(p), open: true, transpose: true });
   ok(song.includes('×2') && song.includes('>99<') && song.includes('+3') && song.includes('>8<'), 'row values');
   ok(song.includes('aria-label="Unmute T2 in row 1"'), 'row mutes');
+});
+
+// ============================================================================
+section('Hidden page (adaptive look-ahead)');
+
+/** A busy project: swing, micro timing both ways, retrigs, conditions (seeded), a 3-pattern chain */
+function lookaheadProject(): Project {
+  let p = proj(4, {
+    0: { 0: {}, 4: { micro: -9 }, 8: { cond: '50%' }, 12: { retrig: { rate: 12, len: 30, vel: -64 } }, 14: { micro: 7, len: 46 } },
+    1: { 2: { cond: '1:2' }, 6: { cond: 'PRE' }, 10: { cond: '!NEI', vel: 40 } },
+    2: { 0: { len: LEN_INF }, 5: { slide: true, note: 67 }, 9: { trigless: true, locks: { cut: 3 } } },
+    3: { 3: { cond: 'NEI' }, 7: { cond: '25%' }, 11: {} },
+  }, { swing: 61 });
+  p = setStep(p, 'A02', 0, 0, { micro: -12 });
+  p = setStep(p, 'A02', 1, 3, { retrig: { rate: 15, len: LEN_INF, vel: 40 } });
+  p = updatePatternSettings(p, 'A02', { length: 12, speed: '3/4x' });
+  p = setStep(p, 'B01', 2, 1, {});
+  return setPlayMode(setChain(p, ['A01', 'A02', 'B01', 'A02']), 'chain');
+}
+
+/** Run `project` for `seconds` on `clock`; `during` runs at whole seconds (to flip the visibility) */
+function runOn(clock: FakeClock, project: Project, seconds: number, opts: Partial<SequencerOptions> = {}, during?: (sec: number) => void) {
+  const trigs: { e: TrigEvent; at: number }[] = [];
+  const offs: { track: number; note: number; time: number }[] = [];
+  const seq = new ElektronSequencer({
+    ctx: clock, timers: clock, tracks: project.tracks, seed: 77, bpm: 133, visibility: null,
+    onTrig: e => trigs.push({ e, at: clock.currentTime }), onNoteOff: (track, note, time) => offs.push({ track, note, time }), ...opts,
+  });
+  seq.setProject(project);
+  seq.start();
+  for (let s = 0; s < seconds; s++) { during?.(s); clock.advance(1); }
+  const end = clock.currentTime;
+  seq.dispose();
+  const key = (e: TrigEvent) => `${e.track}:${e.pattern}:${e.step}:${e.retrigIndex}:${e.note}:${e.velocity}:${e.trigless}:${e.time.toFixed(9)}:${e.duration.toFixed(9)}`;
+  return {
+    trigs, end,
+    // what has sounded by the end (later events depend on how far each run scheduled)
+    heard: trigs.filter(x => x.e.time < end).map(x => key(x.e)),
+    offs: offs.filter(o => o.time < end).map(o => `${o.track}:${o.note}:${o.time.toFixed(9)}`),
+  };
+}
+
+test('a long look-ahead schedules exactly the same events (notes, note-offs, probability rolls)', () => {
+  const ref = runOn(new FakeClock(), lookaheadProject(), 12);
+  const long = runOn(new FakeClock(), lookaheadProject(), 12, { lookahead: 2 });
+  ok(ref.heard.length > 150, `busy enough (${ref.heard.length} hits)`);
+  eq(long.heard, ref.heard, 'trigs');
+  eq(long.offs, ref.offs, 'note-offs');
+  // a tick inside the window can carry a trig up to a step later (swing, positive micro timing)
+  const lead = Math.max(...long.trigs.map(x => x.e.time - x.at));
+  ok(lead > 1.8 && lead < 2.25, `scheduled about 2 s ahead (lead ${lead.toFixed(3)} s)`);
+});
+
+test('page hidden: the look-ahead grows at once, nothing plays late with timers running once a second, and it shrinks back', () => {
+  const ref = runOn(new FakeClock(), lookaheadProject(), 10);
+  const clock = new HiddenPageClock();
+  const vis = new FakeVisibility();
+  const flip = (s: number) => {
+    if (s === 2) { clock.hidden = true; vis.set(true); }
+    if (s === 8) { clock.hidden = false; vis.set(false); }
+  };
+  const hid = runOn(clock, lookaheadProject(), 10, { visibility: vis }, flip);
+  eq(hid.heard, ref.heard, 'same music as a visible page');
+  eq(hid.offs, ref.offs, 'same note-offs');
+  hid.trigs.forEach(x => ok(x.at <= x.e.time + 1e-9, `${x.e.track}:${x.e.step} emitted at ${x.at.toFixed(3)}, after its time ${x.e.time.toFixed(3)}`));
+  const leads = (from: number, to: number) => hid.trigs.filter(x => x.at >= from && x.at < to).map(x => x.e.time - x.at);
+  ok(Math.max(...leads(2, 8)) > 1.5, 'hidden: scheduled well past the next timer');
+  ok(Math.max(...leads(0, 2)) < 0.4, 'visible: the normal look-ahead');
+  ok(Math.max(...leads(9.5, 10)) < 0.4, 'visible again: back to normal');
+  eq(vis.listeners.size, 0, 'dispose removes the visibilitychange listener');
+  // Without the adaptation the same hidden page drops notes
+  const clock2 = new HiddenPageClock();
+  const vis2 = new FakeVisibility();
+  const flat = runOn(clock2, lookaheadProject(), 10, { visibility: vis2, hiddenLookahead: 0.12 }, s => {
+    if (s === 2) { clock2.hidden = true; vis2.set(true); }
+    if (s === 8) { clock2.hidden = false; vis2.set(false); }
+  });
+  ok(flat.heard.length < ref.heard.length, `a fixed short look-ahead stutters (${flat.heard.length} of ${ref.heard.length} hits)`);
 });
 
 // ============================================================================
