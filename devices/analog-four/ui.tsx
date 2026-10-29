@@ -26,11 +26,12 @@ import { useUiStore } from '@/store/ui';
 import {
   ChainBuilder, PatternPicker, ScaleMenu, SongEditor, TrigEditor, TrigKeys,
 } from '@/components/sequencer';
-import { C as SC, Frame, Group, Overlay, SeqButton, UI, lessonFocus, seqStateOf, viewPattern } from '@/components/sequencer/shared';
+import { C as SC, Frame, Group, Overlay, SeqButton, Stepper, UI, lessonFocus, seqStateOf, viewPattern } from '@/components/sequencer/shared';
 import {
-  CHANGE_MODES, TRIG_CONDITIONS, asProject, clearPattern, copyPattern, formatLength, formatNote, getPattern, parsePatternId, rowEntry, setStep as setStepFn,
-  pastePattern, patternHasContent, patternId, setActive, setChain, setChangeMode, setMasterMute, setMasterMutes, setPlayMode, setTrigMute, trackLength,
-  trackTrigDefaults, updateSteps, withSteps, withTrack,
+  CHANGE_MODES, QUANTIZE_MAX, TRIG_CONDITIONS, asProject, clearPattern, copyPattern, formatLength, formatNote, getPattern, parsePatternId, reloadPattern,
+  reloadTrack, rowEntry, savePattern, saveTrack, setStep as setStepFn, pastePattern, patternHasContent, patternId, setActive, setChain, setChangeMode,
+  setMasterMute, setMasterMutes, setPlayMode, setTrackQuantize, setTrigMute, trackLength, trackTrigDefaults, updatePatternSettings, updateSteps, withSteps,
+  withTrack,
   type Pattern, type Project, type SeqState, type Step,
 } from '@/lib/sequencer/elektron';
 import {
@@ -91,6 +92,7 @@ const UIK = {
   clip: 'a4clip',
   trnsLock: 'a4trnsLock',
   perfPending: 'a4perfPending', // PERF mode: tracks whose mute toggles when FUNC is released
+  yesNo: 'a4yesNo',             // [YES] or [NO] held: quick save / reload with [PTN] and [TRK] (manual p.54)
 } as const;
 
 const num = (v: ControlValue | undefined, d = 0) => (typeof v === 'number' ? v : typeof v === 'boolean' ? (v ? 1 : 0) : d);
@@ -206,7 +208,7 @@ function setTempo(ctx: CustomRenderContext, bpm: number) {
   ctx.setValue('tempo', Math.round(bpm));
 }
 
-function toggleA4Menu(ctx: CustomRenderContext, menu: 'sound' | 'kit' | 'global' | 'tempo' | 'swing') {
+function toggleA4Menu(ctx: CustomRenderContext, menu: 'sound' | 'kit' | 'global' | 'tempo' | 'swing' | 'pattern' | 'track') {
   const open = liveUi(ctx)[UIK.menu] === menu;
   ctx.setUi({ [UIK.menu]: open ? null : menu, [UI.menu]: null });
 }
@@ -458,13 +460,21 @@ const KEYDEFS: Record<string, KeyDef> = {
   PERF: viewKey('PERF', 'PERF', 'Setup', e => say(e.ctx, 'PERF SETUP: the macros are fixed; see the PERF page')),
   TRK: {
     label: 'TRK', sub: 'Metronome', aria: 'Track menu',
-    led: e => (e.ctx.ui[UI.menu] === 'scale' ? [COL.red, 1] : null),
-    press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'METRONOME: not modelled (use the studio click)'); return; } toggleKitMenu(e.ctx, 'scale'); },
+    led: e => (e.ctx.ui[UIK.menu] === 'track' ? [COL.red, 1] : null),
+    press: e => {
+      if (e.func) { useFunc(e.ctx); say(e.ctx, 'CLICK TRACK: use the studio metronome (Click)'); return; }
+      if (quickSaveReload(e, 'track')) return;
+      toggleA4Menu(e.ctx, 'track');
+    },
   },
   PTN: {
     label: 'PTN', sub: 'Swing', aria: 'Pattern menu',
-    led: e => (e.ctx.ui[UI.menu] === 'pattern' ? [COL.red, 1] : null),
-    press: e => { if (e.func) { useFunc(e.ctx); toggleA4Menu(e.ctx, 'swing'); return; } toggleKitMenu(e.ctx, 'pattern'); },
+    led: e => (e.ctx.ui[UIK.menu] === 'pattern' || e.ctx.ui[UI.menu] === 'pattern' ? [COL.red, 1] : null),
+    press: e => {
+      if (e.func) { useFunc(e.ctx); toggleA4Menu(e.ctx, 'swing'); return; }
+      if (quickSaveReload(e, 'pattern')) return;
+      toggleA4Menu(e.ctx, 'pattern');
+    },
     target: c => c === 'seq:menu:pattern',
   },
   SONG: {
@@ -472,8 +482,17 @@ const KEYDEFS: Record<string, KeyDef> = {
     led: e => (e.ctx.ui[UI.menu] === 'song' ? [COL.red, 1] : null),
     press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'SONG SAVED (with the project)'); return; } toggleKitMenu(e.ctx, 'song'); },
   },
-  YES: { label: 'YES', sub: 'Save', subPlain: true, aria: 'Yes', press: e => { if (e.func) useFunc(e.ctx); closeMenus(e.ctx); } },
-  NO: { label: 'NO', sub: 'Reload', subPlain: true, aria: 'No', press: e => { if (e.func) { useFunc(e.ctx); say(e.ctx, 'RELOAD: load the kit preset again'); return; } closeMenus(e.ctx); } },
+  // Held, [YES] / [NO] + [PTN] or [TRK] quick-saves / quick-reloads (manual p.54)
+  YES: {
+    label: 'YES', sub: 'Save', subPlain: true, aria: 'Yes',
+    press: e => { if (e.func) useFunc(e.ctx); closeMenus(e.ctx); e.ctx.setUi({ [UIK.yesNo]: 'yes' }); },
+    release: e => e.ctx.setUi({ [UIK.yesNo]: null }),
+  },
+  NO: {
+    label: 'NO', sub: 'Reload', subPlain: true, aria: 'No',
+    press: e => { if (e.func) useFunc(e.ctx); closeMenus(e.ctx); e.ctx.setUi({ [UIK.yesNo]: 'no' }); },
+    release: e => e.ctx.setUi({ [UIK.yesNo]: null }),
+  },
   UP: { label: '', icon: 'up', aria: 'Up', press: e => arrow(e, 0, 1) },
   DOWN: { label: '', icon: 'down', aria: 'Down', press: e => arrow(e, 0, -1) },
   LEFT: { label: '', icon: 'left', sub: 'µTime -', subPlain: true, aria: 'Left', press: e => arrow(e, -1, 0), release: arrowUp },
@@ -617,6 +636,17 @@ const KEYDEFS: Record<string, KeyDef> = {
   },
 };
 for (let b = 0; b < 8; b++) KEYDEFS[`BANK_${'ABCDEFGH'[b]}`] = bankKey(b);
+
+/** [YES] / [NO] held + [PTN] / [TRK]: SAVE / RELOAD PATTERN or TRACK (manual p.42-43, p.54). True when it acted. */
+function quickSaveReload(e: KeyEnv, what: 'pattern' | 'track'): boolean {
+  const yn = liveUi(e.ctx)[UIK.yesNo];
+  if (yn !== 'yes' && yn !== 'no') return false;
+  const t = Math.min(e.track, TRACKS - 1);
+  if (what === 'pattern') e.ctx.updateData(d => (yn === 'yes' ? savePattern : reloadPattern)(asProject(d, TRACKS)));
+  else e.ctx.updateData(d => (yn === 'yes' ? saveTrack(asProject(d, TRACKS), t) : reloadTrack(asProject(d, TRACKS), t)));
+  say(e.ctx, `${yn === 'yes' ? 'SAVE' : 'RELOAD'} ${what === 'pattern' ? `PATTERN ${project(e.ctx).active}` : `TRACK ${TRACK_NAMES[t]}`}`, 1200);
+  return true;
+}
 
 /** Arrow keys: with held trigs they edit them (UP/DOWN note, LEFT/RIGHT micro timing), else track / page */
 function arrow(e: KeyEnv, dx: number, dy: number) {
@@ -1690,6 +1720,62 @@ function SwingMenu({ ctx }: { ctx: CustomRenderContext }) {
   );
 }
 
+/** [PTN]: the PATTERN menu - RELOAD PATTERN and SAVE PATTERN (manual p.43) */
+function PatternMenu({ ctx }: { ctx: CustomRenderContext }) {
+  const pr = project(ctx);
+  const id = pr.active;
+  const name = getPattern(pr, id).name;
+  const run = (fn: (p: Project) => Project, msg: string) => { ctx.updateData(d => fn(asProject(d, TRACKS))); say(ctx, msg, 1200); };
+  return (
+    <Overlay portal portalSize={{ w: 480, h: 260 }}>
+      <Frame title="PATTERN" sub={`${id}${name ? ` ${name}` : ''}`} onClose={() => ctx.setUi({ [UIK.menu]: null })}>
+        <Group label="RELOAD / SAVE">
+          <SeqButton onPress={() => run(reloadPattern, `${id} RELOADED`)} title="[NO] + [PTN]">RELOAD PATTERN</SeqButton>
+          <SeqButton onPress={() => run(savePattern, `${id} SAVED`)} color={SC.green} title="[YES] + [PTN]">SAVE PATTERN</SeqButton>
+        </Group>
+        <div style={{ fontSize: 11, color: SC.dim, margin: '6px 2px' }}>
+          RELOAD puts the pattern back the way it was when you selected it, or at the last SAVE: an undo for live edits. Hold [NO] or [YES] and press [PTN] to do it from anywhere.
+        </div>
+        <Group label="MORE">
+          <SeqButton onPress={() => ctx.setUi({ [UIK.menu]: null, [UI.menu]: 'pattern' })} title="Banks A-H: select, name, copy, paste, clear">PATTERN LIST</SeqButton>
+          <span style={{ fontSize: 11, color: SC.dim, flex: '1 1 200px' }}>[BANK] + [TRIG] selects a pattern; [FUNC] + [PAGE] sets its length and scale.</span>
+        </Group>
+      </Frame>
+    </Overlay>
+  );
+}
+
+/** [TRK]: the TRACK menu - NOTES SETUP quantize, RELOAD TRACK and SAVE TRACK (manual p.42, p.47) */
+function TrackMenu({ ctx }: { ctx: CustomRenderContext }) {
+  const pr = project(ctx);
+  const t = Math.max(0, Math.min(TRACKS - 1, Math.round(num(ctx.values.track))));
+  const id = pr.active;
+  const pat = getPattern(pr, id);
+  const run = (fn: (p: Project) => Project, msg: string) => { ctx.updateData(d => fn(asProject(d, TRACKS))); say(ctx, msg, 1200); };
+  return (
+    <Overlay portal portalSize={{ w: 500, h: 300 }}>
+      <Frame title="TRACK" sub={`${TRACK_NAMES[t]} in ${id}`} onClose={() => ctx.setUi({ [UIK.menu]: null })}>
+        <Group label="NOTES SETUP">
+          <Stepper label="QUANTIZE" value={pat.tracks[t]?.quantize ?? 0} min={0} max={QUANTIZE_MAX} width={56}
+            title="Pulls this track's micro-timed trigs towards the grid (127 = on the grid)"
+            onChange={v => ctx.updateData(d => setTrackQuantize(asProject(d, TRACKS), id, t, v))} />
+          <Stepper label="GLOBAL QUANTIZE" value={pat.quantize ?? 0} min={0} max={QUANTIZE_MAX} width={56}
+            title="The same for every track of the pattern"
+            onChange={v => ctx.updateData(d => updatePatternSettings(asProject(d, TRACKS), id, { quantize: v }))} />
+        </Group>
+        <div style={{ height: 6 }} />
+        <Group label="RELOAD / SAVE">
+          <SeqButton onPress={() => run(p => reloadTrack(p, t), `TRACK ${TRACK_NAMES[t]} RELOADED`)} title="[NO] + [TRK]">RELOAD TRACK</SeqButton>
+          <SeqButton onPress={() => run(p => saveTrack(p, t), `TRACK ${TRACK_NAMES[t]} SAVED`)} color={SC.green} title="[YES] + [TRK]">SAVE TRACK</SeqButton>
+        </Group>
+        <div style={{ fontSize: 11, color: SC.dim, margin: '6px 2px' }}>
+          A track is its trigs, locks and NOTE settings in this pattern. RELOAD takes only this track back to its saved state. The [ARP] key sets the arpeggiator; its step offsets (ARP SETUP) are not modelled.
+        </div>
+      </Frame>
+    </Overlay>
+  );
+}
+
 export function Menus({ ctx }: { ctx: CustomRenderContext }) {
   const m = ctx.ui[UIK.menu];
   return (
@@ -1705,6 +1791,8 @@ export function Menus({ ctx }: { ctx: CustomRenderContext }) {
       {m === 'global' && <GlobalMenu ctx={ctx} />}
       {m === 'tempo' && <TempoMenu ctx={ctx} />}
       {m === 'swing' && <SwingMenu ctx={ctx} />}
+      {m === 'pattern' && <PatternMenu ctx={ctx} />}
+      {m === 'track' && <TrackMenu ctx={ctx} />}
     </>
   );
 }

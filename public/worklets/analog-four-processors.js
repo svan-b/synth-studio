@@ -127,6 +127,11 @@ function lfoHz(spd, mulIdx, bpm) {
   return ((spd * m) / 128) * ((mulIdx < 12 ? bpm : 120) / 240);
 }
 
+// The fastest an envelope rises: the original's envelopes are computed at a control rate of about
+// 1.5 kHz and reach the analog circuits through smoothed control voltages, so even ATK 0 takes about
+// a millisecond and a half. (Faster, a snapping filter or VCA would step the waveform.)
+var ENV_MIN_RISE = 0.0015;
+
 // Envelope shapes (shape >> 1), manual p.74-75: [attack, decay/release]
 //   attack 0 linear, 1 standard (analog RC), 2 exponential (rises faster and faster),
 //          3 full (jumps to full level and stays there for the ATK time)
@@ -153,9 +158,14 @@ class Env {
     const s = SHAPES[shape >> 1];
     switch (this.stage) {
       case 1: {
-        if (atk <= 0.00105) { this.v = 1; this.stage = 2; break; }
-        const inc = dt / atk;
-        if (s[0] === 3) { this.v = 1; this.x += inc; if (this.x >= 1) this.stage = 2; break; } // full: hold for ATK
+        if (s[0] === 3) {
+          // full: up to full level at once (within the shortest rise), then held for the ATK time
+          this.v = Math.min(1, this.v + dt / ENV_MIN_RISE);
+          this.x += dt / (atk > ENV_MIN_RISE ? atk : ENV_MIN_RISE);
+          if (this.x >= 1 && this.v >= 1) this.stage = 2;
+          break;
+        }
+        const inc = dt / (atk > ENV_MIN_RISE ? atk : ENV_MIN_RISE);
         if (s[0] === 0) this.v += inc;
         else if (s[0] === 1) this.v += (1.32 - this.v) * (1 - Math.exp(-inc * 1.4));
         else { this.x += inc; this.v = this.x * this.x * this.x; }
@@ -281,6 +291,8 @@ class A4Voice extends AudioWorkletProcessor {
     this.idle = true;
     this.velMod = this.vel;
     this.cutLeft = 0; this.cutN = 1;   // STOP: control blocks left of the cut-off fade
+    this.gS = 0;                       // smoothed VCA gain
+    this.kGain = 1 - Math.exp(-BLOCK / (sampleRate * 0.0005));
     this.nb = 8; // control blocks per quantum
     this.alloc(128);
     this.port.onmessage = e => this.msg(e.data);
@@ -291,7 +303,10 @@ class A4Voice extends AudioWorkletProcessor {
     const nb = Math.ceil(n / BLOCK);
     this.nb = nb;
     const f = () => new Float64Array(nb + 1);
-    this.bDt1 = f(); this.bDt2 = f(); this.bPw1 = f(); this.bPw2 = f(); this.bG1 = f(); this.bG2 = f();
+    // PW starts at the centre: the oscillator pass also runs over the idle blocks before a voice's
+    // first control tick, and a width of exactly 0 or 1 gives the triangle and transistor pulse
+    // infinite slopes (NaN in the band-limiting buffers)
+    this.bDt1 = f(); this.bDt2 = f(); this.bPw1 = f().fill(0.5); this.bPw2 = f().fill(0.5); this.bG1 = f(); this.bG2 = f();
     this.bInDrive = f().fill(1); this.bInComp = f().fill(1);
     this.bGain = f(); this.bPanL = f(); this.bPanR = f(); this.bSC = f(); this.bSD = f(); this.bSR = f();
     this.bK1 = f(); this.bComp = f(); this.bDrive = f(); this.bOvr = f(); this.bK2 = f(); this.bPk = f();
@@ -330,6 +345,7 @@ class A4Voice extends AudioWorkletProcessor {
     for (const e of [this.envA, this.envF, this.env2]) { e.v = 0; e.stage = 0; e.gate = false; e.pending = false; e.gateEnd = Infinity; }
     this.gate = false;
     this.glideTime = 0;
+    this.gS = 0;
   }
 
   E(i) {
@@ -500,10 +516,14 @@ class A4Voice extends AudioWorkletProcessor {
     this.bK2[b] = type2 === 6 ? 1.2 : 2 - 1.94 * Math.pow(r2, 0.8);
     this.bPk[b] = type2 === 6 ? r2 * 3 : 0;
 
-    // VCA: envelope x velocity x accent x volume x track level; pan; sends
+    // VCA: envelope x velocity x accent x volume x track level; pan; sends. The VCA's control
+    // voltage is smoothed (as on the analog original), so no modulation steps the gain faster
+    // than about half a millisecond - a square LFO on VOL gates without clicking.
     const vol = this.E(I.amp_vol) / 127, lvl = this.E(I.level) / 127;
     const acc = 1 + this.acc * (this.E(I.snd_acc) / 127);
-    this.bGain[b + 1] = ea * (0.08 + 0.92 * this.vel) * acc * vol * vol * 1.6 * lvl * lvl * 1.6;
+    const gT = ea * (0.08 + 0.92 * this.vel) * acc * vol * vol * 1.6 * lvl * lvl * 1.6;
+    this.gS += (gT - this.gS) * this.kGain;
+    this.bGain[b + 1] = this.gS;
     const pan = (clamp(this.E(I.amp_pan), -64, 64) + 64) / 128;
     this.bPanL[b + 1] = Math.cos(pan * Math.PI * 0.5);
     this.bPanR[b + 1] = Math.sin(pan * Math.PI * 0.5);
@@ -739,7 +759,7 @@ class A4Voice extends AudioWorkletProcessor {
         this.bGain[b + 1] *= this.cutLeft / this.cutN;
         if (this.cutLeft === 0) this.silence();
       }
-      if (this.envA.stage === 0 && ea <= 1e-5 && !this.gate) this.idle = true;
+      if (this.envA.stage === 0 && ea <= 1e-5 && !this.gate && this.gS < 1e-5) this.idle = true;
     }
     // carry the last targets into the next quantum
     this.dt1 = this.bDt1[nb]; this.dt2 = this.bDt2[nb]; this.g1 = this.bG1[nb]; this.g2 = this.bG2[nb];
@@ -995,6 +1015,10 @@ class A4FxMod extends AudioWorkletProcessor {
   }
 }
 
+/** Output noise floor: uniform, peak NOISE_FLOOR (1e-5 = -100 dBFS) */
+const NOISE_FLOOR = 1e-5;
+const NOISE_FLOOR_STEP = (2 * NOISE_FLOOR) / 65535;
+
 // ============================================================================
 // FX: delay + effect sends + mix. Inputs: [0] sends (cho, del, rev),
 // [1] chorus return (stereo), [2] dry (stereo), [3] parameters (a4-fxmod).
@@ -1009,6 +1033,9 @@ class A4Fx extends AudioWorkletProcessor {
     this.dL = new Float32Array(this.len); this.dR = new Float32Array(this.len);
     this.w = 0; this.time = 0.375 * sr; this.lpL = 0; this.lpR = 0; this.hpL = 0; this.hpR = 0;
     this.fd = 1; this.empty = false;
+    // the analog output stage's noise floor, about -100 dBFS (the manual gives 102 dB S/N, p.85):
+    // like the hardware, the output is never digital silence between notes
+    this.nz = 0x9e3779b9 | 0;
   }
   read(buf, w, d) {
     let pos = w - d;
@@ -1038,7 +1065,7 @@ class A4Fx extends AudioWorkletProcessor {
     const dLi = dry && dry[0], dRi = dry && (dry[1] || dry[0]);
     const widOff = Math.abs(wid) * 0.012 * sampleRate;
     const dl = this.dL, dr = this.dR, len = this.len;
-    let w = this.w, time = this.time, lpL = this.lpL, lpR = this.lpR, hpL = this.hpL, hpR = this.hpR;
+    let w = this.w, time = this.time, lpL = this.lpL, lpR = this.lpR, hpL = this.hpL, hpR = this.hpR, nz = this.nz;
     for (let i = 0; i < n; i++) {
       time += (tgt - time) * 0.00035; // tape-style glide when the time changes
       const chl = cL ? cL[i] : 0, chr = cR ? cR[i] : 0;
@@ -1057,9 +1084,12 @@ class A4Fx extends AudioWorkletProcessor {
       const rs = (sR ? sR[i] : 0);
       RL[i] = (rs + chl * cToR + eL * toRev) * fd;
       RR[i] = (rs + chr * cToR + eR * toRev) * fd;
-      OL[i] = (dLi ? dLi[i] : 0) + (chl * cVol + eL * dVol) * ret * fd;
-      OR[i] = (dRi ? dRi[i] : 0) + (chr * cVol + eR * dVol) * ret * fd;
+      nz ^= nz << 13; nz ^= nz >>> 17; nz ^= nz << 5;
+      const nL = (nz & 0xffff) * NOISE_FLOOR_STEP - NOISE_FLOOR, nR = ((nz >>> 16) & 0xffff) * NOISE_FLOOR_STEP - NOISE_FLOOR;
+      OL[i] = (dLi ? dLi[i] : 0) + (chl * cVol + eL * dVol) * ret * fd + nL;
+      OR[i] = (dRi ? dRi[i] : 0) + (chr * cVol + eR * dVol) * ret * fd + nR;
     }
+    this.nz = nz;
     this.fd = fdTo;
     lpL = flush(lpL); lpR = flush(lpR); hpL = flush(hpL); hpR = flush(hpR);
     if (!Number.isFinite(lpL + lpR + hpL + hpR + time)) { dl.fill(0); dr.fill(0); lpL = lpR = hpL = hpR = 0; time = tgt; }

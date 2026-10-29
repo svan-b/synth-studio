@@ -1,221 +1,238 @@
-# Analog Four MKII - front-panel and architecture reference
+# Analog Four MKII: reference for the twin
 
-The ground truth this twin is built from. `docs/reference/analog-four/` holds no photos,
-and manufacturer sites, manual mirrors and image hosts are blocked from this
-environment, so every claim below is tagged with its source and a confidence level.
+What the twin is built from, element by element. The primary source is the
+**Elektron Analog Four MKII User Manual for OS 1.55**, cited as
+"(A4 MKII manual, p.N)". Everything with such a cite was checked against that
+page. The measurements and longer notes behind this file are in
+`docs/research/analog-four/` (`panel.md`, `signal-flow.md`, `sources.md`).
+Where the manual is silent the twin makes a choice; those rows say
+**not in the manual** and what the twin does instead.
 
-## Sources
-
-| Tag | Source | What it gives |
-|---|---|---|
-| **EMU** | `trigcondition/analog-emu` on GitHub, `src/gui/hw.rs` (`layout_a4`, `face_label`, `sub_label`, `decor`, `strips`) and `src/panel.rs` | A pixel layout of the A4 MKII panel "after a community drawing of the panel": the position and size of every key, knob, LED strip and the screen window, the label printed on each key and the secondary (FUNC) label under it. The LED tables were **measured** by running the real OS 1.56 in the emulator. |
-| **KEYS** | `Iced-Cream/analoghealth`, `keys-a4.def` and `docs/BUTTONS.md` | The OS 1.56 button names and key codes: the authoritative list of the 89 inputs (74 keys, 10 DATA ENTRY pushes, TRACK LEVEL push, 2 pots). |
-| **CORE** | `irpina/elekloader`, `mods/core-a4/README.md`, `sdk/include/analog-four-mk2/pages.h` | Page keys per track type (synth / FX / CV), "the FX track has no OSC2", the GLOBAL key's menu, 29 page views, 10 knobs per page. |
-| **MAN** | Elektron *Analog Four MKII User Manual* (OS 1.30 - 1.56) and *Quick Guide*, read through search-engine snippets | Front-panel item numbers 1-37 and their descriptions, screen items 1-7, menu contents, parameter semantics. |
-| **SOS** | Sound On Sound review "Elektron MkII Analog Four, Analog Rytm & Octatrack" | MKII keys: labels printed on the keys in bold white, secondary functions printed below; red/yellow/green key lighting; high-resolution encoders. |
-| **ELK** | Elektronauts thread "Analog mk2 grey and black comparison" | MKII Black edition: "midnight" finish, the coloured highlight replaced by grey, FUNC shortcuts underlined, smaller Elektron logo. |
-| **SPEC** | Elektron product page and retailer spec sheets | 385 x 225 x 82 mm (W x D x H, including knobs, jacks and feet), 2.4 kg, 128 x 64 OLED. |
-| **SYSEX** | `kimasendorf/elektron-analog-four-sound-sysex` (OS 1.40A sound dump tables) | Every sound parameter with its screen abbreviation, display range and init value; waveform, sub, filter type, envelope shape, LFO and routing enumerations. |
-| **MIDI** | midi.guide (CC BY-SA 4.0), in the repo as `public/midi-guide/devices/elektron-analog-four-mkii.json` (230 parameters; the same data as `pencilresearch/midi` `Elektron/Analog Four MKII.csv`) | **Verified source.** The MKII NRPN map: every parameter by page in encoder order (NRPN LSB = page base + knob slot), ranges, centred / 0-based, the 12 envelope shape names, the full modulation destination list. |
-
-Confidence: **verified** = two independent sources agree, or a measurement of the real OS;
-**high** = one authoritative source (manual text, OS tables); **medium** = the community
-drawing (EMU layout) or a single secondary source; **low** = inferred, chosen by us.
+Positions are element centres in mm from the faceplate's top-left corner.
+They were measured on the manual's panel drawing (A4 MKII manual, p.12), whose
+top plate is 385 × 224 mm, and checked within 3 mm against a top-down image of
+a black unit. The twin draws the faceplate as 381 × 220 mm inside a 2 mm frame,
+so its numbers are the drawing's minus 2 mm (`geometry.ts`).
 
 ## Chassis
 
-| Item | Value | Source | Confidence |
-|---|---|---|---|
-| Outer size | 385 x 225 mm (W x D), 82 mm high incl. knobs/feet; 2.4 kg | SPEC | verified |
-| Faceplate drawn | 381 x 221 mm + 2 mm frame (the EMU drawing is 1156 x 643 px; mapped with 0.330 mm/px across, 0.344 mm/px down) | EMU, SPEC | medium |
-| Edition modelled | MKII **Black** (2020): near-black "midnight" anodised panel, dark backlit keys, white legends on the keys, grey underlined FUNC legends under them, smaller Elektron logo. The 2017 grey MKII had a light grey panel (EMU draws it #A9ABAE) with coloured secondary legends. | ELK, SOS, EMU | high (finish), medium (exact colours) |
-| Keys | Rectangular rubber keys, backlit (red / green / yellow / white). Primary label printed on the key, FUNC label under it. Trig keys and REC/PLAY/STOP larger. | SOS, EMU | high |
-| Encoders | Black knurled endless encoders with push function (10 DATA ENTRY + TRACK LEVEL); MAIN VOLUME and QUICK PERF AMOUNT are pots | SOS, KEYS, EMU (A4-PORT: "QUICK PERF AMOUNT is one of two absolute inputs (pots)") | verified |
-| Screen | 128 x 64 white OLED behind a black glass window that also carries the tag line "4 VOICE ANALOG TABLETOP SYNTHESIZER" above and "ANALOG FOUR MKII" below the display | SPEC, EMU | high (OLED), medium (window text) |
+| Item | Fact | Source |
+|---|---|---|
+| Size and weight | 385 × 225 × 82 mm including knobs, jacks and feet; about 2.4 kg; aluminium enclosure | (A4 MKII manual, p.85) |
+| Screen | 128 × 64 pixel OLED | (A4 MKII manual, p.85) |
+| Finishes | Black units light the open page key white (page 1) or dimmed white (page 2); grey units use red and green, and print the FUNC legends green instead of underlined | (A4 MKII manual, p.12, p.13) |
+| Twin | The black finish: dark keys with legends on the key, underlined FUNC legends under it, a light grey FUNC key | panel.md §1 (image of a black unit) |
 
-## Front panel, element by element
+## Front panel: the 37 numbered elements
 
-Positions are the centre in mm from the faceplate's top-left (EMU drawing converted).
-Rows are listed top to bottom, elements left to right. "MAN #" is the manual's front-panel
-item number.
+Numbering as in the manual (A4 MKII manual, p.12-13). "FUNC:" is the underlined
+secondary legend under the key.
 
-### Left block (top to bottom)
+| # | Element | Twin position (mm) | What it does in the twin | Source |
+|---:|---|---|---|---|
+| 1 | MAIN VOLUME pot | 22, 30 | Main and headphone level | (A4 MKII manual, p.12) |
+| 2 | [GLOBAL SETTINGS], FUNC: Save Project | 22, 54 | GLOBAL menu (MIDI clock receive = studio sync) | (A4 MKII manual, p.12) |
+| 3 | QUICK PERF AMOUNT pot | 60, 30 | Drives the macro picked with [QPER] | (A4 MKII manual, p.12, p.28) |
+| 4 | [QPER], FUNC: Mute | 60, 54 | [QPER] + [TRIG 1-10] picks the macro; FUNC mutes the macros. Green while the macros act, dark when muted | (A4 MKII manual, p.12, p.27-28) |
+| 5 | TRACK LEVEL encoder, FUNC: Sound Browser | 99, 30 | The active track's level; the tempo in TEMPO, the swing in SWING, the accent amount in ACCENT; [FUNC] + TRACK LEVEL opens the SOUND BROWSER | (A4 MKII manual, p.12, p.21, p.39, p.52) |
+| 6 | [TEMPO], FUNC: Tap Tempo | 99, 54 | TEMPO menu; FUNC taps (averaged over 4 taps) | (A4 MKII manual, p.12, p.39) |
+| 7 | [YES] (Save) | 134, 92 | Closes menus; held, + [PTN] / [TRK] saves the pattern / track | (A4 MKII manual, p.12, p.54) |
+| 8 | [NO] (Reload) | 134, 110 | Closes menus; held, + [PTN] / [TRK] reloads the pattern / track | (A4 MKII manual, p.12, p.54) |
+| 9 | Screen | window x 120-198, y 25-80 | The OLED, below the tagline and above the product name (layout below) | (A4 MKII manual, p.12, p.18) |
+| 10 | [UP] [DOWN] [LEFT] [RIGHT] | 167, 92 / 167, 110 / 150, 110 / 183, 110 | UP/DOWN shift the keyboard octave (the tempo decimal in TEMPO); LEFT/RIGHT shift the tempo ±10 % while held; with a trig held they set its note and micro timing | (A4 MKII manual, p.36, p.39, p.40) |
+| 11 | [ARP], FUNC: Setup | 219, 92 | ARPEGGIATOR page | (A4 MKII manual, p.12, p.43-44) |
+| 12 | [NOTE], FUNC: Setup | 235, 92 | NOTE page | (A4 MKII manual, p.12, p.44-45) |
+| 13 | PARAMETER keys OSC1 OSC2 FLTR AMP ENV LFO | x 251, 267, 284, 300, 317, 333; y 92 | The track's pages; a second press opens the sub page; FX and CV page names printed under them | (A4 MKII manual, p.12, p.36) |
+| 14 | [OCT-] / [OCT+] and 7 OCTAVE LEDs | 235, 114 / 300, 114; LEDs x 253-283 | Keyboard octave -5..+5; the LEDs show -3..+3 | (A4 MKII manual, p.12, p.36) |
+| 15 | DATA ENTRY knobs A-J | x 219, 247, 276, 304, 333; row 1 y 36, row 2 y 64 | Two rows of five, laid out like the screen's parameters | (A4 MKII manual, p.12, p.18) |
+| 16 | [T1] [T2] [T3] [T4] [FX] [CV], FUNC: Mute | column at x 359; y 36, 55, 74, 92, 114, 132 | Select the track; FUNC mutes it | (A4 MKII manual, p.13, p.37) |
+| 17 | [TRNS], FUNC: Lock | 333, 114 | Hold + KEYBOARD transposes the note trigs; FUNC locks transpose | (A4 MKII manual, p.13, p.53) |
+| 18 | KEYBOARD, 13 keys | lower row y 158 at x 219-333 (under ARP...LFO); sharps y 135 | One octave plus one note, C to C; plays the active track, or with a trig held sets its note | (A4 MKII manual, p.13, p.36) |
+| 19 | [FILL], FUNC: Cue Fill | 359, 161 | Hold for FILL (GRID RECORDING off); FUNC cues one cycle | (A4 MKII manual, p.13, p.51) |
+| 20 | PATTERN PAGE LEDs 1:4-4:4 | x 351-367, y 184 | Pages the pattern has; the shown one bright; the playing one blinks | (A4 MKII manual, p.13, p.39) |
+| 21 | [PAGE], FUNC: Scale | 359, 194 | Next pattern page; FUNC opens SCALE | (A4 MKII manual, p.13, p.48) |
+| 22 | [TRIG 1-16] | y 190; x = 22 + 21 (n - 1) | Trigs; with [BANK] patterns; with [QPER] macros; in PERF track mutes. 1, 5, 9 and 13 framed; A-P, T1-CV and the Quick Performance bracket printed under them | (A4 MKII manual, p.12-13) |
+| 23 | [STOP], FUNC: Paste | 180, 158 | Stop (below) | (A4 MKII manual, p.13, p.38) |
+| 24 | [PLAY], FUNC: Clear | 159, 158 | Play; pressed while playing it pauses | (A4 MKII manual, p.13, p.39) |
+| 25 | [RECORD], FUNC: Copy | 137, 158 | GRID RECORDING on/off; [RECORD] + [PLAY] = LIVE RECORDING | (A4 MKII manual, p.13, p.40) |
+| 26 | [SONG MODE], FUNC: Edit Song | 167, 132 | SONG mode; FUNC opens the song editor | (A4 MKII manual, p.13, p.55) |
+| 27 | [CHAIN MODE], FUNC: New Chain | 150, 132 | CHAIN mode; FUNC starts a new chain | (A4 MKII manual, p.13, p.55) |
+| 28 | [BANK A-H] | x 22, 43, 64, 85; y 145 (A-D), 162 (E-H) | Bank, then a trig picks the pattern. FUNC + A-D: pattern mode; FUNC + E-H: TRIG MUTE, ACCENT, NOTE SLIDE, PARAM SLIDE | (A4 MKII manual, p.13, p.38-39, p.51-53) |
+| 29 | PATTERN MODE LEDs | x 22, 43, 64, 85; y 131 | Sequential, Direct Start, Direct Jump, Temp Jump | (A4 MKII manual, p.13, p.39-40) |
+| 30 | [PERF], FUNC: Setup | 22, 114 | PERFORMANCE mode: knobs A-J are the 10 macros, TRIG 1-6 mute tracks | (A4 MKII manual, p.13, p.26-27) |
+| 31 | [KIT], FUNC: Save Kit | 54, 92 | KIT menu (load a kit's sounds, with or without its patterns) | (A4 MKII manual, p.13) |
+| 32 | [SND], FUNC: Settings | 71, 92 | SOUND browser; FUNC: VELOCITY MOD and SOUND SETTINGS pages | (A4 MKII manual, p.13, p.35) |
+| 33 | [MIX], FUNC: Poly Config | 88, 92 | PERFORMANCE MIXER: track levels on knobs A-E | (A4 MKII manual, p.13, p.28) |
+| 34 | [TRK], FUNC: Metronome | 54, 114 | TRACK menu: QUANTIZE, GLOBAL QUANTIZE, RELOAD / SAVE TRACK | (A4 MKII manual, p.13, p.42, p.47) |
+| 35 | [PTN], FUNC: Swing | 71, 114 | PATTERN menu: RELOAD / SAVE PATTERN; FUNC opens SWING | (A4 MKII manual, p.13, p.43, p.53) |
+| 36 | [SONG], FUNC: Save Song | 88, 114 | Song editor | (A4 MKII manual, p.13, p.57) |
+| 37 | [FUNC] | 22, 89 (18 × 17) | Hold for the secondary functions; a mouse tap latches it for the next key; Shift works too. The key whose secondary function is used lights light blue | (A4 MKII manual, p.13) |
 
-| MAN # | Label on the panel | FUNC / secondary legend | Pos. (x, y) | Type and appearance | Function (MAN) | Source | Conf. |
-|---|---|---|---|---|---|---|---|
-| 1 | MAIN VOLUME | - | 25.7, 21.7 | pot, 14.5 mm | Main and headphone output level | MAN, EMU | verified |
-| 3 | QUICK PERF (AMOUNT) | - | 61.0, 21.7 | pot, 14.5 mm | Amount of the selected performance macro | MAN, EMU | verified |
-| 5 | TRACK LEVEL | SOUND BROWSER (push) | 94.3, 21.0 | encoder with push, 17.8 mm | Level of the active track; scrolls menus; push opens the sound browser | MAN, EMU | verified |
-| 2 | GLOBAL (GLOBAL SETTINGS) | SAVE PROJECT (long press: LOAD PROJECT) | 25.0, 51.2 | key 18.5 x 13.7, LED | GLOBAL SETTINGS menu | MAN, EMU, CORE | verified |
-| 4 | QPER | MUTE | 60.6, 51.2 | key, no LED | With [TRIG 1-10]: pick the macro QUICK PERF controls; FUNC mutes the macros | MAN, EMU | verified |
-| 6 | TEMPO | TAP TEMPO | 96.2, 51.2 | key, no LED | TEMPO menu; FUNC+TEMPO taps the tempo | MAN, EMU | verified |
-| 15 or 37 (unconfirmed) | FUNC | - | 25.4, 87.3 | large key 19.1 x 17.2, no LED; on the black finish drawn as a plain dark key (assumed; the grey 2017 MKII had a dark green-grey cap, EMU 0x3B4A3D) | Shift for every secondary function | MAN, EMU | verified (function), guessed (black-finish colour) |
-| 31 | KIT | SAVE KIT | 58.3, 85.2 | key, LED | KIT menu | MAN, EMU | verified |
-| 32 | SND | SETTINGS | 78.1, 85.2 | key, LED | SOUND menu; FUNC: SOUND SETTINGS | MAN, EMU | verified |
-| 33 | MIX | POLY CONFIG | 97.9, 85.2 | key, LED | PERFORMANCE MIXER; FUNC: POLY CONFIG | MAN, EMU | verified |
-| 29 or 30 | PERF | SETUP | 25.0, 112.0 | key, LED | PERFORMANCE mode (DATA ENTRY knobs become macros) | MAN, EMU | verified |
-| 34 | TRK | METRONOME | 58.3, 112.0 | key, LED | TRACK menu; FUNC: CLICK TRACK (printed METRONOME) | MAN, EMU | verified (function), medium (legend) |
-| 35 | PTN | SWING | 78.1, 112.0 | key, LED | PATTERN menu; FUNC: SWING | MAN, EMU | verified |
-| 36 | SONG | SAVE SONG | 97.9, 112.0 | key, LED | SONG menu; FUNC saves the song | MAN, EMU | verified |
-| - | four PATTERN MODE LEDs: SEQUENTIAL, DIRECT START, DIRECT JUMP, TEMP JUMP | - | 23.7 / 42.8 / 62.0 / 81.1, 133.0 | LED strip over BANK A-D | Shows the pattern change mode; FUNC + BANK A-D selects it | EMU (measured OS 1.56) | verified |
-| 28 | BANK A, B, C, D | (FUNC: the four change modes above) | x 23.7 / 42.8 / 62.0 / 81.1, y 147.1 | keys 17.1 x 13.7, LED | BANK + TRIG 1-16 selects a pattern | MAN, EMU, KEYS | verified |
-| 28 | BANK E, F, G, H | TRIG MUTE, ACCENT, NOTE SLD, PARAM SLD | same x, y 167.0 | keys, LED | FUNC + BANK E-H: trig edit modes | EMU | medium |
+Also printed on the panel: the rear connectors' names along the top edge, from
+headphones and Main Out at the left to Power at the right (A4 MKII manual,
+p.13), and the Elektron mark at the top right (drawn as a plain outline, not
+the trademark artwork).
 
-### Screen and centre column
+**No LEVEL or DATA knob.** The MKII has TRACK LEVEL (with FUNC: Sound Browser)
+and MAIN VOLUME; the twin has no other knob (A4 MKII manual, p.12).
 
-| MAN # | Label | FUNC legend | Pos. | Type | Function | Source | Conf. |
-|---|---|---|---|---|---|---|---|
-| 9 | Screen window | - | box 109.8, 7.2, 95.6 x 72.9; OLED 115.4, 17.5, 84.4 x 44.0 | black glass + 128 x 64 OLED | see "Screen" below | EMU, SPEC | high |
-| 7 | YES | SAVE | 137.8, 95.2 | key, no LED | Enter / confirm | MAN, EMU | verified |
-| 8 | NO | RELOAD | 137.8, 112.7 | key, no LED | Exit / back | MAN, EMU | verified |
-| 10 | UP | - | 166.8, 95.2 | key (arrow icon) | menu navigation | MAN, EMU | verified |
-| 10 | LEFT / DOWN / RIGHT | TIME- / - / TIME+ | 155.6 / 173.0 / 190.5, 112.7 | keys (arrow icons) | menu navigation; LEFT/RIGHT nudge the tempo; FUNC micro-timing nudge | MAN, EMU | high |
-| 26 | SONG M (SONG MODE) | EDIT SONG | 138.1, 138.9 | key, LED | SONG mode on/off; FUNC opens the song editor | MAN, EMU | verified |
-| 27 | CHAIN (CHAIN MODE) | NEW CHAIN | 157.2, 138.9 | key, LED | CHAIN mode on/off; FUNC starts a new chain | MAN, EMU | verified |
-| 25 | REC (record icon) | COPY | 138.8, 164.6 | large key 17.8 x 16.5, LED red | GRID RECORDING on/off; hold + PLAY = LIVE RECORDING | MAN, EMU | verified |
-| 24 | PLAY (play icon) | CLEAR | 159.2, 164.6 | large key, LED green while playing | start / pause | MAN, EMU (measured) | verified |
-| 23 | STOP (stop icon) | PASTE | 179.6, 164.6 | large key, LED white while stopped | stop | MAN, EMU (measured) | verified |
+## Screen
 
-### Right block
+| # | What | Twin | Source |
+|---:|---|---|---|
+| 1 | Active kit name; the full parameter name while a knob turns | Kit / pattern name, replaced by the parameter's name for 1.4 s | (A4 MKII manual, p.18) |
+| 2 | Tempo with one decimal | Yes; the studio tempo while synced | (A4 MKII manual, p.18) |
+| 3 | Record, play, pause or stop symbol | Yes | (A4 MKII manual, p.18) |
+| 4 | Up to ten parameters in the knobs' 2 × 5 layout | Yes; a held trig's locked values show inverted | (A4 MKII manual, p.18, p.49) |
+| 5 | Active pattern, with the song row to its left ("_ _:" = scratch pad) | Yes | (A4 MKII manual, p.18) |
+| 6 | Level bar of the active track | Yes | (A4 MKII manual, p.18) |
+| 7 | Track name | Yes | (A4 MKII manual, p.18) |
 
-| MAN # | Label | Secondary legends | Pos. | Type | Function | Source | Conf. |
-|---|---|---|---|---|---|---|---|
-| 14 | DATA ENTRY knobs, letters A B C D E (row 1), F G H I J (row 2) printed under them | push shows the full parameter name | x 215.2 / 246.5 / 277.8 / 309.2 / 340.5; y 22.7 and 55.3 | endless encoders 17.1 mm | edit the 10 parameters shown on screen (same 5 x 2 grid) | MAN, EMU, KEYS | verified |
-| 11 | ARP | SETUP | 214.6, 95.2 | key, LED | ARPEGGIATOR menu; FUNC: ARP SETUP | MAN, EMU | verified |
-| 12 | NOTE | SETUP | 233.0, 95.2 | key, LED | NOTE menu (NOT VEL LEN uTM TRC); FUNC: NOTES SETUP | MAN, EMU | verified |
-| 13 | OSC 1 | FX row: EXT IN - CV row: CV A | 251.5, 95.2 | PARAMETER key, LED (red page 1, green page 2) | OSC 1 / second press NOISE | MAN, CORE, EMU | verified |
-| 13 | OSC 2 | FX row: (none) - CV row: CV B | 269.9, 95.2 | PARAMETER key | OSC 2 / second press OSC 1&2 | MAN, CORE, EMU | verified |
-| 13 | FILTER | CHORUS - CV C | 288.4, 95.2 | PARAMETER key | FILTERS | MAN, EMU | high |
-| 13 | AMP | DELAY - CV D | 306.8, 95.2 | PARAMETER key | AMP | MAN, EMU | high |
-| 13 | ENV | REVERB - ENV | 325.3, 95.2 | PARAMETER key | ENV F / second press ENV 2 | MAN, EMU | high |
-| 13 | LFO | LFO - LFO | 343.8, 95.2 | PARAMETER key | LFO 1 / second press LFO 2 | MAN, EMU | high |
-| 19 (inferred) | OCT- | (OCTAVE) | 238.6, 116.2 | key, no LED | keyboard octave down | MAN, KEYS, EMU (measured: 0xa5 is OCT-) | verified |
-| - | seven OCTAVE LEDs (-3 ... +3) | - | x 255.1 ... 298.6 (7.25 mm apart), y 116.2 | LED strip, one lit red | current keyboard octave (default +1) | EMU (measured) | verified |
-| 19 (inferred) | OCT+ | (OCTAVE) | 313.4, 116.2 | key | keyboard octave up | MAN, KEYS | verified |
-| 17 | TRNS | LOCK | 332.6, 116.2 | key, LED | transpose (hold + keyboard key); FUNC: transpose lock | MAN, EMU | verified |
-| 18 | KEYBOARD: C C# D D# E F F# G G# A A# B C (13 keys, one octave + one note) | - | white keys x 214.1 ... 329.4 (16.5 mm pitch), y 128.2-171.5; black keys 9.2 x 25.4 on top | piano-style keys, each with an LED | play the active track; hold a trig + key = note lock | MAN, KEYS, EMU | verified (13 keys), medium (shape) |
-| 16 | T1, T2, T3, T4, FX, CV (column) | MUTE (FUNC + track key) | x 363.5; y 24.1 / 41.9 / 59.8 / 77.7 / 95.5 / 113.4 | keys 17.8 x 11.7, LED: red = active track, green = audible, off = muted | select the active track | MAN, KEYS, EMU (measured colours) | verified |
-| 29 or 30 | FILL | CUE FILL | 363.5, 171.2 | key, LED red while active | FILL mode (when GRID RECORDING is off); FUNC cues it | MAN, EMU | verified |
-| 20 | PATTERN PAGE LEDs 1 2 3 4 | - | x 345.1 / 352.0 / 358.9 / 365.8, y 186.6 | LED strip: dim red = page exists, bright = shown | pattern pages | MAN, EMU (measured) | verified |
-| 21 | PAGE | SCALE | 363.5, 199.3 | key, no LED | next pattern page; FUNC opens the SCALE menu | MAN, EMU | verified |
+The OLED is drawn about 1.2 × its real 56 × 27 mm inside the real-size window,
+for legibility (panel.md §4).
 
-### Bottom row
+## LEDs and key lighting
 
-| MAN # | Label | Secondary | Pos. | Type | Function | Source | Conf. |
-|---|---|---|---|---|---|---|---|
-| 22 | TRIG keys 1-16 (number printed on the key, underlined) | - | x 18.5 + 21.1 n, y 200.0 | large keys 18.5 x 16.5 with RGB LED | enter trigs; select patterns with BANK; QPER + 1-10 selects a macro | MAN, SOS, EMU | verified |
+| Element | Behaviour | Source |
+|---|---|---|
+| Track keys | Red = active, green = audible, dark = muted, yellow = active and muted; dim red = the synth track the keyboard still plays while FX or CV is active. A song mute of the playing song position shows half-bright | (A4 MKII manual, p.13, p.36-37, p.56) |
+| PARAMETER keys | The open page: white, dimmed for its second page. Red while a held trig has locks on that page | (A4 MKII manual, p.12, p.50) |
+| Trig keys | Red note trig, yellow lock trig; locks flash (the twin marks them with a dot) | (A4 MKII manual, p.40, p.49) |
+| Trig keys, pattern select | Half-bright red = holds data, full-bright red = active | (A4 MKII manual, p.38) |
+| Trig keys, TRIG MUTE / ACCENT / NOTE SLIDE / PARAM SLIDE | Trigs light; flagged trigs darker. Green / magenta / yellow / blue | (A4 MKII manual, p.51-53) |
+| Trig keys, PERFORMANCE | Full bright = audible, dim red = muted; with FUNC held, half-bright = will unmute, half-bright blinking = will mute | (A4 MKII manual, p.27) |
+| BANK E-H with a trig held | Lit when the trig has that flag | (A4 MKII manual, p.51-53) |
+| QPER | Green while the macros act, dark when muted | (A4 MKII manual, p.27) |
+| FUNC combinations | The target key lights light blue | (A4 MKII manual, p.13) |
+| PATTERN PAGE | The playing page blinks | (A4 MKII manual, p.39) |
+| PLAY / STOP | Green while playing / white while stopped | not in the manual (the emulator's OS palette) |
 
-EMU also prints the letters A-P under the trig keys. No second source confirms them, so
-the twin leaves them out (**unverified**).
+## Voice and signal path
 
-### Not on the top panel
-
-Rear panel (not drawn): power, USB, MIDI IN/OUT/THRU, CV A-D outputs, audio inputs L/R,
-main outputs L/R, track outputs 1-4, headphones (MAN, item list of the rear panel).
-
-## Screen (MAN, "The user interface")
-
-1. Active kit name, top left. While a DATA ENTRY knob turns it shows the parameter's full name.
-2. Tempo with one decimal.
-3. Sequencer state icon: record, play, pause, stop.
-4. Up to ten track parameters in the 5 x 2 knob grid, with their values.
-5. Active pattern, with the active song row to its left.
-6. A bar with the active track's level.
-7. Track name.
-
-## LED behaviour (EMU, measured on OS 1.56)
-
-- PARAMETER keys: the open page's key red on its first page, green on its second (OSC 1 red on OSC 1, green on NOISE).
-- Track keys: active track red, the others green (audible); muted tracks dark.
-- PLAY green while playing, STOP white while stopped, REC red in GRID RECORDING.
-- OCTAVE: one LED red; PATTERN PAGE: dim red for the pattern's pages, bright for the shown page; PATTERN MODE: the change mode in use.
-- FILL red while active; TRNS lit while held (and the track keys show which tracks transpose); GLOBAL red in its menu.
-- Trig keys (MAN): note trigs full-bright, trigless (lock) trigs half-bright.
-
-## Voice architecture (MAN 4.1 and Appendix E via EMU A4-PORT; SYSEX; MIDI)
-
-Per synth track, one analog voice:
+Per synth track, one analog voice (A4 MKII manual, p.15, p.110):
 
 ```
-OSC 1 (+ SUB 1) ──┐
-OSC 2 (+ SUB 2) ──┼─► FILTER 1 (4-pole ladder LP) ─► OVERDRIVE ─► FILTER 2 (2-pole multimode) ─► VCA (ENV A) ─► PAN ─► out
-NOISE (digital) ──┘        ▲ ENV F (DEP)                          ▲ ENV F (DEP)
-ENV F, ENV 2, LFO 1, LFO 2, vibrato, PWM LFOs, velocity: digital modulation of the analog controls
-Sends CHO / DEL / REV (AMP page) ─► FX track: chorus ─► delay ─► reverb (digital), returns summed before the outputs
+OSC 1 + SUB 1 ─┐
+OSC 2 + SUB 2 ─┼─► FILTER 1: 4-pole ladder low-pass ─► OVERDRIVE ─► FILTER 2: 2-pole multimode ─► VCA (amp envelope) ─► PAN ─► main out
+NOISE (digital)┘                                                     │                                                       └► CHO / DEL / REV sends
+                                                                     └► the next track's OSC 2 when its WAV is NEI
 ```
 
-Pages and encoder slots (MIDI NRPN order, SYSEX abbreviations):
+| Block | Fact | Source |
+|---|---|---|
+| Analog and digital | Oscillators, filters, overdrive and amps are analog; the noise, envelopes and LFOs are digital; the send effects are digital and mixed in before the output stage | (A4 MKII manual, p.15) |
+| Waveforms | SAW, TRP (transistor pulse), PUL, TRI, IN L, IN R, FDB (OSC 1) / NEI (OSC 2), OFF. PW reshapes all four waves; selecting a wave keeps PW | (A4 MKII manual, p.72, p.87-88) |
+| PW per wave | SAW: a second, phase-shifted saw, single again at the centre or the extremes. TRP and PUL: the width, muted at the extremes. TRI: towards a reversed saw | (A4 MKII manual, p.72) |
+| Sub oscillators | 1OCT: square at 1/2 f. 2OCT: square at 1/4 f. 2PUL: 25 % pulse two octaves down. **5TH: 33 % pulse a perfect fifth below, at 2/3 f.** PW and PWM leave the sub alone; WAV OFF leaves the sub on | (A4 MKII manual, p.72-73) |
+| LEV | The oscillator and its sub together; 100 is the normal level | (A4 MKII manual, p.73, p.87) |
+| FDB (OSC 1) | The ladder output becomes OSC 1's source at LEV1; high levels self-oscillate | (A4 MKII manual, p.73) |
+| NEI (OSC 2) | The multimode output of the track before (1 → 2, 2 → 3, 3 → 4); nothing on track 1. The twin keeps the feeding voice's oscillators and filters running while its VCA is closed, like the analog original, so the next track always hears it | (A4 MKII manual, p.73, p.88) |
+| AM | Osc 1 switched by osc 2's pulse (AM1), or the reverse (AM2); it still works on FDB, NEI and inputs | (A4 MKII manual, p.73, p.88) |
+| Sync | SMD: OFF, 1>2, 2>1, metal; SNC 127 = hard, lower = soft | (A4 MKII manual, p.88) |
+| Ladder | 24 dB/oct; cannot be bypassed (open it); about 25 RES is the flattest (and the default) | (A4 MKII manual, p.36, p.73) |
+| **Overdrive (bipolar)** | 0 clean; positive = clipping after filter 1; negative = a softer drive inside filter 1 | (A4 MKII manual, p.89) |
+| Multimode | LP2, LP1, BP, HP1, HP2, BS, PK; all 2-pole with resonance, the "1-pole" types with a flatter slope | (A4 MKII manual, p.74, p.89) |
+| ENV F | Always drives both cutoffs (DEP knobs), plus two free destinations | (A4 MKII manual, p.89, p.91) |
+| Noise | S&H, COL (-64 red, -32 pink, 0 white, positive high-passed), FAD (0 constant, + out, - in), LEV | (A4 MKII manual, p.87) |
+| Envelope shapes | 12: six shapes, each with and without restart from zero | (A4 MKII manual, p.74-75) |
+| LFO modes | FRE, TRG, HLD, ONE, HLF; SPD bipolar (negative plays backwards); 16, 32 or 64 give straight beats | (A4 MKII manual, p.92) |
 
-| Page (key) | A | B | C | D | E | F | G | H | I | J |
-|---|---|---|---|---|---|---|---|---|---|---|
-| OSC 1 ([OSC 1]) | TUN | FIN | DET | TRK | LEV | WAV | SUB | PW | SPD | PWM |
-| NOISE ([OSC 1] x2) | SNH | COL | FAD | - | LEV | | | | | |
-| OSC 2 ([OSC 2]) | TUN | FIN | DET | TRK | LEV | WAV | SUB | PW | SPD | PWM |
-| OSC 1&2 ([OSC 2] x2) | AM1 | SMD (sync mode) | SNC (sync amount) | BND | SLI | AM2 | TRG (osc retrig) | FAD (vibrato fade) | SPD (vibrato speed) | VIB (vibrato depth) |
-| FILTERS ([FILTER]) | FRQ | RES | OVR | TRK | DEP | FRQ | RES | TYP | TRK | DEP |
-| AMP ([AMP]) | ATK | DEC | SUS | REL | SHP | CHO | DEL | REV | PAN | VOL |
-| ENV F ([ENV]) | ATK | DEC | SUS | REL | SHP | LEN | DST | DEP | DST | DEP |
-| ENV 2 ([ENV] x2) | same as ENV F | | | | | | | | | |
-| LFO 1 ([LFO]) | SPD | MUL | FAD | SPH | MOD | WAV | DST | DEP | DST | DEP |
-| LFO 2 ([LFO] x2) | same as LFO 1 | | | | | | | | | |
+## Pages and encoder slots
 
-FX track: EXT IN ([OSC 1]: L CHO DEL REV PAN LEV / R ...), CHORUS ([FILTER]: PRE SPD DEP
-WID FB / HPF LPF DEL REV VOL), DELAY ([AMP]: TIM X - WID FB / HPF LPF OVR REV VOL), REVERB
-([ENV]: PRE DEC FRQ GAI - / HPF LPF - - VOL), FX LFO 1/2 ([LFO]). CV track: CV A-D on
-[OSC 1]/[OSC 2]/[FILTER]/[AMP] (TUN FIN VAL SRC BND SLI), CV ENV and CV LFO pages.
+Knob letters A-E are the top row, F-J the bottom row (A4 MKII manual, p.18;
+slots per the MIDI tables, p.102-107).
 
-Enumerations (SYSEX, MIDI): WAV SAW TRP PUL TRI INL INR FDB/NEI OFF; SUB OFF 1OCT 2OCT 2PUL
-5TH; F2 TYP LP2 LP1 BP HP1 HP2 BS PK; ENV SHP 12 shapes (Linear ADR, Standard, E.A/L.DR,
-Exp. ADR, Full ADR, F.A/E.DR, each also as a Restart "(R)" version; default Standard);
-LFO WAV TRI SIN SQR SAW EXP RMP RND; LFO MOD FREE TRIG HOLD ONE HALF; LFO MUL x1 ... x2k
-(tempo synced) and .1 ... .2k (fixed 120 BPM). SPD x MUL = 128 is one cycle per bar
-(Elektronauts, community-derived; consistent across three posts). Filter TRK 32 = 1:1
-note tracking (manual quote on Elektronauts). DET is a linear detune in Hz (manual).
+| Page (key) | A | B | C | D | E | F | G | H | I | J | Source |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| OSC 1 ([OSC1]) | TUN | FIN | DET | TRK | LEV | WAV | SUB | PW | SPD | PWM | (A4 MKII manual, p.87) |
+| NOISE ([OSC1] again) | S&H | COL | FAD | | LEV | | | | | | (A4 MKII manual, p.87) |
+| OSC 2 ([OSC2]) | TUN | FIN | DET | TRK | LEV | WAV | SUB | PW | SPD | PWM | (A4 MKII manual, p.88) |
+| OSC 1&2 ([OSC2] again) | AM1 | SMD | SNC | BND | SLI | AM2 | TRG | FAD | SPD | VIB | (A4 MKII manual, p.88) |
+| FILTERS ([FLTR]) | FRQ | RES | OVR | TRK | DEP | FRQ | RES | TYP | TRK | DEP | (A4 MKII manual, p.89) |
+| AMP ([AMP]) | ATK | DEC | SUS | REL | SHP | CHO | DEL | REV | PAN | VOL | (A4 MKII manual, p.90) |
+| ENV F / ENV 2 ([ENV], twice) | ATK | DEC | SUS | REL | SHP | LEN | DST | DEP | DST | DEP | (A4 MKII manual, p.91) |
+| LFO 1 / LFO 2 ([LFO], twice) | SPD | MUL | FAD | SPH | MOD | WAV | DST | DEP | DST | DEP | (A4 MKII manual, p.92) |
+| NOTE ([NOTE]) | NOT | VEL | LEN | µTM | PRB (TRC with a trig held) | ENV F | ENV 2 | LFO 1 | LFO 2 | | (A4 MKII manual, p.45, p.50) |
+| ARPEGGIATOR ([ARP]) | MOD | SPD | RNG | LEG | LEN | NO2 | NO3 | NO4 | | | (A4 MKII manual, p.43-44) |
+| FX: EXT IN ([OSC1]) | CHO | DEL | REV | PAN | VOL (L) | CHO | DEL | REV | PAN | VOL (R) | (A4 MKII manual, p.93) |
+| FX: CHORUS ([FLTR]) | PRE | SPD | DEP | WID | FDB | HPF | LPF | DEL | REV | VOL | (A4 MKII manual, p.94) |
+| FX: DELAY ([AMP]) | TIM | X | | WID | FDB | HPF | LPF | OVR | REV | VOL | (A4 MKII manual, p.95) |
+| FX: REVERB ([ENV]) | PRE | DEC | FRQ | GAI | | HPF | LPF | | | VOL | (A4 MKII manual, p.96) |
+| FX: LFO 1 / 2 ([LFO]) | as the synth LFOs, FX destinations | | | | | | | | | | (A4 MKII manual, p.97) |
+| CV A-D ([OSC1]-[AMP]) | TUN | FIN | VAL | CLK | SRC | BND | SLI | | | | (A4 MKII manual, p.98) |
+
+The ARP modes are OFF, THR (the order played), UP, DWN, CYC, SHF, RND and PLY
+(A4 MKII manual, p.43). SPD 6 is 16th notes and 12 eighths (A4 MKII manual,
+p.44). The ARP settings belong to the pattern, not the kit, and only NO2-NO4
+can be locked (A4 MKII manual, p.43-44). The NOTE page values are copied into
+each trig as it is placed, so later changes only affect new trigs; µTM, the
+retrig switches and TRC are set on held trigs only (A4 MKII manual, p.45).
+The keyboard is not velocity sensitive: trigs take VEL (A4 MKII manual, p.47).
+
+## FX track and the transport
+
+| Fact | Source |
+|---|---|
+| Five pages: EXT IN, CHORUS, DELAY, REVERB, LFO (OSC2 has none) | (A4 MKII manual, p.37) |
+| Order: the chorus feeds the delay and the reverb, the delay feeds the reverb; each also takes every track's send | (A4 MKII manual, p.94-96, p.110) |
+| Delay TIM counts 128th notes of the tempo: 32 is a quarter, 24 a dotted eighth, 128 a whole note | (A4 MKII manual, p.95) |
+| Delay X 0 places the echo with WID; 1 alternates it left and right | (A4 MKII manual, p.95) |
+| Delay feedback can swell; OVR adds to it | (A4 MKII manual, p.95) |
+| Reverb FRQ and GAI: a shelf that darkens the tail; GAI at its maximum keeps the treble | (A4 MKII manual, p.96) |
+| **[STOP]** cuts the sound while the delay repeats ring out; **[STOP][STOP]** while stopped also fades the send effects | (A4 MKII manual, p.38) |
+| **[PLAY]** while playing pauses; [PLAY] again resumes | (A4 MKII manual, p.39) |
+| Synced to the studio (like MIDI clock) PLAY and STOP drive the studio transport and there is no pause | not in the manual (twin) |
+
+## Sequencer
+
+The shared Elektron sequencer (`lib/sequencer/elektron`, see
+`docs/ELEKTRON_SEQUENCER.md`) with six tracks: T1-T4, FX and CV.
+
+| Feature | Fact | Source |
+|---|---|---|
+| Patterns | 8 banks × 16; up to 64 steps in pages of 16; [BANK] + [TRIG] selects; patterns change at the end in SEQUENTIAL mode | (A4 MKII manual, p.38-39, p.48) |
+| Pattern modes | SEQUENTIAL, DIRECT START, DIRECT JUMP, TEMP JUMP (FUNC + BANK A-D) | (A4 MKII manual, p.39-40) |
+| Trigs | Note trigs and lock trigs ([FUNC] + [TRIG]); hold a trig + KEYBOARD for its note; hold + LEFT/RIGHT for micro timing in 1/384 notes | (A4 MKII manual, p.40, p.45) |
+| Parameter locks | Hold a trig and turn a knob; at most 128 different parameters locked in a pattern (`LOCK_LIMIT_A4`) | (A4 MKII manual, p.49-50) |
+| Trig conditions | X %, FILL, !FILL, PRE, !PRE, NEI, !NEI, 1ST, !1ST, A:B | (A4 MKII manual, p.50-51) |
+| Track mutes | [FUNC] + [TRACK]: global, kept through pattern changes, saved with the project (`Project.mutes`). Only sequencer trigs are muted; the keyboard still plays | (A4 MKII manual, p.16, p.37) |
+| Trig mutes, accents, slides | FUNC + BANK E-H menus, or the BANK key with a trig held; note slides use SLI; parameter slides arrive at the next trig | (A4 MKII manual, p.51-53) |
+| Fill | Hold [FILL]; FUNC + [FILL] cues one cycle | (A4 MKII manual, p.51) |
+| Swing, scale | FUNC + [PTN]; FUNC + [PAGE]: NORMAL / ADVANCED, 1/8X ... 2X | (A4 MKII manual, p.48-49, p.53) |
+| Transpose | Hold [TRNS] + KEYBOARD; FUNC + [TRNS] locks it | (A4 MKII manual, p.53) |
+| Reload / save | Pattern and track restore points: [PTN] and [TRK] menus, [YES] / [NO] + key | (A4 MKII manual, p.42-43, p.54) |
+| Copy / clear / paste | FUNC + [RECORD] / [PLAY] / [STOP]: the track in GRID RECORDING, else the pattern | (A4 MKII manual, p.54) |
+| LIVE RECORDING | [RECORD] + [PLAY]; played notes land micro-timed; [PLAY] leaves it, [STOP] stops | (A4 MKII manual, p.40-41) |
+| Chains and songs | Quick chains: hold the first pattern's trig and press more; songs play row by row with repeats, song mutes and transpose, then stop | (A4 MKII manual, p.55-57) |
+| Demo song | Night Drive loops back to row 2 so it keeps playing while you explore (SONG EDIT > END makes it stop like the hardware's) | twin choice |
 
 ## What the twin simplifies or leaves out
 
-See `index.ts` tips and the comments in `params.ts` / `engine.ts`. In short: one kit per
-project (patterns share it), POLY mode, sound/kit/project management menus, live
-motion recording of knob moves, MIDI, the CV outputs (the CV track is sequenced and shown
-but has no jacks: they are on the rear panel), the audio inputs (INL/INR waveforms and the
-EXT IN page are present but silent), and FDB / NEI routings approximated as described in
-`engine.ts`. Value-to-Hz and value-to-seconds curves are our fits to the documented
-ranges, not measurements.
+- **One kit per project.** Patterns share the kit; there is no kit link per pattern (A4 MKII manual, p.38).
+- **No POLY mode** (A4 MKII manual, p.28-29): each track plays its own voice, so the PLY arp mode and chords on one track are absent.
+- **No CV or audio-input jacks.** The CV track is sequenced and shown; IN L / IN R and the EXT IN page are present but silent.
+- **No sound locks** (A4 MKII manual, p.50), no Euclidean NOTE page (p.46-47), no STEP RECORDING (p.41), no ARP SETUP step offsets (p.44), no KEY SCALE / KEY NOTE / TRANSPOSABLE (p.47), no control-all (p.18), no page randomise / revert (p.17).
+- **Performance macros are fixed** (LP sweep, HP sweep, resonance ...): there is no PERFORMANCE SETUP (p.26-27); QPER picks one macro, not several (p.28).
+- **LFO multiplier**: the × and · groups (24 values); the tuning-fork group that syncs to an oscillator is left out (A4 MKII manual, p.92).
+- **Modulation destinations**: continuous parameters only (55 synth, 22 FX); discrete targets such as waveforms are left out.
+- **Sends** are taken after the VCA in mono; the manual's diagram does not show where they sit relative to PAN (A4 MKII manual, p.110).
+- **Menus** are overlays rather than OLED pages; MIDI, the +Drive, projects and the Click Track are the studio's job.
 
-## Cross-check of params.ts against midi.guide
+## The twin's own curves (not in the manual)
 
-A script maps each of the 230 midi.guide entries to a control in `params.ts` and compares
-the encoder slot (NRPN LSB minus the page base) and the value range.
+| Quantity | Twin |
+|---|---|
+| Envelope stage times | 0 → 1 ms, 64 → 0.13 s, 127 → 16 s (exponential); REL 127 = infinite |
+| Filter FRQ | One semitone per step, 440 Hz at 60 (13.75 Hz at 0, about 21 kHz at 127): the Rytm MKII's measured law |
+| Filter TRK | 32 = 1:1 keytracking (A4 MKII manual, p.89) |
+| LFO rate | SPD × MUL = 128 is one cycle per bar |
+| DET | 0.125 Hz per step |
+| Oscillator drift, F1 resonance boost | Small random pitch drift; resonance compensation for the ladder's bass loss |
+| Noise COL | Pink and red by filtering white noise (equal RMS); positive values high-pass from 30 Hz up to 8 kHz |
 
-- **139 parameters match exactly** in page, slot and range: every OSC 1 / OSC 2 / NOISE /
-  OSC 1&2 / FILTERS / AMP / ENV F / ENV 2 / LFO page entry not listed below, the FX track's
-  EXT IN, CHORUS, DELAY and REVERB pages, the FX LFO pages and the CV A-D pages.
-- **Not one-to-one, by design:** midi.guide's `OSCn: Pitch` is a 14-bit NRPN that combines
-  TUN and FIN; the twin shows them as the two encoders the screen has. Performance A-J,
-  TRACK LEVEL and track mute exist (`perf_a..j`, `tN_level`, `t1_mute..t6_mute`: global,
-  so they survive pattern changes, set with [FUNC] + [TRACK]) but are not paged synth
-  parameters. Mod wheel and breath are not modelled (no MIDI input).
+## DSP implementation
 
-Where the twin differs from midi.guide, and why:
-
-| Parameter | midi.guide | Twin | Reason |
-|---|---|---|---|
-| OSC 2 DET, NOISE FAD, LFO SPD, DELAY WID, EXT IN L PAN | 0..127, 0-based | -64..+63 | The screen shows these signed (SYSEX ranges; the manual: FAD "0 gives a constant noise, positive fades out, negative fades in"; LFO SPD "negative values run the cycle backwards"). midi.guide lists the raw NRPN value. OSC 1 DET is centred in midi.guide, OSC 2 DET is not: an inconsistency there. |
-| EXT IN L LEV | centred | 0..127 | Looks swapped with L PAN in midi.guide (R PAN is centred, R LEV is not). |
-| ENV / LFO DEP A/B, FX LFO DEP | 7-bit MSB, centred | -128..+127 | The hardware has a finer (14-bit, decimals) depth; SYSEX gives -128..+127. |
-| ENV / LFO DST, VELOCITY MOD DST | 0..127 code list (about 70 targets) | 55 targets | Continuous targets only; discrete ones (waveform, sub, sync mode, shapes, multiplier) are left out. FX LFO DST: 22 of the 73 codes (the EXT IN targets are left out with the inputs). |
-| LFO MUL | 36 values (x1..x2K, .1...2K, f1..f2K) | 24 values | The third group (`µ` in SYSEX) is undocumented; left out. The FX LFO has 24 values in both. |
-| DELAY X (ping-pong) | 0..127 | OFF / ON | Kept as the on/off switch the screen shows (unverified). |
-| REVERB GAI | 0..127 | 0..127 | Matches (an earlier draft had it signed; fixed). |
-
-## DSP implementation notes
-
-- Voices: one `a4-voice` worklet per track (`public/worklets/analog-four-processors.js`):
-  oscillators with the shared core's 4-point polyBLEP/polyBLAMP residuals, A4 sub
-  dividers, transistor pulse, sync modes and AM, noise, ladder, overdrive, multimode,
-  envelopes and LFOs in one node, so the A4's full modulation matrix (envelope times, LFO
-  speed, sends, levels...) works without native glue. Four worklet nodes instead of the
-  previous version's 36 shared nodes plus native gains.
-- FX track: the shared `Chorus` (BBD) and `Reverb2` (FDN) processors, and an `a4-fx`
-  worklet for the delay, the effect-to-effect sends and the master mix (see engine.ts).
-
+- `public/worklets/analog-four-processors.js`, `a4-voice`: one worklet node per track holds the whole voice (oscillators with 4-point polyBLEP/polyBLAMP band-limiting, subs, sync, AM, noise, TPT ladder, overdrive, SVF multimode, VCA, envelopes, LFOs, the modulation matrix). Control rate 3 kHz (16-sample blocks) with per-sample interpolation.
+- `a4-fxmod` maps the FX track's values, locks and FX LFOs to channels; the shared `chorus` and `fdn-reverb` processors do the chorus and reverb; `a4-fx` holds the tempo-synced delay (feedback filters and saturation in the loop), the effect-to-effect sends and the dry + wet mix.
+- [STOP] sends `cut` (a 6 ms fade, nothing queued survives); [STOP][STOP] fades the send returns in 0.3 s and empties the delay and reverb.
+- Previews (lessons, the preset browser, audio QA) play the selected pattern, or a riff on the keyboard's track when it is empty, and end like [STOP][STOP].

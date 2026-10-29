@@ -65,6 +65,16 @@ const analogFour: DeviceModule = {
     migrate: base.migrate,
   },
   interceptChange: (id: string, value: ControlValue, api) => {
+    // [FUNC] + TRACK LEVEL opens the SOUND BROWSER (manual p.12, p.21); while it is open TRACK LEVEL
+    // scrolls its list on the hardware, so it leaves the track level alone here too
+    if (/^(t[1-4]|fx)_level$/.test(id)) {
+      const func = api.ui.a4func; // ui.tsx UIK.func: 'held' | 'latched'
+      if (func === 'held' || func === 'latched') {
+        api.setUi({ a4menu: 'sound', a4func: func === 'latched' ? null : func, a4funcUsed: true });
+        return true;
+      }
+      if (api.ui.a4menu === 'sound') return true;
+    }
     if (id === 'swing' && typeof value === 'number') {
       api.updateData(d => { const p = asProject(d, SEQ_TRACKS); return updatePatternSettings(p, p.active, { swing: value }); });
       return true;
