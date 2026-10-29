@@ -1,126 +1,134 @@
 // ============================================================================
-// MOOG SUBHARMONICON
-// Semi-modular polyrhythmic analog synthesizer (2020), 60HP Eurorack, 3U.
-// Control names, ranges, switch positions and the 32-point patchbay follow the
-// Moog Subharmonicon user manual. Page numbers are those printed in Moog's PDF
-// (Oscillators p.18, Mixer p.21, Filter p.23, EGs p.24, Sequencers p.26,
-// Transport p.28-29, Polyrhythm Generators p.30, Patchbay p.31-35,
-// Global Parameters p.41, MIDI p.44).
+// MOOG SUBHARMONICON (2020)
+// Semi-modular polyrhythmic analog synthesizer, 60 HP: two VCOs with four
+// subharmonic oscillators, a six-channel mixer, a 4-pole ladder filter, two
+// AD envelopes, two 4-step sequencers, four rhythm generators and a 32-point
+// patchbay. Every control, range and normal is documented with sources and
+// confidence in devices/subharmonicon/REFERENCE.md; manual page numbers below
+// are the Owner's Manual's printed folios (printed page = PDF page + 1).
+// Presets live in ./presets.ts.
 //
-// Value conventions used in this twin:
-//   * SUB FREQ and RHYTHM knobs store the NEGATED divisor (-16..-1) so that
-//     the knob reads ÷16 fully counter-clockwise and ÷1 fully clockwise, which
-//     is how the hardware is marked. Use D(n) below to write "divide by n".
-//   * Sequencer STEP knobs are -100..+100 (% of the SEQ OCT range).
-//   * TEMPO is shown in BPM; the hardware range 0.333-50 Hz = 20-3000 BPM.
+// Stored-value conventions (kept from v1 saves):
+//   * SUB FREQ and RHYTHM knobs store the NEGATED divisor (-16..-1), so the knob
+//     reads ÷16 fully counter-clockwise and ÷1 fully clockwise, as on the panel.
+//     Use D(n) to write "divide by n".
+//   * STEP knobs are -100..+100 % of the SEQ OCT range (12 o'clock = 0 V).
+//   * TEMPO is BPM at the internal clock's 1 PPQ (manual p.25: .333-50 Hz =
+//     20-3000 BPM). The knob is linear in Hz, so 12 o'clock is about 1510 BPM:
+//     the only taper under which Moog's 20 patch sheets step at musical rates.
 // ============================================================================
 
-import type { ControlSpec, DeviceSpec, PresetSpec } from '@/types';
+import type { ControlSpec, DeviceSpec, PatchPoint } from '@/types';
+import { QUANTIZE_OPTIONS, SEQ_OCT_OPTIONS, VCO_MAX_HZ, VCO_MIN_HZ, noteOf } from './theory';
+import { SUBHARMONICON_PRESETS } from './presets';
 
-/** Divisor n (1..16) → stored knob value */
+export { QUANTIZE_OPTIONS, SEQ_OCT_OPTIONS };
+
+/** Divisor n (1..16) -> stored knob value */
 export const D = (n: number) => -n;
 
 const divFormat = (v: number) => `÷${Math.round(-v)}`;
-const stepFormat = (v: number) => `${v > 0 ? '+' : ''}${Math.round(v)}`;
+const freqFormat = (v: number) => `${v >= 1000 ? `${(v / 1000).toFixed(2)}k` : Math.round(v)} ${noteOf(v)}`;
 
-export const QUANTIZE_OPTIONS = ['OFF', '12-ET', '8-ET', '12-JI', '8-JI'];
-export const SEQ_OCT_OPTIONS = ['±1', '±2', '±5'];
 export const EG_OPTIONS = ['OFF', 'ON', 'HELD'];
-export const WAVE_OPTIONS = ['SQR', 'SQ/SAW', 'SAW'];
+/** Wave switch, top to bottom: UP square, MIDDLE pulse VCO with PWM from the SUB 1 saw (saw subs), DOWN saw */
+export const WAVE_OPTIONS = ['SQR', 'PWM', 'SAW'];
 
 const controls: Record<string, ControlSpec> = {};
 
 // ---------------------------------------------------------------------------
-// Oscillators (p.18-20)
+// Oscillators (manual pp.18-20)
 // ---------------------------------------------------------------------------
 for (const v of [1, 2]) {
   controls[`vco${v}_freq`] = {
     type: 'knob',
     label: `VCO ${v} FREQ`,
-    description: `Initial pitch of VCO ${v}. Four octaves: fully counter-clockwise is Middle C (262 Hz), fully clockwise the highest piano C (4186 Hz). The subharmonics divide this frequency.`,
-    min: 261.63,
-    max: 4186,
-    default: v === 1 ? 261.63 : 392,
+    description: `Initial pitch of VCO ${v}, over four octaves: fully counter-clockwise is Middle C (262 Hz), fully clockwise the top C of a piano (4186 Hz). With QUANTIZE on it steps through the scale. Its two subharmonics divide this frequency, so they follow it.`,
+    min: VCO_MIN_HZ,
+    max: VCO_MAX_HZ,
+    default: v === 1 ? VCO_MIN_HZ : 392,
     units: 'Hz',
     curve: 'logarithmic',
     size: 'large',
-    manualReference: 'p.18 – VCO FREQ',
+    format: freqFormat,
+    manualReference: `p.${v === 1 ? 18 : 19} – VCO ${v} FREQ`,
   };
-  controls[`vco${v}_sub1_freq`] = {
-    type: 'knob',
-    label: 'SUB 1 FREQ',
-    description: `Subharmonic 1 of VCO ${v}: the VCO frequency divided by a whole number from 1 (fully clockwise) to 16 (fully counter-clockwise). f/2 is an octave down, f/3 an octave and a fifth down.`,
-    min: -16,
-    max: -1,
-    step: 1,
-    default: v === 1 ? D(2) : D(3),
-    units: 'none',
-    format: divFormat,
-    manualReference: 'p.18 – SUB 1 FREQ',
-  };
-  controls[`vco${v}_sub2_freq`] = {
-    type: 'knob',
-    label: 'SUB 2 FREQ',
-    description: `Subharmonic 2 of VCO ${v}: VCO frequency ÷ 1..16.`,
-    min: -16,
-    max: -1,
-    step: 1,
-    default: v === 1 ? D(4) : D(4),
-    units: 'none',
-    format: divFormat,
-    manualReference: 'p.19 – SUB 2 FREQ',
-  };
+  for (const s of [1, 2]) {
+    controls[`vco${v}_sub${s}_freq`] = {
+      type: 'knob',
+      label: `SUB ${s} FREQ`,
+      description: `Subharmonic ${s} of VCO ${v}: the VCO's frequency divided by a whole number, from ÷1 (fully clockwise, unison) to ÷16 (fully counter-clockwise, four octaves down). ÷2 is an octave down, ÷3 an octave and a fifth, ÷4 two octaves, ÷5 two octaves and a major third. It counts the VCO's cycles, so it is always exactly in tune with it.`,
+      min: -16,
+      max: -1,
+      step: 1,
+      default: D(v === 1 ? (s === 1 ? 2 : 4) : s === 1 ? 3 : 4),
+      units: 'none',
+      format: divFormat,
+      manualReference: `p.${v === 1 ? (s === 1 ? 18 : 19) : 20} – SUB ${s} FREQ`,
+    };
+  }
   controls[`vco${v}_wave`] = {
     type: 'switch',
     label: `VCO ${v} WAVE`,
-    description: `Top: square from VCO ${v}, SUB 1 and SUB 2. Middle: VCO square (pulse-width modulated by SUB 1's sawtooth unless the VCO ${v} PWM jack is patched), subs sawtooth. Bottom: sawtooth from all three.`,
+    description: `Waveform of VCO ${v} and its subs. Up: square on all three (hollow, odd harmonics). Middle: the VCO is a square whose pulse width is swept by SUB 1's sawtooth (or the VCO ${v} PWM jack), the subs are sawtooths. Down: sawtooth on all three (bright, every harmonic).`,
     options: WAVE_OPTIONS,
     default: 2,
-    manualReference: 'p.19 – Waveform switch',
+    manualReference: `p.${v === 1 ? 19 : 20} – Waveform switch`,
   };
-  // Mixer (p.21)
+  // Mixer (pp.21-22)
   controls[`vco${v}_level`] = {
-    type: 'knob', label: `VCO ${v} LEVEL`, description: `Level of VCO ${v} into the filter.`,
-    min: 0, max: 100, default: v === 1 ? 60 : 40, units: '%', manualReference: 'p.21 – Mixer',
+    type: 'knob', label: `VCO ${v} LEVEL`, min: 0, max: 100, default: v === 1 ? 60 : 40, units: '%', size: 'medium',
+    description: `Level of VCO ${v} in the mixer. Several sources near the top push the mixer into a warm distortion; moderate levels stay clean.`,
+    manualReference: `p.${v === 1 ? 21 : 22} – Mixer`,
   };
-  controls[`vco${v}_sub1_level`] = {
-    type: 'knob', label: 'SUB 1 LEVEL', description: `Level of VCO ${v} SUB 1 into the filter.`,
-    min: 0, max: 100, default: v === 1 ? 50 : 0, units: '%', manualReference: 'p.21 – Mixer',
-  };
-  controls[`vco${v}_sub2_level`] = {
-    type: 'knob', label: 'SUB 2 LEVEL', description: `Level of VCO ${v} SUB 2 into the filter.`,
-    min: 0, max: 100, default: v === 1 ? 35 : 0, units: '%', manualReference: 'p.21 – Mixer',
-  };
+  for (const s of [1, 2]) {
+    controls[`vco${v}_sub${s}_level`] = {
+      type: 'knob', label: `SUB ${s} LEVEL`, min: 0, max: 100, default: v === 1 ? (s === 1 ? 50 : 35) : 0, units: '%', size: 'medium',
+      description: `Level of VCO ${v}'s SUB ${s} in the mixer.`,
+      manualReference: 'p.22 – Mixer',
+    };
+  }
 }
 
-// SEQ ASSIGN (p.26): which oscillators each sequencer controls
+// SEQ ASSIGN (p.26-27): what each sequencer's four steps move
 for (const s of [1, 2]) {
   controls[`seq${s}_osc`] = {
-    type: 'button', label: 'OSC', default: true,
-    description: `Sequencer ${s} transposes VCO ${s} (its subharmonics follow, because they divide it).`,
-    manualReference: 'p.26 – SEQ ASSIGN',
+    type: 'button', label: `OSC ${s}`, default: true,
+    description: `Sequencer ${s} plays VCO ${s}'s pitch. Its subharmonics follow, because they divide it.`,
+    manualReference: `p.${s === 1 ? 26 : 27} – SEQ ${s} ASSIGN`,
   };
   controls[`seq${s}_sub1`] = {
     type: 'button', label: 'SUB 1', default: false,
-    description: `Sequencer ${s} changes the SUB 1 divisor of VCO ${s}, so the sub walks the undertone series.`,
-    manualReference: 'p.26 – SEQ ASSIGN',
+    description: `Sequencer ${s} changes the whole-number value of VCO ${s}'s SUB 1 FREQ knob, so SUB 1 walks the undertone series while the VCO stays put.`,
+    manualReference: `p.${s === 1 ? 26 : 27} – SEQ ${s} ASSIGN`,
   };
   controls[`seq${s}_sub2`] = {
     type: 'button', label: 'SUB 2', default: false,
-    description: `Sequencer ${s} changes the SUB 2 divisor of VCO ${s}.`,
-    manualReference: 'p.26 – SEQ ASSIGN',
+    description: `Sequencer ${s} changes the whole-number value of VCO ${s}'s SUB 2 FREQ knob.`,
+    manualReference: `p.${s === 1 ? 26 : 27} – SEQ ${s} ASSIGN`,
   };
 }
 
 controls.seq_oct = {
   type: 'switch', label: 'SEQ OCT', options: SEQ_OCT_OPTIONS, default: 0,
-  description: 'Range of the sequencer STEP knobs around the VCO FREQ setting: ±1, ±2 or ±5 octaves. Shared by both sequencers. For full ±5 use, set VCO FREQ fully counter-clockwise.',
-  manualReference: 'p.27 – SEQ OCT',
+  description: 'How far each STEP knob reaches above and below the VCO FREQ setting: ±1, ±2 or ±5 octaves, shared by both sequencers. For the full ±5, set both VCO FREQ knobs fully counter-clockwise. Press to cycle; press and hold until the LED flashes to free the SEQ jacks (OUT ±5 beside it does the same).',
+  manualReference: 'p.28 – SEQ OCT',
 };
 controls.quantize = {
   type: 'switch', label: 'QUANTIZE', options: QUANTIZE_OPTIONS, default: 1,
-  description: 'Snaps sequencer pitch to a scale built on the VCO FREQ: 12-ET chromatic or 8-ET diatonic in equal temperament, 12-JI / 8-JI the same in just intonation. All LEDs dark = off (continuous pitch).',
-  manualReference: 'p.27 – QUANTIZE',
+  description: 'Snaps the VCO FREQ knobs and the sequencer steps to a scale on C: 12-ET chromatic or 8-ET major in equal temperament, 12-JI and 8-JI the same in just intonation (whole-number ratios, like the subharmonics). All LEDs dark = off: continuous pitch. Press to cycle; press and hold until the LED flashes to unquantize the SEQ jacks (OUT UNQ beside it does the same).',
+  manualReference: 'p.21 – QUANTIZE',
+};
+// The two "held" modes (no separate panel control on the hardware: hold the button until its LED flashes)
+controls.seq_oct_held = {
+  type: 'button', label: 'SEQ OUT ±5', default: false,
+  description: 'SEQ OCT held (its LED flashes): the SEQ 1 and SEQ 2 jacks always put out the full ±5 V range, whatever SEQ OCT is set to. The oscillators keep following SEQ OCT. Press and hold SEQ OCT again, or tap here, to return.',
+  manualReference: 'p.28 – SEQ OCT (hold)',
+};
+controls.quantize_held = {
+  type: 'button', label: 'SEQ OUT UNQ', default: false,
+  description: 'QUANTIZE held (its LED flashes): the SEQ 1 and SEQ 2 jacks put out unquantized voltages, while the oscillators stay quantized. Press and hold QUANTIZE again, or tap here, to return.',
+  manualReference: 'p.21 – QUANTIZE (hold)',
 };
 
 // ---------------------------------------------------------------------------
@@ -132,9 +140,8 @@ for (const s of [1, 2]) {
     controls[`seq${s}_step${i}`] = {
       type: 'knob',
       label: `STEP ${i}`,
-      description: `Sequencer ${s} step ${i} pitch offset (−100..+100 % of the SEQ OCT range, then quantized).`,
-      min: -100, max: 100, default: STEP_DEFAULTS[s - 1][i - 1], units: 'none', bipolar: true,
-      format: stepFormat,
+      description: `Sequencer ${s}, step ${i}: an offset from the VCO FREQ setting. 12 o'clock is 0 V; fully clockwise is the whole SEQ OCT range up (+100), fully counter-clockwise the whole range down. With SEQ OCT ±1 one semitone is about 8.3.`,
+      min: -100, max: 100, default: STEP_DEFAULTS[s - 1][i - 1], units: '%', bipolar: true, size: 'small',
       manualReference: 'p.26 – Sequencer STEP knobs',
     };
   }
@@ -148,128 +155,129 @@ for (let r = 1; r <= 4; r++) {
   controls[`rhythm${r}`] = {
     type: 'knob',
     label: `RHYTHM ${r}`,
-    description: `Rhythm generator ${r}: divides TEMPO by a whole number, ÷1 (fully clockwise) to ÷16 (fully counter-clockwise).`,
-    min: -16, max: -1, step: 1, default: D(RHYTHM_DEFAULTS[r - 1]), units: 'none', format: divFormat,
+    description: `Rhythm generator ${r}: divides the clock by a whole number, ÷1 (fully clockwise, every count) to ÷16 (fully counter-clockwise). Its SEQ 1 and SEQ 2 buttons choose which sequencer it steps.`,
+    min: -16, max: -1, step: 1, default: D(RHYTHM_DEFAULTS[r - 1]), units: 'none', size: 'small', format: divFormat,
     manualReference: 'p.30 – Polyrhythm Generators',
   };
   for (const s of [1, 2]) {
     controls[`rhythm${r}_seq${s}`] = {
       type: 'button', label: `SEQ ${s}`,
       default: (r === 1 && s === 1) || (r === 2 && s === 2),
-      description: `Clock Sequencer ${s} from Rhythm ${r}. Several rhythms on one sequencer combine by the RHYTHM LOGIC.`,
+      description: `Lit: rhythm generator ${r} steps Sequencer ${s}. Several generators on one sequencer combine by the rhythm logic (OR, or XOR).`,
       manualReference: 'p.30 – Rhythm SEQ 1 / SEQ 2 buttons',
     };
   }
 }
 controls.rhythm_logic = {
   type: 'switch', label: 'RHYTHM LOGIC', options: ['OR', 'XOR'], default: 0,
-  description: 'How several rhythm generators assigned to one sequencer combine. OR: advance when any fires. XOR: advance only when exactly one fires (coincident hits cancel). A global parameter on the hardware (MIDI CC 113), shown here as a switch.',
-  manualReference: 'p.41 – Global Parameters: Rhythm Generator Logic',
+  description: 'How several rhythm generators on one sequencer combine. OR: it steps when any of them fires (once, even if several coincide). XOR: only when exactly one fires - coinciding hits cancel. A global setting on the hardware (MIDI CC 113).',
+  manualReference: 'p.44 – MIDI CC 113: Rhythm Generator Logic',
 };
 
 // ---------------------------------------------------------------------------
-// Tempo & transport (p.28-29)
+// Tempo and transport (pp.25, 28-30)
 // ---------------------------------------------------------------------------
 controls.tempo = {
-  type: 'knob', label: 'TEMPO', min: 20, max: 3000, default: 240, units: 'BPM', curve: 'logarithmic', size: 'large',
-  description: 'Master clock that the four rhythm generators divide. 0.333 Hz to 50 Hz (20 to 3000 BPM).',
-  manualReference: 'p.28 – TEMPO',
+  type: 'knob', label: 'TEMPO', min: 20, max: 3000, default: 480, units: 'BPM', curve: 'linear', size: 'large',
+  format: v => `${Math.round(v)} BPM`,
+  description: 'The master clock the four rhythm generators divide: .333 Hz to 50 Hz, one count per beat (20 to 3000 BPM). The knob is linear, so 12 o\'clock is about 1510 BPM and musical tempos sit in its first quarter: 480 BPM counts 16th notes at 120. Ignored while a cable is in CLOCK or the studio clock runs (the studio clock counts 16th notes).',
+  manualReference: 'p.25 – TEMPO',
 };
 controls.play = {
   type: 'button', label: 'PLAY', default: false, ledColor: '#ff3b30',
-  description: 'Starts / stops the sequencers, the rhythm generators and the CLOCK output.',
+  description: 'Starts and stops the sequencers, the rhythm generators and the CLOCK output. In the studio it starts the studio clock.',
   manualReference: 'p.28 – PLAY',
 };
 controls.reset = {
   type: 'button', label: 'RESET', momentary: true, default: false,
-  description: 'Returns both sequencers to step 1 and realigns the rhythm generators. Hold it to keep the sequencers on step 1 while the rhythms keep triggering the EGs.',
-  manualReference: 'p.28 – RESET',
+  description: 'Returns both sequencers to step 1 and the rhythm generators to their starting point; the next clock count plays step 1. Hold it to keep the sequencers on step 1 while the rhythms keep firing the envelopes (NEXT while holding picks the held step).',
+  manualReference: 'p.29 – RESET',
 };
 controls.next = {
   type: 'button', label: 'NEXT', momentary: true, default: false,
-  description: 'Advances both sequencers one step, stopped or running - handy for tuning steps.',
-  manualReference: 'p.28 – NEXT',
+  description: 'Moves to the next step at once, without firing the envelopes - with PLAY off and EG held (blinking) it lets you tune each step by ear. It advances the rhythm generators until Sequencer 1 steps, so Sequencer 2 keeps its place in the polyrhythm.',
+  manualReference: 'p.29 – NEXT',
 };
 controls.trigger = {
   type: 'button', label: 'TRIGGER', momentary: true, default: false,
-  description: 'EG ON: restarts the envelopes. EG OFF: acts as a gate, holding the envelopes at maximum while pressed. EG HELD: no effect.',
+  description: 'EG lit: restarts both envelopes at once, without waiting for the next step. EG unlit: a gate - the envelopes rise and hold at their maximum while you press it. EG blinking: no effect.',
   manualReference: 'p.29 – TRIGGER',
 };
 controls.eg_mode = {
   type: 'switch', label: 'EG', options: EG_OPTIONS, default: 1,
-  description: 'ON (lit): the sequencers trigger the VCF and VCA envelopes. OFF (unlit): only TRIGGER / the TRIGGER jack fire them. HELD (blinking, hold the button): envelopes sit at maximum - a drone.',
-  manualReference: 'p.29 – EG button',
+  description: 'ON (lit): every sequencer step fires the VCF and VCA envelopes. OFF (unlit): only TRIGGER, the TRIGGER jack and keys fire them. HELD (press and hold until it blinks): both envelopes held open at maximum - a drone for tuning.',
+  manualReference: 'p.29 – EG',
 };
 
 // ---------------------------------------------------------------------------
-// Filter, envelopes, VCA (p.23-25)
+// Filter, envelopes, VCA (pp.23-25)
 // ---------------------------------------------------------------------------
 Object.assign(controls, {
   cutoff: {
     type: 'knob', label: 'CUTOFF', min: 20, max: 20000, default: 1800, units: 'Hz', curve: 'logarithmic', size: 'large',
-    description: 'Cutoff frequency of the 24 dB/octave Moog ladder low-pass filter.',
+    description: 'Cutoff of the 4-pole (24 dB/octave) Moog ladder low-pass filter, 20 Hz to 20 kHz. Harmonics above it are removed, so lower is darker.',
     manualReference: 'p.23 – CUTOFF',
   },
   resonance: {
-    type: 'knob', label: 'RESONANCE', min: 0, max: 100, default: 15, units: '%',
-    description: 'Feeds the filter output back to its input, emphasising the cutoff. Near maximum the filter rings; like any ladder it thins the bass as it rises.',
+    type: 'knob', label: 'RESONANCE', min: 0, max: 100, default: 15, units: '%', size: 'large',
+    description: 'Feeds the filter output back to its input, boosting a narrow band at the cutoff. Toward maximum the filter chirps and, past about 2 o\'clock, sings a sine of its own. Like any ladder, the bass thins as it rises.',
     manualReference: 'p.23 – RESONANCE',
   },
   vcf_eg_amt: {
-    type: 'knob', label: 'VCF EG AMT', min: -100, max: 100, default: 35, units: '%', bipolar: true,
-    description: 'How far the VCF EG (or whatever is patched into the CUTOFF jack) moves the cutoff - up or, below centre, down.',
-    manualReference: 'p.23 – VCF EG AMT',
+    type: 'knob', label: 'VCF EG AMT', min: -100, max: 100, default: 35, units: '%', bipolar: true, size: 'large',
+    description: 'How far the VCF envelope moves the cutoff. Centre: no effect. (+) opens the filter on the attack and closes it on the decay; (–) closes it on the attack.',
+    manualReference: 'p.24 – VCF EG AMT',
   },
   volume: {
-    type: 'knob', label: 'VOLUME', min: 0, max: 100, default: 70, units: '%',
-    description: 'Output level.',
-    manualReference: 'p.25 – VOLUME',
+    type: 'knob', label: 'VOLUME', min: 0, max: 100, default: 70, units: '%', size: 'large',
+    description: 'Output level: the VCA envelope rises to this level. It sets both the main output and the VCA jack.',
+    manualReference: 'p.23 – VOLUME',
   },
   vcf_attack: {
-    type: 'knob', label: 'VCF ATTACK', min: 1, max: 10000, default: 5, units: 'ms', curve: 'logarithmic',
-    description: 'Time for the VCF EG to rise from the CUTOFF setting to the maximum set by EG AMT.',
+    type: 'knob', label: 'VCF ATTACK', min: 1, max: 10000, default: 5, units: 'ms', curve: 'logarithmic', size: 'large',
+    description: 'Time for the VCF envelope to rise from the CUTOFF setting to the peak set by VCF EG AMT: 1 ms to 10 s. While it rises, new triggers are ignored.',
     manualReference: 'p.24 – VCF ATTACK',
   },
   vcf_decay: {
-    type: 'knob', label: 'VCF DECAY', min: 1, max: 10000, default: 350, units: 'ms', curve: 'logarithmic',
-    description: 'Time for the VCF EG to fall back to the CUTOFF setting.',
+    type: 'knob', label: 'VCF DECAY', min: 5, max: 10000, default: 350, units: 'ms', curve: 'logarithmic', size: 'large',
+    description: 'Time for the VCF envelope to fall back to the CUTOFF setting: 5 ms to 10 s.',
     manualReference: 'p.24 – VCF DECAY',
   },
   vca_attack: {
-    type: 'knob', label: 'VCA ATTACK', min: 1, max: 10000, default: 3, units: 'ms', curve: 'logarithmic',
-    description: 'Fade-in time of each note.',
+    type: 'knob', label: 'VCA ATTACK', min: 1, max: 10000, default: 3, units: 'ms', curve: 'logarithmic', size: 'large',
+    description: 'Fade-in of each note: 1 ms to 10 s. While it rises, new triggers are ignored - a long attack thins out the rhythm.',
     manualReference: 'p.24 – VCA ATTACK',
   },
   vca_decay: {
-    type: 'knob', label: 'VCA DECAY', min: 1, max: 10000, default: 450, units: 'ms', curve: 'logarithmic',
-    description: 'Fade-out time of each note.',
-    manualReference: 'p.24 – VCA DECAY',
+    type: 'knob', label: 'VCA DECAY', min: 5, max: 10000, default: 450, units: 'ms', curve: 'logarithmic', size: 'large',
+    description: 'Fade-out of each note: 5 ms to 10 s. A gate (held TRIGGER, a held key) holds the note at full level until it ends.',
+    manualReference: 'p.25 – VCA DECAY',
   },
 } satisfies Record<string, ControlSpec>);
 
 // ---------------------------------------------------------------------------
-// Patchbay: 32 points, 17 inputs + 15 outputs, 4 columns × 8 rows (p.31-35)
-//   row 1  VCO 1 in   VCO 1 SUB in   VCO 1 PWM in   VCA out
-//   row 2  VCO 1 out  VCO 1 SUB 1    VCO 1 SUB 2    VCA in
-//   row 3  VCO 2 in   VCO 2 SUB in   VCO 2 PWM in   VCA EG out
-//   row 4  VCO 2 out  VCO 2 SUB 1    VCO 2 SUB 2    CUTOFF in
-//   row 5  PLAY in    RESET in       TRIGGER in     VCF EG out
-//   row 6  RHYTHM 1   RHYTHM 2       RHYTHM 3       RHYTHM 4 (inputs)
-//   row 7  SEQ 1      SEQ 1 CLK      SEQ 2          SEQ 2 CLK (outputs)
-//   row 8  MIDI IN    CLOCK in       CLOCK out      TRIGGER out
+// Patchbay: 32 points, 17 inputs + 15 outputs, 4 columns x 8 rows (pp.31-37)
+//   row 1  VCO 1 in    VCO 1 SUB in   VCO 1 PWM in   VCA out
+//   row 2  VCO 1 out   SUB 1 out      SUB 2 out      VCA in
+//   row 3  VCO 2 in    VCO 2 SUB in   VCO 2 PWM in   VCA EG out
+//   row 4  VCO 2 out   SUB 1 out      SUB 2 out      CUTOFF in
+//   row 5  PLAY in     RESET in       TRIGGER in     VCF EG out
+//   row 6  RHYTHM 1    RHYTHM 2       RHYTHM 3       RHYTHM 4   (inputs)
+//   row 7  SEQ 1       SEQ 1 CLK      SEQ 2          SEQ 2 CLK  (outputs)
+//   row 8  MIDI IN     CLOCK in       CLOCK out      TRIGGER out
 // ---------------------------------------------------------------------------
-type Pt = { id: string; label: string; signalType: 'audio' | 'cv' | 'gate' | 'trigger' | 'clock'; column: number; row: number; normalled?: string };
+type Pt = Omit<PatchPoint, 'jackType'>;
 const IN: Pt[] = [
   { id: 'in_vco1', label: 'VCO 1', signalType: 'cv', column: 0, row: 0 },
   { id: 'in_vco1_sub', label: 'VCO 1 SUB', signalType: 'cv', column: 1, row: 0 },
   { id: 'in_vco1_pwm', label: 'VCO 1 PWM', signalType: 'cv', column: 2, row: 0, normalled: 'out_vco1_sub1' },
-  { id: 'in_vca', label: 'VCA', signalType: 'cv', column: 3, row: 1, normalled: 'out_vca_eg' },
+  { id: 'in_vca', label: 'VCA', signalType: 'cv', column: 3, row: 1 },
   { id: 'in_vco2', label: 'VCO 2', signalType: 'cv', column: 0, row: 2, normalled: 'in_vco1' },
   { id: 'in_vco2_sub', label: 'VCO 2 SUB', signalType: 'cv', column: 1, row: 2 },
   { id: 'in_vco2_pwm', label: 'VCO 2 PWM', signalType: 'cv', column: 2, row: 2, normalled: 'out_vco2_sub1' },
-  { id: 'in_cutoff', label: 'CUTOFF', signalType: 'cv', column: 3, row: 3, normalled: 'out_vcf_eg' },
+  { id: 'in_cutoff', label: 'CUTOFF', signalType: 'cv', column: 3, row: 3 },
   { id: 'in_play', label: 'PLAY', signalType: 'gate', column: 0, row: 4 },
-  { id: 'in_reset', label: 'RESET', signalType: 'gate', column: 1, row: 4 },
+  { id: 'in_reset', label: 'RESET', signalType: 'trigger', column: 1, row: 4 },
   { id: 'in_trigger', label: 'TRIGGER', signalType: 'trigger', column: 2, row: 4 },
   { id: 'in_rhythm1', label: 'RHYTHM 1', signalType: 'cv', column: 0, row: 5 },
   { id: 'in_rhythm2', label: 'RHYTHM 2', signalType: 'cv', column: 1, row: 5 },
@@ -299,129 +307,34 @@ const OUT: Pt[] = [
 /** Patchbay grid in panel order, for the layout */
 export const PATCH_GRID = [...IN, ...OUT].map(p => ({ id: p.id, col: p.column, row: p.row }));
 
-// ---------------------------------------------------------------------------
-// Presets
-// ---------------------------------------------------------------------------
-const presets: Record<string, PresetSpec> = {
-  init: {
-    name: 'Init: two sequences, 4 against 3',
-    description: 'Rhythm 1 (÷4) clocks Sequencer 1, Rhythm 2 (÷3) clocks Sequencer 2.',
-    source: 'factory',
-    settings: {},
-  },
-  undertone_drone: {
-    name: 'Undertone Drone',
-    description: 'EG HELD, no sequencing: VCO 1 with SUB 1 ÷3 and SUB 2 ÷5, VCO 2 a fifth up with its own subs - a slow-beating undertone chord.',
-    source: 'community',
-    settings: {
-      eg_mode: 2, vco1_freq: 523.25, vco1_sub1_freq: D(3), vco1_sub2_freq: D(5),
-      vco2_freq: 784, vco2_sub1_freq: D(4), vco2_sub2_freq: D(6),
-      vco1_level: 45, vco1_sub1_level: 70, vco1_sub2_level: 55, vco2_level: 30, vco2_sub1_level: 50, vco2_sub2_level: 45,
-      vco1_wave: 2, vco2_wave: 1, cutoff: 1400, resonance: 25, vcf_eg_amt: 0, volume: 65,
-    },
-  },
-  three_against_four: {
-    name: '3 Against 4',
-    description: 'Rhythm 3 (÷3) drives Sequencer 1, Rhythm 4 (÷4) drives Sequencer 2: the two lines meet every 12 clocks.',
-    source: 'community',
-    settings: {
-      tempo: 420, rhythm1: D(1), rhythm2: D(1), rhythm3: D(3), rhythm4: D(4),
-      rhythm1_seq1: false, rhythm2_seq2: false, rhythm3_seq1: true, rhythm4_seq2: true,
-      vco1_freq: 261.63, vco2_freq: 523.25, vco2_level: 45, vco2_sub1_level: 30, vco2_sub1_freq: D(2),
-      seq1_step1: 0, seq1_step2: 25, seq1_step3: 58, seq1_step4: 42,
-      seq2_step1: 0, seq2_step2: -17, seq2_step3: 33, seq2_step4: 58,
-      quantize: 2, cutoff: 1500, vcf_eg_amt: 45, vcf_decay: 220, vca_decay: 300,
-    },
-  },
-  just_arp: {
-    name: 'Just Intonation Arp',
-    description: '12-JI quantize with the subs on simple ratios, so the sequence and the undertones share one harmonic grid - no beating.',
-    source: 'community',
-    settings: {
-      quantize: 3, seq_oct: 0, tempo: 600, rhythm1: D(2), rhythm2: D(3),
-      vco1_sub1_freq: D(2), vco1_sub2_freq: D(3), vco1_level: 50, vco1_sub1_level: 45, vco1_sub2_level: 40,
-      vco2_freq: 392, vco2_level: 35, vco2_sub1_freq: D(2), vco2_sub1_level: 35,
-      seq1_step1: 0, seq1_step2: 33, seq1_step3: 58, seq1_step4: 83,
-      seq2_step1: 0, seq2_step2: 42, seq2_step3: 25, seq2_step4: 58,
-      vco1_wave: 1, cutoff: 2200, resonance: 30, vcf_eg_amt: 30, vca_decay: 250,
-    },
-  },
-  sub_melody: {
-    name: 'Undertone Melody',
-    description: 'Sequencer 1 changes only the SUB 1 divisor (OSC off): the melody walks down the undertone series while VCO 1 stays put.',
-    source: 'community',
-    settings: {
-      seq1_osc: false, seq1_sub1: true, vco1_freq: 1046.5, vco1_level: 20, vco1_sub1_level: 80, vco1_sub2_level: 0,
-      vco1_sub1_freq: D(8), seq1_step1: 0, seq1_step2: 100, seq1_step3: 50, seq1_step4: -60, seq_oct: 1, quantize: 0,
-      tempo: 360, rhythm1: D(2), rhythm2_seq2: false, cutoff: 2500, vcf_eg_amt: 25, vca_decay: 380,
-    },
-  },
-  pwm_envelope: {
-    name: 'Envelope PWM (cable)',
-    description: 'VCF EG patched into VCO 1 PWM in the SQ/SAW wave position: every note sweeps the pulse width.',
-    source: 'manual',
-    settings: {
-      vco1_wave: 1, vco1_level: 75, vco1_sub1_level: 30, vco1_sub2_level: 0, vcf_decay: 700, vcf_eg_amt: 20, cutoff: 2600,
-      tempo: 300, rhythm1: D(2), rhythm2_seq2: false, vca_decay: 650,
-    },
-    patchConnections: [{ from: 'out_vcf_eg', to: 'in_vco1_pwm' }],
-  },
-  seq_filter: {
-    name: 'Sequenced Filter (cable)',
-    description: 'SEQ 2 drives the CUTOFF jack (replacing the VCF EG, scaled by EG AMT) while Sequencer 1 plays the notes - two different rhythms in pitch and tone.',
-    source: 'community',
-    settings: {
-      seq2_osc: false, vco2_level: 0, rhythm2: D(3), rhythm1: D(2), vcf_eg_amt: 70, cutoff: 500, resonance: 55,
-      seq2_step1: -80, seq2_step2: 20, seq2_step3: 90, seq2_step4: -10, seq_oct: 1, quantize: 0, tempo: 480,
-    },
-    patchConnections: [{ from: 'out_seq2', to: 'in_cutoff' }],
-  },
-  clock_chaos: {
-    name: 'Shifting Rhythms (cables)',
-    description: 'EG OFF with CLOCK patched into TRIGGER: every tempo beat articulates a note while the pitches change at the rhythm rates, and SEQ 1 modulates the RHYTHM 3 division - a generative polyrhythm.',
-    source: 'community',
-    settings: {
-      tempo: 540, rhythm1: D(3), rhythm2: D(4), rhythm3: D(5), rhythm3_seq1: true, rhythm2_seq2: false, rhythm4_seq2: true, rhythm4: D(7),
-      vco2_level: 40, vco2_sub1_level: 25, quantize: 2, cutoff: 1600, vcf_eg_amt: 40, vca_decay: 120, vcf_decay: 120, eg_mode: 0,
-    },
-    patchConnections: [
-      { from: 'out_seq1', to: 'in_rhythm3' },
-      { from: 'out_clock', to: 'in_trigger' },
-    ],
-  },
-  filter_fm: {
-    name: 'Sub-Audio Filter FM (cable)',
-    description: 'VCO 2 SUB 2 into CUTOFF: an audio-rate subharmonic frequency-modulates the ladder filter for growling sidebands.',
-    source: 'community',
-    settings: {
-      vco2_freq: 523.25, vco2_sub2_freq: D(7), vco2_level: 0, vco2_sub1_level: 0, vco2_sub2_level: 0, seq2_osc: false,
-      cutoff: 900, resonance: 50, vcf_eg_amt: 30, vco1_sub1_level: 60, rhythm2_seq2: false,
-    },
-    patchConnections: [{ from: 'out_vco2_sub2', to: 'in_cutoff' }],
-  },
-};
-
 export const SUBHARMONICON: DeviceSpec = {
   id: 'subharmonicon',
   name: 'Subharmonicon',
   manufacturer: 'Moog',
   year: 2020,
-  description: 'Semi-modular polyrhythmic analog synthesizer: two VCOs, four subharmonic oscillators, two 4-step sequencers, four rhythm generators and a Moog ladder filter.',
-  manualUrl: 'https://www.moogmusic.com/products/subharmonicon',
-  dimensions: { width: 319, height: 128.5, depth: 133, eurorackHP: 60 },
-  display: { width: 1220, height: 514, scale: 4 },
+  description: 'Semi-modular polyrhythmic analog synthesizer: two VCOs with four subharmonic oscillators, two 4-step sequencers, four rhythm generators and a Moog ladder filter.',
+  manualUrl: 'https://www.moogmusic.com/synthesizers/subharmonicon/',
+  // 60 HP Eurorack panel (304.8 x 128.5 mm) between wood side pieces; the unit is 319.3 x 133 mm
+  dimensions: { width: 319.3, height: 133, depth: 107, eurorackHP: 60 },
+  display: { width: 1133, height: 456, scale: 3.55 },
   signalFlow: [
-    { id: 'oscillators', name: 'Oscillators & Subharmonics', order: 1, controls: ['vco1_freq', 'vco1_sub1_freq', 'vco1_sub2_freq', 'vco1_wave', 'vco2_freq', 'vco2_sub1_freq', 'vco2_sub2_freq', 'vco2_wave'] },
-    { id: 'mixer', name: 'Mixer', order: 2, controls: ['vco1_level', 'vco1_sub1_level', 'vco1_sub2_level', 'vco2_level', 'vco2_sub1_level', 'vco2_sub2_level'] },
-    { id: 'filter', name: 'Filter', order: 3, controls: ['cutoff', 'resonance', 'vcf_eg_amt', 'vcf_attack', 'vcf_decay'] },
-    { id: 'vca', name: 'VCA', order: 4, controls: ['vca_attack', 'vca_decay', 'volume'] },
-    { id: 'sequencers', name: 'Sequencers', order: 5, controls: ['seq_oct', 'quantize', 'seq1_osc', 'seq1_sub1', 'seq1_sub2', 'seq2_osc', 'seq2_sub1', 'seq2_sub2', ...[1, 2].flatMap(s => [1, 2, 3, 4].map(i => `seq${s}_step${i}`))] },
-    { id: 'rhythm', name: 'Polyrhythm', order: 6, controls: ['tempo', 'rhythm_logic', ...[1, 2, 3, 4].flatMap(r => [`rhythm${r}`, `rhythm${r}_seq1`, `rhythm${r}_seq2`]), 'play', 'reset', 'next', 'trigger', 'eg_mode'] },
+    { id: 'oscillators', name: 'Oscillators & subharmonics', description: 'Two VCOs, each with two integer-divider subharmonic oscillators', order: 1,
+      controls: ['vco1_freq', 'vco1_sub1_freq', 'vco1_sub2_freq', 'vco1_wave', 'vco2_freq', 'vco2_sub1_freq', 'vco2_sub2_freq', 'vco2_wave'] },
+    { id: 'mixer', name: 'Mixer', description: 'Six levels into the filter; warm distortion near the top', order: 2,
+      controls: ['vco1_level', 'vco1_sub1_level', 'vco1_sub2_level', 'vco2_level', 'vco2_sub1_level', 'vco2_sub2_level'] },
+    { id: 'filter', name: 'Filter', description: '4-pole Moog ladder low-pass with its own attack/decay envelope', order: 3,
+      controls: ['cutoff', 'resonance', 'vcf_eg_amt', 'vcf_attack', 'vcf_decay'] },
+    { id: 'vca', name: 'VCA', description: 'Amplifier with its own attack/decay envelope', order: 4,
+      controls: ['vca_attack', 'vca_decay', 'volume'] },
+    { id: 'sequencers', name: 'Sequencers', description: 'Two 4-step sequencers, assignable to each VCO and its subs', order: 5,
+      controls: ['seq_oct', 'quantize', 'seq_oct_held', 'quantize_held', 'seq1_osc', 'seq1_sub1', 'seq1_sub2', 'seq2_osc', 'seq2_sub1', 'seq2_sub2', ...[1, 2].flatMap(s => [1, 2, 3, 4].map(i => `seq${s}_step${i}`))] },
+    { id: 'rhythm', name: 'Polyrhythm & transport', description: 'Four tempo dividers that step the sequencers', order: 6,
+      controls: ['tempo', 'rhythm_logic', ...[1, 2, 3, 4].flatMap(r => [`rhythm${r}`, `rhythm${r}_seq1`, `rhythm${r}_seq2`]), 'play', 'reset', 'next', 'trigger', 'eg_mode'] },
   ],
   controls,
   patchBay: {
     inputs: IN.map(p => ({ ...p, jackType: 'input' as const })),
     outputs: OUT.map(p => ({ ...p, jackType: 'output' as const })),
   },
-  presets,
+  presets: SUBHARMONICON_PRESETS,
 };

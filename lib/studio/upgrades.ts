@@ -191,6 +191,24 @@ const UPGRADES: Upgrade[] = [
     oldDefaults: { seq_pitch_mod: 0 },
     apply: v => v,
   },
+  {
+    // Subharmonicon rebuild to the Owner's Manual: VCF EG AMT spans ±8 octaves
+    // (was ±5), the EG decays start at 5 ms, and TEMPO's default moved from 240 to
+    // 480 BPM (the knob is now linear; stored BPM keep their meaning).
+    store: 10,
+    project: 7,
+    device: 'subharmonicon',
+    oldDefaults: { tempo: 240 },
+    apply: v => {
+      const o: Values = { ...v };
+      if (typeof o.vcf_eg_amt === 'number') o.vcf_eg_amt = o.vcf_eg_amt * 0.625;
+      for (const k of ['vcf_decay', 'vca_decay']) {
+        const x = o[k];
+        if (typeof x === 'number' && x < 5) o[k] = 5;
+      }
+      return o;
+    },
+  },
 ];
 
 /** Lessons replaced by a rebuild: completing the old one counts for its successor */
@@ -226,6 +244,20 @@ const LESSON_RENAMES: { store: number; map: Record<string, string> }[] = [
       'm32-external-clock': 'mother32-st1-studio-clock',
     },
   },
+  {
+    store: 10,
+    map: {
+      'subh-what-is-a-subharmonic': 'subharmonicon-f1-undertones',
+      'subh-waveforms-pwm': 'subharmonicon-f2-waves-mixer',
+      'subh-filter-envelopes': 'subharmonicon-f4-envelopes',
+      'subh-sequencers-assign': 'subharmonicon-f5-sequencer',
+      'subh-polyrhythm-3-4': 'subharmonicon-f6-rhythm',
+      'subh-rhythm-logic': 'subharmonicon-sq1-or-xor',
+      'subh-subharmonic-chords': 'subharmonicon-sd2-just-chords',
+      'subh-just-vs-equal': 'subharmonicon-et4-just-vs-equal',
+      'subh-clock-patching': 'subharmonicon-st1-studio-clock',
+    },
+  },
 ];
 
 /** Carry lesson completions over to the lessons that replaced them */
@@ -237,8 +269,8 @@ export function upgradeCompletedLessons(done: string[], from: number): string[] 
   return [...out];
 }
 
-export const STORE_VERSION = 9;
-export const PROJECT_VERSION = 6;
+export const STORE_VERSION = 10;
+export const PROJECT_VERSION = 7;
 
 /**
  * Upgrade the control values of every instance saved before version `from`
