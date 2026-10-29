@@ -207,7 +207,12 @@ For the best excitation, give your module an `audition()` that plays what a user
 ## Limits
 
 - **Realtime capture.** It takes about 7.5 s per preset. On a loaded machine the audio clock can fall behind; the capture stays continuous, and a note warns when the audio ran below 0.9x realtime.
-- **Randomness.** Presets with randomness (S&H, drift, random start phases, noise) vary by a few tenths of an LU between runs.
+- **Repeatability.** Two independent full runs of the same build agreed as follows:
+  - integrated loudness: within 0.04 LU for the median preset, 0.5 LU at the 90th percentile and 2.0 LU at worst (an Analog Four pattern);
+  - true peak: within 0.2 dB for the median preset, 1.1 dB at the 90th percentile and 2.0 dB at worst;
+  - device medians: within 0.25 LU.
+
+  Randomness causes this: drift, random start phases, S&H, noise and free-running LFOs. A preset whose true peak is within about 1 dB of the ceiling can flip between runs.
 - **Short captures.** The integrated loudness of a 4 s excitation includes the partly filled blocks at its edges. They are the same for every preset, so comparisons hold, but the number reads a little lower than it would over a long performance.
 - **Instrument output only.** The flags judge the instrument output. The master columns include the master limiter, and its Chrome make-up gain reads about +2 dB.
 - **Hybrids.** Hybrid instruments (keyboard plus sequencer) are measured one way per run: see Excitation.
@@ -215,4 +220,16 @@ For the best excitation, give your module an `audition()` that plays what a user
 
 ## Baseline
 
-`docs/audio-qa-baseline/` holds the reports of every current device at commit `ec79288`. See its `SUMMARY.md`.
+`docs/audio-qa-baseline/` holds the reports of every current device at app commit `ec79288`: 86 presets on 7 instruments, headless Chromium 141 at 44.1 kHz. The meter calibration passed: the BS.1770 reference read -20.00 dBFS and -23.00 LUFS. See its `SUMMARY.md`.
+
+| Device | Presets | Excitation | Median LUFS | Spread LU | Flagged |
+|---|---|---|---|---|---|
+| DFAM | 38 | audition | -21.6 | 20.1 | 12: loudness 12 |
+| Mother-32 | 10 | keys | -19.1 | 20.6 | 6: loudness 5, dc 1 |
+| Subharmonicon | 9 | keys | -26.9 | 3.6 | 2: loudness 1, dc 1 |
+| Sub 37 | 11 | keys | -17.4 | 20.5 | 6: loudness 6, true-peak 1 |
+| Analog Four MKII | 7 | transport | -31.5 | 12.0 | 5: loudness 4, stuck-tail 1, long-tail 1 |
+| Analog Rytm MKII | 6 | transport | -13.6 | 14.3 | 4: true-peak 3, loudness 3, long-tail 1 |
+| Xone:96 | 5 | transport | -21.7 | 10.9 | 2: loudness 1, long-tail 1 |
+
+The instrument medians span 18 LU, from the Analog Four (-31.5) to the Rytm (-13.6). Line them up with `--target` once the master-bus rework sets the studio level.

@@ -119,18 +119,19 @@ function computeFlags(p, th) {
 }
 
 /** Notes that do not gate: context for reviewers */
-function computeNotes(p) {
+function computeNotes(p, th) {
   const n = [...(p.runNotes || [])];
   const i = p.inst;
   const m = p.master;
   if (i && fin(i.idlePeakDb) && i.idlePeakDb > -60) n.push(`already sounding before the excitation (idle peak ${fx(i.idlePeakDb)} dBFS)`);
-  if (i && p.rule && p.rule.sustain && i.tail && fin(i.tail.peakDb) && i.tail.peakDb > -60) n.push(`keeps sounding after stop (${fx(i.tail.peakDb)} dBFS ${i.tail.afterSec} s later), allowed for the ${p.rule.name} category`);
+  if (i && p.rule && p.rule.sustain && i.tail && fin(i.tail.peakDb) && i.tail.peakDb > th.tailDbfs) n.push(`keeps sounding after stop (${fx(i.tail.peakDb)} dBFS ${i.tail.afterSec} s later), allowed for the ${p.rule.name} category`);
   if (i && m && fin(i.lufs) && fin(m.lufs) && fin(i.truePeakDb) && fin(m.truePeakDb)) {
     const gain = m.lufs - i.lufs;
     const peakGain = m.truePeakDb - i.truePeakDb;
     if (peakGain < gain - 1) n.push(`master limiter reduced peaks by ${(gain - peakGain).toFixed(1)} dB`);
   }
   if (m && m.clip && m.clip.samples) n.push(`${m.clip.samples} samples at or above 0 dBFS at the master output`);
+  else if (m && fin(m.truePeakDb) && m.truePeakDb > 0) n.push(`master true peak ${signed(m.truePeakDb)} dBTP: inter-sample overs reach the output after the limiter`);
   if (i && fin(i.correlation) && i.correlation < -0.2) n.push(`L/R correlation ${i.correlation.toFixed(2)}: partly out of phase, collapses in mono`);
   return n;
 }
@@ -159,7 +160,7 @@ function evaluateDevice(rep, cfg, opts = {}) {
     p.target = fin(reference) ? round(reference + offset, 2) : null;
     p.tolerance = p.rule && p.rule.tolerance != null ? p.rule.tolerance : th.loudnessLu;
     p.flags = computeFlags(p, th);
-    p.notes = computeNotes(p);
+    p.notes = computeNotes(p, th);
     const loud = p.flags.find(f => f.id === 'loudness');
     p.suggestion = loud ? suggestion(p, th) : null;
   });
