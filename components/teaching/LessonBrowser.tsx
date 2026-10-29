@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { Lesson } from '@/types';
-import { conceptLabel } from './Instructions';
+import { conceptLabel } from './concepts';
 
 const PATHS: { id: NonNullable<Lesson['path']> | 'other'; title: string; blurb: string }[] = [
   { id: 'foundations', title: 'Foundations', blurb: 'What every control does, one idea at a time.' },

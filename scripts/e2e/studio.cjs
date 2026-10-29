@@ -30,7 +30,9 @@ const fs = require('fs');
     await p.getByRole('button', { name: /tap for sound/i }).click().catch(() => p.mouse.click(4, 4));
     await p.waitForTimeout(600);
     await p.getByRole('button', { name: /Studio/ }).first().click();
-    await p.waitForTimeout(1200);
+    // The studio view loads on demand: wait until it is on screen
+    await p.getByText('Opening the studio…').waitFor({ state: 'detached', timeout: 15000 }).catch(() => undefined);
+    await p.waitForTimeout(800);
     await p.screenshot({ path: `${out}-studio.png`, fullPage: true });
     const tapJack = async (inst, jack) => {
       const el = p.locator(`[data-instance="${inst}"] [data-jack="${jack}"]`).first();
