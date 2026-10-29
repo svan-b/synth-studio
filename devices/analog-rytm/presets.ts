@@ -165,12 +165,12 @@ export const KIT_PRESETS: KitDef[] = [
       sd: { machine: 'SD HARD', tun: 3, dec: 34, swd: 30, nol: 80, nod: 46, amp_vol: 84 },
       rs: { machine: 'RS HARD', dec: 22, amp_del: 64, amp_pan: -18 },
       cp: { machine: 'CP CLASSIC', num: 4, rat: 81, cpd: 81, ton: 72, nod: 54, nol: 72, amp_rev: 46 },
-      lt: { tun: 20, dec: 46, swd: 54, amp_del: 30, amp_pan: 20 },
-      ch: { dec: 22, col: 10, amp_vol: 96 },
+      lt: { tun: 20, dec: 46, swd: 54, amp_del: 30, amp_pan: 20, amp_vol: 90 },
+      ch: { dec: 22, col: 10, amp_vol: 100 },
       oh: { dec: 58, col: 8, amp_vol: 92 },
       cy: { machine: 'CY RIDE', typ: 1, dec: 78, c1: 70, amp_vol: 74 },
     },
-    { del_tim: 24, del_fdb: 54, del_hpf: 30, del_lpf: 92, rev_dec: 72, dis_amt: 30, dis_del: 1, cmp_thr: 108, cmp_atk: 2, cmp_rel: 1, cmp_mup: 21, cmp_rat: 1, cmp_seq: 1, cmp_mix: 80, cmp_vol: 105 },
+    { del_tim: 24, del_fdb: 54, del_hpf: 30, del_lpf: 92, rev_dec: 72, dis_amt: 20, dis_del: 1, cmp_thr: 108, cmp_atk: 2, cmp_rel: 1, cmp_mup: 21, cmp_rat: 1, cmp_seq: 1, cmp_mix: 80, cmp_vol: 105 },
     {
       name: 'WAREHOUSE',
       rows: {
@@ -190,15 +190,15 @@ export const KIT_PRESETS: KitDef[] = [
     128,
     {
       bd: { machine: 'BD PLASTIC', tun: -2, dec: 52, typ: 1, mod: 70, swt: 30, swd: 92, tic: 80, amp_ovr: 80 },
-      sd: { machine: 'SD FM', tun: -4, dec: 30, fmt: 7, fmd: 40, fma: 90, nod: 60, nol: 100, amp_ovr: 40 },
+      sd: { machine: 'SD FM', tun: -4, dec: 30, fmt: 7, fmd: 40, fma: 90, nod: 60, nol: 100, amp_ovr: 40, amp_vol: 66 },
       rs: { machine: 'RS HARD', tun: -5, dec: 30, sym: 40, amp_del: 80 },
-      cp: { machine: 'CP CLASSIC', num: 5, rat: 92, cpd: 81, ton: 40, nod: 70, nol: 90, amp_ovr: 50, amp_rev: 30 },
+      cp: { machine: 'CP CLASSIC', num: 5, rat: 92, cpd: 81, ton: 40, nod: 70, nol: 90, amp_ovr: 50, amp_rev: 30, amp_vol: 74 },
       bt: { machine: 'UT NOISE', lpf: 70, hpf: 30, lpq: 90, dec: 40, nswd: 50, swt: 40, amp_del: 40 },
       ch: { machine: 'CH METALLIC', dec: 20, amp_vol: 100 },
       oh: { machine: 'OH METALLIC', dec: 52, amp_vol: 90 },
       cy: { machine: 'CY METALLIC', dec: 60, ton: 20 },
     },
-    { del_tim: 16, del_fdb: 62, del_hpf: 40, del_lpf: 80, rev_dec: 60, dis_amt: 18, dis_sym: 12, dis_dov: 70, dis_del: 1, cmp_thr: 106, cmp_atk: 1, cmp_rel: 6, cmp_mup: 21, cmp_rat: 0, cmp_seq: 3, cmp_mix: 100, cmp_vol: 94 },
+    { del_tim: 16, del_fdb: 62, del_hpf: 40, del_lpf: 80, rev_dec: 60, dis_amt: 18, dis_sym: 12, dis_dov: 70, dis_del: 1, cmp_thr: 106, cmp_atk: 1, cmp_rel: 6, cmp_mup: 19, cmp_rat: 0, cmp_seq: 3, cmp_mix: 100, cmp_vol: 100 },
     {
       name: 'GRIND',
       rows: {
@@ -225,7 +225,7 @@ export const KIT_PRESETS: KitDef[] = [
       oh: { machine: 'OH CLASSIC', dec: 50, col: -10, amp_vol: 74 },
       cy: { machine: 'CY CLASSIC', dec: 86, ton: -20, amp_vol: 60 },
     },
-    { del_tim: 24, del_x: 1, del_fdb: 60, del_hpf: 36, del_lpf: 76, del_rev: 60, rev_pre: 20, rev_dec: 72, rev_gai: 70, dis_amt: 18, dis_del: 1, cmp_thr: 112, cmp_atk: 3, cmp_rel: 6, cmp_mup: 21, cmp_rat: 2, cmp_seq: 1, cmp_mix: 64, cmp_vol: 120 },
+    { del_tim: 24, del_x: 1, del_fdb: 60, del_hpf: 36, del_lpf: 76, del_rev: 60, rev_pre: 20, rev_dec: 72, rev_gai: 70, dis_amt: 18, dis_del: 1, cmp_thr: 112, cmp_atk: 3, cmp_rel: 6, cmp_mup: 21, cmp_rat: 2, cmp_seq: 1, cmp_mix: 64, cmp_vol: 114 },
     {
       name: 'DUB CHORDS',
       rows: {
@@ -248,11 +248,11 @@ export const KIT_PRESETS: KitDef[] = [
       rs: { machine: 'RS CLASSIC', dec: 30, amp_del: 40, amp_pan: -24 },
       lt: { tun: 34, dec: 40, swd: 30, amp_pan: 30 },
       mt: { tun: 58, dec: 36, swd: 30, amp_pan: -30 },
-      ch: { dec: 28, col: -6, amp_vol: 92 },
+      ch: { dec: 28, col: -6, amp_vol: 78 },
       oh: { dec: 46, col: -4, amp_vol: 88 },
       cb: { machine: 'CB CLASSIC', cdet: 54, dec: 30, amp_vol: 70, amp_del: 50 },
     },
-    { del_tim: 24, del_fdb: 60, del_lpf: 90, rev_dec: 66, rev_gai: 84, dis_amt: 18, dis_del: 1, cmp_thr: 114, cmp_atk: 3, cmp_rel: 1, cmp_mup: 17, cmp_rat: 2, cmp_seq: 1, cmp_mix: 70, cmp_vol: 119 },
+    { del_tim: 24, del_fdb: 60, del_lpf: 90, rev_dec: 66, rev_gai: 84, dis_amt: 18, dis_del: 1, cmp_thr: 114, cmp_atk: 3, cmp_rel: 1, cmp_mup: 17, cmp_rat: 2, cmp_seq: 1, cmp_mix: 70, cmp_vol: 115 },
     {
       name: 'GARAGE',
       rows: {
@@ -305,14 +305,14 @@ export const KIT_PRESETS: KitDef[] = [
     118,
     {
       bd: { machine: 'BD CLASSIC', tun: -5, dec: 104, hld: 30, swt: 70, swd: 66, wav: 0, tra: 4 },
-      sd: { machine: 'SD CLASSIC', tun: 2, dec: 36, det: 58, snp: 70, nod: 40, nol: 70, bal: 10 },
-      cp: { machine: 'CP CLASSIC', num: 2, rat: 77, cpd: 81, ton: 64, nod: 40, nol: 60, amp_rev: 30 },
+      sd: { machine: 'SD CLASSIC', tun: 2, dec: 48, det: 58, snp: 70, nod: 60, nol: 90, bal: 10, trk_lev: 124 },
+      cp: { machine: 'CP CLASSIC', num: 2, rat: 77, cpd: 81, ton: 64, nod: 50, nol: 80, amp_rev: 30, trk_lev: 112 },
       rs: { machine: 'RS CLASSIC', dec: 24, amp_pan: -20 },
-      lt: { tun: 24, dec: 70, swd: 30, swt: 70 },
-      mt: { tun: 48, dec: 66, swd: 30, swt: 70 },
-      ch: { dec: 20, amp_vol: 90 },
+      lt: { tun: 24, dec: 70, swd: 30, swt: 70, amp_vol: 88 },
+      mt: { tun: 48, dec: 66, swd: 30, swt: 70, amp_vol: 88 },
+      ch: { dec: 20, amp_vol: 104 },
       oh: { dec: 50 },
-      cb: { machine: 'CB CLASSIC', cdet: 54, dec: 40, amp_vol: 74, amp_del: 40 },
+      cb: { machine: 'CB CLASSIC', cdet: 54, dec: 40, amp_vol: 104, amp_del: 40 },
     },
     { del_tim: 16, del_x: 1, del_fdb: 50, rev_dec: 50, dis_amt: 6, dis_del: 1, cmp_thr: 114, cmp_atk: 3, cmp_rel: 2, cmp_mup: 11, cmp_rat: 2, cmp_seq: 2, cmp_mix: 60, cmp_vol: 117 },
     {
@@ -336,11 +336,11 @@ export const KIT_PRESETS: KitDef[] = [
     {
       bd: { machine: 'BD FM', tun: -3, dec: 56, fma: 50, swt: 36, fms: 20, fmd: 30, fmt: 0 },
       sd: { machine: 'SD FM', tun: 2, dec: 34, fmt: 12, fmd: 30, fma: 70, nod: 40, nol: 64 },
-      rs: { machine: 'SY CHIP', tun: 10, dec: 40, of2: 7, of3: 12, of4: 3, cwav: 5, cspd: 13, amp_vol: 70, amp_del: 50 },
+      rs: { machine: 'SY CHIP', tun: 10, dec: 40, of2: 7, of3: 12, of4: 3, cwav: 5, cspd: 13, amp_vol: 90, amp_del: 50 },
       cp: { machine: 'CP CLASSIC', num: 2, rat: 73, cpd: 81, ton: 80, nod: 30, amp_rev: 20 },
       ch: { machine: 'CH METALLIC', dec: 14 },
-      oh: { machine: 'OH METALLIC', dec: 40 },
-      cb: { machine: 'CB METALLIC', dec: 30, cdet: 14, amp_vol: 70 },
+      oh: { machine: 'OH METALLIC', dec: 40, amp_vol: 68 },
+      cb: { machine: 'CB METALLIC', dec: 30, cdet: 14, amp_vol: 100 },
     },
     { del_tim: 12, del_x: 1, del_fdb: 80, rev_dec: 40, dis_amt: 24, dis_del: 1, cmp_thr: 112, cmp_atk: 2, cmp_rel: 1, cmp_mup: 16, cmp_rat: 2, cmp_seq: 3, cmp_mix: 70, cmp_vol: 122 },
     {
@@ -362,7 +362,7 @@ export const KIT_PRESETS: KitDef[] = [
     100,
     {
       bd: { machine: 'BD CLASSIC', tun: -2, dec: 92, hld: 20, swt: 64, swd: 54, tra: 2 },
-      sd: { machine: 'SD CLASSIC', tun: 0, dec: 32, det: 56, snp: 60, nod: 44, nol: 64 },
+      sd: { machine: 'SD CLASSIC', tun: 0, dec: 46, det: 56, snp: 60, nod: 60, nol: 80, trk_lev: 118 },
       rs: { machine: 'RS CLASSIC', dec: 26 },
       cp: { machine: 'CP CLASSIC', num: 3, rat: 73, cpd: 81, ton: 64, nod: 48, nol: 60 },
       bt: { tun: 25, dec: 64 },
@@ -399,11 +399,11 @@ export const KIT_PRESETS: KitDef[] = [
       bd: { machine: 'BD SILKY', tun: -3, dec: 70, hld: 16, swt: 46, swd: 50, dus: 40, clk: 36, smp_slot: 1, smp_lev: 70, smp_br: 30 },
       sd: { machine: 'SD NATURAL', tun: -2, bdy: 40, nbal: 70, dec: 50, lpf: 90, hpf: 40, nres: 20, smp_slot: 4, smp_lev: 90, smp_br: 40, amp_rev: 26 },
       rs: { machine: 'RS CLASSIC', dec: 20, smp_slot: 8, smp_lev: 60 },
-      ch: { dec: 24, col: -20, smp_slot: 9, smp_lev: 80, smp_br: 50, amp_vol: 84, flt_frq: 112 },
+      ch: { dec: 24, col: -20, smp_slot: 9, smp_lev: 80, smp_br: 50, amp_vol: 104, flt_frq: 112 },
       oh: { dec: 46, col: -20, amp_vol: 70, flt_frq: 110 },
       cy: { machine: 'UT NOISE', lpf: 90, hpf: 40, dec: 127, lev: 40, smp_slot: 22, smp_lop: 1, smp_lev: 70, amp_vol: 50, amp_dec: 50 },
     },
-    { rev_dec: 44, rev_gai: 60, dis_amt: 18, cmp_thr: 104, cmp_atk: 3, cmp_rel: 6, cmp_mup: 14, cmp_rat: 1, cmp_seq: 3, cmp_mix: 90, cmp_vol: 127 },
+    { rev_dec: 44, rev_gai: 60, dis_amt: 18, cmp_thr: 104, cmp_atk: 3, cmp_rel: 6, cmp_mup: 15, cmp_rat: 1, cmp_seq: 3, cmp_mix: 90, cmp_vol: 127 },
     {
       name: 'BOOM BAP',
       rows: {
@@ -424,10 +424,10 @@ export const KIT_PRESETS: KitDef[] = [
     140,
     {
       bd: { machine: 'BD CLASSIC', tun: -7, dec: 116, hld: 40, swt: 60, swd: 46, wav: 0, tra: 6, amp_ovr: 20 },
-      sd: { machine: 'SD CLASSIC', tun: 5, dec: 30, det: 50, snp: 80, nod: 46, nol: 90 },
-      cp: { machine: 'CP CLASSIC', num: 2, rat: 86, cpd: 81, ton: 70, nod: 40, nol: 70, amp_rev: 24 },
-      ch: { dec: 16, col: 20, amp_vol: 92 },
-      oh: { dec: 40, col: 20 },
+      sd: { machine: 'SD CLASSIC', tun: 5, dec: 40, det: 50, snp: 80, nod: 54, nol: 90, trk_lev: 124 },
+      cp: { machine: 'CP CLASSIC', num: 2, rat: 86, cpd: 81, ton: 70, nod: 40, nol: 82, amp_rev: 24, trk_lev: 114 },
+      ch: { dec: 16, col: 20, amp_vol: 112 },
+      oh: { dec: 40, col: 20, amp_vol: 104 },
       rs: { machine: 'RS HARD', dec: 20, amp_del: 40 },
     },
     { rev_dec: 50, dis_amt: 6, cmp_thr: 114, cmp_atk: 3, cmp_rel: 2, cmp_mup: 11, cmp_rat: 2, cmp_seq: 2, cmp_mix: 60, cmp_vol: 119 },
@@ -452,12 +452,12 @@ export const KIT_PRESETS: KitDef[] = [
     {
       bd: { machine: 'BD ACOUSTIC', tun: -1, dec: 50, hld: 10, swt: 50, swd: 40, wavx: 0, imp: 70 },
       sd: { machine: 'SD ACOUSTIC', tun: 4, bdy: 40, nod: 50, nol: 80, hld: 4, swd: 30, imp: 80 },
-      ch: { dec: 22, smp_slot: 9, smp_lev: 70 },
+      ch: { dec: 22, lev: 76, smp_slot: 9, smp_lev: 70 },
       oh: { dec: 44 },
       cy: { machine: 'CY RIDE', typ: 0, dec: 84, hit: 30, c1: 80, c2: 70, c3: 60, amp_vol: 76 },
-      mt: { tun: 60, dec: 50 },
+      mt: { tun: 60, dec: 50, amp_vol: 88 },
     },
-    { rev_dec: 40, dis_amt: 18, cmp_thr: 106, cmp_atk: 2, cmp_rel: 1, cmp_mup: 16, cmp_rat: 1, cmp_seq: 3, cmp_mix: 90, cmp_vol: 127 },
+    { rev_dec: 40, dis_amt: 18, cmp_thr: 106, cmp_atk: 2, cmp_rel: 1, cmp_mup: 17, cmp_rat: 1, cmp_seq: 3, cmp_mix: 90, cmp_vol: 119 },
     {
       name: 'ROLLER',
       rows: {
@@ -473,17 +473,17 @@ export const KIT_PRESETS: KitDef[] = [
     }, 52),
 
   K('bigbeat', 'Breaks / Big Beat',
-    'A saw-wave kick and a driven snare through heavy master distortion: big beat breaks.',
+    'A saw-wave kick, an overdriven snare and clap and a fully wet master compressor: big beat breaks.',
     128,
     {
       bd: { machine: 'BD SHARP', tun: -2, dec: 52, hld: 14, swt: 34, swd: 76, wavx: 8, tic: 60, amp_ovr: 60, flt_frq: 96, flt_res: 30 },
-      sd: { machine: 'SD HARD', tun: 0, dec: 38, swd: 50, swt: 30, tic: 60, nod: 56, nol: 110, amp_ovr: 70 },
+      sd: { machine: 'SD HARD', tun: 0, dec: 38, swd: 50, swt: 30, tic: 60, nod: 56, nol: 110, amp_ovr: 70, amp_vol: 96 },
       cp: { machine: 'CP CLASSIC', num: 4, rat: 82, cpd: 81, ton: 54, nod: 50, nol: 80, amp_ovr: 40 },
       ch: { machine: 'CH METALLIC', dec: 22 },
       oh: { machine: 'OH METALLIC', dec: 46 },
       cy: { machine: 'CY CLASSIC', dec: 96, smp_slot: 12, smp_lev: 80 },
     },
-    { rev_dec: 50, dis_amt: 30, dis_sym: -10, cmp_thr: 100, cmp_atk: 3, cmp_rel: 1, cmp_mup: 24, cmp_rat: 0, cmp_seq: 3, cmp_mix: 127, cmp_vol: 97 },
+    { rev_dec: 50, dis_amt: 12, dis_sym: -10, cmp_thr: 100, cmp_atk: 3, cmp_rel: 1, cmp_mup: 24, cmp_rat: 0, cmp_seq: 3, cmp_mix: 127, cmp_vol: 97 },
     {
       name: 'BIG BEAT',
       rows: {
@@ -503,10 +503,10 @@ export const KIT_PRESETS: KitDef[] = [
       bd: { machine: 'BD SILKY', tun: -2, dec: 40, hld: 4, swt: 30, swd: 50, clk: 50 },
       rs: { machine: 'RS HARD', tun: 8, dec: 14, amp_del: 76, amp_pan: 30 },
       cp: { machine: 'CP CLASSIC', num: 1, rat: 92, cpd: 81, ton: 90, nod: 20, nol: 40, amp_rev: 40 },
-      bt: { machine: 'UT IMPULSE', atk: 0, dec: 20, flt_typ: 2, flt_frq: 70, flt_res: 118, amp_del: 40 },
-      lt: { machine: 'UT IMPULSE', atk: 0, dec: 16, flt_typ: 2, flt_frq: 79, flt_res: 120, amp_pan: -30, amp_del: 30 },
-      ch: { dec: 12, col: 30, amp_vol: 86 },
-      oh: { dec: 36, col: 30, amp_vol: 74 },
+      bt: { machine: 'UT IMPULSE', lev: 104, atk: 0, dec: 20, flt_typ: 2, flt_frq: 70, flt_res: 118, amp_del: 40 },
+      lt: { machine: 'UT IMPULSE', lev: 104, atk: 0, dec: 16, flt_typ: 2, flt_frq: 79, flt_res: 120, amp_pan: -30, amp_del: 30 },
+      ch: { dec: 12, col: 22, amp_vol: 78 },
+      oh: { dec: 36, col: 22, amp_vol: 68 },
     },
     { del_tim: 24, del_x: 1, del_fdb: 60, del_hpf: 50, del_lpf: 84, rev_dec: 60, dis_amt: 36, dis_del: 1, cmp_thr: 116, cmp_atk: 1, cmp_rel: 1, cmp_mup: 17, cmp_rat: 3, cmp_seq: 1, cmp_mix: 50, cmp_vol: 112 },
     {
@@ -528,14 +528,14 @@ export const KIT_PRESETS: KitDef[] = [
     150,
     {
       bd: { machine: 'BD PLASTIC', tun: -1, dec: 40, typ: 0, mod: 50, swt: 24, swd: 80, tic: 70 },
-      sd: { machine: 'UT NOISE', lpf: 96, hpf: 50, lpq: 70, dec: 30, atk: 0, swt: 30, nswd: -40 },
-      rs: { machine: 'SY CHIP', tun: 12, dec: 30, of2: 12, of3: 19, of4: 24, cwav: 13, cspd: 10, amp_del: 60, amp_vol: 64 },
-      cp: { machine: 'CP CLASSIC', num: 6, rat: 105, cpd: 81, ton: 100, rnd: 90, nod: 30, nol: 60 },
-      ch: { machine: 'HH LAB', osc1: 70, osc2: 77, osc3: 90, osc4: 96, osc5: 104, osc6: 118, dec: 14 },
-      oh: { machine: 'HH LAB', osc1: 60, osc2: 66, osc3: 81, osc4: 95, osc5: 99, osc6: 110, dec: 40 },
+      sd: { machine: 'UT NOISE', lpf: 96, hpf: 50, lpq: 70, dec: 30, atk: 0, swt: 30, nswd: -40, trk_lev: 120 },
+      rs: { machine: 'SY CHIP', tun: 12, dec: 30, of2: 12, of3: 19, of4: 24, cwav: 13, cspd: 10, amp_del: 60, amp_vol: 112 },
+      cp: { machine: 'CP CLASSIC', num: 6, rat: 105, cpd: 81, ton: 100, rnd: 90, nod: 30, nol: 60, amp_vol: 72 },
+      ch: { machine: 'HH LAB', osc1: 70, osc2: 77, osc3: 90, osc4: 96, osc5: 104, osc6: 118, dec: 14, amp_vol: 80 },
+      oh: { machine: 'HH LAB', osc1: 60, osc2: 66, osc3: 81, osc4: 95, osc5: 99, osc6: 110, dec: 40, amp_vol: 92 },
       cy: { machine: 'CY METALLIC', dec: 50, trd: 10, ton: 40 },
     },
-    { del_tim: 6, del_x: 1, del_fdb: 108, del_lpf: 100, rev_dec: 64, dis_amt: 36, dis_dov: 40, dis_del: 1, cmp_thr: 108, cmp_atk: 1, cmp_rel: 0, cmp_mup: 17, cmp_rat: 1, cmp_seq: 3, cmp_mix: 80, cmp_vol: 99 },
+    { del_tim: 6, del_x: 1, del_fdb: 108, del_lpf: 100, rev_dec: 64, dis_amt: 36, dis_dov: 40, dis_del: 1, cmp_thr: 108, cmp_atk: 1, cmp_rel: 0, cmp_mup: 17, cmp_rat: 1, cmp_seq: 3, cmp_mix: 80, cmp_vol: 110 },
     {
       name: 'GLITCH',
       rows: {
@@ -558,11 +558,11 @@ export const KIT_PRESETS: KitDef[] = [
       bd: { machine: 'BD CLASSIC', tun: -4, dec: 100, hld: 20, swt: 60, swd: 50, tra: 2 },
       sd: { machine: 'SD CLASSIC', tun: -3, dec: 40, det: 60, snp: 40, nod: 54, nol: 60, amp_del: 70, amp_rev: 80 },
       rs: { machine: 'RS CLASSIC', dec: 28, amp_del: 100, amp_rev: 50, amp_pan: -30 },
-      ch: { dec: 22, col: -16, amp_vol: 80, amp_del: 30 },
+      ch: { dec: 22, col: -16, amp_vol: 80, amp_del: 22 },
       oh: { dec: 50, col: -16, amp_vol: 70 },
       cb: { machine: 'CB CLASSIC', cdet: 54, dec: 34, amp_del: 90, amp_vol: 60 },
     },
-    { del_tim: 24, del_x: 1, del_fdb: 66, del_hpf: 40, del_lpf: 70, del_rev: 50, rev_pre: 30, rev_dec: 74, rev_gai: 60, dis_amt: 30, dis_dov: 50, dis_del: 1, cmp_thr: 114, cmp_atk: 3, cmp_rel: 6, cmp_mup: 23, cmp_rat: 3, cmp_seq: 1, cmp_mix: 60, cmp_vol: 112 },
+    { del_tim: 24, del_x: 1, del_fdb: 66, del_hpf: 40, del_lpf: 70, del_rev: 50, rev_pre: 30, rev_dec: 74, rev_gai: 60, dis_amt: 30, dis_dov: 50, dis_del: 1, cmp_thr: 114, cmp_atk: 3, cmp_rel: 6, cmp_mup: 23, cmp_rat: 3, cmp_seq: 1, cmp_mix: 60, cmp_vol: 110 },
     {
       name: 'ECHO',
       rows: {
@@ -614,7 +614,7 @@ export const KIT_PRESETS: KitDef[] = [
     {
       bd: { machine: 'BD SILKY', tun: -1, dec: 46, hld: 6, swt: 40, swd: 30, lev: 70 },
       sd: { machine: 'SD NATURAL', tun: 0, bdy: 20, nbal: 104, dec: 70, lpf: 80, hpf: 50, nres: 10, amp_atk: 20 },
-      ch: { dec: 18, col: -30, amp_vol: 70 },
+      ch: { dec: 18, col: -30, amp_vol: 54 },
       cy: { machine: 'CY RIDE', typ: 0, dec: 96, hit: 40, c1: 80, c2: 60, c3: 50, amp_vol: 74 },
     },
     { rev_dec: 58, rev_gai: 80, dis_amt: 30, cmp_thr: 120, cmp_atk: 4, cmp_rel: 3, cmp_mup: 12, cmp_rat: 3, cmp_seq: 0, cmp_mix: 30, cmp_vol: 127 },
@@ -637,11 +637,11 @@ export const KIT_PRESETS: KitDef[] = [
     {
       bd: { machine: 'BD SILKY', tun: -3, dec: 60, dus: 50, smp_slot: 2, smp_lev: 70, smp_br: 70, lfo_dst: 2, lfo_dep: 12, lfo_spd: 4, lfo_mul: 3 },
       sd: { machine: 'SD NATURAL', tun: -3, bdy: 30, nbal: 80, smp_slot: 5, smp_lev: 90, smp_br: 80, flt_frq: 100 },
-      ch: { dec: 20, smp_slot: 13, smp_lev: 80, smp_br: 60, flt_frq: 104, amp_vol: 80 },
+      ch: { dec: 20, smp_slot: 13, smp_lev: 80, smp_br: 60, flt_frq: 112, amp_vol: 110 },
       cy: { machine: 'UT NOISE', dec: 127, lev: 30, lpf: 80, smp_slot: 22, smp_lop: 1, smp_lev: 90, amp_vol: 60, amp_dec: 50 },
       rs: { machine: 'RS CLASSIC', dec: 24, smp_slot: 18, smp_lev: 70, smp_br: 40 },
     },
-    { rev_dec: 48, rev_gai: 50, dis_amt: 44, dis_sym: 8, cmp_thr: 114, cmp_atk: 4, cmp_rel: 6, cmp_mup: 15, cmp_rat: 1, cmp_seq: 1, cmp_mix: 90, cmp_vol: 117 },
+    { rev_dec: 48, rev_gai: 50, dis_amt: 20, dis_sym: 8, cmp_thr: 114, cmp_atk: 4, cmp_rel: 6, cmp_mup: 15, cmp_rat: 1, cmp_seq: 1, cmp_mix: 90, cmp_vol: 119 },
     {
       name: 'TAPE',
       rows: {
@@ -668,7 +668,7 @@ export const KIT_PRESETS: KitDef[] = [
       mt: { tun: 44, dec: 34, swd: 20, smp_slot: 15, smp_lev: 80, smp_tun: -12 },
       ht: { tun: 56, dec: 30, swd: 20, smp_slot: 17, smp_lev: 70, smp_tun: -12 },
       ch: { machine: 'UT NOISE', lpf: 110, hpf: 90, dec: 20, atk: 10, smp_slot: 13, smp_lev: 80, amp_vol: 80 },
-      cb: { machine: 'CB CLASSIC', cdet: 54, dec: 36, amp_vol: 80 },
+      cb: { machine: 'CB CLASSIC', cdet: 54, dec: 36, amp_vol: 110, trk_lev: 112 },
     },
     { rev_dec: 50, dis_amt: 6, cmp_thr: 116, cmp_atk: 3, cmp_rel: 2, cmp_mup: 14, cmp_rat: 3, cmp_seq: 3, cmp_mix: 50, cmp_vol: 117 },
     {
@@ -693,13 +693,13 @@ export const KIT_PRESETS: KitDef[] = [
     120,
     {
       bd: { machine: 'SY DUAL VCO', tun: -12, vdet: 12, dec: 56, dec2: 40, bal: -30, bnd: 8, cfg: 24, flt_typ: 0, flt_frq: 66, flt_res: 64, flt_env: 30, flt_dec: 46 },
-      sd: { machine: 'SY RAW', tun: 0, rdet: 7, dec: 40, wav1: 5, wav2: 1, bal: 0, flt_frq: 90, flt_res: 30, amp_del: 50, amp_vol: 80 },
-      rs: { machine: 'SY CHIP', tun: 24, dec: 50, of2: 4, of3: 7, of4: 12, cwav: 16, cspd: 10, amp_del: 60, amp_vol: 60 },
+      sd: { machine: 'SY RAW', tun: 0, rdet: 7, dec: 40, wav1: 5, wav2: 1, bal: 0, flt_frq: 90, flt_res: 30, amp_del: 32, amp_vol: 110, trk_lev: 116 },
+      rs: { machine: 'SY CHIP', tun: 24, dec: 50, of2: 4, of3: 7, of4: 12, cwav: 16, cspd: 10, amp_del: 34, amp_vol: 100, trk_lev: 116 },
       cp: { machine: 'CP CLASSIC', num: 2, rat: 73, cpd: 81, nod: 50, amp_rev: 50 },
       ch: { dec: 18 },
       oh: { dec: 46 },
     },
-    { del_tim: 24, del_x: 1, del_fdb: 80, rev_dec: 64, dis_amt: 24, dis_del: 1, cmp_thr: 112, cmp_atk: 2, cmp_rel: 1, cmp_mup: 16, cmp_rat: 2, cmp_seq: 0, cmp_mix: 60, cmp_vol: 118 },
+    { del_tim: 24, del_x: 1, del_fdb: 80, rev_dec: 64, dis_amt: 24, dis_del: 1, cmp_thr: 112, cmp_atk: 2, cmp_rel: 1, cmp_mup: 16, cmp_rat: 2, cmp_seq: 0, cmp_mix: 60, cmp_vol: 108 },
     {
       name: 'TOYS',
       rows: {
