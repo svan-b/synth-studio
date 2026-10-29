@@ -17,10 +17,12 @@ export default function MidiButton() {
 
   const ready = snap.status === 'ready';
   const color = !snap.support.supported ? '#4b5563' : ready ? '#22c55e' : snap.status === 'denied' || snap.status === 'error' ? '#ef4444' : '#6b7280';
-  const ports = snap.inputs.length + snap.outputs.length;
+  // Hardware ports only: the built-in Practice synth is always there
+  const realOut = snap.outputs.filter(o => !o.virtual).length;
+  const ports = snap.inputs.length + realOut;
   const title = !snap.support.supported
-    ? 'MIDI is not available in this browser'
-    : ready ? `MIDI on · ${snap.inputs.length} in, ${snap.outputs.length} out` : 'MIDI keyboards, controllers and clock';
+    ? 'No Web MIDI in this browser - press for what works here'
+    : ready ? `MIDI on · ${snap.inputs.length} in, ${realOut} out` : 'MIDI keyboards, controllers and clock';
 
   return (
     <>
