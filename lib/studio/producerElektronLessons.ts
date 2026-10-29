@@ -940,11 +940,16 @@ function loopRoles(s: S): Set<string> {
   if (anyPattern(s, A4, p => trigs(s, A4, T2, p).length > 0 || trigs(s, A4, T3, p).length > 0)) out.add('chords');
   if (anyPattern(s, A4, p => trigs(s, A4, T4, p).length >= 3)) out.add('hook');
   if (val(s, SUB, 'arp_on') === true) out.add('lead');
+  // any other instrument in the mix (a DFAM, a Mother-32, your own synth...) is a part of its own
   for (const [id, x] of Object.entries(s.instances)) {
-    if (![RYTM, A4, SUB, XONE, 'studio-clock', 'audio-in'].includes(x.device) && s.routes[id]) out.add(id);
+    if (![RYTM, A4, SUB, XONE, 'studio-clock'].includes(x.device) && s.routes[id]) out.add(id);
   }
   return out;
 }
+
+/** Melodic parts of the loop: the A4's bass, chords and hook, a Sub 37 line, and any other pitched instrument in the mix */
+const MELODIC_DEVICES = ['mother32', 'subharmonicon', 'midi-synth', 'wam-plugin', 'audio-in'];
+const melodicParts = (s: S) => [...loopRoles(s)].filter(r => ['bass', 'chords', 'hook', 'lead'].includes(r) || MELODIC_DEVICES.includes(s.instances[r]?.device ?? '')).length;
 
 /** Every note the melodic parts play (A4 tracks 1-4, every pattern the song uses) */
 function melodicNotes(s: S): number[] {
@@ -1014,7 +1019,7 @@ const capstone: Lesson = {
         { text: 'Tempo between 100 and 140 BPM', check: s => between(s.transport.bpm, 100, 140) },
         { text: 'A beat with a kick (the Rytm\'s BD, or a DFAM in the mix)', check: s => anyPattern(s, RYTM, p => trigs(s, RYTM, BD, p).length >= 2) || (has(s, 'dfam') && !!s.routes[inst(s, 'dfam')!]) },
         { text: 'Four or more parts: drums, bass, chords, a hook, or other instruments in the mix', check: s => loopRoles(s).size >= 4 },
-        { text: 'A bass, and chords or a hook over it', check: s => loopRoles(s).has('bass') && (loopRoles(s).has('chords') || loopRoles(s).has('hook') || loopRoles(s).has('lead')) },
+        { text: 'Two or more melodic parts: a bass, chords, a hook or a lead', check: s => melodicParts(s) >= 2 },
         { text: 'Every melodic part in one key', check: s => melodicNotes(s).length === 0 || oneKey(melodicNotes(s)) },
         { text: 'A guest: the Sub 37 arpeggiates (ARP ON), or another instrument joins the mix', check: s => loopRoles(s).has('lead') || [...loopRoles(s)].some(r => !CORE_ROLES.includes(r)) },
         { text: 'Every sequencer in time: synced to the studio or clocked by cable', check: allInTime },
@@ -1107,7 +1112,7 @@ const capstone: Lesson = {
         { text: 'Bounced from bar 1 to the end of the song', check: s => !!s.bounce?.last?.complete },
         { text: 'Stems bounced with it', check: s => (s.bounce?.last?.stems ?? 0) >= 2 },
       ],
-      hints: ['Raise the master fader (DRIVE) a dB at a time, and play the loudest section.', 'If the limiter works too hard, switch on GLUE: 2:1, a slow attack, and it holds the mix together before the limiter.', 'Bounce (top bar) from bar 1 with stems on, then read its loudness in the readout.'],
+      hints: ['Raise the master fader (DRIVE) a dB at a time, and play the loudest section.', 'If the limiter works too hard, switch on GLUE: 2:1 with a fast attack takes the edge off the kick\'s peaks before the limiter.', 'Bounce (top bar) from bar 1 with stems on, then read its loudness in the readout.'],
       solution: { master: { gain: CAPSTONE_DRIVE, glue: CAPSTONE_GLUE }, bounce: { stems: true } },
     },
     {

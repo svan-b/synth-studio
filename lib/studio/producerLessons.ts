@@ -1126,15 +1126,15 @@ const mixdown: Lesson = {
       solution: { parts: { [XONE]: { ch1_gain: 0 } }, play: { seconds: 3 } },
       hints: ['PK is the LED beside GAIN: it lights when the signal after GAIN is too hot.', 'Watch the channel meter while you turn: the loudest LEDs should reach +3 or +6, never +10.', 'About 0 dB on GAIN.'],
       principle: 'A channel peaking near +6 has room above it and stays clear of the noise below.',
-      explanation: 'The channel meter reads after GAIN and EQ, before the fader, from −20 to +10. PK lights when the signal after GAIN is hot enough to distort the channel. Someone had GAIN at +9 dB.',
+      explanation: 'The channel meter reads after GAIN and EQ, before the fader, from −20 to +10. Like the hardware\'s LED ladder it is quasi-peak: the sharpest hits read a few dB under their true peak. PK takes the true peaks: it lights when the signal after GAIN is hot enough to distort the channel. Someone had GAIN at +9 dB.',
       manualReference: 'Xone:96 User Guide p.9, p.11 – channel meters and PK!',
     },
     {
       kind: 'do', concept: 'gain-staging', instance: XONE, focus: ['ch2_gain', 'ch3_gain', 'ch4_gain'], readout: ['channels'],
-      instruction: 'Set channels 2, 3 and 4 GAIN the same way: peaks between +3 and +6, PK dark.',
+      instruction: 'Set channels 2, 3 and 4 GAIN the same way: peaks between +1 and +6, PK dark. Short perc hits read lower than the decks.',
       check: s => ['2', '3', '4'].every(c => healthy(s, c)),
       solution: { parts: { [XONE]: { ch2_gain: MIX_LEVELS.ch2_gain, ch3_gain: MIX_LEVELS.ch3_gain, ch4_gain: MIX_LEVELS.ch4_gain } }, play: { seconds: 3 } },
-      hints: ['One channel at a time: watch only its meter.', 'The stabs (3) are too hot; the perc (4) is too quiet.', 'Bass about −1 dB, stabs about −2 dB, perc about +5 dB.'],
+      hints: ['One channel at a time: watch only its meter.', 'The stabs (3) are too hot; the perc (4) is too quiet.', 'Bass about −1 dB, stabs about +2 dB, perc fully up (+10 dB).'],
       principle: 'Matched input levels make the faders do the balancing, not rescue it.',
     },
     {
@@ -1161,8 +1161,8 @@ const mixdown: Lesson = {
       instruction: 'Bring channel 3 (stabs) and channel 4 (perc) back in, under the drums and the bass.',
       check: s => between(xv(s, '3', 'FADER'), 7, 9.8) && between(xv(s, '4', 'FADER'), 6.5, 9.8) &&
         xv(s, '3', 'FADER') < xv(s, '1', 'FADER') && xv(s, '4', 'FADER') < xv(s, '1', 'FADER'),
-      solution: { parts: { [XONE]: { ch3_fader: 9, ch4_fader: 8.5 } } },
-      hints: ['Push each one up until you can hear it clearly, then back off a touch.', 'Stabs about 9, perc about 8.5.'],
+      solution: { parts: { [XONE]: { ch3_fader: MIX_LEVELS.ch3_fader, ch4_fader: MIX_LEVELS.ch4_fader } } },
+      hints: ['Push each one up until you can hear it clearly, then back off a touch.', 'Stabs about 8.5, perc about 7.5.'],
       principle: 'Supporting parts sit just under the leaders: heard clearly, never competing.',
     },
     {
