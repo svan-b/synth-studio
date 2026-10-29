@@ -87,6 +87,7 @@ export class SubharmoniconEngine extends BaseEngine {
     Object.entries(OUTPUTS).forEach(([jack, ch]) => { this.outputs[jack] = { node: this.taps[ch] }; });
 
     this.onDispose(() => {
+      if (this.blinkTimer) { clearInterval(this.blinkTimer); this.blinkTimer = null; }
       this.unsubTransport.forEach(u => u());
       this.unsubTransport = [];
       this.node.port.onmessage = null;
@@ -227,7 +228,28 @@ export class SubharmoniconEngine extends BaseEngine {
     // While following a running studio transport, PLAY mirrors it: the transport's
     // start / stop events run the sequencers, not the button (no double start)
     if (id === 'play' && value && this.transport?.playing) return;
+    if (id === 'seq_oct_held' || id === 'quantize_held') this.setHeld(id, !!value);
     const msg = knobMessage(id, value);
     if (msg) this.post({ t: 'k', i: msg[0], v: msg[1] });
+  }
+
+  // --------------------------------------------------------------------------
+  // SEQ OCT / QUANTIZE held: their lit LED flashes (2 Hz) while the mode is on
+  // --------------------------------------------------------------------------
+
+  private held = new Set<string>();
+  private blinkTimer: ReturnType<typeof setInterval> | null = null;
+
+  private setHeld(id: string, on: boolean) {
+    if (on) this.held.add(id); else this.held.delete(id);
+    if (this.held.size && !this.blinkTimer) {
+      let phase = false;
+      this.blinkTimer = setInterval(() => { phase = !phase; this.emit({ blink: phase }); }, 250);
+    } else if (!this.held.size) this.stopBlink();
+  }
+
+  private stopBlink() {
+    if (this.blinkTimer) { clearInterval(this.blinkTimer); this.blinkTimer = null; }
+    this.emit({ blink: false });
   }
 }
