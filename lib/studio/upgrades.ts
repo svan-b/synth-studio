@@ -6,6 +6,11 @@
 // Each upgrade runs once: on the browser's saved studio when the store version
 // moves past it, and on project files written before it. To add one, append an
 // entry and bump both versions below.
+//
+// Saves only keep the controls someone touched; the rest follow the spec's
+// default. So when a rebuild also changes defaults, an entry lists the old ones
+// (`oldDefaults`) and they are filled in first: the conversion then sees the
+// patch the user actually heard.
 // ============================================================================
 
 import type { ControlValue } from '@/types';
@@ -19,6 +24,8 @@ interface Upgrade {
   /** First project-file version with the new meaning */
   project: number;
   device: string;
+  /** Defaults of the version being replaced, for controls whose default changed or that were removed */
+  oldDefaults?: Values;
   apply: (values: Values) => Values;
 }
 
@@ -30,6 +37,7 @@ const UPGRADES: Upgrade[] = [
     store: 5,
     project: 2,
     device: 'dfam',
+    oldDefaults: { vco_decay: 300, vco2_level: 50, vcf_cutoff: 1000, vcf_decay: 400, vca_decay: 500, tempo: 120 },
     apply: v => (typeof v.tempo === 'number' ? { ...v, tempo: Math.min(10500, Math.max(10.5, v.tempo / 4)) } : v),
   },
   {
@@ -39,6 +47,11 @@ const UPGRADES: Upgrade[] = [
     store: 6,
     project: 3,
     device: 'xone96',
+    oldDefaults: {
+      master: 7.5, booth: 6, send1_pre: 0,
+      cha_fader: 7, chb_fader: 7, cha_midf: 700, chb_midf: 700,
+      ch2_src: 1, ch3_src: 4, ch4_src: 5, ch2_fader: 0, ch3_fader: 0, ch4_fader: 0,
+    },
     apply: v => {
       const out: Values = { ...v };
       const law = (x: ControlValue) =>
@@ -81,7 +94,9 @@ export function upgradeDevices<S extends { controlValues?: Values }>(
   Object.entries(devices).forEach(([instance, state]) => {
     const device = rack.find(r => r.id === instance)?.device ?? instance.split('#')[0];
     let values = state.controlValues;
-    pending.forEach(u => { if (values && u.device === device) values = u.apply(values); });
+    pending.forEach(u => {
+      if (values && u.device === device) values = u.apply(u.oldDefaults ? { ...u.oldDefaults, ...values } : values);
+    });
     out[instance] = values === state.controlValues ? state : { ...state, controlValues: values };
   });
   return out;
