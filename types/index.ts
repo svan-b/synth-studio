@@ -279,7 +279,46 @@ export interface LessonStep {
   /** Hint ladder - revealed one at a time on request (guidance that fades) */
   hints?: string[];
   /** One way to satisfy an open challenge - used by "show me" and the automated lesson runner */
-  solution?: { values?: Record<string, ControlValue>; patches?: PatchConnection[]; data?: unknown };
+  solution?: LessonSolution;
+
+  // ---- v3: performance actions, scope (see docs/PEDAGOGY.md) ----------------
+  /**
+   * Presses needed to finish the step (default 1). A `do` step whose `control` is a
+   * momentary button (TRIGGER, ADVANCE, TAP...) completes once the learner has pressed
+   * it this many times during the step - no `targetValue` needed. Also works on toggle
+   * buttons ("press RUN / STOP twice") and together with `event`.
+   */
+  presses?: number;
+  /**
+   * A `do` step about a button that has no control of its own - pads, trig keys,
+   * transport keys. Name the button's `event` from the layout; the step completes after
+   * `presses` presses. The button is highlighted like a control target.
+   */
+  event?: string;
+  /**
+   * A `do` step about playing the keys (on-screen keys, computer keyboard or MIDI):
+   * `count` notes of any pitch, or exactly `notes` (MIDI numbers, in this order).
+   */
+  play?: { count?: number; notes?: number[]; anyOctave?: boolean };
+  /** Scope view for this step - 'spectrum' for EQ and filter work. The coach switches to it; the learner can still change it. */
+  scope?: 'wave' | 'spectrum' | 'both';
+}
+
+/** One way to complete a step - "show me" and the automated lesson runner use it */
+export interface LessonSolution {
+  values?: Record<string, ControlValue>;
+  patches?: PatchConnection[];
+  data?: unknown;
+  /** Instance the values, patches and presses apply to (default: the step's instance) */
+  instance?: string;
+  /** Buttons to press, in order: control ids or event names */
+  presses?: string[];
+  /** Notes to play, in order (MIDI numbers) */
+  notes?: number[];
+  /** Cables between instruments; name each end by `instance` or by `device` (its first instance in the rack) */
+  studioCables?: { from: { instance?: string; device?: string; jack: string }; to: { instance?: string; device?: string; jack: string } }[];
+  /** Start or stop the studio transport */
+  transport?: 'play' | 'stop';
 }
 
 export interface MultipleChoice {
@@ -305,6 +344,17 @@ export interface LessonCheckState {
   sync: Record<string, boolean>;
   transport: { playing: boolean; bpm: number };
   arrangement: { enabled: boolean; loop: boolean; sections: { name: string; bars: number; parts: Record<string, { pattern?: string; snapshot?: unknown; muted?: boolean }> }[] };
+  /**
+   * Presses the learner made during this step on the step's instrument, keyed by control
+   * id and by event name: momentary buttons, pads, trig keys, transport keys
+   * (`s.events?.trigger >= 3`). Always present while a lesson runs; optional in the type so
+   * test harnesses that build a state by hand still compile.
+   */
+  events?: Record<string, number>;
+  /** Notes the learner played during this step on the step's instrument, oldest first (on-screen keys, computer keyboard, MIDI) */
+  notesPlayed?: number[];
+  /** Presses during this step on every instrument: instance -> id -> count (studio lessons) */
+  eventsByInstance?: Record<string, Record<string, number>>;
 }
 
 export interface Lesson {

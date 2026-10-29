@@ -48,8 +48,21 @@ export class Transport {
   private _swing = 0; // 0..0.75 - delays every second 16th
   private _playing = false;
   private startTime = 0;
-  readonly lookahead = 0.1;
+  private startTick = 0;
+  /** Recently scheduled ticks (time, tick), for "where are we now" displays */
+  private recentTime = new Float64Array(128);
+  private recentTick = new Float64Array(128);
+  private recentN = 0;
+  /** How far ahead ticks are scheduled, seconds. Raised while the page is hidden (setLookahead). */
+  lookahead = 0.1;
   readonly interval = 0.02;
+  /** Normal look-ahead while the page is visible */
+  static readonly LOOKAHEAD = 0.1;
+  /**
+   * Look-ahead while the page is hidden. WebKit (iPad) aligns hidden pages' timers to
+   * one second even while audio plays, so 100 ms of look-ahead would run dry.
+   */
+  static readonly HIDDEN_LOOKAHEAD = 1.8;
 
   attach(ctx: BaseAudioContext) {
     this.ctx = ctx;
@@ -60,13 +73,36 @@ export class Transport {
   get swing() { return this._swing; }
   /** Audio time playback (tick 0) started */
   get startedAt() { return this.startTime; }
+  /** Tick playback started from (0, or a song position) */
+  get startedAtTick() { return this.startTick; }
   get position() { return this.tickCount; }
+
+  /**
+   * The tick sounding at audio time `time` (the latest scheduled tick at or before it),
+   * or null before the first tick (stopped, or still counting in). Displays pass
+   * ctx.currentTime (+ output latency for what you hear).
+   */
+  tickAt(time: number): number | null {
+    if (!this._playing || time < this.startTime) return null;
+    const n = Math.min(this.recentN, 128);
+    for (let k = 1; k <= n; k++) {
+      const i = (this.recentN - k) & 127;
+      if (this.recentTime[i] <= time) return this.recentTick[i];
+    }
+    return null;
+  }
 
   setBpm(bpm: number) {
     const b = Math.max(20, Math.min(300, bpm));
     if (b === this._bpm) return;
     this._bpm = b;
     this.eventListeners.forEach(l => l({ type: 'tempo', bpm: b }));
+  }
+
+  /** Change the scheduling look-ahead (seconds); takes effect on the next pump */
+  setLookahead(seconds: number) {
+    this.lookahead = Math.max(0.05, Math.min(3, seconds));
+    if (this._playing) this.pump();
   }
 
   /** Swing amount 0..0.75: fraction of a 16th that off-beat 16ths are delayed by */
@@ -86,17 +122,23 @@ export class Transport {
     this.tickCount = fromTick;
     this.nextTickTime = t;
     this.startTime = t;
+    this.startTick = fromTick;
+    this.recentN = 0;
     this.eventListeners.forEach(l => l({ type: 'start', time: t }));
     this.timer = setInterval(() => this.pump(), this.interval * 1000);
     this.pump();
   }
 
-  stop() {
+  /**
+   * Stop scheduling now. `atTime` (audio time, optional) is when the music stops: notes
+   * already scheduled before it still play (a song's end on its last bar line).
+   */
+  stop(atTime?: number) {
     if (!this._playing || !this.ctx) return;
     this._playing = false;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
-    const t = this.ctx.currentTime;
+    const t = Math.max(this.ctx.currentTime, atTime ?? 0);
     this.eventListeners.forEach(l => l({ type: 'stop', time: t }));
   }
 
@@ -146,7 +188,16 @@ export class Transport {
         bar: Math.floor(tick / (PPQN * 4)),
         sixteenth: Math.floor(tick / (PPQN / 4)),
       };
-      this.tickListeners.forEach(l => l(ev));
+      const r = this.recentN & 127;
+      this.recentTime[r] = ev.time;
+      this.recentTick[r] = tick;
+      this.recentN++;
+      // A listener may stop the transport (the song's end): nobody else gets that tick
+      for (const l of this.tickListeners) {
+        l(ev);
+        if (!this._playing) break;
+      }
+      if (!this._playing) return;
       this.tickCount++;
       this.nextTickTime += dur;
     }
