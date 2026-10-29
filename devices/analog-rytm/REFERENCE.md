@@ -198,7 +198,7 @@ section is the FX defaults (`KIT01_MASTER` in `model.ts`).
   at AMT 0. It holds the peaks. Dub Chords, Deep Garage and Jungle Roller keep
   their drive at 18: there, bright hats ride on a big kick, and deeper clipping
   notches them on the kick's flattened crest, which crackles. For the same
-  reason Warehouse (20), Big Beat (12) and Lo-Fi (26) were turned down once the
+  reason Warehouse (20), Big Beat (12) and Lo-Fi (20) were turned down once the
   closed hats got louder: dense downbeats drove them three to four times past
   the knee, where the output flattens into a plateau right after a fast rise.
   The audio-QA click detector flagged that now and then; it sounds like crunch,
@@ -206,8 +206,12 @@ section is the FX defaults (`KIT01_MASTER` in `model.ts`).
 - **COMP** keeps each kit's character (threshold, attack, release, ratio, SEQ).
   MIX is parallel compression, with MUP matched to the wet path's fixed loss
   plus the average gain reduction.
-- **VOL** puts the kit at the target, with the worst true peak of four takes at
-  or under -1.7 dBTP.
+- **VOL** puts the kit at the target where its crest factor allows, with the
+  worst true peak of 12 random states (offline, at the studio's 120 BPM) at or
+  under -1.5 dBTP. Kits with parallel compression and delays returned POST have
+  the most crest; Warehouse, Industrial Grind, Deep Garage, Dub Chords, Jungle
+  Roller, Big Beat, Micro Clicks, Glitch Lab and Lo-Fi sit about 2-3 LU under
+  the target.
 - Echo kits return the delay **POST** (DIST page DEL), so the drive doesn't
   lift their tails. Their feedback and reverb decay are set so the tails fall
   below -60 dBFS within 2 s of stop.
@@ -224,30 +228,32 @@ its master section is calibrated instead.
 
 ### Measured loudness (audio QA, `--target -18`)
 
-Two runs at 44.1 kHz on the instrument output: `audition` plays each kit's demo pattern through the module's own audition, and `transport` plays it from the studio transport (`--excite analog-rytm=transport`). Neither run has a click, DC or tail flag. Audition: median -18.1 LUFS, spread 3.1 LU, worst true peak -1.6 dBTP, 0 of 20 flagged. Transport: median -18.4 LUFS, spread 3.0 LU, worst true peak -1.3 dBTP, 0 of 20 flagged.
+Two runs at 44.1 kHz on the instrument output: `audition` plays each kit's demo pattern through the module's own audition, and `transport` plays it from the studio transport (`--excite analog-rytm=transport`). Both play the kits synced to the studio's 120 BPM. Neither run has a click, DC or tail flag. Audition: median -18.9 LUFS, spread 3.1 LU, worst true peak -1.7 dBTP, 0 of 20 flagged. Transport: median -19.0 LUFS, spread 3.4 LU, worst true peak -1.7 dBTP, 0 of 20 flagged.
+
+The true peaks were also checked offline over 12 random states per kit (the browser starts each kit from whatever state the kits before it left: hat oscillator phases, noise, the sample buffers), because single takes vary by up to 1.5 dB. Every kit's worst case is at or under -1.5 dBTP there. Bright hats raise the risk: around 9-12 kHz a true peak can sit 2.4-3.6 dB above the samples at 44.1 kHz.
 
 | Kit | Audition LUFS | Audition dBTP | Transport LUFS | Transport dBTP |
 |---|---:|---:|---:|---:|
-| Techno / Warehouse | -19.1 | -1.9 | -19.3 | -1.8 |
-| Techno / Industrial Grind | -18.1 | -4.2 | -18.3 | -3.9 |
-| Techno / Dub Chords | -19.6 | -1.7 | -19.7 | -1.3 |
-| House / Deep Garage | -20.2 | -1.8 | -20.4 | -1.4 |
-| House / Nine-O-Nine Box | -17.8 | -2.3 | -18.7 | -2.3 |
-| Electro / Miami Bass | -18.0 | -4.4 | -18.2 | -4.2 |
-| Electro / Robot Funk | -18.0 | -3.0 | -18.3 | -2.7 |
-| Drum Machine / Straight Boom | -18.1 | -3.1 | -18.4 | -2.8 |
-| Hip-Hop / Dusty Boom Bap | -17.7 | -2.3 | -18.3 | -2.3 |
-| Hip-Hop / Trap Sub | -18.1 | -4.2 | -18.2 | -3.7 |
-| Breaks / Jungle Roller | -19.8 | -2.5 | -19.9 | -2.3 |
-| Breaks / Big Beat | -18.4 | -2.2 | -18.4 | -2.9 |
-| Minimal / Micro Clicks | -20.8 | -2.4 | -21.2 | -2.4 |
-| IDM / Glitch Lab | -19.3 | -2.3 | -19.1 | -2.4 |
-| Dub / Echo Chamber | -18.0 | -1.6 | -18.3 | -1.6 |
-| Acoustic / Studio Kit | -18.2 | -3.8 | -18.2 | -4.1 |
-| Acoustic / Brush Jazz | -18.1 | -2.5 | -18.3 | -3.1 |
-| Lo-Fi / Bitcrushed Tape | -17.9 | -2.1 | -18.3 | -2.1 |
-| Percussion / Afro-Latin | -18.3 | -4.2 | -18.4 | -4.3 |
-| Synth / Analog Toys | -18.3 | -2.5 | -18.5 | -3.1 |
+| Techno / Warehouse | -20.3 | -1.7 | -20.4 | -1.7 |
+| Techno / Industrial Grind | -20.9 | -3.5 | -21.0 | -4.3 |
+| Techno / Dub Chords | -20.2 | -2.1 | -20.4 | -1.7 |
+| House / Deep Garage | -20.5 | -2.3 | -20.6 | -1.7 |
+| House / Nine-O-Nine Box | -18.8 | -2.5 | -18.8 | -2.4 |
+| Electro / Miami Bass | -17.9 | -3.3 | -18.1 | -4.0 |
+| Electro / Robot Funk | -18.3 | -2.6 | -18.5 | -2.8 |
+| Drum Machine / Straight Boom | -17.7 | -1.9 | -17.9 | -1.9 |
+| Hip-Hop / Dusty Boom Bap | -18.5 | -2.0 | -18.7 | -1.9 |
+| Hip-Hop / Trap Sub | -17.8 | -3.1 | -18.0 | -3.8 |
+| Breaks / Jungle Roller | -20.7 | -3.8 | -21.3 | -2.4 |
+| Breaks / Big Beat | -20.2 | -2.0 | -20.1 | -2.2 |
+| Minimal / Micro Clicks | -20.5 | -2.2 | -20.7 | -2.0 |
+| IDM / Glitch Lab | -20.0 | -2.5 | -20.0 | -2.9 |
+| Dub / Echo Chamber | -18.2 | -1.9 | -18.5 | -2.0 |
+| Acoustic / Studio Kit | -18.3 | -3.8 | -18.3 | -3.7 |
+| Acoustic / Brush Jazz | -18.0 | -3.0 | -18.3 | -2.8 |
+| Lo-Fi / Bitcrushed Tape | -19.8 | -1.9 | -20.1 | -1.9 |
+| Percussion / Afro-Latin | -18.1 | -4.1 | -18.5 | -3.8 |
+| Synth / Analog Toys | -19.0 | -3.9 | -19.1 | -2.8 |
 
 ## Model choices (not in the manual)
 

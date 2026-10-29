@@ -18,14 +18,14 @@ performance and kits, and which simplifications matter for making full tracks.
 | # | Severity | Finding | Evidence / source | Change |
 |---|---|---|---|---|
 | 1 | High | **Closed hats were nearly inaudible.** CH CLASSIC, HH BASIC and CH METALLIC sat 10-17 LU under every other voice at their init values, and in 17 of the 20 kits the closed hat played 20-27 LU under the mix (kit 01 in the demo song: -18.5 / -21.3 LU). Kits that layered a sample on the hat (909, Jungle, Studio) were the only ones near a normal -14 LU | momentary loudness of each machine's init hit: CH CLASSIC -41.8 LUFS, HH BASIC -41.1, CH METALLIC -37.8, against -24 to -30 for the kicks, snares, toms and cymbals and -31.5 for OH CLASSIC on the same voice; per-track loudness of every demo pattern | Output trim per hat machine in the worklet: CH CLASSIC and HH BASIC +7 dB, CH METALLIC +5 dB, HH LAB's extra +4 dB removed (it was 11 dB above the other hats). Every hat machine's init hit is now -32.8 to -35.2 LUFS, open hats -27.8 / -31.5 |
-| 2 | High | **Kits were unbalanced as genre starting points.** Miami Bass and Trap Sub had weak backbeats (SD -12.5 / -10.8 LU, CP -10.7 / -9.3), with Miami's toms louder than its snare; Straight Boom's 808 snare sat under its cowbell and open hat; Industrial Grind's distorted kick was at -10 LU under the SD FM (-1.3); Robot Funk's open hat -4.8 LU; Glitch Lab's clap roll louder than the whole mix (+0.7); Micro Clicks' impulse percussion -21 / -23 LU; Analog Toys' lead and chip parts -14 / -19 LU; the cowbells of Miami Bass and Afro-Latin -18 / -16.5 LU; Lo-Fi's hat low-passed at 5.6 kHz to -24.9 LU | offline per-track loudness of every demo pattern, LU against the dry mix (table below) | Kit values in `presets.ts`: SD CLASSIC longer (DEC, NOD) and louder (NOL, TRACK LEVEL) in the three 808-style kits, louder claps, kick up and snare down in Industrial Grind, toms and open hats trimmed where they outshouted the beat, impulse LEV up, synth parts up, cowbells up, Lo-Fi's hat opened to FRQ 112. Master sections re-checked (finding 7) |
+| 2 | High | **Kits were unbalanced as genre starting points.** Miami Bass and Trap Sub had weak backbeats (SD -12.5 / -10.8 LU, CP -10.7 / -9.3), with Miami's toms louder than its snare; Straight Boom's 808 snare sat under its cowbell and open hat; Industrial Grind's distorted kick was at -10 LU under the SD FM (-1.3); Robot Funk's open hat -4.8 LU; Glitch Lab's clap roll louder than the whole mix (+0.7); Micro Clicks' impulse percussion -21 / -23 LU; Analog Toys' lead and chip parts -14 / -19 LU; the cowbells of Miami Bass and Afro-Latin -18 / -16.5 LU; Lo-Fi's hat low-passed at 5.6 kHz to -24.9 LU | offline per-track loudness of every demo pattern, LU against the dry mix (table below) | Kit values in `presets.ts`: SD CLASSIC longer (DEC, NOD) and louder (NOL, TRACK LEVEL) in the three 808-style kits, louder claps, Industrial Grind's snare and clap down so its kick sits level with them, toms and open hats trimmed where they outshouted the beat, impulse LEV up, synth parts up, cowbells up, Lo-Fi's hat opened to FRQ 112. Master sections re-checked (finding 7) |
 | 3 | High | **Retriggering a ringing voice clicked.** A trig on a sounding voice (a roll, a fill on a tom still ringing, CH taking the voice from OH) dipped by about 40-45 % of the ringing level on the second sample | harness, BD, LT and MT retriggered 30-60 ms into a hit: MT 0.2019, 0.2019, **0.1114**, 0.1605...; BD 0.0507, 0.0507, **0.0275**, 0.0409. Cause: the new sound's fade-in started the filter input at zero, so the input stepped from the old level to ~0 and the open filter's 2-3 sample response (with overshoot) got past the output-side declick, whose offset is taken on the first sample | The filter input now carries on from the old sound's last value over the same 1.3 ms raised cosine. After: MT 0.2019, 0.2019, 0.2027, 0.2047; the step measure at the retrigger fell to the sound's own onset level (MT 0.505 to 0.050 of peak, LT 0.273 to 0.043, BD 0.104 to 0.031) |
-| 3b | High | **One-shot samples stopped dead.** Most of the 32 synthesized one-shots end while still ringing, and playback stopped at the last sample; an END set inside a sample stopped it mid-wave the same way. In the factory kits that is a click after every Lo-Fi kick (KICK 909 ends at -20 dB re its peak), when the Studio Kit's and Big Beat's crash runs out, on the Afro-Latin congas, the 909 kit's open hat and others | end level re peak: KICK 909 -20 dB, SUB DROP -24, KICK SUB -24.6, ZAP -25.8, CONGA LO -28.5, KICK ACOU -30, COWBELL -31, TRIANGLE -31.3, CRASH -35.6; the QA detector's dead-stop test found 19 of 64 plays (each one-shot at END 120 and END 60). The final audition QA run flagged the Studio Kit once | Without a loop, the last 3 ms before the end point fade out (raised cosine): 0 of 64. Loops are unchanged |
+| 3b | High | **One-shot samples stopped dead.** Most of the 32 synthesized one-shots end while still ringing, and playback stopped at the last sample; an END set inside a sample stopped it mid-wave the same way. In the factory kits that is a click after every Lo-Fi kick (KICK 909 ends at -20 dB re its peak), when the Studio Kit's and Big Beat's crash runs out, on the Afro-Latin congas, the 909 kit's open hat and others | end level re peak: KICK 909 -20 dB, SUB DROP -24, KICK SUB -24.6, ZAP -25.8, CONGA LO -28.5, KICK ACOU -30, COWBELL -31, TRIANGLE -31.3, CRASH -35.6; the QA detector's dead-stop test found 19 of 64 plays (each one-shot at END 120 and END 60). One audition QA run flagged the Studio Kit as its crash ran out | Without a loop, the last 3 ms before the end point fade out (raised cosine): 0 of 64. Loops are unchanged |
 | 4 | Medium | **No output headroom.** With every level, the overdrive, accent, the compressor makeup (up to +40 dB, a measured hardware curve) and the delay feedback at maximum, the instrument output reached +31.3 dBFS. The hardware's main outputs top out at +15 dBu | manual p.76; harness stress render | An order-12 soft saturation at full scale before the AC coupling (unchanged below -6 dBFS, -0.16 dB at -1 dBFS; the calibrated kits lose at most 0.1 dB on their highest peaks). Everything-up now peaks at +1.3 dBFS (the AC coupling after the clip), output DC 2.7e-5 (was 4.6e-3) |
 | 5 | Medium | **Lesson s3's comparisons were inaudible.** The A/B "full range vs high-passed" closed hat used HP2 at FRQ 70 (785 Hz), and the ear challenge asked for an open hat's high-pass FRQ at 40 vs 90 (139 Hz vs 2.5 kHz). The hat circuit already removes everything below ~4 kHz, so neither changes the sound | harness: CH open vs HP2@70 both -30.7 LUFS, centroid 7135 vs 7172 Hz; OH HP2@90 vs @40: 0.6 LU and 100 Hz apart. PEDAGOGY: "Match targets must be clearly distinguishable by ear" | The high-pass step uses FRQ 104 (5.6 kHz: -4.2 LU, centroid +475 Hz) with an explanation of why a hat's high-pass only bites in the kilohertz; the ear challenge matches DEC and COL (both taught in the lesson): DEC 30 / COL +30 against DEC 90 / COL -30 rings 5x longer with its centroid 4.7 kHz lower. Lesson id unchanged |
 | 6 | Medium | **Key legends below the legibility floor on iPad.** The FUNC sub-legends (Save Project, Kit, Sound, Track, Pattern, Song, Setup, Tap Tempo, Save Kit, Metronome, Save, Reload...) and the trig-key numbers rendered at 7.3 px at 1180 x 820; the MIDI rear legends at 5.6-5.9 px | Playwright text probe, effective size after the 91 % fit | Sub-legends 8 px to 10 px (9.1 px on iPad), MIDI rear legends on two lines so the fit keeps them at the floor. Screenshots checked: no overlaps |
-| 7 | Medium | **High master drive vs dense downbeats.** In Warehouse (DIST AMT 30), Big Beat (30) and Lo-Fi (44), dense hits drove the order-12 master clipper three to four times past its knee, where the output flattens into a plateau right after a fast rise. The QA click detector flagged that intermittently once the hats got louder (Big Beat in 2 of 4 audition runs, Lo-Fi in 1 of 2 transport runs). Big Beat also reached -0.88 dBTP in offline takes (the browser takes were lucky at -1.5 to -2.1) | offline sweeps with the QA detector, 16-24 start offsets at 120 BPM; sample dumps show the plateau at the clipper ceiling times the compressor gain. A softer order-6 knee did not help, so it is the depth of the drive, not the knee shape | DIST AMT 20 (Warehouse), 12 (Big Beat, snare VOL 96), 26 (Lo-Fi, VOL 122). Each is clean over 24 offsets; worst true peaks -1.70, -1.71 and about -1.7 dBTP. Cost: 1-2 LU of loudness on those three (still inside the QA window) |
-| 8 | Medium | True-peak headroom after the rebalance: Jungle Roller reached -0.6 dBTP in a transport QA run and Deep Garage -1.0 in an audition run (the ceiling is -1) | both QA excitations play the kits at the studio's 120 BPM, where Jungle's parallel compressor recovers more between hits than at 170; Deep Garage's louder 16th hats meet the clap's reverb return (POST) | Jungle: makeup 17 (16 originally), hat LEV 88, mid tom VOL 88, worst true peak -1.77 dBTP over 4 offsets offline. Deep Garage: hat VOL 84, master VOL 115 |
+| 7 | Medium | **High master drive vs dense downbeats.** In Warehouse (DIST AMT 30), Big Beat (30), Lo-Fi (44) and Industrial Grind (a first rebalance that raised its overdriven kick into DIST 18), dense hits drove the order-12 master clipper three to four times past its knee, where the output flattens into a plateau right after a fast rise. The QA click detector flagged that intermittently once the hats and the rebalanced parts got louder (Big Beat in 2 of 4 audition runs, Lo-Fi in 2 transport runs, Industrial once). Big Beat also reached -0.88 dBTP in offline takes (the browser takes were lucky at -1.5 to -2.1) | offline sweeps with the QA detector, 16-24 start offsets and random states at 120 BPM; sample dumps show the plateau at the clipper ceiling times the compressor gain. A softer order-6 knee did not help, so it is the depth of the drive, not the knee shape | DIST AMT 20 (Warehouse), 12 (Big Beat, snare VOL 96), 20 (Lo-Fi); Industrial keeps its kick at the original level and gets its balance from a lower snare and clap (VOL 66 / 74, makeup 19, master VOL 100). Cost: 1-2 LU of loudness on the first three (still inside the QA window) |
+| 8 | Medium | **True-peak headroom after the rebalance.** Single QA runs reached -0.6 (Jungle Roller), -0.8 (Analog Toys), -0.9 (Micro Clicks) and -1.0 dBTP (Deep Garage, Dub Chords); the ceiling is -1. Two causes: both QA excitations play the kits at the studio's 120 BPM, where parallel compressors recover between hits and let the next transient through at up to +4 dB; and the louder hats sit around 9-12 kHz, where at 44.1 kHz a true peak can be 2.4-3.6 dB above the samples (Micro Clicks' worst take: sample peak -3.2 dBFS, true peak -0.49 dBTP) | a harness sweep over 12 random states (the browser starts each kit from whatever state the previous kits left: hat phases, noise, sample buffers) reproduced the browser's spread; mute tests found the driver in each kit | Analog Toys VOL 108, Dub Chords 114, Echo Chamber 110 (hat delay send 22), Jungle Roller 119 (makeup 17, hat LEV 76, mid tom 88), Lo-Fi 119, Micro Clicks hats darker and lower (COL 22, VOL 78 / 68), Warehouse hat VOL 100, Deep Garage hat VOL 78 and master 115 |
 | 9 | Low | Analog Toys' delay tail reached -60 dBFS 2 s after stop once its lead and chip parts were raised (QA long-tail flag) | QA audition run after the rebalance | their delay sends scaled back by the same factor (DEL 50 to 32, 60 to 34): tail -70 dBFS |
 
 ### Checked and left as they are
@@ -50,18 +50,19 @@ Closed hats and the elements that changed; "before" is the merged build, "after"
 | Kit | Before | After |
 |---|---|---|
 | Kit 01 (demo song A02 / A03) | CH -18.5 / -21.3 | CH -11.8 / -14.3 |
-| Techno / Warehouse | CH -23.5, LT -6.1 | CH -14.1, LT -9.5 |
-| Techno / Industrial Grind | BD -9.9, SD -1.3, CH -22.5 | BD -3.0, SD -5.3, CH -16.8 |
-| House / Deep Garage | CH -17.3 | CH -10.6 |
+| Techno / Warehouse | CH -23.5, LT -6.1 | CH -15.7, LT -9.5 |
+| Techno / Industrial Grind | BD -9.9, SD -1.3, CP -2.9, CH -22.5 | BD -4.7, SD -4.9, CP -4.6, CH -12.2 |
+| House / Deep Garage | CH -17.3 | CH -13.3 |
 | Electro / Miami Bass | SD -12.1, CP -10.3, LT -4.0, MT -3.2, CB -18.1, CH -24.0 | SD -6.2, CP -7.1, LT -8.5, MT -7.6, CB -12.7, CH -15.1 |
 | Electro / Robot Funk | OH -4.7, CB -19.2, RS -14.7 | OH -12.8, CB -12.7, RS -10.0 |
 | Drum Machine / Straight Boom | SD -8.1, CH -17.1 | SD -3.0, CH -10.5 |
 | Hip-Hop / Dusty Boom Bap | CH -23.7 | CH -15.2 |
 | Hip-Hop / Trap Sub | SD -10.8, CP -9.2, CH -24.4 | SD -6.5, CP -6.5, CH -14.4 |
-| Breaks / Jungle Roller | MT -2.0 | MT -7.1 |
-| Minimal / Micro Clicks | BT -20.7, LT -22.6, CH -20.3 | BT -12.6, LT -14.5, CH -13.6 |
+| Breaks / Jungle Roller | MT -2.0, CH -13.8 | MT -5.5, CH -11.9 |
+| Breaks / Big Beat | CH -20.0 | CH -13.9 |
+| Minimal / Micro Clicks | BT -20.7, LT -22.6, CH -20.3 | BT -12.5, LT -14.5, CH -14.2 |
 | IDM / Glitch Lab | CP -0.8, RS -25.2, CH -3.6 | CP -3.7, RS -11.0, CH -8.8 |
-| Lo-Fi / Bitcrushed Tape | CH -26.8 | CH -14.4 |
+| Lo-Fi / Bitcrushed Tape | CH -26.8 | CH -14.9 |
 | Percussion / Afro-Latin | CB -16.5 | CB -9.4 |
 | Synth / Analog Toys | SD (lead) -13.9, RS (chip) -19.1 | SD -6.5, RS -8.3 |
 
@@ -120,7 +121,22 @@ Closed hats and the elements that changed; "before" is the merged build, "after"
 
 ## Audio QA
 
-QA_TABLE
+`node scripts/audio-qa.cjs http://localhost:3146 analog-rytm --target -18 --suggest`, and the same
+with `--excite analog-rytm=transport`, 44.1 kHz:
+
+| Run | Median | Spread | Worst true peak | Flagged |
+|---|---|---|---|---|
+| Before (merged build), audition | -18.2 LUFS | 3.1 LU | -1.6 dBTP | 0 of 20 |
+| Before (merged build), transport | -18.4 LUFS | 3.2 LU | -1.3 dBTP | 0 of 20 |
+| After (this branch), audition | -18.9 LUFS | 3.1 LU | -1.7 dBTP | 0 of 20 |
+| After (this branch), transport | -19.0 LUFS | 3.4 LU | -1.7 dBTP | 0 of 20 |
+
+The median is 0.6-0.7 LU lower: several kits gave level back for true-peak margin (finding 8), measured
+over 12 random states rather than single takes. Every kit is inside the window (-21.3 to -17.7 LUFS).
+The merged build's clean runs were partly luck: the same randomised sweep finds 5 marginal detector
+events in 168 renders of its seven densest kits (Warehouse, Deep Garage, Big Beat with ratio 3.9, Lo-Fi
+twice); this branch finds 2 in the same set (Warehouse and Jungle Roller, ratios 2.5-2.6, against the
+detector's 2.5 threshold), and every kit's worst true peak over 12 random states is at or under -1.5 dBTP.
 
 ## Upgrade notes
 
@@ -141,13 +157,16 @@ QA_TABLE
   A hardware unit (or recordings of init sounds) would settle them. Examples worth checking first:
   the BD base pitch at TUN 0 (55 Hz here), SD CLASSIC's NOD and DEC ranges (the 808-style kits now set
   longer values), the tom strike's brightness.
-- **The QA click detector on dense or very smooth material.** After the changes above an offline sweep
-  of all 20 kits at 120 BPM (16 start offsets each, 320 renders, the QA tool's own detector) found one
-  event: Dub Chords, a -34 dBFS kink (ratio 4) where the chord retriggers onto its own delay echo. It is
-  in the merged build too (identical with the original worklet), comes from the compressor model's
-  block-wise gain target (recomputed every 7 samples and smoothed by two one-poles), and is not audible
-  on a near-sine chord. So any single QA run has a small chance of flagging it. Removing it would mean
-  computing the compressor's gain every sample (the calibrated model's block structure).
+- **The QA click detector on dense or very smooth material.** Like DFAM finding 24, some kits can trip
+  the detector now and then without an audible click. Offline, with the QA tool's own detector at 120 BPM:
+  - Dense, driven downbeats (a fast rise into the clipper's plateau): 2 events in 168 randomised renders
+    of the seven densest kits (Warehouse and Jungle Roller, ratios 2.5-2.6); the merged build had 5 in
+    the same set.
+  - Dub Chords: a -34 dBFS kink (ratio 4) where the chord retriggers onto its own delay echo, 1 of 320
+    renders. It is identical with the original worklet: the compressor model computes its gain target
+    every 7 samples and smooths it with two one-poles, which leaves a slope change on a near-sine chord.
+    Removing it would mean computing the gain every sample, changing the calibrated model's structure.
+  So a single QA run has a small chance (a few percent) of one flag; both final runs were clean.
 - **One manual lesson step.** t2's arranger challenge has no `solution`: `LessonSolution` cannot set
   arranger sections (a framework change).
 - **SY DUAL VCO units** (manual p.103) and **BD HARD's two-sample TIC** (firmware notes), above.

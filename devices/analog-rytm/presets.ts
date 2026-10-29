@@ -166,7 +166,7 @@ export const KIT_PRESETS: KitDef[] = [
       rs: { machine: 'RS HARD', dec: 22, amp_del: 64, amp_pan: -18 },
       cp: { machine: 'CP CLASSIC', num: 4, rat: 81, cpd: 81, ton: 72, nod: 54, nol: 72, amp_rev: 46 },
       lt: { tun: 20, dec: 46, swd: 54, amp_del: 30, amp_pan: 20, amp_vol: 90 },
-      ch: { dec: 22, col: 10, amp_vol: 110 },
+      ch: { dec: 22, col: 10, amp_vol: 100 },
       oh: { dec: 58, col: 8, amp_vol: 92 },
       cy: { machine: 'CY RIDE', typ: 1, dec: 78, c1: 70, amp_vol: 74 },
     },
@@ -189,16 +189,16 @@ export const KIT_PRESETS: KitDef[] = [
     'Distorted plastic kick, FM snare noise, metallic hats and an overdriven delay: industrial techno.',
     128,
     {
-      bd: { machine: 'BD PLASTIC', tun: -2, dec: 52, typ: 1, mod: 70, swt: 30, swd: 92, tic: 80, amp_ovr: 80, amp_vol: 124, trk_lev: 127 },
-      sd: { machine: 'SD FM', tun: -4, dec: 30, fmt: 7, fmd: 40, fma: 90, nod: 60, nol: 100, amp_ovr: 40, amp_vol: 84 },
+      bd: { machine: 'BD PLASTIC', tun: -2, dec: 52, typ: 1, mod: 70, swt: 30, swd: 92, tic: 80, amp_ovr: 80 },
+      sd: { machine: 'SD FM', tun: -4, dec: 30, fmt: 7, fmd: 40, fma: 90, nod: 60, nol: 100, amp_ovr: 40, amp_vol: 66 },
       rs: { machine: 'RS HARD', tun: -5, dec: 30, sym: 40, amp_del: 80 },
-      cp: { machine: 'CP CLASSIC', num: 5, rat: 92, cpd: 81, ton: 40, nod: 70, nol: 90, amp_ovr: 50, amp_rev: 30, amp_vol: 96 },
+      cp: { machine: 'CP CLASSIC', num: 5, rat: 92, cpd: 81, ton: 40, nod: 70, nol: 90, amp_ovr: 50, amp_rev: 30, amp_vol: 74 },
       bt: { machine: 'UT NOISE', lpf: 70, hpf: 30, lpq: 90, dec: 40, nswd: 50, swt: 40, amp_del: 40 },
       ch: { machine: 'CH METALLIC', dec: 20, amp_vol: 100 },
       oh: { machine: 'OH METALLIC', dec: 52, amp_vol: 90 },
       cy: { machine: 'CY METALLIC', dec: 60, ton: 20 },
     },
-    { del_tim: 16, del_fdb: 62, del_hpf: 40, del_lpf: 80, rev_dec: 60, dis_amt: 18, dis_sym: 12, dis_dov: 70, dis_del: 1, cmp_thr: 106, cmp_atk: 1, cmp_rel: 6, cmp_mup: 21, cmp_rat: 0, cmp_seq: 3, cmp_mix: 100, cmp_vol: 94 },
+    { del_tim: 16, del_fdb: 62, del_hpf: 40, del_lpf: 80, rev_dec: 60, dis_amt: 18, dis_sym: 12, dis_dov: 70, dis_del: 1, cmp_thr: 106, cmp_atk: 1, cmp_rel: 6, cmp_mup: 19, cmp_rat: 0, cmp_seq: 3, cmp_mix: 100, cmp_vol: 100 },
     {
       name: 'GRIND',
       rows: {
@@ -248,7 +248,7 @@ export const KIT_PRESETS: KitDef[] = [
       rs: { machine: 'RS CLASSIC', dec: 30, amp_del: 40, amp_pan: -24 },
       lt: { tun: 34, dec: 40, swd: 30, amp_pan: 30 },
       mt: { tun: 58, dec: 36, swd: 30, amp_pan: -30 },
-      ch: { dec: 28, col: -6, amp_vol: 84 },
+      ch: { dec: 28, col: -6, amp_vol: 78 },
       oh: { dec: 46, col: -4, amp_vol: 88 },
       cb: { machine: 'CB CLASSIC', cdet: 54, dec: 30, amp_vol: 70, amp_del: 50 },
     },
@@ -452,12 +452,12 @@ export const KIT_PRESETS: KitDef[] = [
     {
       bd: { machine: 'BD ACOUSTIC', tun: -1, dec: 50, hld: 10, swt: 50, swd: 40, wavx: 0, imp: 70 },
       sd: { machine: 'SD ACOUSTIC', tun: 4, bdy: 40, nod: 50, nol: 80, hld: 4, swd: 30, imp: 80 },
-      ch: { dec: 22, lev: 88, smp_slot: 9, smp_lev: 70 },
+      ch: { dec: 22, lev: 76, smp_slot: 9, smp_lev: 70 },
       oh: { dec: 44 },
       cy: { machine: 'CY RIDE', typ: 0, dec: 84, hit: 30, c1: 80, c2: 70, c3: 60, amp_vol: 76 },
       mt: { tun: 60, dec: 50, amp_vol: 88 },
     },
-    { rev_dec: 40, dis_amt: 18, cmp_thr: 106, cmp_atk: 2, cmp_rel: 1, cmp_mup: 17, cmp_rat: 1, cmp_seq: 3, cmp_mix: 90, cmp_vol: 127 },
+    { rev_dec: 40, dis_amt: 18, cmp_thr: 106, cmp_atk: 2, cmp_rel: 1, cmp_mup: 17, cmp_rat: 1, cmp_seq: 3, cmp_mix: 90, cmp_vol: 119 },
     {
       name: 'ROLLER',
       rows: {
@@ -505,8 +505,8 @@ export const KIT_PRESETS: KitDef[] = [
       cp: { machine: 'CP CLASSIC', num: 1, rat: 92, cpd: 81, ton: 90, nod: 20, nol: 40, amp_rev: 40 },
       bt: { machine: 'UT IMPULSE', lev: 104, atk: 0, dec: 20, flt_typ: 2, flt_frq: 70, flt_res: 118, amp_del: 40 },
       lt: { machine: 'UT IMPULSE', lev: 104, atk: 0, dec: 16, flt_typ: 2, flt_frq: 79, flt_res: 120, amp_pan: -30, amp_del: 30 },
-      ch: { dec: 12, col: 30, amp_vol: 86 },
-      oh: { dec: 36, col: 30, amp_vol: 74 },
+      ch: { dec: 12, col: 22, amp_vol: 78 },
+      oh: { dec: 36, col: 22, amp_vol: 68 },
     },
     { del_tim: 24, del_x: 1, del_fdb: 60, del_hpf: 50, del_lpf: 84, rev_dec: 60, dis_amt: 36, dis_del: 1, cmp_thr: 116, cmp_atk: 1, cmp_rel: 1, cmp_mup: 17, cmp_rat: 3, cmp_seq: 1, cmp_mix: 50, cmp_vol: 112 },
     {
@@ -641,7 +641,7 @@ export const KIT_PRESETS: KitDef[] = [
       cy: { machine: 'UT NOISE', dec: 127, lev: 30, lpf: 80, smp_slot: 22, smp_lop: 1, smp_lev: 90, amp_vol: 60, amp_dec: 50 },
       rs: { machine: 'RS CLASSIC', dec: 24, smp_slot: 18, smp_lev: 70, smp_br: 40 },
     },
-    { rev_dec: 48, rev_gai: 50, dis_amt: 26, dis_sym: 8, cmp_thr: 114, cmp_atk: 4, cmp_rel: 6, cmp_mup: 15, cmp_rat: 1, cmp_seq: 1, cmp_mix: 90, cmp_vol: 119 },
+    { rev_dec: 48, rev_gai: 50, dis_amt: 20, dis_sym: 8, cmp_thr: 114, cmp_atk: 4, cmp_rel: 6, cmp_mup: 15, cmp_rat: 1, cmp_seq: 1, cmp_mix: 90, cmp_vol: 119 },
     {
       name: 'TAPE',
       rows: {
