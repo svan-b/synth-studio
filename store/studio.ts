@@ -92,6 +92,8 @@ export interface StepSession {
   notes?: Record<string, number[]>;
   /** "Show me" was used on this step (the summary reports it honestly) */
   shown?: boolean;
+  /** The step was completed at least once (the end-of-lesson summary) */
+  done?: boolean;
 }
 
 /** A "show me" demonstration in progress: the coach is moving a control (or showing a cable) */
@@ -482,6 +484,7 @@ export const useStudioStore = create<StudioStore>()(
           clearAdvance();
           return;
         }
+        if (!sess.done) setSession({ done: true });
         if (s.stepSatisfied && advanceTimer) return;
         set({ stepSatisfied: true });
         if (!auto) return;

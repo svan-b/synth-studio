@@ -1,21 +1,30 @@
 'use client';
 
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ControlValue, DeviceSpec, KnobSpec, LessonStep, PatchConnection, PatchPoint, SliderSpec, SwitchSpec, ButtonSpec, PatternSpec } from '@/types';
 import type {
-  EngineState, PanelContext, PanelElement, PanelLayout, PanelTheme, Values, ButtonElement, KnobElement, SliderElement,
-  SwitchElement, JackElement, LabelElement, SectionElement, DisplayElement, StepGridElement,
+  CustomElement, EngineState, PanelContext, PanelElement, PanelLayout, PanelTheme, Values, ButtonElement, KnobElement, LedElement,
+  SliderElement, SwitchElement, JackElement, LabelElement, SectionElement, DisplayElement, StepGridElement,
 } from '@/types/panel';
 import Knob from '@/components/controls/Knob';
 import Slider from '@/components/controls/Slider';
 import Switch from '@/components/controls/Switch';
 import Button from '@/components/controls/Button';
 import { isValueOnTarget } from '@/lib/controls/mapping';
-import { FONTS, fitTransform, floorPx, type TextFit } from '@/lib/controls/textFit';
+import { FONTS, fitTransform, floorPx, resetTextMeasureCache, type TextFit } from '@/lib/controls/textFit';
 import { analyseLayout, computeTextFits, elementLabel, type ElementInfo, type PanelTextFits } from './layoutAnalysis';
 import Keyboard from './Keyboard';
 import StepGrid from './StepGrid';
 import styles from './panel.module.css';
+
+/**
+ * Live engine state without re-rendering the whole panel: the elements that show it
+ * (LEDs, lit buttons, screens, playheads, custom pieces) subscribe themselves.
+ */
+export interface EngineSource {
+  get: () => EngineState;
+  subscribe: (onChange: () => void) => () => void;
+}
 
 export interface SynthPanelProps {
   spec: DeviceSpec;
@@ -51,6 +60,8 @@ export interface SynthPanelProps {
   stepDone?: boolean;
   /** "Show me": a cable the coach is demonstrating */
   demoPatch?: { from: string; to: string } | null;
+  /** Live engine state; when given, `engineState` changes no longer re-render the panel */
+  engineSource?: EngineSource;
 }
 
 /** Studio-wide patching: tap a jack on one instrument, then a jack on another */
@@ -60,14 +71,54 @@ export interface PatchController {
 }
 
 const NOOP = () => undefined;
+const NO_SUBSCRIBE = () => NOOP;
 const EMPTY_UI: Record<string, unknown> = {};
 /** Touch target the panel aims for, in rendered CSS px */
 const TOUCH_PX = 44;
+/** A tap may move this far (CSS px) and still count as a tap */
+const TAP_SLOP = 8;
 
 const CABLE_PALETTE = ['#22c55e', '#f97316', '#ef4444', '#06b6d4', '#a855f7', '#eab308', '#ec4899', '#3b82f6', '#14b8a6', '#f43f5e'];
 
 export function cableColor(index: number) {
   return CABLE_PALETTE[index % CABLE_PALETTE.length];
+}
+
+/** Re-render on every engine update (screens, custom pieces) */
+function useEngine(src: EngineSource): EngineState {
+  return useSyncExternalStore(src.subscribe, src.get, src.get);
+}
+
+/** Re-render only when the selected value changes (LED brightness, a playhead) */
+function useEngineValue<T extends number | string | boolean | undefined | null>(src: EngineSource, select: (e: EngineState) => T): T {
+  const pick = () => {
+    try { return select(src.get()); } catch { return undefined as T; }
+  };
+  return useSyncExternalStore(src.subscribe, pick, pick);
+}
+
+const quantize = (v: number | boolean) => (typeof v === 'boolean' ? (v ? 1 : 0) : Math.round(Math.max(0, Math.min(1, v)) * 50) / 50);
+
+/** Re-measure text when web fonts arrive (Roboto Condensed stands in for Arial Narrow on iPad) */
+function useFontsVersion(): number {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
+    if (!fonts) return;
+    let alive = true;
+    const bump = () => {
+      if (!alive) return;
+      resetTextMeasureCache();
+      setV(x => x + 1);
+    };
+    fonts.ready.then(bump).catch(NOOP);
+    fonts.addEventListener?.('loadingdone', bump);
+    return () => {
+      alive = false;
+      fonts.removeEventListener?.('loadingdone', bump);
+    };
+  }, []);
+  return v;
 }
 
 /**
@@ -76,17 +127,18 @@ export function cableColor(index: number) {
  * same coordinate space, so they stay glued to their jacks at any zoom level.
  *
  * Every element is its own memoised component: turning one knob re-renders that
- * knob, not the panel.
+ * knob, and an LED blinking re-renders that LED - not the panel.
  */
 function SynthPanel(props: SynthPanelProps) {
   const { spec, layout, values, engineState } = props;
   const k = layout.pxPerMm;
   const px = useCallback((mm: number) => mm * k, [k]);
   const theme = layout.theme;
-  const ctx: PanelContext = useMemo(
-    () => ({ values, engine: engineState, data: props.data, ui: props.ui ?? EMPTY_UI }),
-    [values, engineState, props.data, props.ui],
-  );
+
+  // Without an engine source, the engineState prop drives it (as before)
+  const fallbackSrc = useMemo<EngineSource>(() => ({ get: () => engineState, subscribe: NO_SUBSCRIBE }), [engineState]);
+  const src = props.engineSource ?? fallbackSrc;
+  const base = useMemo(() => ({ values, data: props.data, ui: props.ui ?? EMPTY_UI }), [values, props.data, props.ui]);
 
   const jacks = useMemo(() => {
     const all: Record<string, PatchPoint> = {};
@@ -105,11 +157,13 @@ function SynthPanel(props: SynthPanelProps) {
 
   const geo = useMemo(() => analyseLayout(layout, spec), [layout, spec]);
 
-  // Encoders bound by a function follow the selected track/page
+  // Encoders bound by a function follow the selected track/page (they read values, not engine state)
+  const ctxNow: PanelContext = { ...base, engine: src.get() };
   const resolved = layout.elements.map(el =>
-    (el.kind === 'knob' || el.kind === 'stepgrid') && typeof el.control === 'function' ? el.control(ctx) : null);
+    (el.kind === 'knob' || el.kind === 'stepgrid') && typeof el.control === 'function' ? el.control(ctxNow) : null);
   const resolvedSig = resolved.join('\u0001');
   const scale = Math.round((props.scale ?? 1) * 50) / 50;
+  const fontsVersion = useFontsVersion();
   const fits = useMemo(() => {
     const labels = layout.elements.map((el, i) => elementLabel(el, spec, resolved[i]));
     const valueSpecs = layout.elements.map((el, i) => {
@@ -120,9 +174,12 @@ function SynthPanel(props: SynthPanelProps) {
       }
       return undefined;
     });
-    return computeTextFits(layout, spec, geo, scale, { labels, valueSpecs });
+    const f = computeTextFits(layout, spec, geo, scale, { labels, valueSpecs });
+    // Legibility tooling: the fit decisions of the last panel drawn
+    if (f.debug) (window as unknown as { __panelFits?: unknown }).__panelFits = f.debug;
+    return f;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, spec, geo, scale, resolvedSig]);
+  }, [layout, spec, geo, scale, resolvedSig, fontsVersion]);
 
   const cheek = theme.cheeks ? px(theme.cheeks.width) : 0;
   const frame = theme.frame ? px(theme.frame.padding) : 0;
@@ -149,7 +206,9 @@ function SynthPanel(props: SynthPanelProps) {
       )}
       <Faceplate
         {...props}
-        ctx={ctx}
+        src={src}
+        base={base}
+        ctxNow={ctxNow}
         jacks={jacks}
         jackPos={jackPos}
         left={cheek + frame}
@@ -166,8 +225,12 @@ function SynthPanel(props: SynthPanelProps) {
   );
 }
 
+type Base = { values: Values; data: unknown; ui: Record<string, unknown> };
+
 interface FaceplateProps extends SynthPanelProps {
-  ctx: PanelContext;
+  src: EngineSource;
+  base: Base;
+  ctxNow: PanelContext;
   jacks: Record<string, PatchPoint>;
   jackPos: Record<string, { x: number; y: number }>;
   left: number;
@@ -182,10 +245,8 @@ interface FaceplateProps extends SynthPanelProps {
 }
 
 function Faceplate(p: FaceplateProps) {
-  const { layout, spec, values, ctx, teaching, step, px, width, height, geo, fits, resolved, scaleNow } = p;
+  const { layout, spec, values, src, base, teaching, step, px, width, height, geo, fits, resolved, scaleNow } = p;
   const theme = layout.theme;
-  const faceRef = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState<{ from: string; pointer: { x: number; y: number }; color: string; moved: boolean } | null>(null);
   const focus = p.focus ?? null;
   const touchNative = TOUCH_PX / Math.max(0.35, scaleNow || 1);
 
@@ -196,6 +257,7 @@ function Faceplate(p: FaceplateProps) {
   const spotOf = (id: string | null | undefined): 'focus' | null => (focus && id && focus.has(id) && !isTarget(id) ? 'focus' : null);
   /** Touch target: 44 CSS px where the neighbours leave room, never smaller than drawn */
   const hitFor = (i: number, visual: number) => Math.max(visual, Math.min(touchNative, geo[i].nearest * 0.95));
+  const resolvedKey = resolved.join('\u0001');
 
   // Focus mode: which elements stay lit
   const lit = useMemo(() => {
@@ -221,90 +283,27 @@ function Faceplate(p: FaceplateProps) {
     layout.elements.forEach((el, i) => {
       if (el.kind !== 'section' || !el.title) return;
       const x0 = px(el.x), y0 = px(el.y), x1 = px(el.x + el.w), y1 = px(el.y + el.h);
-      on[i] = geo.some((g, j) => j !== i && on[j] && layout.elements[j].kind !== 'section' && layout.elements[j].kind !== 'label'
-        && geo[j].body !== null && ['knob', 'slider', 'switch', 'button', 'jack', 'stepgrid'].includes(g.kind)
+      on[i] = geo.some((g, j) => j !== i && on[j] && ['knob', 'slider', 'switch', 'button', 'jack', 'stepgrid'].includes(g.kind)
         && g.cx >= x0 && g.cx <= x1 && g.cy >= y0 && g.cy <= y1);
     });
     return on;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focus, layout, geo, resolved.join('\u0001')]);
+  }, [focus, layout, geo, resolvedKey]);
   const dimmed = (i: number) => !!lit && !lit[i];
 
-  const toLocal = useCallback((clientX: number, clientY: number) => {
-    const el = faceRef.current;
-    if (!el) return { x: 0, y: 0 };
-    const r = el.getBoundingClientRect();
-    const scale = r.width / width || 1;
-    return { x: (clientX - r.left) / scale, y: (clientY - r.top) / scale };
-  }, [width]);
-
-  // --- patching --------------------------------------------------------------
-  const jackUnder = (clientX: number, clientY: number): string | null => {
-    const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
-    const j = el?.closest('[data-jack]') as HTMLElement | null;
-    return j?.dataset.jack ?? null;
-  };
-
-  // Drag state lives in a ref: pointer events can arrive faster than React re-renders
-  const drag = useRef<{ from: string; moved: boolean } | null>(null);
-
-  const startOrFinish = (jackId: string, e: React.PointerEvent | null) => {
-    if (e) { e.stopPropagation(); e.preventDefault(); }
-    if (active && active.from !== jackId) {
-      p.onPatch(active.from, jackId);
-      setActive(null);
-      drag.current = null;
-      return;
-    }
-    if (active && active.from === jackId) {
-      setActive(null);
-      drag.current = null;
-      return;
-    }
-    if (e) { try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* ignore */ } }
-    drag.current = { from: jackId, moved: false };
-    const origin = p.jackPos[jackId] ?? { x: 0, y: 0 };
-    setActive({ from: jackId, pointer: e ? toLocal(e.clientX, e.clientY) : origin, color: cableColor(p.patches.length), moved: false });
-  };
-
-  const onJackMove = (e: React.PointerEvent) => {
-    const d = drag.current;
-    if (!d) return;
-    const pt = toLocal(e.clientX, e.clientY);
-    const origin = p.jackPos[d.from];
-    if (!d.moved && origin && Math.hypot(pt.x - origin.x, pt.y - origin.y) > 12) d.moved = true;
-    setActive(a => (a ? { ...a, pointer: pt, moved: d.moved } : a));
-  };
-
-  const onJackUp = (e: React.PointerEvent) => {
-    const d = drag.current;
-    if (!d) return;
-    if (!d.moved) return; // tap: keep the cable "in hand" until the next tap
-    drag.current = null;
-    const over = jackUnder(e.clientX, e.clientY);
-    if (over && over !== d.from) p.onPatch(d.from, over);
-    setActive(null);
-  };
-
-  const onFaceMove = (e: React.PointerEvent) => {
-    if (active && !drag.current?.moved) {
-      const pt = toLocal(e.clientX, e.clientY);
-      setActive(a => (a ? { ...a, pointer: pt } : a));
-    }
-  };
+  // Custom elements' events count as presses too (trig keys, pads drawn by the device)
+  const onPress = p.onPress;
+  const onEvent = p.onEvent;
+  const sendEvent = useCallback((name: string, payload?: unknown) => {
+    onEvent(name, payload);
+    if (onPress && !name.endsWith(':up')) onPress([name]);
+  }, [onEvent, onPress]);
 
   const highlightedJacks = teaching && step?.patchFrom && step?.patchTo ? [step.patchFrom, step.patchTo] : [];
   const targetPatchDone = highlightedJacks.length === 2 && p.patches.some(
     c => (c.from === step!.patchFrom && c.to === step!.patchTo) || (c.from === step!.patchTo && c.to === step!.patchFrom),
   );
-
-  // Custom elements' events count as presses too (trig keys, pads drawn by the device)
-  const onPress = p.onPress;
-  const sendEvent = useCallback((name: string, payload?: unknown) => {
-    p.onEvent(name, payload);
-    if (onPress && !name.endsWith(':up')) onPress([name]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p.onEvent, onPress]);
+  const instanceId = p.instance ?? p.spec.id;
 
   // --- element renderers ----------------------------------------------------
   const renderElement = (el: PanelElement, i: number) => {
@@ -378,7 +377,7 @@ function Faceplate(p: FaceplateProps) {
             value={values[el.control] as number | undefined}
             onChange={p.onChange}
             x={px(el.x)}
-            y={px(el.y)}
+            y={px(el.y) + (fits.shift[i] ?? 0)}
             labelColor={theme.muted ?? theme.text}
             highlighted={isTarget(el.control)}
             targetValue={target(el.control) as number | undefined}
@@ -394,23 +393,21 @@ function Faceplate(p: FaceplateProps) {
         const controlSpec = el.control ? spec.controls[el.control] : undefined;
         const isRadio = el.setValue !== undefined;
         const current = el.control ? values[el.control] : undefined;
-        let litV: number | boolean = false;
-        if (el.lit) litV = el.lit(ctx);
-        else if (isRadio) litV = current === el.setValue;
-        else if (el.control) litV = !!current;
+        const staticLit = el.lit ? 0 : quantize(isRadio ? current === el.setValue : !!(el.control && current));
         const pressTarget = !!(teaching && step && ((el.event && step.event === el.event) || (el.control && step.control === el.control && controlSpec?.type === 'button' && ((controlSpec as ButtonSpec).momentary || step.presses !== undefined))));
         const highlighted = pressTarget || !!(teaching && step && el.control && step.control === el.control && (!isRadio || step.targetValue === el.setValue));
         const correct = highlighted && (pressTarget ? !!p.stepDone : isValueOnTarget(controlSpec, current, step!.targetValue));
         const w = px(el.w ?? 7);
         const hgt = el.shape === 'rect' ? (el.h !== undefined ? px(el.h) : w * 0.6) : w;
-        const amount = typeof litV === 'boolean' ? (litV ? 1 : 0) : Math.round(Math.max(0, Math.min(1, litV)) * 100) / 100;
         return (
           <ButtonEl
             key={i}
             el={el}
             controlSpec={controlSpec}
             current={current}
-            lit={amount}
+            staticLit={staticLit}
+            src={src}
+            base={base}
             onChange={p.onChange}
             onEvent={p.onEvent}
             onPress={onPress}
@@ -434,9 +431,7 @@ function Faceplate(p: FaceplateProps) {
         const j = p.jacks[el.jack];
         if (!j) return null;
         const isHl = highlightedJacks.includes(el.jack);
-        const isActive = p.patchController
-          ? p.patchController.active?.instance === (p.instance ?? p.spec.id) && p.patchController.active?.jack === el.jack
-          : active?.from === el.jack;
+        const studioActive = !!p.patchController && p.patchController.active?.instance === instanceId && p.patchController.active?.jack === el.jack;
         return (
           <JackEl
             key={i}
@@ -448,7 +443,7 @@ function Faceplate(p: FaceplateProps) {
             theme={theme}
             highlighted={isHl}
             done={targetPatchDone}
-            active={isActive}
+            active={studioActive}
             dim={dimmed(i)}
             spot={spotOf(el.jack)}
             fit={fits.label[i]}
@@ -456,14 +451,11 @@ function Faceplate(p: FaceplateProps) {
         );
       }
 
-      case 'led': {
-        const on = el.on(ctx);
-        const amt = typeof on === 'boolean' ? (on ? 1 : 0) : Math.max(0, Math.min(1, on));
-        return <LedEl key={i} x={px(el.x)} y={px(el.y)} d={px(el.size ?? 2.5)} color={el.color ?? '#ff3333'} amount={Math.round(amt * 100) / 100} />;
-      }
+      case 'led':
+        return <LedEl key={i} el={el} src={src} base={base} x={px(el.x)} y={px(el.y)} d={px(el.size ?? 2.5)} />;
 
       case 'display':
-        return <DisplayEl key={i} el={el} px={px} ctx={ctx} floor={floorPx(9, scaleNow)} />;
+        return <DisplayEl key={i} el={el} px={px} src={src} base={base} floor={floorPx(9, scaleNow)} />;
 
       case 'keyboard':
         return (
@@ -490,7 +482,8 @@ function Faceplate(p: FaceplateProps) {
             el={el}
             id={id}
             pattern={pattern}
-            playhead={el.playhead?.(ctx)}
+            src={src}
+            base={base}
             target={typeof tgt === 'string' ? tgt : undefined}
             highlighted={isTarget(id)}
             onChange={p.onChange}
@@ -503,20 +496,20 @@ function Faceplate(p: FaceplateProps) {
 
       case 'custom':
         return (
-          <div key={i} className="absolute pointer-events-none [&>*]:pointer-events-auto" style={{ left: px(el.x), top: px(el.y), width: px(el.w), height: px(el.h) }}>
-            {el.render({
-              ...ctx,
-              setValue: p.onChange,
-              sendEvent,
-              teaching,
-              step,
-              data: p.data,
-              ui: p.ui ?? EMPTY_UI,
-              updateData: p.updateData ?? NOOP,
-              setUi: p.setUi ?? NOOP,
-              instance: p.instance ?? p.spec.id,
-            })}
-          </div>
+          <CustomEl
+            key={i}
+            el={el}
+            px={px}
+            src={src}
+            base={base}
+            setValue={p.onChange}
+            sendEvent={sendEvent}
+            teaching={teaching}
+            step={step}
+            updateData={p.updateData ?? NOOP}
+            setUi={p.setUi ?? NOOP}
+            instance={instanceId}
+          />
         );
     }
   };
@@ -527,64 +520,42 @@ function Faceplate(p: FaceplateProps) {
     return [...idx.filter(x => x.e.kind === 'section'), ...idx.filter(x => x.e.kind !== 'section')];
   }, [layout]);
 
-  const tapJack = (jackId: string, e: React.PointerEvent | null) => {
-    if (p.patchController) {
-      if (e) { e.stopPropagation(); e.preventDefault(); }
-      p.patchController.tap(p.instance ?? p.spec.id, jackId);
-      return;
-    }
-    startOrFinish(jackId, e);
-  };
+  const jackHits = useMemo(() => layout.elements
+    .map((el, i) => (el.kind === 'jack' && p.jacks[el.jack]
+      ? { jack: el.jack, x: px(el.x), y: px(el.y), d: Math.max(px(7.5), Math.min(touchNative, geo[i].nearest * 0.95)) }
+      : null))
+    .filter((x): x is { jack: string; x: number; y: number; d: number } => !!x),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [layout, p.jacks, px, touchNative, geo]);
 
   return (
     <div
-      ref={faceRef}
       className="absolute"
       style={{ left: p.left, top: p.top, width, height, background: theme.background, borderRadius: 4, overflow: 'visible', color: theme.text }}
-      onPointerMove={onFaceMove}
-      onPointerDown={() => { if (active) { setActive(null); drag.current = null; } }}
     >
       {ordered.map(({ e, i }) => renderElement(e, i))}
-      <Cables
-        patches={p.patches}
+      <PatchLayer
+        jacks={p.jacks}
         jackPos={p.jackPos}
-        active={active ? { from: active.from, to: active.pointer, color: active.color } : null}
-        onRemove={p.onUnpatch}
+        hits={jackHits}
+        patches={p.patches}
+        onPatch={p.onPatch}
+        onUnpatch={p.onUnpatch}
+        patchController={p.patchController}
+        instanceId={instanceId}
         width={width}
         height={height}
         jackRadius={px(3.1)}
         demo={p.demoPatch ?? null}
       />
-      {/* Jack hit targets sit above the cables, so a patched jack can still start another cable */}
-      {layout.elements.map((el, i) => {
-        if (el.kind !== 'jack' || !p.jacks[el.jack]) return null;
-        const j = p.jacks[el.jack];
-        const d = Math.max(px(7.5), Math.min(touchNative, geo[i].nearest * 0.95));
-        const name = `${j.label} ${j.jackType === 'output' ? 'output' : 'input'} jack (${j.signalType})`;
-        return (
-          <div
-            key={`hit-${i}`}
-            data-jack={el.jack}
-            role="button"
-            tabIndex={0}
-            aria-label={name}
-            onPointerDown={e => tapJack(el.jack, e)}
-            onPointerMove={p.patchController ? undefined : onJackMove}
-            onPointerUp={p.patchController ? undefined : onJackUp}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); tapJack(el.jack, null); } }}
-            title={name}
-            className={`absolute rounded-full cursor-pointer ${styles.jackHit}`}
-            style={{ left: px(el.x) - d / 2, top: px(el.y) - d / 2, width: d, height: d, zIndex: 40, touchAction: 'none' }}
-          />
-        );
-      })}
     </div>
   );
 }
 
 // ---- element components (memoised: they re-render only when their own props change) ----
 
-const dimStyle = (dim: boolean): React.CSSProperties => (dim ? { opacity: 0.26, filter: 'saturate(0.3)' } : { opacity: 1 });
+// Opacity only: a filter on dozens of elements is expensive to composite on iPad
+const dimStyle = (dim: boolean): React.CSSProperties => ({ opacity: dim ? 0.28 : 1 });
 
 function Anchor({ x, y, children, dim }: { x: number; y: number; children: React.ReactNode; dim?: boolean }) {
   return (
@@ -634,7 +605,7 @@ const LabelEl = memo(function LabelEl({ el, px, theme, fit, dim }: { el: LabelEl
       className={`absolute whitespace-pre pointer-events-none leading-none ${styles.dimmable}`}
       title={fit?.title}
       style={{
-        left: px(el.x), top: px(el.y),
+        left: px(el.x), top: px(el.y) + (fit?.dy ?? 0),
         transform: fitTransform(fit, base),
         transformOrigin: el.align === 'left' ? 'left center' : el.align === 'right' ? 'right center' : 'center',
         fontSize: fit?.size ?? el.size ?? 8,
@@ -797,7 +768,10 @@ interface ButtonElProps {
   controlSpec: DeviceSpec['controls'][string] | undefined;
   /** The control's own value (toggle state) */
   current: ControlValue | undefined;
-  lit: number;
+  /** Light from the control's value (used when the layout gives no `lit`) */
+  staticLit: number;
+  src: EngineSource;
+  base: Base;
   onChange: (id: string, v: ControlValue) => void;
   onEvent: (name: string, payload?: unknown) => void;
   onPress?: (ids: string[]) => void;
@@ -815,9 +789,11 @@ interface ButtonElProps {
   hitSize: number;
 }
 
-const ButtonEl = memo(function ButtonEl({ el, controlSpec, current, lit, onChange, onEvent, onPress, x, y, w, h, labelColor, highlighted, correct, dim, spot, labelFit, capFit, hitSize }: ButtonElProps) {
+const ButtonEl = memo(function ButtonEl({ el, controlSpec, current, staticLit, src, base, onChange, onEvent, onPress, x, y, w, h, labelColor, highlighted, correct, dim, spot, labelFit, capFit, hitSize }: ButtonElProps) {
   const isRadio = el.setValue !== undefined;
   const momentary = controlSpec?.type === 'button' && !!(controlSpec as ButtonSpec).momentary;
+  // A layout `lit` may follow the engine (RUN lit while playing): only this button re-renders
+  const lit = useEngineValue(src, e => (el.lit ? quantize(el.lit({ ...base, engine: e })) : staticLit)) ?? 0;
   // The control's own value, read at press time (its light may show engine state instead)
   const currentRef = useRef(current);
   currentRef.current = current;
@@ -845,7 +821,7 @@ const ButtonEl = memo(function ButtonEl({ el, controlSpec, current, lit, onChang
         id={el.control ?? el.event ?? 'button'}
         label={label}
         description={controlSpec?.description}
-        lit={lit}
+        lit={lit as number}
         onPress={press}
         onRelease={release}
         shape={el.shape}
@@ -909,7 +885,8 @@ const JackEl = memo(function JackEl({ el, jack, x, y, d, theme, highlighted, don
               color: fit?.color ?? (isOut ? theme.jack?.outputLabelText ?? '#fff' : theme.muted ?? '#999'),
               background: isOut ? theme.jack?.outputLabelBg ?? '#000' : 'transparent',
               border: isOut ? '1px solid #444' : '1px solid transparent',
-              padding: '1px 3px',
+              // Input legends have no box, so no side padding: more room for legible text
+              padding: isOut ? '1px 3px' : '1px 1px',
               borderRadius: 2,
             }}
           >
@@ -937,7 +914,9 @@ const JackEl = memo(function JackEl({ el, jack, x, y, d, theme, highlighted, don
   );
 });
 
-const LedEl = memo(function LedEl({ x, y, d, color, amount }: { x: number; y: number; d: number; color: string; amount: number }) {
+const LedEl = memo(function LedEl({ el, src, base, x, y, d }: { el: LedElement; src: EngineSource; base: Base; x: number; y: number; d: number }) {
+  const amount = (useEngineValue(src, e => quantize(el.on({ ...base, engine: e }))) as number | undefined) ?? 0;
+  const color = el.color ?? '#ff3333';
   return (
     <div className="absolute" style={{ left: x, top: y, transform: 'translate(-50%, -50%)' }}>
       <div
@@ -953,8 +932,9 @@ const LedEl = memo(function LedEl({ x, y, d, color, amount }: { x: number; y: nu
   );
 });
 
-function DisplayEl({ el, px, ctx, floor }: { el: DisplayElement; px: (mm: number) => number; ctx: PanelContext; floor: number }) {
-  const content = el.render(ctx);
+const DisplayEl = memo(function DisplayEl({ el, px, src, base, floor }: { el: DisplayElement; px: (mm: number) => number; src: EngineSource; base: Base; floor: number }) {
+  const engine = useEngine(src);
+  const content = el.render({ ...base, engine });
   const isLines = Array.isArray(content);
   const style = el.style ?? 'oled';
   const w = px(el.w);
@@ -985,13 +965,38 @@ function DisplayEl({ el, px, ctx, floor }: { el: DisplayElement; px: (mm: number
       {isLines ? (content as string[]).map((l, li) => <div key={li} className="whitespace-pre truncate">{l}</div>) : content}
     </div>
   );
+});
+
+interface CustomElProps {
+  el: CustomElement;
+  px: (mm: number) => number;
+  src: EngineSource;
+  base: Base;
+  setValue: (id: string, v: ControlValue) => void;
+  sendEvent: (e: string, payload?: unknown) => void;
+  teaching: boolean;
+  step: LessonStep | null;
+  updateData: (fn: (draft: unknown) => unknown) => void;
+  setUi: (patch: Record<string, unknown>) => void;
+  instance: string;
 }
+
+/** A device-drawn piece: it re-renders with the engine (screens, meters) without re-rendering the panel */
+const CustomEl = memo(function CustomEl({ el, px, src, base, setValue, sendEvent, teaching, step, updateData, setUi, instance }: CustomElProps) {
+  const engine = useEngine(src);
+  return (
+    <div data-panel-custom="" className="absolute pointer-events-none [&>*]:pointer-events-auto" style={{ left: px(el.x), top: px(el.y), width: px(el.w), height: px(el.h) }}>
+      {el.render({ ...base, engine, setValue, sendEvent, teaching, step, data: base.data, ui: base.ui, updateData, setUi, instance })}
+    </div>
+  );
+});
 
 interface StepGridElProps {
   el: StepGridElement;
   id: string | null;
   pattern: string;
-  playhead?: number;
+  src: EngineSource;
+  base: Base;
   target?: string;
   highlighted: boolean;
   onChange: (id: string, v: ControlValue) => void;
@@ -1000,7 +1005,8 @@ interface StepGridElProps {
   numberSize: number;
 }
 
-const StepGridEl = memo(function StepGridEl({ el, id, pattern, playhead, target, highlighted, onChange, px, dim, numberSize }: StepGridElProps) {
+const StepGridEl = memo(function StepGridEl({ el, id, pattern, src, base, target, highlighted, onChange, px, dim, numberSize }: StepGridElProps) {
+  const playhead = useEngineValue(src, e => (el.playhead ? el.playhead({ ...base, engine: e }) : undefined)) as number | undefined;
   const padded = pattern.padEnd(el.steps, '0');
   const toggle = useCallback((idx: number) => {
     if (!id) return;
@@ -1029,6 +1035,153 @@ const StepGridEl = memo(function StepGridEl({ el, id, pattern, playhead, target,
   );
 });
 
+// ---- patching: cables, jack targets and the cable being drawn (its own component, so a
+//      cable drag re-renders this layer only) -------------------------------------------
+
+interface PatchLayerProps {
+  jacks: Record<string, PatchPoint>;
+  jackPos: Record<string, { x: number; y: number }>;
+  hits: { jack: string; x: number; y: number; d: number }[];
+  patches: PatchConnection[];
+  onPatch: (from: string, to: string) => void;
+  onUnpatch: (from: string, to: string) => void;
+  patchController?: PatchController;
+  instanceId: string;
+  width: number;
+  height: number;
+  jackRadius: number;
+  demo: { from: string; to: string } | null;
+}
+
+const PatchLayer = memo(function PatchLayer(p: PatchLayerProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState<{ from: string; pointer: { x: number; y: number }; color: string } | null>(null);
+  // Drag state lives in a ref: pointer events can arrive faster than React re-renders
+  const drag = useRef<{ from: string; moved: boolean } | null>(null);
+
+  const toLocal = useCallback((clientX: number, clientY: number) => {
+    const el = rootRef.current;
+    if (!el) return { x: 0, y: 0 };
+    const r = el.getBoundingClientRect();
+    const scale = r.width / p.width || 1;
+    return { x: (clientX - r.left) / scale, y: (clientY - r.top) / scale };
+  }, [p.width]);
+
+  // A cable "in hand" (tapped, not dragged) follows the pointer; a press anywhere but a jack drops it
+  const holding = active !== null;
+  useEffect(() => {
+    if (!holding) return;
+    const move = (e: PointerEvent) => {
+      if (drag.current?.moved) return;
+      const pt = toLocal(e.clientX, e.clientY);
+      setActive(a => (a ? { ...a, pointer: pt } : a));
+    };
+    const down = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest?.('[data-jack]') && rootRef.current?.contains(t)) return;
+      drag.current = null;
+      setActive(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerdown', down, true);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerdown', down, true);
+    };
+  }, [holding, toLocal]);
+
+  const jackUnder = (clientX: number, clientY: number): string | null => {
+    const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+    const j = el?.closest('[data-jack]') as HTMLElement | null;
+    return j && rootRef.current?.contains(j) ? j.dataset.jack ?? null : null;
+  };
+
+  const startOrFinish = (jackId: string, e: React.PointerEvent | null) => {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    if (active && active.from !== jackId) {
+      p.onPatch(active.from, jackId);
+      setActive(null);
+      drag.current = null;
+      return;
+    }
+    if (active && active.from === jackId) {
+      setActive(null);
+      drag.current = null;
+      return;
+    }
+    if (e) { try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* ignore */ } }
+    drag.current = { from: jackId, moved: false };
+    const origin = p.jackPos[jackId] ?? { x: 0, y: 0 };
+    setActive({ from: jackId, pointer: e ? toLocal(e.clientX, e.clientY) : origin, color: cableColor(p.patches.length) });
+  };
+
+  const onJackMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    const pt = toLocal(e.clientX, e.clientY);
+    const origin = p.jackPos[d.from];
+    if (!d.moved && origin && Math.hypot(pt.x - origin.x, pt.y - origin.y) > 12) d.moved = true;
+    setActive(a => (a ? { ...a, pointer: pt } : a));
+  };
+
+  const onJackUp = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    if (!d.moved) return; // tap: keep the cable "in hand" until the next tap
+    drag.current = null;
+    const over = jackUnder(e.clientX, e.clientY);
+    if (over && over !== d.from) p.onPatch(d.from, over);
+    setActive(null);
+  };
+
+  const tapJack = (jackId: string, e: React.PointerEvent | null) => {
+    if (p.patchController) {
+      if (e) { e.stopPropagation(); e.preventDefault(); }
+      p.patchController.tap(p.instanceId, jackId);
+      return;
+    }
+    startOrFinish(jackId, e);
+  };
+
+  return (
+    <>
+      <Cables
+        patches={p.patches}
+        jackPos={p.jackPos}
+        active={active ? { from: active.from, to: active.pointer, color: active.color } : null}
+        onRemove={p.onUnpatch}
+        width={p.width}
+        height={p.height}
+        jackRadius={p.jackRadius}
+        demo={p.demo}
+      />
+      {/* Jack hit targets sit above the cables, so a patched jack can still start another cable */}
+      <div ref={rootRef} className="absolute left-0 top-0 pointer-events-none" style={{ width: p.width, height: p.height, zIndex: 40 }}>
+        {p.hits.map(h => {
+          const j = p.jacks[h.jack];
+          const name = `${j.label} ${j.jackType === 'output' ? 'output' : 'input'} jack (${j.signalType})`;
+          return (
+            <div
+              key={h.jack}
+              data-jack={h.jack}
+              role="button"
+              tabIndex={0}
+              aria-label={name}
+              onPointerDown={e => tapJack(h.jack, e)}
+              onPointerMove={p.patchController ? undefined : onJackMove}
+              onPointerUp={p.patchController ? undefined : onJackUp}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); tapJack(h.jack, null); } }}
+              title={name}
+              className={`absolute rounded-full cursor-pointer pointer-events-auto ${styles.jackHit}`}
+              style={{ left: h.x - h.d / 2, top: h.y - h.d / 2, width: h.d, height: h.d, touchAction: 'none' }}
+            />
+          );
+        })}
+      </div>
+    </>
+  );
+});
+
 function cablePath(a: { x: number; y: number }, b: { x: number; y: number }) {
   const dist = Math.hypot(b.x - a.x, b.y - a.y);
   const sag = Math.min(dist * 0.35, 60) + 8;
@@ -1050,6 +1203,8 @@ const Cables = memo(function Cables({
   demo: { from: string; to: string } | null;
 }) {
   const plug = Math.max(5, jackRadius * 0.9);
+  // A tap unplugs (press and release without moving): a finger resting on a cable does not
+  const tap = useRef<{ id: number; x: number; y: number; key: string } | null>(null);
   return (
     <svg className="absolute left-0 top-0 pointer-events-none" width={width} height={height} style={{ overflow: 'visible', zIndex: 30 }}>
       {patches.map((c, i) => {
@@ -1058,8 +1213,9 @@ const Cables = memo(function Cables({
         if (!a || !b) return null;
         const d = cablePath(a, b);
         const color = c.color ?? cableColor(i);
+        const key = `${c.from}-${c.to}`;
         return (
-          <g key={`${c.from}-${c.to}`}>
+          <g key={key}>
             <path d={d} stroke="rgba(0,0,0,0.55)" strokeWidth={8} fill="none" strokeLinecap="round" transform="translate(1.5,3)" />
             <path d={d} stroke={color} strokeWidth={5} fill="none" strokeLinecap="round" opacity={0.95} />
             <path d={d} stroke="rgba(255,255,255,0.25)" strokeWidth={1.5} fill="none" strokeLinecap="round" transform="translate(-1,-1)" />
@@ -1069,8 +1225,19 @@ const Cables = memo(function Cables({
               stroke="transparent"
               strokeWidth={18}
               fill="none"
-              style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
-              onPointerDown={e => { e.stopPropagation(); onRemove(c.from, c.to); }}
+              data-cable={key}
+              style={{ pointerEvents: 'stroke', cursor: 'pointer', touchAction: 'none' }}
+              onPointerDown={e => {
+                e.stopPropagation();
+                try { (e.currentTarget as Element).setPointerCapture(e.pointerId); } catch { /* ignore */ }
+                tap.current = { id: e.pointerId, x: e.clientX, y: e.clientY, key };
+              }}
+              onPointerUp={e => {
+                const t = tap.current;
+                tap.current = null;
+                if (t && t.id === e.pointerId && t.key === key && Math.hypot(e.clientX - t.x, e.clientY - t.y) < TAP_SLOP) onRemove(c.from, c.to);
+              }}
+              onPointerCancel={() => { tap.current = null; }}
             >
               <title>Tap to unplug</title>
             </path>
@@ -1082,6 +1249,8 @@ const Cables = memo(function Cables({
       {active && jackPos[active.from] && (
         <g>
           <path d={cablePath(jackPos[active.from], active.to)} stroke={active.color} strokeWidth={5} fill="none" opacity={0.85} strokeDasharray="10,5" strokeLinecap="round" />
+          {/* The jack the cable comes from */}
+          <circle cx={jackPos[active.from].x} cy={jackPos[active.from].y} r={jackRadius + 3} fill="none" stroke="#fff" strokeWidth={2} />
           <circle cx={jackPos[active.from].x} cy={jackPos[active.from].y} r={plug} fill="#1a1a1a" stroke={active.color} strokeWidth={2.5} />
           <circle cx={active.to.x} cy={active.to.y} r={4} fill={active.color} />
         </g>

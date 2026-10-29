@@ -128,7 +128,8 @@ function Switch({
               onClick={() => select(i)}
               className={`rounded-sm font-bold leading-none transition-colors whitespace-nowrap ${styles.focusable}`}
               style={{
-                fontSize: legendFont + 1,
+                // The panel's fit is for the button text itself
+                fontSize: legendFit ? legendFit.size : legendFont + 1,
                 padding: `${2 * scale}px ${4 * scale}px`,
                 minWidth: 16 * scale,
                 background: i === current ? '#e5e5e5' : '#222',
@@ -212,8 +213,8 @@ function Switch({
   const lever = 8 * scale;
   const frac = positions > 1 ? current / (positions - 1) : 0;
   const leverPos = 1 + frac * (trackLong - lever - 2);
-  // Bigger legends than the lever is long: give them room and centre the lever on them
-  const legendSpan = vertical ? Math.max(trackLong, positions * legendFont * 1.08) : undefined;
+  // Bigger legends than the lever is long: give them room (so their lines never touch) and centre the lever on them
+  const legendSpan = vertical ? Math.max(trackLong, positions * legendFont * 1.22) : undefined;
 
   // Swipe the lever towards a position (like flicking a real toggle)
   const onLeverDown = (e: React.PointerEvent) => {

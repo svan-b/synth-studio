@@ -26,14 +26,22 @@ export interface TextFit {
   title?: string;
   /** Colour lifted for contrast, when the authored one was too faint */
   color?: string;
+  /** Vertical nudge (px): a legend that grew moves away from its control instead of into it */
+  dy?: number;
 }
 
 /** Rendered CSS px floors */
 export const FLOOR_SMALL = 9;
 export const FLOOR_CONTROL = 10;
-/** Floors stop growing below this zoom (a panel drawn tinier than this needs a bigger zoom, not bigger text) */
-export const MIN_FLOOR_SCALE = 0.7;
-export const MIN_CONDENSE = 0.82;
+/**
+ * Floors are guaranteed down to this zoom (every instrument's fitted zoom on an iPad
+ * is >= 0.85). Below it the text shrinks with the panel rather than truncating: a
+ * panel drawn that small needs more room (or a zoom), not bigger letters.
+ */
+export const MIN_FLOOR_SCALE = 0.85;
+/** Gentle condense tried first, and the most the letters may ever be narrowed */
+export const SOFT_CONDENSE = 0.88;
+export const MIN_CONDENSE = 0.8;
 
 export const FONTS: Record<string, string> = {
   sans: '"Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -52,6 +60,11 @@ export function floorPx(cssPx: number, scale: number): number {
 
 let canvas: CanvasRenderingContext2D | null = null;
 const widthCache = new Map<string, number>();
+
+/** Forget measured widths (call when web fonts finish loading) */
+export function resetTextMeasureCache() {
+  widthCache.clear();
+}
 
 /** Width in px of one line of text at `size` px (canvas measureText; estimated on the server) */
 export function measureLine(text: string, size: number, weight: number, family: string, letterSpacing = 0): number {
@@ -78,8 +91,13 @@ export function measureText(text: string, size: number, weight: number, family: 
 }
 
 /**
- * Fit text into `maxW` px. `want` is the preferred size (authored, raised to the floor);
- * the text shrinks towards `floor`, then condenses, then truncates.
+ * Fit text into `maxW` px.
+ *   want     preferred size (authored, raised to the legibility floor)
+ *   floor    legibility floor for this zoom
+ *   authored the size the layout asked for: text never ends up smaller than
+ *            min(authored, floor), and is truncated only if it can't fit even there
+ * Order: condense a little, shrink towards the floor, condense more, shrink towards
+ * the authored size, then truncate (keeping at least 3 characters per line).
  */
 export function fitText(
   text: string,
@@ -89,28 +107,53 @@ export function fitText(
   weight: number,
   family: string,
   letterSpacing = 0,
+  authored = floor,
 ): TextFit {
   const lim = Math.max(8, maxW);
-  const w = measureText(text, want, weight, family, letterSpacing);
-  if (w <= lim) return { size: want };
-  const lo = Math.min(want, floor);
-  // Shrink towards the floor
-  const shrunk = Math.max(lo, (want * lim) / w);
-  const ws = measureText(text, shrunk, weight, family, letterSpacing);
-  if (ws <= lim) return { size: +shrunk.toFixed(2) };
-  // Condense the letters
-  const sx = lim / ws;
-  if (sx >= MIN_CONDENSE) return { size: +shrunk.toFixed(2), scaleX: +sx.toFixed(3) };
+  const W = (s: number) => measureText(text, s, weight, family, letterSpacing);
+  const done = (size: number, w: number): TextFit => {
+    const sx = w > lim ? lim / w : 1;
+    return sx < 0.999 ? { size: +size.toFixed(2), scaleX: +sx.toFixed(3) } : { size: +size.toFixed(2) };
+  };
+  /** Largest size in [lo, hi] whose width, condensed by `c`, fits (null if not even `lo` does) */
+  const largest = (lo: number, hi: number, c: number): number | null => {
+    if (W(lo) * c > lim) return null;
+    if (W(hi) * c <= lim) return hi;
+    let a = lo, b = hi;
+    for (let i = 0; i < 12; i++) {
+      const m = (a + b) / 2;
+      if (W(m) * c <= lim) a = m; else b = m;
+    }
+    return a;
+  };
+  const w0 = W(want);
+  if (w0 <= lim) return { size: +want.toFixed(2) };
+  if (w0 * SOFT_CONDENSE <= lim) return done(want, w0);
+  const fl = Math.min(want, floor);
+  // Shrink towards the floor, lightly condensed
+  let s = largest(fl, want, SOFT_CONDENSE);
+  if (s !== null) return done(s, W(s));
+  if (W(fl) * MIN_CONDENSE <= lim) return done(fl, W(fl));
+  // Below the floor, but never below what the layout itself asked for. Narrowed letters
+  // must buy a clearly bigger size (12%); otherwise plain letters read better.
+  const lo = Math.min(fl, authored);
+  const plain = largest(lo, fl, 1);
+  s = largest(lo, fl, MIN_CONDENSE);
+  if (plain !== null && (s === null || s < plain * 1.12)) return { size: +plain.toFixed(2) };
+  if (s !== null) return done(s, W(s));
   // Truncate (per line), keeping the full text as a tooltip
+  const keep = (line: string) => Math.min(line.length, 3);
   const lines = text.split('\n').map(line => {
-    if (measureLine(line, shrunk, weight, family, letterSpacing) * MIN_CONDENSE <= lim) return line;
+    if (measureLine(line, lo, weight, family, letterSpacing) * MIN_CONDENSE <= lim) return line;
     let n = line.length;
-    while (n > 1 && measureLine(`${line.slice(0, n).trimEnd()}…`, shrunk, weight, family, letterSpacing) * MIN_CONDENSE > lim) n--;
-    return `${line.slice(0, n).trimEnd()}…`;
+    while (n > keep(line) && measureLine(`${line.slice(0, n).trimEnd()}…`, lo, weight, family, letterSpacing) * MIN_CONDENSE > lim) n--;
+    return n >= line.length ? line : `${line.slice(0, n).trimEnd()}…`;
   });
   const shown = lines.join('\n');
-  const wt = measureText(shown, shrunk, weight, family, letterSpacing);
-  return { size: +shrunk.toFixed(2), scaleX: wt > lim ? +Math.max(MIN_CONDENSE, lim / wt).toFixed(3) : undefined, text: shown, title: text };
+  const wt = measureText(shown, lo, weight, family, letterSpacing);
+  const fit = done(lo, wt);
+  if (fit.scaleX !== undefined) fit.scaleX = Math.max(MIN_CONDENSE, fit.scaleX);
+  return shown === text ? fit : { ...fit, text: shown, title: text };
 }
 
 // ---- colour contrast -----------------------------------------------------------------

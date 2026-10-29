@@ -1,15 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ControlValue, PatchConnection, PresetSpec } from '@/types';
+import type { ControlValue, DeviceSpec, PatchConnection, PresetSpec } from '@/types';
+import type { EngineState, Values } from '@/types/panel';
 import type { DeviceModule, DeviceUiApi } from '@/devices/types';
 import { useStudioStore, specDefaults, stepKind, registerLessons, setLessonEngineReader } from '@/store/studio';
 import { useUiStore, selectUi } from '@/store/ui';
 import { hub } from '@/lib/studio/hub';
-import { useDeviceModule, useEngineState } from '@/lib/studio/useHub';
-import SynthPanel, { type PatchController } from '@/components/panel/SynthPanel';
+import { useDeviceModule } from '@/lib/studio/useHub';
+import { describeValue } from '@/lib/controls/mapping';
+import SynthPanel, { type EngineSource, type PatchController } from '@/components/panel/SynthPanel';
 import ResponsiveDeviceContainer from '@/components/ui/ResponsiveDeviceContainer';
 import { midiLearnTouch, useMidiFocus } from '@/lib/midi'; // external gear: MIDI learn + MIDI input
+
+const NO_ENGINE: EngineState = {};
 
 // Computer keyboard → semitone offset (two rows like a DAW)
 const KEYMAP: Record<string, number> = {
@@ -65,7 +69,13 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
   const lessonDemo = useStudioStore(s => s.lessonDemo);
   const ui = useUiStore(selectUi(instance));
   const setUiStore = useUiStore(s => s.setUi);
-  const engineState = useEngineState(instance);
+  // Engine state goes straight to the elements that show it (LEDs, screens, playheads):
+  // an LED blinking must not re-render this host and the whole panel
+  const engineSource = useMemo<EngineSource>(() => ({
+    get: () => (hub.hasInstance(instance) ? hub.getState(instance) : NO_ENGINE),
+    subscribe: cb => hub.subscribeState(instance, () => cb()),
+  }), [instance]);
+  const [touched, setTouched] = useState<{ kind: 'control' | 'jack'; id: string } | null>(null);
   const [zoom, setZoom] = useState<'fit' | number>('fit');
   const [scaleInfo, setScaleInfo] = useState({ scale: 1, fit: 1 });
   const [held, setHeld] = useState<Set<number>>(new Set());
@@ -205,8 +215,9 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
   // Checks that read the engine (the current step LED, a playing sequencer) re-run as it changes
   const engineChecks = !!step && (!!step.check || !!step.checklist?.length);
   useEffect(() => {
-    if (engineChecks) useStudioStore.getState().reevaluate();
-  }, [engineState, engineChecks]);
+    if (!engineChecks) return;
+    return hub.subscribeState(instance, () => useStudioStore.getState().reevaluate());
+  }, [engineChecks, instance]);
 
   const demoPatch = lessonDemo && lessonDemo.instance === instance ? lessonDemo.patch ?? null : null;
 
@@ -237,8 +248,20 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
 
   const onScaleChange = useCallback((scale: number, fit: number) => setScaleInfo({ scale, fit }), []);
 
+  // The status strip follows the last control touched (iPad has no hover tooltips)
+  const noteTouched = (target: EventTarget | null) => {
+    const el = (target as Element | null)?.closest?.('[data-control], [data-jack]') as HTMLElement | null;
+    if (!el) return;
+    const next = el.dataset.jack ? { kind: 'jack' as const, id: el.dataset.jack } : el.dataset.control ? { kind: 'control' as const, id: el.dataset.control } : null;
+    if (next) setTouched(t => (t && t.kind === next.kind && t.id === next.id ? t : next));
+  };
+
   return (
-    <div onPointerDownCapture={() => hub.ensureAudio()} data-instance={instance}>
+    <div
+      onPointerDownCapture={e => { hub.ensureAudio(); noteTouched(e.target); }}
+      onFocusCapture={e => noteTouched(e.target)}
+      data-instance={instance}
+    >
       <div className={`flex flex-wrap items-center justify-center gap-2 ${compact ? 'mb-1.5' : 'mb-3'} text-sm`}>
         {presets.length > 0 && (
           <select
@@ -279,12 +302,15 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
         {!compact && mod.transportControl && keyboardActive && <span className="text-[11px] text-gray-500 hidden md:inline">Space = play/stop</span>}
       </div>
 
+      {!compact && <ControlStatus spec={spec} values={displayValues} touched={touched} />}
+
       <ResponsiveDeviceContainer zoom={zoomOverride ?? zoom} onScaleChange={onScaleChange}>
         <SynthPanel
           spec={spec}
           layout={layout}
           values={displayValues}
-          engineState={engineState}
+          engineState={engineSource.get()}
+          engineSource={engineSource}
           onChange={onChange}
           onEvent={onEvent}
           onNoteOn={handleNoteOn}
@@ -316,6 +342,57 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
             {mod.tips.map(t => <li key={t}>{t}</li>)}
           </ul>
         </details>
+      )}
+    </div>
+  );
+}
+
+/** First sentence of a description (the strip has room for one line) */
+function firstSentence(text: string | undefined): string {
+  if (!text) return '';
+  const i = text.search(/[.!?](\s|$)/);
+  return i >= 0 ? text.slice(0, i + 1) : text;
+}
+
+/**
+ * One line under the toolbar: the control you last touched, its value and what it
+ * does. Touch screens have no hover tooltips, and naming the thing you just moved
+ * (with its unit) is half of learning a new instrument.
+ */
+function ControlStatus({ spec, values, touched }: { spec: DeviceSpec; values: Values; touched: { kind: 'control' | 'jack'; id: string } | null }) {
+  let name = '';
+  let value = '';
+  let about = '';
+  if (touched?.kind === 'control') {
+    // Elektron lock encoders draw `<id>__lock`
+    const id = touched.id.replace(/__lock$/, '');
+    const c = spec.controls[id];
+    if (c) {
+      name = c.label;
+      const v = values[id] ?? ('default' in c ? (c.default as ControlValue) : undefined);
+      value = c.type === 'jack' || c.type === 'pattern' ? '' : describeValue(c, v);
+      about = firstSentence(c.description);
+    }
+  } else if (touched?.kind === 'jack') {
+    const all = [...(spec.patchBay?.inputs ?? []), ...(spec.patchBay?.outputs ?? [])];
+    const j = all.find(x => x.id === touched.id);
+    if (j) {
+      name = `${j.label} ${j.jackType === 'output' ? 'output' : 'input'}`;
+      value = j.signalType;
+      const normal = j.normalled ? all.find(x => x.id === j.normalled) : undefined;
+      about = normal ? `With no cable it is connected inside to ${normal.label}.` : '';
+    }
+  }
+  return (
+    <div className="h-6 mb-1.5 px-2 flex items-center justify-center gap-2 text-[12px] leading-none min-w-0 max-w-full select-none" data-control-status="">
+      {name ? (
+        <>
+          <span className="font-bold text-white shrink-0">{name}</span>
+          {value && <span className="font-mono text-green-300 shrink-0 tabular-nums">{value}</span>}
+          {about && <span className="text-gray-400 truncate min-w-0">{about}</span>}
+        </>
+      ) : (
+        <span className="text-gray-500">Touch any control to see its name, value and what it does.</span>
       )}
     </div>
   );
