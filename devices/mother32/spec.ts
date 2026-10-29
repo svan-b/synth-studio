@@ -82,7 +82,7 @@ export const MOTHER32: DeviceSpec = {
     }),
     resonance: knob({
       label: 'RESONANCE', min: 0, max: 100, default: 5, units: '%',
-      description: 'Feedback around the ladder: a ringing peak at the cutoff. Past about 3 o\'clock the low-pass self-oscillates into a sine. In HI PASS mode there is no peak - turning it up brings the bass back instead.',
+      description: 'Feedback around the ladder: a ringing peak at the cutoff. Past about 3 o\'clock the low-pass self-oscillates into a sine. In HI PASS mode it does not ring - turning it up brings the bass back instead (with only a gentle bump at the cutoff).',
       manualReference: `${M} p.14 - RESONANCE`,
     }),
     vca_mode: {
