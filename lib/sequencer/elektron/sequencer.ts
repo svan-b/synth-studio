@@ -1916,6 +1916,7 @@ export class ElektronSequencer {
         break;
       }
     }
+    this.snap = null; // TEMP JUMP, queue and mode flags changed (listeners hear it with the next audible event)
     this.planDirty = true;
     this.plan();
   }
