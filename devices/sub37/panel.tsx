@@ -14,7 +14,10 @@
 //   RangeButtons   arpeggiator RANGE < > (and BANK + RANGE = rotate, p.19)
 //   SyncTapButton  SYNC, or hold 1 s for tap tempo (p.15)
 //   ShiftButton    KNOB SHIFT, blinking while shifted (p.30)
-// Touch and mouse alike: pointer events only, no hover-only information.
+// Touch and mouse alike: pointer events only, no hover-only information. Button
+// combinations (BANK + ..., a step + ..., MOD DEST + a control) work with two
+// fingers; with a mouse, long-press the first button (half a second) and release
+// it: it stays held for the next press (combos.ts).
 // ============================================================================
 
 import { useEffect, useRef } from 'react';
@@ -26,18 +29,19 @@ import { useUiStore } from '@/store/ui';
 import { MOD_DESTS, PATTERN_REC, PATTERN_SEQ, noteName } from './model';
 import { SUB37 } from './spec';
 import {
-  readSeq, recNote, rotate, seqDiff, setFirstStep, setLastStep, setStepPitch, stepLit, tieGroup, toggleRest,
+  readSeq, recNote, rotate, setFirstStep, setLastStep, setStepPitch, stepLit, tieGroup, toggleRest,
   type SeqStrings,
 } from './seq';
+import { LATCH_MS, UI_CONTROLS, applySeq, bankHeld, heldStep, selectedStep, usedBank, usedStep } from './combos';
 
-export const UI_CONTROLS = ['knob_shift', 'pitch_bend', 'mod_wheel', 'preset_number', 'preset_bank', 'kb_octave', 'seq_ref', 'latch_restart'];
+export { UI_CONTROLS };
 const UI = new Set(UI_CONTROLS);
 const DOUBLE_TAP_MS = 320;
 const HOLD_MS = 1000;
 const RED = '#ff2d2d';
 
 type Ctx = CustomRenderContext;
-type SetValue = (id: string, v: ControlValue) => void;
+type Timer = ReturnType<typeof setTimeout>;
 
 const uiOf = (instance: string) => useUiStore.getState().ui[instance] ?? {};
 const noSelect: React.CSSProperties = { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', touchAction: 'none' };
@@ -82,10 +86,6 @@ const splitName = (p: PresetSpec | null) => {
   return rest.length ? { cat: cat.toUpperCase(), name: rest.join(' / ') } : { cat: 'MISC', name: p.name };
 };
 
-function applySeq(setValue: SetValue, before: SeqStrings, after: SeqStrings) {
-  Object.entries(seqDiff(before, after)).forEach(([k, v]) => setValue(k, v as ControlValue));
-}
-
 // ---------------------------------------------------------------------------
 // Wheels
 // ---------------------------------------------------------------------------
@@ -98,11 +98,13 @@ interface WheelProps {
   max: number;
   spring?: boolean;
   onChange: (v: number) => void;
+  /** Called once per gesture when the wheel reaches its top or bottom ('up' / 'down') - lessons count it */
+  onEnd?: (end: 'up' | 'down') => void;
 }
 
 /** A vertical performance wheel: drag up / down; the PITCH wheel springs back to centre; double-tap resets */
-export function Wheel({ label, control, value, min, max, spring, onChange }: WheelProps) {
-  const drag = useRef<{ y: number; v: number; id: number; h: number } | null>(null);
+export function Wheel({ label, control, value, min, max, spring, onChange, onEnd }: WheelProps) {
+  const drag = useRef<{ y: number; v: number; id: number; h: number; ends: Set<string> } | null>(null);
   const lastTap = useRef(0);
   const norm = (value - min) / (max - min);
   const offset = (norm - 0.5) * 2; // -1..1
@@ -119,7 +121,7 @@ export function Wheel({ label, control, value, min, max, spring, onChange }: Whe
     }
     lastTap.current = now;
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-    drag.current = { y: e.clientY, v: value, id: e.pointerId, h: e.currentTarget.getBoundingClientRect().height };
+    drag.current = { y: e.clientY, v: value, id: e.pointerId, h: e.currentTarget.getBoundingClientRect().height, ends: new Set() };
   };
   const move = (e: React.PointerEvent) => {
     const d = drag.current;
@@ -127,6 +129,8 @@ export function Wheel({ label, control, value, min, max, spring, onChange }: Whe
     const delta = ((d.y - e.clientY) / (d.h * 0.8)) * (max - min);
     const v = Math.round(Math.max(min, Math.min(max, d.v + delta)));
     if (v !== value) onChange(v);
+    const end = v >= max ? 'up' : v <= min ? 'down' : null;
+    if (end && !d.ends.has(end)) { d.ends.add(end); onEnd?.(end); }
   };
   const up = (e: React.PointerEvent) => {
     const d = drag.current;
@@ -242,19 +246,38 @@ export function CycleButton({ ctx, control, order, reverse }: { ctx: Ctx; contro
   return <Cap lit={0} control={control} aria={`${spec?.label ?? control}: ${label}`} onDown={next} highlighted={targeted(ctx, control)} />;
 }
 
-/** MOD DEST (p.23-24): press steps through the seven destinations; hold it and move a control to assign that control */
+/**
+ * MOD DEST (pp.23-24): a press steps through the seven destinations; hold it and move a control
+ * to make that control the destination (combos.ts). A long press and release keeps it held
+ * for the next control you move (mouse).
+ */
 export function DestButton({ ctx, bus }: { ctx: Ctx; bus: 1 | 2 }) {
   const control = `mod${bus}_dest`;
-  const down = () => ctx.setUi({ destHeld: bus, destAssigned: false });
-  const up = () => {
+  const timer = useRef<Timer | null>(null);
+  const down = () => {
     const ui = uiOf(ctx.instance);
+    // a press on the latched button lets go of it
+    if (Number(ui.destLatched ?? 0) === bus) { ctx.setUi({ destHeld: 0, destLatched: 0, destArmed: 0, destCancel: true }); return; }
+    ctx.setUi({ destHeld: bus, destLatched: 0, destAssigned: false, destArmed: 0, destCancel: false });
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => { timer.current = null; ctx.setUi({ destArmed: bus }); }, LATCH_MS);
+  };
+  const up = () => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    const ui = uiOf(ctx.instance);
+    if (ui.destCancel) { ctx.setUi({ destCancel: false }); return; }
+    if (ui.destAssigned) { ctx.setUi({ destHeld: 0, destArmed: 0 }); return; }
+    if (Number(ui.destArmed ?? 0) === bus) {
+      ctx.setUi({ destLatched: bus, destArmed: 0, note: `MOD ${bus} DEST: MOVE A CONTROL`, noteAt: Date.now() });
+      return;
+    }
     ctx.setUi({ destHeld: 0 });
-    if (ui.destAssigned) return;
     const cur = Math.round(Number(ctx.values[control] ?? 1));
     ctx.setValue(control, (cur + 1) % MOD_DESTS.length);
   };
   const held = Number(ctx.ui.destHeld ?? 0) === bus;
-  return <Cap lit={held ? 1 : 0} control={control} aria={`MOD ${bus} DEST: ${MOD_DESTS[Math.round(Number(ctx.values[control] ?? 1))]}`} onDown={down} onUp={up} highlighted={targeted(ctx, control)} />;
+  const latched = Number(ctx.ui.destLatched ?? 0) === bus;
+  return <Cap lit={held ? 1 : 0} blink={latched} control={control} aria={`MOD ${bus} DEST: ${MOD_DESTS[Math.round(Number(ctx.values[control] ?? 1))]}`} onDown={down} onUp={up} highlighted={targeted(ctx, control)} />;
 }
 
 /** CONTROLLERS: opens the bus's MOD CONTROL menu on the LCD (p.50) */
@@ -274,10 +297,10 @@ export function ControllersButton({ ctx, bus }: { ctx: Ctx; bus: 1 | 2 }) {
 export function RangeButton({ ctx, dir }: { ctx: Ctx; dir: -1 | 1 }) {
   const press = () => {
     const ui = uiOf(ctx.instance);
-    if (ui.bankHeld) {
+    if (bankHeld(ui)) {
       const s = readSeq(ctx.values);
       applySeq(ctx.setValue, s, rotate(s, dir));
-      ctx.setUi({ bankUsed: true });
+      ctx.setUi({ ...usedBank(ui), note: `ROTATE ${dir < 0 ? 'LEFT' : 'RIGHT'}`, noteAt: Date.now() });
       return;
     }
     const cur = Math.round(Number(ctx.values.arp_oct_range ?? 3));
@@ -465,8 +488,8 @@ function useNoteWriter(ctx: Ctx) {
     const values = useStudioStore.getState().devices[ctx.instance]?.controlValues ?? ctx.values;
     const pattern = Math.round(Number(values.arp_pattern ?? 0));
     const s = readSeq(values);
-    const sel = ui.stepEdit ? (ui.stepSel as number | null | undefined) : null;
-    if (sel !== null && sel !== undefined && (pattern === PATTERN_SEQ || pattern === PATTERN_REC)) {
+    const sel = ui.stepEdit ? selectedStep(ui) : null;
+    if (sel !== null && (pattern === PATTERN_SEQ || pattern === PATTERN_REC)) {
       // a non-legato key sets pitch 1 of the selected step, a legato key pitch 2
       applySeq(ctx.setValue, s, setStepPitch(s, sel, key.note, key.legato));
       return;
@@ -513,21 +536,48 @@ function MenuView({ ctx, menu }: { ctx: Ctx; menu: string }) {
   );
 }
 
+/**
+ * PATTERN moved (by hand, a preset, a lesson or MIDI): turning to REC arms step record, so the
+ * next key starts a new sequence at step 1 (p.17); leaving SEQ / REC ends STEP EDIT (p.18).
+ */
+function usePatternWatch(ctx: Ctx, pattern: number) {
+  const prev = useRef(pattern);
+  useEffect(() => {
+    const was = prev.current;
+    prev.current = pattern;
+    if (was === pattern) return;
+    const patch: Record<string, unknown> = {};
+    if (pattern === PATTERN_REC) Object.assign(patch, { recPos: 0, recTie: false });
+    const ui = uiOf(ctx.instance);
+    if (pattern !== PATTERN_REC && pattern !== PATTERN_SEQ && ui.stepEdit) Object.assign(patch, { stepEdit: false, stepSel: null, stepHeld: null, stepLatched: false });
+    if (Object.keys(patch).length) ctx.setUi(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pattern]);
+}
+
 export function Lcd({ ctx }: { ctx: Ctx }) {
   useNoteWriter(ctx);
   const v = ctx.values;
+  const pattern = Math.round(Number(v.arp_pattern ?? 0));
+  usePatternWatch(ctx, pattern);
   const bank = Math.round(Number(v.preset_bank ?? 1));
   const slot = Math.round(Number(v.preset_number ?? 0));
   const p = slot ? presetAt(bank, slot) : null;
   const { cat, name } = slot ? splitName(p) : { cat: 'PANEL', name: 'Panel' };
   const lcd = ctx.engine.lcd as { title: string; value: string } | null | undefined;
   const menu = ctx.ui.menu as string | null | undefined;
-  const pattern = Math.round(Number(v.arp_pattern ?? 0));
   const note = ctx.ui.note as string | undefined;
   const noteFresh = note && Date.now() - Number(ctx.ui.noteAt ?? 0) < 2500;
   const s = readSeq(v);
+  const latchedStep = ctx.ui.stepLatched ? heldStep(ctx.ui) : null;
   let status = '';
-  if (ctx.ui.stepEdit) {
+  if (Number(ctx.ui.destLatched ?? 0)) {
+    status = `MOD ${ctx.ui.destLatched} DEST: MOVE A CONTROL`;
+  } else if (ctx.ui.bankLatched) {
+    status = 'BANK HELD: PRESS A BUTTON';
+  } else if (latchedStep !== null) {
+    status = `STEP ${latchedStep + 1} HELD: PRESS A BUTTON`;
+  } else if (ctx.ui.stepEdit) {
     const cur = Number(ctx.engine.seqStep ?? -1);
     const sel = ctx.ui.stepSel as number | null | undefined;
     const page = Number(ctx.ui.seqPage ?? 0) + 1;
@@ -571,7 +621,7 @@ export function Lcd({ ctx }: { ctx: Ctx }) {
           <div style={{ ...TRUNC, fontWeight: 700, fontSize: 11, lineHeight: 1.15 }}>{noteFresh ? note : lcd ? lcd.value : ''}</div>
         </>
       )}
-      <div style={{ ...TRUNC, marginTop: 'auto', fontSize: 8, fontWeight: 700, color: status.startsWith('SYNC') ? '#ffd27a' : undefined }}>{status}</div>
+      <div style={{ ...TRUNC, marginTop: 'auto', fontSize: 8, fontWeight: 700, color: status.startsWith('SYNC') || status.includes('HELD') || status.includes('MOVE') ? '#ffd27a' : undefined }}>{status}</div>
     </div>
   );
 }
@@ -599,16 +649,18 @@ export function KbOctave({ ctx }: { ctx: Ctx }) {
     if (both.current.timer) { clearTimeout(both.current.timer); both.current.timer = null; }
     if (wasBoth) { if (!downs.current.size) both.current.used = false; return; }
     const ui = uiOf(ctx.instance);
-    if (ui.stepEdit && ui.stepHeld !== null && ui.stepHeld !== undefined) {
+    const held = heldStep(ui);
+    if (ui.stepEdit && held !== null) {
       // hold a step + KB OCTAVE down / up: FIRST / LAST step (p.19)
       const s = readSeq(ctx.values);
-      applySeq(ctx.setValue, s, dir < 0 ? setFirstStep(s, ui.stepHeld as number) : setLastStep(s, ui.stepHeld as number));
-      ctx.setUi({ stepHeldUsed: true });
+      applySeq(ctx.setValue, s, dir < 0 ? setFirstStep(s, held) : setLastStep(s, held));
+      ctx.setUi({ ...usedStep(ui), note: `${dir < 0 ? 'FIRST' : 'LAST'} STEP ${held + 1}`, noteAt: Date.now() });
       return;
     }
-    if (ui.bankHeld && ui.stepEdit) {
+    if (bankHeld(ui) && ui.stepEdit) {
       // BANK + KB OCTAVE: sequence page (p.18)
-      ctx.setUi({ seqPage: Math.max(0, Math.min(3, Number(ui.seqPage ?? 0) + dir)), bankUsed: true, pageChase: false });
+      const page = Math.max(0, Math.min(3, Number(ui.seqPage ?? 0) + dir));
+      ctx.setUi({ ...usedBank(ui), seqPage: page, pageChase: false, note: `PAGE P${page + 1}`, noteAt: Date.now() });
       return;
     }
     ctx.setValue('kb_octave', Math.max(-2, Math.min(2, oct + dir)));
@@ -625,17 +677,34 @@ export function KbOctave({ ctx }: { ctx: Ctx }) {
   );
 }
 
+/**
+ * BANK (pp.12, 18): a press picks the bank-select mode (then PRESET 1-16), or in STEP EDIT
+ * deselects the step. Held (or long-pressed and released), it combines with the next button:
+ * LATCH (STEP EDIT), a step (select it), KB OCTAVE (page), RANGE (rotate), BACK/FORTH and
+ * INVERT (ratchet count), PATTERN to REC (quick erase).
+ */
 export function BankButton({ ctx }: { ctx: Ctx }) {
-  const down = () => ctx.setUi({ bankHeld: true, bankUsed: false });
-  const up = () => {
+  const timer = useRef<Timer | null>(null);
+  const down = () => {
     const ui = uiOf(ctx.instance);
-    ctx.setUi({ bankHeld: false });
+    if (ui.bankLatched) { ctx.setUi({ bankLatched: false, bankCancel: true, bankArmed: false }); return; }
+    ctx.setUi({ bankDown: true, bankUsed: false, bankArmed: false, bankCancel: false });
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => { timer.current = null; ctx.setUi({ bankArmed: true }); }, LATCH_MS);
+  };
+  const up = () => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    const ui = uiOf(ctx.instance);
+    ctx.setUi({ bankDown: false, bankArmed: false });
+    if (ui.bankCancel) { ctx.setUi({ bankCancel: false }); return; }
     if (ui.bankUsed) return;
+    if (ui.bankArmed) { ctx.setUi({ bankLatched: true, bankMode: false, note: 'BANK HELD: PRESS A BUTTON', noteAt: Date.now() }); return; }
     if (ui.stepEdit) { ctx.setUi({ stepSel: null }); return; }   // deselect the step (p.18)
     ctx.setUi({ bankMode: !ui.bankMode, menu: null });
   };
-  const lit = ctx.ui.bankMode || ctx.ui.bankHeld ? 1 : ctx.ui.stepEdit ? 0.5 : 0;
-  return <Cap lit={lit} blink={!!ctx.ui.stepEdit && ctx.ui.stepSel == null} control="preset_bank" aria="BANK" onDown={down} onUp={up} w={22} />;
+  const held = bankHeld(ctx.ui);
+  const lit = ctx.ui.bankMode || held ? 1 : ctx.ui.stepEdit && ctx.ui.stepSel == null ? 0.5 : 0;
+  return <Cap lit={lit} blink={!!ctx.ui.bankLatched || (!!ctx.ui.stepEdit && ctx.ui.stepSel == null)} control="preset_bank" aria="BANK" onDown={down} onUp={up} w={22} />;
 }
 
 export function PresetRow({ ctx }: { ctx: Ctx }) {
@@ -647,35 +716,51 @@ export function PresetRow({ ctx }: { ctx: Ctx }) {
   const chase = ctx.ui.pageChase !== false;
   const page = stepEdit ? (chase && playing >= 0 ? Math.floor(playing / 16) : Number(ctx.ui.seqPage ?? 0)) : 0;
   const s = readSeq(v);
+  const timer = useRef<Timer | null>(null);
 
   const down = (i: number) => {
     const ui = uiOf(ctx.instance);
     if (!stepEdit) {
       // BANK then a PRESET button picks the bank; otherwise the button loads that preset (p.12)
-      if (ui.bankMode) { ctx.setUi({ bankMode: false }); ctx.setValue('preset_bank', i + 1); return; }
+      if (ui.bankMode || bankHeld(ui)) { ctx.setUi({ bankMode: false, ...usedBank(ui) }); ctx.setValue('preset_bank', i + 1); return; }
       loadSlot(ctx.instance, bank, i + 1);
       return;
     }
     const step = page * 16 + i;
-    if (ui.bankHeld) { ctx.setUi({ stepSel: step, bankUsed: true, stepHeld: null }); return; }   // select for editing
-    const held = ui.stepHeld as number | null | undefined;
-    if (held !== null && held !== undefined && held !== step) {
-      // hold one step and press another: tie them and the steps between (p.19)
-      applySeq(ctx.setValue, s, tieGroup(s, held, step));
-      ctx.setUi({ stepHeldUsed: true });
+    if (bankHeld(ui)) {
+      // BANK + a step: select it for editing (p.18)
+      ctx.setUi({ ...usedBank(ui), stepSel: step, stepHeld: null, stepLatched: false, note: `EDIT STEP ${step + 1}`, noteAt: Date.now() });
       return;
     }
-    if (ui.stepSel !== null && ui.stepSel !== undefined) { ctx.setUi({ stepSel: step }); return; }
-    ctx.setUi({ stepHeld: step, stepHeldUsed: false });
+    const held = heldStep(ui);
+    if (held !== null && held !== step) {
+      // hold one step and press another: tie them and the steps between (p.19)
+      applySeq(ctx.setValue, s, tieGroup(s, held, step));
+      ctx.setUi({ ...usedStep(ui), note: `TIE ${Math.min(held, step) + 1}-${Math.max(held, step) + 1}`, noteAt: Date.now() });
+      return;
+    }
+    if (selectedStep(ui) !== null) { ctx.setUi({ stepSel: step, note: `EDIT STEP ${step + 1}`, noteAt: Date.now() }); return; }
+    if (held === step && ui.stepLatched) { ctx.setUi({ stepCancel: true }); return; }   // a press lets a latched step go
+    ctx.setUi({ stepHeld: step, stepHeldUsed: false, stepLatched: false, stepArmed: null, stepCancel: false });
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => { timer.current = null; ctx.setUi({ stepArmed: step }); }, LATCH_MS);
   };
   const up = (i: number) => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     const ui = uiOf(ctx.instance);
     if (!stepEdit) return;
     const step = page * 16 + i;
-    if (ui.stepHeld === step) {
-      if (!ui.stepHeldUsed) applySeq(ctx.setValue, s, toggleRest(s, step));   // a tap toggles the rest (p.19)
-      ctx.setUi({ stepHeld: null, stepHeldUsed: false });
+    if (heldStep(ui) !== step) return;
+    if (ui.stepCancel) { ctx.setUi({ stepHeld: null, stepLatched: false, stepCancel: false, stepArmed: null }); return; }
+    if (ui.stepLatched) return;
+    if (ui.stepHeldUsed) { ctx.setUi({ stepHeld: null, stepHeldUsed: false, stepArmed: null }); return; }
+    if (ui.stepArmed === step) {
+      // long press and release: the step stays held for the next press (mouse)
+      ctx.setUi({ stepLatched: true, stepArmed: null, note: `STEP ${step + 1} HELD`, noteAt: Date.now() });
+      return;
     }
+    applySeq(ctx.setValue, s, toggleRest(s, step));   // a tap toggles the rest (p.19)
+    ctx.setUi({ stepHeld: null, stepHeldUsed: false, stepArmed: null });
   };
 
   return (
@@ -685,8 +770,8 @@ export function PresetRow({ ctx }: { ctx: Ctx }) {
         let lit = 0, blink = false;
         if (stepEdit) {
           lit = playing === step ? 1 : stepLit(s, step) ? 0.4 : 0;
-          blink = ctx.ui.stepSel === step;
-        } else if (ctx.ui.bankMode) lit = bank === i + 1 ? 1 : 0;
+          blink = ctx.ui.stepSel === step || (!!ctx.ui.stepLatched && ctx.ui.stepHeld === step);
+        } else if (ctx.ui.bankMode || bankHeld(ctx.ui)) lit = bank === i + 1 ? 1 : 0;
         else lit = slot === i + 1 ? 1 : 0;
         const p = !stepEdit ? presetAt(bank, i + 1) : null;
         const stepNote = stepEdit ? s.arp_seq[step] : '';

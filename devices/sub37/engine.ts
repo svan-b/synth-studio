@@ -69,6 +69,8 @@ export class Sub37Engine extends BaseEngine {
   private keyCount = 0;
   private readonly keySid = Math.random().toString(36).slice(2);
   private auditioning = false;
+  /** The audition plays on the player's own running arpeggio / sequence (and leaves it running) */
+  private audKeep = false;
   private audNotes = new Set<number>();
   private audGen = 0;
 
@@ -402,8 +404,9 @@ export class Sub37Engine extends BaseEngine {
     this.held = this.held.filter(n => n !== note);
     this.held.push(note);
     this.velocity = velocity;
-    // the panel writes keys into the sequence while step recording or editing a step (pp.17, 19)
-    this.emit({ keyNote: { sid: this.keySid, n: ++this.keyCount, note: this.played(note), legato: wasHeld > 0 } });
+    // the panel writes keys into the sequence while step recording or editing a step (pp.17, 19);
+    // a lesson or QA audition's demo phrase is not the learner playing, so it never records
+    if (!this.auditioning) this.emit({ keyNote: { sid: this.keySid, n: ++this.keyCount, note: this.played(note), legato: wasHeld > 0 } });
     if (this.arpActive()) {
       const latch = this.bool('arp_latch');
       if (isSeqPattern(this.pattern())) {
@@ -783,9 +786,10 @@ export class Sub37Engine extends BaseEngine {
   // ==========================================================================
 
   /**
-   * The demo phrase for lessons and the audio QA: the standard phrase (C2 C3 G3 C4 as 8ths at 120,
-   * then C3 held) for keyboard patches; for an arpeggio a held C major chord; for a sequence its
-   * first note held, so it plays as recorded.
+   * The demo phrase for lessons and the audio QA: the standard phrase (MIDI 36 48 55 60 as 8ths at
+   * 120, then 48 held; in DUO MODE 48 + 55, a fifth) for keyboard patches; for an arpeggio a held
+   * C major chord; for a sequence its first note held, so it plays as recorded. A latched pattern
+   * the player already has running is left running.
    */
   private startAudition() {
     this.stopAudition();
@@ -795,6 +799,10 @@ export class Sub37Engine extends BaseEngine {
     const off = (k: number) => { if (gen !== this.audGen) return; if (this.audNotes.delete(k)) this.noteOff(k); };
     const at = (sec: number, fn: () => void) => this.atTime(this.ctx.currentTime + sec, fn);
     const shift = 12 * Math.round(this.num('kb_octave', 0)) + Math.round(this.num('kb_transpose', 0));
+    // An arpeggio or sequence the player already has running (latched) is the demo: the A/B
+    // values play on it, and it keeps running when the audition ends
+    this.audKeep = this.arpActive() && this.arpHasNotes();
+    if (this.audKeep) { this.updateClock(); return; }
     if (this.arpActive()) {
       if (isSeqPattern(this.pattern())) {
         const first = firstSeqNote(String(this.params.arp_seq ?? ''), String(this.params.arp_seq_flags ?? ''), Math.round(this.num('seq_first', 1)) - 1, Math.round(this.num('seq_len', 16)) - 1);
@@ -805,6 +813,8 @@ export class Sub37Engine extends BaseEngine {
     } else {
       [36, 48, 55, 60].forEach((k, i) => { at(i * 0.5, () => on(k)); at(i * 0.5 + 0.375, () => off(k)); });
       at(2, () => on(48));
+      // DUO MODE: the held ending is a fifth, so both oscillators' notes are heard (p.26)
+      if (this.bool('duo_mode')) at(2.05, () => on(55));
     }
     this.updateClock();
   }
@@ -815,6 +825,7 @@ export class Sub37Engine extends BaseEngine {
     this.audNotes.clear();
     if (!this.auditioning) return;
     this.auditioning = false;
+    if (this.audKeep) { this.audKeep = false; this.updateClock(); return; }
     if (this.arpActive()) {
       // a latched arpeggio or sequence started by the audition stops with it
       this.arp.clear();

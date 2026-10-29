@@ -260,9 +260,11 @@ const elements: PanelElement[] = [
   { kind: 'jack', jack: 'in_volume', x: 31, y: 204 },
   { kind: 'jack', jack: 'in_gate', x: 11, y: 225 },
   { kind: 'jack', jack: 'out_audio', x: 31, y: 225 },
-  custom(44, KEYS_Y + 4, 42, H - KEYS_Y - 10, ({ values, setValue }) => (
+  // The PITCH wheel springs back, so lessons count "pushed all the way" as the events
+  // pitch_wheel_up / pitch_wheel_down
+  custom(44, KEYS_Y + 4, 42, H - KEYS_Y - 10, ({ values, setValue, sendEvent }) => (
     <div style={{ display: 'flex', height: '100%', gap: '14%', padding: '0 6%' }}>
-      <Wheel label="PITCH" control="pitch_bend" value={Number(values.pitch_bend ?? 0)} min={-100} max={100} spring onChange={x => setValue('pitch_bend', x)} />
+      <Wheel label="PITCH" control="pitch_bend" value={Number(values.pitch_bend ?? 0)} min={-100} max={100} spring onChange={x => setValue('pitch_bend', x)} onEnd={end => sendEvent(`pitch_wheel_${end}`)} />
       <Wheel label="MOD" control="mod_wheel" value={Number(values.mod_wheel ?? 0)} min={0} max={100} onChange={x => setValue('mod_wheel', x)} />
     </div>
   )),

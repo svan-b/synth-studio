@@ -96,7 +96,7 @@ export const SUB37_PRESETS: Record<string, PresetSpec> = {
     aeg_attack: 350, aeg_decay: 1000, aeg_sustain: 90, aeg_release: 1200, mod1_rate: 5.5, mod1_pitch_amt: 4,
     mod2_rate: 0.6, mod2_dest: 3, mod2_mod_amt: 30,
   }),
-  8_bit_chip_arp: preset("Classic / 8-Bit Chip Arp", "A video-game chip sound: a narrow pulse at 4' with the filter wide open, and a fast UP arpeggio that turns any held chord into a chiptune arpeggio. Short gate. Recreation of the Sub 37 factory preset “Gamecom 8Bit Chiptime Fun” (bank 1, preset 15, CLASSIC); Moog's own settings are not published, so these are ours. Play: Hold a three- or four-note chord; change chords on the beat.", 1, 14, {
+  chip_arp_8bit: preset("Classic / 8-Bit Chip Arp", "A video-game chip sound: a narrow pulse at 4' with the filter wide open, and a fast UP arpeggio that turns any held chord into a chiptune arpeggio. Short gate. Recreation of the Sub 37 factory preset “Gamecom 8Bit Chiptime Fun” (bank 1, preset 15, CLASSIC); Moog's own settings are not published, so these are ours. Play: Hold a three- or four-note chord; change chords on the beat.", 1, 14, {
     osc1_octave: 2, osc1_wave: 85, mix_osc1: 60, aeg_decay: 100, aeg_sustain: 80, aeg_release: 30, arp_on: true,
     arp_sync: true, arp_div: 18, arp_gate: 60,
   }),
@@ -110,7 +110,7 @@ export const SUB37_PRESETS: Record<string, PresetSpec> = {
     osc1_wave: 0, osc2_octave: 2, osc2_wave: 67, osc2_frequency: 6, mix_osc1: 70, mix_osc2: 40, mix_noise: 10,
     cutoff: 1800, resonance: 20, filter_slope: 1, filter_eg_amt: 40, filter_kb_amt: 50, feg_decay: 4000,
     feg_sustain: 0, feg_release: 4000, feg_vel_amt: 50, feg_multi_trig: true, feg_reset: true, aeg_decay: 7000,
-    aeg_sustain: 0, aeg_release: 7000, aeg_vel_amt: 50, aeg_multi_trig: true, aeg_reset: true, mod2_rate: 173,
+    aeg_sustain: 0, aeg_release: 7000, aeg_vel_amt: 50, aeg_multi_trig: true, aeg_reset: true, mod2_rate: 17.3,
     mod2_hi_range: true, mod2_pitch_amt: 40, mod2_pitch_dest: 1,
   }),
   rhythmic_fifth_filter: preset("Duo / Rhythmic Fifth Filter", "Rhythmic fifths: a clock-synced square LFO gates the brightness of a resonant fifth in eighth notes. In DUO, one key gives a power fifth and two keys spread the voicing. Recreation of the Sub 37 factory preset “Rhythmic 5th Filtration” (bank 1, preset 1, DUO); Moog's own settings are not published, so these are ours. Play: Hold one or two keys; set the studio tempo. MOD 2 KB RESET puts each new note on the beat.", 2, 1, {
@@ -205,7 +205,7 @@ export const SUB37_PRESETS: Record<string, PresetSpec> = {
     resonance: 20, multidrive: 100, filter_eg_amt: 40, feg_decay: 400, feg_sustain: 50, feg_release: 200,
     aeg_decay: 500, aeg_sustain: 90, aeg_release: 200, preset_volume: 60,
   }),
-  70s_tv_detective_lead: preset("Classic / 70s TV Detective Lead", "A funky 70s TV-detective lead: saw plus square, a resonant bite, two voices for fourths and fifths, a short glide. Recreation of the Sub 37 factory preset “70s TV PI Theme” (bank 3, preset 9, CLASSIC); Moog's own settings are not published, so these are ours. Play: A four-note riff shape played three times, a step lower each time; two-note fourths for punch.", 3, 2, {
+  tv_detective_lead_70s: preset("Classic / 70s TV Detective Lead", "A funky 70s TV-detective lead: saw plus square, a resonant bite, two voices for fourths and fifths, a short glide. Recreation of the Sub 37 factory preset “70s TV PI Theme” (bank 3, preset 9, CLASSIC); Moog's own settings are not published, so these are ours. Play: A four-note riff shape played three times, a step lower each time; two-note fourths for punch.", 3, 2, {
     osc2_wave: 67, beat_freq: 0.5, duo_mode: true, mix_osc1: 60, mix_sub: 20, mix_osc2: 60, mix_feedback: 10,
     cutoff: 1200, resonance: 35, multidrive: 25, filter_eg_amt: 50, feg_attack: 5, feg_decay: 350, feg_sustain: 40,
     feg_release: 200, aeg_attack: 3, aeg_decay: 400, aeg_sustain: 80, aeg_release: 200, mod1_rate: 5.5,
@@ -253,7 +253,7 @@ export const SUB37_PRESETS: Record<string, PresetSpec> = {
     feg_sustain: 20, feg_release: 180, feg_vel_amt: 80, aeg_decay: 600, aeg_sustain: 90, aeg_release: 140,
     aeg_vel_amt: 50, mod2_source: 5, mod2_pgm_src: 2, mod2_filter_amt: 50, mod2_wheel: 100,
   }),
-  70s_computer_bleeps: preset("Sound FX / 70s Computer Bleeps", "The 1970s \"computer thinking\" sound the manual describes for S&H: random steps on the pitch and on a resonant filter. Recreation of the Sub 37 factory preset “1970s SciFi Computer” (bank 4, preset 14, SOUND-FX); Moog's own settings are not published, so these are ours. Play: Hold one key; the S&H does the rest. Push the wheel to add pitch randomness.", 3, 10, {
+  computer_bleeps_70s: preset("Sound FX / 70s Computer Bleeps", "The 1970s \"computer thinking\" sound the manual describes for S&H: random steps on the pitch and on a resonant filter. Recreation of the Sub 37 factory preset “1970s SciFi Computer” (bank 4, preset 14, SOUND-FX); Moog's own settings are not published, so these are ours. Play: Hold one key; the S&H does the rest. Push the wheel to add pitch randomness.", 3, 10, {
     osc1_octave: 2, osc1_wave: 67, mix_osc1: 60, cutoff: 1500, resonance: 60, filter_slope: 1, aeg_release: 200,
     mod1_source: 4, mod1_rate: 7, mod1_pitch_amt: 40, mod2_source: 4, mod2_rate: 7, mod2_filter_amt: 40,
   }),
