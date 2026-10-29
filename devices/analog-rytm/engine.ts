@@ -126,6 +126,9 @@ export class AnalogRytmEngine extends BaseEngine {
       onNoteOff: (track, _note, time) => { if (track < 12) this.post({ t: 'off', at: time, tr: track }); },
       onPattern: (id, time) => this.onPattern(id, time),
       onStep: (track, step, time) => { const c = this.stepClock[track]; c.step = step; c.time = time; },
+      // [STOP] (or the studio's stop, or a song's end) cuts every track's sound; the delay and
+      // reverb ring on (manual p.37). A pause ([PLAY] while playing) lets the sounds decay.
+      onPlay: playing => { if (!playing && !this.seq.isPaused) this.post({ t: 'stop' }); },
     });
     this.seq.subscribe(s => this.onSeqState(s));
 

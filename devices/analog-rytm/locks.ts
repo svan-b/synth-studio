@@ -5,7 +5,7 @@
 // own NOTE / VEL / LEN and the track probability.
 // ============================================================================
 
-import { asProject, type LockOptions } from '@/lib/sequencer/elektron';
+import { LOCK_LIMIT_RYTM, asProject, type LockOptions } from '@/lib/sequencer/elektron';
 import { SEQ_TRACKS, parseId } from './model';
 
 const NOT_LOCKABLE = new Set(['machine', 'trk_lev', 'acc_lev', 'vel_vol', 'rtrg_rate', 'rtrg_len', 'rtrg_vcr', 'rtrg_on']);
@@ -27,4 +27,6 @@ export const LOCKS: LockOptions = {
   currentPattern: data => asProject(data, SEQ_TRACKS).active,
   trackDefaults: true,
   tracks: SEQ_TRACKS,
+  // a pattern locks at most 72 different parameters; a lock on one more is refused (manual p.47)
+  lockLimit: LOCK_LIMIT_RYTM,
 };

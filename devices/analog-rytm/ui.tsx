@@ -15,8 +15,8 @@ import React, { useEffect, useRef, useState, type CSSProperties, type ReactNode 
 import type { ControlValue } from '@/types';
 import type { CustomRenderContext } from '@/types/panel';
 import {
-  CHANGE_MODES, asProject, clearTrack, getPattern, setActive, setChangeMode, setPlayMode, setStep, trackLength,
-  updatePatternSettings, updateSteps, withTrack, type Project, type Step, type Track,
+  CHANGE_MODES, asProject, clearTrack, getPattern, isSwingStep, setActive, setChangeMode, setMasterMute, setMasterMutes, setPlayMode, setStep,
+  setTrigMute, toggleSwingTrig, trackLength, updatePatternSettings, updateSteps, withTrack, type Project, type Step, type Track,
 } from '@/lib/sequencer/elektron';
 import { isLocked } from '@/lib/sequencer/elektron/locks';
 import { C, Frame, FONT, Group, MONO, Overlay, SeqButton, Stepper } from '@/components/sequencer/shared';
@@ -290,15 +290,15 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
           const k = pre.indexOf(pad);
           if (k >= 0) pre.splice(k, 1); else pre.push(pad);
           c.setUi({ mutePre: pre });
-        } else c.sendEvent('seq:mute', { track: pad });
+        } else toggleMasterMute(c, pad);
         return;
       }
       if (m === PAD_MODE.SCNE) { c.setUi({ sceneEdit: pad, perfEdit: null }); flash(c, `SCENE ${pad + 1} EDIT: TURN THE ENCODERS`); return; }
     }
-    if (m === PAD_MODE.MUTE && c.ui.rtrgHeld) { toggleSolo(c, pad); return; }
+    if (m === PAD_MODE.MUTE && (c.ui.rtrgHeld || c.ui.rtrgLatch)) { toggleSolo(c, pad); return; }
     switch (m) {
       case PAD_MODE.MUTE:
-        c.sendEvent('seq:mute', { track: pad });
+        toggleMasterMute(c, pad);
         return;
       case PAD_MODE.CHRO: {
         const tr = Math.min(11, active);
@@ -341,8 +341,8 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
     c.sendEvent('pad:up', { track: h.track });
   };
 
-  const mutes = st?.mutes ?? [];
-  const solo = (ctx.ui.solo as number[] | undefined) ?? [];
+  const master = project.mutes ?? [];
+  const solos = (st as { solos?: boolean[] } | undefined)?.solos ?? [];
   const pre = (ctx.ui.mutePre as number[] | undefined) ?? [];
   const octave = Math.round(num(ctx.ui.octave));
   /** Mode colours (manual pp.19-30): base colour and brightness 0..1 */
@@ -350,8 +350,8 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
     switch (mode) {
       case PAD_MODE.MUTE: {
         if (pre.includes(i)) return { color: RY.blue, base: 0.8 };
-        if (solo.includes(i)) return { color: RY.cyan, base: 0.85 };
-        const muted = !!mutes[i] || !!pat.tracks[i]?.mute;
+        if (solos[i]) return { color: RY.cyan, base: 0.85 };
+        const muted = master.includes(i) || !!pat.tracks[i]?.mute;
         return muted ? { color: RY.pad, base: 0 } : { color: RY.green, base: 0.6 };
       }
       case PAD_MODE.CHRO:
@@ -426,25 +426,37 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
 /** The track's VEL on the TRIG page (what [FUNC] + pad, the trig keys and FIX AUTO play) */
 const trackVel = (c: CustomRenderContext, track: number) => Math.round(num(c.values[`${TRACKS[track].id}_trig_vel`], 100));
 
-/** [RTRG] + pad in MUTE mode: solo (mute every other track); again to release */
+/** [RTRG] + pad in MUTE mode: solo (every other track is muted); again to release (manual p.23) */
 function toggleSolo(c: CustomRenderContext, pad: number) {
-  const solo = ((c.ui.solo as number[] | undefined) ?? []).slice();
-  const k = solo.indexOf(pad);
-  if (k >= 0) solo.splice(k, 1); else solo.push(pad);
-  const mutes = (c.engine.seq as { mutes?: boolean[] } | undefined)?.mutes ?? [];
-  for (let t = 0; t < 12; t++) {
-    const want = solo.length > 0 && !solo.includes(t);
-    if (!!mutes[t] !== want) c.sendEvent('seq:mute', { track: t, on: want });
-  }
-  c.setUi({ solo });
-  flash(c, solo.length ? `SOLO ${solo.map(t => TRACKS[t].name).join(' ')}` : 'SOLO OFF');
+  const solos = ((c.engine.seq as { solos?: boolean[] } | undefined)?.solos ?? []).slice(0, 12);
+  const on = !solos[pad];
+  c.sendEvent('seq:solo', { track: pad, on });
+  solos[pad] = on;
+  const list = TRACKS.filter((_, t) => solos[t]).map(t => t.name);
+  flash(c, list.length ? `SOLO ${list.join(' ')}` : 'SOLO OFF');
 }
 
-/** [FUNC] released in MUTE mode: the preselected mutes come into effect */
+/**
+ * MUTE mode: the master mutes. They stay when the pattern or the kit changes and
+ * win over trig mutes and song mutes (manual p.23); the project keeps them.
+ */
+export function toggleMasterMute(c: CustomRenderContext, track: number) {
+  c.updateData(d => {
+    const p = asProject(d, T);
+    return setMasterMute(p, track, !(p.mutes ?? []).includes(track));
+  });
+}
+
+/** [FUNC] released in MUTE mode: the preselected mutes come into effect together */
 export function applyMutePreselect(c: CustomRenderContext) {
   const pre = (c.ui.mutePre as number[] | undefined) ?? [];
   if (!pre.length) return;
-  for (const t of pre) c.sendEvent('seq:mute', { track: t });
+  c.updateData(d => {
+    const p = asProject(d, T);
+    const cur = new Set(p.mutes ?? []);
+    for (const t of pre) { if (cur.has(t)) cur.delete(t); else cur.add(t); }
+    return setMasterMutes(p, [...cur]);
+  });
   c.setUi({ mutePre: [] });
 }
 
@@ -506,6 +518,87 @@ export function PlayTrigs({ ctx }: { ctx: CustomRenderContext }) {
       })}
     </div>
   );
+}
+
+/**
+ * TRIG MUTE ([FUNC] + [BANK E]) and SWING ([FUNC] + [BANK G]) menus (manual pp.49-50): the trig
+ * keys place or remove trig mutes on the active track's trigs, or the pattern's swing trigs.
+ * Trigs light pale, marked steps bright; the white ring is the playhead.
+ */
+export function FlagTrigs({ ctx, mode }: { ctx: CustomRenderContext; mode: 'tmute' | 'swing' }) {
+  const p = projectOf(ctx);
+  const track = Math.round(num(ctx.values.track));
+  const st = ctx.engine.seq as { playing?: boolean; pattern?: string | null; steps?: number[] } | undefined;
+  const pid = (st?.playing && st.pattern) || p.active;
+  const pat = getPattern(p, pid);
+  const tr = pat.tracks[track];
+  const len = trackLength(pat, track);
+  const page = Math.round(num(ctx.ui.stepPage));
+  const play = st?.playing ? st.steps?.[track] ?? -1 : -1;
+  const color = mode === 'tmute' ? RY.green : RY.yellow;
+  const live = useRef(ctx);
+  live.current = ctx;
+  const down = (k: number, e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    e.preventDefault();
+    const c = live.current;
+    const s = page * 16 + k;
+    if (mode === 'tmute') {
+      const q = projectOf(c);
+      const cur = getPattern(q, pid).tracks[track]?.steps[s];
+      if (!cur) { flash(c, 'TRIG MUTE GOES ON A TRIG'); return; }
+      c.updateData(d => setTrigMute(asProject(d, T), pid, track, [s], !cur.mute));
+    } else c.updateData(d => toggleSwingTrig(asProject(d, T), pid, s));
+  };
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 'var(--rytm-trig-gap, 3px)' }}>
+      {Array.from({ length: 16 }, (_, k) => {
+        const s = page * 16 + k;
+        const inLen = s < len;
+        const trig = tr?.steps[s];
+        const marked = mode === 'tmute' ? !!trig?.mute : isSwingStep(pat, s);
+        const lv = marked ? 0.95 : trig && !trig.trigless ? 0.3 : 0;
+        return (
+          <button key={k} type="button" data-control={`trig:${k + 1}`}
+            aria-label={`Trig key ${k + 1}: ${mode === 'tmute' ? (marked ? 'trig muted' : trig ? 'trig' : 'empty') : (marked ? 'swing trig' : 'straight')}`}
+            aria-pressed={marked}
+            onPointerDown={e => down(k, e)} onContextMenu={e => e.preventDefault()}
+            style={{
+              flex: 1, minWidth: 0, height: '100%', padding: 0, borderRadius: '14%', cursor: inLen ? 'pointer' : 'default', touchAction: 'none',
+              userSelect: 'none', WebkitUserSelect: 'none', WebkitTapHighlightColor: 'transparent', opacity: inLen ? 1 : 0.35,
+              border: `${s === play ? 2 : k % 4 === 0 ? 2 : 1}px solid ${s === play ? '#ffffff' : k % 4 === 0 ? '#55585d' : RY.keyEdge}`,
+              background: lv > 0 ? `radial-gradient(circle at 50% 40%, ${mix(RY.keyHi, color, 0.25 + 0.65 * lv)} 0%, ${RY.key} 90%)` : `linear-gradient(180deg, ${RY.keyHi} 0%, ${RY.key} 60%)`,
+              boxShadow: lv > 0.5 ? `0 2px 0 #000, 0 0 ${4 + 8 * lv}px ${color}` : '0 2px 0 #000',
+              color: lv > 0.5 ? '#111' : RY.sub, fontFamily: FONT, fontSize: 'var(--rytm-sub-font, 8px)', fontWeight: 700,
+            }}>{s + 1}</button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Held trig + [BANK E]: trig mute on / off for the held trigs (manual p.49) */
+export function toggleHeldMute(ctx: CustomRenderContext) {
+  const held = Array.isArray(ctx.ui.heldSteps) ? (ctx.ui.heldSteps as number[]) : [];
+  if (!held.length) return false;
+  const p = projectOf(ctx);
+  const track = typeof ctx.ui.heldTrack === 'number' ? ctx.ui.heldTrack : Math.round(num(ctx.values.track));
+  const pid = typeof ctx.ui.heldPattern === 'string' ? ctx.ui.heldPattern : p.active;
+  const first = getPattern(p, pid).tracks[track]?.steps[held[0]];
+  const on = !first?.mute;
+  ctx.updateData(d => setTrigMute(asProject(d, T), pid, track, held, on));
+  ctx.setUi({ heldEdited: true });
+  flash(ctx, `TRIG MUTE ${on ? 'ON' : 'OFF'}`);
+  return true;
+}
+
+/** SWING menu: [UP] / [DOWN] set the pattern's swing 50-80 % (manual p.50) */
+export function nudgeSwing(ctx: CustomRenderContext, dir: number) {
+  const p = projectOf(ctx);
+  const cur = getPattern(p, p.active).swing;
+  const next = Math.max(50, Math.min(80, cur + dir));
+  ctx.updateData(d => updatePatternSettings(asProject(d, T), p.active, { swing: next }));
+  flash(ctx, `SWING ${next}%`);
 }
 
 const rtrgOn = (c: CustomRenderContext) => !!(c.ui.rtrgHeld || c.ui.rtrgLatch);
@@ -655,12 +748,14 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
   if (showMsg) {
     body = <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '1.1em', lineHeight: 1.35, padding: '0 4%' }}>{message!.text}</div>;
   } else if (mode === PAD_MODE.MUTE) {
-    const mutes = (ctx.engine.seq as { mutes?: boolean[] } | undefined)?.mutes ?? [];
+    const master = project.mutes ?? [];
+    const solos = (ctx.engine.seq as { solos?: boolean[] } | undefined)?.solos ?? [];
+    const anySolo = solos.some(Boolean);
     const pat = getPattern(project, patId);
     body = (
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4%', alignContent: 'center', padding: '2% 0' }}>
         {TRACKS.map((t, i) => {
-          const m = !!mutes[i] || !!pat.tracks[i]?.mute;
+          const m = master.includes(i) || !!pat.tracks[i]?.mute || (anySolo && !solos[i]);
           return <div key={t.id} style={{ textAlign: 'center', border: '1px solid #e8f0ff', padding: '6% 0', background: m ? 'transparent' : '#e8f0ff', color: m ? '#e8f0ff' : '#030403', fontWeight: 700 }}>{t.name}</div>;
         })}
         <div style={{ gridColumn: '1 / -1', textAlign: 'center', fontSize: '0.85em', opacity: 0.8 }}>MUTE MODE: TAP PADS</div>

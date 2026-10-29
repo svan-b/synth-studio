@@ -620,6 +620,15 @@ export const FX_LFO_DESTS: LfoDest[] = [
 const FXP = (key: string, abbr: string, name: string, min: number, max: number, def: number, idx: number, desc: string, extra: Partial<PageParam> = {}): PageParam =>
   ({ key, abbr, name, min, max, def, idx, desc, ...extra });
 
+/**
+ * Kit 01's master section, which is also the FX defaults. A cleared hardware kit has DIST AMT 0
+ * and COMP THR 96, MIX 0, VOL 64 (rytm-rs init values): the compressor is bypassed and the output
+ * sits 6.4 dB under the mix. Kit 01 is the twin's default kit and plays the demo song, so it gets a
+ * calibrated master instead: a little drive into the master clipper, gentle parallel compression
+ * keyed to the kick, and VOL for about -18 LUFS at the output with true peaks under -1 dBTP.
+ */
+export const KIT01_MASTER = { dis_amt: 18, cmp_thr: 116, cmp_atk: 3, cmp_rel: 2, cmp_mup: 20, cmp_rat: 2, cmp_seq: 1, cmp_mix: 50, cmp_vol: 115 } as const;
+
 export const FX_PAGES: Record<number, (PageParam | null)[]> = {
   [PAGE.SRC]: [
     FXP('del_tim', 'TIM', 'Delay Time', 0, 127, 23, FX.DEL_TIM, 'Delay time in 128th notes of the tempo: 32 is one beat (16 = an eighth, 24 = a dotted eighth).'),
@@ -642,7 +651,7 @@ export const FX_PAGES: Record<number, (PageParam | null)[]> = {
     FXP('rev_vol', 'VOL', 'Mix Volume', 0, 127, 110, FX.REV_VOL, 'Volume of the reverb output. It returns before or after the distortion and compressor (DIST page, REV).'),
   ],
   [PAGE.FLTR]: [
-    FXP('dis_amt', 'AMT', 'Distortion Amount', 0, 127, 0, FX.DIS_AMT, 'Amount of the analog master distortion: it drives the peaks of the whole mix into the clipper.'),
+    FXP('dis_amt', 'AMT', 'Distortion Amount', 0, 127, KIT01_MASTER.dis_amt, FX.DIS_AMT, 'Amount of the analog master distortion: it drives the peaks of the whole mix into the clipper.'),
     FXP('dis_sym', 'SYM', 'Distortion Symmetry', -64, 63, 0, FX.DIS_SYM, 'Offsets the signal up or down before the distortion, so only the crests or the troughs clip.', { bipolar: true }),
     FXP('dis_dov', 'DOV', 'Delay Overdrive', 0, 127, 0, FX.DIS_DOV, 'Overdrive inside the delay: from a little edge to aggressive overtones. Works with FDB.'),
     null, null, null,
@@ -650,14 +659,14 @@ export const FX_PAGES: Record<number, (PageParam | null)[]> = {
     FXP('dis_rev', 'REV', 'Reverb Dist/Comp', 0, 1, 1, FX.DIS_REV, 'The reverb returns before (PRE) or after (POST) the distortion and compressor.', { options: PRE_POST }),
   ],
   [PAGE.AMP]: [
-    FXP('cmp_thr', 'THR', 'Threshold', 0, 127, 96, FX.CMP_THR, 'Threshold: about 1 dB a step; lower means more of the mix is compressed.'),
-    FXP('cmp_atk', 'ATK', 'Attack', 0, 6, 0, FX.CMP_ATK, 'Attack time in ms: how fast the compressor reacts to peaks. Slow attacks let the transients through.', { options: COMP_ATTACKS }),
-    FXP('cmp_rel', 'REL', 'Release', 0, 7, 2, FX.CMP_REL, 'Release time in seconds; A1 and A2 adapt to the material (A2 slightly longer).', { options: COMP_RELEASES }),
-    FXP('cmp_mup', 'MUP', 'Makeup Gain', 0, 127, 0, FX.CMP_MUP, 'Makeup gain of the compressed signal: about 0.6 dB a step up to 48, then up to +40 dB.'),
-    FXP('cmp_rat', 'RAT', 'Ratio', 0, 3, 0, FX.CMP_RAT, 'Compression ratio (1:2, 1:4, 1:8, MAX).', { options: COMP_RATIOS }),
-    FXP('cmp_seq', 'SEQ', 'Sidechain EQ', 0, 3, 1, FX.CMP_SEQ, 'Filter on the detector: LPF reacts to the bass (pumping), HPF ignores it, HIT is balanced, OFF unfiltered.', { options: COMP_SEQ }),
-    FXP('cmp_mix', 'MIX', 'Dry/Wet Mix', 0, 127, 0, FX.CMP_MIX, 'Parallel compression: 0 is the dry mix, 127 only the compressed signal.'),
-    FXP('cmp_vol', 'VOL', 'Volume', 0, 127, 64, FX.CMP_VOL, 'Output volume of the compressor section (the whole mix).'),
+    FXP('cmp_thr', 'THR', 'Threshold', 0, 127, KIT01_MASTER.cmp_thr, FX.CMP_THR, 'Threshold: about 1 dB a step; lower means more of the mix is compressed.'),
+    FXP('cmp_atk', 'ATK', 'Attack', 0, 6, KIT01_MASTER.cmp_atk, FX.CMP_ATK, 'Attack time in ms: how fast the compressor reacts to peaks. Slow attacks let the transients through.', { options: COMP_ATTACKS }),
+    FXP('cmp_rel', 'REL', 'Release', 0, 7, KIT01_MASTER.cmp_rel, FX.CMP_REL, 'Release time in seconds; A1 and A2 adapt to the material (A2 slightly longer).', { options: COMP_RELEASES }),
+    FXP('cmp_mup', 'MUP', 'Makeup Gain', 0, 127, KIT01_MASTER.cmp_mup, FX.CMP_MUP, 'Makeup gain of the compressed signal: about 0.6 dB a step up to 48, then up to +40 dB.'),
+    FXP('cmp_rat', 'RAT', 'Ratio', 0, 3, KIT01_MASTER.cmp_rat, FX.CMP_RAT, 'Compression ratio (1:2, 1:4, 1:8, MAX): higher ratios compress harder.', { options: COMP_RATIOS }),
+    FXP('cmp_seq', 'SEQ', 'Sidechain EQ', 0, 3, KIT01_MASTER.cmp_seq, FX.CMP_SEQ, 'Filter on the detector: LPF reacts to the bass (pumping), HPF ignores it, HIT is balanced, OFF unfiltered.', { options: COMP_SEQ }),
+    FXP('cmp_mix', 'MIX', 'Dry/Wet Mix', 0, 127, KIT01_MASTER.cmp_mix, FX.CMP_MIX, 'Parallel compression: 0 is the dry mix, 127 only the compressed signal.'),
+    FXP('cmp_vol', 'VOL', 'Volume', 0, 127, KIT01_MASTER.cmp_vol, FX.CMP_VOL, 'Output volume of the compressor section (the whole mix).'),
   ],
   [PAGE.LFO]: [
     FXP('lfo_spd', 'SPD', 'Speed', -64, 63, 48, FX.LFO_SPD, 'FX LFO speed (8, 16, 32 sync to straight beats; negative runs backwards).', { bipolar: true }),

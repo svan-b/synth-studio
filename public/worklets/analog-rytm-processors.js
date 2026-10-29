@@ -33,7 +33,7 @@
 //   { t:'off', at, tr }            note-off (gate end)
 //   { t:'fxlocks', at, locks }     FX track lock trig
 //   { t:'tempo', bpm }
-//   { t:'stop' }                   release everything
+//   { t:'stop' }                   [STOP]: cut every voice off (5 ms fade; the FX ring on)
 // Reports: { t:'lv', lv: Float32Array(12) } track levels at ~30 Hz while sounding.
 // ============================================================================
 
@@ -164,6 +164,18 @@ const BEATER = new Float32Array(Math.round(0.06 * SR));
 (() => { let lp = 0, lp2 = 0; for (let i = 0; i < BEATER.length; i++) { const t = i * INV_SR; lp += 0.08 * ((rnd() * 2 - 1) - lp); lp2 += 0.3 * (lp - lp2); BEATER[i] = (lp2 * 3 + Math.sin(TWO_PI * 95 * t) * 0.5) * Math.exp(-t / 0.012) + (i < 30 ? (1 - i / 30) * 0.9 : 0); } })();
 const STICK = new Float32Array(Math.round(0.025 * SR));
 (() => { let hp = 0, prev = 0; for (let i = 0; i < STICK.length; i++) { const t = i * INV_SR; const n = rnd() * 2 - 1; hp = 0.85 * (hp + n - prev); prev = n; STICK[i] = (hp * 0.7 + Math.sin(TWO_PI * 1800 * t) * 0.5) * Math.exp(-t / 0.004); } })();
+/**
+ * The machines' digital clicks (BD HARD TIC, BD CLASSIC TRA, the SD HARD and RS HARD
+ * ticks): one smooth 0.5 ms tick around 2.6 kHz that starts and ends at zero. Defined
+ * in time, it sounds the same at 44.1 and 48 kHz, and a retrigger over a ringing voice
+ * (whose declick matches the first sample) can't turn it into a step.
+ */
+const CLICK = new Float32Array(Math.max(8, Math.round(0.0005 * SR)));
+(() => { const n = CLICK.length; for (let i = 0; i < n; i++) { const u = (i + 0.5) / n; CLICK[i] = Math.pow(Math.sin(Math.PI * u), 2) * Math.cos(TWO_PI * 2600 * i * INV_SR); } })();
+/** A smooth one-sided push (0.35 ms): the snap of BD FM, SD CLASSIC and SD FM */
+const BUMP = new Float32Array(Math.max(6, Math.round(0.00035 * SR)));
+(() => { const n = BUMP.length; for (let i = 0; i < n; i++) { const u = (i + 0.5) / n; BUMP[i] = Math.pow(Math.sin(Math.PI * u), 2); } })();
+const CLICK_N = CLICK.length, BUMP_N = BUMP.length;
 
 // ---------------------------------------------------------------------------
 // Sample layer: synthesized one-shots (generated on first use)
@@ -367,8 +379,9 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
         this.dL.fill(0); this.dR.fill(0); this.dHpL = this.dHpR = this.dLpL = this.dLpR = 0; this.dIdle = SR * 6;
         return;
       case 'stop':
+        // [STOP]: every track's sound is cut off (a 5 ms fade); the delay and reverb ring on (manual p.37)
         this.queue.length = 0;
-        for (const v of this.voices) if (v.active) { v.gate = false; if (v.ampStage < 3) v.ampStage = 3; if (v.ampInf) v.choke = 1; }
+        for (const v of this.voices) if (v.active) { v.gate = false; if (v.ampStage < 3) v.ampStage = 3; if (!(v.choke > 0)) v.choke = 1; }
         return;
     }
     if (!m.at || m.at <= currentTime) { this.apply(m); return; }
@@ -1023,9 +1036,9 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           if (settle) a *= e[3];
           y *= a * lev;
           // digital layer
-          if (tic && t < 3) y += (t === 0 ? 0.9 : t === 1 ? -0.5 : 0.2) * tic * lev;
+          if (tic && t < CLICK_N) y += CLICK[t] * 0.42 * tic * lev;
           if (m === BD_SHARP && tic && t < TICK.length) y += TICK[t] * tic * lev * 0.8;
-          if (traClick && t < 4) y += (t === 0 ? 0.8 : -0.3) * traClick * lev;
+          if (traClick && t < CLICK_N) y += CLICK[t] * 0.4 * traClick * lev;
           if (traNoise && t < 1200) { const n = v.noise(); s[0] += (traBright ? 0.6 : 0.15) * (n - s[0]); y += s[0] * traNoise * 0.5 * lev * Math.exp(-t / 160); }
           if (m === BD_HARD && t < 900) { const n = v.noise(); s[0] += 0.3 * (n - s[0]); y += s[0] * 0.06 * lev * (1 - t / 900); }
           if (dus) { const n = v.noise(); s[1] += 0.2 * (n - s[1]); y += s[1] * dus * 0.35 * e[2]; }
@@ -1050,7 +1063,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           const y = sin2pi(p[0] + mod * 0.159);
           // short fixed punch, then DEC
           if (t > 0.005 * SR) e[2] *= k[2];
-          G[i] = y * e[2] * lev + (t < 2 ? 0.25 * lev : 0);
+          G[i] = y * e[2] * lev + (t < BUMP_N ? BUMP[t] * 0.15 * lev : 0);
         }
         alive = e[2] * lev;
         break;
@@ -1095,7 +1108,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
             s[2] += 0.55 * (s[0] - s[2]);                 // gentle low-pass
             y += s[2] * nLev * (1 - t / nDur) * 0.9;
           }
-          if (tic && t < 3) y += (t === 0 ? 1 : -0.4) * tic * 0.8;
+          if (tic && t < CLICK_N) y += CLICK[t] * 0.36 * tic;
           G[i] = y * lev;
         }
         alive = Math.max(e[2], v.t < nDur ? 1 - v.t / nDur : 0) * lev;
@@ -1118,7 +1131,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
             s[2] += 0.6 * (s[0] - s[2]);
             y += s[2] * fb[6] * e[4] * 0.9;
             e[4] *= k[4];
-            if (t < 2) y += 0.5;
+            if (t < BUMP_N) y += BUMP[t] * 0.3;
           } else if (m === SD_FM) {
             const blip = 0.7 * e[0]; e[0] *= k[0];
             const f = base * exp2(blip);
@@ -1128,7 +1141,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
             e[2] *= k[2]; e[3] *= k[3];
             const nd = fb[5] * SR;
             if (t < nd) { const n = v.noise(); s[0] = 0.86 * (s[0] + n - s[1]); s[1] = n; y += s[0] * fb[6] * (1 - t / nd) * 0.8; }
-            if (t < 2) y += 0.4;
+            if (t < BUMP_N) y += BUMP[t] * 0.24;
           } else if (m === SD_ACOUSTIC) {
             const oct = fb[0] * e[0]; e[0] *= k[0];
             const f = base * exp2(oct);
@@ -1174,7 +1187,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           let y = x * e[2] * 0.7;
           e[2] *= k[2];
           if (t < 1400) { const n = v.noise(); s[0] = 0.8 * (s[0] + n - s[1]); s[1] = n; y += s[0] * fb[6] * Math.exp(-t / 220) * 0.6; }
-          if (fb[2] && t < 3) y += (t === 0 ? 1 : -0.5) * fb[2];
+          if (fb[2] && t < CLICK_N) y += CLICK[t] * 0.47 * fb[2];
           G[i] = y * lev;
         }
         alive = e[2] * lev;
@@ -1711,6 +1724,8 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
 //   output      MUP about 0.6 dB a step to 48 then flattening to +40 dB;
 //               MIX a linear crossfade; VOL scales the dry path by the
 //               measured table and the wet path 1.95 dB per dB
+//   coupling    the main outputs are AC coupled: a 5 Hz one-pole high-pass
+//               after the returns, so asymmetric kicks leave no DC
 // ============================================================================
 
 const DIST_X = [0, 32, 64, 96, 127];
@@ -1784,6 +1799,9 @@ class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
     this.state = 0;      // gain reduction, dB
     this.g = 1; this.gStep = 0; this.gTarget = 1;
     this.idle = 0;
+    // output coupling (DC blocker) state
+    this.dcR = Math.exp(-TWO_PI * 5 / SR);
+    this.dcxL = 0; this.dcyL = 0; this.dcxR = 0; this.dcyR = 0;
     this.port.onmessage = e => { const m = e.data; if (m && m.t === 'p') { if (m.all) this.p.set(m.all); else this.p[m.i] = m.v; } };
   }
 
@@ -1836,8 +1854,8 @@ class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
     if (dl) for (let i = 0; i < n; i += 4) { const a = Math.abs(dl[i]) + Math.abs(dr[i]); if (a > mx) mx = a; }
     if (el) for (let i = 0; i < n; i += 4) { const a = Math.abs(el[i]) + Math.abs(er[i]); if (a > mx) mx = a; }
     if (vl) for (let i = 0; i < n; i += 4) { const a = Math.abs(vl[i]) + Math.abs(vr[i]); if (a > mx) mx = a; }
-    if (mx < 1e-7 && this.pk < 1e-6 && this.state < 0.01) {
-      if (++this.idle > 4) { oL.fill(0); if (oR !== oL) oR.fill(0); this.pk = 0; return true; }
+    if (mx < 1e-7 && this.pk < 1e-6 && this.state < 0.01 && Math.abs(this.dcyL) + Math.abs(this.dcyR) < 1e-7) {
+      if (++this.idle > 4) { oL.fill(0); if (oR !== oL) oR.fill(0); this.pk = 0; this.dcxL = this.dcyL = this.dcxR = this.dcyR = 0; return true; }
     } else this.idle = 0;
     // distortion
     const amt = clamp(P[FX_DIS_AMT], 0, 127);
@@ -1855,6 +1873,8 @@ class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
     const pkFall = this.pkFall;
     let pk = this.pk, cnt = this.cnt;
     let g = this.g, gStep = this.gStep;
+    const dcR = this.dcR;
+    let dxl = this.dcxL, dyl = this.dcyL, dxr = this.dcxR, dyr = this.dcyR;
     for (let i = 0; i < n; i++) {
       let l = dl ? dl[i] : 0, r = dr ? dr[i] : 0;
       const del = el ? el[i] : 0, delR = er ? er[i] : 0;
@@ -1882,8 +1902,12 @@ class AnalogRytmMasterProcessor extends AudioWorkletProcessor {
       l *= g; r *= g;
       if (delPost) { l += del; r += delR; }
       if (revPost) { l += rev; r += revR; }
-      oL[i] = l; if (oR !== oL) oR[i] = r;
+      // AC-coupled output
+      dyl = l - dxl + dcR * dyl; dxl = l;
+      dyr = r - dxr + dcR * dyr; dxr = r;
+      oL[i] = dyl; if (oR !== oL) oR[i] = dyr;
     }
+    this.dcxL = dxl; this.dcyL = Math.abs(dyl) < 1e-20 ? 0 : dyl; this.dcxR = dxr; this.dcyR = Math.abs(dyr) < 1e-20 ? 0 : dyr;
     for (let j = 0; j < 8; j++) if (Math.abs(z[j]) < 1e-20) z[j] = 0;
     this.pk = pk; this.cnt = cnt; this.g = g; this.gStep = gStep;
     return true;

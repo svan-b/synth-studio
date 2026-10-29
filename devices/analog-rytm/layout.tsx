@@ -22,8 +22,8 @@ import {
 } from '@/lib/sequencer/elektron';
 import { FX_TRACK, PAGE, SEQ_TRACKS, TRACKS, pageControls, describe } from './model';
 import {
-  Key, Menus, PageLeds, Pads, PlayTrigs, RY, RytmStyles, Screen, applyMutePreselect, flash, funcOn, nudgeHeld, openMenu, pageReloadOrRandom, reloadKit,
-  reloadSound, saveKit, shiftTrack, toggleHeldFlag, trackClear, trackCopy, trackPaste, consumeFunc,
+  FlagTrigs, Key, Menus, PageLeds, Pads, PlayTrigs, RY, RytmStyles, Screen, applyMutePreselect, flash, funcOn, nudgeHeld, nudgeSwing, openMenu,
+  pageReloadOrRandom, reloadKit, reloadSound, saveKit, shiftTrack, toggleHeldFlag, toggleHeldMute, trackClear, trackCopy, trackPaste, consumeFunc,
 } from './ui';
 import type { RytmProject } from './presets';
 
@@ -154,20 +154,28 @@ const BANK_X = [186.5, 209.5, 232.5, 255.4];
 const BANK_SUB = ['', '', '', '', 'Trig Mute', 'Accent', 'Swing', 'Slide'];
 const MODE_LED_NAMES = ['Sequential', 'Direct Start', 'Direct Jump', 'Temp Jump'];
 
+/** The trig-key menu each of [FUNC] + [BANK E-H] opens (manual pp.49-50) */
+const BANK_TRIG_MODE: Record<number, string> = { 4: 'tmute', 5: 'accent', 6: 'swing', 7: 'pslide' };
+
 function bankPress(ctx: CustomRenderContext, b: number) {
-  // a held trig + [BANK F] / [BANK H]: accent / parameter slide on it (manual pp.49-51)
-  if ((b === 5 && toggleHeldFlag(ctx, 'accent')) || (b === 7 && toggleHeldFlag(ctx, 'pslide'))) return;
+  // a held trig + [BANK E] / [BANK F] / [BANK H]: trig mute / accent / parameter slide on it (manual pp.49-51)
+  if ((b === 4 && toggleHeldMute(ctx)) || (b === 5 && toggleHeldFlag(ctx, 'accent')) || (b === 7 && toggleHeldFlag(ctx, 'pslide'))) return;
   press(ctx, () => ctx.setUi({ seqMenu: 'pattern', seqBank: b, rytmMenu: null }), () => {
     if (b < 4) {
       ctx.updateData(d => setChangeMode(asProject(d, SEQ_TRACKS), CHANGE_MODES[b] as ChangeMode));
       flash(ctx, `PATTERN MODE: ${MODE_LED_NAMES[b].toUpperCase()}`);
-    } else if (b === 4) flash(ctx, 'TRIG MUTE IS NOT IN THIS TWIN YET (USE MUTE MODE)');
-    else if (b === 5) {
-      const on = ctx.ui.trigMode === 'accent';
-      ctx.setUi({ trigMode: on ? 'trig' : 'accent' });
-      flash(ctx, on ? 'TRIG KEYS: TRIGS' : 'ACCENT: TRIG KEYS SET ACCENTS, TRACK LEVEL THE AMOUNT');
-    } else if (b === 6) { openMenu(ctx, 'tempo'); flash(ctx, 'SWING: SET THE AMOUNT (EVERY SECOND STEP SWINGS)'); }
-    else { const on = ctx.ui.trigMode === 'pslide'; ctx.setUi({ trigMode: on ? 'trig' : 'pslide' }); flash(ctx, on ? 'TRIG KEYS: TRIGS' : 'TRIG KEYS: PARAMETER SLIDE'); }
+      return;
+    }
+    // the same key again closes the menu: the trig keys place trigs again
+    const mode = BANK_TRIG_MODE[b];
+    const on = ctx.ui.trigMode === mode;
+    ctx.setUi({ trigMode: on ? 'trig' : mode });
+    if (on) { flash(ctx, 'TRIG KEYS: TRIGS'); return; }
+    const p = projectOf(ctx);
+    flash(ctx, b === 4 ? 'TRIG MUTE: TRIG KEYS MUTE OR UNMUTE THE TRIGS'
+      : b === 5 ? 'ACCENT: TRIG KEYS SET ACCENTS, TRACK LEVEL THE AMOUNT'
+        : b === 6 ? `SWING ${getPattern(p, p.active).swing}%: TRIG KEYS PICK THE STEPS, [UP] / [DOWN] THE AMOUNT`
+          : 'TRIG KEYS: PARAMETER SLIDE');
   });
 }
 
@@ -194,6 +202,7 @@ function arrow(ctx: CustomRenderContext, dir: 'up' | 'down' | 'left' | 'right') 
     consumeFunc(ctx);
     if (horiz && Math.round(num(ctx.values.rec)) === 1) { shiftTrack(ctx, d); return; }
   }
+  if (ctx.ui.trigMode === 'swing' && !horiz) { nudgeSwing(ctx, d); return; }
   if ((ctx.ui.rtrgHeld || ctx.ui.rtrgLatch) && !horiz) {
     const t = Math.min(11, Math.round(num(ctx.values.track)));
     const id = `${TRACKS[t].id}_rtrg_rate`;
@@ -253,7 +262,7 @@ function keys(): PanelElement[] {
   out.push(key(26.2, ROW2, SMALL, ctx => <Key ctx={ctx} id="key:global" label={I.gear} title="GLOBAL SETTINGS" sub="Save Project" funcSub onDown={() => press(ctx, () => flash(ctx, 'GLOBAL SETTINGS ARE NOT MODELLED'), () => flash(ctx, 'THE PROJECT SAVES AUTOMATICALLY'))} />));
   MODE_KEYS.forEach(([label, sub, menu, mode], i) => out.push(key(MODE_X[i], ROW2, SMALL, ctx => (
     <Key ctx={ctx} id={`key:${label.toLowerCase()}`} label={label} sub={sub} funcSub
-      lit={Math.round(num(ctx.values.pad_mode)) === mode ? 1 : (mode === 1 && ((ctx.engine.seq as { mutes?: boolean[] } | undefined)?.mutes ?? []).some(Boolean)) || (mode === 3 && num(ctx.engine.scene, -1) >= 0) ? 0.35 : 0}
+      lit={Math.round(num(ctx.values.pad_mode)) === mode ? 1 : (mode === 1 && (projectOf(ctx).mutes ?? []).length > 0) || (mode === 3 && num(ctx.engine.scene, -1) >= 0) ? 0.35 : 0}
       blink={(mode === 3 && typeof ctx.ui.sceneEdit === 'number') || (mode === 4 && typeof ctx.ui.perfEdit === 'number')}
       ledColor={mode === 0 ? RY.green : RY.led} control="pad_mode" value={mode}
       onDown={() => modeDown(ctx, mode, menu)} onUp={() => modeUp(ctx, mode)} />
@@ -351,7 +360,9 @@ function keys(): PanelElement[] {
       const st = ctx.engine.seq as { pattern?: string | null; playing?: boolean } | undefined;
       const shown = (st?.playing && st.pattern) || p.active;
       const active = shown.charCodeAt(0) - 65 === b;
-      return <Key ctx={ctx} id={`key:bank:${'ABCDEFGH'[b]}`} label={'ABCDEFGH'[b]} sub={BANK_SUB[b] || undefined} funcSub lit={active ? 0.7 : 0} focusIds={[`seq:bank:${'ABCDEFGH'[b]}`, 'seq:patterns']}
+      const menuOpen = !!BANK_TRIG_MODE[b] && ctx.ui.trigMode === BANK_TRIG_MODE[b];
+      return <Key ctx={ctx} id={`key:bank:${'ABCDEFGH'[b]}`} label={'ABCDEFGH'[b]} sub={BANK_SUB[b] || undefined} funcSub lit={menuOpen ? 1 : active ? 0.7 : 0}
+        ledColor={menuOpen ? (b === 4 ? RY.green : b === 5 ? RY.purple : b === 6 ? RY.yellow : RY.blue) : undefined} focusIds={[`seq:bank:${'ABCDEFGH'[b]}`, 'seq:patterns']}
         onDown={() => bankPress(ctx, b)} />;
     }));
   }
@@ -363,10 +374,15 @@ function keys(): PanelElement[] {
       onUp={() => ctx.setUi({ recHeld: false })} />;
   }, true));
   out.push(key(303.2, 141.7, BIG, ctx => {
+    const st = ctx.engine.seq as { paused?: boolean; following?: boolean } | undefined;
     const playing = !!ctx.engine.playing;
-    return <Key ctx={ctx} id="key:play" big label={I.play} sub="Clear" funcSub lit={playing} ledColor={RY.green} control="play"
+    const paused = !!st?.paused;
+    return <Key ctx={ctx} id="key:play" big label={I.play} sub="Clear" funcSub lit={playing || paused} blink={paused} ledColor={RY.green} control="play"
       onDown={() => press(ctx, () => {
         if (ctx.ui.recHeld) { ctx.setValue('rec', 2); flash(ctx, 'LIVE RECORDING: PLAY THE PADS'); }
+        // [PLAY] while playing pauses, [PLAY] again resumes (manual p.37). Synced, the studio transport runs the show.
+        if (paused) { ctx.sendEvent('seq:resume'); return; }
+        if (playing && !st?.following && !ctx.ui.recHeld) { ctx.sendEvent('seq:pause'); flash(ctx, 'PAUSED: [PLAY] RESUMES, [STOP] STOPS'); return; }
         ctx.setValue('play', true);
       }, () => trackClear(ctx))} />;
   }, true));
@@ -450,14 +466,16 @@ const sequencer: PanelElement[] = [
     kind: 'custom', x: TRIG_X0 - TRIG_SIZE / 2, y: TRIG_Y - TRIG_SIZE / 2, w: TRIG_PITCH * 15 + TRIG_SIZE, h: TRIG_SIZE,
     render: ctx => {
       const rec = Math.round(num(ctx.values.rec, 0));
-      const mode = (ctx.ui.trigMode as 'trig' | 'accent' | 'pslide' | undefined) ?? 'trig';
+      const mode = (ctx.ui.trigMode as 'trig' | 'accent' | 'pslide' | 'tmute' | 'swing' | undefined) ?? 'trig';
       const gap = { ['--rytm-trig-gap' as string]: `${(TRIG_PITCH - TRIG_SIZE) * PX}px` };
       const editing = rec > 0 || mode !== 'trig';
       return (
         <div className="rytm-trigs" style={{ position: 'absolute', inset: 0, ...gap }}>
-          {editing
-            ? <TrigKeys ctx={ctx} tracks={SEQ_TRACKS} trackNames={TRACK_NAMES} editable mode={mode} color="#ff3b2a" longPressMs={550} />
-            : <PlayTrigs ctx={ctx} />}
+          {mode === 'tmute' || mode === 'swing'
+            ? <FlagTrigs ctx={ctx} mode={mode} />
+            : editing
+              ? <TrigKeys ctx={ctx} tracks={SEQ_TRACKS} trackNames={TRACK_NAMES} editable mode={mode} color="#ff3b2a" longPressMs={550} />
+              : <PlayTrigs ctx={ctx} />}
         </div>
       );
     },
