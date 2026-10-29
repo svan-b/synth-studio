@@ -50,15 +50,14 @@ export function midiSupport(): MidiSupport {
     return {
       supported: false, browser, ios, reason: 'ios',
       message:
-        'iPad and iPhone browsers have no Web MIDI (Safari, and Chrome or Firefox on iOS too - they all use Apple\'s WebKit). ' +
-        'You can still bring your gear in: add an Audio input to hear and record it through your audio interface, and play the twins with the on-screen keys. ' +
-        'For MIDI, use Chrome, Edge or Firefox on a computer, or an iOS browser app that adds Web MIDI.',
+        'iPad and iPhone browsers have no Web MIDI: Safari, Chrome and Firefox on iPad all run on Apple\'s WebKit, which leaves it out. ' +
+        'Nothing is wrong with your setup, and you can still bring your gear in. For MIDI gear, use Chrome or Edge on a computer.',
     };
   }
   if (browser === 'safari') {
     return {
       supported: false, browser, ios, reason: 'safari',
-      message: 'Safari does not support Web MIDI. Open Synth Studio in Chrome, Edge or Firefox to use MIDI. Audio input works in Safari.',
+      message: 'Safari has no Web MIDI. Audio input, Web Audio plugins and the built-in Practice synth work here; for MIDI gear, open Synth Studio in Chrome or Edge.',
     };
   }
   if (window.isSecureContext === false) {
@@ -69,6 +68,6 @@ export function midiSupport(): MidiSupport {
   }
   return {
     supported: false, browser, ios, reason: 'no-api',
-    message: 'This browser has no Web MIDI. Use Chrome, Edge or Firefox to connect MIDI gear. Audio input still works.',
+    message: 'This browser has no Web MIDI. Use Chrome or Edge on a computer to connect MIDI gear. Audio input, plugins and the Practice synth still work.',
   };
 }

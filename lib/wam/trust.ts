@@ -25,6 +25,8 @@ function stored(): string[] {
 }
 
 export function isTrusted(url: string): boolean {
+  // Built-in plugins are part of Synth Studio itself
+  if (url.startsWith('builtin:')) return true;
   if (typeof window === 'undefined') return false;
   const o = originOf(url);
   // Plugins served by Synth Studio itself
