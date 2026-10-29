@@ -47,7 +47,8 @@ const xone96: DeviceModule = {
   createEngine: () => new Xone96Engine(),
   worklets: ['/worklets/xone96-processors.js'],
   transportControl: 'play',
-  uiControls: CHANNELS.map(c => `ch${c}_src`),
+  // The deck menus and YOU HEAR (twin only: which output the browser plays) are custom menus on the panel
+  uiControls: [...CHANNELS.map(c => `ch${c}_src`), 'monitor_out'],
   interceptChange,
   studio: {
     mixerInputs: STUDIO_INPUTS.map(({ id, label }) => ({ id, label })),

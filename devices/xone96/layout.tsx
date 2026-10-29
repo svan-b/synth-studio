@@ -31,7 +31,7 @@ import { DEVICES } from '@/devices';
 import {
   CHANNELS, type ChannelId, chName, isAux, CH_METER_DBU, CH_METER_LABELS, MASTER_METER_DBU, MASTER_METER_LABELS,
   SOURCE_NAMES, SOURCE_MENU, SRC, STUDIO_INPUTS, STUDIO_POSITION, TYPE_MASK, SIG_DBU, ARRANGEMENT_BARS, meterColor,
-  PHONES2_SOURCES,
+  PHONES2_SOURCES, MONITOR_OUTS,
 } from './model';
 import type { MeterSnapshot } from './engine';
 
@@ -99,30 +99,48 @@ function useFrame(fn: () => void) {
 type XoneEngineLike = { meterSnapshot?: () => MeterSnapshot; position?: () => number };
 const engineOf = (instance: string) => hub.getEngine(instance) as unknown as XoneEngineLike | undefined;
 
-/** A vertical LED ladder. `k` is the engine's meter key (channel id, 'L', 'R'). */
-function Ladder({ instance, k, steps, height, width, aria }: { instance: string; k: string; steps: number[]; height: number; width: number; aria: string }) {
+/**
+ * A vertical LED ladder. `k` is the engine's meter key (channel id, 'L', 'R'). With `pkTop` the top
+ * LED is a PK! indicator: it also lights on the engine's sample-peak flag (the LR MIX meters).
+ */
+function Ladder({ instance, k, steps, height, width, aria, pkTop = false }: { instance: string; k: string; steps: number[]; height: number; width: number; aria: string; pkTop?: boolean }) {
   const refs = useRef<(HTMLDivElement | null)[]>([]);
+  const box = useRef<HTMLDivElement | null>(null);
   const last = useRef(-1);
   const update = useCallback(() => {
     const m = engineOf(instance)?.meterSnapshot?.().meters[k];
     const db = m ? m.db : -120;
     let lit = 0;
     for (const s of steps) if (db >= s) lit++;
-    if (lit === last.current) return;
-    last.current = lit;
+    const top = pkTop && !!m?.pk;
+    const key = lit + (top ? 100 : 0);
+    if (key === last.current) return;
+    last.current = key;
+    // Assistive tech reads the highest lit LED's legend (the bottom one when dark)
+    box.current?.setAttribute('aria-valuenow', String(steps[Math.max(0, lit - 1)]));
+    box.current?.setAttribute('aria-valuetext', `${lit ? `${steps[lit - 1]} dB` : 'no signal'}${top ? ', PK!' : ''}`);
     refs.current.forEach((el, i) => {
       if (!el) return;
       const c = meterColor(steps[i]);
-      const on = i < lit;
+      const on = i < lit || (top && i === steps.length - 1);
       el.style.background = on ? c : LED_OFF;
       el.style.boxShadow = on ? `0 0 5px ${c}` : 'inset 0 1px 1px #000';
     });
-  }, [instance, k, steps]);
+  }, [instance, k, steps, pkTop]);
   useFrame(update);
   const n = steps.length, seg = height / n;
   const d = Math.min(width, seg - 2);
   return (
-    <div role="meter" aria-label={aria} style={{ position: 'relative', width, height, pointerEvents: 'none' }}>
+    <div
+      ref={box}
+      role="meter"
+      aria-label={aria}
+      aria-valuemin={steps[0]}
+      aria-valuemax={steps[steps.length - 1]}
+      aria-valuenow={steps[0]}
+      aria-valuetext="no signal"
+      style={{ position: 'relative', width, height, pointerEvents: 'none' }}
+    >
       {steps.map((s, i) => (
         <div
           key={s}
@@ -159,7 +177,7 @@ const channelMeter = (ch: string, x: number, top: number, h: number, scale = tru
   kind: 'custom', x: x - (scale ? 8.5 : 1.6), y: top, w: scale ? 10.5 : 3.2, h,
   render: c => (
     <div style={{ display: 'flex', gap: 1.5, alignItems: 'flex-start', pointerEvents: 'none' }}>
-      {scale && ladderScale(CH_METER_LABELS, h * K, 'right', 5, 17)}
+      {scale && ladderScale(CH_METER_LABELS, h * K, 'right', 9, 19)}
       <Ladder instance={c.instance} k={ch} steps={CH_METER_DBU} height={h * K} width={3.2 * K} aria={`Channel ${chName(ch)} meter`} />
     </div>
   ),
@@ -181,15 +199,15 @@ function LrMeters({ c, h, gap }: { c: Ctx; h: number; gap: number }) {
   return (
     <div style={{ width: (gap + 4) * K, pointerEvents: 'none' }} aria-label="LR MIX meters">
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <Ladder instance={c.instance} k="L" steps={MASTER_METER_DBU} height={hp} width={wl} aria="Left meter" />
-        {ladderScale(MASTER_METER_LABELS, hp, 'center', 5, (gap - 4) * K)}
-        <Ladder instance={c.instance} k="R" steps={MASTER_METER_DBU} height={hp} width={wl} aria="Right meter" />
+        <Ladder instance={c.instance} k="L" steps={MASTER_METER_DBU} height={hp} width={wl} aria="Left meter" pkTop />
+        {ladderScale(MASTER_METER_LABELS, hp, 'center', 9, (gap - 4) * K)}
+        <Ladder instance={c.instance} k="R" steps={MASTER_METER_DBU} height={hp} width={wl} aria="Right meter" pkTop />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 5.5, marginTop: 3, lineHeight: 1.3 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginTop: 2, lineHeight: 1.15 }}>
         {legend(cueOn, cueOn && !split ? 'CUE' : 'L')}{legend(false, 'MIX')}{legend(cueOn && !split, cueOn && !split ? 'CUE' : 'R')}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 5, lineHeight: 1.2 }}>
-        {legend(cueOn && split, 'CUE')}{legend(false, '· SPLIT ·')}{legend(false, 'PRG')}
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, lineHeight: 1.15 }}>
+        {legend(cueOn && split, 'CUE')}{legend(false, 'SPLIT')}{legend(false, 'PRG')}
       </div>
     </div>
   );
@@ -385,7 +403,7 @@ function StudioChip({ c, ch, w }: { c: Ctx; ch: ChannelId | 'c' | 'd'; w: number
   return (
     <div
       style={{
-        width: w * K, boxSizing: 'border-box', padding: '1px 3px', borderRadius: 3, fontSize: 7, fontWeight: 800, lineHeight: 1.25,
+        width: w * K, boxSizing: 'border-box', padding: '1px 3px', borderRadius: 3, fontSize: 9, fontWeight: 800, lineHeight: 1.2,
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center', pointerEvents: 'auto',
         background: onInput ? '#0f5132' : '#6b4a00', color: '#fff', border: `1px solid ${onInput ? '#1f8a56' : '#c08a00'}`,
       }}
@@ -423,7 +441,7 @@ function DeckColumn({ c, ch, w, compact }: { c: Ctx; ch: ChannelId; w: number; c
   const focus = c.teaching && c.step?.control === `ch${ch}_src`;
   return (
     <div style={{ width: w * K, display: 'flex', flexDirection: 'column', gap: compact ? 2 : 3 }}>
-      {!compact && <div style={{ fontSize: 8, fontWeight: 800, color: '#8fd3ff', letterSpacing: 0.5 }}>DECK → CH {chName(ch)}</div>}
+      {!compact && <div style={{ fontSize: 9, fontWeight: 800, color: '#8fd3ff', letterSpacing: 0.5 }}>DECK → CH {chName(ch)}</div>}
       <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
         <select
           aria-label={`Deck source for channel ${chName(ch)}`}
@@ -438,7 +456,7 @@ function DeckColumn({ c, ch, w, compact }: { c: Ctx; ch: ChannelId; w: number; c
           {SOURCE_MENU.map(i => <option key={i} value={i}>{SOURCE_NAMES[i]}</option>)}
         </select>
         <label
-          style={{ fontSize: 8.5, fontWeight: 800, color: '#dfe6ec', background: '#24303b', border: '1px solid #3b4652', borderRadius: 4, padding: compact ? '4px 3px' : '5px 4px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+          style={{ fontSize: 9, fontWeight: 800, color: '#dfe6ec', background: '#24303b', border: '1px solid #3b4652', borderRadius: 4, padding: compact ? '4px 3px' : '5px 4px', cursor: 'pointer', whiteSpace: 'nowrap' }}
           aria-label={`Load an audio file onto channel ${chName(ch)} USB`}
         >
           FILE
@@ -454,9 +472,36 @@ function DeckColumn({ c, ch, w, compact }: { c: Ctx; ch: ChannelId; w: number; c
           />
         </label>
       </div>
-      <div style={{ fontSize: 8.5, fontWeight: 700, color: isStudio ? '#7ef0a8' : '#b9c8d6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: isStudio ? '#7ef0a8' : '#b9c8d6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {!isStudio && <span style={{ color: '#6f8090' }}>hears </span>}{status}
       </div>
+    </div>
+  );
+}
+
+/**
+ * YOU HEAR as a menu (compact view): five outputs don't fit the deck strip as legible buttons, and a
+ * native menu is the easiest touch target on an iPad. It glows like a panel control when a lesson asks for it.
+ */
+function YouHearSelect({ c }: { c: Ctx }) {
+  const v = Number(c.values.monitor_out ?? 0);
+  const focus = c.teaching && c.step?.control === 'monitor_out';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, height: '100%' }}>
+      <span style={{ fontSize: 9, fontWeight: 800, color: TWIN_INK, whiteSpace: 'nowrap' }}>YOU HEAR</span>
+      <select
+        aria-label="YOU HEAR: which mixer output plays"
+        data-control="monitor_out"
+        value={v}
+        onChange={e => c.setValue('monitor_out', Number(e.target.value))}
+        style={{
+          flex: 1, minWidth: 0, fontSize: 10, height: 20, background: '#101418', color: '#fff', fontWeight: 700,
+          border: `1px solid ${focus ? '#f97316' : '#3b4652'}`, boxShadow: focus ? '0 0 8px #f97316' : undefined, borderRadius: 4, padding: '0 3px',
+          touchAction: 'manipulation',
+        }}
+      >
+        {MONITOR_OUTS.map((name, i) => <option key={name} value={i}>{name}</option>)}
+      </select>
     </div>
   );
 }
@@ -466,13 +511,13 @@ function ReturnsStatus({ c, compact }: { c: Ctx; compact: boolean }) {
   const cNames = useRoutedNames(c.instance, 'c');
   const dNames = useRoutedNames(c.instance, 'd');
   const row = (r: string, names: string[]) => (
-    <div style={{ fontSize: 8, fontWeight: 700, color: names.length ? '#7ef0a8' : '#6f8090', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+    <div style={{ fontSize: 9, fontWeight: 700, color: names.length ? '#7ef0a8' : '#6f8090', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
       RTN {r}: {names.length ? `STUDIO: ${names.join(' + ')}` : 'nothing routed'}
     </div>
   );
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 1 : 3 }}>
-      {!compact && <div style={{ fontSize: 8, fontWeight: 800, color: '#8fd3ff', letterSpacing: 0.5 }}>RETURNS</div>}
+      {!compact && <div style={{ fontSize: 9, fontWeight: 800, color: '#8fd3ff', letterSpacing: 0.5 }}>RETURNS</div>}
       {row('C', cNames)}
       {row('D', dNames)}
     </div>
@@ -505,7 +550,7 @@ function DeckDisplay({ c, compact }: { c: Ctx; compact: boolean }) {
       aria-live="off"
       style={{
         width: '100%', height: '100%', boxSizing: 'border-box', background: '#050805', color: '#e8f0ff', border: '2px solid #222', borderRadius: 3,
-        padding: '3px 5px', fontFamily: 'ui-monospace, Menlo, monospace', fontSize: compact ? 8.5 : 9, lineHeight: 1.3, whiteSpace: 'pre',
+        padding: '3px 5px', fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 9, lineHeight: 1.3, whiteSpace: 'pre',
         textShadow: '0 0 3px rgba(200,220,255,0.6)', overflow: 'hidden', pointerEvents: 'none',
       }}
     />
@@ -547,7 +592,7 @@ function ViewToggle({ c, compact }: { c: Ctx; compact: boolean }) {
       aria-pressed={compact}
       aria-label={compact ? 'Compact view on: switch back to the full hardware layout' : 'Switch to the compact view (EQ, faders and crossfader on one screen)'}
       style={{
-        fontSize: 8, fontWeight: 800, letterSpacing: 0.4, padding: '2px 6px', borderRadius: 9, cursor: 'pointer', whiteSpace: 'nowrap',
+        fontSize: 9, fontWeight: 800, letterSpacing: 0.4, padding: '2px 6px', borderRadius: 9, cursor: 'pointer', whiteSpace: 'nowrap',
         border: `1px solid ${compact ? '#38bdf8' : '#3b4652'}`, background: compact ? '#0c4a6e' : '#1a222b', color: compact ? '#e0f2fe' : '#b9c8d6',
       }}
     >
@@ -628,12 +673,13 @@ function fullStrip(ch: ChannelId): PanelElement[] {
     label(chName(ch), x - 13, y(21.1), 7.5, { weight: 800 }),
     studioChip(ch, x + 1, y(4), 31),
     // SEND 1, PRE, SEND 2
-    small('SEND', x - 6.5, y(20.5), { align: 'right' }), small('1', x - 7.6, y(23.4), { align: 'right' }),
+    // "SEND 1" / "SEND 2" on one line beside each knob (the panel stacks SEND over the number, too small to read)
+    small('SEND 1', x - 2.4, y(27), { align: 'right', size: 6 }),
     knob(`${p}snd1`, x + 3.5, y(25), 10.5),
     ...ends(x + 3.5, y(25), 10.5, '∞', '+6'),
     round(`${p}pre`, x - 3.5, y(38.9), 5, AMBER),
     small('PRE', x + 0.2, y(38.9), { align: 'left' }),
-    small('SEND', x - 6.5, y(45.8), { align: 'right' }), small('2', x - 7.6, y(48.7), { align: 'right' }),
+    small('SEND 2', x - 2.4, y(52.3), { align: 'right', size: 6 }),
     knob(`${p}snd2`, x + 3.5, y(50.3), 10.5),
     ...ends(x + 3.5, y(50.3), 10.5, '∞', '+6'),
     // INPUT select: the knob points at the lit position
@@ -665,7 +711,7 @@ function fullStrip(ch: ChannelId): PanelElement[] {
       label('MID', x - 11.5, y(161.8), 5.5, { align: 'left', invert: true }),
       knob(`${p}mid`, x, y(168.3), 14),
       ...ends(x, y(168.3), 14, '-24', '+10'),
-      label('PARAMETRIC EQ', x - 14.8, y(156), 4.6, { rotate: -90, color: MUTED }),
+      label('PARAMETRIC EQ', x - 14.35, y(156), 5.6, { rotate: -90, color: MUTED }),
     );
     fullMarks.lines.push([x - 13.2, y(131), x - 13.2, y(181)]);
   } else {
@@ -827,8 +873,7 @@ function deckStripFull(): PanelElement[] {
     knob('bpm', 277, 14, 7.5, { value: 'always' }),
     label('BPM', 277, 7.5, 5.5, { color: TWIN_INK }),
     { kind: 'custom', x: 285, y: 5, w: 49, h: 17, render: c => <DeckDisplay c={c} compact={false} /> },
-    label('YOU HEAR (TWIN)', 299, 25.5, 5.5, { color: TWIN_INK }),
-    buttons('monitor_out', 299, 30.5, 0.72),
+    { kind: 'custom', x: 285, y: 24, w: 49, h: 7, render: c => <YouHearSelect c={c} /> },
     { kind: 'button', control: 'cue_latch', x: 262, y: 30.5, shape: 'rect', w: 14, h: 5, color: '#26292c', ledColor: RED, capText: 'LATCH CUE', label: 'none' },
     label('STAND-IN FX UNIT', 268, 38.5, 5.5, { color: '#8fd3ff' }),
     buttons('fx_time', 268, 43.8, 0.8),
@@ -882,25 +927,38 @@ const RA = 306, RB = 330, RC = 354; // master / booth / monitor / PHONES 2 sub-c
 
 const compactMarks: Marks = { faders: [], dots: [], lines: [] };
 
+/**
+ * An assign switch as a row of three real-size buttons (compact view): 9.5 x 6 mm caps, 10.5 mm
+ * apart, so a finger finds 1 / OFF / 2 (or X / OFF / Y) on an iPad. The hardware's 3-way toggle.
+ */
+function assignRow(control: string, x: number, y: number, caps: [string, string, string]): PanelElement[] {
+  return caps.map((cap, i): PanelElement => ({
+    kind: 'button', control, setValue: i, x: x + (i - 1) * 10.5, y, shape: 'rect', w: 9.5, h: 6, color: CAP, ledColor: '#e8edf2', capText: cap, label: 'none',
+  }));
+}
+
 function compactStrip(ch: ChannelId): PanelElement[] {
   const x = CX[ch];
   const p = `ch${ch}_`;
   const aux = isAux(ch);
   const l = x - 8.5, r = x + 8.5;
   const y = (v: number) => TOP + v;
-  compactMarks.faders.push({ x: x + 4, top: y(118), len: 50 });
-  compactMarks.lines.push([x - 17.5, y(4), x - 17.5, y(176)]);
+  compactMarks.faders.push({ x: x + 4, top: y(130), len: 50 });
+  compactMarks.lines.push([x - 17.5, y(4), x - 17.5, y(186)]);
   return [
     label(chName(ch), x - 13.8, y(4.2), 7, { weight: 800 }),
     studioChip(ch, x + 2.5, y(1.6), 27),
     // sends
     knob(`${p}snd1`, l, y(15), 8.8, { label: 'above', labelText: 'SEND 1' }),
     knob(`${p}snd2`, r, y(15), 8.8, { label: 'above', labelText: 'SEND 2' }),
-    round(`${p}pre`, x, y(22.5), 4.6, AMBER),
-    small('PRE', x, y(26.4), { size: 4.4 }),
-    // INPUT
+    round(`${p}pre`, x - 1.5, y(22.5), 5.5, AMBER),
+    small('PRE', x + 1.8, y(22.6), { align: 'left', color: INK, size: 6 }),
+    // INPUT: the selector knob points at the lit position; four position buttons in a 2 x 2 grid
     selectorKnob(`${p}input`, l - 1, y(36), 7.5, INPUT_ANGLES),
-    { kind: 'switch', control: `${p}input`, x: x + 6.5, y: y(36), style: 'buttons', orientation: 'vertical', scale: 0.7, label: 'none' },
+    ...(aux ? ['USB 1', 'MIC', 'RTN', 'USB 2'] : ['USB 1', 'PH', 'LN', 'USB 2']).map((cap, i): PanelElement => ({
+      kind: 'button', control: `${p}input`, setValue: i, x: x + 2 + (i % 2) * 9, y: y(31.5 + Math.floor(i / 2) * 7), shape: 'rect', w: 8.5, h: 5.5,
+      color: CAP, ledColor: '#e8edf2', capText: cap, label: 'none',
+    })),
     // GAIN + PK!
     knob(`${p}gain`, l, y(53.5), 9.5, { label: 'above', labelText: 'GAIN' }),
     meterLed(ch, 'pk', r + 1, y(46.2)), small('PK!', r + 3.3, y(46.2), { align: 'left', color: INK }),
@@ -910,15 +968,15 @@ function compactStrip(ch: ChannelId): PanelElement[] {
       ? [knob(`${p}midf`, l, y(72), 9, { label: 'above', labelText: 'FREQ' }), knob(`${p}mid`, r, y(75), 9.5, { label: 'above', labelText: 'MID' })]
       : [knob(`${p}himid`, l, y(72), 9.5, { label: 'above', labelText: 'HI MID' }), knob(`${p}lomid`, r, y(75), 9.5, { label: 'above', labelText: 'LO MID' })]),
     knob(`${p}lo`, l, y(90), 9.5, { label: 'above', labelText: 'LO' }),
-    // assigns
-    small('FILTER', r + 0.5, y(84.6), { size: 4.2 }),
-    buttons(`${p}filter`, r + 0.5, y(88.5), 0.72),
-    ...(aux ? [] : [buttons(`${p}xf`, r + 0.5, y(95.5), 0.72), small('XFADER', r + 0.5, y(99.6), { size: 4.2 })]),
+    // assigns: full-width rows of real-size buttons (FILTER on every channel, XFADER on 1-4)
+    small('FILTER', r + 0.5, y(92.6), { color: INK, size: 6 }),
+    ...assignRow(`${p}filter`, x, y(99), ['1', 'OFF', '2']),
+    ...(aux ? [] : [small('XFADER', r + 0.5, y(105.4), { color: INK, size: 6 }), ...assignRow(`${p}xf`, x, y(111.5), ['X', 'OFF', 'Y'])]),
     // CUE, meter, fader
-    round(`${p}cue`, x + 4, y(107), 10, RED),
-    small('CUE', x - 2, y(107), { color: INK, align: 'right' }),
-    channelMeter(ch, x - 10, y(119.5), 42),
-    { kind: 'slider', control: `${p}fader`, x: x + 4, y: y(143), length: 50, capColor: '#1d1f21', label: 'none', value: 'hover' },
+    round(`${p}cue`, x + 4, y(120.5), 10, RED),
+    small('CUE', x - 2, y(120.5), { color: INK, align: 'right' }),
+    channelMeter(ch, x - 8.5, y(132), 42),
+    { kind: 'slider', control: `${p}fader`, x: x + 4, y: y(155), length: 50, capColor: '#1d1f21', label: 'none', value: 'hover' },
   ];
 }
 
@@ -977,28 +1035,28 @@ function compactRight(): PanelElement[] {
     knob('master', RA, y(12), 10.5, { label: 'above', labelText: 'MASTER 1' }),
     knob('master2', RB, y(12), 10.5, { label: 'above', labelText: 'MASTER 2' }),
     small('BOOTH', RC, y(5.5), { color: INK, size: 5.5 }),
-    round('booth_mono', RC - 4, y(11), 4.6, AMBER), small('MONO', RC - 1, y(11), { align: 'left', color: INK }),
-    round('booth_mute', RC, y(21), 7.5, RED), small('MUTE', RC, y(26.4), { color: INK }),
+    round('booth_mono', RC - 4, y(11), 5.5, AMBER), small('MONO', RC - 0.6, y(11), { align: 'left', color: INK }),
+    round('booth_mute', RC, y(21), 7.5, RED), small('MUTE', RC - 4.6, y(21), { align: 'right', color: INK }),
     knob('booth_hi', RA, y(34), 9, { label: 'above', labelText: 'HI' }),
     knob('booth_mid', RB, y(34), 9, { label: 'above', labelText: 'MID' }),
     knob('booth_lo', RC, y(37), 9, { label: 'above', labelText: 'LO' }),
     knob('booth', RB, y(51), 9, { label: 'above', labelText: 'BOOTH' }),
-    // curves: three positions under their icons
-    ...curveSwitch('fader_curve', 'fader', RB, y(64), 7, 3.4, 4.4),
-    small('CHANNEL FADER', RB, y(72.6), { size: 4.2, color: INK }),
-    ...curveSwitch('xf_curve', 'xfader', RB, y(77.2), 7, 3.4, 4.4),
-    small('XFADER', RB, y(85.8), { size: 4.2, color: INK }),
+    // curves: three positions under their icons (5 mm buttons, 9 mm apart: finger-sized)
+    ...curveSwitch('fader_curve', 'fader', RB, y(62.5), 9, 5, 5),
+    small('CHANNEL FADER', RB, y(72.3), { size: 5, color: INK }),
+    ...curveSwitch('xf_curve', 'xfader', RB, y(76.5), 9, 5, 5),
+    small('XFADER', RB, y(86.3), { size: 5, color: INK }),
     // MONITOR
     small('MONITOR', RA - 1, y(93), { color: INK, size: 5.5 }),
     cueActiveLed(RA + 9, y(93)), small('ACTIVE', RA + 11.5, y(93), { align: 'left', color: INK, size: 4.2 }),
-    round('cue_post_eq', RB + 8, y(93), 4.6, AMBER), small('POST EQ', RB + 11, y(93), { align: 'left', color: INK, size: 4.2 }),
-    round('split_cue', RB + 8, y(99.5), 4.6, AMBER), small('SPLIT', RB + 11, y(99.5), { align: 'left', color: INK, size: 4.2 }),
+    round('cue_post_eq', RB + 8, y(93), 5.5, AMBER), small('POST EQ', RB + 11.3, y(93), { align: 'left', color: INK, size: 4.2 }),
+    round('split_cue', RB + 8, y(100), 5.5, AMBER), small('SPLIT', RB + 11.3, y(100), { align: 'left', color: INK, size: 4.2 }),
     knob('cue_mix', RA, y(108), 9, { label: 'above', labelText: 'CUE/MST' }),
     knob('phones', RB - 4, y(110), 9.5, { label: 'above', labelText: 'LEVEL' }),
     deco('jack', RC, y(110), 6),
     // PHONES 2
     small('PHONES 2', RB, y(123), { color: INK, size: 5.5 }),
-    ...phones2Selector(RA + 3, y(139), 7, 8.6, 4.4),
+    ...phones2Selector(RA + 4, y(139.5), 7, 10.5, 5.2),
     knob('phones2_mix', RB + 1, y(139), 8.5, { label: 'above', labelText: 'CUE/MST' }),
     knob('phones2', RC, y(139), 8.5, { label: 'above', labelText: 'LEVEL' }),
     small('ALLEN & HEATH', RB, y(160), { color: INK, size: 6 }),
@@ -1020,13 +1078,12 @@ function deckStripCompact(): PanelElement[] {
     knob('bpm', 274, 14, 6.5, { value: 'hover' }),
     label('BPM', 274, 8, 5, { color: TWIN_INK }),
     { kind: 'custom', x: 280, y: 4, w: 36, h: 12, render: c => <DeckDisplay c={c} compact /> },
-    label('YOU HEAR', 274.5, 20.6, 5, { color: TWIN_INK, align: 'right' }),
-    buttons('monitor_out', 303, 20.6, 0.62),
+    { kind: 'custom', x: 258, y: 17.6, w: 58, h: 6.6, render: c => <YouHearSelect c={c} /> },
     label('FX', 333, 5.5, 5, { color: TWIN_INK }),
-    buttons('fx_time', 333, 10.5, 0.62),
+    buttons('fx_time', 333, 10.8, 0.8),
     knob('fx_fdbk', 350, 13, 6, { label: 'above', labelText: 'FDBK' }),
     knob('fx_size', 363, 13, 6, { label: 'above', labelText: 'REVERB' }),
-    { kind: 'button', control: 'cue_latch', x: 338.6, y: 20.6, shape: 'rect', w: 14, h: 4.5, color: '#26292c', ledColor: RED, capText: 'LATCH CUE', label: 'none' },
+    { kind: 'button', control: 'cue_latch', x: 336.4, y: 20.7, shape: 'rect', w: 18, h: 4.8, color: '#26292c', ledColor: RED, capText: 'LATCH CUE', label: 'none' },
     { kind: 'custom', x: 346.5, y: 17.9, w: 24, h: 5.5, render: c => <ViewToggle c={c} compact /> },
   ];
 }
