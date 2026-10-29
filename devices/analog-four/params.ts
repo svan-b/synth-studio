@@ -134,7 +134,7 @@ export const LFO_MULTS = [
 ];
 export const LFO_MODES = ['FRE', 'TRG', 'HLD', 'ONE', 'HLF'];
 export const LFO_WAVES = ['TRI', 'SIN', 'SQR', 'SAW', 'EXP', 'RMP', 'RND'];
-export const ARP_MODES = ['OFF', 'TRU', 'UP', 'DWN', 'CYC', 'SHF', 'RND'];
+export const ARP_MODES = ['OFF', 'THR', 'UP', 'DWN', 'CYC', 'SHF', 'RND'];
 export const PORTA_MODES = ['OFF', 'ON', 'LEG'];
 export const CV_SOURCES = ['T1', 'T2', 'T3', 'T4', 'FX', 'CV'];
 
@@ -357,7 +357,7 @@ export const SYNTH_PARAMS: ParamDef[] = [
   ...notePage('note'),
 
   // ARPEGGIATOR
-  { key: 'arp_mod', page: 'arp', slot: 0, short: 'MOD', name: 'Arpeggiator mode', min: 0, max: ARP_MODES.length - 1, def: 0, options: ARP_MODES, fmt: opt(ARP_MODES), manual: 'Manual p.43-44, ARPEGGIATOR', lock: false, desc: 'OFF, TRU (order played), UP, DWN, CYC (up and down), SHF (shuffle), RND.' },
+  { key: 'arp_mod', page: 'arp', slot: 0, short: 'MOD', name: 'Arpeggiator mode', min: 0, max: ARP_MODES.length - 1, def: 0, options: ARP_MODES, fmt: opt(ARP_MODES), manual: 'Manual p.43-44, ARPEGGIATOR', lock: false, desc: 'OFF, THR (the order the notes came in), UP, DWN, CYC (up then down), SHF (a new random order each octave), RND (random every note). PLY needs POLY mode, which the twin does not have.' },
   { key: 'arp_spd', page: 'arp', slot: 1, short: 'SPD', name: 'Arpeggiator speed', min: 1, max: 48, def: 6, fmt: int, manual: 'Manual p.43-44, ARPEGGIATOR', lock: false, desc: 'Time between arpeggio notes in 1/24 beats: 6 = 16th notes, 12 = 8th notes, 4 = 16th triplets.' },
   { key: 'arp_rng', page: 'arp', slot: 2, short: 'RNG', name: 'Arpeggiator range', min: 1, max: 4, def: 1, fmt: v => `${Math.round(v)}OCT`, manual: 'Manual p.43-44, ARPEGGIATOR', lock: false, desc: 'Octaves the pattern climbs before it starts again.' },
   { key: 'arp_nlen', page: 'arp', slot: 4, short: 'LEN', name: 'Arpeggio note length', min: 0, max: 46, def: 12, fmt: v => formatLength(v), manual: 'Manual p.44, ARPEGGIATOR', lock: false, desc: 'Gate length of each arpeggiated note.' },

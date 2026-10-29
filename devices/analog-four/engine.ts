@@ -482,7 +482,7 @@ export class AnalogFourEngine extends BaseEngine {
     const mode = Math.round(this.arpVal(t, 'arp_mod'));
     const sorted = [...st.notes].sort((a, b) => a - b);
     switch (mode) {
-      case 1: return [...st.notes];                                  // TRU: as played
+      case 1: return [...st.notes];                                  // THR: in the order the notes came in (manual p.43)
       case 2: return sorted;                                          // UP
       case 3: return sorted.reverse();                                // DWN
       case 4: return sorted.length > 2 ? [...sorted, ...sorted.slice(1, -1).reverse()] : sorted; // CYC
