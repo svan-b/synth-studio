@@ -120,6 +120,11 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Each output becomes its own channel `<instance>/<id>`: fader, pan, sends, mute, solo, meter, route, stem and a map arrow. Arranger mutes follow the instrument.
   - Checked with a stand-in output (`scripts/e2e/outputs.cjs`; e2e 47/47).
   - The Rytm's eight TRACK OUTs and the A4's four stereo track outputs come after their feature branches merge. Each will act as "cable in the TRACK OUT, route-to-main off" (manuals: Rytm ROUTE TO MAIN, A4 VOICE ROUTING).
+- **Project files carry user samples.** An instrument can declare `assets` (`has`, `collect`, `restore`); project files embed them as mono 16-bit PCM, base64.
+  - Opening a project restores them before the studio loads.
+  - The Rytm's user samples now travel to another browser or the iPad Home Screen app, which keeps its own storage.
+  - A save with no samples still goes straight from the tap, so the iPad share sheet can open.
+  - Checked with `project-assets.cjs`: save in one browser, open in an empty one. e2e 49/49.
 - **Rytm separate outputs**: the eight TRACK OUTs (BD, SD, RS/CP, BT, LT, MT/HT, CH/OH, CY/CB) in the mixer's Outs menu.
   - A voice with its own output plays there (mono, after its level) and leaves the main mix and the master effects; its delay and reverb sends stay.
   - Its channel starts at the Rytm's fader and route, so turning it on changes nothing until you move it.
@@ -130,7 +135,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - User samples: WAV or AIFF from the file picker, stored in IndexedDB, falling back to the built-in one-shot when missing.
   - Two new lessons; `scripts/test-rytm.ts` has 47 checks. With the features off the output is bit-identical (21/21), and CPU is unchanged.
   - Gate: lessons 22, 0 failed, 0 manual; QA 0/20 in both modes; e2e 47/47; touch monkey test 578 actions, 0 errors.
-  - Known gap: user samples don't travel in exported project files yet.
+  - User samples now travel inside project files (below).
 - Panel fidelity, Moog toggles. A new opt-in `legends: 'ends'` on the shared switch puts the first position above the lever and the last below, as Moog prints them.
   - 3223ae2: on the Mother-32 (p.9).
   - 819f38c: on the DFAM (p.7), including the three-way SEQ PITCH MOD with OFF beside.

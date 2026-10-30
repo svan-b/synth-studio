@@ -6,7 +6,7 @@ import {
 } from '@/lib/sequencer/elektron';
 import { cleanPool, setSoundLock, soundChoices } from './pool';
 import { cleanEuclid, euclidSettings, euclidView, euclidWriteBack, setEuclid } from './euclid';
-import { cleanSampleMap } from './samples';
+import { cleanSampleMap, collectSampleAssets, restoreSampleAssets } from './samples';
 import { ANALOG_RYTM, KIT_CONTROL_IDS } from './spec';
 import { ANALOG_RYTM_LAYOUT } from './layout';
 import { ANALOG_RYTM_LESSONS } from './lessons';
@@ -200,6 +200,12 @@ const analogRytm: DeviceModule = {
   // the TRIG page 2 (Euclidean) encoders edit the pattern through interceptChange: their own values are never stored
   uiControls: ['track', 'page', 'pad_mode', 'rec', 'fix', 'auto_trk', ...EUC_IDS],
   data: { initial: defaultProject, migrate },
+  // the learner's own samples live in IndexedDB: project files carry the ones the project uses
+  assets: {
+    has: data => Object.keys((data as Partial<RytmProject> | null)?.samples ?? {}).length > 0,
+    collect: data => collectSampleAssets((data as Partial<RytmProject> | null)?.samples),
+    restore: restoreSampleAssets,
+  },
   interceptChange: (id, value, api) => {
     const m = macroTarget(api.ui);
     if (m && KIT_IDS.has(id) && typeof value === 'number' && !id.endsWith('_machine')) {

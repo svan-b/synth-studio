@@ -77,6 +77,18 @@ export interface DeviceModule {
   audition?: (api: AuditionApi) => (() => void) | void;
 
   /** Studio integration */
+  /**
+   * Files the learner brought in that live outside the saved studio (the Rytm's user samples, in
+   * IndexedDB). Project files carry them, so a project opens complete in another browser or in
+   * the iPad Home Screen app (which has its own storage).
+   */
+  assets?: {
+    /** Does this instrument's data use any? (export stays synchronous when none do) */
+    has(data: unknown): boolean;
+    collect(data: unknown): Promise<ProjectAudioAsset[]>;
+    /** Put them back where the instrument looks for them (before its data is loaded) */
+    restore(assets: ProjectAudioAsset[]): Promise<void>;
+  };
   studio?: {
     /** Can follow the studio transport like MIDI clock (Elektrons, Sub 37, Mother-32, Subharmonicon) */
     midiSync?: boolean;
@@ -99,6 +111,9 @@ export interface DeviceModule {
     patterns?: (data: unknown) => { id: string; label?: string }[];
   };
 }
+
+/** A file the learner brought in (a user sample), carried inside project files: mono 16-bit PCM, base64 */
+export interface ProjectAudioAsset { kind: 'audio'; id: string; name: string; rate: number; pcm16: string }
 
 export interface DeviceEntry {
   id: string;

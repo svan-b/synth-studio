@@ -121,6 +121,11 @@ const sr = run(path.join(__dirname, 'outputs-rytm.cjs'), [base]);
 check('separate outputs: the Rytm\'s BD TRACK OUT takes the kick to its own channel and back', !sr.__error && sr.ok && (sr.errs ?? []).length === 0,
   sr.__error ?? { before: sr.before, mainWithBdOut: sr.mainWith, bd: sr.bd, after: sr.after });
 
+// ---- Project files carry user samples ------------------------------------------
+const pa = run(path.join(__dirname, 'project-assets.cjs'), [base]);
+check('projects: a Rytm user sample travels inside the project file to an empty browser', !pa.__error && pa.ok && (pa.errs ?? []).length === 0,
+  pa.__error ?? { saved: pa.saved?.first?.id, before: pa.before, after: pa.after });
+
 // ---- Producer path on iPad ---------------------------------------------------
 const pp = run(path.join(__dirname, 'producer.cjs'), [base, path.join(outDir, 'producer')], 600_000);
 check('producer path: iPad walkthrough of a whole-studio lesson', !pp.__error && pp.total > 0 && (pp.failed ?? []).length === 0 && (pp.errs ?? []).length === 0,

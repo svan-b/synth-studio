@@ -20,6 +20,8 @@
 //   site data) leaves the slot on its built-in one-shot, and the panel says which.
 // ============================================================================
 
+import type { ProjectAudioAsset } from '@/devices/types';
+
 export const MAX_SECONDS = 33;
 const DB_NAME = 'synth-studio-rytm-samples';
 const STORE = 'samples';
@@ -207,4 +209,47 @@ export async function prepareForWorklet(s: Pick<StoredSample, 'data' | 'rate'>, 
   for (let i = 0; i < out.length; i++) peak = Math.max(peak, Math.abs(out[i]));
   if (peak > 1e-6) for (let i = 0; i < out.length; i++) out[i] *= 0.8 / peak;
   return out;
+}
+
+// ----------------------------------------------------------------------------
+// Project files: the user samples a project uses travel inside it (16-bit, base64)
+// ----------------------------------------------------------------------------
+
+function toPcm16Base64(data: Float32Array): string {
+  const pcm = new Int16Array(data.length);
+  for (let i = 0; i < data.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, Math.round(data[i] * 32767)));
+  const bytes = new Uint8Array(pcm.buffer);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+function fromPcm16Base64(b64: string): Float32Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const pcm = new Int16Array(bytes.buffer, 0, bytes.length >> 1);
+  const out = new Float32Array(pcm.length);
+  for (let i = 0; i < pcm.length; i++) out[i] = pcm[i] / 32767;
+  return out;
+}
+
+/** The samples a project's slots use, for its project file */
+export async function collectSampleAssets(refs: Record<string, UserSampleRef> | undefined): Promise<ProjectAudioAsset[]> {
+  const ids = [...new Set(Object.values(refs ?? {}).map(r => r.id))];
+  const out: ProjectAudioAsset[] = [];
+  for (const id of ids) {
+    const s = await getSample(id);
+    if (s) out.push({ kind: 'audio', id: s.id, name: s.name, rate: s.rate, pcm16: toPcm16Base64(s.data) });
+  }
+  return out;
+}
+
+/** A project file's samples back into this browser (ones it already has are kept) */
+export async function restoreSampleAssets(list: ProjectAudioAsset[]): Promise<void> {
+  for (const a of list) {
+    if (a?.kind !== 'audio' || !a.id || typeof a.pcm16 !== 'string') continue;
+    if (await getSample(a.id)) continue;
+    await putSample({ id: a.id, name: a.name, rate: a.rate, data: fromPcm16Base64(a.pcm16), created: Date.now() });
+  }
 }

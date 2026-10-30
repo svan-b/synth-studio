@@ -183,6 +183,13 @@ Hardware with individual outputs (the Rytm's voice outs, say) can offer them to 
 - The arranger's mutes of the instrument mute its outputs too. Sets and lesson studios start with every output off.
 - The main output must sound exactly as before while no output is connected.
 
+## Files the learner brings in
+An instrument that keeps a learner's own files outside the saved studio (the Rytm's user
+samples, in IndexedDB) declares `assets: { has(data), collect(data), restore(list) }`. Project
+files then carry them (mono 16-bit PCM, base64), and opening a project restores them before the
+instrument's data loads. A project therefore opens complete in another browser, or in the iPad
+Home Screen app, which keeps its own storage.
+
 ## Song arranger
 - Pattern-based instruments provide `studio.patterns(data) => [{ id, label }]` and handle
   `event('arranger:pattern', { id, time })` by switching pattern at audio `time` (a bar line).
