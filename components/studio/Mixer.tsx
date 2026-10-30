@@ -121,6 +121,7 @@ export default function Mixer({ onFocus }: { onFocus: (instance: string) => void
                     id={id}
                     device={r.device}
                     name={`${instanceLabel(rack, r.id)} · ${outs.find(x => x.id === o)?.label ?? o}`}
+                    heading={{ main: outs.find(x => x.id === o)?.label ?? o, sub: instanceLabel(rack, r.id) }}
                     audible={audible.has(id)}
                     powered={!off?.[r.id]}
                     targets={targets.filter(t => t.mixer !== r.id)}
@@ -155,8 +156,10 @@ function StripShell({ children, accent, dim, label, wide }: { children: React.Re
   );
 }
 
-function Strip({ id, device, name, audible, powered, targets, onFocus, outputs }: {
+function Strip({ id, device, name, audible, powered, targets, onFocus, outputs, heading }: {
   id: string; device: string; name: string; audible: boolean; powered: boolean;
+  /** A separate output's header: its name, with the instrument under it (the full name is too long) */
+  heading?: { main: string; sub: string };
   targets: { value: string; label: string; short: string }[];
   onFocus: (id: string) => void;
   /** The instrument's separate outputs (hardware individual outs), and which are in use */
@@ -184,7 +187,14 @@ function Strip({ id, device, name, audible, powered, targets, onFocus, outputs }
         className="w-full text-[11px] font-bold text-white truncate hover:text-teaching-current leading-tight h-[28px] flex items-center justify-center text-center"
         title={`${name} - open the instrument`}
       >
-        <span className="line-clamp-2 break-words">{name}</span>
+        {heading ? (
+          <span className="flex flex-col items-center leading-tight min-w-0">
+            <span className="truncate max-w-full">{heading.main}</span>
+            <span className="truncate max-w-full text-[9px] font-normal text-gray-400">{heading.sub}</span>
+          </span>
+        ) : (
+          <span className="line-clamp-2 break-words">{name}</span>
+        )}
       </button>
       {!isMixer ? (
         <select

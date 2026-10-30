@@ -885,7 +885,15 @@ export const useStudioStore = create<StudioStore>()(
           if (now.includes(output) === on) return st;
           const outputs = { ...(st.outputs ?? {}), [instance]: on ? [...now, output] : now.filter(o => o !== output) };
           if (!outputs[instance].length) delete outputs[instance];
-          return { ...st, outputs };
+          if (!on) return { ...st, outputs };
+          // A new output channel starts where its instrument is - the same fader, the same route
+          // (a mixer input sums both) - so turning it on changes nothing until you move it.
+          // One you have set before keeps its settings.
+          const id = `${instance}/${output}`;
+          const channels = { ...(st.mixer?.channels ?? {}) };
+          if (!channels[id]) channels[id] = { gain: channelOf(st.mixer, instance).gain };
+          const routes = st.routes[id] ? st.routes : { ...st.routes, [id]: st.routes[instance] ?? 'master' };
+          return { ...st, outputs, routes, mixer: { ...(st.mixer ?? {}), channels } };
         }),
 
         setSync: (instance, on) => updateStudio(st => ({ ...st, sync: { ...st.sync, [instance]: on } })),

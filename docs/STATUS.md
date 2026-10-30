@@ -120,6 +120,10 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Each output becomes its own channel `<instance>/<id>`: fader, pan, sends, mute, solo, meter, route, stem and a map arrow. Arranger mutes follow the instrument.
   - Checked with a stand-in output (`scripts/e2e/outputs.cjs`; e2e 47/47).
   - The Rytm's eight TRACK OUTs and the A4's four stereo track outputs come after their feature branches merge. Each will act as "cable in the TRACK OUT, route-to-main off" (manuals: Rytm ROUTE TO MAIN, A4 VOICE ROUTING).
+- **Rytm separate outputs**: the eight TRACK OUTs (BD, SD, RS/CP, BT, LT, MT/HT, CH/OH, CY/CB) in the mixer's Outs menu.
+  - A voice with its own output plays there (mono, after its level) and leaves the main mix and the master effects; its delay and reverb sends stay.
+  - Its channel starts at the Rytm's fader and route, so turning it on changes nothing until you move it.
+  - The main output is bit-identical with no output on (21/21). `outputs-rytm.cjs` checks that the kick leaves the main channel and comes back. e2e 48/48.
 - c3f2f9e: merged the **Rytm full-track features**.
   - Live recording of parameter locks (pp.40-41), and the sound pool and sound locks (p.48).
   - The Euclidean sequencer (p.44), chromatic play from keys and studio MIDI (pp.19, 22-23), and step recording.

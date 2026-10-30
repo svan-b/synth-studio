@@ -402,6 +402,8 @@ export const TRACK_OPTIONS = [...TRACKS.map(t => t.name), 'FX'];
 /** Pairs on one voice: [left, right] */
 export const SHARED_PAIRS: [number, number][] = [[2, 3], [6, 7], [8, 9], [10, 11]];
 export const VOICE_NAMES = ['BD', 'SD', 'RS/CP', 'BT', 'LT', 'MT/HT', 'CH/OH', 'CY/CB'];
+/** The eight TRACK OUTs, one per voice (rear panel), as the studio's separate outputs */
+export const TRACK_OUTS = VOICE_NAMES.map(label => ({ id: label.toLowerCase().replace('/', '-'), label }));
 
 /** The machine-parameter keys a track has (union of its machines' parameters) */
 export function trackParamKeys(t: TrackDef): string[] {

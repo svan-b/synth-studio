@@ -12,7 +12,7 @@ import { ANALOG_RYTM_LAYOUT } from './layout';
 import { ANALOG_RYTM_LESSONS } from './lessons';
 import { AnalogRytmEngine } from './engine';
 import { LOCKS } from './locks';
-import { EUC_IDS, SEQ_TRACKS, parseId } from './model';
+import { EUC_IDS, SEQ_TRACKS, TRACK_OUTS, parseId } from './model';
 import { PROJECT_RV, defaultProject, type RytmProject } from './presets';
 import { editMacro } from './ui';
 
@@ -231,7 +231,11 @@ const analogRytm: DeviceModule = {
     }
     return euclidDisplay(api, displayWithLocks({ values: api.values, ui: api.ui, data: euclidView(asProject(api.data, SEQ_TRACKS)) }, LOCKS));
   },
-  studio: { midiSync: true, stereo: true, patterns: data => arrangerPatterns(euclidView(asProject(data, SEQ_TRACKS)), SEQ_TRACKS) },
+  studio: {
+    midiSync: true, stereo: true, patterns: data => arrangerPatterns(euclidView(asProject(data, SEQ_TRACKS)), SEQ_TRACKS),
+    // the eight TRACK OUTs: kick, snare and the rest each on a mixer channel of its own
+    outputs: TRACK_OUTS,
+  },
   audition: api => {
     api.event('rytm:audition');
     return () => api.event('rytm:audition:stop');

@@ -359,6 +359,10 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     this.lvTimer = 0;
     this.lvOut = new Float32Array(NT);
     this.anyActive = false;
+    // Voices sent to their own TRACK OUT (the studio's separate outputs): 1 = the voice plays on
+    // output 4, channel k, and leaves the main mix - like a TRACK OUT cable with that voice's
+    // ROUTE TO MAIN off (manual: the routing menu). Its delay and reverb sends stay.
+    this.indiv = new Uint8Array(8);
     // defaults so a fresh node makes sound before the engine's first messages
     for (let tr = 0; tr < NT; tr++) {
       const o = tr * NP;
@@ -376,6 +380,9 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
   onMessage(m) {
     if (!m) return;
     switch (m.t) {
+      case 'indiv':
+        if (m.k >= 0 && m.k < 8) this.indiv[m.k] = m.on ? 1 : 0;
+        return;
       case 'ovr':
         if (m.tr === 12) this.fxOvr[m.i] = m.v; else this.ovr[m.tr * NP + m.i] = m.v;
         return;
@@ -1509,7 +1516,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
   // The voice channel: (machine + sample) -> overdrive -> filter -> amp -> pan
   // --------------------------------------------------------------------------
 
-  renderVoice(v, i0, i1, oL, oR, dL, dR, rL, rR) {
+  renderVoice(v, i0, i1, oL, oR, dL, dR, rL, rR, ind) {
     const G = this.G;
     const genAlive = this.generate(v, G, i0, i1);
     // sample layer
@@ -1591,7 +1598,8 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
       if (v.dclN > 0) { y += v.dcl * DECLICK_W[v.dclN]; v.dclN--; }
       v.lastY = y;
       const l = y * gl, r = y * gr;
-      oL[i] += l; oR[i] += r;
+      // its own TRACK OUT (mono, after the level, before the pan), or the main mix
+      if (ind) ind[i] += y * gain; else { oL[i] += l; oR[i] += r; }
       if (ds) { dL[i] += l * ds; dR[i] += r * ds; }
       if (rs) { rL[i] += l * rs; rR[i] += r * rs; }
       const a = y < 0 ? -y : y;
@@ -1686,6 +1694,10 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
     dLo.fill(0); if (dRo !== dLo) dRo.fill(0);
     rL.fill(0); if (rR !== rL) rR.fill(0);
     const voices = this.voices;
+    // separate outputs in use (output 4: one channel per voice)
+    const indOut = outputs[4];
+    const indiv = this.indiv;
+    if (indOut) for (let k = 0; k < 8; k++) if (indiv[k] && indOut[k]) indOut[k].fill(0);
 
     const blockStart = currentTime;
     const blockEnd = blockStart + n * INV_SR;
@@ -1708,7 +1720,7 @@ class AnalogRytmProcessor extends AudioWorkletProcessor {
           const v = voices[k];
           if (!v.active) continue;
           any = true;
-          this.renderVoice(v, i0, i1, oL, oR, dInL, dInR, rL, rR);
+          this.renderVoice(v, i0, i1, oL, oR, dInL, dInR, rL, rR, indiv[k] && indOut && indOut[k] ? indOut[k] : null);
         }
         i0 = i1;
       }

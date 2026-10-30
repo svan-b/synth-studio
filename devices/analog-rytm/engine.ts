@@ -26,7 +26,7 @@ import {
   type SeqState, type TrigEvent,
 } from '@/lib/sequencer/elektron';
 import {
-  FX, FX_PAGES, FX_TRACK, FX_TRACK_LEVEL, IX, MACHINES, SEQ_TRACKS, TRACKS, TRACK_EXTRA, TRACK_PAGES, TRIG_PAGE, parseId,
+  FX, FX_PAGES, FX_TRACK, FX_TRACK_LEVEL, IX, MACHINES, SEQ_TRACKS, TRACKS, TRACK_EXTRA, TRACK_OUTS, TRACK_PAGES, TRIG_PAGE, parseId,
 } from './model';
 import { ANALOG_RYTM, KIT_CONTROL_IDS } from './spec';
 import type { RytmProject } from './presets';
@@ -79,6 +79,9 @@ const num = (v: ControlValue | undefined, d = 0) => (typeof v === 'number' ? v :
 export class AnalogRytmEngine extends BaseEngine {
   private node!: AudioWorkletNode;
   private master!: AudioWorkletNode;
+  /** The eight TRACK OUTs (worklet output 4, a channel per voice) and where each one goes */
+  private trackOuts!: ChannelSplitterNode;
+  private trackOutDest: (AudioNode | null)[] = new Array(8).fill(null);
   private reverb!: Reverb2;
   private revVol!: GainNode;
   private mainVol!: GainNode;
@@ -133,8 +136,10 @@ export class AnalogRytmEngine extends BaseEngine {
   protected build(): void {
     const ctx = this.ctx;
     this.node = new AudioWorkletNode(ctx, 'analog-rytm', {
-      numberOfInputs: 0, numberOfOutputs: 4, outputChannelCount: [2, 2, 2, 12],
+      numberOfInputs: 0, numberOfOutputs: 5, outputChannelCount: [2, 2, 2, 12, 8],
     });
+    this.trackOuts = ctx.createChannelSplitter(8);
+    this.node.connect(this.trackOuts, 4);
     // channelCountMode 'max': each input takes its source's channel count (2, 2, 2 and 12 control channels)
     this.master = new AudioWorkletNode(ctx, 'analog-rytm-master', {
       numberOfInputs: 4, numberOfOutputs: 1, outputChannelCount: [2], channelInterpretation: 'discrete',
@@ -189,6 +194,20 @@ export class AnalogRytmEngine extends BaseEngine {
 
   private post(m: Record<string, unknown>) {
     this.node?.port.postMessage(m);
+  }
+
+  /**
+   * A TRACK OUT in the studio (DeviceModule.studio.outputs): the voice plays there, mono after
+   * its level, and leaves the main mix and the master effects; null puts it back.
+   */
+  connectOutput(id: string, destination: AudioNode | null) {
+    const k = TRACK_OUTS.findIndex(o => o.id === id);
+    if (k < 0 || !this.trackOuts) return;
+    const prev = this.trackOutDest[k];
+    if (prev) { try { this.trackOuts.disconnect(prev, k); } catch { /* already gone */ } }
+    this.trackOutDest[k] = destination;
+    if (destination) this.trackOuts.connect(destination, k);
+    this.post({ t: 'indiv', k, on: !!destination });
   }
 
   // --------------------------------------------------------------------------
