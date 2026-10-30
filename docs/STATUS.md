@@ -150,7 +150,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 - **Monkey tests** (`scripts/e2e/monkey.cjs`, `studio-monkey.cjs`, `run.cjs --monkey`): seeded random use.
   - Every instrument, mouse and touch: about 6,700 actions, 0 page errors.
   - The studio (tabs, instruments, sets, transport, mixer, routes, undo, lessons): about 900 actions, 0 page errors.
-- **Vercel build rate limit.** Previews from 49f3469 on failed with `build-rate-limit`, not a code error (local builds pass). Every push to any branch, the agents' `wip/*` included, starts a preview build. Pushes are now batched. Option for the user: disable preview builds for scratch branches with `vercel.json` → `"git": { "deploymentEnabled": { "wip/*": false } }`.
+- **Vercel build rate limit.** Previews from 49f3469 on failed with `build-rate-limit`, not a code error (local builds pass), because every push to any branch, the agents' `wip/*` included, started a preview build. Fixed: `vercel.json` now skips `wip/*` branches.
 - A4 performance pass delegated (`wip/perf-analog-four`). In /bench the A4 runs at 5.1× realtime, about 20 % of a core; the other instruments run at 11–45×. All seven together use about 50 % of one core before the master chain.
 
 ## Live log (session 2, 2026-10-29)
@@ -185,11 +185,11 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 - Smoke test fix: buttons that a paged panel removed are skipped after 1 s; the Rytm smoke went from 498 s to 34 s (the app was never slow, at 67–125 ms per press).
 ## 2. In progress
 
+Nothing. With the user's approval (2026-10-30), all 24 `wip/*` branches were deleted from GitHub after each was confirmed fully merged into the working branch (`git merge-base --is-ancestor`). Their work lives on in this branch's history.
 
-Earlier work: nothing else in progress. All 22 `wip/*` branches on GitHub are fully merged into the working branch (checked with `git merge-base --is-ancestor`), so they can be deleted once the user agrees:
-`analog-four`, `analog-rytm`, `demo-excerpts`, `demo-tracks`, `dfam-review`, `elektron-sequencer`, `mother32`, `panel-teaching`, `perf-analog-four`, `perf-shared-fx`, `producer-path`, `producer-path-2`, `review-analog-four`, `review-analog-rytm`, `review-mother32`, `review-sub37`, `review-subharmonicon`, `review-xone96`, `studio`, `sub37`, `subharmonicon`, `xone96`.
+`vercel.json` no longer builds previews for `wip/*` branches. `git.deploymentEnabled` turns them off, and an `ignoreCommand` cancels any that start anyway. The working branch and `main` build as before.
 
-New work merges through the gate below. Before merging an instrument change, compare `specDefaults(<device>)` at both commits to find changed defaults and removed ids, then add an upgrade entry.
+Before merging a future instrument change, compare `specDefaults(<device>)` at both commits to find changed defaults and removed ids, then add an upgrade entry.
 
 ## 3. Merge gate (run for every merge)
 
@@ -224,7 +224,6 @@ Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Su
 - **Full-track gaps on the A4**: POLY, a kit per pattern, separate track outputs, live recording of knob moves, TRANSPOSABLE, and trig/page/sound copy.
 - StudioView: hide "Output" for Your synth when it has no audio. `hub.push()` should apply data before values.
 - Optional "Hardware synth" studio set (Your synth + Audio input + Xone:96).
-- Delete the `wip/*` branches after their work is merged (ask first).
 - **To confirm on real hardware** (each review lists its own; the main ones):
   - A4: the FRQ-to-Hz law, envelope times, BND and DET scales, accent depth and FDB loop gain
   - Mother-32: DECAY at noon and 11 o'clock, the HI PASS slope, LIN FM depth and the mixer's AC-coupling corner
