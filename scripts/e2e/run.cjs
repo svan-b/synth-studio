@@ -117,9 +117,11 @@ const so = run(path.join(__dirname, 'outputs.cjs'), [base, path.join(outDir, 'ou
 check('separate outputs: a channel of its own that routes, mutes, shows in the mixer and goes when off', !so.__error && so.ok && (so.errs ?? []).length === 0,
   so.__error ?? { on: so.on && { strip: so.on.strip, rms: so.on.rms }, ui: so.ui, mute: so.mute, off: so.off && { strip: so.off.strip } });
 
-const sr = run(path.join(__dirname, 'outputs-rytm.cjs'), [base]);
-check('separate outputs: the Rytm\'s BD TRACK OUT takes the kick to its own channel and back', !sr.__error && sr.ok && (sr.errs ?? []).length === 0,
-  sr.__error ?? { before: sr.before, mainWithBdOut: sr.mainWith, bd: sr.bd, after: sr.after });
+for (const [device, output, what] of [['analog-rytm', 'bd', 'the Rytm\'s BD TRACK OUT takes the kick']]) {
+  const sr = run(path.join(__dirname, 'outputs-device.cjs'), [base, device, output]);
+  check(`separate outputs: ${what} to its own channel and back`, !sr.__error && sr.ok && (sr.errs ?? []).length === 0,
+    sr.__error ?? { before: sr.before, mainWithOut: sr.mainWith, out: sr.bd, after: sr.after, inherit: sr.inherit });
+}
 
 // ---- Project files carry user samples ------------------------------------------
 const pa = run(path.join(__dirname, 'project-assets.cjs'), [base]);

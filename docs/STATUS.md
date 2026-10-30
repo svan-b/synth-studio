@@ -120,6 +120,12 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Each output becomes its own channel `<instance>/<id>`: fader, pan, sends, mute, solo, meter, route, stem and a map arrow. Arranger mutes follow the instrument.
   - Checked with a stand-in output (`scripts/e2e/outputs.cjs`; e2e 47/47).
   - The Rytm's eight TRACK OUTs and the A4's four stereo track outputs come after their feature branches merge. Each will act as "cable in the TRACK OUT, route-to-main off" (manuals: Rytm ROUTE TO MAIN, A4 VOICE ROUTING).
+- 01401e3: merged the **Analog Four full-track features**.
+  - POLY with chord trigs and the PLY arp mode; live recording of knob moves; step recording; copy, clear and paste of pages, trigs and Sounds; TRANSPOSABLE; and kits per pattern.
+  - Two new lessons. With the new features off the output is bit-identical (163/163).
+  - Gate: A4 lessons 22, 0 failed, 0 manual; Rytm lessons still 22, 0 failed; sequencer tests 237; e2e 49/49 for the checks that apply; touch monkey test 536 actions, 0 errors.
+  - Audio QA flags 1 of 47 in each mode (Arp Garden, Bubble Cycle), the intermittent onset detection the agent also saw on the base build. A follow-up task was suggested to investigate.
+  - **Not done:** the A4's TRACK 1-4 outputs as separate outputs. A first attempt carried almost no signal in the test, so it was backed out (next step).
 - **Project files carry user samples.** An instrument can declare `assets` (`has`, `collect`, `restore`); project files embed them as mono 16-bit PCM, base64.
   - Opening a project restores them before the studio loads.
   - The Rytm's user samples now travel to another browser or the iPad Home Screen app, which keeps its own storage.
@@ -179,7 +185,6 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 - Smoke test fix: buttons that a paged panel removed are skipped after 1 s; the Rytm smoke went from 498 s to 34 s (the app was never slow, at 67–125 ms per press).
 ## 2. In progress
 
-- `wip/a4-tracks`: Analog Four POLY and chords, live knob-lock recording, step recording, trig and page copy, TRANSPOSABLE and kit per pattern.
 
 Earlier work: nothing else in progress. All 22 `wip/*` branches on GitHub are fully merged into the working branch (checked with `git merge-base --is-ancestor`), so they can be deleted once the user agrees:
 `analog-four`, `analog-rytm`, `demo-excerpts`, `demo-tracks`, `dfam-review`, `elektron-sequencer`, `mother32`, `panel-teaching`, `perf-analog-four`, `perf-shared-fx`, `producer-path`, `producer-path-2`, `review-analog-four`, `review-analog-rytm`, `review-mother32`, `review-sub37`, `review-subharmonicon`, `review-xone96`, `studio`, `sub37`, `subharmonicon`, `xone96`.
