@@ -1,0 +1,266 @@
+# Analog Four MKII twin: independent review
+
+This is a reviewer's pass over `devices/analog-four/**` and `public/worklets/analog-four-processors.js`.
+
+- **Primary source:** the Analog Four MKII User Manual for OS 1.55, cited as "M p.N".
+- **Other sources:** `docs/research/analog-four/` (panel.md, signal-flow.md, sources.md) and a top-down image of a black unit, used only as a measurement reference (panel.md, IMG).
+- **Measurements:** an offline Node harness that runs the `a4-voice` worklet exactly as the engine drives it, plus Playwright runs of the production build.
+
+The panel geometry was verified first, because the earlier verdict on this instrument was "looks nothing like it". Every element position is right: they all agree with the manual's drawing to about 1 mm. What still looked wrong was the surface: small grey legends, grey knurled knobs and outlined lit keys. Those are fixed.
+
+## Findings and changes
+
+| # | Severity | Finding | Evidence / source | Change |
+|---|---|---|---|---|
+| 1 | High | **BND (auto bend) did nothing.** The OSC 1&2 knob D had no effect in the worklet, and its help text called it a MIDI pitch-bend range | M p.88: each trigged note starts offset by BND and glides to its pitch in the SLI time; with sync on, only the synced oscillator bends | Implemented: 0.5 semitone a step, falling fast at first, over the SLI time. Only the synced oscillator bends for 1>2 and 2>1, both for metal. Measured: BND +24 starts at +11.2 st, +2.4 st after 100 ms and 0 after 200 ms (SLI 64, 0.19 s); BND -24 mirrors it. Description corrected |
+| 2 | High | **The transport audio-QA gate failed: 8 of 47 flagged.** 7 presets left delay or reverb tails above -60 dBFS 2 s after the studio stop. The empty project was silent on PLAY | audio QA `--excite analog-four=transport` on the reviewed build: `median -19.0 LUFS, spread 7.6 LU, 8 of 47 flagged (long-tail 7, silent 1)`, exit 1. The builder's 0/47 was the audition run only | A stop from the studio (■, Space, the arranger's end) is now a full stop for the rack: the voices are cut and the sends fade in 1.5 s. The A4's own [STOP] key and the end of its own song keep the hardware ring-out, and [STOP][STOP] still fades in 0.3 s (M p.38). The init preset keeps a blank pattern memory but has one trig per beat on T1, so PLAY sounds. Measured in the app on Dub Chords: after the [STOP] key the echoes are at -35 dBFS 1 s later and -47 dBFS 2 s later; after a studio stop, -51 and -103 dBFS |
+| 3 | High | **The panel surface did not read as the black unit** (geometry was right; see "Panel"): <br>• Legends at 7.5-8 px: about 25 % smaller than the unit's printed legends, and below the app's 9/10 px floors on the iPad (95 % fit). <br>• Legends grey (#9a9da2) where the unit's are near-white. <br>• Knobs drawn as grey knurled rings, where the unit has satin-black domes. <br>• Lit keys drawn as coloured outlines, where the unit backlights the legend. <br>• Arrow chevrons and transport icons tiny. <br>• Beat-marker frames on TRIG 1/5/9/13 were narrow portrait boxes, not squares. <br>• "Quick Performance" sat 15 mm right of where it is printed (under TRIG 8). <br>• "Sound Browser" sat detached from "Track Level" | M p.12 drawing; IMG side by side at equal scale. Text sizes, colours and positions were measured on both | Legends 9.5-10 px native (about 9-9.5 CSS px on the iPad), near-white, with no two legends touching. Black glossy knob caps (an instance-scoped restyle of the shared cap). Keys lit through their legend with a soft glow, the cap staying dark. Chevrons 17 px and transport icons 22 px. Square beat frames. The bracket label centred under TRIG 8 and Sound Browser right under Track Level. See "Panel" |
+| 4 | Medium | **Portamento glided sequencer notes.** PRT ON slid every note, and PRT LEG worked without LEGATO MODE | M p.35: PORTAMENTO and LEGATO MODE affect only notes played on the keyboard or from MIDI, and LEGATO portamento needs LEGATO MODE on | Glide only on played notes, and LEG needs LEGATO MODE. Slide trigs always glide. The "Lead / Glide Saw" demo now glides with slide trigs, and its description says why |
+| 5 | Medium | **An accent changed only the level** | M p.51: an accent changes "the volume and filter envelope behavior" | An accent now also deepens ENV F's sweep of both filters: x(1 + 0.8 ACC/127). Measured: +22 dB more 2 kHz in the first 30 ms of an accented note (F1 40, DEP +30). Acid Workout's accented line then peaked at -1.3 dBTP, too close to the -1 ceiling, so its bass VOL went from 84 to 76 |
+| 6 | Medium | **FDB could never self-oscillate.** Its loop gain was 0.8 at LEV 127, with no AC coupling | M p.73: high FDB levels self-oscillate (drums, screams); moderate ones overload what OSC 2 feeds in | The feedback path is AC-coupled (25 Hz) with a loop gain of 1.3 at LEV 127. Measured: no oscillation at LEV 64; it self-oscillates from LEV 100 at RES 0 (157 Hz at FRQ 100, 67 Hz at FRQ 70). OSC 2 + FDB 64 is +5 dB more overdriven. Cutoff and resonance change the behaviour, as the manual says. No preset uses FDB |
+| 7 | Medium | **ARP LEG had no effect on note trigs with the arpeggiator off** | M p.44: LEG "will affect the note trigs of the track even if the MOD setting is set to OFF" | Overlapping note trigs now play legato with LEG ON: the gate carries over and the envelopes are not retriggered. Measured: the level change at the next note is -0.2 dB with LEG and +0.8 dB (a retrigger) without. LEG's help text said "glide"; corrected |
+| 8 | Medium | **No output stage, so levels were unbounded.** One voice with every source up, OVR, VOL 127, TRACK LEVEL 127 and an accent peaked at +15.7 dBFS (+21.8 dBFS with ACC 127). That is about +12 dBFS at the instrument tap | harness, single voice | An analog-style output stage sits after the dry + FX mix and before MAIN VOLUME (M p.15): unity to 0 dBFS, then a soft knee to +3.5 dBFS. It is not oversampled, because the 2x filter overshot clipped peaks by 1 dB. Measured in the app with all four tracks that hot, on Night Drive: +0.20 dBFS at the instrument tap. Normal kits peak below the knee; the drums' highest peaks lose under 0.1 dB |
+| 9 | Medium | **Lesson texts used labels that are not on the panel:** <br>• "BANK G (NOTE SLD)": the panel says Note Slide. <br>• Delay "FB": the screen says FDB. <br>• sq4 taught [SONG] to open SONG EDIT; on the hardware that is [FUNC] + [SONG MODE] (M p.55-57). <br>• f2 said 5TH is "a fifth below the octave"; it is a fifth below the oscillator, at 2/3 of its frequency (M p.72) | PEDAGOGY.md writing rules | Texts fixed. Lesson ids and checks are unchanged |
+| 10 | Low | Touch targets: the 11 mm keys are about 32 CSS px on the iPad | PEDAGOGY / platform guidance: 44 px | On touch screens, small keys and keyboard keys answer within 44 px, and wide keys get the extra height only. Their neighbours are 16-17 mm apart, so the hit areas do not overlap |
+| 11 | Low | The worklet header said NEI takes the post-VCA signal. The code correctly sends the multimode output before the VCA (M p.73) | code reading; harness: T1's feed carries on at -7.6 dBFS while its own VCA is closed, and T2 plays T1's 130.8 Hz | Comment fixed |
+| 12 | Low | The delay's WID is a time offset between the channels. In the manual it places the echo (X 0) or sets the ping-pong width (X 1), and X 1 always swings fully | M p.95 | Left; documented in REFERENCE.md. Changing it would move every kit's echo, because WID defaults to +63 |
+| 13 | Low | There is no TRANSPOSABLE / KEY SCALE (M p.47, p.53): song-row transposes and [TRNS] move every track | M p.53, p.57 | Left; documented. The drum sounds run with oscillator TRK OFF, so they keep their pitch |
+
+## Measurements against the hardware
+
+| Quantity | Hardware (manual) | Twin, measured offline at 48 kHz |
+|---|---|---|
+| Pitch tracking | Note-tracked oscillators; TRK OFF gives a constant pitch (p.87) | Within 0.5 cent from C0 to C7 (16.35-2093 Hz); +1.2 cent at C8 (estimator resolution). TRK OFF holds 261.63 Hz at any note |
+| TUN, FIN, DET | Semitones; 1 turn of FIN = 1 semitone; DET a fixed number of Hz (p.87) | TUN +-63 st exact; FIN 1/128 st per step; DET 0.125 Hz per step (+63 = +7.9 Hz: 269.5 Hz at C4) |
+| Sub oscillators | 1OCT f/2, 2OCT f/4, 2PUL 25 % pulse at f/4, 5TH 33 % pulse at 2/3 f (p.72) | 130.81 / 65.41 / 65.41 / 174.43 Hz at C4 (exact) |
+| Envelopes | Times not published; 12 shapes (p.74-75) | The twin's law: 0 = 1 ms, 64 = 0.13 s, 127 = 16 s. STD decay reaches -60 dB at about 1.2x the nominal time; LIN reaches zero at the nominal time; fastest rise 1.5 ms |
+| F1 ladder | 24 dB/oct; RES about 25 is the flattest; it self-oscillates (p.73, p.89) | -23 to -26 dB/oct from 2x to 8x the cutoff. At RES 0 it is -12 dB at the nominal cutoff (the ladder knee). Self-oscillation from RES ~120 at -17 dBFS, exactly on the FRQ law (110/220/440/880/1760/3520 Hz at FRQ 36-96). The Hz law itself is the Rytm's measured one (not published for the A4) |
+| F2 multimode | LP2 12, LP1 6, BP 6/6, HP1 6, HP2 12 dB/oct, BS notch, PK boost (p.74) | LP2 -11 to -13, LP1 -6, HP1 +6, HP2 +10 to +12 dB/oct; BS -18 dB at the cutoff; PK +9 dB at RES 80 |
+| Levels | +19 dBu maximum output (p.85) | The init voice peaks at -2.2 dBFS at the voice and about -5.5 dBFS at the tap. The worst case is bounded by the output stage (finding 8) |
+| DC | - | Mean/RMS below 0.6 % for SAW, TRP, PUL and TRI at every PW; 2PUL sub 1.5 % |
+| Retrigger and stop clicks | - | A retrigger's largest sample step is 1.2-1.8x the steady signal's for all shapes (no click). The [STOP] cut takes 6 ms, click-free, and is silent after 10 ms |
+| CPU | - | `scripts/bench.cjs`: the whole A4 (4 voices + FX, 8 worklet nodes) renders the demo song at 6.8x realtime on a machine shared by about 7 agents |
+
+## Panel
+
+- **Positions.** The manual's drawing (p.12, 200 dpi) is 1074 x 625 px for 385 x 224 mm. Every blob centre was located by flood fill, and all 37 elements match panel.md and `geometry.ts` (drawing minus the 2 mm frame) within about 1 mm. Examples, drawing then twin + 2 mm:
+  - DATA ENTRY: x 220.6/249.1/277.6/306.1/334.6, y 38.0/66.5, against 221/249/278/306/335, 38/66.
+  - TRIG keys: x 23.7 ... 339.5 at y 192.8, against 24 + 21(n-1) at 192.
+  - Keyboard: lower row at y 160.2, upper at y 137.3, against 160 and 137.
+  - The geometry needed no change.
+- **Surface.** This is what made it look "nothing like it", and the IMG comparison at equal scale shows it:
+  - the legends' size and colour;
+  - the knob caps;
+  - how lit keys glow;
+  - the icon sizes.
+  
+  All of these are fixed (finding 3). The knob caps are restyled by an instance-scoped stylesheet over the shared `elektron` cap. A proper "satin dome" cap variant in `components/controls/Knob.tsx` would be cleaner; that file is outside this review's scope.
+- **iPad (1180 x 820, 95 % fit).** All legends render at about 9-9.5 CSS px, and none touch. "Fit" fits the width, so the last row of printed legends (A-P, T1-CV, Quick Performance) and PAGE's "Scale" sit just below the fold. The trig keys themselves are visible. This is app-level: Fit does not consider height on this panel's 1.72 aspect.
+- **Kept as the builder had it:**
+  - The OLED is drawn 1.2x its real size, and shows values under the knobs (the real screen shows icons only). Both help learning.
+  - GRID RECORDING is on by default.
+  - The lock dot on locked trigs replaces the hardware's rapid flashing.
+
+## Builder's choices
+
+| Choice | Verdict |
+|---|---|
+| Old A4 saves start fresh | **Acceptable.** About 500 ids were redefined and the old patterns lived in control strings, so no faithful conversion exists. Recommendation for the integrator: keep the old values in the save under a legacy key instead of discarding them, and show a one-time notice that the A4 was rebuilt. Today the user's old work disappears silently |
+| [STOP] lets the delay and reverb ring; [STOP][STOP] fades them | **Correct** (M p.38: "effects like the Saturator Delay will continue to be audible"; the double press fades the send effects). Refined: a stop that comes from the studio now fades the sends in 1.5 s, so the studio's ■ means "everything stops". The A4's own key keeps the hardware behaviour (finding 2) |
+| No POLY | **Right for the effort** (allocation modes, unison, the PLY arp, voice stealing; M p.28-29). It is the biggest gap for making full tracks: one track cannot play chords or pads. The 5TH-sub chord trick (M p.73) and OSC 2 intervals cover two- to four-note voicings |
+| No sound locks | **Acceptable.** P-locks of the sound's parameters do the same job, as Night Drive's one-track drums show, at more effort |
+| No Euclidean page | **Acceptable**; low value for the effort |
+| No STEP RECORDING | **Acceptable.** Grid recording plus hold-a-trig + keyboard covers note entry, and with a mouse step recording saves little |
+
+**Also missing for making full tracks.** These are reported, not built here. A later pass built POLY, STEP RECORDING and items 1, 3, 4 and 5 (see "Full-track features" at the end):
+1. **A kit per pattern.** All patterns share one kit, so the sound cannot change between song sections except by p-locks (M p.38).
+2. **Separate track outputs.** The A4 is one stereo stem, so its four voices cannot be mixed or bounced separately in the studio mixer (M p.14: four stereo track outputs).
+3. **LIVE RECORDING of knob moves** (M p.50). Parameter slides are the workaround.
+4. **TRANSPOSABLE** (M p.47).
+5. **Trig, page and sound copy/paste** (M p.54).
+6. **[PAGE] + [TRIG] page playback** (M p.39).
+
+## Presets
+
+- Audio QA, before (the reviewed build):
+  - Audition: `[analog-four] median -18.9 LUFS, spread 9.0 LU, 0 of 47 flagged (none)`, exit 0.
+  - Transport: `[analog-four] median -19.0 LUFS, spread 7.6 LU, 8 of 47 flagged (long-tail 7, silent 1)`, exit 1.
+- The first after run (transport) cleared every tail and the silent init. It flagged two loudness outliers caused by this review:
+  - "Lead / Glide Saw" at -13.2 LUFS: its slide demo is legato.
+  - The init pulse at -22.5 LUFS.
+  
+  They were calibrated: Glide Saw TRACK LEVEL 76, and the init trigs are 3 steps long. The Acid Workout bass VOL went from 84 to 76 for true-peak margin (finding 5).
+- After, on the final build:
+  - Audition: `[analog-four] median -18.9 LUFS, spread 7.4 LU, 0 of 47 flagged (none)`, exit 0, max true peak -2.4 dBTP.
+  - Transport: `[analog-four] median -19.0 LUFS, spread 7.4 LU, 0 of 47 flagged (none)`, exit 0, max true peak -1.6 dBTP (Drum / Zap Perc, the same as before the review).
+  - Every tail is at about -103 dBFS 2 s after a studio stop.
+- Names follow "Category / Name". "Kit / Empty project (init sounds)" became "Kit / Init sounds (blank pattern)", with the same preset id.
+- The sounds are musically sensible and true to their character, with no copied factory names.
+
+## Lessons
+
+- The lesson runner plays all 20 lessons with 0 failed and 2 manual steps. Both manual steps are in st2, which arranges the studio: the lesson solution API cannot set the arranger.
+- **Predictions:** each has one clearly right answer.
+- **Ear targets:** they differ by 8-40 % of knob travel, and by 8-14 % at the "fine" level.
+- **Sequence:** the lessons follow the signal flow, then sequencing, performance and studio.
+- **Wording:** fixed where it did not use the panel's labels or got a fact wrong (finding 9).
+
+## Upgrade notes (for `lib/studio/upgrades.ts`)
+
+- No control ids, ranges or defaults changed. These behaviours changed, and they matter for saves made since the A4 rebuild:
+  - `t1..t4_osc_bnd`: no effect → auto bend. Saves with BND ≠ 0 now bend, so reset BND to 0 for saves from before this version if the old sound must be kept.
+  - `t1..t4_snd_prt` = 1 (ON): sequencer notes no longer glide; played notes still do. `snd_prt` = 2 (LEG) now needs `snd_leg` on.
+  - `t1..t4_arp_leg` = 1: overlapping note trigs now play legato with the arpeggiator off.
+  - `t1..t4_osc1_wav` = 6 (FDB): louder, and self-oscillating from LEV ~100.
+  - Accent trigs: a deeper filter envelope.
+  - A studio stop now fades the A4's send effects in 1.5 s (the A4's own [STOP] key and the end of its own song do not).
+  - The Acid Workout kit's T1 VOL is 76 (was 84).
+- Preset name: `init` is "Kit / Init sounds (blank pattern)", and its project has four trigs on T1.
+
+## Open
+
+- **To confirm on a unit:**
+  - the FRQ-to-Hz law (borrowed from the Rytm);
+  - the envelope times;
+  - the BND and DET scales;
+  - the accent depth;
+  - the FDB loop gain.
+- **Delay WID** as placement (finding 12) would move every kit's echo, so it was left.
+- **App level, outside this review's scope:**
+  - the iPad fit puts the last legend row below the fold;
+  - a satin-black cap variant in `Knob.tsx` would replace the scoped restyle;
+  - the lesson solution API has no arranger field, which leaves st2's two manual steps.
+
+## Gate
+
+| Check | Result |
+|---|---|
+| tsc, `next lint`, `npm run validate analog-four` | clean; 0 errors (17 warnings, none from this review: controls driven by custom elements, and the studio challenges without solutions) |
+| build | passes |
+| `scripts/smoke.cjs` | no errors; no horizontal scroll on desktop or iPad; peaks: keys 0.33, transport 0.33, buttons 0.16 |
+| `scripts/lesson-runner.cjs analog-four` | 20 lessons, 0 failed, 2 manual steps (the arranger) |
+| `scripts/e2e/run.cjs` | 34/34 |
+| `scripts/audio-qa.cjs analog-four --target -18 --suggest` | exit 0: 0 of 47 flagged, median -18.9 LUFS, max true peak -2.4 dBTP |
+| the same with `--excite analog-four=transport` | exit 0: 0 of 47 flagged, median -19.0 LUFS, max true peak -1.6 dBTP |
+| in-app checks (Playwright) | worst case on all four tracks +0.20 dBFS at the tap; Dub Chords rings after the [STOP] key (-35 / -47 dBFS at 1 / 2 s) and fades after a studio stop (-51 / -103 dBFS) |
+| screenshots (desktop 1440 x 900, iPad 1180 x 820) | read against M p.12 and IMG at equal scale; no legend touches another; the last legend row sits just below the iPad fold (see "Panel") |
+
+## Performance
+
+On an iPad every instrument shares one audio thread, and the twin cost about four times the average instrument. Its worklets were reworked to do the same arithmetic with less overhead. The output does not change.
+
+| | before | after |
+|---|---|---|
+| `/bench` × realtime: 10 s demo render, headless Chromium, best of 5 renders; median of 6 interleaved runs | 8.30 | 13.93 (1.68× faster) |
+| the four voices once everything is optimised (offline harness, % of one core): bench demo / full demo song | 2.76 / 3.33 | 1.17 / 1.22 |
+
+Equivalence was checked with an offline harness. It runs the real engine (sequencer, kits, presets) on a fake AudioContext and drives the old and the new processors in lockstep, with the same seeded `Math.random`. It compares every node output of every render quantum over 163 renders:
+- the demo song;
+- every preset, by transport and by audition;
+- the keyboard phrase on every sound;
+- delay idle and wake cases;
+- 24 fuzzed kits.
+
+All 163 are bit-identical.
+
+What made it faster, largest first:
+- **Stable object shapes for V8.** Each bench render starts in a fresh audio scope, where V8 compiles the code from scratch. Numeric state fields created with integers (`this.l0 = 0`) became doubles at their first fractional value. That deprecated the object's map and threw away the optimised code: the voice's `process()` was compiled 10 times per render. Every such field is now created holding a double. The voice's parameter-index map was in dictionary mode, so each of the ~150 name lookups per control tick was a hash lookup. It is now a frozen table in the voice's own parameter order.
+- **Less work per control tick** (3 kHz per voice):
+  - each envelope reads only the running stage's time;
+  - control-rate `exp2`, `pow`, `tan`, `sin`, `cos` and `exp` are memoised on their inputs;
+  - the 40 parameters read after the modulation routes get their effective values in one pass;
+  - only the modulation entries the last tick wrote are cleared.
+- **Smaller units for the JIT.**
+  - `process()` is split into ticks, events, ramps, idle blocks and the sample loop.
+  - The control tick is split into modulation, pitch, tone and amp parts.
+  - A part that meets a path it has not seen run (a first glide, accent or noise fade) is recompiled on its own.
+  - Queued events share one shape.
+  - `route()` gets its type feedback at construction.
+- **Per-block constants in the sample loops.** The oscillator, filter and VCA loops read each control block's settings once. A still cutoff computes its filter coefficients once per block, and the saw's split is computed once per block.
+- **Idle work skipped, exactly.**
+  - The delay skips its loop while both lines hold only zeros and nothing feeds it.
+  - A silent voice does not zero its outputs again.
+  - The FX parameters are read by index, with no closures per quantum.
+
+The shared `fdn-reverb` and `chorus` processors are now a large part of what the A4 costs. The chorus runs even when no track sends to it.
+
+Audio QA (`--target -18`) varies from run to run with the old code too. Oscillator phases and noise seeds are random:
+- Wobble's sub and OSC 2 sit at the same pitch, so its loudness swings by up to 2.8 LU;
+- the snare's peaks vary by about 3 dB;
+- the old code had flagged runs as well (1 of 2 in each mode).
+
+The final build passes both modes:
+- **audition:** median −18.8 LUFS, spread 7.4 LU, 0 of 47 flagged;
+- **transport:** median −19.0 LUFS, spread 7.4 LU, 0 of 47 flagged.
+
+The old code over two runs per mode gave −19.05 / 7.69 LU (audition) and −19.03 / 7.57 LU (transport). The presets whose level repeats within 0.2 LU from run to run differ by a median of 0.01 LU between the versions.
+
+Found here and fixed in a separate commit after the merge: an idle voice's free-running LFOs did not actually run. `this.lfo1.ph -= Math.floor(this.lfo1.ph += d1)` read the phase before the addition, so the phase stayed put, and after a wrap it stuck at a negative value until the voice woke. `idleBlock` now advances, then wraps. A FREE LFO keeps running while its voice is silent, as on the unit, so the phase a note starts on depends on how long the voice rested.
+
+## Full-track features
+
+A second pass built what this review listed as missing for making whole tracks, to the manual (M p.N as above). Every new feature is off until you use it. With POLY off and no kit links, every preset and the demo song give the engine's old message stream (163 of 163 harness scenarios) and the worklet renders bit-identically (163 of 163).
+
+| Feature | Manual | What the twin does |
+|---|---|---|
+| **POLY** | M p.25, p.28-31 | POLY CONFIG ([FUNC] + [MIX], or KIT > POLY CONFIG) ticks voices into a pool; a track whose voice is ticked plays polyphonically on any pool voice, and the others keep their own mono voice. ALLOCATION RESET, ROTATE, REASSIGN and UNISON; with no free voice the least recently used one is stolen. USE TRK SOUNDS keeps each voice on its own track's sound. UNISON DETUNE and PAN SPREAD (16 and 64, as on the manual's screen). TRIG 1-4 tick the voices while the menu is open and light white while their voice plays. The settings are kit controls, so a kit loads its own |
+| Chord trigs | M p.28, p.42 | A trig holds up to four notes (`Step.chord`). Hold a trig and press several keys together (panel keys, or the computer keyboard with a mouse), or play them together in LIVE or STEP RECORDING. Overlapping trigs sound together on a poly track; a mono track plays the chord's first note. The screen lists a held chord trig's notes |
+| PLY arpeggio | M p.43 | ARP MOD PLY plays the whole chord on each arpeggio step, an octave up each step until RNG |
+| **LIVE RECORDING of knob moves** | M p.40-41, p.47, p.50 | A knob turned with no trig held records a lock on the step that plays on the active track: a note trig takes it, an empty step gets a lock trig. The value sounds at once, the kit keeps its own value, and the knob shows the recorded value until recording ends. NOT, VEL and LEN go into the note trigs the playhead passes. A held trig still takes the knob as in GRID RECORDING. Real-time erase while held: [FUNC] + [NO] the locks, [TRACK] + [NO] the trigs, [NO] + a knob turn that parameter's locks. [RECORD] + [PLAY][PLAY] records quantized |
+| **STEP RECORDING** | M p.41-42 | [RECORD] + [STOP] (again: STANDARD / JUMP), [RECORD] leaves it. The trig keys pick the active step, LEFT / RIGHT move it; each key writes there and moves on one step, or the NOTE page's LEN in JUMP (also locked on the trig). Keys held together make a chord, [NO] a rest, [YES] held sets LEN from how long the key was held. Existing locks stay |
+| **Copy / clear / paste** | M p.19, p.54 | [PAGE] + [RECORD] / [STOP] / [PLAY] for the shown page; held trigs + [RECORD] copy them, a held trig + [STOP] pastes them from there, held trigs + [PLAY] clear their locks; repeating a paste or clear undoes it, and again redoes it. [TRACK] + [RECORD] / [STOP] copy and paste a Sound. The TRACK menu has the same as buttons for a mouse, and with the trig editor open its steps count as held |
+| **TRANSPOSABLE** | M p.47, p.53, p.57 | Per pattern track (NOTES SETUP): off, the track's notes ignore [TRNS] and the song's transpose. [TRNS] + [TRACK] switches it; while [TRNS] is held, the lit track keys are the transposable ones. The brief placed it under SOUND SETTINGS (p.35); the manual puts it in NOTES SETUP |
+| **Kits per pattern** | M p.16, p.24-25, p.38 | The project keeps its kits and each pattern can link one. SAVE KIT ([FUNC] / [YES] + [KIT]), SAVE AS NEW, LOAD (links the active pattern; the loaded kit reloads from its save), RELOAD ([NO] + [KIT]), CLEAR. When a pattern with another kit starts (a pattern change, a chain, a song, the studio arranger), the engine schedules that kit's voices, FX track and POLY CONFIG exactly at the pattern's start, and the knobs follow when you hear it. The kit left behind keeps its edits. A linked pattern picked while stopped loads its kit; an unlinked one plays the loaded kit and joins it when you edit it |
+
+**Where the manual leaves room** (also in REFERENCE.md):
+- RESET counts up from the playing track's own voice and wraps round (the manual's figure plays from track 1).
+- UNISON spreads the voices evenly by their place in the pool: the outer ones DETUNE/128 semitone and SPREAD/127 x 64 PAN either side.
+- A poly voice takes the new sound at the note's start with no crossfade, as a stolen voice must.
+- On a poly track, an INF note holds until its voice is stolen or the sequencer stops.
+- Knob locks land on the step under the playhead; they carry no micro timing.
+- The twin's knobs have no push switch, so [NO] + turning a knob erases its locks.
+- Kits are slots of the project, named KIT nn (there is no NAMING menu).
+
+**Library additions** (`lib/sequencer/elektron`; nothing existing changed): `Step.chord`, `CHORD_MAX` / `CHORD_SPAN`, `cleanChord` (also in `normalizeStep`), `trigNotes`, `addChordNote`, `formatChord`, `patchStep` cleaning `chord`, and `LockTracker.add` for live-recorded locks. There are four new test cases (`npm run test:seq`: 237 pass). `docs/ELEKTRON_SEQUENCER.md` documents them.
+
+**Lessons:**
+- *Chords with POLY* (`analog-four-sq5-poly-chords`, sequencing): the pool, a chord trig, POLY on against off, voice stealing, a chord progression, and UNISON with an ear match of UNISON DETUNE.
+- *Record knob moves live* (`analog-four-p2-live-locks`, performance): live recording, a recorded filter sweep, what the knob still controls, an ear match of RES, and a second take on the delay send.
+- Every step has a solution. Every existing lesson id and check is unchanged.
+
+**Verification:**
+- Offline harness, POLY and kits: 23 checks. The manual's four allocation figures note for note; stealing with stale note-offs ignored; RESET from T2; chord trigs on three and four voices; T1's sound on the other voices; UNISON offsets; USE TRK SOUNDS; knob turns reaching every voice that holds the sound; a mono track beside a poly pool; PLY; POLY off again; kit switches at the pattern start (FX too) and back, the kit left behind keeping its unsaved edit.
+- Browser checks on the production build: 32 checks (POLY CONFIG, chord entry, live-recorded locks and erase, step recording with a chord, page and trig copy / undo, TRANSPOSABLE, kits through a chain), plus iPad screenshots and text and touch-target sizes of every new menu.
+
+**Gate on the final build:**
+
+| Check | Result |
+|---|---|
+| `tsc`, `npm run lint` | clean |
+| `npm run validate` | 0 errors. The eight new warnings are the POLY CONFIG controls, which only the POLY CONFIG menu edits |
+| `npm run test:seq` | 237 pass |
+| Worklet null test (lockstep, old against new processors) | 163 of 163 renders bit-identical at every tap |
+| Engine message streams, features off | 163 of 163 identical to the base engine |
+| smoke | 0 errors |
+| Lesson runner | 22 lessons, 0 failed, 0 manual |
+| Audio QA, audition | median -18.8 LUFS, spread 7.4 LU, 0 of 47 flagged |
+| Audio QA, transport | median -19.1 LUFS, spread 7.7 LU, 0 of 47 flagged |
+| e2e | 48 of 48 |
+| A4 browser checks | 32 of 32 |
+| `/bench`, POLY off | 17.7x realtime against the base build's 17.9x (mean of 12 alternating runs each: -0.8 %) |
+
+Arp Garden and Dub Chords sometimes get one click flag in a run (one sharp note onset among other sound, just over the threshold). The base build does the same: in nine alternating runs of the first six presets, the base build was flagged twice and this branch once. A rerun is clean.
+
+**Upgrade notes** (for `lib/studio/upgrades.ts`):
+- `t1..t4_arp_mod`: max 6 → 7 (PLY added at 7) → no conversion: every saved value keeps its meaning.
+- New controls, whose defaults keep the old sound: `poly_v1`..`poly_v4` (off), `poly_alloc` (0, RESET), `poly_trk` (off), `poly_det` (16), `poly_spr` (64). The kit presets now set them, all mono.
+- [PAGE] shows the next page when it is let go, not when it is pressed, so that it can be held for the page combinations.
+- New optional data, so older saves load as they are: `Step.chord`, `Pattern.kit` (now used: a slot of the project's `a4kits`), the project's `a4kits` / `a4kit`, and the pattern's `a4trns`.
+
+**Still missing**, with the reason for each:
+- VOICE ROUTING (voice to main / to FX, M p.29): it matters once separate track outputs come, which the integrator adds after this merges.
+- Sound locks, the Euclidean NOTE page, KEY SCALE / KEY NOTE, [PAGE] + [TRIG] page playback, and trig shift / destructive transpose: these are sequencer extras with no musical gap left by the work above.
+- LIVE RECORDING takes note lengths from the NOTE page's LEN, not from the keys. The manual does not say whether it records them.
+- VELOCITY TO VOL and the MIDI controller routings (M p.35-36) need MIDI-velocity input, which the A4's own keyboard does not have.
+- Kit naming and the kit / macro copy-paste menus (M p.26).
+- With a mouse, the two-key combinations need the TRACK and KIT menu buttons (or the trig editor). On a touch screen they are two fingers, as on the unit. The shared menu frame's close button is 30 px.

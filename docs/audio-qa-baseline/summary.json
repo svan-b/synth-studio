@@ -1,0 +1,304 @@
+{
+ "kind": "audio-qa-summary",
+ "generated": "2026-10-29T17:31:53.883Z",
+ "devices": [
+  {
+   "id": "dfam",
+   "name": "DFAM",
+   "presets": 40,
+   "excitation": "audition",
+   "output": "stereo",
+   "median": -19.1,
+   "spread": 5.18,
+   "iqr": 1.48,
+   "min": -22.98,
+   "max": -17.8,
+   "maxTruePeak": -2.23,
+   "masterOffset": 0,
+   "flagged": 0,
+   "flagCounts": {},
+   "setupErrors": 0,
+   "date": "2026-10-29T16:58:02.412Z",
+   "vsStudio": -0.54
+  },
+  {
+   "id": "mother32",
+   "name": "Mother-32",
+   "presets": 43,
+   "excitation": "audition",
+   "output": "stereo",
+   "median": -18.1,
+   "spread": 8.94,
+   "iqr": 1.54,
+   "min": -24.16,
+   "max": -15.22,
+   "maxTruePeak": -1.78,
+   "masterOffset": 0,
+   "flagged": 0,
+   "flagCounts": {},
+   "setupErrors": 0,
+   "date": "2026-10-29T17:03:49.729Z",
+   "vsStudio": 0.46
+  },
+  {
+   "id": "subharmonicon",
+   "name": "Subharmonicon",
+   "presets": 36,
+   "excitation": "audition",
+   "output": "stereo",
+   "median": -18.45,
+   "spread": 5.58,
+   "iqr": 2.17,
+   "min": -22.21,
+   "max": -16.63,
+   "maxTruePeak": -1.49,
+   "masterOffset": 0,
+   "flagged": 0,
+   "flagCounts": {},
+   "setupErrors": 0,
+   "date": "2026-10-29T17:08:56.897Z",
+   "vsStudio": 0.11
+  },
+  {
+   "id": "sub37",
+   "name": "Sub 37",
+   "presets": 64,
+   "excitation": "audition",
+   "output": "stereo",
+   "median": -18.02,
+   "spread": 5.19,
+   "iqr": 0.61,
+   "min": -22.35,
+   "max": -17.16,
+   "maxTruePeak": -3.54,
+   "masterOffset": 0,
+   "flagged": 0,
+   "flagCounts": {},
+   "setupErrors": 0,
+   "date": "2026-10-29T17:17:22.827Z",
+   "vsStudio": 0.54
+  },
+  {
+   "id": "analog-four",
+   "name": "Analog Four MKII",
+   "presets": 47,
+   "excitation": "audition",
+   "output": "stereo",
+   "median": -18.99,
+   "spread": 7.58,
+   "iqr": 2.16,
+   "min": -24.43,
+   "max": -16.85,
+   "maxTruePeak": -1.56,
+   "masterOffset": 0,
+   "flagged": 1,
+   "flagCounts": {
+    "clicks": 1
+   },
+   "setupErrors": 0,
+   "date": "2026-10-29T17:23:29.238Z",
+   "vsStudio": -0.43
+  },
+  {
+   "id": "analog-rytm",
+   "name": "Analog Rytm MKII",
+   "presets": 20,
+   "excitation": "audition",
+   "output": "stereo",
+   "median": -18.95,
+   "spread": 3.25,
+   "iqr": 2.17,
+   "min": -20.74,
+   "max": -17.49,
+   "maxTruePeak": -1.66,
+   "masterOffset": 0,
+   "flagged": 1,
+   "flagCounts": {
+    "clicks": 1
+   },
+   "setupErrors": 0,
+   "date": "2026-10-29T17:26:06.260Z",
+   "vsStudio": -0.39
+  },
+  {
+   "id": "xone96",
+   "name": "Xone:96",
+   "presets": 21,
+   "excitation": "audition",
+   "output": "stereo",
+   "median": -18.56,
+   "spread": 5.67,
+   "iqr": 0.76,
+   "min": -21.47,
+   "max": -15.8,
+   "maxTruePeak": -1.74,
+   "masterOffset": 0,
+   "flagged": 0,
+   "flagCounts": {},
+   "setupErrors": 0,
+   "date": "2026-10-29T17:28:52.026Z",
+   "vsStudio": 0
+  }
+ ],
+ "studioMedian": -18.56,
+ "presets": 271,
+ "flagged": 2,
+ "flagTotals": {
+  "clicks": 2
+ },
+ "top": [
+  {
+   "device": "analog-rytm",
+   "preset": "Breaks / Big Beat",
+   "key": "bigbeat",
+   "flag": "clicks",
+   "detail": "1 (1 mid); worst step 6.6 dBFS; first at 3.6992 s",
+   "score": 68.3
+  },
+  {
+   "device": "analog-four",
+   "preset": "Bass / Metallic AM",
+   "key": "sound-bass-am",
+   "flag": "clicks",
+   "detail": "1 (1 mid); worst step -34.4 dBFS; first at 1.5546 s",
+   "score": 47.8
+  }
+ ],
+ "calibration": {
+  "device": "dfam",
+  "sampleRate": 44100,
+  "tests": [
+   {
+    "id": "reference",
+    "name": "1 kHz sine at -20 dBFS in one channel (BS.1770 reference)",
+    "measured": "sample peak -20.00 dBFS, integrated -23.00 LUFS",
+    "expected": "-20 dBFS +-0.05, -23.01 LUFS +-0.3",
+    "ok": true,
+    "values": [
+     {
+      "what": "sample peak",
+      "value": -20
+     },
+     {
+      "what": "integrated",
+      "value": -23.0008
+     }
+    ]
+   },
+   {
+    "id": "dual-mono",
+    "name": "1 kHz sine at -20 dBFS from a mono node (heard on L and R)",
+    "measured": "sample peak -20.00 dBFS, integrated -19.99 LUFS",
+    "expected": "-20 dBFS +-0.05, -19.99 LUFS +-0.3",
+    "ok": true,
+    "values": [
+     {
+      "what": "sample peak",
+      "value": -20
+     },
+     {
+      "what": "integrated",
+      "value": -19.9905
+     }
+    ]
+   },
+   {
+    "id": "true-peak",
+    "name": "fs/4 sine at 45 deg, amplitude -6.02 dBFS (inter-sample peaks)",
+    "measured": "sample peak -9.03 dBFS, true peak -5.94 dBTP",
+    "expected": "-9.03 dBFS +-0.05, -6.02 dBTP +0.2/-0.4",
+    "ok": true,
+    "values": [
+     {
+      "what": "sample peak",
+      "value": -9.0309
+     },
+     {
+      "what": "true peak",
+      "value": -5.938
+     }
+    ]
+   },
+   {
+    "id": "dc",
+    "name": "constant +0.01 (DC offset)",
+    "measured": "DC 0.0100",
+    "expected": "0.0100 +-0.0002",
+    "ok": true,
+    "values": [
+     {
+      "what": "DC",
+      "value": 0.01
+     }
+    ]
+   },
+   {
+    "id": "click",
+    "name": "1 kHz sine at -20 dBFS with a 90 deg phase jump",
+    "measured": "clicks 1, mid-sound clicks 1",
+    "expected": "1 exactly, 1 exactly",
+    "ok": true,
+    "values": [
+     {
+      "what": "clicks",
+      "value": 1
+     },
+     {
+      "what": "mid-sound clicks",
+      "value": 1
+     }
+    ]
+   },
+   {
+    "id": "silence",
+    "name": "nothing connected (the idle instrument)",
+    "measured": "peak -inf dBFS, silent flag 1 (1 = raised)",
+    "expected": "peak below -70 dBFS, 1 (1 = raised) exactly",
+    "ok": true,
+    "values": [
+     {
+      "what": "peak",
+      "value": null
+     },
+     {
+      "what": "silent flag",
+      "value": 1
+     }
+    ]
+   },
+   {
+    "id": "stuck",
+    "name": "1 kHz sine at -20 dBFS left on after stop",
+    "measured": "tail peak 2 s after stop -20.00 dBFS",
+    "expected": "-20 dBFS +-0.1",
+    "ok": true,
+    "values": [
+     {
+      "what": "tail peak 2 s after stop",
+      "value": -20
+     }
+    ]
+   }
+  ],
+  "ok": true,
+  "master": "-23.00 LUFS, sample peak -20.00 dBFS (-0.00 LU through the master bus)"
+ },
+ "skipped": [
+  {
+   "id": "studio-clock",
+   "why": "no presets"
+  },
+  {
+   "id": "midi-synth",
+   "why": "no presets"
+  },
+  {
+   "id": "wam-plugin",
+   "why": "no presets"
+  },
+  {
+   "id": "audio-in",
+   "why": "plays a live audio input only"
+  }
+ ]
+}

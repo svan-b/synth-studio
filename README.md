@@ -1,152 +1,104 @@
 # Synth Studio
 
-**Digital Twin Learning System for Hardware Synthesizers**
+**Playable digital twins of hardware instruments, wired into one studio, that teach
+synthesis and production from first principles.**
 
-Pixel-perfect digital replicas of hardware synthesizers with real-time teaching indicators and step-by-step lessons.
+Each instrument follows its real panel, signal flow and specs, built from the
+manufacturers' manuals. It makes sound with a real-time Web Audio engine, can be
+patched with cables, and comes with guided lessons. Instruments sync to one studio
+clock, route into a mixer, and can be arranged into full tracks and bounced to WAV.
 
-## 🎯 Features
+## Instruments
 
-### Exact Hardware Replicas
-- Every knob, slider, and button positioned exactly as on real hardware
-- Real hardware units: Hz, ms, octaves, semitones, cents, dB, steps
-- LED-style value displays showing current settings
-- 3D knobs with realistic shadows and indicators
-- All specifications verified from official manufacturer manuals
+| Instrument | What it is |
+|---|---|
+| Moog DFAM | Semi-modular analog percussion: 8-step sequencer, 24-point patch bay |
+| Moog Mother-32 | Semi-modular mono synth: 32-step sequencer, 32-point patch bay |
+| Moog Subharmonicon | Subharmonic oscillators, two 4-step sequencers, polyrhythm generators |
+| Moog Sub 37 | Duo-paraphonic analog synth with arpeggiator and 64-step sequencer |
+| Elektron Analog Four MKII | Four-voice analog synth with parameter locks, trig conditions and songs |
+| Elektron Analog Rytm MKII | Analog drum machine: 12 pads, 8 voices, scenes and performance macros |
+| Allen & Heath Xone:96 | Analog DJ mixer; the studio routes instruments into its channels |
+| Studio Clock | Clock, beat, reset and run outputs for syncing gear with cables |
+| Your synth (MIDI) | Play and sequence your own hardware synth; a built-in Practice synth works without gear |
+| Audio input | Bring an instrument's audio back in, with level metering |
+| Web Audio plugin | Load WAM 2 plugin instruments and effects |
 
-### Teaching System
-- **Green outline with pulse** = Adjust this control now
-- **Target indicators** = Shows where to turn the knob
-- **Auto-step advance** = Automatically moves to next step when correct
-- **Progress tracking** = Visual progress bar and step completion
-- **Manual references** = Direct links to official documentation
+## The studio
 
-### Currently Implemented
-- **Moog DFAM** (fully implemented)
-  - 20+ controls with exact specifications
-  - 3 complete lessons: Classic 909 Kick, 808 Sub Kick, Snappy Snare
-  - All specs from [official DFAM manual](https://api.moogmusic.com/sites/default/files/2018-04/DFAM_Manual.pdf)
+- **One clock.** The ▶ in the top bar starts everything. MIDI-capable instruments follow the studio
+  tempo. Instruments without MIDI (the DFAM, or the Mother-32's TEMPO input) follow
+  clock pulses over a cable, exactly like hardware. Each MIDI-capable instrument's **Clock**
+  chip switches it to its own tempo, for patch sheets drawn at their own speed.
+- **Mixing.** A channel strip per instrument: fader, pan, mute, solo, delay and reverb
+  sends. Instruments can also go into the Xone:96. The master is clean, with a true-peak
+  limiter at −1 dBTP and LUFS meters.
+- **Arrangement.** Song sections with patterns, knob snapshots and mutes at bar lines; undo/redo.
+- **Export.** Record the master to WAV, export stems, bounce the arranged song, or save the whole studio as a project file.
 
-### Coming Soon
-- Moog Mother-32
-- Moog Subharmonicon
-- Elektron Analog Four MKII
-- Elektron Analog Rytm MKII
-- Moog Sub 37
-- Allen & Heath Xone:96
+## Learning
 
-## 🚀 Tech Stack
+Lessons follow [docs/PEDAGOGY.md](docs/PEDAGOGY.md):
+- **Each lesson:** predict, observe, explain; ear-training "match the sound" challenges with fading hints; self-explanation.
+- **Over time:** spaced daily review of past lessons.
+- **Producer path:** whole-studio lessons, from a beat to a mixed, mastered and bounced track.
+  Their hooks play recordings of the finished demo tracks, and the demo cards play a whole song
+  without loading it ([docs/DEMOS.md](docs/DEMOS.md)).
 
-- **Framework:** Next.js 14 with App Router
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS
-- **State Management:** Zustand with persistence
-- **UI Components:** Radix UI for accessibility
-- **Deployment:** Vercel
+The coach highlights the control to change and checks your result.
 
-## 📦 Installation
+## Using it
+
+- **Sound:** starts on your first tap or click (a browser rule). On iPad, use the Vercel
+  preview (HTTPS); plain `http://` has no AudioWorklet. Add it to the Home Screen
+  (Share → Add to Home Screen) to run full screen.
+- **Knobs:** drag. For fine adjust, hold Shift, or on touch use a second finger, long-press or slide sideways. Double-tap resets.
+- **Cables:** tap an output, then an input, or drag between them. Tap a cable to unplug it.
+- **Keyboard:** A–K play notes; Z/X shift the octave; Space starts and stops the focused instrument.
+
+## Architecture
+
+```
+devices/<id>/            one folder per instrument (see docs/ADDING_A_DEVICE.md)
+  spec.ts layout.ts      controls, patch bay, presets; panel drawing in mm
+  engine.ts index.ts     Web Audio engine; module (lessons, studio hooks, audition)
+  REFERENCE.md           every panel element and spec, cited to the manual
+public/worklets/         AudioWorklet DSP (shared VCO/ladder/env/SVF/reverb, plus per-device engines)
+lib/audio/               AudioContext and master bus, transport, engine base, DSP wrappers (docs/DSP.md)
+lib/studio/              EngineHub (rack, routing, cables, sync), mixer, arranger, history,
+                         projects, saved-settings upgrades
+lib/sequencer/elektron/  shared Elektron sequencer (docs/ELEKTRON_SEQUENCER.md)
+lib/midi/ lib/wam/       Web MIDI and WAM plugin hosting (docs/EXTERNAL_GEAR.md)
+components/              panel renderer and controls, teaching coach, studio UI
+store/studio.ts          Zustand store (persisted, throttled)
+```
+
+## Development
 
 ```bash
 npm install
+npm run dev                      # http://localhost:3000
+npm run validate                 # every device's spec, layout, presets and lessons
+npx tsc --noEmit -p .            # type-check
+npm run build && npx next start -p 3100
+npm run test:e2e -- http://localhost:3100 --full    # regression suite: iPad journey, studio, every device's smoke and lessons
+node scripts/audio-qa.cjs http://localhost:3100 all --target -18   # preset loudness, true peak, DC, clicks, stuck notes
+npm run test:seq                 # Elektron sequencer unit tests
+node scripts/bench.cjs http://localhost:3100 out.json   # CPU per instrument (or open /bench on an iPad)
 ```
 
-## 🛠️ Development
+Before merging, every change must pass: tsc, lint, validate, the build, the e2e suite and
+audio QA. See [docs/STATUS.md](docs/STATUS.md) for current work and next actions.
 
-```bash
-npm run dev
-```
+## Deployment
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+The GitHub repo is connected to Vercel. Every push to a branch gets a preview URL
+(shown on the commit and pull request), and merging to `main` deploys production.
 
-## 🏗️ Build
+## Sources and copyright
 
-```bash
-npm run build
-npm run start
-```
+Specs, signal flow and patch settings come from the manufacturers' manuals and are
+written in our own words. The manuals themselves are not part of this repository. See
+[docs/research/COPYRIGHT-RULES.md](docs/research/COPYRIGHT-RULES.md).
 
-## 📖 Usage
-
-1. **Select a device** from the dropdown (currently only DFAM available)
-2. **Click "Start Lesson"** to choose from available lessons
-3. **Follow the instructions** in the sidebar
-4. **Adjust controls** to match target values (green indicators show which control)
-5. **System auto-advances** when you get close enough (5% tolerance)
-6. **Complete all steps** to finish the lesson
-
-### Laptop-Beside-Hardware Workflow
-- Open the app on your laptop next to your physical hardware
-- Match the digital twin controls to your hardware settings
-- Learn exact values instead of guessing knob positions
-- Build muscle memory for classic sounds
-
-## 🎛️ Component Architecture
-
-```
-/components
-  /controls
-    - Knob.tsx         # Rotary controls with teaching indicators
-    - Button.tsx       # Buttons with LED indicators
-    - Switch.tsx       # Multi-position switches
-  /devices
-    - DFAM.tsx         # Complete DFAM digital twin
-  /teaching
-    - Indicator.tsx    # Visual teaching hints
-    - Instructions.tsx # Step-by-step sidebar
-```
-
-## 📊 Data Structure
-
-All device specifications stored in `/data`:
-- Hardware-accurate control ranges
-- Real units (Hz, ms, octaves, etc.)
-- Preset patches from official manuals
-- Lesson steps with target values
-
-## 🎨 Design Principles
-
-### Hardware Accuracy
-- Exact control positions from panel layouts
-- Real value ranges from official specifications
-- Authentic LED colors and panel aesthetics
-- 3D knobs with realistic shadows
-
-### Teaching Clarity
-- Subtle indicators (outlines, not animations)
-- Clear target values shown
-- Progress tracking
-- Source attribution for all lessons
-
-### Pixel-Perfect Layout
-- CSS Grid and absolute positioning for exact placement
-- Responsive scaling maintains aspect ratio
-- Touch-friendly on tablets
-- Minimum 1024px width for usability
-
-## 🔗 References
-
-### Moog DFAM
-- [Official Manual PDF](https://api.moogmusic.com/sites/default/files/2018-04/DFAM_Manual.pdf)
-- Tempo Range: 10-300 BPM (0.7Hz - 700Hz capable)
-- VCO Range: ±5 octaves (10 octave range total)
-- Filter: 4-pole Moog Ladder (LP/HP switchable)
-
-### Specifications Sources
-- [Moog Music Official Site](https://www.moogmusic.com)
-- [Elektron Official Site](https://www.elektron.se)
-- [ManualsLib](https://www.manualslib.com)
-
-## 📝 License
-
-For educational and learning purposes.
-
-## 🤝 Contributing
-
-Contributions welcome! Areas for improvement:
-- Additional device implementations
-- More lessons for existing devices
-- Audio synthesis capabilities
-- Mobile responsive optimizations
-
----
-
-**Built with precision • Verified from official manuals • Optimized for learning**
+*Synth Studio is an educational project and is not affiliated with Moog Music, Elektron or Allen & Heath.*

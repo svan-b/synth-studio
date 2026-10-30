@@ -1,0 +1,5279 @@
+{
+ "kind": "audio-qa-device",
+ "tool": {
+  "name": "audio-qa",
+  "version": 1
+ },
+ "run": {
+  "date": "2026-10-29T17:23:29.238Z",
+  "started": "2026-10-29T16:52:23.416Z",
+  "baseUrl": "http://localhost:3100",
+  "commit": "aa0a41a",
+  "appCommit": "04019ab",
+  "buildId": null,
+  "browser": "141.0.7390.37",
+  "sampleRate": 44100,
+  "options": {
+   "seconds": 4,
+   "tail": 2.5,
+   "preroll": 0.25,
+   "settleMs": 400,
+   "bpm": 120,
+   "velocity": 1,
+   "phrase": {
+    "notes": [
+     36,
+     48,
+     55,
+     60
+    ],
+    "step": 0.5,
+    "gate": 0.375,
+    "hold": {
+     "note": 48,
+     "at": 2
+    }
+   },
+   "transportFirstCategories": [
+    "Groovebox",
+    "DJ Mixer"
+   ],
+   "presets": null,
+   "excite": "auto"
+  }
+ },
+ "device": {
+  "id": "analog-four",
+  "name": "Analog Four MKII",
+  "manufacturer": "Elektron",
+  "category": "Groovebox",
+  "keyboard": {
+   "lowNote": 72
+  },
+  "transportControl": "play",
+  "audition": true,
+  "midiSync": true,
+  "output": "stereo",
+  "excitation": {
+   "mode": "audition",
+   "why": "the module's own audition()"
+  },
+  "presetsInSpec": 47
+ },
+ "setupErrors": [],
+ "presets": [
+  {
+   "key": "night-drive",
+   "name": "Kit / Night Drive (demo song)",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.01,
+    "maxShortTermLufs": -17.61,
+    "maxMomentaryLufs": -17.28,
+    "samplePeakDb": -6.98,
+    "truePeakDb": -6.97,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -19.79,
+    "crestDb": 13.38,
+    "dc": 0.00027,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -40.96,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.1,
+     "decayDbPerSec": 0,
+     "releaseSec": 0.3
+    },
+    "correlation": 0.963,
+    "widthDb": -17.04
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.01,
+    "maxShortTermLufs": -17.61,
+    "maxMomentaryLufs": -17.27,
+    "samplePeakDb": -6.98,
+    "truePeakDb": -6.97,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.253,
+    "stop": 4.261,
+    "realtime": 0.987,
+    "wallMs": 6863,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7911,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:17:31.787Z",
+   "category": "Kit",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "acid",
+   "name": "Kit / Acid Workout",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -20.2,
+    "maxShortTermLufs": -19.83,
+    "maxMomentaryLufs": -18.41,
+    "samplePeakDb": -2.16,
+    "truePeakDb": -2.13,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -20.96,
+    "crestDb": 18.81,
+    "dc": 0.00004,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -36.14,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": 0,
+     "releaseSec": 0.28
+    },
+    "correlation": 0.998,
+    "widthDb": -31.02
+   },
+   "master": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -20.2,
+    "maxShortTermLufs": -19.83,
+    "maxMomentaryLufs": -18.4,
+    "samplePeakDb": -2.16,
+    "truePeakDb": -2.13,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.769,
+    "excite": 0.258,
+    "stop": 4.261,
+    "realtime": 1.001,
+    "wallMs": 6764,
+    "channels": {
+     "mono": 0,
+     "stereo": 2332,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7783,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:17:39.571Z",
+   "category": "Kit",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "dub",
+   "name": "Kit / Dub Chords",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.82,
+    "maxShortTermLufs": -17.47,
+    "maxMomentaryLufs": -15.08,
+    "samplePeakDb": -4.97,
+    "truePeakDb": -4.95,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -17.88,
+    "crestDb": 12.93,
+    "dc": 0.00065,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -38.95,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.13,
+     "decayDbPerSec": -0.03,
+     "releaseSec": 0.3
+    },
+    "correlation": 0.992,
+    "widthDb": -24.08
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.82,
+    "maxShortTermLufs": -17.47,
+    "maxMomentaryLufs": -15.08,
+    "samplePeakDb": -4.97,
+    "truePeakDb": -4.95,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 0.999,
+    "wallMs": 6775,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7769,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:17:47.340Z",
+   "category": "Kit",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "ambient",
+   "name": "Kit / Ambient Drift",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.14,
+    "maxShortTermLufs": -17.39,
+    "maxMomentaryLufs": -16.07,
+    "samplePeakDb": -7.03,
+    "truePeakDb": -7.01,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -18.68,
+    "crestDb": 11.91,
+    "dc": 0.00007,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -41.01,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": -0.01,
+     "releaseSec": 0.3
+    },
+    "correlation": 0.777,
+    "widthDb": -8.99
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.14,
+    "maxShortTermLufs": -17.39,
+    "maxMomentaryLufs": -16.09,
+    "samplePeakDb": -7.03,
+    "truePeakDb": -7.01,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 0.99,
+    "wallMs": 6837,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7863,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:17:55.204Z",
+   "category": "Kit",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "electro",
+   "name": "Kit / Electro Funk",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 278,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298880,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -18.14,
+    "maxShortTermLufs": -17.64,
+    "maxMomentaryLufs": -16.41,
+    "samplePeakDb": -3.46,
+    "truePeakDb": -3.45,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -19.32,
+    "crestDb": 15.86,
+    "dc": 0.00004,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -37.44,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.07,
+     "decayDbPerSec": 0.02,
+     "releaseSec": 0.1
+    },
+    "correlation": 1,
+    "widthDb": -44.4
+   },
+   "master": {
+    "frames": 298880,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -18.14,
+    "maxShortTermLufs": -17.64,
+    "maxMomentaryLufs": -16.41,
+    "samplePeakDb": -3.46,
+    "truePeakDb": -3.45,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.777,
+    "excite": 0.258,
+    "stop": 4.27,
+    "realtime": 0.996,
+    "wallMs": 6802,
+    "channels": {
+     "mono": 0,
+     "stereo": 2335,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7785,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:18:02.989Z",
+   "category": "Kit",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "arps",
+   "name": "Kit / Arp Garden",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.29,
+    "maxShortTermLufs": -17.71,
+    "maxMomentaryLufs": -16.31,
+    "samplePeakDb": -8.81,
+    "truePeakDb": -8.8,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -19.1,
+    "crestDb": 11.89,
+    "dc": 0.00003,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -42.79,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": -0.03,
+     "releaseSec": 0.28
+    },
+    "correlation": 0.799,
+    "widthDb": -9.07
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.29,
+    "maxShortTermLufs": -17.71,
+    "maxMomentaryLufs": -16.33,
+    "samplePeakDb": -8.81,
+    "truePeakDb": -8.8,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1,
+    "wallMs": 6770,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7711,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:18:10.700Z",
+   "category": "Kit",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "init",
+   "name": "Kit / Init sounds (blank pattern)",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298880,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -18.25,
+    "maxShortTermLufs": -18.03,
+    "maxMomentaryLufs": -17.06,
+    "samplePeakDb": -11.01,
+    "truePeakDb": -10.89,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -20.86,
+    "crestDb": 9.84,
+    "dc": 0.00001,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -44.99,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": -0.03,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -88.12
+   },
+   "master": {
+    "frames": 298880,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -18.25,
+    "maxShortTermLufs": -18.03,
+    "maxMomentaryLufs": -17.06,
+    "samplePeakDb": -11.01,
+    "truePeakDb": -10.89,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.777,
+    "excite": 0.258,
+    "stop": 4.27,
+    "realtime": 1,
+    "wallMs": 6780,
+    "channels": {
+     "mono": 0,
+     "stereo": 2335,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7732,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:18:18.432Z",
+   "category": "Kit",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-bass-saw",
+   "name": "Bass / Plain Saw",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.03,
+    "maxShortTermLufs": -18.61,
+    "maxMomentaryLufs": -17.1,
+    "samplePeakDb": -5.1,
+    "truePeakDb": -5.05,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -20.13,
+    "crestDb": 15.03,
+    "dc": 0.00071,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -39.08,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.1,
+     "decayDbPerSec": -0.01,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -88.87
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.03,
+    "maxShortTermLufs": -18.61,
+    "maxMomentaryLufs": -17.1,
+    "samplePeakDb": -5.1,
+    "truePeakDb": -5.05,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 0.998,
+    "wallMs": 6784,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7759,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:18:26.192Z",
+   "category": "Bass",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-bass-acid",
+   "name": "Bass / Acid Squelch",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 278,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.11,
+    "maxShortTermLufs": -18.62,
+    "maxMomentaryLufs": -16.91,
+    "samplePeakDb": -5.41,
+    "truePeakDb": -5.39,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -20.05,
+    "crestDb": 14.64,
+    "dc": 0.00003,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -39.39,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.06,
+     "decayDbPerSec": 0.04,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -88.95
+   },
+   "master": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.11,
+    "maxShortTermLufs": -18.62,
+    "maxMomentaryLufs": -16.91,
+    "samplePeakDb": -5.41,
+    "truePeakDb": -5.39,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.769,
+    "excite": 0.258,
+    "stop": 4.261,
+    "realtime": 1.001,
+    "wallMs": 6762,
+    "channels": {
+     "mono": 0,
+     "stereo": 2332,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7791,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:18:33.984Z",
+   "category": "Bass",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-bass-sub",
+   "name": "Bass / Sub Pulse",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 301,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.1,
+    "maxShortTermLufs": -16.65,
+    "maxMomentaryLufs": -15.06,
+    "samplePeakDb": -4.28,
+    "truePeakDb": -4.27,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -17.02,
+    "crestDb": 12.74,
+    "dc": 0.0006,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -38.26,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.1,
+     "decayDbPerSec": 0.01,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -91.98
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.1,
+    "maxShortTermLufs": -16.65,
+    "maxMomentaryLufs": -15.06,
+    "samplePeakDb": -4.28,
+    "truePeakDb": -4.27,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6764,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7728,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:18:41.713Z",
+   "category": "Bass",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-bass-reese",
+   "name": "Bass / Reese",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 295,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18,
+    "maxShortTermLufs": -17.51,
+    "maxMomentaryLufs": -15.82,
+    "samplePeakDb": -8.43,
+    "truePeakDb": -8.42,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -19.04,
+    "crestDb": 10.61,
+    "dc": 0.00036,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -42.41,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.1,
+     "decayDbPerSec": 0,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -89.94
+   },
+   "master": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18,
+    "maxShortTermLufs": -17.51,
+    "maxMomentaryLufs": -15.82,
+    "samplePeakDb": -8.43,
+    "truePeakDb": -8.42,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.769,
+    "excite": 0.258,
+    "stop": 4.261,
+    "realtime": 0.999,
+    "wallMs": 6772,
+    "channels": {
+     "mono": 0,
+     "stereo": 2332,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7796,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:18:49.510Z",
+   "category": "Bass",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-bass-rubber",
+   "name": "Bass / Rubber Pluck",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -20.77,
+    "maxShortTermLufs": -20.15,
+    "maxMomentaryLufs": -18.37,
+    "samplePeakDb": -1.68,
+    "truePeakDb": -1.68,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -21.91,
+    "crestDb": 20.24,
+    "dc": 0.00028,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -35.65,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.1,
+     "decayDbPerSec": 0.03,
+     "releaseSec": 0.02
+    },
+    "correlation": 1,
+    "widthDb": -87.09
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -20.77,
+    "maxShortTermLufs": -20.15,
+    "maxMomentaryLufs": -18.37,
+    "samplePeakDb": -1.68,
+    "truePeakDb": -1.68,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 0.999,
+    "wallMs": 6777,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7746,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:18:57.256Z",
+   "category": "Bass",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-bass-sync",
+   "name": "Bass / Sync Growl",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -18.18,
+    "maxShortTermLufs": -17.77,
+    "maxMomentaryLufs": -16.32,
+    "samplePeakDb": -7.19,
+    "truePeakDb": -7.17,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -19.69,
+    "crestDb": 12.5,
+    "dc": 0.00014,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -41.17,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.11,
+     "decayDbPerSec": -0.03,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -89.31
+   },
+   "master": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -18.18,
+    "maxShortTermLufs": -17.77,
+    "maxMomentaryLufs": -16.32,
+    "samplePeakDb": -7.19,
+    "truePeakDb": -7.17,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.78,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6773,
+    "channels": {
+     "mono": 0,
+     "stereo": 2336,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7707,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:19:04.964Z",
+   "category": "Bass",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-bass-wobble",
+   "name": "Bass / Wobble",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.86,
+    "maxShortTermLufs": -19.37,
+    "maxMomentaryLufs": -17.57,
+    "samplePeakDb": -5.12,
+    "truePeakDb": -5.11,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -19.96,
+    "crestDb": 14.84,
+    "dc": 0.00074,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -39.1,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.12,
+     "decayDbPerSec": -0.01,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -89.05
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.86,
+    "maxShortTermLufs": -19.39,
+    "maxMomentaryLufs": -17.57,
+    "samplePeakDb": -5.12,
+    "truePeakDb": -5.11,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1,
+    "wallMs": 6770,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7743,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:19:12.707Z",
+   "category": "Bass",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-bass-am",
+   "name": "Bass / Metallic AM",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298240,
+    "seconds": 6.76,
+    "silent": false,
+    "lufs": -19.79,
+    "maxShortTermLufs": -19.5,
+    "maxMomentaryLufs": -18.03,
+    "samplePeakDb": -5.34,
+    "truePeakDb": -5.05,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -21.18,
+    "crestDb": 15.84,
+    "dc": 0.00015,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 1,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 1
+     },
+     "worstJumpDb": -34.39,
+     "thresholdDb": -39.32,
+     "events": [
+      {
+       "t": 1.5546,
+       "jumpDb": -34.4,
+       "ratio": 3,
+       "kind": "mid",
+       "ch": 1
+      }
+     ]
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.12,
+     "decayDbPerSec": -0.04,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -87.81
+   },
+   "master": {
+    "frames": 298240,
+    "seconds": 6.76,
+    "silent": false,
+    "lufs": -19.79,
+    "maxShortTermLufs": -19.5,
+    "maxMomentaryLufs": -18.03,
+    "samplePeakDb": -5.34,
+    "truePeakDb": -5.05,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.763,
+    "excite": 0.253,
+    "stop": 4.261,
+    "realtime": 1.001,
+    "wallMs": 6757,
+    "channels": {
+     "mono": 0,
+     "stereo": 2330,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7747,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:19:20.456Z",
+   "category": "Bass",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [
+    {
+     "id": "clicks",
+     "detail": "1 (1 mid); worst step -34.4 dBFS; first at 1.5546 s",
+     "score": 47.8
+    }
+   ],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-lead-sync",
+   "name": "Lead / Sync Lead",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.71,
+    "maxShortTermLufs": -17.45,
+    "maxMomentaryLufs": -15.95,
+    "samplePeakDb": -12.37,
+    "truePeakDb": -12.35,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -21.69,
+    "crestDb": 9.33,
+    "dc": 0.00003,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -46.35,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.11,
+     "decayDbPerSec": -0.01,
+     "releaseSec": 0.3
+    },
+    "correlation": 0.988,
+    "widthDb": -22.23
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.71,
+    "maxShortTermLufs": -17.45,
+    "maxMomentaryLufs": -15.94,
+    "samplePeakDb": -12.37,
+    "truePeakDb": -12.35,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6765,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7804,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:19:28.260Z",
+   "category": "Lead",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-lead-square",
+   "name": "Lead / Square Lead",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 279,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.43,
+    "maxShortTermLufs": -18.18,
+    "maxMomentaryLufs": -16.75,
+    "samplePeakDb": -12.52,
+    "truePeakDb": -12.45,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -21.47,
+    "crestDb": 8.95,
+    "dc": 0,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -46.49,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": 0.01,
+     "releaseSec": 0.3
+    },
+    "correlation": 0.963,
+    "widthDb": -17.24
+   },
+   "master": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.43,
+    "maxShortTermLufs": -18.18,
+    "maxMomentaryLufs": -16.75,
+    "samplePeakDb": -12.52,
+    "truePeakDb": -12.45,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.769,
+    "excite": 0.258,
+    "stop": 4.261,
+    "realtime": 1,
+    "wallMs": 6766,
+    "channels": {
+     "mono": 0,
+     "stereo": 2332,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7731,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:19:35.991Z",
+   "category": "Lead",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-lead-scream",
+   "name": "Lead / Screamer",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 279,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -17.82,
+    "maxShortTermLufs": -17.56,
+    "maxMomentaryLufs": -15.93,
+    "samplePeakDb": -14.82,
+    "truePeakDb": -14.1,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -21.96,
+    "crestDb": 7.15,
+    "dc": 0.00027,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -48.8,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.07,
+     "decayDbPerSec": -0.01,
+     "releaseSec": 0.3
+    },
+    "correlation": 0.986,
+    "widthDb": -21.63
+   },
+   "master": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -17.82,
+    "maxShortTermLufs": -17.56,
+    "maxMomentaryLufs": -15.93,
+    "samplePeakDb": -14.82,
+    "truePeakDb": -14.1,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.78,
+    "excite": 0.258,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6776,
+    "channels": {
+     "mono": 0,
+     "stereo": 2336,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7771,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:19:43.763Z",
+   "category": "Lead",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-lead-porta",
+   "name": "Lead / Glide Saw",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 278,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.59,
+    "maxShortTermLufs": -17.17,
+    "maxMomentaryLufs": -16.83,
+    "samplePeakDb": -12.73,
+    "truePeakDb": -12.71,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -20.21,
+    "crestDb": 7.47,
+    "dc": 0.00007,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -46.71,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": 0,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -88.78
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.59,
+    "maxShortTermLufs": -17.17,
+    "maxMomentaryLufs": -16.81,
+    "samplePeakDb": -12.73,
+    "truePeakDb": -12.71,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6766,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7770,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:19:51.537Z",
+   "category": "Lead",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-lead-whistle",
+   "name": "Lead / Filter Whistle",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 278,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.76,
+    "maxShortTermLufs": -19.42,
+    "maxMomentaryLufs": -17.63,
+    "samplePeakDb": -14.24,
+    "truePeakDb": -14.22,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -23.37,
+    "crestDb": 9.17,
+    "dc": 0.00005,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -48.22,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.1,
+     "decayDbPerSec": 0.01,
+     "releaseSec": 0.22
+    },
+    "correlation": 0.999,
+    "widthDb": -31.33
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.76,
+    "maxShortTermLufs": -19.42,
+    "maxMomentaryLufs": -17.63,
+    "samplePeakDb": -14.24,
+    "truePeakDb": -14.22,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1,
+    "wallMs": 6771,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7735,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:19:59.273Z",
+   "category": "Lead",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-pad-strings",
+   "name": "Pad / String Ensemble",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.66,
+    "maxShortTermLufs": -17.28,
+    "maxMomentaryLufs": -14.44,
+    "samplePeakDb": -7.84,
+    "truePeakDb": -7.82,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -20.22,
+    "crestDb": 12.38,
+    "dc": 0,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -41.82,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.11,
+     "decayDbPerSec": -0.04,
+     "releaseSec": 0.22
+    },
+    "correlation": 0.621,
+    "widthDb": -6.29
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.66,
+    "maxShortTermLufs": -17.28,
+    "maxMomentaryLufs": -14.43,
+    "samplePeakDb": -7.84,
+    "truePeakDb": -7.82,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1,
+    "wallMs": 6768,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7708,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:20:06.981Z",
+   "category": "Pad",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-pad-pwm",
+   "name": "Pad / Warm PWM",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 280,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.53,
+    "maxShortTermLufs": -17.41,
+    "maxMomentaryLufs": -14.61,
+    "samplePeakDb": -9.71,
+    "truePeakDb": -9.7,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -20,
+    "crestDb": 11.08,
+    "dc": 0,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -43.69,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": 0.07,
+     "releaseSec": 0.18
+    },
+    "correlation": 0.814,
+    "widthDb": -9.81
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -17.53,
+    "maxShortTermLufs": -17.41,
+    "maxMomentaryLufs": -14.6,
+    "samplePeakDb": -9.71,
+    "truePeakDb": -9.7,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.261,
+    "realtime": 0.998,
+    "wallMs": 6783,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7719,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:20:14.701Z",
+   "category": "Pad",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-pad-glass",
+   "name": "Pad / Glass Drone",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -18.66,
+    "maxShortTermLufs": -17.95,
+    "maxMomentaryLufs": -16.78,
+    "samplePeakDb": -9.86,
+    "truePeakDb": -9.83,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -19.34,
+    "crestDb": 12.78,
+    "dc": 0,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -43.84,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.11,
+     "decayDbPerSec": -0.01,
+     "releaseSec": 0.26
+    },
+    "correlation": 0.697,
+    "widthDb": -5.38
+   },
+   "master": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -18.66,
+    "maxShortTermLufs": -17.95,
+    "maxMomentaryLufs": -16.78,
+    "samplePeakDb": -9.86,
+    "truePeakDb": -9.83,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.78,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 0.925,
+    "wallMs": 7331,
+    "channels": {
+     "mono": 0,
+     "stereo": 2336,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 8292,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:20:22.993Z",
+   "category": "Pad",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-pad-choir",
+   "name": "Pad / Dark Choir",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298880,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -16.85,
+    "maxShortTermLufs": -16.39,
+    "maxMomentaryLufs": -13.51,
+    "samplePeakDb": -6.77,
+    "truePeakDb": -6.76,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -19.47,
+    "crestDb": 12.69,
+    "dc": 0,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -40.75,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.08,
+     "decayDbPerSec": 0.02,
+     "releaseSec": 0.28
+    },
+    "correlation": 0.873,
+    "widthDb": -11.67
+   },
+   "master": {
+    "frames": 298880,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -16.85,
+    "maxShortTermLufs": -16.39,
+    "maxMomentaryLufs": -13.51,
+    "samplePeakDb": -6.77,
+    "truePeakDb": -6.76,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.777,
+    "excite": 0.258,
+    "stop": 4.27,
+    "realtime": 0.999,
+    "wallMs": 6781,
+    "channels": {
+     "mono": 0,
+     "stereo": 2335,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7749,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:20:30.742Z",
+   "category": "Pad",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-pluck-glass",
+   "name": "Pluck / Glass Pluck",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -20.48,
+    "maxShortTermLufs": -20.25,
+    "maxMomentaryLufs": -19.2,
+    "samplePeakDb": -1.82,
+    "truePeakDb": -1.78,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -22.48,
+    "crestDb": 20.92,
+    "dc": 0.00063,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -35.8,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": 0.03,
+     "releaseSec": 0.3
+    },
+    "correlation": 0.928,
+    "widthDb": -14.26
+   },
+   "master": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -20.48,
+    "maxShortTermLufs": -20.25,
+    "maxMomentaryLufs": -19.21,
+    "samplePeakDb": -1.82,
+    "truePeakDb": -1.78,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.78,
+    "excite": 0.258,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6772,
+    "channels": {
+     "mono": 0,
+     "stereo": 2336,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7744,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:20:38.487Z",
+   "category": "Pluck",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-pluck-marimba",
+   "name": "Pluck / Wood Marimba",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.83,
+    "maxShortTermLufs": -19.73,
+    "maxMomentaryLufs": -18.14,
+    "samplePeakDb": -3.36,
+    "truePeakDb": -3.35,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -22.73,
+    "crestDb": 19.37,
+    "dc": 0.00003,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -37.34,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": 0.02,
+     "releaseSec": 0.22
+    },
+    "correlation": 0.998,
+    "widthDb": -29.18
+   },
+   "master": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.93,
+    "maxShortTermLufs": -19.73,
+    "maxMomentaryLufs": -18.14,
+    "samplePeakDb": -3.36,
+    "truePeakDb": -3.35,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": -0.1
+   },
+   "capture": {
+    "seconds": 6.769,
+    "excite": 0.258,
+    "stop": 4.261,
+    "realtime": 1,
+    "wallMs": 6767,
+    "channels": {
+     "mono": 0,
+     "stereo": 2332,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7705,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:20:46.192Z",
+   "category": "Pluck",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-pluck-mute",
+   "name": "Pluck / Muted Guitar",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 284,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.94,
+    "maxShortTermLufs": -18.49,
+    "maxMomentaryLufs": -16.89,
+    "samplePeakDb": -4.76,
+    "truePeakDb": -4.75,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -21.15,
+    "crestDb": 16.39,
+    "dc": 0.00092,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -38.74,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.08,
+     "decayDbPerSec": 0.01,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -87.84
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.94,
+    "maxShortTermLufs": -18.49,
+    "maxMomentaryLufs": -16.89,
+    "samplePeakDb": -4.76,
+    "truePeakDb": -4.75,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6763,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7734,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:20:53.929Z",
+   "category": "Pluck",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-keys-ep",
+   "name": "Keys / Tine Piano",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 278,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -18.99,
+    "maxShortTermLufs": -18.54,
+    "maxMomentaryLufs": -14.22,
+    "samplePeakDb": -4.44,
+    "truePeakDb": -4.4,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -21.86,
+    "crestDb": 17.94,
+    "dc": 0.0001,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -38.41,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.13,
+     "decayDbPerSec": -0.02,
+     "releaseSec": 0.22
+    },
+    "correlation": 0.939,
+    "widthDb": -14.89
+   },
+   "master": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -18.99,
+    "maxShortTermLufs": -18.54,
+    "maxMomentaryLufs": -14.22,
+    "samplePeakDb": -4.44,
+    "truePeakDb": -4.4,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.78,
+    "excite": 0.258,
+    "stop": 4.27,
+    "realtime": 1,
+    "wallMs": 6783,
+    "channels": {
+     "mono": 0,
+     "stereo": 2336,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7694,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:21:01.624Z",
+   "category": "Keys",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-keys-organ",
+   "name": "Keys / Drawbar Organ",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.86,
+    "maxShortTermLufs": -18.78,
+    "maxMomentaryLufs": -16.52,
+    "samplePeakDb": -8.8,
+    "truePeakDb": -8.79,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -21.36,
+    "crestDb": 12.85,
+    "dc": 0.0001,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -42.78,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": -0.02,
+     "releaseSec": 0
+    },
+    "correlation": 0.707,
+    "widthDb": -7.65
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.86,
+    "maxShortTermLufs": -18.78,
+    "maxMomentaryLufs": -16.52,
+    "samplePeakDb": -8.8,
+    "truePeakDb": -8.79,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1,
+    "wallMs": 6780,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7721,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:21:09.345Z",
+   "category": "Keys",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-keys-clav",
+   "name": "Keys / Funk Clav",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -20.52,
+    "maxShortTermLufs": -20.09,
+    "maxMomentaryLufs": -18.57,
+    "samplePeakDb": -3.29,
+    "truePeakDb": -3.26,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -23.72,
+    "crestDb": 20.43,
+    "dc": 0.00003,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -37.27,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.1,
+     "decayDbPerSec": -0.03,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -85.26
+   },
+   "master": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -20.52,
+    "maxShortTermLufs": -20.09,
+    "maxMomentaryLufs": -18.57,
+    "samplePeakDb": -3.29,
+    "truePeakDb": -3.26,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.78,
+    "excite": 0.27,
+    "stop": 4.272,
+    "realtime": 0.999,
+    "wallMs": 6772,
+    "channels": {
+     "mono": 0,
+     "stereo": 2336,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7725,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:21:17.071Z",
+   "category": "Keys",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-keys-brass",
+   "name": "Keys / Poly Brass Stab",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.02,
+    "maxShortTermLufs": -17.2,
+    "maxMomentaryLufs": -14.6,
+    "samplePeakDb": -7.47,
+    "truePeakDb": -7.38,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -20.55,
+    "crestDb": 13.09,
+    "dc": 0.00002,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -41.45,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.08,
+     "decayDbPerSec": 0.04,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -88.43
+   },
+   "master": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.02,
+    "maxShortTermLufs": -17.2,
+    "maxMomentaryLufs": -14.6,
+    "samplePeakDb": -7.47,
+    "truePeakDb": -7.38,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.769,
+    "excite": 0.261,
+    "stop": 4.261,
+    "realtime": 1,
+    "wallMs": 6772,
+    "channels": {
+     "mono": 0,
+     "stereo": 2332,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7751,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:21:24.822Z",
+   "category": "Keys",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-arp-pulse",
+   "name": "Arp / Minor Seventh Arp",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 280,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.35,
+    "maxShortTermLufs": -19.1,
+    "maxMomentaryLufs": -18.18,
+    "samplePeakDb": -4.85,
+    "truePeakDb": -4.81,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -21.92,
+    "crestDb": 17.07,
+    "dc": 0.00007,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -38.83,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": 0.02,
+     "releaseSec": 0.3
+    },
+    "correlation": 0.937,
+    "widthDb": -14.9
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.35,
+    "maxShortTermLufs": -19.1,
+    "maxMomentaryLufs": -18.23,
+    "samplePeakDb": -4.85,
+    "truePeakDb": -4.81,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1,
+    "wallMs": 6771,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7753,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:21:32.580Z",
+   "category": "Arp",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-arp-bubble",
+   "name": "Arp / Bubble Cycle",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.34,
+    "maxShortTermLufs": -18.91,
+    "maxMomentaryLufs": -17.53,
+    "samplePeakDb": -4.5,
+    "truePeakDb": -4.42,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -22.74,
+    "crestDb": 18.48,
+    "dc": 0.00002,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -38.48,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": 0.02,
+     "releaseSec": 0.3
+    },
+    "correlation": 0.896,
+    "widthDb": -12.6
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.34,
+    "maxShortTermLufs": -18.91,
+    "maxMomentaryLufs": -17.53,
+    "samplePeakDb": -4.5,
+    "truePeakDb": -4.42,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 0.998,
+    "wallMs": 6785,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7772,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:21:40.352Z",
+   "category": "Arp",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-arp-gate",
+   "name": "Arp / Trance Gate",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.31,
+    "maxShortTermLufs": -18.15,
+    "maxMomentaryLufs": -16.16,
+    "samplePeakDb": -7.85,
+    "truePeakDb": -7.83,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -21.16,
+    "crestDb": 13.46,
+    "dc": 0.00005,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -41.82,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.1,
+     "decayDbPerSec": 0.01,
+     "releaseSec": 0.14
+    },
+    "correlation": 0.963,
+    "widthDb": -17.27
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -18.31,
+    "maxShortTermLufs": -18.16,
+    "maxMomentaryLufs": -16.18,
+    "samplePeakDb": -7.85,
+    "truePeakDb": -7.83,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.253,
+    "stop": 4.261,
+    "realtime": 1,
+    "wallMs": 6771,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7727,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:21:48.079Z",
+   "category": "Arp",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-fx-zap",
+   "name": "FX / Laser Zap",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298240,
+    "seconds": 6.76,
+    "silent": false,
+    "lufs": -24.43,
+    "maxShortTermLufs": -24.3,
+    "maxMomentaryLufs": -23.29,
+    "samplePeakDb": -8.85,
+    "truePeakDb": -8.77,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -28,
+    "crestDb": 19.14,
+    "dc": 0.00001,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -42.83,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.11,
+     "decayDbPerSec": -0.01,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -81.01
+   },
+   "master": {
+    "frames": 298240,
+    "seconds": 6.76,
+    "silent": false,
+    "lufs": -24.43,
+    "maxShortTermLufs": -24.3,
+    "maxMomentaryLufs": -23.29,
+    "samplePeakDb": -8.85,
+    "truePeakDb": -8.77,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.763,
+    "excite": 0.253,
+    "stop": 4.261,
+    "realtime": 1.001,
+    "wallMs": 6757,
+    "channels": {
+     "mono": 0,
+     "stereo": 2330,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7786,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:21:55.865Z",
+   "category": "FX",
+   "rule": {
+    "name": "FX",
+    "offset": -4,
+    "tolerance": null,
+    "sustain": false
+   },
+   "target": -22,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-fx-riser",
+   "name": "FX / Noise Riser",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298240,
+    "seconds": 6.76,
+    "silent": false,
+    "lufs": -20.27,
+    "maxShortTermLufs": -19.31,
+    "maxMomentaryLufs": -16.12,
+    "samplePeakDb": -9.54,
+    "truePeakDb": -9.47,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -24.05,
+    "crestDb": 14.55,
+    "dc": 0.00001,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -43.52,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.1,
+     "decayDbPerSec": 0.01,
+     "releaseSec": 0.3
+    },
+    "correlation": 0.941,
+    "widthDb": -15.15
+   },
+   "master": {
+    "frames": 298240,
+    "seconds": 6.76,
+    "silent": false,
+    "lufs": -20.18,
+    "maxShortTermLufs": -19.31,
+    "maxMomentaryLufs": -16.15,
+    "samplePeakDb": -9.54,
+    "truePeakDb": -9.47,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0.09
+   },
+   "capture": {
+    "seconds": 6.763,
+    "excite": 0.253,
+    "stop": 4.261,
+    "realtime": 0.997,
+    "wallMs": 6783,
+    "channels": {
+     "mono": 0,
+     "stereo": 2330,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7797,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:22:03.662Z",
+   "category": "FX",
+   "rule": {
+    "name": "FX",
+    "offset": -4,
+    "tolerance": null,
+    "sustain": false
+   },
+   "target": -22,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-fx-bleeps",
+   "name": "FX / Random Bleeps",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -22.01,
+    "maxShortTermLufs": -21.72,
+    "maxMomentaryLufs": -20.83,
+    "samplePeakDb": -16.45,
+    "truePeakDb": -16.44,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -24.63,
+    "crestDb": 8.23,
+    "dc": 0.00002,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -50,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.12,
+     "decayDbPerSec": 0,
+     "releaseSec": 0.28
+    },
+    "correlation": 0.922,
+    "widthDb": -13.93
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -22.01,
+    "maxShortTermLufs": -21.73,
+    "maxMomentaryLufs": -20.83,
+    "samplePeakDb": -16.45,
+    "truePeakDb": -16.44,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6765,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7792,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:22:11.454Z",
+   "category": "FX",
+   "rule": {
+    "name": "FX",
+    "offset": -4,
+    "tolerance": null,
+    "sustain": false
+   },
+   "target": -22,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-fx-metal",
+   "name": "FX / Metal Ring",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 280,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -22.31,
+    "maxShortTermLufs": -22.17,
+    "maxMomentaryLufs": -21.09,
+    "samplePeakDb": -9.14,
+    "truePeakDb": -9.11,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -25.33,
+    "crestDb": 16.2,
+    "dc": 0.00001,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -43.12,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.11,
+     "decayDbPerSec": -0.05,
+     "releaseSec": 0.26
+    },
+    "correlation": 0.99,
+    "widthDb": -23.08
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -22.31,
+    "maxShortTermLufs": -22.17,
+    "maxMomentaryLufs": -21.09,
+    "samplePeakDb": -9.14,
+    "truePeakDb": -9.11,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.253,
+    "stop": 4.261,
+    "realtime": 1,
+    "wallMs": 6769,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7720,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:22:19.180Z",
+   "category": "FX",
+   "rule": {
+    "name": "FX",
+    "offset": -4,
+    "tolerance": null,
+    "sustain": false
+   },
+   "target": -22,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-drum-kick",
+   "name": "Drum / Analog Kick",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -20.31,
+    "maxShortTermLufs": -20.09,
+    "maxMomentaryLufs": -18.31,
+    "samplePeakDb": -4.83,
+    "truePeakDb": -4.82,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -20.74,
+    "crestDb": 15.91,
+    "dc": 0.00209,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -38.81,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": 0.01,
+     "releaseSec": 0.02
+    },
+    "correlation": 1,
+    "widthDb": -88.26
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -20.31,
+    "maxShortTermLufs": -20.09,
+    "maxMomentaryLufs": -18.31,
+    "samplePeakDb": -4.83,
+    "truePeakDb": -4.82,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1,
+    "wallMs": 6774,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7771,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:22:26.951Z",
+   "category": "Drum",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-drum-snare",
+   "name": "Drum / Snare",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 288,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298880,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -20.63,
+    "maxShortTermLufs": -20.66,
+    "maxMomentaryLufs": -17.48,
+    "samplePeakDb": -2.22,
+    "truePeakDb": -2.19,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -24.95,
+    "crestDb": 22.73,
+    "dc": 0.00008,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -36.2,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.12,
+     "decayDbPerSec": -0.01,
+     "releaseSec": 0.02
+    },
+    "correlation": 1,
+    "widthDb": -84.04
+   },
+   "master": {
+    "frames": 298880,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -20.63,
+    "maxShortTermLufs": -20.66,
+    "maxMomentaryLufs": -17.54,
+    "samplePeakDb": -2.22,
+    "truePeakDb": -2.19,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.777,
+    "excite": 0.258,
+    "stop": 4.27,
+    "realtime": 0.999,
+    "wallMs": 6782,
+    "channels": {
+     "mono": 0,
+     "stereo": 2335,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7812,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:22:34.763Z",
+   "category": "Drum",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-drum-hat",
+   "name": "Drum / Closed Hat",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -21.19,
+    "maxShortTermLufs": -20.95,
+    "maxMomentaryLufs": -19.89,
+    "samplePeakDb": -4.14,
+    "truePeakDb": -1.56,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -26.4,
+    "crestDb": 22.25,
+    "dc": 0,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -38.12,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.11,
+     "decayDbPerSec": -0.01,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -18.18
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -21.19,
+    "maxShortTermLufs": -20.95,
+    "maxMomentaryLufs": -19.92,
+    "samplePeakDb": -4.14,
+    "truePeakDb": -1.56,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1,
+    "wallMs": 6770,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7815,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:22:42.578Z",
+   "category": "Drum",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-drum-ohat",
+   "name": "Drum / Open Hat",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -20.28,
+    "maxShortTermLufs": -20.24,
+    "maxMomentaryLufs": -19.22,
+    "samplePeakDb": -3.8,
+    "truePeakDb": -3.29,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -25.7,
+    "crestDb": 21.9,
+    "dc": 0,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -37.78,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.1,
+     "decayDbPerSec": -0.02,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -18.18
+   },
+   "master": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -20.28,
+    "maxShortTermLufs": -20.24,
+    "maxMomentaryLufs": -19.22,
+    "samplePeakDb": -3.8,
+    "truePeakDb": -3.29,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.78,
+    "excite": 0.258,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6773,
+    "channels": {
+     "mono": 0,
+     "stereo": 2336,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7755,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:22:50.333Z",
+   "category": "Drum",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-drum-clap",
+   "name": "Drum / Clap",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -21.15,
+    "maxShortTermLufs": -21.89,
+    "maxMomentaryLufs": -18.76,
+    "samplePeakDb": -6.4,
+    "truePeakDb": -5.89,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -28.17,
+    "crestDb": 21.77,
+    "dc": 0,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -40.38,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": 0.03,
+     "releaseSec": 0.24
+    },
+    "correlation": 0.998,
+    "widthDb": -30.44
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -21.15,
+    "maxShortTermLufs": -21.89,
+    "maxMomentaryLufs": -18.76,
+    "samplePeakDb": -6.4,
+    "truePeakDb": -5.89,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6767,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7754,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:22:58.088Z",
+   "category": "Drum",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-drum-tom",
+   "name": "Drum / Analog Tom",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.62,
+    "maxShortTermLufs": -19.35,
+    "maxMomentaryLufs": -18.13,
+    "samplePeakDb": -4.42,
+    "truePeakDb": -4.41,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -20.95,
+    "crestDb": 16.53,
+    "dc": 0.00071,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -38.4,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.1,
+     "decayDbPerSec": 0.01,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -88.03
+   },
+   "master": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.62,
+    "maxShortTermLufs": -19.35,
+    "maxMomentaryLufs": -18.13,
+    "samplePeakDb": -4.42,
+    "truePeakDb": -4.41,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.769,
+    "excite": 0.258,
+    "stop": 4.261,
+    "realtime": 1.001,
+    "wallMs": 6763,
+    "channels": {
+     "mono": 0,
+     "stereo": 2332,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7771,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:23:05.860Z",
+   "category": "Drum",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-drum-rim",
+   "name": "Drum / Rim Click",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 278,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.12,
+    "maxShortTermLufs": -18.69,
+    "maxMomentaryLufs": -16.85,
+    "samplePeakDb": -2.81,
+    "truePeakDb": -2.81,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -22.38,
+    "crestDb": 19.57,
+    "dc": 0.00003,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -36.79,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.5,
+     "peakDb": -103.31,
+     "rmsDb": -108.14,
+     "decayDbPerSec": -0.05,
+     "releaseSec": 0.02
+    },
+    "correlation": 1,
+    "widthDb": -86.61
+   },
+   "master": {
+    "frames": 298624,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -19.12,
+    "maxShortTermLufs": -18.69,
+    "maxMomentaryLufs": -16.85,
+    "samplePeakDb": -2.81,
+    "truePeakDb": -2.81,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.772,
+    "excite": 0.261,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6767,
+    "channels": {
+     "mono": 0,
+     "stereo": 2333,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7764,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:23:13.625Z",
+   "category": "Drum",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-drum-cowbell",
+   "name": "Drum / Cowbell",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -21.13,
+    "maxShortTermLufs": -20.83,
+    "maxMomentaryLufs": -19.05,
+    "samplePeakDb": -2.36,
+    "truePeakDb": -2.33,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -25.64,
+    "crestDb": 23.28,
+    "dc": 0,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -36.34,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.11,
+     "decayDbPerSec": -0.02,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -83.35
+   },
+   "master": {
+    "frames": 298496,
+    "seconds": 6.77,
+    "silent": false,
+    "lufs": -21.13,
+    "maxShortTermLufs": -20.83,
+    "maxMomentaryLufs": -19.05,
+    "samplePeakDb": -2.36,
+    "truePeakDb": -2.33,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.769,
+    "excite": 0.258,
+    "stop": 4.261,
+    "realtime": 1,
+    "wallMs": 6771,
+    "channels": {
+     "mono": 0,
+     "stereo": 2332,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7807,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:23:21.432Z",
+   "category": "Drum",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  },
+  {
+   "key": "sound-drum-zap",
+   "name": "Drum / Zap Perc",
+   "source": "community",
+   "cables": 0,
+   "errors": [],
+   "runNotes": [],
+   "quiet": {
+    "quiet": true,
+    "waitedMs": 277,
+    "levelDb": -103.31250771277627
+   },
+   "appliedVia": "ui",
+   "verify": {
+    "mismatched": [],
+    "mismatchCount": 0,
+    "cables": 0,
+    "expectedCables": 0,
+    "transportOn": false
+   },
+   "output": "stereo",
+   "inst": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -20.91,
+    "maxShortTermLufs": -20.8,
+    "maxMomentaryLufs": -19.8,
+    "samplePeakDb": -2.84,
+    "truePeakDb": -2.73,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "rmsDb": -23.89,
+    "crestDb": 21.05,
+    "dc": 0.00055,
+    "dcTail": 0,
+    "idlePeakDb": -103.31,
+    "clicks": {
+     "count": 0,
+     "kinds": {
+      "onset": 0,
+      "cutoff": 0,
+      "mid": 0
+     },
+     "worstJumpDb": null,
+     "thresholdDb": -36.82,
+     "events": []
+    },
+    "dropouts": {
+     "count": 0,
+     "events": []
+    },
+    "tail": {
+     "afterSec": 2,
+     "windowSec": 0.51,
+     "peakDb": -103.31,
+     "rmsDb": -108.09,
+     "decayDbPerSec": 0.01,
+     "releaseSec": 0
+    },
+    "correlation": 1,
+    "widthDb": -85.11
+   },
+   "master": {
+    "frames": 299008,
+    "seconds": 6.78,
+    "silent": false,
+    "lufs": -20.91,
+    "maxShortTermLufs": -20.8,
+    "maxMomentaryLufs": -19.8,
+    "samplePeakDb": -2.84,
+    "truePeakDb": -2.73,
+    "clip": {
+     "samples": 0,
+     "events": 0
+    },
+    "nonFinite": 0,
+    "deltaLu": 0
+   },
+   "capture": {
+    "seconds": 6.78,
+    "excite": 0.258,
+    "stop": 4.27,
+    "realtime": 1.001,
+    "wallMs": 6772,
+    "channels": {
+     "mono": 0,
+     "stereo": 2336,
+     "none": 0
+    },
+    "masterFeeds": 3,
+    "tap": "outGain"
+   },
+   "ms": 7793,
+   "excitation": "audition",
+   "measuredAt": "2026-10-29T17:23:29.225Z",
+   "category": "Drum",
+   "rule": null,
+   "target": -18,
+   "tolerance": 4,
+   "flags": [],
+   "notes": [],
+   "suggestion": null
+  }
+ ],
+ "stats": {
+  "setupErrors": 0,
+  "presets": 47,
+  "measured": 47,
+  "silent": 0,
+  "failed": 0,
+  "median": -18.99,
+  "reference": -18,
+  "referenceKind": "fixed target",
+  "min": -24.43,
+  "max": -16.85,
+  "spread": 7.58,
+  "iqr": 2.16,
+  "maxTruePeak": -1.56,
+  "medianTruePeak": -5.39,
+  "masterOffset": 0,
+  "flagged": 1,
+  "flagCounts": {
+   "clicks": 1
+  },
+  "thresholds": {
+   "silentDbfs": -70,
+   "truePeakDbtp": -1,
+   "dc": 0.005,
+   "tailAfterSec": 2,
+   "tailDbfs": -60,
+   "ringingDbPerSec": -6,
+   "loudnessLu": 4,
+   "clicksMin": 1
+  }
+ },
+ "categories": [
+  {
+   "name": "Kit",
+   "rule": null,
+   "presets": 7,
+   "measured": 7,
+   "target": -18,
+   "median": -18.14,
+   "min": -20.2,
+   "max": -17.82,
+   "spread": 2.38,
+   "vsDevice": 0.85,
+   "flagged": 0
+  },
+  {
+   "name": "Bass",
+   "rule": null,
+   "presets": 8,
+   "measured": 8,
+   "target": -18,
+   "median": -19.07,
+   "min": -20.77,
+   "max": -17.1,
+   "spread": 3.67,
+   "vsDevice": -0.08,
+   "flagged": 1
+  },
+  {
+   "name": "Lead",
+   "rule": null,
+   "presets": 5,
+   "measured": 5,
+   "target": -18,
+   "median": -17.82,
+   "min": -19.76,
+   "max": -17.59,
+   "spread": 2.17,
+   "vsDevice": 1.17,
+   "flagged": 0
+  },
+  {
+   "name": "Pad",
+   "rule": null,
+   "presets": 4,
+   "measured": 4,
+   "target": -18,
+   "median": -17.59,
+   "min": -18.66,
+   "max": -16.85,
+   "spread": 1.81,
+   "vsDevice": 1.39,
+   "flagged": 0
+  },
+  {
+   "name": "Pluck",
+   "rule": null,
+   "presets": 3,
+   "measured": 3,
+   "target": -18,
+   "median": -19.83,
+   "min": -20.48,
+   "max": -18.94,
+   "spread": 1.54,
+   "vsDevice": -0.84,
+   "flagged": 0
+  },
+  {
+   "name": "Keys",
+   "rule": null,
+   "presets": 4,
+   "measured": 4,
+   "target": -18,
+   "median": -18.92,
+   "min": -20.52,
+   "max": -18.02,
+   "spread": 2.5,
+   "vsDevice": 0.07,
+   "flagged": 0
+  },
+  {
+   "name": "Arp",
+   "rule": null,
+   "presets": 3,
+   "measured": 3,
+   "target": -18,
+   "median": -19.34,
+   "min": -19.35,
+   "max": -18.31,
+   "spread": 1.04,
+   "vsDevice": -0.35,
+   "flagged": 0
+  },
+  {
+   "name": "FX",
+   "rule": "FX",
+   "presets": 4,
+   "measured": 4,
+   "target": -22,
+   "median": -22.16,
+   "min": -24.43,
+   "max": -20.27,
+   "spread": 4.16,
+   "vsDevice": -3.17,
+   "flagged": 0
+  },
+  {
+   "name": "Drum",
+   "rule": null,
+   "presets": 9,
+   "measured": 9,
+   "target": -18,
+   "median": -20.63,
+   "min": -21.19,
+   "max": -19.12,
+   "spread": 2.07,
+   "vsDevice": -1.64,
+   "flagged": 0
+  }
+ ]
+}
