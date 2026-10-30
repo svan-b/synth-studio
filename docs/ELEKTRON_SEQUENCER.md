@@ -17,14 +17,14 @@ marked **design**.
 | File | Contents |
 |---|---|
 | `types.ts` | `Project`, `Pattern`, `Track`, `Step`, `Song`, `SongRow`, `TrigEvent`, `SeqState`; tables (`NOTE_LENGTHS`, `SPEEDS`, `TRIG_CONDITIONS`, `RETRIG_RATES`), `LOCK_LIMIT_A4`, `LOCK_LIMIT_RYTM` |
-| `project.ts` | factories, `migrateProject`, `asProject`, `projectData`, `arrangerPatterns`, reads (`getPattern`, `trackLength`, `trigSteps`, `mutedSteps`, `isSwingStep`, `trackTrigDefaults`, `lockedParamCount`, `rowEntry`...) |
-| `edit.ts` | immutable edits: trigs, locks, tracks, patterns, chains, songs (rows and their chains), trig mutes, swing trigs, track mutes, copy / paste / clear, SAVE / RELOAD |
+| `project.ts` | factories, `migrateProject`, `asProject`, `projectData`, `arrangerPatterns`, reads (`getPattern`, `trackLength`, `trigSteps`, `mutedSteps`, `isSwingStep`, `trackTrigDefaults`, `lockedParamCount`, `rowEntry`, `trigNotes`...) |
+| `edit.ts` | immutable edits: trigs, chord notes (`addChordNote`), locks, tracks, patterns, chains, songs (rows and their chains), trig mutes, swing trigs, track mutes, copy / paste / clear, SAVE / RELOAD |
 | `sequencer.ts` | `ElektronSequencer`: internal clock (with pause) or the studio transport, `onTrig` with audio times |
 | `locks.ts` | `interceptForLocks`, `displayWithLocks`, `clearLock`, `isLocked` for `DeviceModule` hooks |
 | `lockState.ts` | `LockTracker`: per-voice lock bookkeeping in engines |
 | `conditions.ts`, `format.ts`, `rng.ts` | condition codes and descriptions, readouts ("1/16", "+1/384", "INF"), the seedable RNG |
 
-Run `npm run test:seq` after changing anything here: 233 cases, most of them
+Run `npm run test:seq` after changing anything here: 237 cases, most of them
 tables taken from the manuals' examples (section 10).
 
 ---
@@ -55,6 +55,7 @@ step field uses the track default.
         { "note": 36, "vel": 100, "len": 14, "steps": {
             "0":  {},                                               // a plain note trig
             "4":  { "vel": 127, "cond": "1:2", "micro": -3 },
+            "5":  { "note": 57, "chord": [3, 7] },                  // a chord trig: A C E (Analog Four POLY)
             "6":  { "trigless": true, "locks": { "decay": 40 } },   // a lock trig
             "8":  { "mute": true },                                 // a trig mute
             "12": { "retrig": { "rate": 12, "len": 30, "vel": -64 }, "accent": true }
@@ -81,6 +82,7 @@ step field uses the track default.
 | `cond` | `"1:2"`…`"8:8"`, `"1%"`…`"100%"` (22 steps), `FILL !FILL PRE !PRE NEI !NEI 1ST !1ST`. `TRIG_CONDITIONS` lists them in encoder order |
 | `retrig` | `rate` = index into `RETRIG_RATES` (1/1 … 1/80 of a whole note), `len` = `NOTE_LENGTHS` index (INF = until the next trig), `vel` = −128 … +127 velocity curve |
 | `locks` | `{ key: number }`: parameter keys and units are the device's business |
+| `chord` | a chord trig's further notes, semitone offsets from `note` (non-zero, unique, ±48, at most `CHORD_MAX` − 1 = 3). The sequencer ignores it; a device plays `trigNotes(step, e.note)` (the transposed note first) when the track is polyphonic (A4 MKII manual, p.28, p.42). `addChordNote` adds a note the way keys held together do, `formatChord` reads it out ("C4 E4 G4"), `cleanChord` normalises saved data |
 | `slide` / `pslide` / `accent` / `mute` | note slide (A4), parameter slide, accent, trig mute |
 | song `rows` | a row is its own pattern position plus an optional `chain` of further positions; `mutes` and `transpose` belong to each position, `repeats` to the row. `length` and `tempo` per row are extras the hardware doesn't have |
 
@@ -439,6 +441,7 @@ shared with the project data, so don't mutate it.
 | `note`, `velocity` | step value or track default, song transpose included; velocity 1–127 after the retrig curve |
 | `locks` | the trig's parameter locks (apply for this trig only, see `LockTracker`) |
 | `trigless` | lock trig: apply `locks` to the sounding voice, start no note (no note-off follows) |
+| (chord) | not a field: a device that plays chords reads the step (`getStep(project, e.pattern, e.track, e.step)`) and plays `trigNotes(step, e.note)`; overlapping notes on a polyphonic track are the device's to keep (it ignores the cut note-off) |
 | `retrig`, `retrigIndex` | retrig hits arrive as separate events, `retrigIndex` 1, 2…; each ends before the next |
 | `slide` | note slide: glide from the previous note. When the notes overlap there is **no note-off** in between (legato), so don't retrigger the envelope |
 | `paramSlide`, `slideTo` | parameter slide from this trig's values to `slideTo.locks` (unlocked keys → track values), arriving at `slideTo.time` |
@@ -447,6 +450,9 @@ shared with the project data, so don't mutate it.
 
 On a stop or a pause, `locks.releaseAll((track, key) => ...)` from
 `onPlay(false)` puts locked values back if your voices keep them.
+`locks.add(track, key, value)` marks a key locked by the trig playing now
+(a lock recorded live while the track plays): the next trig reverts it like
+the trig's own locks.
 
 ### Options and methods
 
@@ -685,8 +691,11 @@ pages when the length grows.
 One project per instance (no project, kit or sound management:
 `pattern.kit` is a reference); sound locks (lock a `sound` key if you need
 them); the scratch pad row and saved song slots; page playback; live and step
-recording; the arpeggiator, the Euclidean mode, key scales and track
-transpose; tap tempo and the ±10 % nudge; the Rytm's per-track retrig menu
+recording (the Analog Four twin builds them on these edits: LIVE RECORDING
+writes `setLock` on the playing step for each knob turn, STEP RECORDING
+`updateSteps` / `addChordNote` at an active step, see `devices/analog-four`);
+the arpeggiator, the Euclidean mode, key scales and track transpose (the
+Analog Four keeps TRANSPOSABLE per pattern track itself); tap tempo and the ±10 % nudge; the Rytm's per-track retrig menu
 settings (only retrigs on trigs); editing a step property on all tracks at
 once ([FUNC] held in the TRIG MUTE, ACCENT and PARAMETER SLIDE menus, Rytm
 MKII manual, p.49–50). A trig mute, accent or slide can only sit on a step

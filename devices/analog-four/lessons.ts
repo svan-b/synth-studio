@@ -1375,7 +1375,113 @@ const sq4: Lesson = {
   ],
 };
 
-export const SEQUENCING: Lesson[] = [sq1, sq2, sq3, sq4];
+
+// ---------------------------------------------------------------- POLY chords
+
+/** The pattern: one long note per beat on T1 (A, F, C, G) */
+const SQ5_START = oneBar('POLY', [{ s: 'x...x...x...x...', n: [57, 53, 60, 55], len: LEN.s4, vel: 96 }]);
+const chordOn = (p: Project, step: number, note: number, chord: number[]) => {
+  p.patterns.A01.tracks[0].steps[step] = { ...p.patterns.A01.tracks[0].steps[step], note, chord };
+};
+/** Trig 1 holds A minor (A C E) */
+const SQ5_CHORD1 = edited(SQ5_START, p => chordOn(p, 0, 57, [3, 7]));
+/** Four chords: A minor, F major, C major, G major */
+const SQ5_PROG = edited(SQ5_CHORD1, p => { chordOn(p, 4, 53, [4, 7]); chordOn(p, 8, 60, [4, 7]); chordOn(p, 12, 55, [4, 7]); });
+const POLY3 = { poly_v1: true, poly_v2: true, poly_v3: true };
+/** Trigs of T1 that play `n` notes or more (a note and n - 1 chord notes) */
+const chordTrigs = (s: LessonCheckState, n: number) => noteTrigs(s, 0).filter(([, st]) => 1 + (st.chord?.length ?? 0) >= n);
+const polyVoices = (s: LessonCheckState) => [1, 2, 3, 4].filter(k => !!s.values[`poly_v${k}`]).length;
+
+const sq5: Lesson = {
+  id: 'analog-four-sq5-poly-chords', device: 'analog-four', path: 'sequencing', order: O(17.5), difficulty: 'intermediate',
+  name: 'Chords with POLY',
+  description: 'Give a track several voices with POLY CONFIG, store chords on its trigs, and hear how notes find a voice - or pile onto all of them in UNISON.',
+  objective: 'Make track 1 polyphonic, write a chord progression on its trigs, and thicken a sound with UNISON.',
+  source: `${SRC}, POLYPHONY and STEP RECORDING`, estimatedMinutes: 10,
+  prerequisites: ['analog-four-sq1-trigs-notes'],
+  concepts: ['sequencer-pattern', 'signal-routing', 'oscillator-pitch'],
+  tags: ['poly', 'chords', 'unison', 'voice allocation', 'pads'],
+  start: { reset: true, values: { ...sound('pad-strings', 0, { level: 80 }), page: V.NOTE, kb_oct: 3 }, data: SQ5_START },
+  steps: [
+    playStep('Press PLAY. Track 1 plays a pad, one long note per beat: one voice, one note at a time.', 'A mono voice plays one note at a time: a new note takes over the old one.'),
+    {
+      kind: 'predict', concept: 'signal-routing', focus: ['key:FUNC', 'key:MIX', 'poly_v1', 'poly_v2', 'poly_v3'],
+      instruction: 'Hold FUNC and press MIX: POLY CONFIG opens. Tick voices 1, 2 and 3 (or press TRIG keys 1-3).',
+      predict: mc('Voices 1-3 are now a pool shared by tracks 1-3. What can track 1 do now?', ['Play up to three notes at once', 'Play three times as loud', 'Play the patterns of three tracks'], 0,
+        'Each ticked voice joins the pool. Track 1\'s notes can now take any free pool voice, so up to three of them sound together. The loudness of one note does not change.'),
+      principle: 'Polyphony is the number of voices that can sound at once; each note needs a voice of its own.',
+      explanation: 'The A4 has four analog voices. Normally each track owns one. Voices you tick in POLY CONFIG are shared: their tracks can use any of them, which is how one track plays a chord.',
+      check: s => !!s.values.poly_v1 && !!s.values.poly_v2 && !!s.values.poly_v3,
+      solution: { values: POLY3 },
+      manualReference: 'Manual p.28-29, POLYPHONY CONFIGURATION',
+    },
+    {
+      kind: 'predict', concept: 'sequencer-pattern', focus: ['seq:trig:1', 'key:KB'],
+      instruction: 'Close the menu. Hold trig key 1, then hold the keyboard\'s A and press C and E while A is still down.',
+      predict: mc('What does trig 1 store when you press three keys together?', ['A chord: all three notes on one trig', 'Only the last key\'s note', 'Three trigs on three steps'], 0,
+        'Keys pressed while another is still down join the trig\'s chord. A track playing polyphonically sounds them together, each on its own voice.'),
+      principle: 'A chord trig stores several notes on one step; a poly track plays them on separate voices.',
+      explanation: 'With a mouse, long-press trig 1 so it stays held, then press the notes together on the computer keyboard. STEP RECORDING ([RECORD] + [STOP]) takes chords the same way.',
+      check: s => chordTrigs(s, 3).some(([k]) => k === 0),
+      solution: { data: SQ5_CHORD1 },
+      manualReference: 'Manual p.28, p.42',
+    },
+    {
+      kind: 'listen', concept: 'signal-routing', focus: ['poly_v1', 'poly_v2', 'poly_v3'],
+      instruction: 'Compare the chord trig with POLY on and off.',
+      listen: {
+        a: POLY3, b: { poly_v1: false, poly_v2: false, poly_v3: false }, labels: ['POLY: the chord', 'Mono: its first note'],
+        question: mc('With POLY off, the chord trig plays…', ['Only its first note: one voice', 'The chord, quieter', 'Nothing'], 0,
+          'A mono track has one voice, so a chord trig can only play its first note. The chord is still stored on the trig and comes back with POLY.'),
+      },
+    },
+    {
+      kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
+      quiz: mc('Three voices are in the pool and all three are playing. A fourth note starts. What happens?', ['The voice used least recently is taken for it', 'The fourth note is skipped', 'All the notes stop'], 0,
+        'This is voice stealing: with no free voice, the A4 takes the one that has been playing longest. Every allocation method does it.'),
+    },
+    {
+      kind: 'challenge', concept: 'sequencer-pattern',
+      instruction: 'Write a chord progression on T1: give trigs 5, 9 and 13 chords of three notes too.',
+      checklist: [
+        { text: 'Four trigs with chords of three or more notes', check: s => chordTrigs(s, 3).length >= 4 },
+        { text: 'At least three voices in the pool', check: s => polyVoices(s) >= 3 },
+        { text: 'ALLOCATION is not UNISON (so the chords play)', check: s => num(s, 'poly_alloc') !== 3 },
+      ],
+      hints: ['Hold each trig and press its three notes together.', 'Root, third and fifth: A C E, F A C, C E G, G B D.', 'The pattern\'s own notes are the roots.'],
+      solution: { data: SQ5_PROG, values: { ...POLY3, poly_alloc: 0 } },
+    },
+    {
+      kind: 'predict', control: 'poly_alloc', targetValue: 3, concept: 'oscillator-pitch', focus: ['poly_alloc', 'key:MIX'],
+      instruction: 'Open POLY CONFIG again (FUNC + MIX) and set ALLOCATION to UNISON.',
+      predict: mc('With UNISON, each chord trig plays…', ['Its first note on all three voices, detuned: one thick note', 'Every note three times as loud', 'Its notes one after another'], 0,
+        'UNISON puts every pool voice on the same note, each slightly detuned and panned. Three voices become one wide, thick sound, so chords collapse to their first note.'),
+      principle: 'Several slightly detuned copies of one note beat against each other, which sounds thick and wide.',
+      manualReference: 'Manual p.29, ALLOCATION: UNISON',
+    },
+    {
+      kind: 'match', concept: 'oscillator-pitch', setup: { poly_det: 4 },
+      instruction: 'Match the target\'s UNISON DETUNE by ear: how far apart are the voices tuned?',
+      match: { target: { poly_det: 40 }, controls: ['poly_det'] },
+      hints: ['Listen to the wobble: faster beating means more detune.', 'The target beats much faster than 4.', 'Try around 40.'],
+    },
+    {
+      kind: 'reflect', instruction: 'Explain it in your own words.',
+      reflect: {
+        prompt: 'What does POLY CONFIG change about how a track plays its notes?',
+        model: 'It lets a track use several of the A4\'s voices: each note of a chord or overlapping trig takes a free pool voice, the oldest is stolen when none is free, and UNISON stacks every voice on one note instead.',
+      },
+    },
+  ],
+  review: [
+    mc('To play a chord on one A4 track you need…', ['Several voices in the POLY CONFIG pool', 'A longer LEN', 'The arpeggiator'], 0, 'One note, one voice.'),
+    mc('With no free voice, a new note…', ['Takes the voice used least recently', 'Is skipped', 'Stops the pattern'], 0, 'Voice stealing.'),
+    mc('UNISON plays…', ['One note on every pool voice, detuned', 'Each note twice', 'Only on track 1'], 0, 'A thick, wide single note.'),
+    mc('A chord trig on a mono track plays…', ['Only its first note', 'The whole chord', 'Nothing'], 0, 'One voice, one note.'),
+  ],
+};
+
+export const SEQUENCING: Lesson[] = [sq1, sq2, sq3, sq4, sq5];
 
 // ============================================================================
 // PERFORMANCE
@@ -1467,7 +1573,97 @@ const p1: Lesson = {
   ],
 };
 
-export const PERFORMANCE: Lesson[] = [p1];
+
+// ---------------------------------------------------------------- LIVE RECORDING knob moves
+
+const P2_START = oneBar('LIVE', [{ s: 'x.x.x.x.x.x.x.x.', n: [45, 45, 57, 45, 48, 45, 55, 43], len: LEN.s1_5 }]);
+const lockSteps = (p: Project, key: string, values: Record<number, number>) => {
+  const steps = p.patterns.A01.tracks[0].steps;
+  for (const [k, v] of Object.entries(values)) {
+    const i = Number(k);
+    const st = steps[i] ?? { trigless: true };
+    steps[i] = { ...st, locks: { ...(st.locks ?? {}), [key]: v } };
+  }
+};
+/** A filter sweep over the first half bar, recorded live: a lock on every step the playhead passed */
+const P2_SWEEP = edited(P2_START, p => lockSteps(p, 'flt1_frq', { 0: 46, 1: 52, 2: 58, 3: 64, 4: 70, 5: 78, 6: 86, 7: 94 }));
+/** ...and a delay throw on the last beat */
+const P2_THROW = edited(P2_SWEEP, p => lockSteps(p, 'amp_del', { 12: 100, 13: 110, 14: 120, 15: 120 }));
+const lockedT1 = (s: LessonCheckState, key: string) => Object.entries(stepsOf(s, 0)).filter(([, st]) => st.locks?.[key] !== undefined);
+
+const p2: Lesson = {
+  id: 'analog-four-p2-live-locks', device: 'analog-four', path: 'performance', order: O(18.5), difficulty: 'intermediate',
+  name: 'Record knob moves live',
+  description: 'In LIVE RECORDING the knobs write parameter locks onto the steps as the pattern plays, so a filter sweep or an echo throw plays back every loop.',
+  objective: 'Record a filter sweep and an echo throw as parameter locks while the pattern plays, and know what the knob itself still controls.',
+  source: `${SRC}, LIVE RECORDING and parameter locks`, estimatedMinutes: 9,
+  prerequisites: ['analog-four-sq2-plocks'],
+  concepts: ['parameter-locks', 'filter-cutoff', 'filter-resonance', 'effects'],
+  tags: ['live recording', 'p-locks', 'automation', 'performance'],
+  start: { reset: true, values: { ...sound('bass-saw', 0, { flt1_frq: 46, flt1_res: 40, amp_del: 0 }), page: V.FLTR, fx_del_fb: 70 }, data: P2_START },
+  steps: [
+    playStep('Press PLAY: a bass line on T1, filter fairly closed.', 'Recording works best over a loop that already grooves.'),
+    {
+      kind: 'do', control: 'live_rec', targetValue: true, concept: 'parameter-locks', focus: ['key:RECORD', 'key:PLAY'],
+      instruction: 'Hold RECORD and press PLAY: LIVE RECORDING. The RECORD key flashes.',
+      principle: 'Live recording captures what you play and turn, in time with the sequencer.',
+      explanation: 'With a mouse, press TRK and choose LIVE RECORDING: ON, which does the same.',
+      manualReference: 'Manual p.40, LIVE RECORDING MODE',
+    },
+    {
+      kind: 'predict', concept: 'parameter-locks', focus: ['t1_flt1_frq'],
+      instruction: 'Turn knob A (FRQ) slowly up from about 45 to about 95 over half a bar, then let go.',
+      predict: mc('What does the A4 record while you turn the knob?', ['A lock with the knob\'s value on each step the playhead passes', 'One new knob position for the whole track', 'Nothing until the pattern stops'], 0,
+        'Each step that plays while the knob moves gets a parameter lock with the value at that moment: note trigs take the lock, empty steps get a lock trig. That is how the move plays back.'),
+      principle: 'A recorded knob move is a row of parameter locks, one per step.',
+      explanation: 'Locks hold one value per step, so a recorded move is stepped, not smooth. A PARAMETER SLIDE trig can glide between two of them.',
+      check: s => lockedT1(s, 'flt1_frq').length >= 4 && new Set(lockedT1(s, 'flt1_frq').map(([, st]) => st.locks!.flt1_frq)).size >= 3,
+      solution: { data: P2_SWEEP },
+      manualReference: 'Manual p.50, PARAMETER LOCKS in LIVE RECORDING',
+    },
+    {
+      kind: 'quiz', instruction: 'Quick check.', concept: 'parameter-locks',
+      quiz: mc('Live recording ends and FRQ shows its old value again. Why does the sweep still play?', ['It is stored as locks on the steps; the knob holds the kit\'s own value', 'The A4 plays back an audio recording', 'It does not: the sweep is lost'], 0,
+        'Recording knob moves writes locks into the pattern and leaves the kit\'s value alone. Steps with a lock play the lock; steps without one play the knob.'),
+    },
+    {
+      kind: 'do', control: 'live_rec', targetValue: false, concept: 'parameter-locks', focus: ['key:PLAY'],
+      instruction: 'Press PLAY once: LIVE RECORDING ends and the pattern keeps playing. Listen to the sweep play back on every loop.',
+      principle: 'Recorded locks repeat every loop until you change or clear them.',
+    },
+    {
+      kind: 'match', concept: 'filter-resonance', setup: { t1_flt1_res: 20 },
+      instruction: 'The sweep locked only FRQ: RES still follows its knob on every step. Match the target\'s resonance by ear with knob B.',
+      match: { target: { t1_flt1_res: 100 }, controls: ['t1_flt1_res'] },
+      hints: ['Listen for the whistle at the top of the sweep.', 'The target rings much more.', 'Try around 100.'],
+    },
+    {
+      kind: 'challenge', concept: 'effects',
+      instruction: 'Record a second take: in LIVE RECORDING, press AMP and turn knob G (DEL) up as the playhead reaches trig 13.',
+      checklist: [
+        { text: 'A delay-send (DEL) lock of 60 or more on trigs 13-16', check: s => lockedT1(s, 'amp_del').some(([k, st]) => Number(k) >= 12 && st.locks!.amp_del >= 60) },
+        { text: 'The filter sweep is still there (FRQ locks on 4 trigs or more)', check: s => lockedT1(s, 'flt1_frq').length >= 4 },
+      ],
+      hints: ['Hold RECORD and press PLAY again.', 'Press AMP; DEL is knob G.', 'Turn it just as the playhead reaches trig 13, then leave live recording with PLAY.'],
+      solution: { data: P2_THROW, values: { live_rec: false } },
+    },
+    {
+      kind: 'reflect', instruction: 'Explain it in your own words.',
+      reflect: {
+        prompt: 'How is a knob turned in LIVE RECORDING different from the same turn with recording off?',
+        model: 'In LIVE RECORDING the turn is written as a lock on each step it passes, so it plays back every loop and the kit value stays as it was; with recording off the turn changes the kit value itself, on every step that has no lock.',
+      },
+    },
+  ],
+  review: [
+    mc('In LIVE RECORDING, turning a knob…', ['Locks its value on the steps the playhead passes', 'Changes the tempo', 'Mutes the track'], 0, 'One lock per step.'),
+    mc('An empty step that a recorded knob move passes gets…', ['A lock trig', 'A note trig', 'Nothing'], 0, 'Locks without a note.'),
+    mc('After recording, the knob\'s own value sets…', ['The steps without a lock for it', 'Every step', 'Nothing any more'], 0, 'Locks win on their steps.'),
+    mc('To erase recorded locks as the pattern plays, hold…', ['FUNC + NO', 'TRK + PTN', 'BANK A'], 0, 'Real-time erase.'),
+  ],
+};
+
+export const PERFORMANCE: Lesson[] = [p1, p2];
 
 // ============================================================================
 // STUDIO

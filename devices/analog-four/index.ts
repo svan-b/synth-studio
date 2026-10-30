@@ -81,6 +81,25 @@ const analogFour: DeviceModule = {
     }
     // micro timing and conditions belong to a held trig: without one there is nothing to set
     if (/^t\d_trig_(micro|cond|envf|env2|lfo1|lfo2)$/.test(id) && !heldSteps(api.ui).length) return true;
+    // LIVE RECORDING: a knob turned with no trig held records a lock on the step that plays, on the
+    // active track (manual p.50); NOT, VEL and LEN go into the note trigs it passes (p.47). The kit
+    // keeps its value; the panel (ui.tsx Helpers) writes the lock and the engine sounds it at once.
+    if (api.values.live_rec === true && !heldSteps(api.ui).length && typeof value === 'number') {
+      const key = LOCKS.lockKey(id);
+      const track = LOCKS.trackOf?.(id);
+      const active = Math.max(0, Math.min(SEQ_TRACKS - 1, Math.round(Number(api.values.track) || 0)));
+      if (key && key !== 'prob' && key !== 'micro' && key !== 'cond' && track === active) {
+        // [NO] held + a knob: erase that parameter's locks as the playhead passes them (manual p.50)
+        if (api.ui.a4yesNo === 'no') {
+          api.setUi({ a4erase: { kind: 'param', tracks: [track], key } });
+          return true;
+        }
+        const live = (api.ui.a4liveKnob as Record<string, number> | undefined) ?? {};
+        const n = Number((api.ui.a4liveRec as { n?: number } | undefined)?.n ?? 0) + 1;
+        api.setUi({ a4liveKnob: { ...live, [id]: value }, a4liveRec: { n, id, key, value, track } });
+        return true;
+      }
+    }
     // the ARP page belongs to the pattern (manual p.43); with a trig held only NO2-NO4 lock (p.44)
     const arp = /^t([1-4])_(arp_\w+)$/.exec(id);
     if (arp && isArpKey(arp[2]) && typeof value === 'number') {
@@ -99,6 +118,9 @@ const analogFour: DeviceModule = {
   },
   displayValues: api => {
     let v = displayWithLocks(api, LOCKS);
+    // LIVE RECORDING: the knobs show the values you are recording (the kit keeps its own)
+    const live = api.values.live_rec === true ? (api.ui.a4liveKnob as Record<string, number> | undefined) : undefined;
+    if (live) for (const id in live) if (v[id] !== live[id]) v = { ...v, [id]: live[id] };
     const p = asProject(api.data, SEQ_TRACKS);
     const sw = getPattern(p, p.active).swing;
     if (v.swing !== sw) v = { ...v, swing: sw };
@@ -129,7 +151,9 @@ const analogFour: DeviceModule = {
     'Trig keys: tap to add or remove a trig. Hold a trig and turn a knob to parameter-lock that step; hold a trig and press a keyboard key to give it a note. A long hold (or double tap) opens the trig editor: note, length, micro timing, conditions, slides.',
     '[FUNC] reaches the grey legends under the keys: hold it, or tap it once for the next key (Shift on a computer keyboard works too). [FUNC] + a track key mutes that track. [BANK A-H] then a trig key picks a pattern; [PTN], [SONG], [FUNC]+[CHAIN] and [FUNC]+[PAGE] open the pattern, song, chain and scale menus.',
     'Space = PLAY/STOP; synced to the studio it is the studio transport. On its own clock [PLAY] while playing pauses and [PLAY] resumes; [STOP] cuts the sound while the delay rings on, and [STOP][STOP] fades the send effects. Keys A-K play the active track, Z/X shift the octave. [SND] or the TRACK LEVEL push opens the sound browser; [KIT] loads whole kits.',
-    'Simplified: one kit per project, no POLY mode (so no PLY arpeggio), no CV or audio-input jacks (the CV track is sequenced and shown), no sound locks and no Euclidean NOTE page. Value-to-Hz and -seconds curves are fits to the documented ranges.',
+    'Chords: [FUNC] + [MIX] opens POLY CONFIG. Tick voices (or TRIG 1-4) to share them between their tracks, then hold a trig and press several keys together to store a chord. ALLOCATION picks how notes find a voice; UNISON stacks them all on one note.',
+    'Recording: [RECORD] + [PLAY] records live - played notes, and knob turns as locks on the steps that pass ([PLAY][PLAY] quantizes). [RECORD] + [STOP] is STEP RECORDING: each key writes the active step and moves on. [PAGE] or held trigs + [RECORD] / [STOP] / [PLAY] copy, paste and clear.',
+    'Simplified: one kit per project, no CV or audio-input jacks (the CV track is sequenced and shown), no sound locks and no Euclidean NOTE page. Value-to-Hz and -seconds curves are fits to the documented ranges.',
   ],
 };
 

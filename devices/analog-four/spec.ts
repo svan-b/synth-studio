@@ -13,7 +13,7 @@
 
 import type { ControlSpec, DeviceSpec, PresetSpec } from '@/types';
 import {
-  CV_PARAMS, FX_PARAMS, PERF_MACROS, SYNTH_PARAMS, SYNTH_TRACKS, TRACK_NAMES, V, VIEW_LABELS,
+  CV_PARAMS, FX_PARAMS, PERF_MACROS, POLY_ALLOC, SYNTH_PARAMS, SYNTH_TRACKS, TRACK_NAMES, V, VIEW_LABELS,
   cvid, fxid, tid, type ParamDef,
 } from './params';
 import { SOUNDS } from './sounds';
@@ -104,6 +104,33 @@ Object.assign(controls, {
   trns: {
     type: 'knob', label: 'TRANSPOSE', min: -24, max: 24, default: 0, step: 1, units: 'semitones', bipolar: true,
     description: 'Live transpose of the synth tracks\' note trigs (hold [TRNS] and press a keyboard key).', manualReference: `${MAN}, [TRNS]`,
+  },
+  // POLY CONFIG ([FUNC] + [MIX], or KIT > POLY CONFIG): kit settings (manual p.24, p.28-31). All
+  // off by default, so every track plays its own mono voice as before.
+  ...Object.fromEntries([1, 2, 3, 4].map(n => [`poly_v${n}`, {
+    type: 'button', label: `POLY VOICE ${n}`, default: false,
+    description: `Voice ${n} joins the poly pool: track ${n} then plays chords and overlapping notes on the pool's voices, which it shares with the other poly tracks. Off, voice ${n} is track ${n}'s own mono voice.`,
+    manualReference: 'Manual p.28-29, POLYPHONY CONFIGURATION: VOICES',
+  } satisfies ControlSpec])),
+  poly_alloc: {
+    type: 'switch', label: 'POLY ALLOCATION', options: POLY_ALLOC, default: 0,
+    description: 'Which poly voice a new note takes. RESET: the first free one, counting up from the track\'s own voice. ROTATE: the next one in turn. REASSIGN: the voice that note used last time, if it is free. UNISON: every poly voice plays the same note.',
+    manualReference: 'Manual p.29-31, POLYPHONY CONFIGURATION: ALLOCATION',
+  },
+  poly_trk: {
+    type: 'button', label: 'USE TRK SOUNDS', default: false,
+    description: 'Off: a poly voice plays the sound of the track whose note it plays. On: each voice keeps its own track\'s sound, so one track\'s chord is spread over several sounds.',
+    manualReference: 'Manual p.29, POLYPHONY CONFIGURATION: USE TRK SOUNDS',
+  },
+  poly_det: {
+    type: 'knob', label: 'UNISON DETUNE', min: 0, max: 127, default: 16, step: 1, units: 'none', endless: true,
+    description: 'UNISON: how far the voices are detuned from each other. The outer voices sit DETUNE/128 of a semitone either side of the note (16 = 12.5 cents).',
+    manualReference: 'Manual p.29, POLYPHONY CONFIGURATION: UNISON DETUNE',
+  },
+  poly_spr: {
+    type: 'knob', label: 'UNISON PAN SPREAD', min: 0, max: 127, default: 64, step: 1, units: 'none', endless: true,
+    description: 'UNISON: how wide the voices are spread across the stereo field around the sound\'s own PAN (127 = hard left and right).',
+    manualReference: 'Manual p.29, POLYPHONY CONFIGURATION: UNISON PAN SPREAD',
   },
   trig_mode: {
     type: 'switch', label: 'TRIG MODE', options: ['TRIGS', 'ACCENT', 'NOTE SLIDE', 'PARAM SLIDE', 'TRIG MUTE'], default: 0,

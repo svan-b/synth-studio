@@ -4,7 +4,7 @@
 // ============================================================================
 
 import {
-  BANKS, CHANGE_MODES, CHANGE_OFF, LEN_DEFAULT, MASTER_MAX, MAX_STEPS, NOTE_LENGTHS, PAGE_SIZE, PATTERNS_PER_BANK,
+  BANKS, CHANGE_MODES, CHANGE_OFF, CHORD_MAX, CHORD_SPAN, LEN_DEFAULT, MASTER_MAX, MAX_STEPS, NOTE_LENGTHS, PAGE_SIZE, PATTERNS_PER_BANK,
   PLAY_MODES, QUANTIZE_MAX, RETRIG_RATES, RETRIG_VEL_MAX, RETRIG_VEL_MIN, SPEEDS, SWING_MAX, SWING_MIN, TEMPO_MAX,
   TEMPO_MIN,
   type ChangeMode, type Locks, type Pattern, type PatternId, type PlayMode, type Project, type Retrig,
@@ -125,11 +125,25 @@ function cleanRetrig(x: unknown): Retrig | undefined {
   };
 }
 
+/** Chord offsets as stored: integers in +-CHORD_SPAN, non-zero, unique, at most CHORD_MAX - 1 */
+export function cleanChord(x: unknown): number[] | undefined {
+  if (!Array.isArray(x)) return undefined;
+  const out: number[] = [];
+  for (const v of x) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    const o = Math.max(-CHORD_SPAN, Math.min(CHORD_SPAN, Math.round(v)));
+    if (o !== 0 && !out.includes(o) && out.length < CHORD_MAX - 1) out.push(o);
+  }
+  return out.length ? out : undefined;
+}
+
 export function normalizeStep(x: unknown): Step | undefined {
   if (!isObj(x)) return x === true || x === 1 ? {} : undefined;
   const s: Step = {};
   if (x.trigless === true) s.trigless = true;
   if (typeof x.note === 'number') s.note = int(x.note, 0, 127, 60);
+  const ch = cleanChord(x.chord);
+  if (ch) s.chord = ch;
   if (typeof x.vel === 'number') s.vel = int(x.vel, 1, 127, 100);
   if (typeof x.len === 'number') s.len = int(x.len, 0, NOTE_LENGTHS.length - 1, LEN_DEFAULT);
   if (typeof x.micro === 'number') { const m = int(x.micro, -23, 23, 0); if (m) s.micro = m; }
@@ -383,6 +397,17 @@ export function trigSteps(p: Project, id: PatternId, track: number, opts: { trig
     if (!!s.trigless === !!opts.trigless) out.push(Number(k));
   }
   return out.sort((a, b) => a - b);
+}
+
+/**
+ * The notes a trig plays: its note (`note`, already transposed when it comes from a TrigEvent),
+ * then the notes of its chord (Step.chord offsets), clamped to 0..127, without repeats
+ */
+export function trigNotes(step: Step | undefined, note: number): number[] {
+  const out = [Math.max(0, Math.min(127, Math.round(note)))];
+  const ch = step?.chord;
+  if (ch) for (const o of ch) { const n = Math.max(0, Math.min(127, out[0] + o)); if (!out.includes(n)) out.push(n); }
+  return out;
 }
 
 /** Steps of the track that hold a lock for `key` */

@@ -12,6 +12,11 @@ export function formatNote(n: number): string {
   return `${NOTE_NAMES[((r % 12) + 12) % 12]}${Math.floor(r / 12) - 1}`;
 }
 
+/** A chord trig's notes: "C4 E4 G4" (the trig's note, then its chord offsets); the note alone without a chord */
+export function formatChord(note: number, chord: readonly number[] | undefined): string {
+  return [note, ...(chord ?? []).map(o => Math.max(0, Math.min(127, note + o)))].map(formatNote).join(' ');
+}
+
 /** Steps for a LEN index (Infinity for INF) */
 export function lengthSteps(idx: number): number {
   return NOTE_LENGTHS[Math.max(0, Math.min(NOTE_LENGTHS.length - 1, Math.round(idx)))];

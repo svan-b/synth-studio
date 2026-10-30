@@ -15,10 +15,11 @@
 // step, `at` any other step fields (len, cond, micro, vel) by step.
 // ============================================================================
 
+import type { ControlValue } from '@/types';
 import {
   createPattern, createProject, LEN_1_STEP, setSongLoop, type Locks, type Pattern, type Project, type SongRow, type Step,
 } from '@/lib/sequencer/elektron';
-import { SEQ_TRACKS, SYNTH_BY_KEY, FX_BY_KEY, V, dest, tid, fxid } from './params';
+import { CV_BY_KEY, SEQ_TRACKS, SYNTH_BY_KEY, FX_BY_KEY, V, dest, tid, fxid } from './params';
 import { SOUNDS, SOUND_BY_ID, type SoundDef, type SoundParams } from './sounds';
 import { withPatternArp } from './arp';
 
@@ -116,12 +117,26 @@ export interface KitDef {
   fx?: Record<string, number>;
   /** TRACK LEVEL of T1-T4 (default 100): sets the kit's loudness (about -18 LUFS for the demo) */
   level?: number;
+  /** POLY CONFIG (manual p.28-29): the voices in the pool and how they are allocated (default: every voice mono) */
+  poly?: Partial<PolyConfig>;
   project: () => Project;
 }
 
-/** Control values of a kit: every sound parameter of the 4 tracks, the FX track and the tempo */
-export function kitValues(kit: KitDef): Record<string, number> {
-  const out: Record<string, number> = { tempo: kit.tempo };
+/** A kit's POLY CONFIG, as control values */
+export interface PolyConfig { voices: [boolean, boolean, boolean, boolean]; alloc: number; trk: boolean; det: number; spr: number }
+
+/** The POLY CONFIG control values of a kit (a kit holds its polyphony settings, manual p.24) */
+export function polyValues(poly: Partial<PolyConfig> = {}): Record<string, ControlValue> {
+  const v = poly.voices ?? [false, false, false, false];
+  return {
+    poly_v1: v[0], poly_v2: v[1], poly_v3: v[2], poly_v4: v[3],
+    poly_alloc: poly.alloc ?? 0, poly_trk: poly.trk ?? false, poly_det: poly.det ?? 16, poly_spr: poly.spr ?? 64,
+  };
+}
+
+/** Control values of a kit: every sound parameter of the 4 tracks, the FX track, the POLY CONFIG and the tempo */
+export function kitValues(kit: KitDef): Record<string, ControlValue> {
+  const out: Record<string, ControlValue> = { tempo: kit.tempo, ...polyValues(kit.poly) };
   kit.tracks.forEach((kt, t) => {
     const params = soundParams(kt.sound, kt.p);
     for (const key in SYNTH_BY_KEY) {
@@ -135,6 +150,67 @@ export function kitValues(kit: KitDef): Record<string, number> {
     out[fxid(key)] = kit.fx?.[key] ?? FX_BY_KEY[key].def;
   }
   return out;
+}
+
+// ----------------------------------------------------------------------------
+// The project's kits (manual p.16, p.24-25, p.38): each pattern is linked to a kit
+// ----------------------------------------------------------------------------
+//
+// A project keeps up to 128 kits (`a4kits`, by slot number) and each pattern may
+// link one (`Pattern.kit`, the slot as a string; '' = no link: the pattern plays
+// whatever kit is loaded, as every pattern did before kits were linked). The
+// controls hold the loaded kit (`a4kit`, its slot). When a pattern with another
+// kit starts, the kit it leaves keeps its edits (`values`) and the new one loads;
+// SAVE KIT stores `saved` too, which RELOAD KIT returns to. Kits are stored as
+// their differences from the init kit.
+
+/** One kit of the project: its name, its settings as last played, as last saved */
+export interface KitSlot { name: string; values: Record<string, ControlValue>; saved: Record<string, ControlValue> }
+/** A project with the A4's kits */
+export type A4Project = Project & { a4kits?: Record<string, KitSlot>; a4kit?: string };
+export const KIT_SLOTS = 128;
+
+const KIT_DEFAULTS: Record<string, ControlValue> = (() => {
+  const out: Record<string, ControlValue> = {};
+  for (let t = 0; t < 4; t++) {
+    for (const key in SYNTH_BY_KEY) if (!key.startsWith('trig_') && !key.startsWith('arp_')) out[tid(t, key)] = SYNTH_BY_KEY[key].def;
+  }
+  for (const key in FX_BY_KEY) if (!key.startsWith('trig_')) out[fxid(key)] = FX_BY_KEY[key].def;
+  for (const key in CV_BY_KEY) if (!key.startsWith('trig_')) out[`cv_${key}`] = CV_BY_KEY[key].def;
+  'abcdefghij'.split('').forEach(c => (out[`perf_${c}`] = 0));
+  Object.assign(out, polyValues());
+  return out;
+})();
+
+/** The controls a kit holds: the four Sounds and their levels, the FX and CV tracks, the macros, POLY CONFIG (manual p.24) */
+export const KIT_CONTROLS: readonly string[] = Object.keys(KIT_DEFAULTS);
+
+/** A kit's settings as stored: what differs from the init kit */
+export function kitSnapshot(values: Record<string, ControlValue | undefined>): Record<string, ControlValue> {
+  const out: Record<string, ControlValue> = {};
+  for (const id of KIT_CONTROLS) {
+    const v = values[id];
+    if (v !== undefined && v !== KIT_DEFAULTS[id]) out[id] = v;
+  }
+  return out;
+}
+
+/** Every control of a stored kit */
+export function kitFull(snapshot: Record<string, ControlValue> | undefined): Record<string, ControlValue> {
+  return { ...KIT_DEFAULTS, ...(snapshot ?? {}) };
+}
+
+/** The kit slots the project uses, and the one loaded */
+export function projectKits(p: Project): { kits: Record<string, KitSlot>; active: string } {
+  const a = p as A4Project;
+  return { kits: a.a4kits ?? {}, active: a.a4kit ?? '' };
+}
+
+/** The first kit slot nobody uses ('' when all 128 are taken) */
+export function freeKitSlot(p: Project): string {
+  const { kits } = projectKits(p);
+  for (let i = 1; i <= KIT_SLOTS; i++) if (!kits[String(i)]) return String(i);
+  return '';
 }
 
 /** A sound's parameters (init + the sound + overrides) */

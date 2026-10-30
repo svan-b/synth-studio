@@ -28,19 +28,23 @@ import {
 } from '@/components/sequencer';
 import { C as SC, Frame, Group, Overlay, SeqButton, Stepper, UI, lessonFocus, seqStateOf, viewPattern } from '@/components/sequencer/shared';
 import {
-  CHANGE_MODES, LOCK_LIMIT_A4, QUANTIZE_MAX, TRIG_CONDITIONS, asProject, clearPattern, copyPattern, formatLength, formatNote, getPattern, parsePatternId, reloadPattern,
+  CHANGE_MODES, LEN_1_STEP, LOCK_LIMIT_A4, NOTE_LENGTHS, QUANTIZE_MAX, TRIG_CONDITIONS, addChordNote, asProject, clearPattern, copyPattern, formatChord, formatLength, formatNote, getPattern,
+  lengthSteps, parsePatternId, reloadPattern, stepSeconds, trackSpeed,
   reloadTrack, rowEntry, savePattern, saveTrack, setStep as setStepFn, pastePattern, patternHasContent, patternId, setActive, setChain, setChangeMode,
-  setMasterMute, setMasterMutes, setPlayMode, setTrackQuantize, setTrigMute, trackLength, trackTrigDefaults, updatePatternSettings, updateSteps, withSteps,
+  clearLocks, clearPage, copyPage, copyTrigs, pastePage, pasteTrigs, setLock, withPattern, setMasterMute, setMasterMutes, setPlayMode, setTrackQuantize, setTrigMute, trackLength, trackTrigDefaults, updatePatternSettings, updateSteps, withSteps,
   withTrack,
-  type Pattern, type Project, type SeqState, type Step,
+  type Pattern, type Project, type SeqState, type Step, type StepsClip,
 } from '@/lib/sequencer/elektron';
 import {
-  CV_BY_KEY, FX_BY_KEY, FX_TRACK, PAGE_TITLE, PERF_MACROS, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS, TRACK_NAMES, V, VIEWS, keyOfView, levelControl, pageFor,
+  CV_BY_KEY, FX_BY_KEY, FX_TRACK, PAGE_TITLE, PERF_MACROS, POLY_ALLOC, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS, TRACK_NAMES, V, VIEWS, keyOfView, levelControl, pageFor,
   pageSlots, controlFor, routeOf, trackKind, viewAfterPress, type ParamDef,
 } from './params';
 import { KEYS, PX_PER_MM, TRIGS, TRIG_LEGENDS, KEYBOARD, KB_KEY, KB_KEYS, MODE_LEDS, OCT_LEDS, PAGE_LEDS, LOGO } from './geometry';
 import { SOUNDS, SOUND_CATEGORIES, type SoundDef } from './sounds';
-import { KITS, KIT_PROJECT_IDS, SOUND_DEMO_BASE, kitValues, projectFor, soundTrackValues } from './kits';
+import {
+  KITS, KIT_PROJECT_IDS, SOUND_DEMO_BASE, freeKitSlot, kitFull, kitSnapshot, kitValues, projectFor, projectKits, soundTrackValues, type A4Project,
+} from './kits';
+import { isTransposable, setTransposable } from './arp';
 
 const TRACKS = SEQ_TRACKS;
 const k = PX_PER_MM;
@@ -95,14 +99,44 @@ const UIK = {
   bank: 'a4bank',       // pattern-select mode: bank index or null
   qper: 'a4qper',
   trns: 'a4trns',
-  menu: 'a4menu',       // 'sound' | 'kit' | 'global' | null
+  menu: 'a4menu',       // 'sound' | 'kit' | 'global' | 'poly' | ... | null
   msg: 'a4msg',
   recDown: 'a4recDown',
   clip: 'a4clip',
   trnsLock: 'a4trnsLock',
   perfPending: 'a4perfPending', // PERF mode: tracks whose mute toggles when FUNC is released
   yesNo: 'a4yesNo',             // [YES] or [NO] held: quick save / reload with [PTN] and [TRK] (manual p.54)
+  liveKnob: 'a4liveKnob',       // LIVE RECORDING: the values the knobs are recording (control id -> value)
+  liveRec: 'a4liveRec',         // LIVE RECORDING: the last knob turn to write as a lock ({ n, id, key, value, track })
+  liveQuant: 'a4liveQuant',     // LIVE RECORDING quantized ([RECORD] + [PLAY][PLAY], manual p.41)
+  erase: 'a4erase',             // LIVE RECORDING real-time erase: { kind: 'locks' | 'trigs' | 'param', tracks, key? }
+  trackDown: 'a4trackDown',     // track keys held down (with [NO]: erase their trigs as the playhead passes)
+  recCombo: 'a4recCombo',       // [RECORD] was used in a combination while held ([STOP], [PLAY])
+  stepRec: 'a4stepRec',         // STEP RECORDING: { jump, step } (the active step) or null (manual p.41)
+  pageDown: 'a4pageDown',       // [PAGE] held: [RECORD] / [STOP] / [PLAY] copy, paste, clear the page (p.54)
+  pageCombo: 'a4pageCombo',     // [PAGE] was used in a combination (its release then keeps the page)
+  pageUndo: 'a4pageUndo',       // the last page / trig paste or clear, for the undo by repeating it (p.54)
+  trigClip: 'a4trigClip',       // copied trigs (relative steps) and their track
+  soundClip: 'a4soundClip',     // a copied track Sound ([TRACK] + [RECORD], p.54)
 } as const;
+
+/** STEP RECORDING: STANDARD (advance one step) or JUMP (advance by the NOTE page's LEN), and the active step */
+interface StepRec { jump: boolean; step: number }
+
+function stepRecOf(ctx: CustomRenderContext): StepRec | null {
+  const v = liveUi(ctx)[UIK.stepRec] as StepRec | null | undefined;
+  return v && typeof v.step === 'number' ? v : null;
+}
+
+/** Enter STEP RECORDING (or switch STANDARD / JUMP), starting on the shown page's first step */
+function setStepRec(ctx: CustomRenderContext, sr: StepRec | null) {
+  ctx.setUi({ [UIK.stepRec]: sr, ...(sr ? { [UI.stepPage]: Math.floor(sr.step / 16) } : {}) });
+  ctx.sendEvent('a4:step-rec', { on: !!sr });
+  if (sr) { ctx.setValue('rec', true); if (ctx.values.live_rec) ctx.setValue('live_rec', false); }
+}
+
+/** LIVE RECORDING real-time erase (manual p.41, p.50) */
+interface EraseMode { kind: 'locks' | 'trigs' | 'param'; tracks: number[]; key?: string }
 
 const num = (v: ControlValue | undefined, d = 0) => (typeof v === 'number' ? v : typeof v === 'boolean' ? (v ? 1 : 0) : d);
 
@@ -112,6 +146,11 @@ function liveUi(ctx: CustomRenderContext): Record<string, unknown> {
 
 function project(ctx: { data?: unknown }): Project {
   return asProject(ctx.data, TRACKS);
+}
+
+/** A synth track whose voice is in the POLY CONFIG pool plays polyphonically (manual p.28-29) */
+export function isPolyTrack(values: Record<string, ControlValue>, t: number): boolean {
+  return t >= 0 && t < SYNTH_TRACKS && !!values[`poly_v${t + 1}`];
 }
 
 /** Track mutes ([FUNC] + [TRACK]) are the project's: global, kept through pattern changes (manual p.37) */
@@ -217,7 +256,9 @@ function setTempo(ctx: CustomRenderContext, bpm: number) {
   ctx.setValue('tempo', Math.round(bpm));
 }
 
-function toggleA4Menu(ctx: CustomRenderContext, menu: 'sound' | 'kit' | 'global' | 'tempo' | 'swing' | 'pattern' | 'track') {
+type A4Menu = 'sound' | 'kit' | 'global' | 'tempo' | 'swing' | 'pattern' | 'track' | 'poly';
+
+function toggleA4Menu(ctx: CustomRenderContext, menu: A4Menu) {
   const open = liveUi(ctx)[UIK.menu] === menu;
   ctx.setUi({ [UIK.menu]: open ? null : menu, [UI.menu]: null });
 }
@@ -291,6 +332,8 @@ const viewKey = (name: 'ARP' | 'NOTE' | 'PERF' | 'MIX' | 'TEMPO', label: string,
 const lastTrackPress = { t: -1, at: 0 };
 /** The last [STOP] press: a quick second press while stopped fades the send effects (manual p.38) */
 const lastStopPress = { at: 0 };
+/** The last [RECORD] + [PLAY]: a second [PLAY] soon after quantizes the live recording (manual p.41) */
+const lastLivePlay = { at: 0 };
 
 /** The held trig(s) of the active track, if any */
 function heldTrig(ctx: CustomRenderContext): { track: number; pattern: string; steps: number[]; first: Step | undefined } | null {
@@ -322,6 +365,8 @@ const trackKey = (t: number): KeyDef => ({
   aria: `Track ${TRACK_NAMES[t]}`,
   led: e => {
     const pr = project(e.ctx);
+    // [TRNS] held: the lit track keys are the transposable ones (manual p.53)
+    if (trnsHeld(e.ctx)) return t < SYNTH_TRACKS && isTransposable(pr, viewPattern(e.ctx, pr), t) ? [COL.red, 1] : null;
     const muted = masterMuted(pr, t) || !!getPattern(pr, viewPattern(e.ctx, pr)).tracks[t]?.mute;
     // red = active, yellow = active and muted, green = audible, dark = muted; with the FX or CV
     // track active, the synth track the keyboard still plays is half-bright red (manual p.13, p.36);
@@ -339,15 +384,48 @@ const trackKey = (t: number): KeyDef => ({
       say(e.ctx, `${TRACK_NAMES[t]} ${m ? 'MUTED' : 'UNMUTED'}`, 1000);
       return;
     }
-    e.ctx.setUi({ [UI.heldSteps]: [], [UI.trigEditor]: null });
+    // [TRNS] + [TRACK]: TRANSPOSABLE on / off for this track in the pattern (NOTES SETUP, manual p.47)
+    if (trnsHeld(e.ctx)) {
+      if (t >= SYNTH_TRACKS) return;
+      const pr = project(e.ctx);
+      const pat = viewPattern(e.ctx, pr);
+      const on = !isTransposable(pr, pat, t);
+      e.ctx.updateData(d => setTransposable(asProject(d, TRACKS), pat, t, on));
+      say(e.ctx, `${TRACK_NAMES[t]} ${on ? 'TRANSPOSES' : 'KEEPS ITS NOTES (NOT TRANSPOSABLE)'}`, 1400);
+      return;
+    }
+    const u = liveUi(e.ctx);
+    const down = Array.isArray(u[UIK.trackDown]) ? (u[UIK.trackDown] as number[]) : [];
+    e.ctx.setUi({ [UI.heldSteps]: [], [UI.trigEditor]: null, [UIK.trackDown]: [...down.filter(x => x !== t), t] });
+    // LIVE RECORDING: [TRACK] + [NO] erases that track's trigs as the playhead passes them (manual p.41)
+    if (e.ctx.values.live_rec && u[UIK.yesNo] === 'no') startErase(e.ctx, 'trigs', [...down.filter(x => x !== t), t]);
     const now = performance.now();
     const twice = lastTrackPress.t === t && now - lastTrackPress.at < 380 && t < SYNTH_TRACKS;
     lastTrackPress.t = t; lastTrackPress.at = now;
     e.ctx.setValue('track', t);
     if (twice) toggleA4Menu(e.ctx, 'sound');
   },
+  release: e => {
+    const down = liveUi(e.ctx)[UIK.trackDown];
+    const rest = Array.isArray(down) ? (down as number[]).filter(x => x !== t) : [];
+    e.ctx.setUi({ [UIK.trackDown]: rest });
+    const er = liveUi(e.ctx)[UIK.erase] as EraseMode | null | undefined;
+    if (er?.kind === 'trigs') e.ctx.setUi({ [UIK.erase]: rest.length ? { ...er, tracks: rest } : null });
+  },
   target: (c, v) => c === 'track' && v === t,
 });
+
+/** [TRNS] held down (not TRANSPOSE LOCK, which keeps the keyboard for transposing only) */
+function trnsHeld(ctx: CustomRenderContext): boolean {
+  const u = liveUi(ctx);
+  return !!u[UIK.trns] && !u[UIK.trnsLock];
+}
+
+/** LIVE RECORDING: start a real-time erase; it runs while the keys stay down (ui.tsx Helpers applies it) */
+function startErase(ctx: CustomRenderContext, kind: EraseMode['kind'], tracks: number[], key?: string) {
+  ctx.setUi({ [UIK.erase]: { kind, tracks, key } satisfies EraseMode });
+  say(ctx, kind === 'locks' ? 'ERASING LOCKS AS IT PLAYS' : kind === 'trigs' ? `ERASING ${tracks.map(x => TRACK_NAMES[x]).join(' ')} TRIGS AS IT PLAYS` : 'ERASING THAT LOCK AS IT PLAYS', 1200);
+}
 
 /** BANK E-H: the trig flag each one sets with a held trig, its trig_mode, its LED colour (manual p.51-53) */
 const BANK_FLAGS = [
@@ -460,7 +538,17 @@ const KEYDEFS: Record<string, KeyDef> = {
   KIT: {
     label: 'KIT', sub: 'Save Kit', aria: 'Kit menu',
     led: e => (e.ctx.ui[UIK.menu] === 'kit' ? [COL.red, 1] : null),
-    press: e => { if (e.func) { spendFunc(e.ctx); say(e.ctx, 'KIT SAVED (with the project)'); return; } toggleA4Menu(e.ctx, 'kit'); },
+    // [FUNC] / [YES] + [KIT] saves the kit, [NO] + [KIT] reloads it (manual p.25, p.54)
+    press: e => {
+      const yn = liveUi(e.ctx)[UIK.yesNo];
+      if (e.func || yn === 'yes') { if (e.func) spendFunc(e.ctx); saveKit(e.ctx, false); return; }
+      if (yn === 'no') {
+        const { active } = projectKits(project(e.ctx));
+        if (active) { switchKit(e.ctx, active, { saved: true }); say(e.ctx, 'KIT RELOADED'); } else say(e.ctx, 'SAVE A KIT FIRST ([FUNC] + [KIT])');
+        return;
+      }
+      toggleA4Menu(e.ctx, 'kit');
+    },
   },
   SND: {
     label: 'SND', sub: 'Settings', aria: 'Sound menu',
@@ -471,7 +559,12 @@ const KEYDEFS: Record<string, KeyDef> = {
     },
     target: (c, v) => c === 'page' && (v === V.SOUND || v === V.SOUND_2),
   },
-  MIX: viewKey('MIX', 'MIX', 'Poly Config', e => say(e.ctx, 'POLY CONFIG: each track keeps its own voice here')),
+  // [FUNC] + [MIX] opens POLY CONFIG (manual p.28)
+  MIX: {
+    ...viewKey('MIX', 'MIX', 'Poly Config', e => toggleA4Menu(e.ctx, 'poly')),
+    led: e => (e.ctx.ui[UIK.menu] === 'poly' ? [COL.lightBlue, 1] : e.view === V.MIX ? [COL.white, 1] : null),
+    target: (c, v) => (c === 'page' && v === V.MIX) || (typeof c === 'string' && c.startsWith('poly_')),
+  },
   PERF: viewKey('PERF', 'PERF', 'Setup', e => say(e.ctx, 'PERF SETUP: the macros are fixed; see the PERF page')),
   TRK: {
     label: 'TRK', sub: 'Metronome', aria: 'Track menu',
@@ -505,8 +598,30 @@ const KEYDEFS: Record<string, KeyDef> = {
   },
   NO: {
     label: 'NO', sub: 'Reload', subPlain: true, aria: 'No',
-    press: e => { if (e.func) spendFunc(e.ctx); closeMenus(e.ctx); e.ctx.setUi({ [UIK.yesNo]: 'no' }); },
-    release: e => e.ctx.setUi({ [UIK.yesNo]: null }),
+    press: e => {
+      const live = !!e.ctx.values.live_rec;
+      const down = liveUi(e.ctx)[UIK.trackDown];
+      if (e.func) spendFunc(e.ctx);
+      closeMenus(e.ctx);
+      e.ctx.setUi({ [UIK.yesNo]: 'no' });
+      // LIVE RECORDING real-time erase (manual p.41, p.50): [FUNC] + [NO] the active track's locks,
+      // [TRACK] + [NO] the held tracks' trigs, while the keys stay down
+      if (live && e.func) startErase(e.ctx, 'locks', [Math.min(e.track, TRACKS - 1)]);
+      else if (live && Array.isArray(down) && down.length) startErase(e.ctx, 'trigs', down as number[]);
+      // STEP RECORDING: [NO] removes the active step's trig (a rest) and moves on (manual p.41)
+      const sr = stepRecOf(e.ctx);
+      if (sr && !e.func) {
+        const pr = project(e.ctx);
+        const pat = viewPattern(e.ctx, pr);
+        const t = Math.min(e.track, TRACKS - 1);
+        const len = trackLength(getPattern(pr, pat), t);
+        e.ctx.updateData(d => setStepFn(asProject(d, TRACKS), pat, t, sr.step, null));
+        const step = (sr.step + 1) % len;
+        e.ctx.setUi({ [UIK.stepRec]: { ...sr, step }, [UI.stepPage]: Math.floor(step / 16) });
+        say(e.ctx, `REST ON STEP ${sr.step + 1}`, 800);
+      }
+    },
+    release: e => e.ctx.setUi({ [UIK.yesNo]: null, [UIK.erase]: null }),
   },
   UP: { label: '', icon: 'up', aria: 'Up', press: e => arrow(e, 0, 1) },
   DOWN: { label: '', icon: 'down', aria: 'Down', press: e => arrow(e, 0, -1) },
@@ -537,15 +652,24 @@ const KEYDEFS: Record<string, KeyDef> = {
   },
   RECORD: {
     label: '', icon: 'rec', sub: 'Copy', aria: 'Record',
-    led: e => (e.ctx.values.live_rec ? [COL.red, 1] : e.ctx.values.rec ? [COL.red, 0.85] : null),
+    // lit in GRID RECORDING; flashing in LIVE RECORDING and STEP RECORDING (manual p.40-41)
+    led: e => (e.ctx.values.live_rec || e.ctx.ui[UIK.stepRec] ? [COL.red, 1, true] : e.ctx.values.rec ? [COL.red, 0.85] : null),
     press: e => {
       if (e.func) { spendFunc(e.ctx); copyPaste(e, 'copy'); return; }
-      e.ctx.setUi({ [UIK.recDown]: true });
+      // [PAGE] + [RECORD] copies the page, held trigs + [RECORD] copy the trigs, [TRACK] + [RECORD] the Sound (manual p.54)
+      if (pageOp(e, 'copy') || trigOp(e, 'copy') || soundOp(e, 'copy')) return;
+      e.ctx.setUi({ [UIK.recDown]: true, [UIK.recCombo]: false });
+      // in STEP RECORDING [RECORD] leaves it - on release, unless [STOP] switched STANDARD / JUMP meanwhile
+      if (stepRecOf(e.ctx)) return;
       if (e.ctx.values.live_rec) { e.ctx.setValue('live_rec', false); e.ctx.setValue('rec', true); say(e.ctx, 'GRID RECORDING'); return; }
       e.ctx.setValue('rec', !e.ctx.values.rec);
     },
-    release: e => e.ctx.setUi({ [UIK.recDown]: false }),
-    target: (c, v) => (c === 'rec' && typeof v === 'boolean') || c === 'live_rec',
+    release: e => {
+      const combo = !!liveUi(e.ctx)[UIK.recCombo];
+      e.ctx.setUi({ [UIK.recDown]: false });
+      if (stepRecOf(e.ctx) && !combo) { setStepRec(e.ctx, null); say(e.ctx, 'GRID RECORDING', 1000); }
+    },
+    target: (c, v) => (c === 'rec' && typeof v === 'boolean') || c === 'live_rec' || c === 'seq:step-rec',
   },
   PLAY: {
     label: '', icon: 'play', sub: 'Clear', aria: 'Play',
@@ -553,11 +677,20 @@ const KEYDEFS: Record<string, KeyDef> = {
     led: e => (e.playing ? [COL.green, 1] : seqStateOf(e.ctx.engine)?.paused ? [COL.green, 0.6, true] : null),
     press: e => {
       if (e.func) { spendFunc(e.ctx); copyPaste(e, 'clear'); return; }
+      // [PAGE] + [PLAY] clears the page, held trigs + [PLAY] clear their locks (manual p.54)
+      if (pageOp(e, 'clear') || trigOp(e, 'clear')) return;
       if (liveUi(e.ctx)[UIK.recDown]) {
+        e.ctx.setUi({ [UIK.recCombo]: true });
+        if (stepRecOf(e.ctx)) { pressPlay(e.ctx); return; }
+        // [RECORD] + [PLAY] records live; a second [PLAY] before [RECORD] is let go quantizes it (manual p.40-41)
+        const again = !!e.ctx.values.live_rec && performance.now() - lastLivePlay.at < 700;
+        lastLivePlay.at = performance.now();
         e.ctx.setValue('rec', true);
         e.ctx.setValue('live_rec', true);
+        e.ctx.setUi({ [UIK.liveQuant]: again });
+        e.ctx.sendEvent('a4:live-quant', { on: again });
         if (!e.playing) pressPlay(e.ctx);
-        say(e.ctx, 'LIVE RECORDING: play the keyboard');
+        say(e.ctx, again ? 'LIVE RECORDING, QUANTIZED: notes land on the steps' : 'LIVE RECORDING: play the keyboard, turn knobs');
         return;
       }
       if (e.ctx.values.live_rec && e.playing) { e.ctx.setValue('live_rec', false); say(e.ctx, 'LIVE RECORDING OFF'); return; }
@@ -574,6 +707,18 @@ const KEYDEFS: Record<string, KeyDef> = {
     led: e => (!e.playing ? [COL.white, 0.5] : null),
     press: e => {
       if (e.func) { spendFunc(e.ctx); copyPaste(e, 'paste'); return; }
+      // [PAGE] + [STOP] pastes the page, a held trig + [STOP] pastes the copied trigs from it, [TRACK] + [STOP] the Sound (manual p.54)
+      if (pageOp(e, 'paste') || trigOp(e, 'paste') || soundOp(e, 'paste')) return;
+      // [RECORD] + [STOP]: STEP RECORDING; [STOP] again with [RECORD] still held switches STANDARD / JUMP (manual p.41)
+      if (liveUi(e.ctx)[UIK.recDown]) {
+        e.ctx.setUi({ [UIK.recCombo]: true });
+        const sr = stepRecOf(e.ctx);
+        const page = Math.round(Number(e.ctx.ui[UI.stepPage]) || 0);
+        const next: StepRec = sr ? { ...sr, jump: !sr.jump } : { jump: false, step: page * 16 };
+        setStepRec(e.ctx, next);
+        say(e.ctx, `STEP RECORDING ${next.jump ? 'JUMP' : 'STANDARD'}: PLAY THE KEYBOARD`, 1600);
+        return;
+      }
       const now = performance.now();
       const quick = now - lastStopPress.at < 500;
       lastStopPress.at = now;
@@ -634,8 +779,17 @@ const KEYDEFS: Record<string, KeyDef> = {
   },
   PAGE: {
     label: 'PAGE', sub: 'Scale', aria: 'Pattern page',
+    // held, [PAGE] + [RECORD] / [STOP] / [PLAY] copy, paste and clear the shown page (manual p.54); let go
+    // without one of them it shows the next page
     press: e => {
       if (e.func) { spendFunc(e.ctx); toggleKitMenu(e.ctx, 'scale'); return; }
+      e.ctx.setUi({ [UIK.pageDown]: true, [UIK.pageCombo]: false });
+    },
+    release: e => {
+      const u = liveUi(e.ctx);
+      if (!u[UIK.pageDown]) return;
+      e.ctx.setUi({ [UIK.pageDown]: false });
+      if (u[UIK.pageCombo]) return;
       const pr = project(e.ctx);
       const pat = viewPattern(e.ctx, pr);
       const len = trackLength(getPattern(pr, pat), Math.min(e.track, TRACKS - 1));
@@ -643,7 +797,7 @@ const KEYDEFS: Record<string, KeyDef> = {
       const cur = Math.round(Number(e.ctx.ui[UI.stepPage]) || 0);
       e.ctx.setUi({ [UI.stepPage]: (cur + 1) % pages });
     },
-    target: c => c === 'seq:pages',
+    target: c => c === 'seq:pages' || c === 'seq:page-copy',
   },
 };
 for (let b = 0; b < 8; b++) KEYDEFS[`BANK_${'ABCDEFGH'[b]}`] = bankKey(b);
@@ -681,6 +835,16 @@ function arrow(e: KeyEnv, dx: number, dy: number) {
       say(ctx, `MICRO TIMING ${micro > 0 ? '+' : ''}${micro}/384`, 900);
     }
     ctx.setUi({ [UI.heldEdited]: true });
+    return;
+  }
+  // STEP RECORDING: LEFT / RIGHT move the active step (or skip steps, manual p.41)
+  const sr = stepRecOf(ctx);
+  if (sr && dx) {
+    const pr = project(ctx);
+    const len = trackLength(getPattern(pr, viewPattern(ctx, pr)), Math.min(e.track, TRACKS - 1));
+    const step = (((sr.step + dx) % len) + len) % len;
+    ctx.setUi({ [UIK.stepRec]: { ...sr, step }, [UI.stepPage]: Math.floor(step / 16) });
+    say(ctx, `STEP ${step + 1}`, 700);
     return;
   }
   if (dy && u[UIK.menu] === 'tempo') {
@@ -749,6 +913,145 @@ function copyPaste(e: KeyEnv, op: 'copy' | 'clear' | 'paste') {
     ctx.updateData(d => pastePattern(asProject(d, TRACKS), pat, clip));
     say(ctx, `PASTED into ${pat}`);
   }
+}
+
+// ---- Copy, paste and clear of pages, trigs and Sounds (manual p.19, p.54) ---------------------
+
+/** Some steps of a track as they are (null = no trig), for undoing a paste or clear */
+type Snap = Record<number, Step | null>;
+
+function snap(pr: Project, pat: string, track: number, steps: readonly number[]): Snap {
+  const t = getPattern(pr, pat).tracks[track];
+  const out: Snap = {};
+  for (const i of steps) out[i] = t?.steps[i] ? (JSON.parse(JSON.stringify(t.steps[i])) as Step) : null;
+  return out;
+}
+
+function restoreSnap(p: Project, pat: string, track: number, s: Snap): Project {
+  for (const k in s) p = setStepFn(p, pat, track, Number(k), s[k]);
+  return p;
+}
+
+/** The last paste or clear: repeating it on what it left puts back what was there (and again, redoes it) */
+interface EditUndo { key: string; op: string; pat: string; track: number; before: Snap; after: Snap }
+
+/** Run a paste / clear (`fn`) on `steps`, or undo it when it repeats the last one (manual p.19). Returns 'undo' or 'done'. */
+function editWithUndo(ctx: CustomRenderContext, key: string, op: string, pat: string, track: number, steps: readonly number[], fn: (p: Project) => Project): 'undo' | 'done' {
+  const pr = project(ctx);
+  const undo = liveUi(ctx)[UIK.pageUndo] as EditUndo | undefined;
+  if (undo && undo.key === key && undo.op === op && JSON.stringify(snap(pr, pat, track, Object.keys(undo.after).map(Number))) === JSON.stringify(undo.after)) {
+    ctx.updateData(d => restoreSnap(asProject(d, TRACKS), pat, track, undo.before));
+    ctx.setUi({ [UIK.pageUndo]: { ...undo, before: undo.after, after: undo.before } satisfies EditUndo });
+    return 'undo';
+  }
+  const before = snap(pr, pat, track, steps);
+  const after = snap(fn(pr), pat, track, steps);
+  ctx.updateData(d => fn(asProject(d, TRACKS)));
+  ctx.setUi({ [UIK.pageUndo]: { key, op, pat, track, before, after } satisfies EditUndo });
+  return 'done';
+}
+
+/** The shown track page's steps */
+function pageRange(page: number): number[] {
+  return Array.from({ length: 16 }, (_, i) => page * 16 + i);
+}
+
+/** [PAGE] held + [RECORD] / [STOP] / [PLAY]: copy, paste or clear the shown page of the active track (GRID RECORDING). True when it acted. */
+function pageOp(e: KeyEnv, op: 'copy' | 'paste' | 'clear'): boolean {
+  const ctx = e.ctx;
+  const u = liveUi(ctx);
+  if (!u[UIK.pageDown]) return false;
+  ctx.setUi({ [UIK.pageCombo]: true });
+  doPageOp(ctx, Math.min(e.track, TRACKS - 1), op);
+  return true;
+}
+
+export function doPageOp(ctx: CustomRenderContext, track: number, op: 'copy' | 'paste' | 'clear') {
+  if (!ctx.values.rec) { say(ctx, 'PAGE COPY, PASTE AND CLEAR NEED GRID RECORDING ([RECORD])', 1800); return; }
+  const pr = project(ctx);
+  const pat = viewPattern(ctx, pr);
+  const page = Math.round(Number(ctx.ui[UI.stepPage]) || 0);
+  const where = `PAGE ${page + 1} OF ${TRACK_NAMES[track]}`;
+  if (op === 'copy') {
+    ctx.setUi({ [UIK.clip]: { kind: 'page', steps: copyPage(pr, pat, track, page) } });
+    say(ctx, `COPIED ${where}`);
+    return;
+  }
+  if (op === 'paste') {
+    const clip = liveUi(ctx)[UIK.clip] as { kind: string; steps: StepsClip } | undefined;
+    if (!clip || clip.kind !== 'page') { say(ctx, 'COPY A PAGE FIRST ([PAGE] + [RECORD])', 1600); return; }
+    const r = editWithUndo(ctx, `page:${pat}:${track}:${page}`, 'paste', pat, track, pageRange(page), p => pastePage(p, pat, track, page, clip.steps));
+    say(ctx, r === 'undo' ? `${where}: PASTE UNDONE` : `PASTED INTO ${where} (AGAIN: UNDO)`);
+    return;
+  }
+  const r = editWithUndo(ctx, `page:${pat}:${track}:${page}`, 'clear', pat, track, pageRange(page), p => clearPage(p, pat, track, page));
+  say(ctx, r === 'undo' ? `${where}: CLEAR UNDONE` : `CLEARED ${where} (AGAIN: UNDO)`);
+}
+
+/**
+ * Held trigs + [RECORD] / [STOP] / [PLAY] (GRID RECORDING): copy them with their locks, paste the copied
+ * trigs from the held one on (in the same relation to each other), or clear their locks (manual p.54).
+ * With the trig editor open its steps count as held, so a mouse can do it too. True when it acted.
+ */
+function trigOp(e: KeyEnv, op: 'copy' | 'paste' | 'clear'): boolean {
+  const ctx = e.ctx;
+  const u = liveUi(ctx);
+  const held = Array.isArray(u[UI.heldSteps]) ? (u[UI.heldSteps] as number[]) : [];
+  if (!held.length || typeof u[UI.heldTrack] !== 'number') return false;
+  const track = u[UI.heldTrack] as number;
+  const pat = (u[UI.heldPattern] as string) ?? project(ctx).active;
+  // the held trig is not toggled when it is let go
+  ctx.setUi({ [UI.heldEdited]: true });
+  if (!ctx.values.rec) { say(ctx, 'TRIG COPY, PASTE AND CLEAR NEED GRID RECORDING ([RECORD])', 1800); return true; }
+  const pr = project(ctx);
+  if (op === 'copy') {
+    const clip = copyTrigs(pr, pat, track, held);
+    const n = Object.keys(clip).length;
+    if (!n) { say(ctx, 'NO TRIG THERE TO COPY'); return true; }
+    ctx.setUi({ [UIK.trigClip]: clip });
+    say(ctx, `COPIED ${n} TRIG${n > 1 ? 'S' : ''}: HOLD ANOTHER TRIG + [STOP] PASTES`);
+    return true;
+  }
+  if (op === 'paste') {
+    const clip = u[UIK.trigClip] as StepsClip | undefined;
+    if (!clip || !Object.keys(clip).length) { say(ctx, 'COPY TRIGS FIRST: HOLD THEM + [RECORD]', 1600); return true; }
+    const at = Math.min(...held);
+    const targets = Object.keys(clip).map(k => at + Number(k)).filter(i => i < 64);
+    const r = editWithUndo(ctx, `trigs:${pat}:${track}:${at}`, 'paste', pat, track, targets, p => pasteTrigs(p, pat, track, at, clip));
+    say(ctx, r === 'undo' ? 'PASTE UNDONE' : `PASTED ${targets.length} TRIG${targets.length > 1 ? 'S' : ''} FROM TRIG ${at + 1} (AGAIN: UNDO)`);
+    return true;
+  }
+  const r = editWithUndo(ctx, `locks:${pat}:${track}:${held.join(',')}`, 'clear', pat, track, held, p => clearLocks(p, pat, track, held));
+  say(ctx, r === 'undo' ? 'LOCKS PUT BACK' : `LOCKS CLEARED ON TRIG ${held.map(x => x + 1).join(' ')} (AGAIN: UNDO)`);
+  return true;
+}
+
+/** [TRACK] held + [RECORD] / [STOP]: copy a synth track's Sound, or paste the copied one into it (manual p.54). True when it acted. */
+function soundOp(e: KeyEnv, op: 'copy' | 'paste'): boolean {
+  const down = liveUi(e.ctx)[UIK.trackDown];
+  if (!Array.isArray(down) || !down.length) return false;
+  doSoundOp(e.ctx, (down as number[])[down.length - 1], op);
+  return true;
+}
+
+export function doSoundOp(ctx: CustomRenderContext, t: number, op: 'copy' | 'paste') {
+  if (t < 0 || t >= SYNTH_TRACKS) { say(ctx, 'ONLY THE SYNTH TRACKS T1-T4 HAVE A SOUND'); return; }
+  if (op === 'copy') {
+    const vals: Record<string, number> = {};
+    for (const key in SYNTH_BY_KEY) {
+      if (key.startsWith('trig_') || key.startsWith('arp_') || key === 'level') continue;
+      vals[key] = num(useStudioStore.getState().getControlValue(ctx.instance, `t${t + 1}_${key}`) ?? ctx.values[`t${t + 1}_${key}`], SYNTH_BY_KEY[key].def);
+    }
+    ctx.setUi({ [UIK.soundClip]: { from: t, vals } });
+    say(ctx, `COPIED ${TRACK_NAMES[t]}'S SOUND: HOLD A TRACK KEY + [STOP] PASTES`);
+    return;
+  }
+  const clip = liveUi(ctx)[UIK.soundClip] as { from: number; vals: Record<string, number> } | undefined;
+  if (!clip) { say(ctx, 'COPY A SOUND FIRST: HOLD ITS TRACK KEY + [RECORD]', 1600); return; }
+  const out: Record<string, ControlValue> = {};
+  for (const key in clip.vals) out[`t${t + 1}_${key}`] = clip.vals[key];
+  useStudioStore.getState().setControlValues(ctx.instance, out);
+  say(ctx, `${TRACK_NAMES[clip.from]}'S SOUND PASTED INTO ${TRACK_NAMES[t]}`);
 }
 
 function useFocusMode(): boolean {
@@ -1057,13 +1360,24 @@ export function MiniKeyboard({ ctx }: { ctx: CustomRenderContext }) {
       return;
     }
     const steps = Array.isArray(u[UI.heldSteps]) ? (u[UI.heldSteps] as number[]) : [];
-    if (steps.length && typeof u[UI.heldTrack] === 'number' && trackKind(u[UI.heldTrack] as number) !== 'fx') {
+    if (steps.length && typeof u[UI.heldTrack] === 'number' && trackKind(u[UI.heldTrack] as number) !== 'fx' && !u[UIK.stepRec]) {
       const track = u[UI.heldTrack] as number;
       const pat = (u[UI.heldPattern] as string) ?? project(ctx).active;
       const note = Math.max(0, Math.min(127, KB_C1 + 12 * oct + offset));
-      editTrigs(ctx, p => updateSteps(p, pat, track, steps, { note }, { create: 'note' }));
+      // a key pressed while another is down adds to the trig's chord - on a poly track (manual p.28, p.42)
+      const chord = pointers.current.size > 0;
+      if (chord && isPolyTrack(ctx.values, track)) {
+        editTrigs(ctx, p => steps.reduce((q, st) => addChordNote(q, pat, track, st, note), p));
+        const after = getPattern(project(ctx), pat).tracks[track]?.steps[steps[0]];
+        const root = after?.note ?? note;
+        const offs = after?.chord ?? [];
+        const shown = note === root || offs.includes(note - root) ? offs : [...offs, note - root];
+        say(ctx, `TRIG ${steps.map(s => s + 1).join(' ')}: CHORD ${formatChord(root, shown)}`, 1400);
+      } else {
+        editTrigs(ctx, p => updateSteps(p, pat, track, steps, { note, chord: null }, { create: 'note' }));
+        say(ctx, chord ? `CHORDS NEED POLY ON ${TRACK_NAMES[track]} ([FUNC] + [MIX])` : `TRIG ${steps.map(s => s + 1).join(' ')}: NOTE ${formatNote(note)}`, chord ? 1800 : 1100);
+      }
       ctx.setUi({ [UI.heldEdited]: true });
-      say(ctx, `TRIG ${steps.map(s => s + 1).join(' ')}: NOTE ${formatNote(note)}`, 1100);
     }
     pointers.current.set(e.pointerId, offset);
     setHeld(h => new Set(h).add(offset));
@@ -1282,7 +1596,14 @@ export function Screen(props: PanelContext) {
     );
   }
 
-  const note = msg || (heldOn ? `TRIG ${held.map(s => s + 1).join(',')}: TURN A KNOB TO LOCK` : trackKind(track) === 'cv' ? 'CV TRACK: NO OUTPUT JACKS HERE' : view === V.OSC1 && trackKind(track) === 'fx' ? 'NO AUDIO INPUTS IN THE STUDIO' : '');
+  // a held chord trig shows its notes (POLY, manual p.28)
+  const heldTr = heldOn ? getPattern(pr, (ui[UI.heldPattern] as string) ?? shownPattern).tracks[track] : undefined;
+  const heldStep = heldTr?.steps[held[0]];
+  const chordTxt = heldStep?.chord?.length ? `TRIG ${held[0] + 1}: ${formatChord(heldStep.note ?? heldTr?.note ?? 60, heldStep.chord)}${isPolyTrack(values, track) ? '' : ' (MONO: ROOT ONLY)'}` : '';
+  const stepRec = ui[UIK.stepRec] as StepRec | null | undefined;
+  const srTxt = stepRec ? `STEP REC ${stepRec.jump ? 'JUMP' : 'STANDARD'}: STEP ${stepRec.step + 1}${stepRec.jump ? ` (LEN ${formatLength(getPattern(pr, shownPattern).tracks[track]?.len ?? 14)})` : ''}` : '';
+  const liveTxt = values.live_rec && playing ? (ui[UIK.erase] ? 'LIVE REC: ERASING AS IT PLAYS' : ui[UIK.liveQuant] ? 'LIVE REC QUANTIZED: PLAY, TURN KNOBS' : 'LIVE REC: PLAY KEYS, TURN KNOBS') : '';
+  const note = msg || chordTxt || (heldOn ? `TRIG ${held.map(s => s + 1).join(',')}: TURN A KNOB TO LOCK` : srTxt ? srTxt : liveTxt ? liveTxt : trackKind(track) === 'cv' ? 'CV TRACK: NO OUTPUT JACKS HERE' : view === V.OSC1 && trackKind(track) === 'fx' ? 'NO AUDIO INPUTS IN THE STUDIO' : '');
   const box = (inv: boolean): CSSProperties => ({ background: inv ? OLED_ON : 'transparent', color: inv ? '#050608' : OLED_ON, padding: '0 2px', borderRadius: 1.5 });
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', color: OLED_ON, fontFamily: '"Helvetica Neue", Arial, sans-serif', userSelect: 'none', WebkitUserSelect: 'none', position: 'relative' }}>
@@ -1297,6 +1618,7 @@ export function Screen(props: PanelContext) {
         ) : (
           <>
             <span style={box(true)}>{TRACK_NAMES[track]}</span>
+            {isPolyTrack(values, track) && <span style={{ ...box(false), border: `1px solid ${OLED_DIM}`, lineHeight: '9px' }} aria-label="Poly track">POLY</span>}
             <span style={{ color: OLED_DIM, whiteSpace: 'nowrap' }}>{title}</span>
             {levelId && (
               <span style={{ width: 30, height: 6, border: `1px solid ${OLED_DIM}`, position: 'relative' }} aria-label="Track level">
@@ -1376,7 +1698,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
       {Array.from({ length: 16 }, (_, i) => <div key={i} style={{ position: 'absolute', left: i * pitch, top: 0, width: keyW, height: '100%' }}>{render(i)}</div>)}
     </div>
   );
-  const keyBtn = (i: number, opts: { lit: string | null; amt?: number; label: string; sub?: string; blink?: boolean; outline?: boolean; onPress: (e: React.PointerEvent) => void; onRelease?: (e: React.PointerEvent) => void; aria: string }) => {
+  const keyBtn = (i: number, opts: { lit: string | null; amt?: number; label: string; sub?: string; blink?: boolean; outline?: boolean; target?: boolean; pressed?: boolean; subSize?: number; onPress: (e: React.PointerEvent) => void; onRelease?: (e: React.PointerEvent) => void; aria: string }) => {
     const col = opts.lit ? mix(COL.trigOff, opts.lit, 0.35 + 0.65 * (opts.amt ?? 1)) : COL.trigOff;
     return (
       <button
@@ -1385,7 +1707,8 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
         onPointerDown={e => { if (e.button !== 0 && e.pointerType === 'mouse') return; e.preventDefault(); e.stopPropagation(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* */ } opts.onPress(e); }}
         onPointerUp={e => opts.onRelease?.(e)}
         onPointerCancel={e => opts.onRelease?.(e)}
-        className={opts.blink ? 'a4-blink' : undefined}
+        aria-pressed={opts.pressed}
+        className={[opts.blink ? 'a4-blink' : '', opts.target ? 'a4-target' : ''].filter(Boolean).join(' ') || undefined}
         style={{
           position: 'absolute', inset: 0, borderRadius: 6, padding: 0, cursor: 'pointer', touchAction: 'none',
           border: `1px solid ${opts.outline ? '#e8e9eb' : '#111214'}`,
@@ -1396,7 +1719,7 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
       >
         <span style={{ position: 'absolute', left: 0, right: 0, top: '22%', textAlign: 'center', fontSize: 14, fontWeight: 400, lineHeight: '15px' }}>{opts.label}</span>
         <span style={{ position: 'absolute', left: '36%', right: '36%', top: '63%', height: 2, borderRadius: 1, background: col }} />
-        {opts.sub && <span style={{ position: 'absolute', left: 1, right: 1, bottom: 1.5, fontSize: 9, letterSpacing: -0.2, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'center', color: COL.trigOff }}>{opts.sub}</span>}
+        {opts.sub && <span style={{ position: 'absolute', left: 1, right: 1, bottom: 1.5, fontSize: opts.subSize ?? 9, letterSpacing: -0.2, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'center', color: COL.trigOff }}>{opts.sub}</span>}
       </button>
     );
   };
@@ -1437,6 +1760,23 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
       });
     });
   }
+  if (ctx.ui[UIK.menu] === 'poly') {
+    // POLY CONFIG: TRIG 1-4 tick the voices - half-bright = a track's own mono voice, full-bright = in
+    // the pool - and light up white while their voice plays (manual p.29)
+    const act = String(ctx.engine.polyAct ?? '');
+    const litIds = new Set<string>(ctx.teaching && ctx.step ? [ctx.step.control, ...(ctx.step.focus ?? [])].filter((x): x is string => typeof x === 'string') : []);
+    return strip(i => {
+      if (i >= SYNTH_TRACKS) return keyBtn(i, { lit: null, label: `${i + 1}`, aria: 'unused', onPress: () => undefined });
+      const id = `poly_v${i + 1}`;
+      const on = !!ctx.values[id];
+      const playing = on && act[i] === '1';
+      return keyBtn(i, {
+        lit: playing ? COL.white : COL.red, amt: on ? 1 : 0.4, label: `${i + 1}`, sub: on ? `POLY ${i + 1}` : `MONO ${i + 1}`, subSize: 10,
+        aria: `Voice ${i + 1}: ${on ? 'in the poly pool' : `track ${i + 1}'s own mono voice`}`, pressed: on, target: litIds.has(id),
+        onPress: () => { ctx.setValue(id, !on); say(ctx, `VOICE ${i + 1}: ${on ? `T${i + 1}'S OWN (MONO)` : 'IN THE POLY POOL'}`, 1100); },
+      });
+    });
+  }
   if (qper) {
     return strip(i => {
       if (i >= PERF_MACROS.length) return keyBtn(i, { lit: null, label: `${i + 1}`, aria: 'unused', onPress: () => undefined });
@@ -1469,6 +1809,34 @@ export function TrigArea({ ctx }: { ctx: CustomRenderContext }) {
           ctx.updateData(d => setMasterMute(asProject(d, TRACKS), i, !muted));
           say(ctx, `${TRACK_NAMES[i]} ${muted ? 'UNMUTED' : 'MUTED'}`, 900);
         },
+      });
+    });
+  }
+  const sr = ctx.ui[UIK.stepRec] as StepRec | null | undefined;
+  if (sr) {
+    // STEP RECORDING: a key picks the active step (green, flashing) - held, its trig takes locks from the
+    // knobs; trigs show red (note) and yellow (lock); the keyboard writes at the active step (manual p.41)
+    const page = Math.round(Number(ctx.ui[UI.stepPage]) || 0);
+    const pat = viewPattern(ctx, pr);
+    const trk = getPattern(pr, pat).tracks[track];
+    const len = trackLength(getPattern(pr, pat), track);
+    const playStep = st?.playing && st.pattern === pat ? st.steps[track] ?? -1 : -1;
+    const focus = lessonFocus(ctx);
+    return strip(i => {
+      const step = page * 16 + i;
+      const s = trk?.steps[step];
+      const active = sr.step === step;
+      const inLen = step < len;
+      return keyBtn(i, {
+        lit: !inLen ? null : active ? COL.green : s ? (s.trigless ? COL.yellow : COL.red) : null, amt: inLen ? 1 : 0.3,
+        blink: active, outline: playStep === step, label: `${step + 1}`, sub: s?.chord?.length ? `${s.chord.length + 1} NOTES` : undefined, subSize: 10,
+        target: !!focus && (focus.has(`seq:trig:${step + 1}`) || focus.has('seq:trigs')),
+        aria: `Step ${step + 1}${active ? ' (active step)' : ''}${s ? (s.trigless ? ', lock trig' : ', note trig') : ''}`,
+        onPress: () => {
+          if (!inLen) return;
+          ctx.setUi({ [UIK.stepRec]: { ...sr, step }, [UI.heldSteps]: [step], [UI.heldTrack]: track, [UI.heldPattern]: pat, [UI.heldEdited]: false });
+        },
+        onRelease: () => ctx.setUi({ [UI.heldSteps]: [], [UI.heldEdited]: false }),
       });
     });
   }
@@ -1633,6 +2001,89 @@ function SoundMenu({ ctx }: { ctx: CustomRenderContext }) {
   );
 }
 
+// ---- The project's kits: each pattern is linked to a kit (manual p.16, p.24-25, p.38) -----------
+
+/** The loaded kit's settings right now (the store, not the render's snapshot) */
+function liveKitValues(ctx: CustomRenderContext): Record<string, ControlValue> {
+  return useStudioStore.getState().devices[ctx.instance]?.controlValues ?? {};
+}
+
+/**
+ * Load kit slot `k` (a pattern linked to it started, or was picked while stopped): the kit being left
+ * keeps its edits, and the knobs take the new kit. With `link`, the active pattern is linked to it.
+ */
+export function switchKit(ctx: CustomRenderContext, k: string, opts: { saved?: boolean; link?: boolean; values?: Record<string, ControlValue> } = {}) {
+  const { kits, active } = projectKits(project(ctx));
+  const slot = kits[k];
+  if (!slot) return;
+  const left = kitSnapshot(liveKitValues(ctx));
+  // the values the engine already plays (a pattern start), else the kit's last played / saved values
+  const loaded = opts.values ?? (opts.saved ? slot.saved : slot.values);
+  ctx.updateData(d => {
+    const p = asProject(d, TRACKS) as A4Project;
+    const ks = { ...(p.a4kits ?? {}) };
+    if (active && ks[active] && active !== k) ks[active] = { ...ks[active], values: left };
+    if (ks[k] && (opts.saved || opts.values)) ks[k] = { ...ks[k], values: loaded };
+    const next: A4Project = { ...p, a4kits: ks, a4kit: k };
+    return opts.link ? withPattern(next, next.active, x => (x.kit === k ? x : { ...x, kit: k })) : next;
+  });
+  useStudioStore.getState().setControlValues(ctx.instance, kitFull(loaded));
+}
+
+/** SAVE KIT: the loaded settings into a slot (the loaded kit's, or a new one), linked to the active pattern (manual p.25) */
+function saveKit(ctx: CustomRenderContext, asNew: boolean) {
+  const pr = project(ctx);
+  const { active } = projectKits(pr);
+  const slot = asNew || !active ? freeKitSlot(pr) : active;
+  if (!slot) { say(ctx, 'ALL 128 KITS ARE IN USE'); return; }
+  const snap = kitSnapshot(liveKitValues(ctx));
+  ctx.updateData(d => {
+    const p = asProject(d, TRACKS) as A4Project;
+    const ks = { ...(p.a4kits ?? {}) };
+    ks[slot] = { name: ks[slot]?.name ?? `KIT ${slot.padStart(2, '0')}`, values: snap, saved: snap };
+    const next: A4Project = { ...p, a4kits: ks, a4kit: slot };
+    return withPattern(next, next.active, x => ({ ...x, kit: slot }));
+  });
+  say(ctx, `KIT ${slot} SAVED, LINKED TO ${pr.active}`, 1600);
+}
+
+/** KIT menu: the project's own kits - SAVE, LOAD (links the active pattern), RELOAD, CLEAR (manual p.24-25) */
+function ProjectKits({ ctx }: { ctx: CustomRenderContext }) {
+  const pr = project(ctx);
+  const { kits, active } = projectKits(pr);
+  const linked = getPattern(pr, pr.active).kit;
+  const slots = Object.keys(kits).sort((a, b) => Number(a) - Number(b));
+  const used = new Set(Object.values(pr.patterns).map(p => p.kit).filter(Boolean));
+  const focus = lessonFocus(ctx);
+  const name = (k: string) => kits[k]?.name ?? `KIT ${k}`;
+  return (
+    <Group label="THE PROJECT'S KITS" highlight={!!focus?.has('a4:kits')}>
+      <span style={{ fontSize: 11, color: SC.text, flex: '1 1 100%' }}>
+        {`Pattern ${pr.active}: ${linked ? `linked to ${name(linked)}` : 'no kit linked (it plays the loaded kit)'}. Loaded: ${active ? name(active) : 'unsaved'}.`}
+      </span>
+      <SeqButton height={40} color={SC.green} highlight={!!focus?.has('a4:kit-save')} onPress={() => saveKit(ctx, false)} title="[FUNC] + [KIT]: the loaded settings into the loaded kit's slot, linked to this pattern">SAVE KIT</SeqButton>
+      <SeqButton height={40} highlight={!!focus?.has('a4:kit-save-new')} onPress={() => saveKit(ctx, true)} title="Into a new slot, linked to this pattern">SAVE AS NEW</SeqButton>
+      <SeqButton height={40} disabled={!active} onPress={() => { switchKit(ctx, active, { saved: true }); say(ctx, `${name(active)} RELOADED`); }} title="[NO] + [KIT]: back to its last save">RELOAD KIT</SeqButton>
+      <SeqButton height={40} onPress={() => { useStudioStore.getState().setControlValues(ctx.instance, kitFull({})); say(ctx, 'KIT CLEARED: SAVE IT TO KEEP THAT'); }} title="Init sounds; nothing is lost until you save the kit">CLEAR KIT</SeqButton>
+      {linked && <SeqButton height={40} onPress={() => { ctx.updateData(d => withPattern(asProject(d, TRACKS), pr.active, x => ({ ...x, kit: '' }))); say(ctx, `${pr.active} UNLINKED`); }} title="The pattern then plays whatever kit is loaded">UNLINK</SeqButton>}
+      {slots.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, flex: '1 1 100%' }}>
+          {slots.map(k => (
+            <SeqButton key={k} height={40} active={k === active} color={SC.red}
+              onPress={() => { switchKit(ctx, k, { link: true, saved: k === active }); say(ctx, `${name(k)} ${k === active ? 'RELOADED' : 'LOADED'}, LINKED TO ${pr.active}`, 1500); }}
+              title={`Load ${name(k)} and link it to ${pr.active}${used.has(k) ? '' : ' (no pattern uses it yet)'}`}>
+              {`${name(k)}${used.has(k) ? '' : ' *'}`}
+            </SeqButton>
+          ))}
+        </div>
+      )}
+      <span style={{ fontSize: 11, color: SC.dim, flex: '1 1 100%' }}>
+        A pattern linked to a kit brings its sounds in when it starts: in a chain or a song each section can sound different. Patterns that share a kit share its edits. * = used by no pattern.
+      </span>
+    </Group>
+  );
+}
+
 function KitMenu({ ctx }: { ctx: CustomRenderContext }) {
   const load = (i: number, withProject: boolean) => {
     const kit = KITS[i];
@@ -1649,9 +2100,16 @@ function KitMenu({ ctx }: { ctx: CustomRenderContext }) {
     say(ctx, `${withProject ? 'PROJECT' : 'KIT'}: ${kit.name.split(' / ')[1].toUpperCase()}`);
   };
   return (
-    <Overlay portal portalSize={{ w: 680, h: 440 }}>
+    <Overlay portal portalSize={{ w: 700, h: 600 }}>
       <Frame title="KIT" sub="four sounds + the FX track" onClose={() => ctx.setUi({ [UIK.menu]: null })}>
         <div style={{ fontSize: 11, color: SC.dim, marginBottom: 6 }}>LOAD SOUNDS keeps your patterns. WITH PATTERNS also loads the kit&apos;s patterns and song, replacing the pattern memory.</div>
+        <Group label="THIS KIT">
+          <SeqButton height={40} onPress={() => ctx.setUi({ [UIK.menu]: 'poly' })} title="[FUNC] + [MIX]">POLY CONFIG</SeqButton>
+          <span style={{ fontSize: 11, color: SC.dim, flex: '1 1 260px' }}>The kit&apos;s polyphony: which voices the poly tracks share, and how notes find a voice.</span>
+        </Group>
+        <div style={{ height: 6 }} />
+        <ProjectKits ctx={ctx} />
+        <div style={{ height: 6 }} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {KITS.map((kit, i) => (
             <Group key={kit.id} label={kit.name.split(' / ')[1].toUpperCase()}>
@@ -1766,12 +2224,15 @@ function PatternMenu({ ctx }: { ctx: CustomRenderContext }) {
 /** [TRK]: the TRACK menu - NOTES SETUP quantize, RELOAD TRACK and SAVE TRACK (manual p.42, p.47) */
 function TrackMenu({ ctx }: { ctx: CustomRenderContext }) {
   const pr = project(ctx);
+  const sr = ctx.ui[UIK.stepRec] as StepRec | null | undefined;
+  const page = Math.round(Number(ctx.ui[UI.stepPage]) || 0);
+  const focus = lessonFocus(ctx);
   const t = Math.max(0, Math.min(TRACKS - 1, Math.round(num(ctx.values.track))));
   const id = pr.active;
   const pat = getPattern(pr, id);
   const run = (fn: (p: Project) => Project, msg: string) => { ctx.updateData(d => fn(asProject(d, TRACKS))); say(ctx, msg, 1200); };
   return (
-    <Overlay portal portalSize={{ w: 500, h: 300 }}>
+    <Overlay portal portalSize={{ w: 600, h: 540 }}>
       <Frame title="TRACK" sub={`${TRACK_NAMES[t]} in ${id}`} onClose={() => ctx.setUi({ [UIK.menu]: null })}>
         <Group label="NOTES SETUP">
           <Stepper label="QUANTIZE" value={pat.tracks[t]?.quantize ?? 0} min={0} max={QUANTIZE_MAX} width={56}
@@ -1780,14 +2241,141 @@ function TrackMenu({ ctx }: { ctx: CustomRenderContext }) {
           <Stepper label="GLOBAL QUANTIZE" value={pat.quantize ?? 0} min={0} max={QUANTIZE_MAX} width={56}
             title="The same for every track of the pattern"
             onChange={v => ctx.updateData(d => updatePatternSettings(asProject(d, TRACKS), id, { quantize: v }))} />
+          {t < SYNTH_TRACKS && (() => {
+            const tr = isTransposable(pr, id, t);
+            return (
+              <SeqButton height={40} active={tr} color={SC.green} highlight={!!focus?.has('a4:transposable')} title="[TRNS] + [TRACK]: off keeps the track out of [TRNS] and song transposes (drums)"
+                onPress={() => ctx.updateData(d => setTransposable(asProject(d, TRACKS), id, t, !tr))}>{tr ? '☑ TRANSPOSABLE' : '☐ TRANSPOSABLE'}</SeqButton>
+            );
+          })()}
         </Group>
         <div style={{ height: 6 }} />
         <Group label="RELOAD / SAVE">
           <SeqButton onPress={() => run(p => reloadTrack(p, t), `TRACK ${TRACK_NAMES[t]} RELOADED`)} title="[NO] + [TRK]">RELOAD TRACK</SeqButton>
           <SeqButton onPress={() => run(p => saveTrack(p, t), `TRACK ${TRACK_NAMES[t]} SAVED`)} color={SC.green} title="[YES] + [TRK]">SAVE TRACK</SeqButton>
         </Group>
+        <div style={{ height: 6 }} />
+        {/* the same as the key combinations, for a mouse (manual p.40-41, p.54) */}
+        <Group label="LIVE RECORDING">
+          {(['OFF', 'ON', 'QUANTIZED'] as const).map(m => {
+            const cur = ctx.values.live_rec ? (ctx.ui[UIK.liveQuant] ? 'QUANTIZED' : 'ON') : 'OFF';
+            return (
+              <SeqButton key={m} height={40} active={cur === m} color={SC.red} highlight={!!focus?.has(`a4:live-rec:${m.toLowerCase()}`)}
+                title="[RECORD] + [PLAY]; [PLAY] twice quantizes" onPress={() => {
+                  if (m === 'OFF') { ctx.setValue('live_rec', false); return; }
+                  if (sr) setStepRec(ctx, null);
+                  ctx.setValue('rec', true);
+                  ctx.setValue('live_rec', true);
+                  ctx.setUi({ [UIK.liveQuant]: m === 'QUANTIZED' });
+                  ctx.sendEvent('a4:live-quant', { on: m === 'QUANTIZED' });
+                  if (!seqStateOf(ctx.engine)?.playing) pressPlay(ctx);
+                }}>{m}</SeqButton>
+            );
+          })}
+        </Group>
+        <div style={{ height: 6 }} />
+        <Group label="STEP RECORDING">
+          {(['OFF', 'STANDARD', 'JUMP'] as const).map(m => {
+            const cur = sr ? (sr.jump ? 'JUMP' : 'STANDARD') : 'OFF';
+            return (
+              <SeqButton key={m} height={40} active={cur === m} color={SC.green} highlight={!!focus?.has(`a4:step-rec:${m.toLowerCase()}`)}
+                onPress={() => setStepRec(ctx, m === 'OFF' ? null : { jump: m === 'JUMP', step: sr?.step ?? page * 16 })} title="[RECORD] + [STOP]; [STOP] again switches STANDARD / JUMP">{m}</SeqButton>
+            );
+          })}
+        </Group>
+        <div style={{ height: 6 }} />
+        <Group label={`PAGE ${page + 1}`}>
+          <SeqButton height={40} onPress={() => doPageOp(ctx, t, 'copy')} title="[PAGE] + [RECORD]">COPY</SeqButton>
+          <SeqButton height={40} onPress={() => doPageOp(ctx, t, 'paste')} title="[PAGE] + [STOP]; again undoes it">PASTE</SeqButton>
+          <SeqButton height={40} onPress={() => doPageOp(ctx, t, 'clear')} title="[PAGE] + [PLAY]; again undoes it">CLEAR</SeqButton>
+          {t < SYNTH_TRACKS && (
+            <>
+              <span style={{ width: 10 }} />
+              <SeqButton height={40} onPress={() => doSoundOp(ctx, t, 'copy')} title="[TRACK] + [RECORD]">COPY SOUND</SeqButton>
+              <SeqButton height={40} onPress={() => doSoundOp(ctx, t, 'paste')} title="[TRACK] + [STOP]">PASTE SOUND</SeqButton>
+            </>
+          )}
+        </Group>
         <div style={{ fontSize: 11, color: SC.dim, margin: '6px 2px' }}>
           A track is its trigs, locks and NOTE settings in this pattern. RELOAD takes only this track back to its saved state. The [ARP] key sets the arpeggiator; its step offsets (ARP SETUP) are not modelled.
+        </div>
+      </Frame>
+    </Overlay>
+  );
+}
+
+/** [−] value [+] with 44 px touch targets (the A4's own menus: POLY CONFIG) */
+function BigStep({ label, value, min, max, onChange, highlight, title }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void; highlight?: boolean; title?: string }) {
+  const b = (d: number, glyph: string) => (
+    <SeqButton height={44} minWidth={44} onPress={() => onChange(Math.max(min, Math.min(max, value + d)))} ariaLabel={`${d < 0 ? 'Lower' : 'Raise'} ${label} by ${Math.abs(d)}`} title={title}>{glyph}</SeqButton>
+  );
+  return (
+    <div className={highlight ? 'a4-target' : undefined} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 6 }} title={title}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: SC.dim, letterSpacing: 0.4, minWidth: 64 }}>{label}</span>
+      {b(-8, '−8')}{b(-1, '−')}
+      <span role="status" aria-label={label} style={{ minWidth: 40, textAlign: 'center', fontSize: 16, fontWeight: 800, color: SC.text, fontFamily: 'ui-monospace, Menlo, monospace' }}>{Math.round(value)}</span>
+      {b(1, '+')}{b(8, '+8')}
+    </div>
+  );
+}
+
+const POLY_ALLOC_HINT = [
+  'RESET: each new note takes the first free voice, counting up from the track\'s own voice.',
+  'ROTATE: each new note takes the next voice in turn.',
+  'REASSIGN: a note takes the voice it had last time if that one is free, else the one rested longest.',
+  'UNISON: every pool voice plays the same note, detuned and spread by the two settings below.',
+];
+
+/**
+ * POLY CONFIG ([FUNC] + [MIX], KIT > POLY CONFIG): the voices in the pool, the allocation method,
+ * USE TRK SOUNDS and the unison settings (manual p.28-29). While it is open TRIG 1-4 tick the voices
+ * and light up while their voice plays, so you can watch the allocation as you play.
+ */
+function PolyMenu({ ctx }: { ctx: CustomRenderContext }) {
+  const act = String(ctx.engine.polyAct ?? '');
+  useEffect(() => {
+    ctx.sendEvent('a4:poly-watch', { on: true });
+    return () => ctx.sendEvent('a4:poly-watch', { on: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctx.instance]);
+  const on = [1, 2, 3, 4].map(n => !!ctx.values[`poly_v${n}`]);
+  const alloc = Math.round(num(ctx.values.poly_alloc));
+  const trk = !!ctx.values.poly_trk;
+  // a lesson step about a POLY CONFIG setting lights it (its control, or its focus list)
+  const lit = new Set<string>(ctx.teaching && ctx.step ? [ctx.step.control, ...(ctx.step.focus ?? []), ...(ctx.step.match?.controls ?? [])].filter((x): x is string => typeof x === 'string') : []);
+  const focusCtl = { has: (id: string) => lit.has(id) };
+  const polyTracks = on.map((v, i) => (v ? TRACK_NAMES[i] : null)).filter(Boolean).join(' ');
+  return (
+    <Overlay portal portalSize={{ w: 640, h: 540 }}>
+      <Frame title="POLY CONFIG" sub={polyTracks ? `poly tracks: ${polyTracks}` : 'every track plays its own voice'} onClose={() => ctx.setUi({ [UIK.menu]: null })}>
+        <Group label="VOICES">
+          {on.map((v, i) => (
+            <SeqButton key={i} height={44} minWidth={64} active={v} color={act[i] === '1' && v ? SC.white : SC.red} highlight={focusCtl.has(`poly_v${i + 1}`)}
+              onPress={() => ctx.setValue(`poly_v${i + 1}`, !v)} ariaLabel={`Voice ${i + 1} in the poly pool`} title={`TRIG ${i + 1} does the same`}>
+              {`${v ? '☑' : '☐'} ${i + 1}`}
+            </SeqButton>
+          ))}
+          <span style={{ fontSize: 11, color: SC.dim, flex: '1 1 200px' }}>Ticked voices form the pool. A track whose voice is ticked plays chords and overlapping notes on any pool voice; the others keep their own mono voice.</span>
+        </Group>
+        <div style={{ height: 6 }} />
+        <Group label="ALLOCATION">
+          {POLY_ALLOC.map((a, i) => (
+            <SeqButton key={a} height={44} minWidth={86} active={alloc === i} color={SC.green} highlight={focusCtl.has('poly_alloc')} onPress={() => ctx.setValue('poly_alloc', i)}>{a}</SeqButton>
+          ))}
+          <span style={{ fontSize: 11, color: SC.dim, flex: '1 1 260px' }}>{POLY_ALLOC_HINT[alloc] ?? ''}</span>
+        </Group>
+        <div style={{ height: 6 }} />
+        <Group label="USE TRK SOUNDS">
+          <SeqButton height={44} minWidth={64} active={trk} color={SC.green} highlight={focusCtl.has('poly_trk')} onPress={() => ctx.setValue('poly_trk', !trk)}>{trk ? '☑ ON' : '☐ OFF'}</SeqButton>
+          <span style={{ fontSize: 11, color: SC.dim, flex: '1 1 260px' }}>{trk ? 'Each voice keeps its own track\'s sound: a chord on T1 is spread over the pool\'s sounds.' : 'A voice plays the sound of the track whose note it plays.'}</span>
+        </Group>
+        <div style={{ height: 6 }} />
+        <Group label="UNISON">
+          <BigStep label="DETUNE" value={num(ctx.values.poly_det, 16)} min={0} max={127} onChange={v => ctx.setValue('poly_det', v)} highlight={focusCtl.has('poly_det')} title="UNISON DETUNE: how far apart the voices are tuned" />
+          <BigStep label="PAN SPREAD" value={num(ctx.values.poly_spr, 64)} min={0} max={127} onChange={v => ctx.setValue('poly_spr', v)} highlight={focusCtl.has('poly_spr')} title="UNISON PAN SPREAD: how wide the voices spread" />
+        </Group>
+        <div style={{ fontSize: 11, color: SC.dim, margin: '8px 2px 0' }}>
+          Play a few notes on the keyboard and watch TRIG 1-4: each lights while its voice plays. With no free voice, the one used least recently is taken. Hold a trig and press two or more keys to store a chord.
         </div>
       </Frame>
     </Overlay>
@@ -1814,6 +2402,7 @@ export function Menus({ ctx }: { ctx: CustomRenderContext }) {
       {m === 'swing' && <SwingMenu ctx={ctx} />}
       {m === 'pattern' && <PatternMenu ctx={ctx} />}
       {m === 'track' && <TrackMenu ctx={ctx} />}
+      {m === 'poly' && <PolyMenu ctx={ctx} />}
     </>
   );
 }
@@ -1864,7 +2453,7 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
   }, [playing, ctx]);
 
   // LIVE RECORDING: the engine reports played notes with their quantised step
-  const rec = ctx.engine.recNote as { id: number; track: number; note: number; vel: number; step: number; micro?: number; pattern: string } | undefined;
+  const rec = ctx.engine.recNote as { id: number; track: number; note: number; vel: number; step: number; micro?: number; pattern: string; add?: boolean } | undefined;
   const lastRec = useRef(0);
   useEffect(() => {
     if (!rec || rec.id === lastRec.current) return;
@@ -1872,8 +2461,173 @@ export function Helpers({ ctx }: { ctx: CustomRenderContext }) {
     const pr = project(ctx);
     const len = trackLength(getPattern(pr, rec.pattern), rec.track);
     const step = ((rec.step % len) + len) % len;
-    editTrigs(ctx, p => updateSteps(p, rec.pattern, rec.track, [step], { note: rec.note, trigless: null, micro: rec.micro ? rec.micro : null }, { create: 'note' }));
+    // POLY: a key played while another is held, on the same step, joins its chord
+    if (rec.add) editTrigs(ctx, p => addChordNote(p, rec.pattern, rec.track, step, rec.note));
+    else editTrigs(ctx, p => updateSteps(p, rec.pattern, rec.track, [step], { note: rec.note, trigless: null, micro: rec.micro ? rec.micro : null, chord: null }, { create: 'note' }));
   }, [rec, ctx]);
+
+  // LIVE RECORDING: a knob turned with no trig held becomes a lock on the step that plays, on the
+  // active track: a note trig takes the lock, an empty step gets a lock trig (manual p.50). NOT, VEL
+  // and LEN go into the note trigs the playhead passes (p.47). The engine sounds the value at once.
+  const liveRec = ctx.ui[UIK.liveRec] as { n: number; id: string; key: string; value: number; track: number } | undefined;
+  const lastLive = useRef(0);
+  useEffect(() => {
+    if (!liveRec || liveRec.n === lastLive.current) return;
+    lastLive.current = liveRec.n;
+    const st = seqStateOf(ctx.engine);
+    if (!ctx.values.live_rec || !st?.playing || !st.pattern) return;
+    const { track, key, value } = liveRec;
+    const step = st.steps[track] ?? -1;
+    if (step < 0) return;
+    const pattern = st.pattern;
+    if (key === 'note' || key === 'vel' || key === 'len') {
+      ctx.updateData(d => {
+        const p = asProject(d, TRACKS);
+        const cur = getPattern(p, pattern).tracks[track]?.steps[step];
+        return cur && !cur.trigless ? updateSteps(p, pattern, track, [step], { [key]: value }) : p;
+      });
+      return;
+    }
+    ctx.updateData(d => setLock(asProject(d, TRACKS), pattern, track, [step], key, value, { limit: LOCK_LIMIT_A4 }));
+    ctx.sendEvent('a4:live-lock', { track, key, value });
+  }, [liveRec, ctx]);
+
+  // LIVE RECORDING real-time erase: while the keys stay down, every step the playhead reaches on those
+  // tracks loses its locks ([FUNC] + [NO]; NOT / VEL / LEN stay), its trig ([TRACK] + [NO]) or one
+  // parameter's lock ([NO] + a knob) (manual p.41, p.47, p.50)
+  const erase = ctx.ui[UIK.erase] as EraseMode | null | undefined;
+  const seqNow = seqStateOf(ctx.engine);
+  const eraseAt = erase && ctx.values.live_rec && seqNow?.playing && seqNow.pattern
+    ? `${seqNow.pattern}|${erase.kind}|${erase.key ?? ''}|${erase.tracks.map(t => `${t}:${seqNow.steps[t] ?? -1}`).join(',')}`
+    : '';
+  useEffect(() => {
+    if (!eraseAt || !erase || !seqNow?.pattern) return;
+    const pattern = seqNow.pattern;
+    ctx.updateData(d => {
+      let p = asProject(d, TRACKS);
+      for (const t of erase.tracks) {
+        const step = seqNow.steps[t] ?? -1;
+        if (step < 0) continue;
+        if (erase.kind === 'trigs') p = setStepFn(p, pattern, t, step, null);
+        else if (erase.kind === 'locks') p = clearLocks(p, pattern, t, [step]);
+        else if (erase.key) p = setLock(p, pattern, t, [step], erase.key, null, { create: false });
+      }
+      return p;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eraseAt]);
+
+  // STEP RECORDING (manual p.41-42): each key played writes a note trig at the active step (its locks
+  // stay) and the active step moves on - one step (STANDARD) or the NOTE page's LEN (JUMP, which also
+  // locks that LEN on the trig). A key pressed while another is still down joins the chord the first one
+  // wrote (POLY tracks). With [YES] held the trig's LEN is how long the key was held.
+  const sr = ctx.ui[UIK.stepRec] as StepRec | null | undefined;
+  const heldNow = Array.isArray(ctx.ui[UI.heldSteps]) && (ctx.ui[UI.heldSteps] as number[]).length > 0;
+  // the engine reports the keys played while they can write something: STEP RECORDING or a held trig
+  const report = !!sr || heldNow;
+  useEffect(() => {
+    ctx.sendEvent('a4:kb-report', { on: report });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report]);
+  const kbNote = ctx.engine.kbNote as { id: number; track: number; note: number; held: number; src?: string } | undefined;
+  const kbOff = ctx.engine.kbOff as { id: number; track: number; note: number; held: number } | undefined;
+  const lastKb = useRef(0);
+  const lastKbOff = useRef(0);
+  const chordAt = useRef<{ track: number; step: number } | null>(null);
+  const pressedAt = useRef(new Map<number, { t: number; step: number; track: number; yes: boolean }>());
+  useEffect(() => {
+    if (!kbNote || kbNote.id === lastKb.current) return;
+    lastKb.current = kbNote.id;
+    const cur = stepRecOf(ctx);
+    if (!cur) {
+      // GRID RECORDING with a trig held: a computer-keyboard (or MIDI) key gives it its note, and keys
+      // held together make a chord on a poly track (the A4's own keys do this in MiniKeyboard)
+      const u = liveUi(ctx);
+      const steps = Array.isArray(u[UI.heldSteps]) ? (u[UI.heldSteps] as number[]) : [];
+      if (kbNote.src !== 'keys' || !steps.length || typeof u[UI.heldTrack] !== 'number' || u[UI.heldTrack] !== kbNote.track) return;
+      const pat = (u[UI.heldPattern] as string) ?? project(ctx).active;
+      const t = kbNote.track;
+      if (kbNote.held > 1 && isPolyTrack(ctx.values, t)) editTrigs(ctx, p => steps.reduce((q, st) => addChordNote(q, pat, t, st, kbNote.note), p));
+      else editTrigs(ctx, p => updateSteps(p, pat, t, steps, { note: kbNote.note, chord: null }, { create: 'note' }));
+      ctx.setUi({ [UI.heldEdited]: true });
+      say(ctx, `TRIG ${steps.map(x => x + 1).join(' ')}: ${kbNote.held > 1 && isPolyTrack(ctx.values, t) ? 'CHORD +' : 'NOTE'} ${formatNote(kbNote.note)}`, 1000);
+      return;
+    }
+    const pr = project(ctx);
+    const pat = viewPattern(ctx, pr);
+    const t = kbNote.track;
+    const tr = getPattern(pr, pat).tracks[t];
+    const len = trackLength(getPattern(pr, pat), t);
+    const ch = chordAt.current;
+    if (kbNote.held > 1 && ch && ch.track === t && isPolyTrack(ctx.values, t)) {
+      editTrigs(ctx, p => addChordNote(p, pat, t, ch.step, kbNote.note));
+      say(ctx, `STEP ${ch.step + 1}: CHORD + ${formatNote(kbNote.note)}`, 1000);
+      return;
+    }
+    const step = ((cur.step % len) + len) % len;
+    const nlen = tr?.len ?? LEN_1_STEP;
+    editTrigs(ctx, p => updateSteps(p, pat, t, [step], { note: kbNote.note, trigless: null, chord: null, ...(cur.jump ? { len: nlen } : {}) }, { create: 'note' }));
+    chordAt.current = { track: t, step };
+    const adv = cur.jump ? Math.max(1, Math.min(64, Math.round(Number.isFinite(lengthSteps(nlen)) ? lengthSteps(nlen) : 16))) : 1;
+    const next = (step + adv) % len;
+    ctx.setUi({ [UIK.stepRec]: { ...cur, step: next }, [UI.stepPage]: Math.floor(next / 16) });
+    pressedAt.current.set(kbNote.note, { t: performance.now(), step, track: t, yes: liveUi(ctx)[UIK.yesNo] === 'yes' });
+    say(ctx, `STEP ${step + 1}: ${formatNote(kbNote.note)} - NEXT ${next + 1}`, 900);
+  }, [kbNote, ctx]);
+  useEffect(() => {
+    if (!kbOff || kbOff.id === lastKbOff.current) return;
+    lastKbOff.current = kbOff.id;
+    if (kbOff.held === 0) chordAt.current = null;
+    const pa = pressedAt.current.get(kbOff.note);
+    pressedAt.current.delete(kbOff.note);
+    if (!pa?.yes || !stepRecOf(ctx)) return;
+    // [YES] held while the key went down: the trig lasts as long as the key was held (manual p.42)
+    const pr = project(ctx);
+    const pat = viewPattern(ctx, pr);
+    const bpm = seqStateOf(ctx.engine)?.bpm ?? num(ctx.values.tempo, 120);
+    const steps = (performance.now() - pa.t) / 1000 / stepSeconds(trackSpeed(getPattern(pr, pat), pa.track), bpm);
+    let best = 0;
+    for (let i = 1; i < NOTE_LENGTHS.length - 1; i++) if (Math.abs(NOTE_LENGTHS[i] - steps) < Math.abs(NOTE_LENGTHS[best] - steps)) best = i;
+    editTrigs(ctx, p => updateSteps(p, pat, pa.track, [pa.step], { len: best }));
+    say(ctx, `STEP ${pa.step + 1}: LEN ${formatLength(best)}`, 900);
+  }, [kbOff, ctx]);
+
+  // KITS (manual p.16, p.24, p.38). A pattern linked to another kit started: the engine switched the
+  // sound right there, and the knobs follow (the kit left behind keeps its edits). Picking a linked
+  // pattern while stopped loads its kit. An unlinked pattern you edit joins the loaded kit.
+  // (also when the panel mounts again after the A4 played on off screen)
+  const kitNow = ctx.engine.kitNow as { n: number; kit: string; values?: Record<string, ControlValue> } | undefined;
+  useEffect(() => {
+    if (!kitNow || projectKits(project(ctx)).active === kitNow.kit) return;
+    switchKit(ctx, kitNow.kit, { values: kitNow.values });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kitNow?.n]);
+  const prNow = project(ctx);
+  const activeKitLink = getPattern(prNow, prNow.active).kit;
+  useEffect(() => {
+    if (!activeKitLink || seqStateOf(ctx.engine)?.playing) return;
+    if (projectKits(project(ctx)).active !== activeKitLink) switchKit(ctx, activeKitLink);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prNow.active, activeKitLink]);
+  const editedPattern = prNow.patterns[prNow.active];
+  const lastEdited = useRef<{ id: string; pat: unknown }>({ id: prNow.active, pat: editedPattern });
+  useEffect(() => {
+    const prev = lastEdited.current;
+    lastEdited.current = { id: prNow.active, pat: editedPattern };
+    if (prev.id !== prNow.active || prev.pat === editedPattern || !editedPattern || editedPattern.kit) return;
+    const { active } = projectKits(prNow);
+    if (active) ctx.updateData(d => withPattern(asProject(d, TRACKS), prNow.active, x => (x.kit ? x : { ...x, kit: active })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prNow.active, editedPattern]);
+
+  // LIVE RECORDING over: the knobs show the kit's values again
+  const liveOn = !!ctx.values.live_rec;
+  useEffect(() => {
+    if (liveOn) return;
+    if (ctx.ui[UIK.liveKnob] || ctx.ui[UIK.erase] || ctx.ui[UIK.liveQuant]) ctx.setUi({ [UIK.liveKnob]: null, [UIK.erase]: null, [UIK.liveQuant]: false });
+    ctx.sendEvent('a4:live-quant', { on: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveOn]);
 
   // Shift on a computer keyboard works as FUNC
   useEffect(() => {
