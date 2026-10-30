@@ -229,10 +229,25 @@ A second pass built what this review listed as missing for making whole tracks, 
 - Every step has a solution. Every existing lesson id and check is unchanged.
 
 **Verification:**
-- Offline harness, POLY and kits: 22 checks. The manual's four allocation figures note for note; stealing with stale note-offs ignored; RESET from T2; chord trigs on three and four voices; T1's sound on the other voices; UNISON offsets; USE TRK SOUNDS; knob turns reaching every voice that holds the sound; a mono track beside a poly pool; PLY; POLY off again; kit switches at the pattern start (FX too) and back.
-- Browser checks on the production build: 30 checks (POLY CONFIG, chord entry, live-recorded locks and erase, step recording with a chord, page and trig copy / undo, TRANSPOSABLE, kits through a chain), plus iPad screenshots and text and touch-target sizes of every new menu.
+- Offline harness, POLY and kits: 23 checks. The manual's four allocation figures note for note; stealing with stale note-offs ignored; RESET from T2; chord trigs on three and four voices; T1's sound on the other voices; UNISON offsets; USE TRK SOUNDS; knob turns reaching every voice that holds the sound; a mono track beside a poly pool; PLY; POLY off again; kit switches at the pattern start (FX too) and back, the kit left behind keeping its unsaved edit.
+- Browser checks on the production build: 32 checks (POLY CONFIG, chord entry, live-recorded locks and erase, step recording with a chord, page and trig copy / undo, TRANSPOSABLE, kits through a chain), plus iPad screenshots and text and touch-target sizes of every new menu.
 
-GATE_TABLE
+**Gate on the final build:**
+
+| Check | Result |
+|---|---|
+| `tsc`, `npm run lint` | clean |
+| `npm run validate` | 0 errors. The eight new warnings are the POLY CONFIG controls, which only the POLY CONFIG menu edits |
+| `npm run test:seq` | 237 pass |
+| Worklet null test (lockstep, old against new processors) | 163 of 163 renders bit-identical at every tap |
+| Engine message streams, features off | 163 of 163 identical to the base engine |
+| smoke | 0 errors |
+| Lesson runner | 22 lessons, 0 failed, 0 manual |
+| Audio QA, audition | median -19.0 LUFS, spread 7.4 LU, 0 of 47 flagged |
+| Audio QA, transport | median -19.0 LUFS, spread 7.6 LU, 0 of 47 flagged. One earlier run flagged a single click in Dub Chords (one spike at 0.32 s). Four alternating repeats on this build and on the base build were clean, and the rerun was too |
+| e2e | 47 of 47 |
+| A4 browser checks | 32 of 32 |
+| `/bench`, POLY off | 17.7x realtime against the base build's 17.9x (mean of 12 alternating runs each: -0.8 %) |
 
 **Upgrade notes** (for `lib/studio/upgrades.ts`):
 - `t1..t4_arp_mod`: max 6 → 7 (PLY added at 7) → no conversion: every saved value keeps its meaning.
