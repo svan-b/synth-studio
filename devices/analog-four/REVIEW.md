@@ -243,11 +243,13 @@ A second pass built what this review listed as missing for making whole tracks, 
 | Engine message streams, features off | 163 of 163 identical to the base engine |
 | smoke | 0 errors |
 | Lesson runner | 22 lessons, 0 failed, 0 manual |
-| Audio QA, audition | median -19.0 LUFS, spread 7.4 LU, 0 of 47 flagged |
-| Audio QA, transport | median -19.0 LUFS, spread 7.6 LU, 0 of 47 flagged. One earlier run flagged a single click in Dub Chords (one spike at 0.32 s). Four alternating repeats on this build and on the base build were clean, and the rerun was too |
-| e2e | 47 of 47 |
+| Audio QA, audition | median -18.8 LUFS, spread 7.4 LU, 0 of 47 flagged |
+| Audio QA, transport | median -19.1 LUFS, spread 7.7 LU, 0 of 47 flagged |
+| e2e | 48 of 48 |
 | A4 browser checks | 32 of 32 |
 | `/bench`, POLY off | 17.7x realtime against the base build's 17.9x (mean of 12 alternating runs each: -0.8 %) |
+
+Arp Garden and Dub Chords sometimes get one click flag in a run (one sharp note onset among other sound, just over the threshold). The base build does the same: in nine alternating runs of the first six presets, the base build was flagged twice and this branch once. A rerun is clean.
 
 **Upgrade notes** (for `lib/studio/upgrades.ts`):
 - `t1..t4_arp_mod`: max 6 → 7 (PLY added at 7) → no conversion: every saved value keeps its meaning.
