@@ -14,7 +14,7 @@
 
 import type { ControlSpec, DeviceSpec, KnobSpec } from '@/types';
 import {
-  FX_PAGES, FX_TRACK, FX_TRACK_LEVEL, MACHINES, PAGES, PARAM_INDEX, RETRIG_MENU, TRACKS, TRACK_EXTRA, TRACK_OPTIONS, TRACK_PAGES, TRIG_COND, TRIG_PAGE,
+  EUC_PAGE, FX_PAGES, FX_TRACK, FX_TRACK_LEVEL, MACHINES, PAGES, PARAM_INDEX, RETRIG_MENU, TRACKS, TRACK_EXTRA, TRACK_OPTIONS, TRACK_PAGES, TRIG_COND, TRIG_PAGE,
   formatMachineParam, formatPage, machineParamDefault, trackParamKeys, type PageParam,
 } from './model';
 import { KIT_PRESETS } from './presets';
@@ -29,6 +29,7 @@ const REF = {
   lfo: 'Rytm MKII manual pp.79-80: LFO page',
   fx: 'Rytm MKII manual pp.81-84: Appendix B, FX track',
   retrig: 'Rytm MKII manual p.41: RETRIG menu',
+  euc: 'Rytm MKII manual p.44: TRIG menu page 2, the Euclidean sequencer',
 };
 
 const knob = (label: string, description: string, ref: string, min: number, max: number, def: number, extra: Partial<KnobSpec> = {}): KnobSpec => ({
@@ -74,6 +75,9 @@ function buildControls(): Record<string, ControlSpec> {
   add('fx_trk_lev', pageKnob('FX', FX_TRACK_LEVEL, 'Rytm MKII manual p.36: FX track level'));
   add('fx_trig_prob', pageKnob('FX', TRIG_PAGE[3], REF.trig), false);
   add('fx_trig_cond', pageKnob('FX', TRIG_COND, REF.trc), false);
+
+  // TRIG page 2, the Euclidean sequencer: the active track's settings in the pattern (index.ts), not part of a kit
+  for (const p of EUC_PAGE) c[p.key] = pageKnob('EUCLID', p, REF.euc);
 
   // Globals (project settings, not part of a kit)
   c.bpm = knob('TEMPO', 'Project tempo in BPM ([TEMPO]). Synced to the studio, the studio clock sets it.', 'Manual: TEMPO menu', 30, 300, 124, {

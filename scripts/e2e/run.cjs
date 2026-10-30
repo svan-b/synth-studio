@@ -117,6 +117,10 @@ const so = run(path.join(__dirname, 'outputs.cjs'), [base, path.join(outDir, 'ou
 check('separate outputs: a channel of its own that routes, mutes, shows in the mixer and goes when off', !so.__error && so.ok && (so.errs ?? []).length === 0,
   so.__error ?? { on: so.on && { strip: so.on.strip, rms: so.on.rms }, ui: so.ui, mute: so.mute, off: so.off && { strip: so.off.strip } });
 
+const sr = run(path.join(__dirname, 'outputs-rytm.cjs'), [base]);
+check('separate outputs: the Rytm\'s BD TRACK OUT takes the kick to its own channel and back', !sr.__error && sr.ok && (sr.errs ?? []).length === 0,
+  sr.__error ?? { before: sr.before, mainWithBdOut: sr.mainWith, bd: sr.bd, after: sr.after });
+
 // ---- Producer path on iPad ---------------------------------------------------
 const pp = run(path.join(__dirname, 'producer.cjs'), [base, path.join(outDir, 'producer')], 600_000);
 check('producer path: iPad walkthrough of a whole-studio lesson', !pp.__error && pp.total > 0 && (pp.failed ?? []).length === 0 && (pp.errs ?? []).length === 0,

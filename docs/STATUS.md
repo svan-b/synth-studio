@@ -120,6 +120,17 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Each output becomes its own channel `<instance>/<id>`: fader, pan, sends, mute, solo, meter, route, stem and a map arrow. Arranger mutes follow the instrument.
   - Checked with a stand-in output (`scripts/e2e/outputs.cjs`; e2e 47/47).
   - The Rytm's eight TRACK OUTs and the A4's four stereo track outputs come after their feature branches merge. Each will act as "cable in the TRACK OUT, route-to-main off" (manuals: Rytm ROUTE TO MAIN, A4 VOICE ROUTING).
+- **Rytm separate outputs**: the eight TRACK OUTs (BD, SD, RS/CP, BT, LT, MT/HT, CH/OH, CY/CB) in the mixer's Outs menu.
+  - A voice with its own output plays there (mono, after its level) and leaves the main mix and the master effects; its delay and reverb sends stay.
+  - Its channel starts at the Rytm's fader and route, so turning it on changes nothing until you move it.
+  - The main output is bit-identical with no output on (21/21). `outputs-rytm.cjs` checks that the kick leaves the main channel and comes back. e2e 48/48.
+- c3f2f9e: merged the **Rytm full-track features**.
+  - Live recording of parameter locks (pp.40-41), and the sound pool and sound locks (p.48).
+  - The Euclidean sequencer (p.44), chromatic play from keys and studio MIDI (pp.19, 22-23), and step recording.
+  - User samples: WAV or AIFF from the file picker, stored in IndexedDB, falling back to the built-in one-shot when missing.
+  - Two new lessons; `scripts/test-rytm.ts` has 47 checks. With the features off the output is bit-identical (21/21), and CPU is unchanged.
+  - Gate: lessons 22, 0 failed, 0 manual; QA 0/20 in both modes; e2e 47/47; touch monkey test 578 actions, 0 errors.
+  - Known gap: user samples don't travel in exported project files yet.
 - Panel fidelity, Moog toggles. A new opt-in `legends: 'ends'` on the shared switch puts the first position above the lever and the last below, as Moog prints them.
   - 3223ae2: on the Mother-32 (p.9).
   - 819f38c: on the DFAM (p.7), including the three-way SEQ PITCH MOD with OFF beside.
@@ -164,7 +175,6 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 ## 2. In progress
 
 - `wip/a4-tracks`: Analog Four POLY and chords, live knob-lock recording, step recording, trig and page copy, TRANSPOSABLE and kit per pattern.
-- `wip/rytm-tracks`: Rytm live lock recording, the sound pool and sound locks, the Euclidean sequencer, chromatic mode, step recording and user samples.
 
 Earlier work: nothing else in progress. All 22 `wip/*` branches on GitHub are fully merged into the working branch (checked with `git merge-base --is-ancestor`), so they can be deleted once the user agrees:
 `analog-four`, `analog-rytm`, `demo-excerpts`, `demo-tracks`, `dfam-review`, `elektron-sequencer`, `mother32`, `panel-teaching`, `perf-analog-four`, `perf-shared-fx`, `producer-path`, `producer-path-2`, `review-analog-four`, `review-analog-rytm`, `review-mother32`, `review-sub37`, `review-subharmonicon`, `review-xone96`, `studio`, `sub37`, `subharmonicon`, `xone96`.

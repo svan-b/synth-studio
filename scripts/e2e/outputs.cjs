@@ -80,7 +80,7 @@ const fs = require('fs');
     r.ui = await page.evaluate(() => {
       const mixer = document.querySelector('section[aria-label="Mixer"]');
       const text = mixer ? mixer.innerText : '';
-      return { strip: /Sub 37 · TEST/.test(text), outs: !!mixer && [...mixer.querySelectorAll('summary')].some(s => /^Outs/.test(s.innerText.trim())) };
+      return { strip: !!mixer?.querySelector('[aria-label="Sub 37 · TEST channel"]') && /TEST/.test(text), outs: !!mixer && [...mixer.querySelectorAll('summary')].some(s => /^Outs/.test(s.innerText.trim())) };
     });
     if (outDir) {
       await page.locator('section[aria-label="Mixer"]').scrollIntoViewIfNeeded().catch(() => undefined);
