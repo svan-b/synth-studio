@@ -185,7 +185,20 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 - Smoke test fix: buttons that a paged panel removed are skipped after 1 s; the Rytm smoke went from 498 s to 34 s (the app was never slow, at 67–125 ms per press).
 ## 2. In progress
 
-Nothing. With the user's approval (2026-10-30), all 24 `wip/*` branches were deleted from GitHub after each was confirmed fully merged into the working branch (`git merge-base --is-ancestor`). Their work lives on in this branch's history.
+No branch work is in progress. All 24 `wip/*` branches are fully merged into the working branch, checked with `git merge-base --is-ancestor`, so their work lives on in this branch's history.
+
+The user approved deleting them, but the session's GitHub proxy refused the delete with a 403, so the owner deletes them:
+
+```sh
+git push origin --delete $(git ls-remote --heads origin 'wip/*' | awk '{print $2}' | sed 's#refs/heads/##')
+```
+
+**Next up, in order:**
+1. **A4 TRACK 1-4 separate outputs** (`devices/analog-four/engine.ts`, `params.ts`, `index.ts`). Follow the Rytm's pattern.
+   - The first attempt was reverted. It disconnected each voice's dry path from the FX node and fed it through a gain at the MAIN VOLUME law.
+   - Its test, `outputs-device.cjs <base> analog-four <TRACK 1 output id>`, gave these RMS levels: main before 0.0498, main with the output on 0.0493, out channel 0, main after 0.033.
+   - The main output barely dropped and the out channel stayed silent, so the reroute never took effect. Check which node the voice really leaves through before anything else.
+2. **Intermittent A4 click flags in audio QA** (Arp Garden, Bubble Cycle, Metallic AM). Each is clean in most re-runs, so it is likely a voice-steal or envelope-retrigger edge case.
 
 `vercel.json` no longer builds previews for `wip/*` branches. `git.deploymentEnabled` turns them off, and an `ignoreCommand` cancels any that start anyway. The working branch and `main` build as before.
 
@@ -240,5 +253,5 @@ The full report is `docs/research/safari-audit/report.md`. On iPad, test over HT
    - Allen & Heath: Xone:96 guide, block diagram, spec sheet.
    - Moog: Sub 37 / Subsequent 37 manuals and preset lists; Mother-32, Subharmonicon (+ Patching with Intention, Exploration Patchbook), DFAM (+ Electronicus).
    - Extract them outside the repo.
-2. Check out the working branch. For each branch in section 2: finish it on its branch, run the gate, and merge.
+2. Check out the working branch and start from "Next up" in section 2. `CLAUDE.md` has the rules and the test commands.
 3. Follow `docs/research/COPYRIGHT-RULES.md` for anything drawn from the manuals.
