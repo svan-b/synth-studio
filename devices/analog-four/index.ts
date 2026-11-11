@@ -12,7 +12,7 @@ import { ANALOG_FOUR } from './spec';
 import { ANALOG_FOUR_LAYOUT } from './layout';
 import { ANALOG_FOUR_LESSONS } from './lessons';
 import { AnalogFourEngine } from './engine';
-import { CV_BY_KEY, FX_BY_KEY, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS } from './params';
+import { CV_BY_KEY, FX_BY_KEY, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS, TRACK_OUTS } from './params';
 import { ARP_KEYS, isArpKey, patternArp, setPatternArp, type ArpSettings } from './arp';
 import { KIT_BY_ID } from './kits';
 
@@ -139,6 +139,8 @@ const analogFour: DeviceModule = {
     midiSync: true,
     stereo: true,
     patterns: data => arrangerPatterns(data, SEQ_TRACKS),
+    // the four TRACK outputs: each voice on a stereo mixer channel of its own
+    outputs: TRACK_OUTS,
   },
   // A preview plays the selected pattern (a riff on the keyboard's track when it is empty) and ends
   // like [STOP][STOP]: the sound is cut and the send effects fade (engine.ts startAudition)

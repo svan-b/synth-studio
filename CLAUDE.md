@@ -39,7 +39,7 @@ Then run only the checks that apply:
 - **Audio QA for one device:** `node scripts/audio-qa.cjs http://localhost:3100 <device> --target -18`. It must exit 0. See `docs/AUDIO_QA.md`.
 - **Separate outputs:**
   - `node scripts/e2e/outputs.cjs http://localhost:3100` (the studio side)
-  - `node scripts/e2e/outputs-device.cjs http://localhost:3100 [device] [outputId]` (a real instrument's output; the default is the Rytm's BD)
+  - `node scripts/e2e/outputs-device.cjs http://localhost:3100 [device] [outputId] [pattern]` (a real instrument's output; the default is the Rytm's BD. For the A4 use `analog-four t1 A02`: the pattern holds the groove, since the demo song's intro has no TRACK 1)
 - **Sequencer:** `npm run test:seq`.
 
 Devices: `dfam`, `mother32`, `subharmonicon`, `sub37`, `analog-four`, `analog-rytm`, `xone96`.
@@ -52,3 +52,4 @@ On iPad, test over HTTPS on the Vercel preview. Plain `http://` has no AudioWork
 - The Rytm is the reference implementation:
   - `devices/analog-rytm/engine.ts`
   - `public/worklets/analog-rytm-processors.js`, which carries a per-voice `indiv` flag
+- The A4 does it in the graph: `connectOutput` in `devices/analog-four/engine.ts` moves a voice's dry output from `a4-fx` to a gain feeding the studio channel

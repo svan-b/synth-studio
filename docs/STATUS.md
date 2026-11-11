@@ -125,7 +125,13 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Two new lessons. With the new features off the output is bit-identical (163/163).
   - Gate: A4 lessons 22, 0 failed, 0 manual; Rytm lessons still 22, 0 failed; sequencer tests 237; e2e 49/49 for the checks that apply; touch monkey test 536 actions, 0 errors.
   - Audio QA flags 1 of 47 in each mode (Arp Garden, Bubble Cycle), the intermittent onset detection the agent also saw on the base build. A follow-up task was suggested to investigate.
-  - **Not done:** the A4's TRACK 1-4 outputs as separate outputs. A first attempt carried almost no signal in the test, so it was backed out (next step).
+  - The A4's TRACK 1-4 outputs came after, in their own change (below).
+- **A4 TRACK 1-4 separate outputs** (`t1`-`t4` in the mixer's Outs menu).
+  - A voice with its output on plays there in stereo, after its level and pan, and leaves the main mix and the output stage; its chorus, delay and reverb sends stay (VOICE ROUTING TO MAIN off, TO FX on, p.29).
+  - The outputs sit at the main output's level for the default MAIN VOLUME, so turning one on keeps the balance. MAIN VOLUME does not reach them.
+  - No output on: the audio graph is as before, so the main output is unchanged.
+  - Why the first attempt looked broken: the reroute was right, but the demo song opens on an intro where TRACK 1 is silent, and its sections change level between the test's windows. `outputs-device.cjs` now takes a pattern to hold (PATTERN mode), and the A4 check holds the groove, A02.
+  - Gate: e2e 50/50 (both instrument output checks); A4 lessons 22, 0 failed, 0 manual; A4 audio QA exit 0 (Arp Garden's intermittent click flag showed once, then 0 of 47 on a re-run).
 - **Project files carry user samples.** An instrument can declare `assets` (`has`, `collect`, `restore`); project files embed them as mono 16-bit PCM, base64.
   - Opening a project restores them before the studio loads.
   - The Rytm's user samples now travel to another browser or the iPad Home Screen app, which keeps its own storage.
@@ -194,11 +200,7 @@ git push origin --delete $(git ls-remote --heads origin 'wip/*' | awk '{print $2
 ```
 
 **Next up, in order:**
-1. **A4 TRACK 1-4 separate outputs** (`devices/analog-four/engine.ts`, `params.ts`, `index.ts`). Follow the Rytm's pattern.
-   - The first attempt was reverted. It disconnected each voice's dry path from the FX node and fed it through a gain at the MAIN VOLUME law.
-   - Its test, `outputs-device.cjs <base> analog-four <TRACK 1 output id>`, gave these RMS levels: main before 0.0498, main with the output on 0.0493, out channel 0, main after 0.033.
-   - The main output barely dropped and the out channel stayed silent, so the reroute never took effect. Check which node the voice really leaves through before anything else.
-2. **Intermittent A4 click flags in audio QA** (Arp Garden, Bubble Cycle, Metallic AM). Each is clean in most re-runs, so it is likely a voice-steal or envelope-retrigger edge case.
+1. **Intermittent A4 click flags in audio QA** (Arp Garden, Bubble Cycle, Metallic AM). Each is clean in most re-runs, so it is likely a voice-steal or envelope-retrigger edge case.
 
 `vercel.json` no longer builds previews for `wip/*` branches. `git.deploymentEnabled` turns them off, and an `ignoreCommand` cancels any that start anyway. The working branch and `main` build as before.
 
@@ -234,7 +236,6 @@ Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Su
 ## 4. Follow-ups (owner: integrator)
 
 - **Shared controls**: a cap variant in `components/controls/Knob.tsx` (the A4 restyles its caps with a scoped stylesheet).
-- **Full-track gaps on the A4**: POLY, a kit per pattern, separate track outputs, live recording of knob moves, TRANSPOSABLE, and trig/page/sound copy.
 - StudioView: hide "Output" for Your synth when it has no audio. `hub.push()` should apply data before values.
 - Optional "Hardware synth" studio set (Your synth + Audio input + Xone:96).
 - **To confirm on real hardware** (each review lists its own; the main ones):

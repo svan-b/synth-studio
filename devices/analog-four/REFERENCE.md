@@ -206,7 +206,7 @@ loads its own; every kit and preset here has every voice mono.
 | TRIG 1-4 | While POLY CONFIG is open they tick the voices: half-bright = mono, full-bright = in the pool; they light white while their voice plays | (A4 MKII manual, p.29) |
 | PLY arpeggio | ARP MOD PLY plays the whole chord on every arpeggio step, an octave up each step until RNG (like THR with a single note); on a mono track it plays the chord's first note | (A4 MKII manual, p.43) |
 | Live play | Keys on a poly track each take a voice; PORTAMENTO glides each voice from its own last pitch | (A4 MKII manual, p.35-36) |
-| Not modelled | VOICE ROUTING (voice to main / to FX) | (A4 MKII manual, p.29) |
+| TRACK 1-4 outputs | The studio's separate outputs (the mixer's Outs menu): voice k plays on a stereo channel of its own, after its level and pan, and leaves the main mix and the output stage, like VOICE ROUTING TO MAIN off; its chorus, delay and reverb sends stay (TO FX on). The outputs sit at the main output's level for the default MAIN VOLUME, which does not reach them. The kit's VOICE ROUTING switches themselves are not modelled | (A4 MKII manual, p.14, p.29) |
 
 ## Sequencer
 
@@ -245,7 +245,7 @@ The shared Elektron sequencer (`lib/sequencer/elektron`, see
 - **Modulation destinations**: continuous parameters only (55 synth, 22 FX); discrete targets such as waveforms are left out.
 - **Sends** are taken after the VCA in mono; the manual's diagram does not show where they sit relative to PAN (A4 MKII manual, p.110).
 - **Menus** are overlays rather than OLED pages; MIDI, the +Drive, projects and the Click Track are the studio's job. [SONG] opens the song editor directly (on the hardware it opens the SONG menu, whose EDIT is the same as [FUNC] + [SONG MODE], p.57).
-- **Also absent:** VELOCITY TO VOL curves and the pitch bend, mod wheel, breath and aftertouch routings (p.35-36; velocity always shapes the level), the Control In macros (p.25-26), trig preview ([TRIG] + [YES], p.40), trig shift and destructive transpose ([FUNC] + LEFT/RIGHT, [TRACK] + UP/DOWN, p.40, p.54), the copy / paste / clear menus of LOAD KIT, SAVE KIT and PERFORMANCE SETUP (p.26), the delay WID as a pan placement (the twin spreads the echo by a time offset; X 1 always swings fully, p.95), and the VOICE ROUTING to-main / to-FX switches (p.29).
+- **Also absent:** VELOCITY TO VOL curves and the pitch bend, mod wheel, breath and aftertouch routings (p.35-36; velocity always shapes the level), the Control In macros (p.25-26), trig preview ([TRIG] + [YES], p.40), trig shift and destructive transpose ([FUNC] + LEFT/RIGHT, [TRACK] + UP/DOWN, p.40, p.54), the copy / paste / clear menus of LOAD KIT, SAVE KIT and PERFORMANCE SETUP (p.26), the delay WID as a pan placement (the twin spreads the echo by a time offset; X 1 always swings fully, p.95), and the VOICE ROUTING to-main / to-FX switches (p.29; the studio's separate outputs stand in for TO MAIN).
 
 ## The twin's own curves (not in the manual)
 

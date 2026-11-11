@@ -1,15 +1,17 @@
 // ============================================================================
 // An instrument's hardware outputs as studio separate outputs:
-//   node scripts/e2e/outputs-device.cjs <baseUrl> [device] [output]     (default: analog-rytm bd)
+//   node scripts/e2e/outputs-device.cjs <baseUrl> [device] [output] [pattern]   (default: analog-rytm bd)
 // With its demo pattern playing, turning the output on puts that part on a channel of its own
 // ('<device>/<output>') and takes it out of the instrument's main channel; turning it off
 // brings it back. The new channel starts at the instrument's fader and route. Levels are RMS at
-// the channels' outputs over a few bars.
+// the channels' outputs over a few bars. [pattern] holds an Elektron instrument on that one
+// pattern (PATTERN mode), so a demo song's sections don't change the level between measurements
+// (the A4's song opens on an intro its TRACK 1 sits out).
 // ============================================================================
 const { chromium } = require('playwright');
 
 (async () => {
-  const [, , base = 'http://localhost:3100', device = 'analog-rytm', output = 'bd'] = process.argv;
+  const [, , base = 'http://localhost:3100', device = 'analog-rytm', output = 'bd', hold = ''] = process.argv;
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
   const errs = [];
@@ -27,7 +29,7 @@ const { chromium } = require('playwright');
     await page.waitForTimeout(800);
     await page.getByRole('button', { name: /tap for sound/i }).click().catch(() => page.mouse.click(4, 4));
     await page.waitForFunction(d => { const S = window.__synthStudio; return S && S.hub.status === 'on' && !!S.hub.getStripOutput(d); }, device, { timeout: 30000 });
-    r = await page.evaluate(async ([device, output]) => {
+    r = await page.evaluate(async ([device, output, hold]) => {
       const ch = `${device}/${output}`;
       const S = window.__synthStudio;
       const ctx = S.audio.getAudioContext();
@@ -45,6 +47,11 @@ const { chromium } = require('playwright');
       const wait = ms => new Promise(res => setTimeout(res, ms));
       // a fader that isn't at 0 dB: the new output channel must start at it
       S.store.getState().setChannel(device, { gain: -6 });
+      if (hold) {
+        if (!S.store.getState().devices[device]?.data?.patterns?.[hold]) return { error: `no pattern ${hold}` };
+        S.store.getState().updateDeviceData(device, d => ({ ...d, mode: 'pattern', active: hold }));
+        await wait(300);
+      }
       S.hub.startAll({ countIn: false });
       await wait(1500);
       const before = await rms(S.hub.getStripOutput(device), 3000);
@@ -59,7 +66,7 @@ const { chromium } = require('playwright');
       const after = await rms(S.hub.getStripOutput(device), 3000);
       S.hub.stopAll();
       return { before, mainWith, bd, after, strip: !!bdOut, gone: !S.hub.getStripOutput(ch), inherit };
-    }, [device, output]);
+    }, [device, output, hold]);
   } catch (e) {
     errs.push('test: ' + String(e).split('\n')[0]);
   }

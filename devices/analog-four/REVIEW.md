@@ -258,7 +258,7 @@ Arp Garden and Dub Chords sometimes get one click flag in a run (one sharp note 
 - New optional data, so older saves load as they are: `Step.chord`, `Pattern.kit` (now used: a slot of the project's `a4kits`), the project's `a4kits` / `a4kit`, and the pattern's `a4trns`.
 
 **Still missing**, with the reason for each:
-- VOICE ROUTING (voice to main / to FX, M p.29): it matters once separate track outputs come, which the integrator adds after this merges.
+- VOICE ROUTING (voice to main / to FX, M p.29): the separate TRACK 1-4 outputs are now in (the studio's Outs menu), and turning one on acts as TO MAIN off with TO FX on. The kit's own switches are still not modelled.
 - Sound locks, the Euclidean NOTE page, KEY SCALE / KEY NOTE, [PAGE] + [TRIG] page playback, and trig shift / destructive transpose: these are sequencer extras with no musical gap left by the work above.
 - LIVE RECORDING takes note lengths from the NOTE page's LEN, not from the keys. The manual does not say whether it records them.
 - VELOCITY TO VOL and the MIDI controller routings (M p.35-36) need MIDI-velocity input, which the A4's own keyboard does not have.

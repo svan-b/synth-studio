@@ -10,6 +10,8 @@
 //   a4-fxmod (FX track params, FX LFOs, locks) ─► split ─► chorus / reverb params, a4-fx params
 //                                                         fdn-reverb ◄──┘ ─► revRet ─► stage
 //   stage: the analog output stage (a soft rail above 0 dBFS); main: MAIN VOLUME
+//   TRACK 1-4 outputs (studio separate outputs, connectOutput): a voice in use there sends its
+//           dry out0 through its own gain to the studio channel instead of a4-fx; its sends stay
 //
 // Worklet nodes: 4 voices + a4-fxmod + chorus + fdn-reverb + a4-fx = 8 (the
 // previous version used 36 plus about 120 native nodes). Native: 2 splitters,
@@ -49,7 +51,7 @@ import {
 } from '@/lib/sequencer/elektron';
 import {
   ARP_PLY, CV_TRACK, FX_BY_KEY, FX_DESTS, FX_KEYS, FX_TRACK, MOD_DESTS, PERF_MACROS, POLY_UNISON, SEQ_TRACKS, SYNTH_BY_KEY,
-  SYNTH_TRACKS, VOICE_KEYS, tid,
+  SYNTH_TRACKS, TRACK_OUTS, VOICE_KEYS, tid,
 } from './params';
 import { ARP_KEYS, isArpKey, isTransposable, patternArp, type ArpKey } from './arp';
 import { KIT_CONTROLS, kitFull, kitSnapshot, projectKits, type KitSlot } from './kits';
@@ -110,6 +112,10 @@ function voiceOptions() {
  * Drawn over +-3 (the shaper's input is scaled by 1/3 and its output by 3).
  */
 const STAGE_SPAN = 3;
+/** MAIN VOLUME (0-127) to the main output's gain */
+const mainVolumeGain = (v: number) => Math.pow(v / 127, 2) * 1.1;
+/** The TRACK outputs sit at the main output's level for the default MAIN VOLUME (connectOutput) */
+const TRACK_OUT_GAIN = mainVolumeGain(100);
 function outputStageCurve(): Float32Array<ArrayBuffer> {
   const n = 4097;
   const c = new Float32Array(new ArrayBuffer(n * 4));
@@ -160,6 +166,8 @@ export class AnalogFourEngine extends BaseEngine {
   private chorus!: AudioWorkletNode;
   private reverb!: AudioWorkletNode;
   private main!: GainNode;
+  /** TRACK 1-4 outputs in use: the gain each voice's dry signal leaves through (null: in the main mix) */
+  private trackOut: (GainNode | null)[] = [null, null, null, null];
   private seq!: ElektronSequencer;
   private lastSynth = 0;
   private locks = new LockTracker(SEQ_TRACKS);
@@ -358,8 +366,38 @@ export class AnalogFourEngine extends BaseEngine {
       if (this.arpTimer) clearInterval(this.arpTimer);
       if (this.watchTimer) clearInterval(this.watchTimer);
       [...this.voices, this.fxmod, this.fx, this.chorus, this.reverb].forEach(n => { try { n.disconnect(); n.port.close(); } catch { /* */ } });
+      this.trackOut.forEach(g => { try { g?.disconnect(); } catch { /* */ } });
     });
     this.emit({ playing: false, seq: this.seq.getState(), kbTrack: this.lastSynth });
+  }
+
+  /**
+   * A TRACK output in the studio (DeviceModule.studio.outputs): the voice's dry signal, after its
+   * level and pan, plays there and leaves the main mix and the output stage; its chorus, delay
+   * and reverb sends stay (VOICE ROUTING, manual p.29). Null puts it back in the main mix. The
+   * outputs sit at the main output's default level, so turning one on keeps the balance; MAIN
+   * VOLUME does not reach them.
+   */
+  connectOutput(id: string, destination: AudioNode | null) {
+    const k = TRACK_OUTS.findIndex(o => o.id === id);
+    const v = this.voices[k];
+    if (k < 0 || !v) return;
+    const prev = this.trackOut[k];
+    if (prev) {
+      try { v.disconnect(prev); } catch { /* already gone */ }
+      try { prev.disconnect(); } catch { /* already gone */ }
+      this.trackOut[k] = null;
+    } else if (destination) {
+      v.disconnect(this.fx, 0, 2);
+    }
+    if (destination) {
+      const g = this.ctx.createGain();
+      g.gain.value = TRACK_OUT_GAIN;
+      v.connect(g, 0).connect(destination);
+      this.trackOut[k] = g;
+    } else if (prev) {
+      v.connect(this.fx, 0, 2);
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -450,8 +488,7 @@ export class AnalogFourEngine extends BaseEngine {
         if (!this.transport) this.sendTempo();
         break;
       case 'main_volume': {
-        const g = Math.pow(v / 127, 2) * 1.1;
-        this.main.gain.setTargetAtTime(g, this.ctx.currentTime, 0.015);
+        this.main.gain.setTargetAtTime(mainVolumeGain(v), this.ctx.currentTime, 0.015);
         break;
       }
       case 'play':

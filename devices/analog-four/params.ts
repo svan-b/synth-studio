@@ -26,6 +26,12 @@ export const CV_TRACK = 5;
 /** Sequencer tracks: T1-T4, FX, CV */
 export const SEQ_TRACKS = 6;
 export const TRACK_NAMES = ['T1', 'T2', 'T3', 'T4', 'FX', 'CV'] as const;
+/**
+ * The four stereo TRACK outputs on the back panel (manual p.14), one per voice, as studio
+ * separate outputs. With one in use its voice leaves the main mix (VOICE ROUTING TO MAIN off,
+ * p.29) and keeps its effect sends (TO FX on).
+ */
+export const TRACK_OUTS = [1, 2, 3, 4].map(n => ({ id: `t${n}`, label: `TRACK ${n}`, stereo: true }));
 export type TrackKind = 'synth' | 'fx' | 'cv';
 export const trackKind = (t: number): TrackKind => (t === FX_TRACK ? 'fx' : t === CV_TRACK ? 'cv' : 'synth');
 
