@@ -39,6 +39,8 @@ export interface FlowOptions {
   metronome?: boolean;
   /** Extra seconds of input delay to subtract, per source, from calibration. */
   latency?: Partial<Record<NoteSource, number>>;
+  /** Judge timing only and accept any key. Used for rhythm work. */
+  anyPitch?: boolean;
 }
 
 export type FlowEvent =
@@ -84,10 +86,15 @@ export interface FlowResult {
   seconds: number;
   /** A pass with no hints and almost no errors. */
   clean: boolean;
+  /** Average strike strength of the right notes, 0 to 1, or null when the input cannot tell. */
+  velocity: number | null;
 }
 
 /** Typical delay between an action and the app hearing about it. */
 const DEFAULT_LATENCY: Record<NoteSource, number> = { touch: 0.045, midi: 0.008, mic: 0.07, keys: 0.02 };
+
+/** The session now running, for development tools and tests. */
+export const activeFlow: { current: FlowSession | null } = { current: null };
 
 export class FlowSession {
   readonly events = new Emitter<FlowEvent>();
@@ -120,6 +127,8 @@ export class FlowSession {
   private wrong = 0;
   private hinted = 0;
   private measureErrors = new Map<number, number>();
+  private velocitySum = 0;
+  private velocityCount = 0;
   private readonly notes: NoteEvent[];
   private readonly pitches: Set<number>;
 
@@ -136,6 +145,7 @@ export class FlowSession {
       hintAfterWrong: opts.hintAfterWrong ?? 2,
       accompany: opts.accompany ?? false,
       metronome: opts.metronome ?? true,
+      anyPitch: opts.anyPitch ?? false,
       latency: { ...DEFAULT_LATENCY, ...(opts.latency ?? {}) },
     };
     this.steps = stepsFor(score, this.options.hands);
@@ -151,6 +161,7 @@ export class FlowSession {
     if (this.phase !== 'ready') return;
     this.unsub = noteBus.subscribe((ev) => this.onInput(ev));
     this.startedAt = piano.now();
+    activeFlow.current = this;
     if (this.steps.length === 0) {
       this.finish();
       return;
@@ -166,7 +177,18 @@ export class FlowSession {
     this.setPhase('stopped');
   }
 
+  /** Audio time at which a note is due, in tempo mode. */
+  targetTime(note: NoteEvent): number {
+    return this.transport.timeOfBeat(note.start);
+  }
+
+  /** Seconds of delay assumed for an input source. */
+  latencyFor(source: NoteSource): number {
+    return this.options.latency[source];
+  }
+
   private cleanup(): void {
+    if (activeFlow.current === this) activeFlow.current = null;
     this.unsub?.();
     this.unsub = null;
     this.transport.stop();
@@ -187,9 +209,16 @@ export class FlowSession {
   private onInput(ev: NoteInput): void {
     if (ev.type !== 'on' || this.phase !== 'playing') return;
     // The top and bottom keys are buttons for the app, unless the music uses them.
-    if (ev.source === 'midi' && input.remoteKeys && isRemoteKey(ev.midi) && !this.pitches.has(ev.midi)) return;
+    if (ev.source === 'midi' && input.remoteKeys && isRemoteKey(ev.midi) && !this.pitches.has(ev.midi) && !this.options.anyPitch) return;
     if (this.options.mode === 'wait') this.waitInput(ev);
     else this.tempoInput(ev);
+  }
+
+  private noteVelocity(ev: NoteInput): void {
+    // A microphone hears loudness only roughly, so it is left out.
+    if (ev.source === 'mic') return;
+    this.velocitySum += ev.velocity;
+    this.velocityCount++;
   }
 
   private addMeasureError(measure: number): void {
@@ -231,9 +260,10 @@ export class FlowSession {
 
   private waitInput(ev: NoteInput): void {
     const step = this.steps[this.stepIndex];
-    const match = step.notes.find((n) => this.pending.has(n.id) && n.midi === ev.midi);
+    const match = step.notes.find((n) => this.pending.has(n.id) && (n.midi === ev.midi || this.options.anyPitch));
     if (match) {
       this.pending.delete(match.id);
+      this.noteVelocity(ev);
       const rescued = this.stepWrong > 0 || (this.stepHinted && this.options.hintDelayMs > 0);
       if (!rescued) this.firstTry++;
       this.events.emit({ type: 'note', id: match.id, state: rescued ? 'warn' : 'ok', midi: match.midi });
@@ -377,7 +407,7 @@ export class FlowSession {
     let best: NoteEvent | null = null;
     let bestErr = Infinity;
     for (const n of this.notes) {
-      if (n.midi !== ev.midi || this.matched.has(n.id) || this.missed.has(n.id)) continue;
+      if ((n.midi !== ev.midi && !this.options.anyPitch) || this.matched.has(n.id) || this.missed.has(n.id)) continue;
       const err = t - this.transport.timeOfBeat(n.start);
       if (Math.abs(err) <= this.matchWindow && Math.abs(err) < Math.abs(bestErr)) {
         best = n;
@@ -385,6 +415,7 @@ export class FlowSession {
       }
     }
     if (best) {
+      this.noteVelocity(ev);
       this.matched.set(best.id, bestErr);
       const onTime = Math.abs(bestErr) <= this.onTimeWindow;
       this.events.emit({ type: 'note', id: best.id, state: onTime ? 'ok' : 'warn', midi: best.midi });
@@ -495,6 +526,7 @@ export class FlowSession {
         perMeasure,
         seconds,
         clean: this.wrong === 0 && this.hinted === 0,
+        velocity: this.velocityCount > 0 ? this.velocitySum / this.velocityCount : null,
       };
     }
 
@@ -523,6 +555,7 @@ export class FlowSession {
       perMeasure,
       seconds,
       clean: accuracy >= 0.95 && this.missed.size === 0,
+      velocity: this.velocityCount > 0 ? this.velocitySum / this.velocityCount : null,
     };
   }
 }

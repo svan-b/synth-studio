@@ -69,6 +69,8 @@ export type Step =
       names?: boolean;
       /** Accept any key, for rhythm work. */
       anyKey?: boolean;
+      /** Ask for a soft or a loud touch, checked when the piano reports how hard keys are struck. */
+      touch?: 'soft' | 'loud';
       why?: string;
     }
   | { kind: 'echo'; text: string; motifs: string[]; key?: string; hand?: Hand; why?: string }
@@ -85,8 +87,8 @@ export interface Lesson {
   steps: Step[];
   /** Review cards this lesson adds to the daily rotation. */
   cards?: string[];
-  /** Piece this lesson introduces, which then joins the practice rotation. */
-  piece?: string;
+  /** Pieces this lesson introduces, which then join the practice rotation. */
+  pieces?: string[];
 }
 
 export interface Stage {

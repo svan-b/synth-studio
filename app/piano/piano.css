@@ -142,7 +142,7 @@ html:has(.mc-root[data-theme='dark']) body {
 }
 
 .mc-key.is-down.mc-key-w {
-  background: rgb(var(--mc-accent) / 0.22);
+  background: color-mix(in srgb, rgb(var(--mc-accent)) 30%, rgb(var(--mc-key-white)));
   box-shadow: inset 0 -2px 0 rgb(var(--mc-key-white-edge));
   transform: translateY(1px);
 }
@@ -153,20 +153,20 @@ html:has(.mc-root[data-theme='dark']) body {
 }
 
 .mc-key.mark-target.mc-key-w {
-  background: rgb(var(--mc-hint) / 0.3);
+  background: color-mix(in srgb, rgb(var(--mc-hint)) 38%, rgb(var(--mc-key-white)));
 }
 .mc-key.mark-target.mc-key-b {
   background: rgb(var(--mc-hint));
 }
 .mc-key.mark-scale.mc-key-w {
-  background: rgb(var(--mc-accent) / 0.1);
+  background: color-mix(in srgb, rgb(var(--mc-accent)) 24%, rgb(var(--mc-key-white)));
 }
 .mc-key.mark-scale.mc-key-b {
-  background: rgb(var(--mc-accent) / 0.75);
+  background: color-mix(in srgb, rgb(var(--mc-accent)) 80%, rgb(var(--mc-key-black)));
 }
 .mc-key.mark-ok.mc-key-w,
 .mc-key.flash-ok.mc-key-w {
-  background: rgb(var(--mc-ok) / 0.38);
+  background: color-mix(in srgb, rgb(var(--mc-ok)) 45%, rgb(var(--mc-key-white)));
 }
 .mc-key.mark-ok.mc-key-b,
 .mc-key.flash-ok.mc-key-b {
@@ -174,7 +174,7 @@ html:has(.mc-root[data-theme='dark']) body {
 }
 .mc-key.mark-bad.mc-key-w,
 .mc-key.flash-bad.mc-key-w {
-  background: rgb(var(--mc-bad) / 0.4);
+  background: color-mix(in srgb, rgb(var(--mc-bad)) 45%, rgb(var(--mc-key-white)));
 }
 .mc-key.mark-bad.mc-key-b,
 .mc-key.flash-bad.mc-key-b {
@@ -361,4 +361,93 @@ html:has(.mc-root[data-theme='dark']) body {
   background: rgb(var(--mc-surface));
   border: 1.5px solid rgb(var(--mc-ink) / 0.5);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+}
+
+/* ---------------------------------------------------------------- Contour */
+
+.mc-contour-note rect {
+  fill: rgb(var(--mc-accent) / 0.16);
+  stroke: rgb(var(--mc-accent) / 0.55);
+  stroke-width: 2;
+  transition:
+    fill 120ms,
+    stroke 120ms;
+}
+.mc-contour-note text {
+  fill: rgb(var(--mc-ink));
+  font-weight: 700;
+  font-family: -apple-system, system-ui, sans-serif;
+}
+.mc-contour-left rect {
+  fill: rgb(var(--mc-hint) / 0.16);
+  stroke: rgb(var(--mc-hint) / 0.6);
+}
+.mc-contour-now rect {
+  fill: rgb(var(--mc-accent) / 0.4);
+  stroke: rgb(var(--mc-accent));
+  stroke-width: 4;
+}
+.mc-contour-ok rect {
+  fill: rgb(var(--mc-ok) / 0.35);
+  stroke: rgb(var(--mc-ok));
+}
+.mc-contour-warn rect {
+  fill: rgb(var(--mc-hint) / 0.4);
+  stroke: rgb(var(--mc-hint));
+}
+.mc-contour-bad rect {
+  fill: rgb(var(--mc-bad) / 0.3);
+  stroke: rgb(var(--mc-bad));
+}
+
+/* ---------------------------------------------------------------- Beat */
+
+.mc-beat-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgb(var(--mc-line));
+  transition:
+    background-color 60ms,
+    transform 60ms;
+}
+.mc-beat-dot.is-on {
+  background: rgb(var(--mc-accent));
+  transform: scale(1.5);
+}
+.mc-beat-dot.is-accent.is-on {
+  background: rgb(var(--mc-ink));
+}
+
+@keyframes mc-count {
+  0% {
+    transform: scale(1.35);
+    opacity: 0.2;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.mc-count {
+  animation: mc-count 260ms ease-out both;
+}
+
+.mc-keys-mini .mc-key-label {
+  display: none;
+}
+/* On the small mirror keyboard, a dot marks middle C. */
+.mc-keys-mini [data-midi='60']::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: rgb(var(--mc-accent));
 }

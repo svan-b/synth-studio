@@ -12,6 +12,7 @@
  *   E4q~         tied to the next note of the same pitch
  *   G4et         eighth note triplet member
  *   C4q:1        fingering (one digit per chord note, low to high)
+ *   D5h.:5~      fingering and a tie, in either order
  *
  * Durations: w whole, h half, q quarter, e eighth, s sixteenth.
  * One beat is always one quarter note.
@@ -110,7 +111,7 @@ export interface Score {
   measureOffset: number;
 }
 
-const TOKEN_RE = /^(r|[A-G](?:##|#|bb|b|n)?-?\d(?:\+[A-G](?:##|#|bb|b|n)?-?\d)*)([whqes])(\.{0,2})(t?)(~?)(?::([1-5]+))?$/;
+const TOKEN_RE = /^(r|[A-G](?:##|#|bb|b|n)?-?\d(?:\+[A-G](?:##|#|bb|b|n)?-?\d)*)([whqes])(\.{0,2})(t?)(~?)(?::([1-5]+))?(~?)$/;
 
 const EPS = 1e-6;
 
@@ -147,7 +148,7 @@ function parseToken(tok: string, where: string): RawEvent {
       throw new Error(`Fingering count does not match notes in "${tok}" ${where}`);
     }
   }
-  return { kind: 'note', pitches, sym, dots, triplet, beats, tie: m[5] === '~', fingers };
+  return { kind: 'note', pitches, sym, dots, triplet, beats, tie: m[5] === '~' || m[7] === '~', fingers };
 }
 
 function parseHand(

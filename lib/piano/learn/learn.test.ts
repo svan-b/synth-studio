@@ -25,6 +25,7 @@ function result(patch: Partial<FlowResult> = {}): FlowResult {
     perMeasure: [],
     seconds: 10,
     clean: true,
+    velocity: null,
     ...patch,
   };
 }
