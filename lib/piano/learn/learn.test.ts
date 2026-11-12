@@ -210,3 +210,87 @@ describe('streak', () => {
     expect(streak({ '2026-03-01': d(20) }, '2026-03-01')).toBe(0);
   });
 });
+
+import { earExercise, rhythmExercise, sightExercise, EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS } from './generators';
+import { currentPiece, introducedPieces, planSession, readsStaff } from './planner';
+import { parseScore, scoreRange } from '../music/score';
+import { lessonOrder } from '../content/catalog';
+
+describe('generated exercises', () => {
+  it('always produce music that parses, at every level', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      for (let level = 1; level <= RHYTHM_LEVELS; level++) {
+        const m = rhythmExercise(level, seed);
+        const s = parseScore(m);
+        expect(s.measureCount, `rhythm level ${level} seed ${seed}`).toBe(4);
+      }
+      for (let level = 1; level <= EAR_LEVELS; level++) {
+        for (const hand of ['R', 'L'] as const) {
+          const s = parseScore(earExercise(level, seed, hand));
+          expect(s.notes[0].midi % 12, 'ear patterns start on C').toBe(0);
+          const r = scoreRange(s);
+          expect(r.high - r.low).toBeLessThanOrEqual(7);
+        }
+      }
+      for (let level = 1; level <= SIGHT_LEVELS; level++) {
+        const m = sightExercise(level, seed);
+        const s = parseScore(m);
+        expect(s.measureCount, `sight level ${level} seed ${seed}`).toBe(4);
+        const melody = s.notes.filter((n) => n.hand === (m.rh ? 'R' : 'L'));
+        const r = { low: Math.min(...melody.map((n) => n.midi)), high: Math.max(...melody.map((n) => n.midi)) };
+        expect(r.high - r.low, 'stays in one hand position').toBeLessThanOrEqual(7);
+        expect(melody[0].finger).toBeDefined();
+      }
+    }
+  });
+
+  it('is repeatable for a seed and varies between seeds', () => {
+    expect(sightExercise(2, 5)).toEqual(sightExercise(2, 5));
+    const distinct = new Set(Array.from({ length: 20 }, (_, i) => sightExercise(2, i + 1).rh));
+    expect(distinct.size).toBeGreaterThan(12);
+  });
+
+  it('gets harder with level', () => {
+    const easy = Array.from({ length: 30 }, (_, i) => rhythmExercise(1, i + 1).rh!).join(' ');
+    const hard = Array.from({ length: 30 }, (_, i) => rhythmExercise(5, i + 1).rh!).join(' ');
+    expect(/B4e/.test(easy)).toBe(false);
+    expect(/B4e/.test(hard)).toBe(true);
+  });
+});
+
+describe('daily plan', () => {
+  const order = lessonOrder();
+  const doneUpTo = (n: number) => Object.fromEntries(order.slice(0, n).map((id) => [id, { done: true, step: 0 }]));
+
+  it('starts a brand new learner with the first lesson', () => {
+    const plan = planSession({ minutes: 20, lessons: {}, pieces: {}, cards: {}, now: new Date('2026-03-02T09:00:00') });
+    expect(plan[0]).toMatchObject({ kind: 'lesson', id: order[0] });
+    expect(plan.some((b) => b.kind === 'piece')).toBe(false);
+  });
+
+  it('adds piece work once a lesson has introduced a piece', () => {
+    const lessons = doneUpTo(2);
+    expect(introducedPieces(lessons)).toEqual(['hot-cross-buns']);
+    expect(currentPiece(lessons, {})).toBe('hot-cross-buns');
+    const plan = planSession({ minutes: 20, lessons, pieces: {}, cards: {}, now: new Date('2026-03-02T09:00:00') });
+    expect(plan.map((b) => b.kind)).toEqual(['lesson', 'piece', 'drill']);
+    expect(plan[0]).toMatchObject({ id: order[2] });
+  });
+
+  it('opens with note reading when notes are due, and fits the time', () => {
+    const lessons = doneUpTo(8);
+    const cards = { 'read:T:60': newCard(new Date('2026-03-01T09:00:00')) };
+    const plan = planSession({ minutes: 10, lessons, pieces: {}, cards, now: new Date('2026-03-02T09:00:00') });
+    expect(plan[0]).toMatchObject({ kind: 'drill', id: 'reading' });
+    expect(plan.reduce((a, b) => a + b.minutes, 0)).toBeLessThanOrEqual(16);
+    expect(readsStaff(lessons)).toBe(true);
+  });
+
+  it('holds back new lessons when many pieces are unfinished', () => {
+    const lessons = doneUpTo(6);
+    expect(introducedPieces(lessons).length).toBeGreaterThanOrEqual(4);
+    const plan = planSession({ minutes: 30, lessons, pieces: {}, cards: {}, now: new Date('2026-03-02T09:00:00') });
+    expect(plan.some((b) => b.kind === 'lesson')).toBe(false);
+    expect(plan.some((b) => b.kind === 'piece')).toBe(true);
+  });
+});
