@@ -1,0 +1,55 @@
+/* SynthPanel: focus-mode dimming, jack rings, the "show me" ghost cable, jack focus.
+   Every animation stops under prefers-reduced-motion. */
+
+.dimmable {
+  transition: opacity 220ms ease, filter 220ms ease;
+}
+
+.ring {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 9999px;
+}
+.ringTarget {
+  box-shadow: 0 0 0 2.5px rgba(249, 115, 22, 0.95), 0 0 12px 3px rgba(249, 115, 22, 0.5);
+}
+.ringFocus {
+  box-shadow: 0 0 0 1.5px rgba(253, 230, 138, 0.85), 0 0 8px 1px rgba(253, 230, 138, 0.3);
+}
+
+.ghostCable {
+  stroke-dasharray: 12 8;
+  opacity: 0.9;
+}
+
+/* Jack hit targets are invisible; show a ring when reached by keyboard */
+.jackHit {
+  outline: none;
+}
+.jackHit:focus-visible {
+  box-shadow: 0 0 0 2px #7dd3fc;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ringTarget {
+    animation: ringBreathe 1.8s ease-in-out infinite;
+  }
+  .ghostCable {
+    animation: ghostFlow 0.9s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dimmable {
+    transition: none;
+  }
+}
+
+@keyframes ringBreathe {
+  0%, 100% { box-shadow: 0 0 0 2.5px rgba(249, 115, 22, 0.95), 0 0 8px 2px rgba(249, 115, 22, 0.55); }
+  50% { box-shadow: 0 0 0 2.5px rgba(249, 115, 22, 0.95), 0 0 20px 7px rgba(249, 115, 22, 0.18); }
+}
+
+@keyframes ghostFlow {
+  to { stroke-dashoffset: -40; }
+}

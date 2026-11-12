@@ -1,0 +1,1 @@
+{"id":"moog-mother-32","manufacturer":"Moog","device":"Mother-32","source":"https://github.com/pencilresearch/midi/blob/main/Moog/Mother-32.csv","params":[{"name":"Assign1","cc":1},{"name":"Assign2","cc":2},{"name":"Assign3","cc":4},{"name":"Assign4","cc":7},{"name":"Portamento Time","cc":5},{"name":"Portamento","cc":65},{"name":"Sustain","cc":64}],"suggested":[4,5,6]}
