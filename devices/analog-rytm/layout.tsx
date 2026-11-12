@@ -29,8 +29,9 @@ import { slotLabel } from './pool';
 import { euclidOn } from './euclid';
 import type { RytmProject } from './presets';
 
+// The faceplate from above, in mm: 385 x 224 (the drawing of the manual's p.10; the unit is 385 x 225 mm, p.76)
 const W = 385;
-const H = 193;
+const H = 224;
 const PX = 3.2;
 
 const num = (v: unknown, d = 0) => (typeof v === 'number' ? v : typeof v === 'boolean' ? (v ? 1 : 0) : d);
@@ -40,8 +41,10 @@ const TRACK_NAMES = [...TRACKS.map(t => t.name), 'FX'];
 // Key placement: centre (x, y) and cap size; the box adds room for the labels below
 // ----------------------------------------------------------------------------
 
-const SMALL = { w: 11.8, h: 10.4 };
-const BIG = { w: 16.4, h: 16.4 };
+// Cap sizes as drawn: 12 mm square keys, wider ones for [QPER], [TRK], [RTRG] and [PAGE], 18 mm for [FUNC] and the transport
+const SMALL = { w: 12, h: 12 };
+const WIDE = { w: 18.2, h: 12 };
+const BIG = { w: 18.2, h: 18.2 };
 const LABEL_ROOM = 7;
 
 function key(x: number, y: number, size: { w: number; h: number }, render: (ctx: CustomRenderContext) => ReactNode, big = false): CustomElement {
@@ -97,8 +100,8 @@ const MODE_KEYS: [string, string, string, number][] = [
   // label, secondary (FUNC), menu, pad mode
   ['PLAY', 'Kit', 'kit', 0], ['MUTE', 'Sound', 'sound', 1], ['CHRO', 'Track', 'track', 2], ['SCNE', 'Pattern', 'pattern', 3], ['PERF', 'Song', 'song', 4],
 ];
-const MODE_X = [54.6, 72.6, 90.3, 108.3, 126.0];
-const ROW2 = 38.7;
+const MODE_X = [53.3, 72.0, 90.2, 108.3, 127.0];
+const ROW2 = 54.3;
 
 function modeFunc(ctx: CustomRenderContext, menu: string) {
   if (menu === 'pattern') ctx.setUi({ seqMenu: 'pattern', rytmMenu: null });
@@ -157,10 +160,10 @@ const PARAM_KEYS: [string, string | undefined, string | undefined][] = [
   // label, FX-track page name, FUNC function
   ['TRIG', undefined, 'Quantize'], ['SRC', 'Delay', 'Assign'], ['SMPL', 'Reverb', 'Samples'], ['FLTR', 'Dist', 'Settings'], ['AMP', 'Comp', undefined], ['LFO', 'LFO', undefined],
 ];
-const PARAM_X = [275.0, 290.9, 306.7, 322.6, 338.5, 354.2];
-const ROW_PARAM = 79.6;
+const PARAM_X = [279.5, 295.8, 312.5, 328.8, 345.1, 361.3];
+const ROW_PARAM = 96.8;
 
-const BANK_X = [186.5, 209.5, 232.5, 255.4];
+const BANK_X = [192.3, 213.5, 235.1, 256.5];
 const BANK_SUB = ['', '', '', '', 'Trig Mute', 'Accent', 'Swing', 'Slide'];
 const MODE_LED_NAMES = ['Sequential', 'Direct Start', 'Direct Jump', 'Temp Jump'];
 
@@ -249,8 +252,8 @@ function arrowUp(ctx: CustomRenderContext) {
 function keys(): PanelElement[] {
   const out: PanelElement[] = [];
   // --- Top row: SAMPLING, QPER ------------------------------------------------
-  out.push(key(55.0, 17.1, SMALL, ctx => <Key ctx={ctx} id="key:sampling" label={I.sampling} title="SAMPLING" sub="Direct" funcSub onDown={() => flash(ctx, 'SAMPLING IS NOT MODELLED. [FUNC] + [SMPL] LOADS A WAV OR AIFF OF YOURS INTO A SAMPLE SLOT')} />));
-  out.push(key(90.7, 17.1, SMALL, ctx => {
+  out.push(key(53.3, 32.3, SMALL, ctx => <Key ctx={ctx} id="key:sampling" label={I.sampling} title="SAMPLING" sub="Direct" funcSub onDown={() => flash(ctx, 'SAMPLING IS NOT MODELLED. [FUNC] + [SMPL] LOADS A WAV OR AIFF OF YOURS INTO A SAMPLE SLOT')} />));
+  out.push(key(89.9, 32.3, WIDE, ctx => {
     const muted = !!ctx.engine.perfMuted;
     const choosing = !!ctx.ui.qperHeld || !!ctx.ui.qperLatch;
     return <Key ctx={ctx} id="key:qper" label="QPER" sub="Mute" funcSub lit={choosing ? 1 : muted ? 0 : 0.45} blink={!!ctx.ui.qperLatch} ledColor={RY.green}
@@ -272,7 +275,7 @@ function keys(): PanelElement[] {
       }} />;
   }));
   // --- Mode row ------------------------------------------------------------------
-  out.push(key(26.2, ROW2, SMALL, ctx => <Key ctx={ctx} id="key:global" label={I.gear} title="GLOBAL SETTINGS" sub="Save Project" funcSub onDown={() => press(ctx, () => flash(ctx, 'GLOBAL SETTINGS ARE NOT MODELLED'), () => flash(ctx, 'THE PROJECT SAVES AUTOMATICALLY'))} />));
+  out.push(key(24.2, ROW2, SMALL, ctx => <Key ctx={ctx} id="key:global" label={I.gear} title="GLOBAL SETTINGS" sub="Save Project" funcSub onDown={() => press(ctx, () => flash(ctx, 'GLOBAL SETTINGS ARE NOT MODELLED'), () => flash(ctx, 'THE PROJECT SAVES AUTOMATICALLY'))} />));
   MODE_KEYS.forEach(([label, sub, menu, mode], i) => out.push(key(MODE_X[i], ROW2, SMALL, ctx => (
     <Key ctx={ctx} id={`key:${mode === 0 ? 'playmode' : label.toLowerCase()}`} label={label} sub={sub} funcSub
       lit={Math.round(num(ctx.values.pad_mode)) === mode ? 1 : (mode === 1 && (projectOf(ctx).mutes ?? []).length > 0) || (mode === 3 && num(ctx.engine.scene, -1) >= 0) ? 0.35 : 0}
@@ -280,9 +283,9 @@ function keys(): PanelElement[] {
       ledColor={mode === 0 ? RY.green : RY.led} control="pad_mode" value={mode}
       onDown={() => modeDown(ctx, mode, menu)} onUp={() => modeUp(ctx, mode)} />
   ))));
-  out.push(key(144.0, ROW2, SMALL, ctx => <Key ctx={ctx} id="key:fix" label={<span style={{ fontStyle: 'italic', fontWeight: 900, letterSpacing: -0.5 }}>FIX</span>} sub="Setup" funcSub
+  out.push(key(145.2, ROW2, SMALL, ctx => <Key ctx={ctx} id="key:fix" label={<span style={{ fontStyle: 'italic', fontWeight: 900, letterSpacing: -0.5 }}>FIX</span>} sub="Setup" funcSub
     lit={num(ctx.values.fix) > 0} control="fix" onDown={() => press(ctx, () => ctx.setValue('fix', num(ctx.values.fix) > 0 ? 0 : 1), () => openMenu(ctx, 'fix'))} />));
-  out.push(key(161.9, ROW2, SMALL, ctx => <Key ctx={ctx} id="key:tempo" label={I.tempo} sub="Tap Tempo" funcSub
+  out.push(key(163.3, ROW2, SMALL, ctx => <Key ctx={ctx} id="key:tempo" label={I.tempo} sub="Tap Tempo" funcSub
     onDown={() => press(ctx, () => openMenu(ctx, 'tempo'), () => {
       const now = performance.now();
       const taps = ([...((ctx.ui.taps as number[] | undefined) ?? []).filter(t => now - t < 2500), now]).slice(-5);
@@ -294,17 +297,17 @@ function keys(): PanelElement[] {
       } else flash(ctx, 'TAP TEMPO: KEEP TAPPING [FUNC] + [TEMPO]');
     })} />));
   // --- Left column -----------------------------------------------------------------
-  out.push(key(26.6, 74.2, BIG, ctx => <Key ctx={ctx} id="key:func" big label="FUNC" lit={funcOn(ctx) ? 1 : 0} ledColor={RY.blue}
+  out.push(key(24.2, 91.1, BIG, ctx => <Key ctx={ctx} id="key:func" big label="FUNC" lit={funcOn(ctx) ? 1 : 0} ledColor={RY.blue}
     onDown={() => ctx.setUi({ func: true, funcUsed: false })}
     onUp={() => { applyMutePreselect(ctx); ctx.setUi(ctx.ui.funcUsed ? { func: false } : { func: false, funcLatch: !ctx.ui.funcLatch }); }}
     capStyle={{ fontSize: 'var(--rytm-func-font, 11px)' }} title="Hold (or tap) FUNC, then press a key for its second function" />, true));
-  out.push(key(26.6, 111.3, SMALL, ctx => <Key ctx={ctx} id="key:trk" label="TRK" sub="Save Kit" funcSub lit={!!ctx.ui.trkHeld || !!ctx.ui.trkLatch}
+  out.push(key(24.2, 128.9, WIDE, ctx => <Key ctx={ctx} id="key:trk" label="TRK" sub="Save Kit" funcSub lit={!!ctx.ui.trkHeld || !!ctx.ui.trkLatch}
     onDown={() => press(ctx, () => {
       if (doublePress(ctx, 'trkTap')) { ctx.setUi({ trkHeld: false, trkLatch: false }); openMenu(ctx, 'sound'); return; }
       ctx.setUi({ trkHeld: true, trkAt: Date.now() });
     }, () => saveKit(ctx))}
     onUp={() => { if (!ctx.ui.trkHeld) return; const tap = Date.now() - num(ctx.ui.trkAt) < 350; ctx.setUi({ trkHeld: false, trkLatch: tap ? !ctx.ui.trkLatch : false }); }} />));
-  out.push(key(26.6, 145.0, SMALL, ctx => <Key ctx={ctx} id="key:rtrg" label="RTRG" sub="Metronome" funcSub lit={!!ctx.ui.rtrgHeld || !!ctx.ui.rtrgLatch} ledColor={RY.amber}
+  out.push(key(24.2, 163.8, WIDE, ctx => <Key ctx={ctx} id="key:rtrg" label="RTRG" sub="Metronome" funcSub lit={!!ctx.ui.rtrgHeld || !!ctx.ui.rtrgLatch} ledColor={RY.amber}
     onDown={() => press(ctx, () => ctx.setUi({ rtrgHeld: true, rtrgAt: Date.now(), rytmMenu: 'retrig' }), () => flash(ctx, 'THE CLICK TRACK (METRONOME) IS NOT MODELLED'))}
     onUp={() => {
       if (!ctx.ui.rtrgHeld) return;
@@ -316,10 +319,10 @@ function keys(): PanelElement[] {
     }} />));
   // --- YES / NO / arrows ------------------------------------------------------------
   // [YES] / [NO]: confirm / back; held with a mode key they save / reload (with a mouse: [FUNC] + [YES] = KIT menu, [FUNC] + [NO] = reload kit)
-  out.push(key(197.2, 79.6, SMALL, ctx => <Key ctx={ctx} id="key:yes" label="YES" sub="Save" lit={!!ctx.ui.yesHeld}
+  out.push(key(199.7, 96.8, SMALL, ctx => <Key ctx={ctx} id="key:yes" label="YES" sub="Save" lit={!!ctx.ui.yesHeld}
     onDown={() => press(ctx, () => ctx.setUi({ yesHeld: true, yesNoUsed: false }), () => openMenu(ctx, 'kit'))}
     onUp={() => { if (!ctx.ui.yesHeld) return; const used = !!ctx.ui.yesNoUsed; ctx.setUi({ yesHeld: false }); if (!used) closeAll(ctx); }} />));
-  out.push(key(197.2, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:no" label="NO" sub="Reload" lit={!!ctx.ui.noHeld}
+  out.push(key(199.7, 114.5, SMALL, ctx => <Key ctx={ctx} id="key:no" label="NO" sub="Reload" lit={!!ctx.ui.noHeld}
     onDown={() => {
       // LIVE RECORDING: [FUNC] + [NO] held erases the active track's parameter locks on every step reached (manual p.47)
       if (liveRecording(ctx) && funcOn(ctx)) {
@@ -338,10 +341,10 @@ function keys(): PanelElement[] {
       ctx.setUi({ noHeld: false, liveEraseAll: false, liveEraseKey: null, liveEraseTracks: [] });
       if (!used) closeAll(ctx);
     }} />));
-  out.push(key(228.8, 79.6, SMALL, ctx => <Key ctx={ctx} id="key:up" label={I.up} sub="Retrig +" onDown={() => arrow(ctx, 'up')} />));
-  out.push(key(213.1, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:left" label={I.left} sub="µTime -" onDown={() => arrow(ctx, 'left')} onUp={() => arrowUp(ctx)} />));
-  out.push(key(228.8, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:down" label={I.down} sub="Retrig -" onDown={() => arrow(ctx, 'down')} />));
-  out.push(key(244.8, 97.2, SMALL, ctx => <Key ctx={ctx} id="key:right" label={I.right} sub="µTime +" onDown={() => arrow(ctx, 'right')} onUp={() => arrowUp(ctx)} />));
+  out.push(key(232.7, 96.8, SMALL, ctx => <Key ctx={ctx} id="key:up" label={I.up} sub="Retrig +" onDown={() => arrow(ctx, 'up')} />));
+  out.push(key(216.2, 114.5, SMALL, ctx => <Key ctx={ctx} id="key:left" label={I.left} sub="µTime -" onDown={() => arrow(ctx, 'left')} onUp={() => arrowUp(ctx)} />));
+  out.push(key(232.7, 114.5, SMALL, ctx => <Key ctx={ctx} id="key:down" label={I.down} sub="Retrig -" onDown={() => arrow(ctx, 'down')} />));
+  out.push(key(248.9, 114.5, SMALL, ctx => <Key ctx={ctx} id="key:right" label={I.right} sub="µTime +" onDown={() => arrow(ctx, 'right')} onUp={() => arrowUp(ctx)} />));
   // --- PARAMETER keys ------------------------------------------------------------------
   PARAM_KEYS.forEach(([label, fx, func], i) => out.push(key(PARAM_X[i], ROW_PARAM, SMALL, ctx => (
     <Key ctx={ctx} id={`key:${label.toLowerCase()}`} label={label} sub={func} sub2={fx} funcSub lit={Math.round(num(ctx.values.page, 1)) === i} control="page" value={i}
@@ -363,13 +366,13 @@ function keys(): PanelElement[] {
         } : undefined);
       }} />
   ))));
-  out.push(key(353.8, 103.2, SMALL, ctx => <Key ctx={ctx} id="key:fx" label="FX" sub="MIDI Config" funcSub lit={Math.round(num(ctx.values.track)) === FX_TRACK} control="track" value={FX_TRACK} ledColor={RY.amber}
+  out.push(key(361.3, 120.8, SMALL, ctx => <Key ctx={ctx} id="key:fx" label="FX" sub="MIDI Config" funcSub lit={Math.round(num(ctx.values.track)) === FX_TRACK} control="track" value={FX_TRACK} ledColor={RY.amber}
     onDown={() => {
       if (ctx.ui.noHeld) { ctx.setUi({ yesNoUsed: true }); fxReload(ctx); return; }
       if (ctx.ui.qperHeld) return;
       press(ctx, () => ctx.setValue('track', FX_TRACK), () => flash(ctx, 'MIDI CONFIG IS NOT MODELLED'));
     }} />));
-  out.push(key(292.7, 115.5, SMALL, ctx => {
+  out.push(key(298.2, 133.2, SMALL, ctx => {
     const p = projectOf(ctx);
     return <Key ctx={ctx} id="key:chain" label={I.chain} sub="New Chain" funcSub lit={p.mode === 'chain'} ledColor={RY.green} focusIds={['seq:menu:chain']}
       onDown={() => press(ctx, () => {
@@ -378,7 +381,7 @@ function keys(): PanelElement[] {
         else ctx.setUi({ seqMenu: 'chain' });
       }, () => ctx.setUi({ seqMenu: 'chain' }))} />;
   }));
-  out.push(key(313.3, 115.5, SMALL, ctx => {
+  out.push(key(319.2, 133.2, SMALL, ctx => {
     const p = projectOf(ctx);
     return <Key ctx={ctx} id="key:song" label={I.song} sub="Edit Song" funcSub lit={p.mode === 'song'} ledColor={RY.green} focusIds={['seq:menu:song', 'seq:mode:song']}
       onDown={() => press(ctx, () => {
@@ -389,7 +392,7 @@ function keys(): PanelElement[] {
   }));
   // --- Banks ----------------------------------------------------------------------------
   for (let b = 0; b < 8; b++) {
-    out.push(key(BANK_X[b % 4], b < 4 ? 129.0 : 145.2, { w: 15, h: 9.2 }, ctx => {
+    out.push(key(BANK_X[b % 4], b < 4 ? 146.8 : 163.6, { w: 17.7, h: 11.5 }, ctx => {
       const p = projectOf(ctx);
       const st = ctx.engine.seq as { pattern?: string | null; playing?: boolean } | undefined;
       const shown = (st?.playing && st.pattern) || p.active;
@@ -401,7 +404,7 @@ function keys(): PanelElement[] {
     }));
   }
   // --- Transport -----------------------------------------------------------------------
-  out.push(key(282.7, 141.7, BIG, ctx => {
+  out.push(key(287.4, 160.2, BIG, ctx => {
     const rec = Math.round(num(ctx.values.rec, 1));
     // the active track in Euclidean mode lights [REC] purple (manual p.44)
     const p = projectOf(ctx);
@@ -417,7 +420,7 @@ function keys(): PanelElement[] {
       }, () => trackCopy(ctx))}
       onUp={() => ctx.setUi({ recHeld: false })} />;
   }, true));
-  out.push(key(303.2, 141.7, BIG, ctx => {
+  out.push(key(308.7, 160.2, BIG, ctx => {
     const st = ctx.engine.seq as { paused?: boolean; following?: boolean } | undefined;
     const playing = !!ctx.engine.playing;
     const paused = !!st?.paused;
@@ -444,7 +447,7 @@ function keys(): PanelElement[] {
         pressPlay(ctx);
       }, () => trackClear(ctx))} />;
   }, true));
-  out.push(key(323.8, 141.7, BIG, ctx => <Key ctx={ctx} id="key:stop" big label={I.stop} sub="Paste" funcSub control="play" focusIds={['seq:stop']}
+  out.push(key(329.8, 160.2, BIG, ctx => <Key ctx={ctx} id="key:stop" big label={I.stop} sub="Paste" funcSub control="play" focusIds={['seq:stop']}
     onDown={() => press(ctx, () => {
       // [RECORD] + [STOP]: STEP RECORDING; [STOP] again with [RECORD] held: STANDARD / JUMP (manual p.40)
       if (ctx.ui.recHeld) {
@@ -463,7 +466,7 @@ function keys(): PanelElement[] {
       // [STOP] twice: the delay and reverb fade out too (manual p.37)
       if (twice) { ctx.sendEvent('rytm:fx-off'); flash(ctx, 'SEND FX OFF'); }
     }, () => trackPaste(ctx))} />, true));
-  out.push(key(353.8, 145.2, SMALL, ctx => {
+  out.push(key(361.3, 163.3, SMALL, ctx => {
     const st = ctx.engine.seq as { fill?: boolean; fillCued?: boolean } | undefined;
     return <Key ctx={ctx} id="key:fill" label="FILL" sub="Cue Fill" funcSub lit={!!st?.fill} blink={!!st?.fillCued} ledColor={RY.yellow} focusIds={['seq:fill']}
       onDown={() => press(ctx, () => {
@@ -476,7 +479,7 @@ function keys(): PanelElement[] {
       })}
       onUp={() => { if (ctx.ui.fillHeld) { ctx.setUi({ fillHeld: false }); ctx.sendEvent('seq:fill:up'); } }} />;
   }));
-  out.push(key(354.4, 176.8, SMALL, ctx => <Key ctx={ctx} id="key:page" label="PAGE" sub="Scale" funcSub focusIds={['seq:pages', 'seq:menu:scale']}
+  out.push(key(361.3, 196.3, WIDE, ctx => <Key ctx={ctx} id="key:page" label="PAGE" sub="Scale" funcSub focusIds={['seq:pages', 'seq:menu:scale']}
     onDown={() => press(ctx, () => {
       const p = projectOf(ctx);
       const t = Math.round(num(ctx.values.track));
@@ -491,8 +494,8 @@ function keys(): PanelElement[] {
 // Encoders and knobs
 // ----------------------------------------------------------------------------
 
-const ENC_X = [275.2, 301.4, 328.0, 354.8];
-const ENC_Y = [22.2, 50.4];
+const ENC_X = [279.8, 306.8, 334.1, 361.3];
+const ENC_Y = [38.3, 66.7];
 const ENC_D = 13.6;
 
 /** Which control encoder i (0..7) edits right now */
@@ -512,22 +515,22 @@ const knobs: PanelElement[] = [
   ...ENC_Y.flatMap((y, r) => ENC_X.map((x, c): PanelElement => ({
     kind: 'label', text: 'ABCDEFGH'[r * 4 + c], x, y: y + ENC_D / 2 + 3.2, size: 9, color: RY.sub, weight: 600,
   }))),
-  { kind: 'knob', control: 'main_volume', x: 25.2, y: 16.7, diameter: 11.5, variant: 'moog-black', label: 'none', value: 'hover' },
-  { kind: 'label', text: 'Main Volume', x: 25.2, y: 26.4, size: 8.5, color: RY.sub, weight: 600 },
-  { kind: 'knob', control: 'qper', x: 116.5, y: 16.7, diameter: 10.5, variant: 'moog-black', label: 'none', value: 'hover' },
-  { kind: 'label', text: 'Quick Perf Amount', x: 116.5, y: 26.4, size: 8.5, color: RY.sub, weight: 600 },
-  { kind: 'knob', control: levelBinding, x: 161.9, y: 16.7, diameter: 11.5, variant: 'elektron', label: 'none', value: 'hover' },
-  { kind: 'label', text: 'Track Level', x: 161.9, y: 25.9, size: 8.5, color: '#d8d8d8', weight: 700 },
+  { kind: 'knob', control: 'main_volume', x: 24.2, y: 32.0, diameter: 11.5, variant: 'moog-black', label: 'none', value: 'hover' },
+  { kind: 'label', text: 'Main Volume', x: 24.2, y: 41.7, size: 8.5, color: RY.sub, weight: 600 },
+  { kind: 'knob', control: 'qper', x: 117.4, y: 32.0, diameter: 10.5, variant: 'moog-black', label: 'none', value: 'hover' },
+  { kind: 'label', text: 'Quick Perf Amount', x: 117.4, y: 41.7, size: 8.5, color: RY.sub, weight: 600 },
+  { kind: 'knob', control: levelBinding, x: 163.3, y: 32.0, diameter: 11.5, variant: 'elektron', label: 'none', value: 'hover' },
+  { kind: 'label', text: 'Track Level', x: 163.3, y: 41.2, size: 8.5, color: '#d8d8d8', weight: 700 },
 ];
 
 // ----------------------------------------------------------------------------
 // Sequencer UI kit: trig keys, page LEDs, overlays
 // ----------------------------------------------------------------------------
 
-const TRIG_X0 = 26.6;
-const TRIG_PITCH = 20.48;
-const TRIG_SIZE = 17;
-const TRIG_Y = 173.4;
+const TRIG_X0 = 24.2;
+const TRIG_PITCH = 21.07;
+const TRIG_SIZE = 17.7;
+const TRIG_Y = 193.0;
 
 const sequencer: PanelElement[] = [
   {
@@ -549,14 +552,14 @@ const sequencer: PanelElement[] = [
     },
   },
   ...TRACKS.map((t, i): PanelElement => ({ kind: 'label', text: t.name, x: TRIG_X0 + i * TRIG_PITCH, y: TRIG_Y + TRIG_SIZE / 2 + 3.6, size: 9, color: '#d8d8d8', weight: 700 })),
-  { kind: 'custom', x: 344.0, y: 160.6, w: 21.0, h: 6.2, render: ctx => <PageLeds ctx={ctx} /> },
-  ...['1:4', '2:4', '3:4', '4:4'].map((t, i): PanelElement => ({ kind: 'label', text: t, x: 346.3 + i * 5.25, y: 158.0, size: 6.5, color: RY.sub, weight: 600 })),
+  { kind: 'custom', x: 350.8, y: 179.6, w: 21.0, h: 6.2, render: ctx => <PageLeds ctx={ctx} /> },
+  ...['1:4', '2:4', '3:4', '4:4'].map((t, i): PanelElement => ({ kind: 'label', text: t, x: 353.1 + i * 5.25, y: 177.0, size: 6.5, color: RY.sub, weight: 600 })),
   // Pattern-mode LEDs over BANK A-D (FUNC + BANK A-D sets them)
   ...MODE_LED_NAMES.map((n, i): PanelElement => ({
-    kind: 'led', x: BANK_X[i], y: 117.0, size: 2.2, color: '#ff3b2a',
+    kind: 'led', x: BANK_X[i], y: 134.6, size: 2.2, color: '#ff3b2a',
     on: ctx => (asProject(ctx.data, SEQ_TRACKS).changeMode === CHANGE_MODES[i] ? 1 : 0),
   })),
-  ...MODE_LED_NAMES.map((n, i): PanelElement => ({ kind: 'label', text: n, x: BANK_X[i], y: 121.0, size: 7, color: RY.sub, weight: 600 })),
+  ...MODE_LED_NAMES.map((n, i): PanelElement => ({ kind: 'label', text: n, x: BANK_X[i], y: 138.6, size: 7, color: RY.sub, weight: 600 })),
   {
     kind: 'custom', x: 0, y: 0, w: 1, h: 1,
     render: ctx => (
@@ -581,27 +584,46 @@ const sequencer: PanelElement[] = [
 // Decor: rear-panel legends, screen window, logo, the mode-key line
 // ----------------------------------------------------------------------------
 
-// The two MIDI legends are on two lines so the fit keeps them at the legibility floor
-const REAR = ['Headphones', 'Main Out', 'Ext In', 'BD', 'SD', 'RS/CP', 'BT', 'LT', 'MT/HT', 'CH/OH', 'CY/CB', 'Audio In', 'MIDI In', 'MIDI Out\nSync A', 'MIDI Thru\nSync B', 'Control In', 'USB', 'DC In', 'Power'];
+// The legends along the rear edge, over their connectors (the manual's drawing, p.10): each of the
+// four individual outputs is one jack for two voices, so its legend is two lines
+const REAR: [string, number][] = [
+  ['Main Out', 55.3], ['Ext In', 72.7], ['BD\nSD', 90.2], ['RS/CP\nBT', 107.9], ['LT\nMT/HT', 125.6], ['CH/OH\nCY/CB', 143.1], ['Audio In', 160.5],
+  ['MIDI In', 209.6], ['MIDI Out\nSync A', 229.9], ['MIDI Thru\nSync B', 249.0], ['Control In', 274.4], ['USB', 295.7], ['DC In', 317.5], ['Power', 340.0],
+];
+const REAR_Y = 4.6, REAR_LINE = 4.7;
 
 const decor: PanelElement[] = [
-  ...REAR.map((t, i): PanelElement => ({ kind: 'label', text: t, x: 12 + i * 19.0, y: 3.4, size: 6.5, color: '#6f7277', weight: 600, align: 'left' })),
-  // Elektron logo mark (top right)
-  { kind: 'section', x: 370.5, y: 9.5, w: 6.5, h: 6.5, border: '1.6px solid #d0d0d0', radius: 0.6 },
-  { kind: 'label', text: '◢', x: 373.9, y: 12.9, size: 11, color: '#d0d0d0' },
+  // two-line legends hang from the same first line as the others
+  ...REAR.flatMap(([t, x]): PanelElement[] => t.split('\n').map((line, n): PanelElement => (
+    { kind: 'label', text: line, x, y: REAR_Y + n * REAR_LINE, size: 6.5, color: '#7d8086', weight: 600 }
+  ))),
+  // the headphones output
+  {
+    kind: 'custom', x: 36.3, y: REAR_Y - 2, w: 4, h: 4,
+    render: () => (
+      <svg viewBox="0 0 24 24" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} fill="none" stroke="#7d8086" strokeWidth={2.4} strokeLinecap="round" aria-label="Headphones">
+        <path d="M4 15 V12 A8 8 0 0 1 20 12 V15" /><rect x={3} y={14} width={4.5} height={7} rx={1.5} fill="#7d8086" /><rect x={16.5} y={14} width={4.5} height={7} rx={1.5} fill="#7d8086" />
+      </svg>
+    ),
+  },
+  // Elektron logo mark (top right, over encoder D)
+  { kind: 'section', x: 357.2, y: 12.4, w: 8.2, h: 8.2, border: '1.6px solid #d0d0d0', radius: 0.6 },
+  { kind: 'label', text: '◢', x: 361.5, y: 16.7, size: 13, color: '#d0d0d0' },
   // The line joining PLAY .. PERF
   { kind: 'section', x: MODE_X[0], y: ROW2 - 0.25, w: MODE_X[4] - MODE_X[0], h: 0.5, background: '#3b3d41', radius: 0 },
   // Screen window
-  { kind: 'section', x: 175.0, y: 8.8, w: 92.0, h: 62.4, background: 'linear-gradient(180deg, #0b0c0d 0%, #050505 100%)', border: '1px solid #2b2c2f', radius: 2.2 },
-  { kind: 'label', text: '8 Voice Analog Drum Computer & Sampler', x: 221.0, y: 13.0, size: 8.5, color: '#d6d6d6', weight: 600 },
-  { kind: 'label', text: 'Analog Rytm', x: 216.0, y: 64.4, size: 17, color: '#e6e6e6', weight: 800, align: 'right', letterSpacing: -0.4 },
-  { kind: 'label', text: 'MKII', x: 217.2, y: 64.4, size: 17, color: '#c9c9c9', weight: 300, align: 'left', letterSpacing: 0.2 },
-  { kind: 'label', text: 'Sound Browser', x: 161.9, y: 29.3, size: 8, color: RY.sub, weight: 600 },
-  { kind: 'section', x: 154.5, y: 31.2, w: 14.8, h: 0.25, background: RY.sub, radius: 0 },
+  { kind: 'section', x: 178.3, y: 23.3, w: 92.0, h: 62.4, background: 'linear-gradient(180deg, #0b0c0d 0%, #050505 100%)', border: '1px solid #2b2c2f', radius: 2.2 },
+  { kind: 'label', text: '8 Voice Analog Drum Computer & Sampler', x: 224.3, y: 27.5, size: 8.5, color: '#d6d6d6', weight: 600 },
+  { kind: 'label', text: 'Analog Rytm', x: 219.3, y: 78.9, size: 17, color: '#e6e6e6', weight: 800, align: 'right', letterSpacing: -0.4 },
+  { kind: 'label', text: 'MKII', x: 220.5, y: 78.9, size: 17, color: '#c9c9c9', weight: 300, align: 'left', letterSpacing: 0.2 },
+  { kind: 'label', text: 'Sound Browser', x: 163.3, y: 44.6, size: 8, color: RY.sub, weight: 600 },
+  { kind: 'section', x: 155.9, y: 46.5, w: 14.8, h: 0.25, background: RY.sub, radius: 0 },
 ];
 
-const screen: PanelElement = { kind: 'custom', x: 179.6, y: 16.6, w: 82.8, h: 42.4, render: ctx => <Screen ctx={ctx} /> };
-const pads: PanelElement = { kind: 'custom', x: 49.7, y: 57.2, w: 117.4, h: 99, render: ctx => <Pads ctx={ctx} /> };
+// The screen window is drawn about 1.17x its real size (78 x 54 mm), around the same centre, so the OLED stays legible
+const screen: PanelElement = { kind: 'custom', x: 182.9, y: 31.1, w: 82.8, h: 42.4, render: ctx => <Screen ctx={ctx} /> };
+// Twelve 26.8 mm pads, 31.6 mm apart across and 34.65 mm down (their legends sit under each row)
+const pads: PanelElement = { kind: 'custom', x: 47.8, y: 73.2, w: 125.2, h: 103.95, render: ctx => <Pads ctx={ctx} /> };
 
 export const ANALOG_RYTM_LAYOUT: PanelLayout = {
   width: W,

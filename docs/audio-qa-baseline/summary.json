@@ -1,6 +1,6 @@
 {
  "kind": "audio-qa-summary",
- "generated": "2026-10-29T17:31:53.883Z",
+ "generated": "2026-11-12T08:49:44.650Z",
  "devices": [
   {
    "id": "dfam",
@@ -8,18 +8,18 @@
    "presets": 40,
    "excitation": "audition",
    "output": "stereo",
-   "median": -19.1,
-   "spread": 5.18,
-   "iqr": 1.48,
-   "min": -22.98,
-   "max": -17.8,
-   "maxTruePeak": -2.23,
+   "median": -19.01,
+   "spread": 11.77,
+   "iqr": 1.62,
+   "min": -27.82,
+   "max": -16.05,
+   "maxTruePeak": -1.24,
    "masterOffset": 0,
    "flagged": 0,
    "flagCounts": {},
    "setupErrors": 0,
-   "date": "2026-10-29T16:58:02.412Z",
-   "vsStudio": -0.54
+   "date": "2026-11-12T08:49:44.571Z",
+   "vsStudio": -0.45
   },
   {
    "id": "mother32",
@@ -84,20 +84,18 @@
    "presets": 47,
    "excitation": "audition",
    "output": "stereo",
-   "median": -18.99,
-   "spread": 7.58,
-   "iqr": 2.16,
-   "min": -24.43,
-   "max": -16.85,
-   "maxTruePeak": -1.56,
+   "median": -19.1,
+   "spread": 7.64,
+   "iqr": 2.23,
+   "min": -24.42,
+   "max": -16.78,
+   "maxTruePeak": -2.15,
    "masterOffset": 0,
-   "flagged": 1,
-   "flagCounts": {
-    "clicks": 1
-   },
+   "flagged": 0,
+   "flagCounts": {},
    "setupErrors": 0,
-   "date": "2026-10-29T17:23:29.238Z",
-   "vsStudio": -0.43
+   "date": "2026-11-12T07:38:09.604Z",
+   "vsStudio": -0.54
   },
   {
    "id": "analog-rytm",
@@ -142,9 +140,9 @@
  ],
  "studioMedian": -18.56,
  "presets": 271,
- "flagged": 2,
+ "flagged": 1,
  "flagTotals": {
-  "clicks": 2
+  "clicks": 1
  },
  "top": [
   {
@@ -154,14 +152,6 @@
    "flag": "clicks",
    "detail": "1 (1 mid); worst step 6.6 dBFS; first at 3.6992 s",
    "score": 68.3
-  },
-  {
-   "device": "analog-four",
-   "preset": "Bass / Metallic AM",
-   "key": "sound-bass-am",
-   "flag": "clicks",
-   "detail": "1 (1 mid); worst step -34.4 dBFS; first at 1.5546 s",
-   "score": 47.8
   }
  ],
  "calibration": {

@@ -219,20 +219,23 @@ class Env {
 
 class Lfo {
   constructor() {
-    this.ph = this.left = this.hold = this.fade = this.rnd = this.last = this.kF = this.cF = D;
+    this.ph = this.left = this.hold = this.fade = this.rnd = this.from = this.last = this.kF = this.cF = D;
     this.ph = Math.random(); this.run = true; this.left = Infinity; this.hold = 0; this.holding = false; this.fade = 1; this.rnd = Math.random() * 2 - 1; this.last = 0;
+    this.from = this.rnd;   // RND: the value the current step started from (SPH slews from it, manual p.92)
     this.kF = NaN;   // memoised fade time: FAD -> 0.02 x 2^(|FAD| / 8)
   }
-  trig(mode, sph, fad) {
+  /** wave 6 (RND): SPH is the slew of its steps, not a start phase, so a trig starts a new step (manual p.92) */
+  trig(mode, sph, fad, wave) {
     this.fade = fad < 0 ? 0 : 1;
     if (mode === 0) return;                                            // FREE
     if (mode === 2) { this.holding = true; this.hold = this.last; return; } // HOLD
     this.holding = false;
-    this.ph = sph - Math.floor(sph);
+    if (wave === 6) { this.ph = 0; this.from = this.last; this.rnd = Math.random() * 2 - 1; }
+    else this.ph = sph - Math.floor(sph);
     this.run = true;
     this.left = mode === 3 ? 1 : mode === 4 ? 0.5 : Infinity;          // ONE / HALF
   }
-  tick(dt, hz, wave, mode, fad) {
+  tick(dt, hz, wave, mode, fad, slew) {
     if (mode !== 2) this.holding = false;
     if (this.run) {
       const d = hz * dt;
@@ -241,7 +244,7 @@ class Lfo {
         this.left -= d < 0 ? -d : d;
         if (this.left <= 0) { this.run = false; this.ph += d < 0 ? -this.left : this.left; }
       }
-      if (this.ph >= 1 || this.ph < 0) { this.ph -= Math.floor(this.ph); this.rnd = Math.random() * 2 - 1; }
+      if (this.ph >= 1 || this.ph < 0) { this.ph -= Math.floor(this.ph); this.from = wave === 6 ? this.last : this.rnd; this.rnd = Math.random() * 2 - 1; }
     } else if (mode !== 3 && mode !== 4) { this.run = true; this.left = Infinity; }
     // fade (computed every tick and selected, so no code runs only once FAD is set)
     if (fad !== this.kF) { this.kF = fad; this.cF = 0.02 * exp2(Math.abs(fad) / 8); }
@@ -257,7 +260,11 @@ class Lfo {
       case 3: v = 1 - 2 * p; break;                                         // SAW
       case 4: v = Math.exp(-6 * p) * 1.0025 - 0.0025; break;                // EXP
       case 5: v = p; break;                                                 // RMP
-      default: v = this.rnd;                                                // RND
+      default: {                                                            // RND
+        // SPH adds slew to the steps: the share of each step spent gliding to the new value (0: a jump)
+        const q = hz < 0 ? 1 - p : p;
+        v = slew > 0 && q < slew ? this.from + (this.rnd - this.from) * (q / slew) : this.rnd;
+      }
     }
     this.last = v;
     const h = this.hold;
@@ -555,8 +562,8 @@ class A4Voice extends AudioWorkletProcessor {
     const gate = v => lsec(v) || (this.gate ? 0 : this.stepSec);
     if (rt & 1) this.envF.trig(Math.round(P[I.envf_shp]), now, gate(P[I.envf_len]));
     if (rt & 2) this.env2.trig(Math.round(P[I.env2_shp]), now, gate(P[I.env2_len]));
-    if (rt & 4) this.lfo1.trig(Math.round(P[I.lfo1_mod]), this.E(I.lfo1_sph) / 128, P[I.lfo1_fad]);
-    if (rt & 8) this.lfo2.trig(Math.round(P[I.lfo2_mod]), this.E(I.lfo2_sph) / 128, P[I.lfo2_fad]);
+    if (rt & 4) this.lfo1.trig(Math.round(P[I.lfo1_mod]), this.E(I.lfo1_sph) / 128, P[I.lfo1_fad], Math.round(P[I.lfo1_wav]));
+    if (rt & 8) this.lfo2.trig(Math.round(P[I.lfo2_mod]), this.E(I.lfo2_sph) / 128, P[I.lfo2_fad], Math.round(P[I.lfo2_wav]));
   }
 
   noteOff() {
@@ -616,10 +623,10 @@ class A4Voice extends AudioWorkletProcessor {
     this.route2(I.envf_dstb, I.envf_depb, ef);
     this.route2(I.env2_dsta, I.env2_depa, e2);
     this.route2(I.env2_dstb, I.env2_depb, e2);
-    const l2 = this.lfo2.tick(dt, lfoHz(this.E(I.lfo2_spd), Math.round(P[I.lfo2_mul]), this.bpm), Math.round(P[I.lfo2_wav]), Math.round(P[I.lfo2_mod]), this.E(I.lfo2_fad));
+    const l2 = this.lfo2.tick(dt, lfoHz(this.E(I.lfo2_spd), Math.round(P[I.lfo2_mul]), this.bpm), Math.round(P[I.lfo2_wav]), Math.round(P[I.lfo2_mod]), this.E(I.lfo2_fad), this.E(I.lfo2_sph) / 127);
     this.route2(I.lfo2_dsta, I.lfo2_depa, l2);
     this.route2(I.lfo2_dstb, I.lfo2_depb, l2);
-    const l1 = this.lfo1.tick(dt, lfoHz(this.E(I.lfo1_spd), Math.round(P[I.lfo1_mul]), this.bpm), Math.round(P[I.lfo1_wav]), Math.round(P[I.lfo1_mod]), this.E(I.lfo1_fad));
+    const l1 = this.lfo1.tick(dt, lfoHz(this.E(I.lfo1_spd), Math.round(P[I.lfo1_mul]), this.bpm), Math.round(P[I.lfo1_wav]), Math.round(P[I.lfo1_mod]), this.E(I.lfo1_fad), this.E(I.lfo1_sph) / 127);
     this.route2(I.lfo1_dsta, I.lfo1_depa, l1);
     this.route2(I.lfo1_dstb, I.lfo1_depb, l1);
 
@@ -1277,7 +1284,7 @@ class A4FxMod extends AudioWorkletProcessor {
       if (ev.t === 'at') { const l = ev.list; for (let k = 0; k < l.length; k += 2) P[l[k]] = l[k + 1]; }
       else if (ev.t === 'trig') for (let k = 0; k < 2; k++) {
         const li = this.li[k];
-        this.lfo[k].trig(Math.round(P[li.mod]), P[li.sph] / 128, P[li.fad]);
+        this.lfo[k].trig(Math.round(P[li.mod]), P[li.sph] / 128, P[li.fad], Math.round(P[li.wav]));
       }
     }
     // FX LFOs (per quantum)
@@ -1285,7 +1292,7 @@ class A4FxMod extends AudioWorkletProcessor {
     const dt = n / sr;
     for (let k = 0; k < 2; k++) {
       const li = this.li[k];
-      const v = this.lfo[k].tick(dt, lfoHz(P[li.spd], Math.round(P[li.mul]), this.bpm), Math.round(P[li.wav]), Math.round(P[li.mod]), P[li.fad]);
+      const v = this.lfo[k].tick(dt, lfoHz(P[li.spd], Math.round(P[li.mul]), this.bpm), Math.round(P[li.wav]), Math.round(P[li.mod]), P[li.fad], P[li.sph] / 127);
       for (let s = 0; s < 2; s++) {
         const d = this.dests[Math.round(P[li.dst[s]])];
         const dep = P[li.dep[s]];
@@ -1310,7 +1317,8 @@ class A4FxMod extends AudioWorkletProcessor {
     // delay (a4-fx)
     val[FXC.DEL_TIME] = Math.min(3.95, (this.E(X.del_tim) * (240 / this.bpm)) / 128) * sr;
     val[FXC.DEL_X] = P[X.del_x] >= 0.5 ? 1 : 0;
-    val[FXC.DEL_WID] = this.E(X.del_wid) / 63;
+    // WID: the echo's place (X 0) or how far the echoes swing (X 1), -1 (left) .. +1 (right); manual p.95
+    val[FXC.DEL_WID] = clamp(this.E(X.del_wid) / 63, -1, 1);
     val[FXC.DEL_FB] = (this.E(X.del_fb) / 127) * 1.08;
     const hpf = this.E(X.del_hpf);
     val[FXC.DEL_HP] = hpf > 0 ? 1 - Math.exp((-TWO_PI * fltHz(hpf * 0.8)) / sr) : 0;
@@ -1346,6 +1354,13 @@ const NOISE_FLOOR_STEP = (2 * NOISE_FLOOR) / 65535;
 // FX: delay + effect sends + mix. Inputs: [0] sends (cho, del, rev),
 // [1] chorus return (stereo), [2] dry (stereo), [3] parameters (a4-fxmod).
 // Outputs: [0] dry + chorus + delay (stereo), [1] reverb send (stereo).
+//
+// The delay (manual p.95) is one mono echo placed in the stereo field. Two lines A and B hold it:
+//   X 0  A feeds itself and WID places the echo, from hard left through the centre to hard right;
+//   X 1  A feeds B and B feeds A, so the echoes alternate: A sits WID to one side, B as far to the
+//        other (WID 0: no swing; a negative WID starts on the right).
+// Placement is a balance law: both sides at full level in the centre, one side fading out as the
+// echo moves to the other.
 // ============================================================================
 
 class A4Fx extends AudioWorkletProcessor {
@@ -1357,6 +1372,8 @@ class A4Fx extends AudioWorkletProcessor {
     this.dL = new Float32Array(this.len); this.dR = new Float32Array(this.len);
     this.w = 0; this.time = 0.375 * sr; this.lpL = 0; this.lpR = 0; this.hpL = 0; this.hpR = 0;
     this.fd = 1; this.empty = false;
+    // the echo's placement gains (A and B to left and right), glided across each quantum
+    this.aL = this.aR = this.bL = this.bR = D; this.aL = this.aR = this.bL = this.bR = 1;
     // the analog output stage's noise floor, about -100 dBFS (the manual gives 102 dB S/N, p.85):
     // like the hardware, the output is never digital silence between notes
     this.nz = 0x9e3779b9 | 0;
@@ -1389,7 +1406,11 @@ class A4Fx extends AudioWorkletProcessor {
     const sD = sends && sends[1], sR = sends && sends[2];
     const cL = cho && cho[0], cR = cho && (cho[1] || cho[0]);
     const dLi = dry && dry[0], dRi = dry && (dry[1] || dry[0]);
-    const widOff = Math.abs(wid) * 0.012 * sampleRate;
+    // where line A and line B sit: X 0 both at WID; X 1 A at -WID and B at +WID
+    const pA = X ? -wid : wid, pB = wid;
+    const aLt = Math.min(1, 1 - pA), aRt = Math.min(1, 1 + pA), bLt = Math.min(1, 1 - pB), bRt = Math.min(1, 1 + pB);
+    let aL = this.aL, aR = this.aR, bL = this.bL, bR = this.bR;
+    const aLs = (aLt - aL) / n, aRs = (aRt - aR) / n, bLs = (bLt - bL) / n, bRs = (bRt - bR) / n;
     const dl = this.dL, dr = this.dR, len = this.len;
     let w = this.w, time = this.time, lpL = this.lpL, lpR = this.lpR, hpL = this.hpL, hpR = this.hpR, nz = this.nz;
     // An idle delay: both lines all zero, its filters at rest and no input this quantum. Its loop would
@@ -1422,17 +1443,20 @@ class A4Fx extends AudioWorkletProcessor {
       time += (tgt - time) * 0.00035; // tape-style glide when the time changes
       const chl = cL ? cL[i] : 0, chr = cR ? cR[i] : 0;
       const din = (sD ? sD[i] : 0) + 0.5 * (chl + chr) * cToD;
-      const eL = this.read(dl, w, Math.max(2, time + (wid < 0 ? widOff : 0)));
-      const eR = this.read(dr, w, Math.max(2, time + (wid > 0 ? widOff : 0)));
-      let fl = X ? eR : eL, fr = X ? eL : eR;
+      const dly = Math.max(2, time);
+      const eA = this.read(dl, w, dly), eB = this.read(dr, w, dly);
+      // what goes back into A and B: each its own echo (X 0), or the other's (X 1, ping pong)
+      let fl = X ? eB : eA, fr = X ? eA : eB;
       lpL += (fl - lpL) * lp; lpR += (fr - lpR) * lp; fl = lpL; fr = lpR;
       if (hp > 0) { hpL += (fl - hpL) * hp; hpR += (fr - hpR) * hp; fl -= hpL; fr -= hpR; }
       fl = tanhF(fl * fbk * drive) * dNorm;
       fr = tanhF(fr * fbk * drive) * dNorm;
       dl[w] = din + fl;
-      dr[w] = (X ? 0 : din) + fr;
+      dr[w] = fr;
       zrun = dl[w] !== 0 || dr[w] !== 0 ? 0 : zrun + 1;
       w = w + 1 >= len ? 0 : w + 1;
+      aL += aLs; aR += aRs; bL += bLs; bR += bRs;
+      const eL = eA * aL + eB * bL, eR = eA * aR + eB * bR;
       fd += fdStep;
       const rs = (sR ? sR[i] : 0);
       RL[i] = (rs + chl * cToR + eL * toRev) * fd;
@@ -1444,6 +1468,7 @@ class A4Fx extends AudioWorkletProcessor {
     }
     this.nz = nz;
     this.fd = fdTo;
+    this.aL = aLt; this.aR = aRt; this.bL = bLt; this.bR = bRt;
     lpL = flush(lpL); lpR = flush(lpR); hpL = flush(hpL); hpR = flush(hpR);
     if (!Number.isFinite(lpL + lpR + hpL + hpR + time)) { dl.fill(0); dr.fill(0); lpL = lpR = hpL = hpR = 0; time = tgt; zrun = len; }
     this.w = w; this.time = time; this.lpL = lpL; this.lpR = lpR; this.hpL = hpL; this.hpR = hpR; this.zrun = zrun;

@@ -73,9 +73,11 @@ const stalk = (control: string, x: number, y: number, extra: KnobOpts = {}): Pan
   knob(control, x, y, STALK_D, { variant: STALK, ...extra });
 
 /** A toggle as printed (p.7): its title, one position above the lever and the other below (SEQ PITCH MOD's OFF beside) */
-const sw = (control: string, x: number, y: number, scale = 1.6, labelText?: string): PanelElement => ({
-  kind: 'switch', control, x, y, scale, legends: 'ends', ...(labelText ? { labelText } : {}),
+const sw = (control: string, x: number, y: number, scale = 1.6, labelText?: string, legendText?: string[]): PanelElement => ({
+  kind: 'switch', control, x, y, scale, legends: 'ends', ...(labelText ? { labelText } : {}), ...(legendText ? { legendText } : {}),
 });
+/** The WAVE switches print the waves themselves: a square above the lever, a triangle below (manual p.7, p.13) */
+const WAVE_SYMBOLS = ['\u2293', '\u2227'];
 
 const screw = (x: number, y: number): PanelElement => ({
   kind: 'section', x: x - 2.1, y: y - 2.1, w: 4.2, h: 4.2, radius: 2.1,
@@ -119,7 +121,7 @@ const elements: PanelElement[] = [
   sw('seq_pitch_mod', 39.9, 23.7, 1.45),
   ...main('vco1_eg_amount', 'VCO 1 EG AMOUNT', 61.7, ROW1), ...signs(61.7, ROW1),
   ring(90.7, ROW1), ...main('vco1_frequency', 'VCO 1 FREQUENCY', 90.7, ROW1),
-  sw('vco1_wave', 112.3, 23.7),
+  sw('vco1_wave', 112.3, 23.7, 1.6, undefined, WAVE_SYMBOLS),
   text('VCO 1 LEVEL', MIX_X, MIX_Y[0] - 8.5), stalk('vco1_level', MIX_X, MIX_Y[0]),
   text('NOISE / EXT LEVEL', MIX_X, MIX_Y[1] - 8.2), stalk('noise_level', MIX_X, MIX_Y[1]),
   sw('vcf_mode', 151.5, 23.8, 1.6, 'VCF'),
@@ -136,7 +138,7 @@ const elements: PanelElement[] = [
   sw('hard_sync', 40.3, 56.2),
   ...main('vco2_eg_amount', 'VCO 2 EG AMOUNT', 61.7, ROW2), ...signs(61.7, ROW2),
   ring(90.7, ROW2), ...main('vco2_frequency', 'VCO 2 FREQUENCY', 90.7, ROW2),
-  sw('vco2_wave', 112.3, 56.0),
+  sw('vco2_wave', 112.3, 56.0, 1.6, undefined, WAVE_SYMBOLS),
   text('VCO 2 LEVEL', MIX_X, MIX_Y[2] - 8.5), stalk('vco2_level', MIX_X, MIX_Y[2]),
   ...main('vcf_decay', 'VCF DECAY', 158.0, ROW2),
   ...main('vcf_eg_amount', 'VCF EG AMOUNT', 187.0, ROW2), ...signs(187.0, ROW2),

@@ -91,6 +91,12 @@ export interface SwitchElement extends Positioned {
    * three-way switch stays beside)
    */
   legends?: 'side' | 'ends';
+  /**
+   * What the panel prints for each position, when that is not the option's name: the DFAM and
+   * the Mother-32 print wave symbols beside their WAVE switches. Readouts and screen readers
+   * keep the option names.
+   */
+  legendText?: string[];
 }
 
 export interface ButtonElement extends Positioned {

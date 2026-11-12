@@ -641,6 +641,26 @@ check: s => { const p = asProject(s.data, 12); return trigSteps(p, p.active, 0).
 // isSwingStep(getPattern(p, id), 5), p.mutes, s.engine.seq?.paused ...
 ```
 
+### The screen's parameter graphics
+
+Both instruments' OLEDs draw each parameter as a small graphic above its name (the page figures
+in both manuals). `components/sequencer/OledGraphics.tsx` has them, as our own drawings computed
+from the values:
+
+| Graphic | For |
+|---|---|
+| `DialIcon`, `SwitchIcon`, `LevelIcon`, `PanIcon`, `UnusedIcon` | a plain value, OFF / ON, a level or send, PAN, an encoder with no parameter (the hatched square) |
+| `PathIcon` with `LFO_WAVE_PATHS` or a device's own wave paths, `PulseWidthIcon`, `FadeIcon`, `ShapeIcon`, `FilterTypeIcon` | waveforms, PW, FAD, an envelope's SHP, a filter type |
+| `LadderGraph`, `MultimodeGraph` | a filter's response across FRQ and RES (two encoder slots) |
+| `AdsrGraph`, `AhdGraph` | an envelope across its time knobs (four or three slots) |
+| `BandGraph`, `ShelfGraph` | an effect's HPF / LPF band, the reverb's shelf across FRQ GAI |
+
+Each takes the hardware's values (0-127, -64..63) and an optional height `h` (px or any CSS
+length). They draw in `currentColor`, so a cell shown inverted for a locked parameter inverts its
+graphic. The device decides which parameter gets which graphic and which ones span several slots:
+`devices/analog-four/screenGraphics.tsx`, `cellGraphic` and `wideGraphics` in
+`devices/analog-rytm/ui.tsx`. Lists (MUL, MOD, DST) are shown as their word.
+
 ---
 
 ## 7. How a twin adopts the new behaviour

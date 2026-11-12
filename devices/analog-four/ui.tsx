@@ -36,15 +36,16 @@ import {
   type Pattern, type Project, type SeqState, type Step, type StepsClip,
 } from '@/lib/sequencer/elektron';
 import {
-  CV_BY_KEY, FX_BY_KEY, FX_TRACK, PAGE_TITLE, PERF_MACROS, POLY_ALLOC, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS, TRACK_NAMES, V, VIEWS, keyOfView, levelControl, pageFor,
+  CV_BY_KEY, FX_BY_KEY, FX_TRACK, PAGE_KEYS, PAGE_TITLE, PERF_MACROS, POLY_ALLOC, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS, TRACK_NAMES, V, VIEWS, keyOfView, levelControl, pageFor,
   pageSlots, controlFor, routeOf, trackKind, viewAfterPress, type ParamDef,
 } from './params';
 import { KEYS, PX_PER_MM, TRIGS, TRIG_LEGENDS, KEYBOARD, KB_KEY, KB_KEYS, MODE_LEDS, OCT_LEDS, PAGE_LEDS, LOGO } from './geometry';
 import { SOUNDS, SOUND_CATEGORIES, type SoundDef } from './sounds';
 import {
-  KITS, KIT_PROJECT_IDS, SOUND_DEMO_BASE, freeKitSlot, kitFull, kitSnapshot, kitValues, projectFor, projectKits, soundTrackValues, type A4Project,
+  KITS, KIT_FORMAT, KIT_PROJECT_IDS, SOUND_DEMO_BASE, freeKitSlot, kitFull, kitSnapshot, kitValues, projectFor, projectKits, soundTrackValues, type A4Project,
 } from './kits';
 import { isTransposable, setTransposable } from './arp';
+import { DialIcon, GRAPHIC_H, OLED_DIM, OLED_ON, UnusedIcon, paramGraphic, screenLabel, screenWord, wideGraphics } from './screenGraphics';
 
 const TRACKS = SEQ_TRACKS;
 const k = PX_PER_MM;
@@ -1428,28 +1429,6 @@ export function MiniKeyboard({ ctx }: { ctx: CustomRenderContext }) {
 // OLED screen
 // ----------------------------------------------------------------------------
 
-const OLED_ON = '#e9f1ff';
-const OLED_DIM = '#8693a9';
-
-function Arc({ norm, bipolar, locked }: { norm: number; bipolar: boolean; locked: boolean }) {
-  const r = 7.5, cx = 9, cy = 9;
-  const a0 = -225, a1 = 45;
-  const ang = (t: number) => ((a0 + (a1 - a0) * t) * Math.PI) / 180;
-  const pt = (t: number) => [cx + r * Math.cos(ang(t)), cy + r * Math.sin(ang(t))];
-  const from = bipolar ? 0.5 : 0;
-  const [x0, y0] = pt(Math.min(from, norm));
-  const [x1, y1] = pt(Math.max(from, norm));
-  const large = Math.abs(norm - from) * 270 > 180 ? 1 : 0;
-  const [xa, ya] = pt(0), [xb, yb] = pt(1);
-  const [xn, yn] = pt(norm);
-  return (
-    <svg width="15" height="13" viewBox="0 0 18 16" style={{ display: 'block', margin: '0 auto' }}>
-      <path d={`M ${xa} ${ya} A ${r} ${r} 0 1 1 ${xb} ${yb}`} fill="none" stroke={locked ? '#16181c' : '#39404d'} strokeWidth="2" />
-      {Math.abs(norm - from) > 0.002 && <path d={`M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1}`} fill="none" stroke={locked ? '#050608' : OLED_ON} strokeWidth="2" />}
-      <circle cx={xn} cy={yn} r="1.6" fill={locked ? '#050608' : OLED_ON} />
-    </svg>
-  );
-}
 
 function slotNorm(p: ParamDef, v: number): number {
   return Math.max(0, Math.min(1, (v - p.min) / (p.max - p.min || 1)));
@@ -1494,6 +1473,18 @@ export function Screen(props: PanelContext) {
     const t = setTimeout(() => setTouched(null), touched.until - Date.now() + 20);
     return () => clearTimeout(t);
   }, [touched]);
+  // A PARAMETER key (or another track): the page's name takes the kit's place for a moment, with
+  // "(P 1/2)" or "(P 2/2)" when the key holds two pages (the manual's page figures, p.87-100)
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!opened.current) { opened.current = true; return; }
+    if (!page || ['perf', 'mix', 'tempo'].includes(page)) return;
+    const key = keyOfView(view);
+    const pair = key ? PAGE_KEYS[key.key] : undefined;
+    const second = pair?.[1] ? pageFor(track, V[pair[1]]) : null;
+    const two = !!second && second !== pageFor(track, V[pair![0]]);
+    setTouched({ name: `${PAGE_TITLE[page]}${two ? ` (P ${key!.second ? 2 : 1}/2)` : ''}`, until: Date.now() + 1400 });
+  }, [track, view, page]);
 
   // the song row left of the pattern: only while the song plays (not while the studio arranger drives it)
   const songMode = st?.playing ? st.mode === 'song' && !st.arranged : pr.mode === 'song';
@@ -1524,14 +1515,15 @@ export function Screen(props: PanelContext) {
     );
   } else if (page === 'perf') {
     body = (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px 2px', paddingTop: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', paddingTop: 1 }}>
         {PERF_MACROS.map((m, i) => {
           const v = num(values[`perf_${'abcdefghij'[i]}`]);
           const sel = num(values.qper_sel) === i;
           return (
-            <div key={i} style={{ textAlign: 'center' }}>
-              <Arc norm={v / 127} bipolar={false} locked={false} />
-              <div style={{ fontSize: 9, letterSpacing: -0.2, fontWeight: 700, color: sel ? '#050608' : OLED_ON, background: sel ? OLED_ON : 'transparent', borderRadius: 2, whiteSpace: 'nowrap', overflow: 'hidden' }}>{m.name}</div>
+            <div key={i} style={{ textAlign: 'center', minWidth: 0 }}>
+              <DialIcon norm={v / 127} />
+              <div style={{ fontSize: 8, letterSpacing: -0.3, lineHeight: '10px', fontWeight: 700, color: sel ? '#050608' : OLED_ON, background: sel ? OLED_ON : 'transparent', borderRadius: 2, whiteSpace: 'nowrap', overflow: 'hidden', margin: '0 1px' }}>{m.scr ?? m.name}</div>
+              <div style={{ fontSize: 10.5, fontWeight: 700, lineHeight: '11px' }}>{Math.round(v)}</div>
             </div>
           );
         })}
@@ -1540,15 +1532,15 @@ export function Screen(props: PanelContext) {
   } else if (page === 'mix') {
     const lv = [0, 1, 2, 3].map(t => num(values[`t${t + 1}_level`], 100)).concat([num(values.fx_level, 100)]);
     body = (
-      <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: 78, paddingTop: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: 72, paddingTop: 3 }}>
         {lv.map((v, i) => {
           const muted = masterMuted(pr, i) || !!getPattern(pr, shownPattern).tracks[i]?.mute;
           return (
             <div key={i} style={{ textAlign: 'center', width: 34 }}>
-              <div style={{ height: 52, width: 10, margin: '0 auto', border: `1px solid ${OLED_DIM}`, position: 'relative' }}>
+              <div style={{ height: 50, width: 10, margin: '0 auto', border: `1px solid ${OLED_DIM}`, position: 'relative' }}>
                 <div style={{ position: 'absolute', inset: 0, transformOrigin: '50% 100%', transform: `scaleY(${v / 127})`, background: muted ? OLED_DIM : OLED_ON }} />
               </div>
-              <div style={{ fontSize: 10, fontWeight: 700 }}>{TRACK_NAMES[i]}{muted ? ' M' : ''}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, lineHeight: '12px' }}>{TRACK_NAMES[i]}{muted ? ' M' : ''}</div>
             </div>
           );
         })}
@@ -1557,41 +1549,78 @@ export function Screen(props: PanelContext) {
   } else {
     const tr = getPattern(pr, ui[UI.heldPattern] as string ?? shownPattern).tracks[track];
     const step = heldOn ? (tr?.steps[held[0]] as Step | undefined) : undefined;
-    const cell = (p: ParamDef | null, i: number) => {
-      if (!p) return <div key={i} />;
-      const id = controlFor(track, p);
-      const v = num(values[id], p.def);
-      let locked = false;
-      if (heldOn && step) {
-        // every trig carries the NOT / VEL / LEN it was placed with: shown locked when it differs from the NOTE page
-        if (p.key === 'trig_note') locked = step.note !== undefined && step.note !== tr?.note;
-        else if (p.key === 'trig_vel') locked = step.vel !== undefined && step.vel !== tr?.vel;
-        else if (p.key === 'trig_len') locked = step.len !== undefined && step.len !== tr?.len;
-        else if (p.key === 'trig_micro') locked = !!step.micro;
-        else if (p.key === 'trig_cond') locked = !!step.cond;
-        else locked = !!step.locks && p.key in step.locks;
-      }
-      const txt = p.fmt ? p.fmt(v) : String(Math.round(v));
-      return (
-        <div key={i} style={{ textAlign: 'center', minWidth: 0 }}>
-          <Arc norm={slotNorm(p, v)} bipolar={!!p.bipolar} locked={false} />
-          <div style={{ fontSize: TXT.small, color: OLED_DIM, letterSpacing: 0.1, lineHeight: '10px', fontWeight: 700 }}>{p.short}</div>
-          <div style={{ fontSize: 10.5, fontWeight: 700, lineHeight: '12px', whiteSpace: 'nowrap', overflow: 'hidden', color: locked ? '#050608' : OLED_ON, background: locked ? OLED_ON : 'transparent', borderRadius: 2, margin: '0 1px' }}>
-            {txt}
-          </div>
-        </div>
-      );
+    const isLocked = (p: ParamDef): boolean => {
+      if (!heldOn || !step) return false;
+      // every trig carries the NOT / VEL / LEN it was placed with: shown locked when it differs from the NOTE page
+      if (p.key === 'trig_note') return step.note !== undefined && step.note !== tr?.note;
+      if (p.key === 'trig_vel') return step.vel !== undefined && step.vel !== tr?.vel;
+      if (p.key === 'trig_len') return step.len !== undefined && step.len !== tr?.len;
+      if (p.key === 'trig_micro') return !!step.micro;
+      if (p.key === 'trig_cond') return !!step.cond;
+      return !!step.locks && p.key in step.locks;
     };
+    const valueOf = (p: ParamDef) => num(values[controlFor(track, p)], p.def);
     const s = pageSlots(page);
     // NOTE page: TRC takes PRB's place while a trig is held (manual p.50)
     if (heldOn && (page === 'note' || page === 'fxnote' || page === 'cvnote')) {
       const cond = (trackKind(track) === 'synth' ? SYNTH_BY_KEY : trackKind(track) === 'fx' ? FX_BY_KEY : CV_BY_KEY).trig_cond;
       if (cond) s[4] = cond;
     }
+    const byKey: Record<string, ParamDef> = {};
+    s.forEach(p => { if (p) byKey[p.key] = p; });
+    const pageValue = (key: string) => (byKey[key] ? valueOf(byKey[key]) : 0);
+    const inverse = (on: boolean): CSSProperties => ({ color: on ? '#050608' : OLED_ON, background: on ? OLED_ON : 'transparent', borderRadius: 2, margin: '0 1px' });
+    const nameLine = (p: ParamDef) => <div style={{ fontSize: TXT.small, color: OLED_DIM, letterSpacing: 0.1, lineHeight: '10px', fontWeight: 700 }}>{screenLabel(p)}</div>;
+    const valueLine = (p: ParamDef, txt: string) => (
+      <div style={{ fontSize: 10.5, fontWeight: 700, lineHeight: '11px', whiteSpace: 'nowrap', overflow: 'hidden', ...inverse(isLocked(p)) }}>{txt}</div>
+    );
+    // one knob slot: its graphic, its name, its value (the hardware shows the values while a PARAMETER key is held, p.18)
+    const cell = (p: ParamDef | null, i: number) => {
+      if (!p) return <div key={i} style={{ paddingTop: 1 }}><UnusedIcon /></div>;
+      const v = valueOf(p);
+      const txt = p.fmt ? p.fmt(v) : String(Math.round(v));
+      const graphic = paramGraphic(p, v, slotNorm(p, v));
+      return (
+        <div key={i} style={{ textAlign: 'center', minWidth: 0 }}>
+          {graphic ?? (
+            // lists (MUL, MOD, DST ...) are shown as a word where the graphic would be
+            <div style={{ height: GRAPHIC_H, lineHeight: `${GRAPHIC_H}px`, fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', ...inverse(isLocked(p)) }}>{screenWord(p, txt)}</div>
+          )}
+          {nameLine(p)}
+          {graphic ? valueLine(p, txt) : <div style={{ height: 11 }} />}
+        </div>
+      );
+    };
+    // a row of five slots; a graphic may run across several of them (a filter's curve, an envelope)
+    const wide = wideGraphics(page);
+    const row = (from: number) => {
+      const out: ReactNode[] = [];
+      for (let i = from; i < from + 5;) {
+        const g = wide[i];
+        const members = g ? s.slice(i, i + g.span) : [];
+        if (g && members.every(Boolean)) {
+          out.push(
+            <div key={i} style={{ gridColumn: `span ${g.span}`, minWidth: 0, textAlign: 'center' }}>
+              <div style={{ padding: '0 2px' }}>{g.render(pageValue)}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${g.span}, 1fr)` }}>
+                {members.map((p, k) => (p ? (
+                  <div key={k} style={{ minWidth: 0 }}>
+                    {nameLine(p)}
+                    {valueLine(p, p.fmt ? p.fmt(valueOf(p)) : String(Math.round(valueOf(p))))}
+                  </div>
+                ) : <div key={k} />))}
+              </div>
+            </div>,
+          );
+          i += g.span;
+        } else { out.push(cell(s[i], i)); i++; }
+      }
+      return <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', marginTop: 1 }}>{out}</div>;
+    };
     body = (
       <>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', marginTop: 2 }}>{s.slice(0, 5).map(cell)}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', marginTop: 2 }}>{s.slice(5).map(cell)}</div>
+        {row(0)}
+        {row(5)}
       </>
     );
   }
@@ -1609,7 +1638,7 @@ export function Screen(props: PanelContext) {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', color: OLED_ON, fontFamily: '"Helvetica Neue", Arial, sans-serif', userSelect: 'none', WebkitUserSelect: 'none', position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center', fontSize: 9.5, lineHeight: '11px', gap: 3, fontWeight: 700 }}>
         <span style={{ ...box(true), flex: 1, whiteSpace: 'nowrap', overflow: 'hidden' }}>{touched ? touched.name : kitName}</span>
-        <span style={{ ...box(true), whiteSpace: 'nowrap' }}>{bpm.toFixed(1)} {icon}</span>
+        <span style={{ ...box(true), whiteSpace: 'nowrap' }}>BPM:{bpm.toFixed(1)} {icon}</span>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>{body}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: TXT.small, lineHeight: '11px', fontWeight: 700 }}>
@@ -2040,7 +2069,7 @@ function saveKit(ctx: CustomRenderContext, asNew: boolean) {
   ctx.updateData(d => {
     const p = asProject(d, TRACKS) as A4Project;
     const ks = { ...(p.a4kits ?? {}) };
-    ks[slot] = { name: ks[slot]?.name ?? `KIT ${slot.padStart(2, '0')}`, values: snap, saved: snap };
+    ks[slot] = { name: ks[slot]?.name ?? `KIT ${slot.padStart(2, '0')}`, values: snap, saved: snap, v: KIT_FORMAT };
     const next: A4Project = { ...p, a4kits: ks, a4kit: slot };
     return withPattern(next, next.active, x => ({ ...x, kit: slot }));
   });

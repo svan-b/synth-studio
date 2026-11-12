@@ -178,3 +178,14 @@ All on the final code (production build, `next start -p 3143`):
 - `node scripts/e2e/run.cjs http://localhost:3143`: 34 / 34 passed.
 - Audio QA `--target -18 --suggest`, audition and `--excite mother32=transport`: both exit 0,
   0 of 43 flagged.
+
+## Cross-check against the manual's drawing
+
+A second pass with the manual's PDF: the default panel (p.9) at 400 dpi against the twin, legend
+by legend, switch by switch and jack by jack, and the default knob and switch positions. One
+difference: the VCO WAVE and LFO WAVE switches print the waves themselves (a pulse over a
+sawtooth, a square over a triangle), where the twin wrote PULSE / SAW and SQUARE / TRIANGLE. The
+panel now prints the symbols; the readout and the lessons keep the words. HI PASS stays as it is
+(Open, 2): the manual's own note, that any RESONANCE brings the bass back, describes the input
+minus the low-pass, which is what the twin does and what gives the gentle slope.
+

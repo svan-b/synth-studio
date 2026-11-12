@@ -17,7 +17,7 @@
 import type { ControlValue, LessonStudioStart } from '@/types';
 import { SRC } from '@/devices/xone96/model';
 import { XONE96_PRESETS } from '@/devices/xone96/presets';
-import { DFAM_PRESETS } from '@/devices/dfam/presets';
+import { DFAM_NEUTRAL } from '@/devices/dfam/presets';
 import { killKnob, midKnob } from './checks';
 
 type Values = Record<string, ControlValue>;
@@ -41,7 +41,7 @@ function dfamSteps(pitch: number[], vel: number[]): Values {
  * of doubling it. Notes C, G and F: all in A minor. Sits in the mids (250 Hz - 2 kHz).
  */
 export const DFAM_KNOCK: Values = {
-  ...DFAM_PRESETS.init.settings,
+  ...DFAM_NEUTRAL,
   vco1_wave: 1, vco1_frequency: 1, vco1_eg_amount: 30, vco_decay: 30, vco1_level: 85,
   vco2_level: 0, noise_level: 15, fm_amount: 0, hard_sync: 1, seq_pitch_mod: 0,
   vcf_mode: 1, vcf_cutoff: 3000, vcf_resonance: 15, vcf_eg_amount: 30, vcf_decay: 80, noise_vcf_mod: 0,

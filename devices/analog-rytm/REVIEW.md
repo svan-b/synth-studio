@@ -257,3 +257,21 @@ Every existing lesson id and check is unchanged; the lesson runner solves all 22
   project files is a studio-core change.
 - The live-lock edits (`live.ts`) and the Euclidean view are generic; they could move into
   `lib/sequencer/elektron` for the Analog Four's live recording.
+
+## Cross-check against the OS 1.74 manual
+
+A second pass with the current manual (OS 1.74, 114 pages) and Elektron's release notes. OS 1.73
+and 1.74 add Outbox 8 support and fix bugs: the machines, the parameter pages, the FX track and
+the sequencer are as in OS 1.72. The delay's X and WID and the RND LFO's slew were already as
+the manual has them (pp.80-81, p.83). Two visual differences were found and changed.
+
+| # | Against the manual | What the twin did | Now |
+|---:|---|---|---|
+| 1 | The panel drawing (p.10) is the faceplate from above, 385 x 224 mm: square 26.8 mm pads, 12 mm square keys, wide [QPER], [TRK], [RTRG] and [PAGE] keys | The panel was measured from a front-on photo, so it was 193 mm deep: everything about 14 % shallower than it is, the keys 12 x 10 mm, and columns up to 12 mm off at the right edge ([FX], [FILL], [PAGE], the encoders) | Laid out from the drawing: every key, knob, pad, LED and the screen within about 1 mm of it (86 shapes located on the drawing and matched). The rear legends sit over their connectors, the four individual outputs as two lines each, with the headphones symbol |
+| 2 | The screen draws each parameter as a graphic above its name (figures pp.77-83, pp.96-105) | One dial for every value, a "-" for an unused encoder, the filter's FRQ as a number | The hardware's graphics, computed from the values: level columns, switches, the pan marker, the filter and amp envelopes, the filter's response, the HPF / LPF band, the reverb's shelf, hatched squares |
+
+The iPad (1180 x 820, touch): at Fit the whole panel is on screen, the trig keys and their track
+names included; only the empty margin under them is below the fold.
+
+**Gate:** tsc, lint, validate, build; Rytm lessons; core e2e.
+

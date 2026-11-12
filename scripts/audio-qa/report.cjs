@@ -51,9 +51,10 @@ function ruleFor(name, rules) {
   const cat = categoryOf(name);
   const text = cat || String(name);
   for (const r of rules || []) {
+    // `preset`: a rule for single presets, matched on the whole name ("Category / Name")
     let re;
-    try { re = new RegExp(r.match, 'i'); } catch { continue; }
-    if (re.test(text)) return r;
+    try { re = new RegExp(r.preset || r.match, 'i'); } catch { continue; }
+    if (re.test(r.preset ? String(name) : text)) return r;
   }
   return null;
 }
@@ -102,7 +103,7 @@ function computeFlags(p, th) {
     if (ringing) add('long-tail', `${fx(i.tail.peakDb)} dBFS peak ${i.tail.afterSec} s after stop, still decaying at ${fx(rate)} dB/s (long release or FX tail)`, 20 + (i.tail.peakDb - th.tailDbfs) / 2);
     else add('stuck-tail', `${fx(i.tail.peakDb)} dBFS peak ${i.tail.afterSec} s after stop and not decaying (${fin(rate) ? signed(rate) + ' dB/s' : 'flat'}): a note, gate or drone is left on`, 45 + (i.tail.peakDb - th.tailDbfs));
   }
-  if (i.clicks && i.clicks.count >= th.clicksMin) {
+  if (i.clicks && i.clicks.count >= (p.rule && p.rule.clicksMin != null ? p.rule.clicksMin : th.clicksMin)) {
     const k = i.clicks.kinds;
     const kinds = ['mid', 'onset', 'cutoff'].filter(x => k[x]).map(x => `${k[x]} ${x}`).join(', ');
     const first = i.clicks.events[0];
@@ -146,7 +147,7 @@ function evaluateDevice(rep, cfg, opts = {}) {
   rep.presets.forEach(p => {
     p.category = categoryOf(p.name) || '(none)';
     const r = ruleFor(p.name, rules);
-    p.rule = r ? { name: r.name, offset: r.offset || 0, tolerance: r.tolerance ?? null, sustain: !!r.sustain } : null;
+    p.rule = r ? { name: r.name, offset: r.offset || 0, tolerance: r.tolerance ?? null, sustain: !!r.sustain, clicksMin: r.clicksMin ?? null } : null;
   });
   const measured = rep.presets.filter(p => p.inst && !p.inst.silent && fin(p.inst.lufs));
   const regular = measured.filter(p => !(p.rule && p.rule.offset));

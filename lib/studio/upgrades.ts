@@ -233,6 +233,34 @@ const UPGRADES: Upgrade[] = [
     oldDefaults: { decay: 60 },
     apply: v => (typeof v.decay === 'number' && v.decay < 10 ? { ...v, decay: 10 } : v),
   },
+  {
+    // Analog Four delay to the manual (p.95): WID is where the echo sits (X off) or how far the
+    // echoes swing (X on), and it rests at 0, the centre; it used to be a stereo spread resting at
+    // 63. An echo that did not ping-pong was in the middle and stays there; a ping-pong always swung
+    // fully and still does. (The kits saved in an A4 project are converted by the device itself.)
+    store: 13,
+    project: 10,
+    device: 'analog-four',
+    apply: v => {
+      if (!Object.keys(v).length) return v;   // nothing saved: the new defaults
+      const out: Values = { ...v };
+      if (out.fx_del_x === 1) out.fx_del_wid = 63; else delete out.fx_del_wid;
+      return out;
+    },
+  },
+  {
+    // DFAM defaults to the manual's Default settings (p.8): CUTOFF fully open, VCO and VCF DECAY at
+    // their shortest, VOLUME at the centre, a quicker TEMPO and VELOCITY knobs that accent the steps.
+    // A saved DFAM keeps the knobs nobody touched where the old defaults had them.
+    store: 13,
+    project: 10,
+    device: 'dfam',
+    oldDefaults: {
+      vco_decay: 100, vco1_level: 75, vcf_cutoff: 2000, vcf_decay: 300, vca_decay: 300, volume: 75, tempo: 120,
+      velocity_1: 100, velocity_2: 100, velocity_3: 100, velocity_4: 100, velocity_5: 100, velocity_6: 100, velocity_7: 100, velocity_8: 100,
+    },
+    apply: v => v,
+  },
 ];
 
 /** Lessons replaced by a rebuild: completing the old one counts for its successor */
@@ -308,8 +336,8 @@ export function upgradeCompletedLessons(done: string[], from: number): string[] 
   return [...out];
 }
 
-export const STORE_VERSION = 12;
-export const PROJECT_VERSION = 9;
+export const STORE_VERSION = 13;
+export const PROJECT_VERSION = 10;
 
 /**
  * Upgrade the control values of every instance saved before version `from`

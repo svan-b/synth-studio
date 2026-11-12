@@ -164,8 +164,13 @@ export function kitValues(kit: KitDef): Record<string, ControlValue> {
 // SAVE KIT stores `saved` too, which RELOAD KIT returns to. Kits are stored as
 // their differences from the init kit.
 
-/** One kit of the project: its name, its settings as last played, as last saved */
-export interface KitSlot { name: string; values: Record<string, ControlValue>; saved: Record<string, ControlValue> }
+/** One kit of the project: its name, its settings as last played, as last saved, and the format they are in */
+export interface KitSlot { name: string; values: Record<string, ControlValue>; saved: Record<string, ControlValue>; v?: number }
+/**
+ * The format of a stored kit. 2: the delay's WID is the echo's placement, or its ping-pong swing,
+ * resting at 0 (manual p.95); before, it was a stereo spread resting at 63.
+ */
+export const KIT_FORMAT = 2;
 /** A project with the A4's kits */
 export type A4Project = Project & { a4kits?: Record<string, KitSlot>; a4kit?: string };
 export const KIT_SLOTS = 128;
@@ -198,6 +203,28 @@ export function kitSnapshot(values: Record<string, ControlValue | undefined>): R
 /** Every control of a stored kit */
 export function kitFull(snapshot: Record<string, ControlValue> | undefined): Record<string, ControlValue> {
   return { ...KIT_DEFAULTS, ...(snapshot ?? {}) };
+}
+
+/** A kit stored before format 2: an echo that did not ping-pong sat in the middle, a ping-pong swung fully */
+function delayToManual(snapshot: Record<string, ControlValue> | undefined): Record<string, ControlValue> {
+  const out = { ...(snapshot ?? {}) };
+  if (out[fxid('del_x')] === 1) out[fxid('del_wid')] = 63; else delete out[fxid('del_wid')];
+  return out;
+}
+
+/** Bring a saved project's kits to the current format (`DeviceModule.data.migrate`) */
+export function migrateKits(saved: unknown): unknown {
+  const p = saved as A4Project | null;
+  if (!p || typeof p !== 'object' || !p.a4kits) return saved;
+  let changed = false;
+  const kits: Record<string, KitSlot> = {};
+  for (const k in p.a4kits) {
+    const slot = p.a4kits[k];
+    if (!slot || (slot.v ?? 1) >= KIT_FORMAT) { kits[k] = slot; continue; }
+    changed = true;
+    kits[k] = { ...slot, values: delayToManual(slot.values), saved: delayToManual(slot.saved), v: KIT_FORMAT };
+  }
+  return changed ? { ...p, a4kits: kits } : saved;
 }
 
 /** The kit slots the project uses, and the one loaded */
@@ -493,7 +520,7 @@ export const KITS: KitDef[] = [
       { sound: 'drum-hat', p: { amp_rev: 50, amp_vol: 70, amp_dec: 38 } },
       { sound: 'bass-sub', p: { amp_vol: 104 } },
     ],
-    fx: { del_tim: 24, del_fb: 82, del_lpf: 80, del_hpf: 30, del_x: 1, rev_dec: 100, rev_gai: 70, cho_dep: 40 },
+    fx: { del_tim: 24, del_fb: 82, del_lpf: 80, del_hpf: 30, del_x: 1, del_wid: 63, rev_dec: 100, rev_gai: 70, cho_dep: 40 },
     level: 79,
     project: dub,
   },

@@ -27,6 +27,8 @@ export interface SwitchProps {
   spot?: 'target' | 'focus' | null;
   /** Vertical toggle: position legends beside the lever, or at its ends (first above, last below) */
   legends?: 'side' | 'ends';
+  /** Printed legend per position, where the panel prints a symbol instead of the option's name */
+  legendText?: string[];
 }
 
 /** Native sizes the switch draws at (shared with the panel's legibility pass) */
@@ -58,6 +60,7 @@ function Switch({
   legendFit,
   spot,
   legends = 'side',
+  legendText,
 }: SwitchProps) {
   const { options } = spec;
   const current = Math.max(0, Math.min(options.length - 1, Math.round(value)));
@@ -248,7 +251,7 @@ function Switch({
     >
       {/* Bigger invisible target than the tiny legend */}
       <span className={styles.hit} style={{ inset: '-3px -4px' }} />
-      {opt}
+      {legendText?.[i] ?? opt}
     </span>
   );
   const ends = vertical && legends === 'ends' && positions >= 2;

@@ -55,7 +55,7 @@ p.7). Ranges are those of the hardware. "Twin" gives the value units used in `sp
 
 | Printed label | Section | Position | Cap | Range / positions | Twin | Source | Confidence |
 |---|---|---|---|---|---|---|---|
-| VCO DECAY | VCO EG | row 1, far left (18.9, 23.4) | large | decay of the pitch envelope; no effect while both VCO EG AMOUNT knobs are at noon; minimum is an almost instant snap, 9-10 o'clock a stick hit, noon and up slow "booms" | 10-10000 ms, log; default 100 ms | (DFAM manual, p.15); V | behaviour **verified**; range **likely** (the manual gives 10 ms - 10 s for the VCF EG only, p.19) |
+| VCO DECAY | VCO EG | row 1, far left (18.9, 23.4) | large | decay of the pitch envelope; no effect while both VCO EG AMOUNT knobs are at noon; minimum is an almost instant snap, 9-10 o'clock a stick hit, noon and up slow "booms" | 10-10000 ms, log; default 10 ms (the minimum, p.8) | (DFAM manual, p.15); V | behaviour **verified**; range **likely** (the manual gives 10 ms - 10 s for the VCF EG only, p.19) |
 | SEQ PITCH MOD | VCO EG | row 1, between VCO DECAY and VCO 1 EG AMOUNT (39.9, 23.7) | 3-way toggle | UP: VCO 1&2 · CENTRE: OFF (the PITCH jack still carries the steps) · DOWN: VCO 2 | 0/1/2; default OFF | (DFAM manual, p.15; legends p.7) | **verified**; default OFF **likely** (the walkthrough moves it to VCO 1&2 after starting, p.9) |
 | VCO 1 EG AMOUNT | VCO EG | row 1 (61.7, 23.4); (-)/(+) printed below | large | bipolar, noon = none; right of noon the pitch jumps up and falls back, left of noon it dips and rises | -100...+100 % | (DFAM manual, p.16; p.7) | **verified** (sweep in octaves: guess) |
 | VCO 1 FREQUENCY | VCO 1 | row 1 (90.7, 23.4), inside a printed scale ring | large | ten-octave range; noon matches the centre of the PITCH knobs | -5...+5 oct, noon = C3 (131 Hz); the readout shows Hz | (DFAM manual, p.13; ring p.7) | range **verified**; noon pitch **guess** (the walkthrough's deep bass between 10 and 11 o'clock, p.8, is 33-65 Hz in the twin) |
@@ -70,7 +70,7 @@ p.7). Ranges are those of the hardware. "Twin" gives the value units used in `sp
 
 | Printed label | Section | Position | Cap | Range | Twin | Source | Confidence |
 |---|---|---|---|---|---|---|---|
-| VCO 1 LEVEL | Mixer | top of the mixer column (131.2, 18.0), legend above | stalk | off - full; square sounds louder than triangle; high mixer levels sound more aggressive and clip | 0-100 %; default 75 % | (DFAM manual, p.16; p.7); K | **verified** |
+| VCO 1 LEVEL | Mixer | top of the mixer column (131.2, 18.0), legend above | stalk | off - full; square sounds louder than triangle; high mixer levels sound more aggressive and clip | 0-100 %; default 84 % (3 o'clock, p.8) | (DFAM manual, p.16; p.7); K | **verified** |
 | NOISE / EXT LEVEL | Mixer | middle (131.2, 39.8) | stalk | white noise, or the EXT AUDIO signal when patched; the NOISE LEVEL jack adds to it | 0-100 %; default 0 | (DFAM manual, p.17, p.26) | **verified** |
 | VCO 2 LEVEL | Mixer | bottom (131.2, 61.5) | stalk | off - full | 0-100 %; default 0 | (DFAM manual, p.17; the walkthrough turns it up, p.10); K | **verified** |
 
@@ -79,9 +79,9 @@ p.7). Ranges are those of the hardware. "Twin" gives the value units used in `sp
 | Printed label | Section | Position | Cap | Range / positions | Twin | Source | Confidence |
 |---|---|---|---|---|---|---|---|
 | VCF (HP / LP) | VCF | left of CUTOFF (151.5, 23.8) | 2-way toggle | UP: HP · DOWN: LP; a 4-pole ladder, 24 dB/oct | HP/LP; default LP | (DFAM manual, p.17, p.18, p.40; legends p.7) | **verified** |
-| CUTOFF | VCF | row 1 (173.8, 23.4); 20Hz, 200Hz, 2kHz, 20kHz printed around it | large | 20 Hz - 20 kHz | 20-20000 Hz, log; default 2 kHz | (DFAM manual, p.18; marks p.7) | **verified** |
+| CUTOFF | VCF | row 1 (173.8, 23.4); 20Hz, 200Hz, 2kHz, 20kHz printed around it | large | 20 Hz - 20 kHz | 20-20000 Hz, log; default 20 kHz (fully open, p.8) | (DFAM manual, p.18; marks p.7) | **verified** |
 | RESONANCE | VCF | row 1 (202.8, 23.4) | large | feedback: a peak at the cutoff, and the bass may thin; in LP it self-oscillates (a sine) above 3 o'clock; HP is scaled differently: at maximum it self-oscillates from a CUTOFF of about 1 kHz up | 0-100 % | (DFAM manual, p.18) | **verified** |
-| VCF DECAY | VCF EG | row 2 (158.0, 55.8) | large | 10 ms - 10 s; the step velocity also affects it | 10-10000 ms, log; default 300 ms | (DFAM manual, p.19) | **verified** |
+| VCF DECAY | VCF EG | row 2 (158.0, 55.8) | large | 10 ms - 10 s; the step velocity also affects it | 10-10000 ms, log; default 10 ms (the minimum, p.8) | (DFAM manual, p.19) | **verified** |
 | VCF EG AMOUNT | VCF EG | row 2 (187.0, 55.8); (-)/(+) printed below | large | bipolar, noon = none; + raises and - lowers the cutoff, in either mode | -100...+100 % | (DFAM manual, pp.19-20; p.7) | **verified** (octaves: guess) |
 | NOISE / VCF MOD | VCF | row 2 (216.1, 55.8) | large | how much the noise shakes the cutoff (dirty, lo-fi); with a cable in VCF MOD it sets that signal's depth instead, fully clockwise for full CV control | 0-100 % | (DFAM manual, p.20, p.27) | **verified** |
 
@@ -90,19 +90,19 @@ p.7). Ranges are those of the hardware. "Twin" gives the value units used in `sp
 | Printed label | Section | Position | Cap | Range / positions | Twin | Source | Confidence |
 |---|---|---|---|---|---|---|---|
 | VCA EG | VCA | row 1 (225.3, 24.3) | 2-way toggle | UP: FAST (1 ms attack) · DOWN: SLOW (100 ms attack) | FAST/SLOW; default FAST | (DFAM manual, p.20; legends p.7) | **verified** |
-| VOLUME | VCA | row 1, far right (247.5, 23.4) | large | final output level: the VCA jack and the rear AUDIO OUT | 0-100 %; default 75 % | (DFAM manual, p.21, p.25, p.6) | **verified** |
-| VCA DECAY | VCA | row 2, far right (247.5, 55.8) | large | decay of the VCA EG: the minimum gives almost no sound, 9 o'clock short blips, 10 o'clock tight thumps, 11 o'clock a ringing note, noon a long ring, and past noon the hits wash together | 10-10000 ms, log; default 300 ms | (DFAM manual, p.21, p.12) | behaviour **verified**; range and taper **likely** (see Model choices) |
+| VOLUME | VCA | row 1, far right (247.5, 23.4) | large | final output level: the VCA jack and the rear AUDIO OUT | 0-100 %; default 50 % (12 o'clock, p.8) | (DFAM manual, p.21, p.25, p.6) | **verified** |
+| VCA DECAY | VCA | row 2, far right (247.5, 55.8) | large | decay of the VCA EG: the minimum gives almost no sound, 9 o'clock short blips, 10 o'clock tight thumps, 11 o'clock a ringing note, noon a long ring, and past noon the hits wash together | 10-10000 ms, log; default 153 ms (just before 11 o'clock, p.8) | (DFAM manual, p.21, p.12) | behaviour **verified**; range and taper **likely** (see Model choices) |
 
 ### Sequencer and transport
 
 | Printed label | Section | Position | Cap | Range | Twin | Source | Confidence |
 |---|---|---|---|---|---|---|---|
 | TRIGGER | Transport | (18.9, 87.0), legend above | push button | plays the current step (the lit one) without advancing; the manual describes it with the sequencer stopped | momentary | (DFAM manual, p.23; p.7) | **verified** |
-| TEMPO | Transport | (46.4, 87.1), inside a printed scale ring | large | 0.7 Hz - 700 Hz, continuously variable: about 10 - 10,000 BPM if each step is a 16th note; ignored while ADV / CLOCK is patched | 10.5-10500 BPM (16th-note steps), log; default 120; readout on hover or touch only, because RUN / STOP and ADVANCE are printed just under the ring | (DFAM manual, p.23, p.29, p.40; p.7) | **verified** |
+| TEMPO | Transport | (46.4, 87.1), inside a printed scale ring | large | 0.7 Hz - 700 Hz, continuously variable: about 10 - 10,000 BPM if each step is a 16th note; ignored while ADV / CLOCK is patched | 10.5-10500 BPM (16th-note steps), log; default 245 (just before 12 o'clock, p.8); readout on hover or touch only, because RUN / STOP and ADVANCE are printed just under the ring | (DFAM manual, p.23, p.29, p.40; p.7) | **verified** |
 | RUN / STOP | Transport | (36.9, 107.9), legend centred above it at (36.9, 100.6) | push button | starts the sequencer from the current step at the current TEMPO, and stops it when it is running | toggle | (DFAM manual, p.22; p.7) | **verified** |
 | ADVANCE | Transport | (55.9, 107.9), legend at (55.9, 100.6) | push button | with the sequencer stopped, moves to the next step without playing the steps it passes | momentary | (DFAM manual, p.23; p.7) | **verified** |
 | PITCH 1-8 | Sequencer | top row of eight at (79.9 + 23.94 x (n - 1), 84.3); "PITCH" printed at the left | stalk | about +-5 V, roughly ten octaves; right of centre adds to VCO FREQUENCY, left subtracts; reaches the VCOs only with SEQ PITCH MOD on VCO 1&2 or VCO 2; always on the PITCH jack | -5...+5 V, shown in semitones (1/12 V detents) | (DFAM manual, p.22, p.15; p.7) | **verified** (detents: twin choice) |
-| VELOCITY 1-8 | Sequencer | bottom row (y 108.0); "VELOCITY" printed at the left | stalk | 0-5 V; sets the level of all three EGs, and a higher velocity gives a slightly longer decay; the minimum is silent | 0-100 %; default 100 % | (DFAM manual, p.22; p.7) | **verified** |
+| VELOCITY 1-8 | Sequencer | bottom row (y 108.0); "VELOCITY" printed at the left | stalk | 0-5 V; sets the level of all three EGs, and a higher velocity gives a slightly longer decay; the minimum is silent | 0-100 %; defaults 100, 50, 83, 50, 83, 50, 100, 50 (maximum, centre, 3 o'clock: p.8) | (DFAM manual, p.22; p.7, p.8) | **verified** |
 | 1 ... 8 | Sequencer | step numbers above the PITCH row (y 74.7) | printed | - | - | (DFAM manual, p.7) | **verified** |
 
 ### LEDs
@@ -175,7 +175,7 @@ Positions: columns at x 267.6 / 281.2 / 294.8 mm, rows at y = 16.5 + 13.46 x (ro
 | ADV / CLOCK slow edges | any rise through 1.5 V counts, however slow | slowly changing signals may be ignored (DFAM manual, p.29) |
 | TRIGGER button and TRIGGER out | the button also sends the TRIGGER out pulse | the clock and the TRIGGER jack do; the button is not mentioned (DFAM manual, p.24, p.29) |
 | PITCH 1-8 knob feel | semitone detents (1/12 V), so steps can be tuned on a touch screen; presets and cables may still use any voltage | continuous, about +-5 V (DFAM manual, p.22) |
-| Default VELOCITY 1-8 | 100 % | the default patch varies them: the walkthrough's first VELOCITY step turns them all to maximum (DFAM manual, p.9) |
+| Default VELOCITY 1-8 | as the manual's Default settings draw them: 100, 50, 83, 50, 83, 50, 100, 50 | the walkthrough's first VELOCITY step turns them all to maximum (DFAM manual, p.8, p.9) |
 | Analog drift | random wander toward +-3 cents per VCO (about +-1 cent over 250 ms) | the oscillators need a few minutes to warm up, and units differ slightly (DFAM manual, p.6, p.33) |
 | Main output | AC-coupled (5 Hz), then an output rail: unity up to 0.7 (3.5 V), a soft knee above it, never reaching 1.0 (5 V, 0 dBFS); everything-up patches peak at -0.2 dBFS, typical patches never reach the knee | VCA out is -5 to +5 V, and hot mixer levels clip (DFAM manual, p.25, p.16) |
 
@@ -187,20 +187,31 @@ credits the sheet and its page (docs/research/COPYRIGHT-RULES.md).
 
 | Patch sheet | Page | Twin preset | How it was made |
 |---|---|---|---|
-| Music Box | (DFAM manual, p.33) | Metal / FM chime melody | knob positions read from the sheet |
-| Quick Hats | (DFAM manual, p.33) | Hats / Hat lengths per step | knob positions read from the sheet |
-| FM Toys | (DFAM manual, p.34) | Metal / Clanky FM sequence | recreated from the sheet's notes |
-| Sequenced Bass | (DFAM manual, p.34) | Bass / Soft unison bass | from the notes, with the SLOW VCA EG glide tip (p.20) |
-| Kick / Snare / FM Osc 2 | (DFAM manual, p.35) | Loop / Kick, snare and FM | from the notes |
-| Filter As An Oscillator | (DFAM manual, p.35) | Toms / Ringing filter toms | from the notes, with the RESONANCE tip (p.18) |
-| Insane Toms | (DFAM manual, p.36) | Toms / Rolling toms | from the notes |
-| Swing Time | (DFAM manual, p.36) | Loop / Shuffle | from the notes, with the TEMPO tip (p.23) |
-| Sequencer As An Oscillator | (DFAM manual, p.37) | FX / Audio-rate sequencer | from the notes |
-| Talking Drum | (DFAM manual, p.37) | Toms / Vowel drum | from the notes |
-| the "Exploring the DFAM" walkthrough | (DFAM manual, pp.8-9) | Kick / Analog kick | the walkthrough's knob settings |
+| Default settings | (DFAM manual, p.8) | Init / Default settings (and the spec's defaults: what Reset gives) | every knob measured from the drawing |
+| Music Box | (DFAM manual, p.33) | Metal / FM chime melody | every knob measured from the sheet |
+| Quick Hats | (DFAM manual, p.33) | Hats / Hat lengths per step | every knob measured from the sheet |
+| FM Toys | (DFAM manual, p.34) | Metal / Clanky FM sequence | every knob measured from the sheet |
+| Sequenced Bass | (DFAM manual, p.34) | Bass / Soft unison bass | every knob measured from the sheet |
+| Kick / Snare / FM Osc 2 | (DFAM manual, p.35) | Loop / Kick, snare and FM | every knob measured from the sheet |
+| Filter As An Oscillator | (DFAM manual, p.35) | Toms / Ringing filter toms | every knob measured from the sheet |
+| Insane Toms | (DFAM manual, p.36) | Toms / Rolling toms | every knob measured from the sheet |
+| Swing Time | (DFAM manual, p.36) | Loop / Shuffle | every knob measured from the sheet |
+| Sequencer As An Oscillator | (DFAM manual, p.37) | FX / Audio-rate sequencer | every knob measured from the sheet |
+| Talking Drum | (DFAM manual, p.37) | Toms / Vowel drum | every knob measured from the sheet |
+| the "Exploring the DFAM" walkthrough | (DFAM manual, pp.8-9) | Kick / Analog kick | the walkthrough's knob settings, on the neutral patch |
 
-The sheets on pp.34-37 and the default patch on p.8 were not legible enough to read knob positions
-from, so those presets follow the notes. The Electronicus patches pair the DFAM with a Mother-32
+**How the sheets were read.** The Default settings and the ten sheets are drawings in the manual's
+PDF. Rendered at 400 dpi, each knob's pointer was located and its angle measured (the large knobs
+sweep 300 degrees, from 7 to 5 o'clock; the small ones 270, from 7:30 to 4:30; repeat readings agree
+within about half a percent of the sweep). Angles became values through the twin's control laws:
+the DECAY knobs, CUTOFF and TEMPO are logarithmic over their ranges, the others linear. Switches
+are the circled legends, cables as drawn. Two things follow from it:
+- TEMPO sits between 9:25 and 10:45 on the ten sheets, which the twin's law turns into 56 to 139
+  BPM: the law fits. The Default settings put it just before 12 o'clock, about 245 BPM, a fast roll.
+- Every sheet leaves VOLUME at 12 o'clock. The presets set VOLUME for the line-up instead (Levels,
+  below), except Init, which is the Default settings knob for knob and so plays about 10 LU lower.
+
+The Electronicus patches pair the DFAM with a Mother-32
 (Electronicus patchbook, pp.4-10); no preset here follows them or credits them. The other 28 presets
 are well-known community techniques; with Init there are 40 in `presets.ts`.
 

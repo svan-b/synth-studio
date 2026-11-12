@@ -7,7 +7,7 @@
 // ============================================================================
 
 import type { DeviceSpec, KnobSpec } from '@/types';
-import { DFAM_PRESETS } from './presets';
+import { DEFAULT_VELOCITY, DFAM_PRESETS } from './presets';
 
 const step = (n: number) => String(n);
 
@@ -43,7 +43,8 @@ const pitchKnob = (n: number): KnobSpec => ({
 });
 
 const velocityKnob = (n: number): KnobSpec => ({
-  type: 'knob', label: `VELOCITY ${step(n)}`, min: 0, max: 100, default: 100, units: '%', size: 'small',
+  // the manual's Default settings (p.8) accent the steps: maximum, centre, 3 o'clock ...
+  type: 'knob', label: `VELOCITY ${step(n)}`, min: 0, max: 100, default: DEFAULT_VELOCITY[n - 1], units: '%', size: 'small',
   description: `Step ${n} velocity: 0-5 V. Sets how hard all three envelopes hit (level, and a little of their length). 0 silences the step.`,
   manualReference: 'Sequencer - VELOCITY 1-8',
 });
@@ -81,7 +82,7 @@ export const DFAM: DeviceSpec = {
   controls: {
     // ---- VCO EG ---------------------------------------------------------------
     vco_decay: {
-      type: 'knob', label: 'VCO DECAY', min: 10, max: 10000, default: 100, units: 'ms', size: 'large', curve: 'logarithmic',
+      type: 'knob', label: 'VCO DECAY', min: 10, max: 10000, default: 10, units: 'ms', size: 'large', curve: 'logarithmic',
       description: 'Decay time of the VCO envelope (about 10 ms to 10 s). How fast the pitch sweep falls back. No effect while both VCO EG AMOUNT knobs are at noon.',
       manualReference: 'VCO EG - VCO DECAY',
     },
@@ -137,7 +138,7 @@ export const DFAM: DeviceSpec = {
 
     // ---- Mixer ----------------------------------------------------------------------
     vco1_level: {
-      type: 'knob', label: 'VCO 1 LEVEL', min: 0, max: 100, default: 75, units: '%', size: 'small',
+      type: 'knob', label: 'VCO 1 LEVEL', min: 0, max: 100, default: 84, units: '%', size: 'small',
       description: 'VCO 1 into the filter. High levels drive the ladder into warm saturation.',
       manualReference: 'Mixer - VCO 1 LEVEL',
     },
@@ -159,7 +160,7 @@ export const DFAM: DeviceSpec = {
       manualReference: 'VCF - HP / LP switch',
     },
     vcf_cutoff: {
-      type: 'knob', label: 'CUTOFF', min: 20, max: 20000, default: 2000, units: 'Hz', size: 'large', curve: 'logarithmic',
+      type: 'knob', label: 'CUTOFF', min: 20, max: 20000, default: 20000, units: 'Hz', size: 'large', curve: 'logarithmic',
       description: 'Filter cutoff, 20 Hz to 20 kHz. The VCF EG, NOISE / VCF MOD and the VCF MOD jack add to it.',
       manualReference: 'VCF - CUTOFF',
     },
@@ -169,7 +170,7 @@ export const DFAM: DeviceSpec = {
       manualReference: 'VCF - RESONANCE',
     },
     vcf_decay: {
-      type: 'knob', label: 'VCF DECAY', min: 10, max: 10000, default: 300, units: 'ms', size: 'large', curve: 'logarithmic',
+      type: 'knob', label: 'VCF DECAY', min: 10, max: 10000, default: 10, units: 'ms', size: 'large', curve: 'logarithmic',
       description: 'Decay time of the VCF envelope (10 ms to 10 s): how quickly the brightness of each hit closes.',
       manualReference: 'VCF EG - VCF DECAY',
     },
@@ -191,19 +192,19 @@ export const DFAM: DeviceSpec = {
       manualReference: 'VCA - VCA EG FAST / SLOW',
     },
     vca_decay: {
-      type: 'knob', label: 'VCA DECAY', min: 10, max: 10000, default: 300, units: 'ms', size: 'large', curve: 'logarithmic',
+      type: 'knob', label: 'VCA DECAY', min: 10, max: 10000, default: 153, units: 'ms', size: 'large', curve: 'logarithmic',
       description: 'How long each hit rings (10 ms to 10 s). Fully counter-clockwise is a click; fully clockwise is a drone.',
       manualReference: 'VCA - VCA DECAY',
     },
     volume: {
-      type: 'knob', label: 'VOLUME', min: 0, max: 100, default: 75, units: '%', size: 'large',
+      type: 'knob', label: 'VOLUME', min: 0, max: 100, default: 50, units: '%', size: 'large',
       description: 'Output level (the VCA jack and the main output).',
       manualReference: 'VCA - VOLUME',
     },
 
     // ---- Sequencer --------------------------------------------------------------------------
     tempo: {
-      type: 'knob', label: 'TEMPO', min: 10.5, max: 10500, default: 120, units: 'BPM', size: 'large', curve: 'logarithmic',
+      type: 'knob', label: 'TEMPO', min: 10.5, max: 10500, default: 245, units: 'BPM', size: 'large', curve: 'logarithmic',
       description: 'Sequencer clock, 0.7 Hz to 700 Hz (into audio rate). Shown as BPM with each step a 16th note: 120 BPM = 8 steps a second. Ignored while ADV/CLOCK has a cable.',
       manualReference: 'Sequencer - TEMPO',
     },

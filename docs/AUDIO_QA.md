@@ -151,6 +151,7 @@ A preset's category is the part of its name before ` / `, which is also how the 
 - **Preset target.** The device median plus the preset's category offset, with a tolerance of ±4 LU unless the rule sets its own `tolerance`.
 - **Absolute target.** `--target -18` replaces the device median with one target for every instrument. Use it to line all instruments up for the master bus.
 - **Overrides.** Rules can be overridden per device: `{"devices": {"xone96": {"thresholds": {"loudnessLu": 6}}}}`.
+- **A device's own rules.** A device can carry its own `categories` list, which is then used instead of the general one (so it repeats the general rules after its own). A rule with `preset` instead of `match` is tested on the whole preset name, for single presets, and a rule may set `clicksMin`, its own count of clicks from which the preset is flagged. The DFAM uses all three for presets that are a patch sheet of its manual knob for knob: its Default settings leave VOLUME at 12 o'clock (judged 10 LU under the line-up), two sheets keep sounding after a stop by design (`sustain`), and one plays a full-level triangle whose corners read as two or three clicks. Each rule says why in `config.cjs`.
 
 Each device report has a per-category table: the target, median, range and spread, and how far the category sits from the device median.
 

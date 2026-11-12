@@ -14,7 +14,7 @@ import { ANALOG_FOUR_LESSONS } from './lessons';
 import { AnalogFourEngine } from './engine';
 import { CV_BY_KEY, FX_BY_KEY, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS, TRACK_OUTS } from './params';
 import { ARP_KEYS, isArpKey, patternArp, setPatternArp, type ArpSettings } from './arp';
-import { KIT_BY_ID } from './kits';
+import { KIT_BY_ID, migrateKits } from './kits';
 
 const STEP_KEYS: Record<string, string> = { trig_note: 'note', trig_vel: 'vel', trig_len: 'len', trig_micro: 'micro', trig_cond: 'cond', trig_prob: 'prob' };
 
@@ -62,7 +62,8 @@ const analogFour: DeviceModule = {
   data: {
     // A new A4 opens on the demo song; its kit (sounds) is applied when the panel first shows
     initial: () => ({ ...KIT_BY_ID['night-drive'].project(), a4: { pendingKit: 'night-drive' } }),
-    migrate: base.migrate,
+    // the sequencer's own repairs, then the project's kits to the current kit format
+    migrate: saved => migrateKits(base.migrate(saved)),
   },
   interceptChange: (id: string, value: ControlValue, api) => {
     // [FUNC] + TRACK LEVEL opens the SOUND BROWSER (manual p.12, p.21); while it is open TRACK LEVEL

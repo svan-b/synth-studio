@@ -153,7 +153,7 @@ const A4_DEFAULTS = [
 
 const A4_FX: Values = Object.fromEntries(Object.entries({
   cho_pre: 20, cho_spd: 28, cho_dep: 56, cho_wid: 110, cho_fb: 8, cho_hpf: 40, cho_lpf: 120, cho_vol: 90,
-  del_tim: 24, del_x: 1, del_fb: 52, del_ovr: 8, del_hpf: 40, del_lpf: 80, del_rev: 30, del_vol: 95,
+  del_tim: 24, del_x: 1, del_wid: 63, del_fb: 52, del_ovr: 8, del_hpf: 40, del_lpf: 80, del_rev: 30, del_vol: 95,
   rev_pre: 14, rev_dec: 82, rev_gai: 70, rev_hpf: 36, rev_lpf: 76, rev_vol: 92,
 }).map(([k, v]) => [fxid(k), v]));
 

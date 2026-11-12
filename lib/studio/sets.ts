@@ -10,7 +10,7 @@
 
 import type { RackSlot, StudioCable } from '@/devices/types';
 import { useStudioStore } from '@/store/studio';
-import { MIN_DB, type ChannelDoc, type MixerDoc } from './mixerDoc';
+import { MAX_DB, MIN_DB, type ChannelDoc, type MixerDoc } from './mixerDoc';
 
 export interface StudioSet {
   id: string;
@@ -47,10 +47,13 @@ const ch = (gain: number, pan = 0, sendA = MIN_DB, sendB = MIN_DB): Partial<Chan
  *   Analog Rytm  +6 / +10 at 0 dB (the reviewed kits)  -> -6 dB:    0 / +4 to +5.5
  *   Analog Four  -0.6 / +6 at -3 dB, a peaky sound      -> -4 dB:    -1.5 / +5
  *   Sub 37       +1.6 / +2.4 at -3 dB                   -> -4.5 dB:  0 / +1
- *   DFAM         -3.4 / -2.5 at -6 dB (panned -0.3, 120-124 BPM) -> -2.5 dB: 0 / +1
+ *   DFAM         -3.4 / -2.5 at -6 dB (panned -0.3, 120-124 BPM) -> -2.5 dB: 0 / +1, on its old default
+ *                sound. Its default is now the manual's Default settings (p.8), VOLUME at 12 o'clock:
+ *                7 dB less on the meter (-6.3 / -3.6 at 0 dB against +0.9 / +1.9), so 6 dB more
+ *                fader: -0.4 / +2.2
  * The Mother-32 and Subharmonicon use MOOG_LINE_UP.
  */
-const LINE_UP = { 'analog-rytm': -6, 'analog-four': -4, sub37: -4.5, dfam: -2.5 } as const;
+const LINE_UP = { 'analog-rytm': -6, 'analog-four': -4, sub37: -4.5, dfam: 3.5 } as const;
 /**
  * Lined-up channels sum hotter on the LR MIX, whose PK! LED (+10 dBu sample peaks, faders up)
  * was lit for 97-100 % of the play in every one of these sets at their old levels - the Rytm
@@ -164,10 +167,13 @@ const ELEKTRON: StudioSet[] = [
  * Starting levels of the Moogs routed into the Xone:96, measured on its channel meters with
  * the instruments' default sounds (scripts: the Xone's meterSnapshot while the set plays):
  * each channel then averages about 0 with peaks near +4, the guide's line-up (Xone:96 guide
- * p.39). The DFAM arrives there at unity; the Mother-32 arrives hot (about +4 average at
- * -3 dB), the Subharmonicon about 2 dB hot.
+ * p.39). The DFAM, on the manual's Default settings with VOLUME at 12 o'clock, needs the fader's
+ * full +6 dB (-0.4 average, peaks +2.2; at unity it reads -6.3); the Mother-32 arrives hot
+ * (about +4 average at -3 dB), the Subharmonicon about 2 dB hot.
  */
-const MOOG_LINE_UP = { mother32: -6.5, subharmonicon: -8 } as const;
+const MOOG_LINE_UP = { dfam: 6, mother32: -6.5, subharmonicon: -8 } as const;
+/** The DFAM VOLUME the line-ups were measured at: its default, 12 o'clock (see loadStudioSet) */
+const DFAM_LINE_UP_VOLUME = 50;
 /**
  * With all three in, each starts this much under the line-up: three lined-up channels sum about
  * 4 dB hotter on the LR MIX, whose PK! LED (+10 dBu, faders up) then lit about 40 % of the time;
@@ -184,7 +190,7 @@ const MOOG: StudioSet[] = [
     description: 'The DFAM on its own, on its internal clock.',
     goal: 'Tune the 8 steps into a rhythm with PITCH and VELOCITY.',
     rack: [slot('dfam')],
-    channels: { dfam: ch(0, 0, MIN_DB, -22) },
+    channels: { dfam: ch(MOOG_LINE_UP.dfam, 0, MIN_DB, -22) },
     bpm: 110,
     focus: 'dfam',
   },
@@ -197,7 +203,7 @@ const MOOG: StudioSet[] = [
     goal: 'Change CLOCK DIV on the Studio Clock and hear the DFAM speed up or slow down.',
     rack: [slot('studio-clock'), slot('dfam')],
     cables: [CLOCK_TO_DFAM],
-    channels: { dfam: ch(0, 0, MIN_DB, -22) },
+    channels: { dfam: ch(MOOG_LINE_UP.dfam, 0, MIN_DB, -22) },
     bpm: 110,
     focus: 'studio-clock',
   },
@@ -212,7 +218,7 @@ const MOOG: StudioSet[] = [
     routes: { dfam: 'xone96:studio_1' },
     sync: { xone96: true },
     cables: [CLOCK_TO_DFAM],
-    channels: { dfam: ch(0, 0, MIN_DB, -22), xone96: ch(XONE_MAKEUP.m3) },
+    channels: { dfam: ch(MOOG_LINE_UP.dfam, 0, MIN_DB, -22), xone96: ch(XONE_MAKEUP.m3) },
     bpm: 110,
     focus: 'xone96',
   },
@@ -227,7 +233,7 @@ const MOOG: StudioSet[] = [
     routes: { dfam: 'xone96:studio_1', mother32: 'xone96:studio_2' },
     sync: { mother32: true, xone96: true },
     cables: [CLOCK_TO_DFAM],
-    channels: { dfam: ch(0, 0, MIN_DB, -22), mother32: ch(MOOG_LINE_UP.mother32, 0.15, -18, MIN_DB), xone96: ch(XONE_MAKEUP.m4) },
+    channels: { dfam: ch(MOOG_LINE_UP.dfam, 0, MIN_DB, -22), mother32: ch(MOOG_LINE_UP.mother32, 0.15, -18, MIN_DB), xone96: ch(XONE_MAKEUP.m4) },
     bpm: 110,
     focus: 'mother32',
   },
@@ -243,7 +249,7 @@ const MOOG: StudioSet[] = [
     sync: { mother32: true, subharmonicon: true, xone96: true },
     cables: [CLOCK_TO_DFAM],
     channels: {
-      dfam: ch(MOOG_TRIO, 0, MIN_DB, -22),
+      dfam: ch(MOOG_LINE_UP.dfam + MOOG_TRIO, 0, MIN_DB, -22),
       mother32: ch(MOOG_LINE_UP.mother32 + MOOG_TRIO, 0.15, -18, MIN_DB),
       subharmonicon: ch(MOOG_LINE_UP.subharmonicon + MOOG_TRIO, -0.25, MIN_DB, -12),
       xone96: ch(XONE_MAKEUP.m5),
@@ -266,7 +272,7 @@ const MORE: StudioSet[] = [
     routes: { dfam: 'xone96:studio_1', mother32: 'xone96:studio_2', subharmonicon: 'xone96:studio_3' },
     sync: { mother32: true, subharmonicon: true, xone96: true },
     cables: [CLOCK_TO_DFAM],
-    channels: { dfam: ch(MOOG_TRIO), mother32: ch(MOOG_LINE_UP.mother32 + MOOG_TRIO), subharmonicon: ch(MOOG_LINE_UP.subharmonicon + MOOG_TRIO), xone96: ch(XONE_MAKEUP.moogMix) },
+    channels: { dfam: ch(MOOG_LINE_UP.dfam + MOOG_TRIO), mother32: ch(MOOG_LINE_UP.mother32 + MOOG_TRIO), subharmonicon: ch(MOOG_LINE_UP.subharmonicon + MOOG_TRIO), xone96: ch(XONE_MAKEUP.moogMix) },
     bpm: 110,
     focus: 'xone96',
   },
@@ -338,7 +344,21 @@ export function loadStudioSet(set: StudioSet) {
   useStudioStore.setState(s => {
     const mixer: MixerDoc = { ...(s.studio.mixer ?? {}) };
     const channels: NonNullable<MixerDoc['channels']> = {};
-    set.rack.forEach(r => { channels[r.id] = { ...(set.channels?.[r.id] ?? {}) }; });
+    set.rack.forEach(r => {
+      const ch = { ...(set.channels?.[r.id] ?? {}) };
+      // The DFAM's starting level is lined up for VOLUME at 12 o'clock, the manual's Default
+      // settings. A DFAM that keeps another VOLUME (a saved one from before those became the
+      // defaults sits at 75) gets the difference on its fader, so it reads the same on the meter:
+      // the output follows VOLUME squared, 40 dB per decade
+      if (r.device === 'dfam' && typeof ch.gain === 'number' && ch.gain > MIN_DB) {
+        const volume = s.devices[r.id]?.controlValues?.volume;
+        if (typeof volume === 'number' && volume !== DFAM_LINE_UP_VOLUME) {
+          ch.gain = Math.max(-24, Math.min(MAX_DB, ch.gain - 40 * Math.log10(Math.max(5, volume) / DFAM_LINE_UP_VOLUME)));
+          ch.gain = Math.round(ch.gain * 10) / 10;
+        }
+      }
+      channels[r.id] = ch;
+    });
     mixer.channels = channels;
     return {
       studio: {

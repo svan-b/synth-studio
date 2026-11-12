@@ -1,9 +1,11 @@
 # Analog Four MKII: reference for the twin
 
 What the twin is built from, element by element. The primary source is the
-**Elektron Analog Four MKII User Manual for OS 1.55**, cited as
-"(A4 MKII manual, p.N)". Everything with such a cite was checked against that
-page. The measurements and longer notes behind this file are in
+**Elektron Analog Four MKII User Manual**, cited as "(A4 MKII manual, p.N)".
+Everything with such a cite was checked against that page. The twin was built
+on the OS 1.55 manual and checked again against the OS 1.56 one; the page
+numbers are the same. OS 1.55B to 1.56 add Outbox 8 routing and fix bugs
+(Elektron's release notes): nothing the twin models changed. The measurements and longer notes behind this file are in
 `docs/research/analog-four/` (`panel.md`, `signal-flow.md`, `sources.md`).
 Where the manual is silent the twin makes a choice; those rows say
 **not in the manual** and what the twin does instead.
@@ -83,10 +85,12 @@ and MAIN VOLUME; the twin has no other knob (A4 MKII manual, p.12).
 | 1 | Active kit name; the full parameter name while a knob turns | Kit / pattern name, replaced by the parameter's name for 1.4 s | (A4 MKII manual, p.18) |
 | 2 | Tempo with one decimal | Yes; the studio tempo while synced | (A4 MKII manual, p.18) |
 | 3 | Record, play, pause or stop symbol | Yes | (A4 MKII manual, p.18) |
-| 4 | Up to ten parameters in the knobs' 2 × 5 layout | Yes; a held trig's locked values show inverted | (A4 MKII manual, p.18, p.49) |
+| 4 | Up to ten parameters in the knobs' 2 × 5 layout, each drawn as a graphic above its name: a dial, a switch, a level column, a waveform, a filter's curve across FRQ and RES, an envelope across ATK DEC SUS REL, a word for a list (MUL, MOD, DST), a hatched square for a knob with no parameter | The same graphics, our own drawings computed from the values (`screenGraphics.tsx`, `components/sequencer/OledGraphics.tsx`): the filter curves are the response of the type, the envelope follows the times, the level and SHP. The value is written under each name (the hardware shows values while a PARAMETER key is held); a held trig's locked values show inverted | (A4 MKII manual, p.18, p.49; the page figures of p.87-100) |
 | 5 | Active pattern, with the song row to its left ("_ _:" = scratch pad) | Yes | (A4 MKII manual, p.18) |
 | 6 | Level bar of the active track | Yes | (A4 MKII manual, p.18) |
 | 7 | Track name | Yes | (A4 MKII manual, p.18) |
+| - | The page's name, with "(P 1/2)" or "(P 2/2)" on a key with two pages | Takes the kit name's place for 1.4 s after a PARAMETER or track key; it also stays in the foot of the screen | (A4 MKII manual, figures p.87-100) |
+| - | Spellings of the screen | The tempo reads "BPM:120.0"; NOISE's first knob reads SNH (S&H in the manual's text); the LFO modes read FREE, TRIG, HOLD, ONE, HALF and the multipliers with a × | (A4 MKII manual, figures p.18, p.87, p.92) |
 
 The OLED is drawn about 1.2 × its real 56 × 27 mm inside the real-size window,
 for legibility (panel.md §4).
@@ -140,6 +144,7 @@ NOISE (digital)┘                                                     │      
 | Noise | S&H, COL (-64 red, -32 pink, 0 white, positive high-passed), FAD (0 constant, + out, - in), LEV | (A4 MKII manual, p.87) |
 | Envelope shapes | 12: six shapes, each with and without restart from zero | (A4 MKII manual, p.74-75) |
 | LFO modes | FRE, TRG, HLD, ONE, HLF; SPD bipolar (negative plays backwards); 16, 32 or 64 give straight beats | (A4 MKII manual, p.92) |
+| LFO SPH | The phase a trig restarts the wave at. With WAV on RND it adds slew to the steps instead (the twin: the share of each step spent gliding to the new value; a trig starts a new step). The same on the FX LFOs | (A4 MKII manual, p.92, p.97) |
 
 ## Pages and encoder slots
 
@@ -180,7 +185,7 @@ The keyboard is not velocity sensitive: trigs take VEL (A4 MKII manual, p.47).
 | Five pages: EXT IN, CHORUS, DELAY, REVERB, LFO (OSC2 has none) | (A4 MKII manual, p.37) |
 | Order: the chorus feeds the delay and the reverb, the delay feeds the reverb; each also takes every track's send | (A4 MKII manual, p.94-96, p.110) |
 | Delay TIM counts 128th notes of the tempo: 32 is a quarter, 24 a dotted eighth, 128 a whole note | (A4 MKII manual, p.95) |
-| Delay X 0 places the echo with WID; 1 alternates it left and right | (A4 MKII manual, p.95) |
+| Delay X 0 places the echo with WID, from hard left (-64) through the centre (0, the default) to hard right; X 1 alternates the echoes left and right, and WID is how far (0: not at all; a negative WID starts on the right). The twin: one echo in two delay lines, placed with a balance law (both sides at full level in the centre) | (A4 MKII manual, p.95) |
 | Delay feedback can swell; OVR adds to it | (A4 MKII manual, p.95) |
 | Reverb FRQ and GAI: a shelf that darkens the tail; GAI at its maximum keeps the treble | (A4 MKII manual, p.96) |
 | **[STOP]** cuts the sound while the delay repeats ring out; **[STOP][STOP]** while stopped also fades the send effects | (A4 MKII manual, p.38) |
@@ -245,7 +250,7 @@ The shared Elektron sequencer (`lib/sequencer/elektron`, see
 - **Modulation destinations**: continuous parameters only (55 synth, 22 FX); discrete targets such as waveforms are left out.
 - **Sends** are taken after the VCA in mono; the manual's diagram does not show where they sit relative to PAN (A4 MKII manual, p.110).
 - **Menus** are overlays rather than OLED pages; MIDI, the +Drive, projects and the Click Track are the studio's job. [SONG] opens the song editor directly (on the hardware it opens the SONG menu, whose EDIT is the same as [FUNC] + [SONG MODE], p.57).
-- **Also absent:** VELOCITY TO VOL curves and the pitch bend, mod wheel, breath and aftertouch routings (p.35-36; velocity always shapes the level), the Control In macros (p.25-26), trig preview ([TRIG] + [YES], p.40), trig shift and destructive transpose ([FUNC] + LEFT/RIGHT, [TRACK] + UP/DOWN, p.40, p.54), the copy / paste / clear menus of LOAD KIT, SAVE KIT and PERFORMANCE SETUP (p.26), the delay WID as a pan placement (the twin spreads the echo by a time offset; X 1 always swings fully, p.95), and the VOICE ROUTING to-main / to-FX switches (p.29; the studio's separate outputs stand in for TO MAIN).
+- **Also absent:** VELOCITY TO VOL curves and the pitch bend, mod wheel, breath and aftertouch routings (p.35-36; velocity always shapes the level), the Control In macros (p.25-26), trig preview ([TRIG] + [YES], p.40), trig shift and destructive transpose ([FUNC] + LEFT/RIGHT, [TRACK] + UP/DOWN, p.40, p.54), the copy / paste / clear menus of LOAD KIT, SAVE KIT and PERFORMANCE SETUP (p.26), and the VOICE ROUTING to-main / to-FX switches (p.29; the studio's separate outputs stand in for TO MAIN).
 
 ## The twin's own curves (not in the manual)
 

@@ -57,7 +57,7 @@ The panel geometry was verified first, because the earlier verdict on this instr
   All of these are fixed (finding 3). The knob caps are restyled by an instance-scoped stylesheet over the shared `elektron` cap. A proper "satin dome" cap variant in `components/controls/Knob.tsx` would be cleaner; that file is outside this review's scope.
 - **iPad (1180 x 820, 95 % fit).** All legends render at about 9-9.5 CSS px, and none touch. "Fit" fits the width, so the last row of printed legends (A-P, T1-CV, Quick Performance) and PAGE's "Scale" sit just below the fold. The trig keys themselves are visible. This is app-level: Fit does not consider height on this panel's 1.72 aspect.
 - **Kept as the builder had it:**
-  - The OLED is drawn 1.2x its real size, and shows values under the knobs (the real screen shows icons only). Both help learning.
+  - The OLED is drawn 1.2x its real size, and shows values under the knobs (the real screen shows the graphics alone, and the values while a PARAMETER key is held). Both help learning. The graphics themselves were added in the cross-check below.
   - GRID RECORDING is on by default.
   - The lock dot on locked trigs replaces the hardware's rapid flashing.
 
@@ -125,7 +125,7 @@ The panel geometry was verified first, because the earlier verdict on this instr
   - the BND and DET scales;
   - the accent depth;
   - the FDB loop gain.
-- **Delay WID** as placement (finding 12) would move every kit's echo, so it was left.
+- **Delay WID** as placement (finding 12): done in the cross-check below.
 - **App level, outside this review's scope:**
   - the iPad fit puts the last legend row below the fold;
   - a satin-black cap variant in `Knob.tsx` would replace the scoped restyle;
@@ -264,3 +264,37 @@ Arp Garden and Dub Chords sometimes get one click flag in a run (one sharp note 
 - VELOCITY TO VOL and the MIDI controller routings (M p.35-36) need MIDI-velocity input, which the A4's own keyboard does not have.
 - Kit naming and the kit / macro copy-paste menus (M p.26).
 - With a mouse, the two-key combinations need the TRACK and KIT menu buttons (or the trig editor). On a touch screen they are two fingers, as on the unit. The shared menu frame's close button is 30 px.
+
+## Cross-check against the OS 1.56 manual
+
+A second pass with the current manual (OS 1.56, 114 pages; the twin was built on OS 1.55) and
+Elektron's release notes. OS 1.55B to 1.56 add Outbox 8 routing and fix bugs, so the parameter
+appendices, the MIDI tables, the signal path and the panel drawing are unchanged. Three things
+the twin did differently from the manual were found and changed.
+
+| # | What the manual says | What the twin did | Now |
+|---:|---|---|---|
+| 1 | The delay's X 0 places the echo with WID; X 1 alternates it and WID is how far (p.95). The DELAY page's figure shows WID at its centre | WID was a time offset between the channels, resting at 63; X 1 always swung fully (finding 12, left) | As in the manual: one echo, placed from hard left to hard right, or swinging by WID. WID rests at 0. Measured on the main channel with TRACK 1 on its own output: WID 0 equal left and right, -64 left only, +63 right only, X 1 at +63 starting left, at -64 starting right, at 0 no swing |
+| 2 | With WAV on RND, SPH adds slew to the LFO's steps (p.92, p.97; OS 1.55B fixed it on the hardware) | SPH was a start phase for every wave | RND glides to each new value for the share of the step SPH sets; the FX LFOs too |
+| 3 | The screen draws each parameter as a graphic above its name (p.18 and the figures of p.87-100): dial, switch, level column, waveform, filter curve across FRQ and RES, envelope across ATK DEC SUS REL, words for lists, hatched squares for unused knobs. The page's name shows with (P 1/2); the tempo reads BPM:120.0; NOISE reads SNH; the LFO modes read FREE ... HALF | One dial for every parameter; "120.0"; S&H; FRE ... HLF | The hardware's graphics, computed from the values (the curves are the filters' responses, the envelope follows times, level and SHP), with the value still under each name. Shared with the Rytm: `components/sequencer/OledGraphics.tsx` |
+
+Also fixed on the screen: the PERFORMANCE page's macro names ran into each other and its second
+row sat on the foot of the screen; the PERF MIXER's track names did too.
+
+**Checked and unchanged:** the 37 panel elements against the drawing (p.12; the "Quick
+Performance" bracket is drawn to trig 9 there, the text and the ten macros say 1-10, which the
+twin follows), every page's knob order against the MIDI tables (p.102-108), the waveforms, sub
+oscillators, AM, sync, the filters' types and the twelve envelope shapes against chapter 14
+(p.72-75), the FX order (p.94-96).
+
+**Still not modelled** (REFERENCE.md lists them): the CV track's ENV and LFO pages and the CV
+pages that change with the CV type (p.98-100; the twin has no CV outputs), the tuning-fork LFO
+multipliers (p.92), control-all (p.18), page randomise and reset (p.87).
+
+**Upgrade** (`lib/studio/upgrades.ts`, store 13 / project 10): a saved A4 whose delay did not
+ping-pong keeps its echo in the middle (WID 0), one that did keeps the full swing (WID 63). The
+kits saved in an A4 project are converted the same way when the project loads (`KitSlot.v`,
+`migrateKits` in `kits.ts`).
+
+**Gate:** tsc, lint, validate, build; A4 lessons 22, 0 failed; audio QA 47 presets, 0 flagged.
+

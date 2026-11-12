@@ -1,6 +1,6 @@
 # Audio QA: all devices
 
-7 devices, 271 presets, 2 flagged. Measured against http://localhost:3100, app code at `04019ab`. Generated 2026-10-29T17:31:53.883Z.
+7 devices, 271 presets, 1 flagged. Measured against http://localhost:3100, app code at `a6675b9+local changes`; http://localhost:3100, app code at `04019ab`. Generated 2026-11-12T08:49:44.650Z.
 
 ## Meter calibration
 
@@ -22,11 +22,11 @@ Master output during the one-channel reference: -23.00 LUFS, sample peak -20.00 
 
 | Device | Presets | Excitation | Output | Median LUFS | vs studio | Spread LU | IQR | Max TP dBTP | Master vs inst | Flagged | errors | silent | true-peak | stuck-tail | long-tail | clicks | dc | loudness |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| [DFAM](dfam.md) | 40 | audition | stereo | -19.1 | -0.5 | 5.2 | 1.5 | -2.2 | 0.0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| [DFAM](dfam.md) | 40 | audition | stereo | -19.0 | -0.5 | 11.8 | 1.6 | -1.2 | 0.0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [Mother-32](mother32.md) | 43 | audition | stereo | -18.1 | +0.5 | 8.9 | 1.5 | -1.8 | 0.0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [Subharmonicon](subharmonicon.md) | 36 | audition | stereo | -18.4 | +0.1 | 5.6 | 2.2 | -1.5 | 0.0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [Sub 37](sub37.md) | 64 | audition | stereo | -18.0 | +0.5 | 5.2 | 0.6 | -3.5 | 0.0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| [Analog Four MKII](analog-four.md) | 47 | audition | stereo | -19.0 | -0.4 | 7.6 | 2.2 | -1.6 | 0.0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
+| [Analog Four MKII](analog-four.md) | 47 | audition | stereo | -19.1 | -0.5 | 7.6 | 2.2 | -2.1 | 0.0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | [Analog Rytm MKII](analog-rytm.md) | 20 | audition | stereo | -18.9 | -0.4 | 3.3 | 2.2 | -1.7 | 0.0 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
 | [Xone:96](xone96.md) | 21 | audition | stereo | -18.6 | 0.0 | 5.7 | 0.8 | -1.7 | 0.0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
@@ -37,7 +37,6 @@ Studio median (median of the device medians): -18.6 LUFS. "vs studio" is how far
 Ranked by severity (render errors, silence, true-peak overs and stuck notes first).
 
 1. **analog-rytm / Breaks / Big Beat**: clicks: 1 (1 mid); worst step 6.6 dBFS; first at 3.6992 s
-2. **analog-four / Bass / Metallic AM**: clicks: 1 (1 mid); worst step -34.4 dBFS; first at 1.5546 s
 
 ## Not measured
 

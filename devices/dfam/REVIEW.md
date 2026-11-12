@@ -117,8 +117,7 @@ Status: **complete** (finished on `finish/dfam-review`, merged with the integrat
 
 - VCA DECAY clock-position descriptions (M p.21) suggest longer mid-range times than the twin's
   log taper (noon 316 ms); VCO/VCF descriptions fit the current taper, so it was left.
-- The Default patch image (M p.8) and the patch sheets of pp.34-37 are not legible enough to read
-  knob positions from; those presets follow the sheet notes.
+- The Default patch image (M p.8) and the patch sheets of pp.34-37: read in the cross-check below.
 - The clap's 0.4 LU app/offline difference (see "Preset loudness").
 - Finding #24 can make the audio-QA gate flake about once in 20 full DFAM runs (it did once in
   eight full runs after the preset changes). If the gate must never flake, either the integrator sets
@@ -137,3 +136,42 @@ Status: **complete** (finished on `finish/dfam-review`, merged with the integrat
 | `scripts/lesson-runner.cjs dfam` | 20 lessons, 0 failed, 0 manual steps |
 | `scripts/audio-qa.cjs dfam --target -18 --suggest` | exit 0: `[dfam] median -19.1 LUFS, spread 5.3 LU, 0 of 40 flagged (none)`, max true peak -2.1 dBTP; with `--excite dfam=transport`: exit 0, `[dfam] median -19.1 LUFS, spread 4.8 LU, 0 of 40 flagged (none)`. Of the eight full runs after the preset changes (six on the final preset set), seven had 0 flags; one audition run flagged a single -32.7 dBFS crackle in Lo-fi crunch (finding #24) |
 | screenshots (desktop 1440 x 900, iPad 1180 x 820) | read against M p.7: layout, legends and patch bay match; no truncated text |
+
+## Cross-check against the manual's drawings
+
+A second pass with the manual's PDF itself. The Default settings (p.8) and the ten patch sheets
+(pp.33-37) are drawings, so every knob can be measured: the pointer's angle at 400 dpi, to about
+half a percent of the sweep (the large knobs sweep 300 degrees from 7 to 5 o'clock, the small ones
+270). The first review could not read them and recreated eight sheets from their notes.
+
+| # | Against the manual | What the twin did | Now |
+|---:|---|---|---|
+| 1 | "Default settings" (p.8) is a full panel: VCO DECAY, VCF DECAY and RESONANCE at their minimum, CUTOFF fully open, VOLUME and the EG AMOUNT knobs at 12, VCA DECAY just before 11, VCO 1 LEVEL at 3 o'clock, TEMPO just before 12, VELOCITY 1-8 at maximum, centre, 3 o'clock, centre, 3 o'clock, centre, maximum, centre. The manual's tour starts from it and its first VELOCITY step ("turn all eight to maximum ... every hit now sounds the same", p.9) only makes sense on it | Its own neutral patch: VCO DECAY 100 ms, CUTOFF 2 kHz, VCF and VCA DECAY 300 ms, VOLUME 75, TEMPO 120, every VELOCITY 100 | The spec's defaults, and so Reset and a new DFAM, are the manual's Default settings, and "Init / Default settings" is that patch |
+| 2 | Ten patch sheets with every knob, switch and cable drawn | Two read roughly, eight recreated from the notes. Compared with the drawings they differed a lot: "FM Toys" has all three mixer knobs down (the ringing filter is the sound), "Insane Toms" patches VCO 2 into TRIGGER (the twin used ADV / CLOCK), "Sequenced Bass" uses squares and leaves every PITCH knob centred, "Kick / Snare / FM Osc 2" has hard sync on and PITCH at its ends | All ten are the sheets knob for knob, with the switches and cables as drawn. Only VOLUME differs (every sheet leaves it at 12): it lines the presets up |
+| 3 | The WAVE switches print the waves: a square above the lever, a triangle below (p.7, p.13) | The words SQR and TRI | The symbols (the readout and the lessons still say SQR and TRI). The Mother-32's VCO WAVE and LFO WAVE switches got theirs the same way |
+
+What the measurements say about the model: TEMPO sits between 9:25 and 10:45 on the ten sheets,
+56 to 139 BPM under the twin's law, so the law fits; "Quick Hats" at VCA DECAY 12 o'clock with
+PITCH into VCA DECAY gives closed hats near 100 ms and an open one near 1 s, so the decay law
+fits there too.
+
+**Kept as they were:** the lessons (each one now starts from the old neutral patch explicitly, so
+none of them changed), the 28 community presets and the studio's DFAM patches (all written
+against the neutral patch, `DFAM_NEUTRAL`).
+
+**Levels.** The Default settings play at -27.8 LUFS, VOLUME at 12 o'clock being a quarter of the
+full level: the audio QA judges "Init" 10 LU under the line-up (`scripts/audio-qa/config.cjs`).
+"Insane Toms" and "Filter As An Oscillator" ring on after a stop by design (VCO 2 keeps firing
+TRIGGER; VCA DECAY at its maximum), and "Kick / Snare / FM Osc 2" reads two or three "clicks" a
+render that are the corners of its full-level triangle (at the wave's peaks, half a period apart):
+each has its own rule there, with the reason. In the studio's sets the DFAM's channel starts 6 dB
+higher (`lib/studio/sets.ts`): on the Xone:96's channel meter the Default settings read 7 dB under
+the old default (-6.3 against +0.9), and -0.4 with the fader at +6. A DFAM that keeps another
+VOLUME, such as a saved one still at the old 75, gets the difference on that fader when a set
+loads (`loadStudioSet`: the output follows VOLUME squared), so it reads the same on the meter.
+
+**Upgrade** (`lib/studio/upgrades.ts`, store 13 / project 10): a saved DFAM keeps the knobs nobody
+touched where the old defaults had them.
+
+**Gate:** tsc, lint, validate, build; DFAM lessons 20, 0 failed; audio QA 40 presets, 0 flagged.
+

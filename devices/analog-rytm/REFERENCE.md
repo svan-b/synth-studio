@@ -3,7 +3,9 @@
 This file lists what the twin is built from, element by element. The primary
 source is the **Elektron Analog Rytm MKII User Manual for OS 1.72** (last
 updated 30 January 2025), cited as "(Rytm MKII manual, p.N)". Every row with
-such a cite was checked against that page. The longer notes behind this file
+such a cite was checked against that page. The current manual is for OS 1.74:
+OS 1.73 and 1.74 add Outbox 8 support and fix bugs (Elektron's release notes),
+nothing the twin models changed, and the pages cited here are the same. The longer notes behind this file
 are in `docs/research/analog-rytm/` (`sources.md`, `signal-flow.md`,
 `presets.md`, `lessons.md`).
 
@@ -30,8 +32,17 @@ Secondary sources are used only where the manual is silent:
 
 The numbering is the manual's (Rytm MKII manual, pp.10-11). "FUNC" means the
 key's secondary function, reached with [FUNC] held. Positions are in
-`layout.tsx`, in mm from the faceplate's top-left corner, measured from a
-front-on photo of a black unit.
+`layout.tsx`, in mm from the faceplate's top-left corner, measured on the
+manual's panel drawing (Rytm MKII manual, p.10): the faceplate from above is
+385 x 224 mm, the keys are 12 mm squares ([QPER], [TRK], [RTRG] and [PAGE] are
+18 mm wide; [FUNC] and the transport keys 18 mm squares), the pads 26.8 mm
+squares 31.6 mm apart across and 34.65 mm down, the trig keys 17.7 mm squares
+21.07 mm apart. Every key, knob and pad sits within about 1 mm of the drawing.
+The rear-edge legends are where the drawing prints them, over their connectors:
+each of the four individual outputs is one jack for two voices, so its legend
+is two lines (BD over SD, RS/CP over BT, LT over MT/HT, CH/OH over CY/CB). The
+screen window is drawn about 1.17 x its real 78 x 54 mm, around the same
+centre, so the OLED stays legible.
 
 | # | Element | Hardware (manual) | Twin | Source |
 |---:|---|---|---|---|
@@ -44,7 +55,7 @@ front-on photo of a black unit.
 | 7 | [TEMPO] | TEMPO menu; FUNC taps the tempo | The same | (Rytm MKII manual, pp.10, 38) |
 | 8 | [NO] | Exits and steps back. With keys 32-36 it reloads the kit, Sound, track, pattern or song. In LIVE RECORDING, held with pads it erases their trigs, with an encoder that parameter's locks, and FUNC + [NO] the track's locks, on every step reached while held. In STEP RECORDING it places a rest | [NO] + [PLAY MODE] / [MUTE] / [SCNE] reload the kit / the active track's sound / the pattern. Tracks and songs are saved automatically, so there is nothing to reload. [FX] + [NO] reloads the FX track. The LIVE and STEP RECORDING uses are as on the hardware; **twin**: "[NO] + an encoder" is [NO] held while turning it (the twin's encoders can't be pressed). FUNC + [NO] outside LIVE RECORDING reloads the kit, for mouse use | (Rytm MKII manual, pp.10, 40, 47, 51-52, 81) |
 | 9 | [YES] | Enters and confirms. With keys 32-36 it saves the kit, Sound, track, pattern or song. Held while placing trigs in STEP RECORDING, it sets their length to the press | [YES] + [PLAY MODE] saves the kit; [YES] + [MUTE] stores the active track's Sound in the Sound pool; [YES] + [SCNE] saves the pattern's restore point; [YES] + pads in STEP RECORDING as on the hardware. **Twin**: FUNC + [YES] opens the KIT menu | (Rytm MKII manual, pp.10, 33, 35, 41, 43, 51) |
-| 10 | Screen | Page, values and state | Page title (the machine's name on SRC), BPM and play state, eight parameters, track level, song row, pattern, kit or mode | (Rytm MKII manual, p.10) |
+| 10 | Screen | Page, values and state. Each parameter is a graphic above its name: a dial, a switch, a level column (LEV, TIC, NOL, the sends, the volumes), the pan marker, the filter envelope across ATK DEC SUS REL and the filter's curve across FRQ RES, the amp envelope across ATK HLD DEC, the band between HPF and LPF and the reverb's shelf across FRQ GAI, a word for a list, a hatched square for an encoder with no parameter | Page title (the machine's name on SRC), BPM and play state, the eight parameters with the same graphics (our own drawings, computed from the values: `components/sequencer/OledGraphics.tsx`, shared with the Analog Four), track level, song row, pattern, kit or mode. A turned encoder shows its name and value in the title | (Rytm MKII manual, p.10; the page figures of pp.77-83 and pp.96-105) |
 | 11 | [ARROW] keys | Navigation and some values. With a trig held in GRID RECORDING: LEFT / RIGHT micro-time it, UP / DOWN set its retrig. FUNC + LEFT / RIGHT shift the track's trigs. LEFT / RIGHT nudge the tempo by 10 % while held. In STEP RECORDING, LEFT / RIGHT move the active step | The same. In CHRO mode UP / DOWN change the octave; in the SWING menu they change the swing | (Rytm MKII manual, pp.10, 23, 38, 39, 40, 50) |
 | 12 | [TRIG] | The TRIG menu, in two pages: the trig settings, and the Euclidean sequencer; FUNC opens TRIGS SETUP | [TRIG] pressed on the TRIG page shows page 2 (and again page 1). FUNC switches live-recording quantize (the TRIGS SETUP setting) | (Rytm MKII manual, pp.10, 40, 43-44) |
 | 13 | DATA ENTRY A-H | Relative encoders; pressing while turning moves in bigger steps | Endless encoders bound to the page on screen | (Rytm MKII manual, pp.10, 22) |

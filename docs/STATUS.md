@@ -17,7 +17,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Stale-module fix | `useDeviceModule` reads the hub cache on every render, so switching never pairs one instrument's layout with another's data |
 | 60 ms minimum note gate | A quick tap on an on-screen key always sounds |
 | Play starts clocked gear | The studio ▶ presses RUN on every unsynced instrument, cable-clocked ones included, before the clock starts |
-| Saved-settings upgrades | `lib/studio/upgrades.ts`: store v12 / project v9. Untouched controls keep their old defaults; completed lessons carry over to rebuilt successors; settings no conversion can carry are kept and offered as a file. Table in section 3 |
+| Saved-settings upgrades | `lib/studio/upgrades.ts`: store v13 / project v10. Untouched controls keep their old defaults; completed lessons carry over to rebuilt successors; settings no conversion can carry are kept and offered as a file. Table in section 3 |
 | DSP core v2 | Band-limited VCO, 2× ladder, DAHDSR env, SVF, Reverb2 (FDN), Chorus. `/bench` page; see `docs/DSP.md` |
 | Elektron sequencer library + UI kit | `docs/ELEKTRON_SEQUENCER.md` (233 tests) |
 | Bring your own gear | Web MIDI, Practice synth (works on iPad without hardware), audio input, Web Audio plugins, 16 lessons, Safari guidance. See `docs/EXTERNAL_GEAR.md` |
@@ -148,6 +148,14 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Options are longer to read: 79 characters per question on average, up from 55. The longest three still fit the iPad coach with Next on screen (checked in `lesson-flow.cjs`).
   - The lesson audit enforces it (`--lengths` prints the shares), and `docs/PEDAGOGY.md` has the writing rule.
   - Gate: audit 0 findings; core e2e 51/51; lesson runner 0 failed on the Subharmonicon and the studio lessons (the runner answers by index, so option wording cannot change its result).
+- **Cross-check against the manufacturers' PDFs** (panel, screen, signal flow, defaults and presets of all seven instruments). The manuals were fetched again (Elektron OS 1.56 and 1.74, the Moog manuals and patch books, the Xone:96 guide), kept outside the repository, and this time read as drawings too: panels and patch sheets rendered at 300-400 dpi and measured.
+  - **Analog Four.** The delay follows p.95: X 0 places the echo with WID, X 1 alternates it by WID, WID rests at 0 (measured left, centre, right and both ping-pong directions). SPH slews the RND LFO (p.92). The screen draws the hardware's parameter graphics (dial, switch, level column, waveform, filter curves, envelopes, words, hatched squares) with the values under them, shows the page name with (P 1/2), and reads BPM:120.0, SNH, FREE ... HALF.
+  - **Analog Rytm.** The panel had been measured from a photo and was 14 % too shallow (193 mm for 224), with columns up to 12 mm off; it is now laid out from the manual's drawing, to about 1 mm, with square pads and keys and the rear legends over their connectors. The screen uses the same graphics kit (`components/sequencer/OledGraphics.tsx`).
+  - **DFAM.** The manual's Default settings (p.8) and its ten patch sheets (pp.33-37) are drawings: every knob was measured. Reset and a new DFAM are now the Default settings, and the ten presets are the sheets knob for knob, with their switches and cables (eight had been recreated from the notes; "Insane Toms" patched the wrong jack). The WAVE switches print wave symbols, on the Mother-32 too. Lessons, the other presets and the studio's DFAM patches are written against the old neutral patch and did not change; the sets start the DFAM's channel 6 dB higher, measured on the Xone's meter, and less by the difference for a DFAM that keeps another VOLUME (a saved one at the old 75).
+  - **Checked and unchanged:** the Mother-32's panel, defaults and jacks (p.9), the Subharmonicon's panel and patch bay (p.12), the Sub 37's signal path (p.11), the Xone:96's top panel (p.7). OS 1.56 and 1.74 add Outbox 8 only.
+  - Upgrades at store 13 / project 10: the A4's delay WID (and the kits saved in A4 projects, converted by the device), the DFAM's old defaults.
+  - Audio QA rules can now be per device and per preset, with their own click count (`docs/AUDIO_QA.md`): three DFAM patch sheets need one each, with the reason in `config.cjs`.
+  - Each instrument's `REVIEW.md` has the details under "Cross-check".
 - **Project files carry user samples.** An instrument can declare `assets` (`has`, `collect`, `restore`); project files embed them as mono 16-bit PCM, base64.
   - Opening a project restores them before the studio loads.
   - The Rytm's user samples now travel to another browser or the iPad Home Screen app, which keeps its own storage.
@@ -246,8 +254,10 @@ Before merging a future instrument change, compare `specDefaults(<device>)` at b
 | 10 / 7 | Subharmonicon | TEMPO default, EG AMT × 0.625, 5 ms decay floor |
 | 11 / 8 | Analog Rytm | Clean reset (391 of 421 ids replaced) |
 | 12 / 9 | Mother-32 | Untouched DECAY keeps 60 ms; times under 10 ms clamp |
+| 13 / 10 | Analog Four | Delay WID: 0 for an echo that did not ping-pong, 63 for one that did. Kits saved in an A4 project are converted by the device (`migrateKits`) |
+| 13 / 10 | DFAM | Untouched knobs keep the old defaults (the defaults became the manual's Default settings) |
 
-Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Subharmonicon) and 11 (Analog Rytm). **Next free versions: store 13, project 10.**
+Lesson renames carry completions over at store 7 (Sub 37), 8 (Mother-32), 10 (Subharmonicon) and 11 (Analog Rytm). **Next free versions: store 14, project 11.**
 
 ## 4. Follow-ups (owner: integrator)
 

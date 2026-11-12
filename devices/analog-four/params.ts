@@ -327,7 +327,7 @@ function lfoPage(n: 1 | 2): ParamDef[] {
     { key: `${l}spd`, page, slot: 0, short: 'SPD', name: 'LFO speed', min: -64, max: 63, def: n === 1 ? 48 : 32, bipolar: true, fmt: signed, manual: M, desc: 'Speed, synced to the tempo: SPD x MUL = 128 is one cycle per bar. Negative runs the shape backwards.' },
     { key: `${l}mul`, page, slot: 1, short: 'MUL', name: 'LFO multiplier', min: 0, max: LFO_MULTS.length - 1, def: 4, options: LFO_MULTS, fmt: opt(LFO_MULTS), manual: M, desc: 'Multiplies SPD. x values follow the tempo; dotted values assume 120 BPM whatever the tempo.' },
     { key: `${l}fad`, page, slot: 2, short: 'FAD', name: 'LFO fade in/out', min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: M, desc: 'Negative fades the modulation in after each trig, positive fades it out, 0 = none.' },
-    { key: `${l}sph`, page, slot: 3, short: 'SPH', name: 'LFO start phase', min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Where in the cycle a trig restarts the LFO (TRIG, ONE and HALF modes). 64 is half a cycle.' },
+    { key: `${l}sph`, page, slot: 3, short: 'SPH', name: 'LFO start phase', min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Where in the cycle a trig restarts the LFO (TRIG, ONE and HALF modes); 64 is half a cycle. With WAV on RND it smooths the random steps instead: 0 jumps, higher values glide to each new value.' },
     { key: `${l}mod`, page, slot: 4, short: 'MOD', name: 'LFO trig mode', min: 0, max: 4, def: 0, options: LFO_MODES, fmt: opt(LFO_MODES), manual: M, desc: 'FREE runs on, TRIG restarts on every note, HOLD freezes the value at each note, ONE plays one cycle, HALF half a cycle.' },
     { key: `${l}wav`, page, slot: 5, short: 'WAV', name: 'LFO waveform', min: 0, max: 6, def: 0, options: LFO_WAVES, fmt: opt(LFO_WAVES), manual: M, desc: 'TRI, SIN, SQR, SAW, EXP and RMP (one-sided), RND random steps.' },
     { key: `${l}dsta`, page, slot: 6, short: 'DST', name: 'Destination A', min: 0, max: MOD_DESTS.length - 1, def: dest('F1 FRQ'), options: DEST_NAMES, fmt: opt(DEST_NAMES), manual: M, desc: 'First parameter this LFO modulates.', lock: false },
@@ -482,8 +482,8 @@ export const FX_PARAMS: ParamDef[] = [
   { key: 'cho_vol', page: 'chorus', slot: 9, short: 'VOL', name: 'Chorus volume', min: 0, max: 127, def: 100, fmt: int, manual: `${APB}, CHORUS page`, desc: 'Level of the chorus return in the mix.' },
   // DELAY
   { key: 'del_tim', page: 'delay', slot: 0, short: 'TIM', name: 'Delay time', min: 1, max: 128, def: 24, fmt: delayTimeFmt, manual: `${APB}, DELAY page`, desc: 'Delay time in 1/128 notes, locked to the tempo: 16 = 1/8, 24 = dotted 1/8, 32 = 1/4.' },
-  { key: 'del_x', page: 'delay', slot: 1, short: 'X', name: 'Ping pong', min: 0, max: 1, def: 0, options: ONOFF, fmt: opt(ONOFF), manual: `${APB}, DELAY page`, desc: 'ON: the echoes bounce between left and right.' },
-  { key: 'del_wid', page: 'delay', slot: 3, short: 'WID', name: 'Delay stereo width', min: -64, max: 63, def: 63, bipolar: true, fmt: signed, manual: `${APB}, DELAY page`, desc: 'Stereo spread of the echoes (negative swaps the sides).' },
+  { key: 'del_x', page: 'delay', slot: 1, short: 'X', name: 'Ping pong', min: 0, max: 1, def: 0, options: ONOFF, fmt: opt(ONOFF), manual: `${APB}, DELAY page (manual p.95)`, desc: 'OFF: the echo stays where WID puts it. ON: the echoes alternate between left and right, as far apart as WID says.' },
+  { key: 'del_wid', page: 'delay', slot: 3, short: 'WID', name: 'Delay width', min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: `${APB}, DELAY page (manual p.95)`, desc: 'With X off: where the echo sits, from hard left (-64) through the centre (0) to hard right (+63). With X on: how far the echoes swing to either side (0 = no swing; a negative value starts on the right).' },
   { key: 'del_fb', page: 'delay', slot: 4, short: 'FDB', name: 'Delay feedback', min: 0, max: 127, def: 50, fmt: int, manual: `${APB}, DELAY page`, desc: 'How much of each echo is fed back: the number of repeats. Above 100 it builds up (with saturation).' },
   { key: 'del_hpf', page: 'delay', slot: 5, short: 'HPF', name: 'Delay high-pass', min: 0, max: 127, def: 0, fmt: int, manual: `${APB}, DELAY page`, desc: 'High-pass in the feedback loop: echoes get thinner.' },
   { key: 'del_lpf', page: 'delay', slot: 6, short: 'LPF', name: 'Delay low-pass', min: 0, max: 127, def: 110, fmt: int, manual: `${APB}, DELAY page`, desc: 'Low-pass in the feedback loop: each echo gets darker, like tape.' },
@@ -507,7 +507,7 @@ export const FX_PARAMS: ParamDef[] = [
       { key: `${l}spd`, page, slot: 0, short: 'SPD', name: 'FX LFO speed', min: -64, max: 63, def: 16, bipolar: true, fmt: signed, manual: M, desc: 'Speed, synced to the tempo (SPD x MUL = 128: one cycle per bar).' },
       { key: `${l}mul`, page, slot: 1, short: 'MUL', name: 'FX LFO multiplier', min: 0, max: LFO_MULTS.length - 1, def: 2, options: LFO_MULTS, fmt: opt(LFO_MULTS), manual: M, desc: 'Multiplies SPD.' },
       { key: `${l}fad`, page, slot: 2, short: 'FAD', name: 'FX LFO fade', min: -64, max: 63, def: 0, bipolar: true, fmt: signed, manual: M, desc: 'Fade in (negative) or out (positive) after each FX track trig.' },
-      { key: `${l}sph`, page, slot: 3, short: 'SPH', name: 'FX LFO start phase', min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Phase a trig restarts the LFO at.' },
+      { key: `${l}sph`, page, slot: 3, short: 'SPH', name: 'FX LFO start phase', min: 0, max: 127, def: 0, fmt: int, manual: M, desc: 'Phase a trig restarts the LFO at. With WAV on RND it smooths the random steps instead.' },
       { key: `${l}mod`, page, slot: 4, short: 'MOD', name: 'FX LFO trig mode', min: 0, max: 4, def: 0, options: LFO_MODES, fmt: opt(LFO_MODES), manual: M, desc: 'How FX track trigs restart the LFO.' },
       { key: `${l}wav`, page, slot: 5, short: 'WAV', name: 'FX LFO waveform', min: 0, max: 6, def: 1, options: LFO_WAVES, fmt: opt(LFO_WAVES), manual: M, desc: 'LFO shape.' },
       { key: `${l}dsta`, page, slot: 6, short: 'DST', name: 'Destination A', min: 0, max: FX_DESTS.length - 1, def: 0, options: FX_DEST_NAMES, fmt: opt(FX_DEST_NAMES), manual: M, desc: 'First FX parameter it modulates.', lock: false },
@@ -583,12 +583,13 @@ const FX_PAGES = new Set<PageId>(['extin', 'chorus', 'delay', 'reverb', 'fxlfo1'
 const CV_PAGES = new Set<PageId>(['cva', 'cvb', 'cvc', 'cvd', 'cvenv', 'cvlfo']);
 
 /** Performance macros A..J: [name, targets as (param key, offset at 127)] applied to every synth track */
-export const PERF_MACROS: { name: string; synth: [string, number][]; fx?: [string, number][] }[] = [
-  { name: 'LP SWEEP', synth: [['flt1_frq', -90]] },
-  { name: 'HP SWEEP', synth: [['flt2_frq', 80]] },
-  { name: 'RESONANCE', synth: [['flt1_res', 90]] },
+/** `scr`: the name as the screen writes it, where the full one is too long for a knob slot */
+export const PERF_MACROS: { name: string; scr?: string; synth: [string, number][]; fx?: [string, number][] }[] = [
+  { name: 'LP SWEEP', scr: 'LP SWP', synth: [['flt1_frq', -90]] },
+  { name: 'HP SWEEP', scr: 'HP SWP', synth: [['flt2_frq', 80]] },
+  { name: 'RESONANCE', scr: 'RESO', synth: [['flt1_res', 90]] },
   { name: 'DRIVE', synth: [['flt1_ovr', 55]] },
-  { name: 'ENV DEPTH', synth: [['flt1_dep', 48]] },
+  { name: 'ENV DEPTH', scr: 'ENV DEP', synth: [['flt1_dep', 48]] },
   { name: 'DECAY', synth: [['amp_dec', 48], ['envf_dec', 48]] },
   { name: 'CHORUS', synth: [['amp_cho', 110]] },
   { name: 'DELAY', synth: [['amp_del', 100]], fx: [['del_fb', 40]] },

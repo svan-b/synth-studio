@@ -37,10 +37,12 @@ const legend = (text: string, x: number, y: number, size = LEGEND): PanelElement
   return { kind: 'label', text, x, y: y - KNOB / 2 - (lines === 2 ? 4.0 : 2.6), size, letterSpacing: 0.3 };
 };
 
-/** A bat toggle with its title printed above; position legends sit beside the lever */
-/** A toggle as Moog prints it (manual p.9): the title, one position's legend above the lever, the other below */
-const toggle = (control: string, title: string, x: number, y: number): PanelElement[] => [
-  { kind: 'switch', control, x, y, scale: 1.9, label: 'none', legends: 'ends' },
+/**
+ * A toggle as Moog prints it (manual p.9): the title, one position's legend above the lever, the
+ * other below. `legendText`: what is printed, where that is a wave symbol and not the option's name.
+ */
+const toggle = (control: string, title: string, x: number, y: number, legendText?: string[]): PanelElement[] => [
+  { kind: 'switch', control, x, y, scale: 1.9, label: 'none', legends: 'ends', ...(legendText ? { legendText } : {}) },
   { kind: 'label', text: title, x, y: y - (title.includes('\n') ? 12.6 : 11.4), size: LEGEND, letterSpacing: 0.3 },
 ];
 
@@ -152,7 +154,8 @@ const elements: PanelElement[] = [
   ...scaleRing(21.7, ROW1), ...scaleRing(80.8, ROW1), ...scaleRing(41.0, ROW3), ...scaleRing(80.8, ROW3),
   hole(36.5, ROW1), hole(65.9, ROW1), hole(95.6, ROW1), hole(95.6, ROW2), hole(95.6, ROW3),
   ringLegend('FREQUENCY', 21.7, ROW1), knob('frequency', 21.7, ROW1),
-  ...toggle('vco_wave', 'VCO WAVE', 51.3, ROW1),
+  // the WAVE switches print the waves: a pulse above the lever and a sawtooth below (VCO), a square and a triangle (LFO)
+  ...toggle('vco_wave', 'VCO WAVE', 51.3, ROW1, ['\u2293', '\u25FF']),
   ringLegend('PULSE WIDTH', 80.8, ROW1), knob('pulse_width', 80.8, ROW1),
   legend('MIX', 110.3, ROW1), knob('mix', 110.3, ROW1),
   { kind: 'label', text: 'VCO', x: 102.4, y: ROW1 + 12.4, size: 5.6, color: '#bdbdbd' },
@@ -218,7 +221,7 @@ const elements: PanelElement[] = [
     x: 41.0, y: ROW3, diameter: KNOB, variant: 'moog-black', label: 'none',
   },
   ringLegend('LFO RATE', 80.8, ROW3), knob('lfo_rate', 80.8, ROW3),
-  ...toggle('lfo_wave', 'LFO WAVE', 110.4, ROW3),
+  ...toggle('lfo_wave', 'LFO WAVE', 110.4, ROW3, ['\u2293', '\u2227']),
   legend('ATTACK', 139.9, ROW3), knob('attack', 139.9, ROW3),
   ...toggle('sustain', 'SUSTAIN', 169.5, ROW3),
   legend('DECAY', 199.2, ROW3), knob('decay', 199.2, ROW3),

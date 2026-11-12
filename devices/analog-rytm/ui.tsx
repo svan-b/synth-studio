@@ -24,6 +24,10 @@ import { euclidOn, euclidRefused, euclidSettings, euclidSteps, euclidView, eucli
 import { MAX_SECONDS, decodeAudioFile, putSample, sampleId, sampleName } from './samples';
 import { isLocked } from '@/lib/sequencer/elektron/locks';
 import { C, Frame, FONT, Group, MONO, Overlay, SeqButton, Stepper } from '@/components/sequencer/shared';
+import {
+  AdsrGraph, AhdGraph, BandGraph, DialIcon, FadeIcon, FilterTypeIcon, LFO_WAVE_PATHS, LevelIcon, MultimodeGraph, PanIcon, PathIcon, ShelfGraph, SwitchIcon,
+  UnusedIcon,
+} from '@/components/sequencer/OledGraphics';
 import { useStudioStore } from '@/store/studio';
 import { hub } from '@/lib/studio/hub';
 import {
@@ -432,7 +436,7 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
         const face = mix(RY.pad, color, base * 0.72);
         const edge = mix('#cfd1d3', color, base * 0.5);
         return (
-          <div key={pad} style={{ position: 'absolute', left: `${c * 25.2}%`, top: `${r * 34}%`, width: '21.4%', height: '28%', opacity: sp.dim ? 0.3 : 1 }}>
+          <div key={pad} style={{ position: 'absolute', left: `${c * 25.2}%`, top: `${r * 33.333}%`, width: '21.4%', height: '25.78%', opacity: sp.dim ? 0.3 : 1 }}>
             <div
               ref={el => { faces.current[pad] = el; }}
               data-control={`pad:${t.id}`}
@@ -465,7 +469,7 @@ export function Pads({ ctx }: { ctx: CustomRenderContext }) {
         const r = PAD_ROWS.findIndex(row => row.includes(a));
         const c = PAD_ROWS[r].indexOf(a);
         return (
-          <div key={a} aria-hidden style={{ position: 'absolute', left: `${c * 25.2 + 21.4 + 0.9}%`, width: '2%', top: `${r * 34 + 9}%`, height: '10%', display: 'flex', justifyContent: 'space-between', pointerEvents: 'none' }}>
+          <div key={a} aria-hidden style={{ position: 'absolute', left: `${c * 25.2 + 21.4 + 0.9}%`, width: '2%', top: `${r * 33.333 + 8}%`, height: '9.5%', display: 'flex', justifyContent: 'space-between', pointerEvents: 'none' }}>
             <span style={{ width: 2, height: '100%', background: '#8d9095', borderRadius: 1 }} />
             <span style={{ width: 2, height: '100%', background: '#8d9095', borderRadius: 1 }} />
           </div>
@@ -711,36 +715,62 @@ export function PageLeds({ ctx }: { ctx: CustomRenderContext }) {
 // Screen
 // ----------------------------------------------------------------------------
 
-function Dial({ frac, bipolar, locked }: { frac: number; bipolar?: boolean; locked?: boolean }) {
-  const a0 = -135, a1 = 135;
-  const ang = a0 + (a1 - a0) * Math.max(0, Math.min(1, frac));
-  const pt = (deg: number, r: number) => [12 + r * Math.sin((deg * Math.PI) / 180), 12 - r * Math.cos((deg * Math.PI) / 180)];
-  const arc = (from: number, to: number) => {
-    const [x0, y0] = pt(from, 9), [x1, y1] = pt(to, 9);
-    const large = Math.abs(to - from) > 180 ? 1 : 0;
-    return `M ${x0} ${y0} A 9 9 0 ${large} ${to > from ? 1 : 0} ${x1} ${y1}`;
-  };
-  const [px, py] = pt(ang, 9);
-  const fg = locked ? '#050805' : '#e8f0ff';
-  return (
-    <svg viewBox="0 0 24 24" style={{ width: '1.9em', height: '1.9em', display: 'block', margin: '0 auto' }}>
-      <path d={arc(a0, a1)} stroke={fg} strokeOpacity={0.35} strokeWidth={2} fill="none" />
-      <path d={bipolar ? arc(Math.min(0, ang), Math.max(0, ang)) : arc(a0, ang)} stroke={fg} strokeWidth={2.4} fill="none" />
-      <line x1={12} y1={12} x2={px} y2={py} stroke={fg} strokeWidth={2} />
-    </svg>
-  );
-}
+/** Height of a parameter's graphic on the screen */
+const GH = '1.9em';
 
-function cellFor(id: string | null, ctx: CustomRenderContext, flags: { locked: boolean; machine?: number }) {
+/** Parameters drawn as a level column (the manual's page figures, p.77-83 and p.96-105): levels, sends and volumes */
+const LEVEL_KEYS = /^(lev|tic|nol|smp_lev|amp_(del|rev|vol)|del_(rev|vol)|rev_vol|cmp_vol)$/;
+
+interface Cell { key: string; label: string; name: string; text: string; value: number; frac: number; options?: readonly string[]; textual: boolean; locked: boolean }
+
+function cellFor(id: string | null, ctx: CustomRenderContext, flags: { locked: boolean; machine?: number }): Cell | null {
   if (!id) return null;
   const meta = paramMeta(id);
   const v = num(ctx.values[id], num((ANALOG_RYTM.controls[id] as { default?: number } | undefined)?.default));
   const d = describe(id, v, flags.machine);
   if (!meta || !d) return null;
-  const p = meta.p as { min: number; max: number; bipolar?: boolean; options?: readonly string[] };
+  const p = meta.p as { key: string; min: number; max: number; options?: readonly string[] };
   const frac = (v - p.min) / Math.max(1e-9, p.max - p.min);
-  const textual = !!p.options || (meta.kind === 'page' && /trig_note|trig_len|trig_prob|flt_frq|euc_pl|euc_len/.test(meta.p.key));
-  return { label: d.abbr, name: d.name, text: d.text, frac, bipolar: !!p.bipolar, textual, locked: flags.locked };
+  const textual = !!p.options || (meta.kind === 'page' && /trig_note|trig_len|trig_prob|euc_pl|euc_len|smp_slot/.test(p.key));
+  return { key: p.key, label: d.abbr, name: d.name, text: d.text, value: v, frac, options: p.options, textual, locked: flags.locked };
+}
+
+/**
+ * The graphic of one parameter, as the hardware draws it: a switch for OFF/ON, a level column, the
+ * pan marker, the fade slope, the LFO's wave, the filter type's sketch, a dial for a plain value.
+ * `null`: a list, shown as a word.
+ */
+function cellGraphic(c: Cell): ReactNode {
+  const k = c.key;
+  if (c.options && c.options.length === 2 && c.options[0] === 'OFF' && c.options[1] === 'ON') return <SwitchIcon on={c.value >= 0.5} h={GH} />;
+  if (LEVEL_KEYS.test(k)) return <LevelIcon norm={c.frac} h={GH} />;
+  if (k === 'amp_pan') return <PanIcon norm={c.frac} h={GH} />;
+  if (k === 'lfo_fad') return <FadeIcon value={c.value} h={GH} />;
+  if (k === 'lfo_wav') return <PathIcon d={LFO_WAVE_PATHS[Math.max(0, Math.min(LFO_WAVE_PATHS.length - 1, Math.round(c.value)))]} h={GH} />;
+  if (k === 'flt_typ') return <FilterTypeIcon type={c.value} h={GH} />;
+  if (c.textual) return null;
+  return <DialIcon norm={c.frac} h={GH} />;
+}
+
+/**
+ * Graphics that run across several encoders of a page, by the slot they start at: the filter
+ * envelope over ATK DEC SUS REL and the filter's curve over FRQ RES (FILTER), the amp envelope
+ * over ATK HLD DEC (AMPLITUDE), the band between HPF and LPF (DELAY, REVERB), the reverb's shelf
+ * over FRQ GAI. `v(slot)` is that encoder's value.
+ */
+function wideGraphics(isFx: boolean, page: number): Record<number, { span: number; render: (v: (slot: number) => number) => ReactNode }> {
+  const band = { span: 2, render: (v: (slot: number) => number) => <BandGraph hpf={v(4)} lpf={v(5)} h={GH} /> };
+  if (!isFx) {
+    if (page === PAGE.FLTR) return {
+      0: { span: 4, render: v => <AdsrGraph atk={v(0)} dec={v(1)} sus={v(2)} rel={v(3)} decay="exponential" h={GH} /> },
+      4: { span: 2, render: v => <MultimodeGraph frq={v(4)} res={v(5)} type={v(6)} h={GH} /> },
+    };
+    if (page === PAGE.AMP) return { 0: { span: 3, render: v => <AhdGraph atk={v(0)} hld={v(1)} dec={v(2)} hold={v(2) >= 127} h={GH} /> } };
+    return {};
+  }
+  if (page === PAGE.SRC) return { 4: band };
+  if (page === PAGE.SMPL) return { 2: { span: 2, render: v => <ShelfGraph frq={v(2)} gain={v(3)} h={GH} /> }, 4: band };
+  return {};
 }
 
 /** Kit that the panel shows (engine state, else data) */
@@ -867,18 +897,41 @@ export function Screen({ ctx }: { ctx: CustomRenderContext }) {
       </div>
     );
   } else {
+    // one encoder: its graphic (or its value as a word, for a list) above its name
+    const label = (c: Cell) => <div style={{ fontWeight: 700, marginTop: '0.15em', lineHeight: 1.05 }}>{c.label}</div>;
+    const inverse = (on: boolean): CSSProperties => (on ? { background: '#e8f0ff', color: '#030403', borderRadius: 2, textShadow: 'none' } : {});
+    const one = (c: Cell | null, i: number) => (
+      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', minWidth: 0, ...inverse(!!c?.locked) }}>
+        {c ? (
+          <>
+            {cellGraphic(c) ?? <div style={{ fontSize: c.text.length > 5 ? '0.95em' : '1.15em', fontWeight: 700, height: GH, display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{c.text.replace(/^x(?=\d)/, '×')}</div>}
+            {label(c)}
+          </>
+        ) : <><UnusedIcon h={GH} /><div style={{ marginTop: '0.15em', lineHeight: 1.05 }}>&nbsp;</div></>}
+      </div>
+    );
+    const wide = wideGraphics(isFx, page);
+    const slotValue = (slot: number) => cells[slot]?.value ?? 0;
+    const out: ReactNode[] = [];
+    for (let i = 0; i < cells.length;) {
+      const g = wide[i];
+      const members = g ? cells.slice(i, i + g.span) : [];
+      // a graphic across several encoders, their names under it
+      if (g && members.length === g.span && members.every(Boolean)) {
+        out.push(
+          <div key={i} style={{ gridColumn: `span ${g.span}`, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minWidth: 0 }}>
+            <div style={{ padding: '0 3%' }}>{g.render(slotValue)}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${g.span}, 1fr)`, textAlign: 'center' }}>
+              {members.map((c, k) => <div key={k} style={{ minWidth: 0, ...inverse(!!c?.locked) }}>{c && label(c)}</div>)}
+            </div>
+          </div>,
+        );
+        i += g.span;
+      } else { out.push(one(cells[i], i)); i++; }
+    }
     body = (
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: '1fr 1fr', columnGap: '3%', rowGap: '4%', padding: '3% 0 2%' }}>
-        {cells.map((c, i) => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', background: c?.locked ? '#e8f0ff' : 'transparent', color: c?.locked ? '#030403' : undefined, borderRadius: 2, minWidth: 0 }}>
-            {c ? (
-              <>
-                {c.textual ? <div style={{ fontSize: c.text.length > 5 ? '0.95em' : '1.15em', fontWeight: 700, height: '1.9em', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{c.text}</div> : <Dial frac={c.frac} bipolar={c.bipolar} locked={c.locked} />}
-                <div style={{ fontWeight: 700, marginTop: '0.15em' }}>{c.label}</div>
-              </>
-            ) : <div style={{ opacity: 0.25 }}>-</div>}
-          </div>
-        ))}
+        {out}
       </div>
     );
   }
