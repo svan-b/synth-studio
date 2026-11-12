@@ -13,6 +13,7 @@
 import { piano } from '../audio/engine';
 import { Transport, clickEvents, scoreEvents, type TimedEvent } from '../audio/transport';
 import { noteBus, type NoteInput, type NoteSource } from '../input/bus';
+import { input, isRemoteKey } from '../input/hub';
 import type { NoteEvent, Score, Step } from '../music/score';
 import { stepsFor } from '../music/score';
 import { measureBeats, type Hand } from '../music/theory';
@@ -120,6 +121,7 @@ export class FlowSession {
   private hinted = 0;
   private measureErrors = new Map<number, number>();
   private readonly notes: NoteEvent[];
+  private readonly pitches: Set<number>;
 
   constructor(
     readonly score: Score,
@@ -138,6 +140,7 @@ export class FlowSession {
     };
     this.steps = stepsFor(score, this.options.hands);
     this.notes = this.steps.flatMap((s) => s.notes);
+    this.pitches = new Set(this.notes.map((n) => n.midi));
   }
 
   get mode(): FlowMode {
@@ -173,6 +176,7 @@ export class FlowSession {
     this.ticker = null;
     this.timers.forEach((t) => clearTimeout(t));
     this.timers = [];
+    input.expect(null);
   }
 
   private setPhase(phase: FlowPhase): void {
@@ -182,6 +186,8 @@ export class FlowSession {
 
   private onInput(ev: NoteInput): void {
     if (ev.type !== 'on' || this.phase !== 'playing') return;
+    // The top and bottom keys are buttons for the app, unless the music uses them.
+    if (ev.source === 'midi' && input.remoteKeys && isRemoteKey(ev.midi) && !this.pitches.has(ev.midi)) return;
     if (this.options.mode === 'wait') this.waitInput(ev);
     else this.tempoInput(ev);
   }
@@ -205,6 +211,7 @@ export class FlowSession {
     this.stepWrong = 0;
     this.stepHinted = false;
     this.lastStepAt = piano.now();
+    input.expect(step.notes.map((n) => n.midi));
     this.events.emit({ type: 'step', index: this.stepIndex });
     if (this.hintTimer) clearTimeout(this.hintTimer);
     this.hintTimer = null;
@@ -328,6 +335,12 @@ export class FlowSession {
         beat: step.start,
         run: (when) => this.at(when, () => this.events.emit({ type: 'step', index })),
       });
+      // A listening input hears best when told what is coming: this step and the next.
+      const upcoming = [...step.notes, ...(this.steps[index + 1]?.notes ?? [])].map((n) => n.midi);
+      events.push({
+        beat: step.start - 0.35,
+        run: (when) => this.at(when, () => input.expect(upcoming)),
+      });
     });
     // Start listening a little before the first beat, so an early first note still counts.
     events.push({
@@ -389,7 +402,7 @@ export class FlowSession {
     const now = piano.now() - piano.outputLatency();
     for (const n of this.notes) {
       if (this.matched.has(n.id) || this.missed.has(n.id)) continue;
-      if (this.transport.timeOfBeat(n.start) + this.matchWindow + 0.12 < now) {
+      if (this.transport.timeOfBeat(n.start) + this.matchWindow + 0.3 < now) {
         this.missed.add(n.id);
         this.addMeasureError(n.measure);
         this.events.emit({ type: 'note', id: n.id, state: 'bad', midi: n.midi });

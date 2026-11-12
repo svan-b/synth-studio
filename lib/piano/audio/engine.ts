@@ -96,7 +96,7 @@ class PianoEngine {
     if (!this.ctx) {
       this.ctx = new Ctor({ latencyHint: 'interactive' });
       this.buildGraph();
-      this.ctx.onstatechange = () => this.setStatus({ running: this.ctx?.state === 'running' });
+      this.ctx.onstatechange = () => this.setStatus({ running: this.isRunning() });
     }
     this.setSessionType('playback');
     if (this.ctx.state !== 'running') {
@@ -116,8 +116,12 @@ class PianoEngine {
     } catch {
       /* ignore */
     }
-    this.setStatus({ running: this.ctx.state === 'running' });
+    this.setStatus({ running: this.isRunning() });
     void this.load();
+  }
+
+  private isRunning(): boolean {
+    return (this.ctx?.state as string | undefined) === 'running';
   }
 
   /** Resume after the page was hidden or interrupted. Safe to call any time. */
@@ -128,7 +132,7 @@ class PianoEngine {
       } catch {
         /* needs a gesture */
       }
-      this.setStatus({ running: this.ctx.state === 'running' });
+      this.setStatus({ running: this.isRunning() });
     }
   }
 

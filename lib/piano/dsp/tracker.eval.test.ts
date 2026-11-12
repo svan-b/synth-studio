@@ -88,7 +88,7 @@ function render(events: Ev[], seconds: number, cond: Cond = {}): Float32Array {
       out[start + i] += v * g;
     }
   }
-  let sig = out;
+  let sig: Float32Array = out;
   if (cond.reverb) sig = reverb(sig);
   if (cond.gain !== undefined) for (let i = 0; i < sig.length; i++) sig[i] *= cond.gain;
   if (cond.noiseDb !== undefined) {

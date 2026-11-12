@@ -10,6 +10,7 @@ import type { Hand, TimeSig } from '../music/theory';
 import { measureBeats, pulseBeats } from '../music/theory';
 import type { Score } from '../music/score';
 import { piano } from './engine';
+import { instrument } from './instrument';
 
 export interface TimedEvent {
   beat: number;
@@ -150,7 +151,7 @@ export function scoreEvents(score: Score, secondsPerBeat: number, opts: Playback
         // Hold notes for almost their full length, like a legato touch.
         const seconds = Math.max(0.08, n.dur * secondsPerBeat * 0.96);
         const v = both ? (n.hand === 'R' ? base + 0.06 : base - 0.12) : base;
-        piano.play(n.midi, seconds, v, when);
+        instrument.play(n.midi, seconds, v, when);
         opts.onNote?.(n.id, when, n.midi, seconds);
       },
     }));
