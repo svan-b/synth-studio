@@ -10,6 +10,7 @@
 //      ten-octave knob) is not done before the knob has moved.
 //   4. On an iPad (landscape, touch) a question fits the floating coach: every answer and the
 //      Next button are on screen, uncovered and at least 44 px tall, and taps answer and move on.
+//      The same holds for the longest answers in the lessons (three options of about 90 characters).
 // ============================================================================
 const { chromium } = require('playwright');
 
@@ -153,6 +154,22 @@ const { chromium } = require('playwright');
     await page.waitForTimeout(400);
     const moved = await page.evaluate(() => window.__synthStudio.store.getState().currentStep === window.__quiz + 1);
     r.ipad = { answers: m.answers, next: m.next, fits: m.answers.length >= 3 && m.answers.every(fits) && fits(m.next), nextAfterAnswer: fits(m2.next), ...after, moved };
+    // the longest answers in the lessons (about 90 characters each, three lines in the coach) still fit
+    await page.evaluate(() => {
+      window.__quiz = 0;
+      window.__synthStudio.store.getState().startLesson({
+        id: 'dfam-e2e-long-options', device: 'dfam', name: 'Long options', description: 'e2e', difficulty: 'beginner', source: 'scripts/e2e/lesson-flow.cjs',
+        steps: [
+          { kind: 'quiz', instruction: 'Quick check.', quiz: { question: 'Your track sounds great in headphones, but the bass vanishes on a phone speaker. What do you check first?', answer: 2, explain: 'Small speakers can\'t play below about 100 Hz.',
+            options: ['The bass\'s reverb send: a wetter bass spreads out and carries further on small speakers', 'The pattern\'s swing: a looser groove leaves the bass more room to be heard between the hits', 'The bass\'s harmonics: a little brightness or a higher octave so it is heard on small speakers'] } },
+          { kind: 'info', instruction: 'Done.' },
+        ],
+      }, 'dfam');
+    });
+    await page.waitForTimeout(900);
+    const ml = await measure();
+    r.ipad.longFits = ml.answers.length === 3 && ml.answers.every(fits) && fits(ml.next);
+    r.ipad.longHeights = ml.answers.map(a => a.h);
     await ctx.close();
   } catch (e) {
     errs.push('test: ' + String(e).split('\n')[0]);
@@ -161,7 +178,7 @@ const { chromium } = require('playwright');
   const ok = o.permutations === 8 && o.rightCounted === 8 && o.notAlwaysFirst && (o.sides ?? []).join('|') === 'A|B|Neither' && o.bothLast
     && r.next?.then === 'subharmonicon-f2-waves-mixer' && r.next?.unlocked
     && r.waits?.before?.step === r.waits?.index && r.waits?.before?.satisfied === false
-    && r.ipad?.fits && r.ipad?.nextAfterAnswer && r.ipad?.right && r.ipad?.satisfied && r.ipad?.moved
+    && r.ipad?.fits && r.ipad?.nextAfterAnswer && r.ipad?.right && r.ipad?.satisfied && r.ipad?.moved && r.ipad?.longFits
     && errs.length === 0;
   console.log(JSON.stringify({ ok, ...r, errs: errs.slice(0, 5) }));
   await browser.close();

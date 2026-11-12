@@ -93,7 +93,7 @@ const l1: Lesson = {
       instruction: 'In Setup, set Channel to 3, Save, and play a few keys.',
       predict: {
         question: 'The Practice synth has parts on channels 1, 2 and 10. What will you hear on channel 3?',
-        options: ['Nothing: no part listens on channel 3', 'The same sound, quieter', 'The keys part'], answer: 0,
+        options: ['Nothing: no part listens on channel 3', 'The same bass sound, only a little quieter', 'The keys part, borrowed from channel 2'], answer: 0,
         explain: 'Every message carries its channel, and each part only reacts to its own. Nothing listens on 3, so it stays silent, although the monitor shows the notes going out. A hardware synth in "omni" mode would play every channel.',
       },
       check: s => md(s).channel === 2,
@@ -112,7 +112,7 @@ const l1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'Why does MIDI have 16 channels?',
-        options: ['So one cable can address up to 16 instruments or parts separately', 'So you can play 16 notes at once', 'To carry 16 audio tracks'], answer: 0,
+        options: ['So one cable can address up to 16 instruments or parts separately', 'So one synth can play chords of up to 16 notes at the same time', 'So one cable can carry up to 16 tracks of audio between devices'], answer: 0,
         explain: 'Channels are addresses. One channel already carries chords (many notes at once), and MIDI never carries audio.',
       },
     },
@@ -137,8 +137,8 @@ const l1: Lesson = {
   review: [
     { question: 'How many channels does one MIDI connection carry?', options: ['16', '8', '128'], answer: 0, explain: 'Channels 1 to 16 (0 to 15 inside the message).' },
     { question: 'A synth listening on channel 1 receives notes on channel 3. It…', options: ['Stays silent', 'Plays them quieter', 'Plays them an octave higher'], answer: 0, explain: 'It ignores other channels, unless it is in omni mode.' },
-    { question: 'What does a MIDI cable carry?', options: ['Messages such as notes and knob moves', 'The synth\'s audio', 'Power for the synth'], answer: 0, explain: 'MIDI is control data; the sound comes back on an audio cable.' },
-    { question: 'A synth in "omni" mode…', options: ['Responds on every channel', 'Only plays drums', 'Ignores velocity'], answer: 0, explain: 'Omni means it listens to all 16 channels.' },
+    { question: 'What does a MIDI cable carry?', options: ['Messages such as notes and knob moves', 'The synth\'s audio, in stereo, to the mixer', 'Power for the synth\'s circuits'], answer: 0, explain: 'MIDI is control data; the sound comes back on an audio cable.' },
+    { question: 'A synth in "omni" mode…', options: ['Responds on every channel', 'Only plays its drum sounds', 'Ignores every note\'s velocity'], answer: 0, explain: 'Omni means it listens to all 16 channels.' },
   ],
 };
 
@@ -213,10 +213,10 @@ const l2: Lesson = {
     },
   ],
   review: [
-    { question: 'Velocity in a note-on runs…', options: ['From 1 to 127 (0 means note off)', 'From 0 to 100 %', 'From 1 to 16'], answer: 0, explain: 'Seven bits, with 0 reserved for note-off.' },
-    { question: 'Velocity usually changes…', options: ['How loud, and often how bright, a note is', 'Its pitch', 'Its MIDI channel'], answer: 0, explain: 'What it changes is up to the synth.' },
-    { question: 'On the on-screen keys, tapping lower on a key…', options: ['Plays louder: a higher velocity', 'Plays a lower note', 'Sends a CC'], answer: 0, explain: 'Lower on the key is a harder strike.' },
-    { question: 'Accents on the first 16th of each beat make a pattern…', options: ['Easier to feel: the beat stands out', 'Slower', 'Out of tune'], answer: 0, explain: 'Contrast in loudness marks the beat.' },
+    { question: 'Velocity in a note-on runs…', options: ['From 1 to 127 (0 means note off)', 'From 0 to 100 % (0 is silent)', 'From 1 to 16 (one per channel)'], answer: 0, explain: 'Seven bits, with 0 reserved for note-off.' },
+    { question: 'Velocity usually changes…', options: ['How loud, and often how bright, a note is', 'How high or low a note is tuned', 'Which of the 16 channels a note is sent on'], answer: 0, explain: 'What it changes is up to the synth.' },
+    { question: 'On the on-screen keys, tapping lower on a key…', options: ['Plays louder: a higher velocity', 'Plays a lower note: an octave down', 'Sends a CC: the mod wheel'], answer: 0, explain: 'Lower on the key is a harder strike.' },
+    { question: 'Accents on the first 16th of each beat make a pattern…', options: ['Easier to feel: the beat stands out', 'Slower: the accents drag the tempo', 'Out of tune: loud notes play sharp'], answer: 0, explain: 'Contrast in loudness marks the beat.' },
   ],
 };
 
@@ -266,7 +266,7 @@ const l3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'The monitor shows "CC 74 Cutoff = 87". What does 87 tell the synth?',
-        options: ['Where to set the cutoff, on a scale of 0 to 127', 'Which parameter to change', 'Which channel to use'], answer: 0,
+        options: ['Where to set the cutoff, on a scale of 0 to 127', 'Which parameter to change, out of the 128 CC numbers', 'Which program to load, out of 128'], answer: 0,
         explain: '74 names the parameter and 87 is its new position. In bytes it is B0 4A 57: B0 means "control change on channel 1", 4A is 74 and 57 is 87, in hexadecimal.',
       },
     },
@@ -281,7 +281,7 @@ const l3: Lesson = {
       instruction: 'Press PROGRAM + until it shows 003, then play a few keys.',
       predict: {
         question: 'A CC moves one parameter. What will a program change do?',
-        options: ['Load a whole different stored sound', 'Move one knob', 'Change the tempo'], answer: 0,
+        options: ['Load a whole different stored sound', 'Move one knob to a stored position', 'Change the tempo of the sequencer'], answer: 0,
         explain: 'A program change recalls a complete patch stored in the synth. Program 3 of the Practice synth\'s bass part is an acid bass: every setting changes at once.',
       },
       principle: 'A program change recalls a complete stored sound in one message.',
@@ -320,9 +320,9 @@ const l3: Lesson = {
     },
   ],
   review: [
-    { question: 'A CC message carries…', options: ['A controller number and a value from 0 to 127', 'A note and a velocity', 'Audio'], answer: 0, explain: 'Number = which parameter, value = where.' },
-    { question: 'On synths that follow General MIDI, CC 74 controls…', options: ['Brightness (filter cutoff)', 'Volume', 'Pitch bend'], answer: 0, explain: 'CC 7 is volume; pitch bend is its own message.' },
-    { question: 'A program change…', options: ['Recalls a whole stored sound', 'Moves one knob', 'Starts the sequencer'], answer: 0, explain: 'It loads a complete patch.' },
+    { question: 'A CC message carries…', options: ['A controller number and a value from 0 to 127', 'A note number and a velocity from 1 to 127', 'A short burst of audio from the synth'], answer: 0, explain: 'Number = which parameter, value = where.' },
+    { question: 'On synths that follow General MIDI, CC 74 controls…', options: ['Brightness (filter cutoff)', 'Volume (the channel\'s level)', 'Pitch bend (the wheel)'], answer: 0, explain: 'CC 7 is volume; pitch bend is its own message.' },
+    { question: 'A program change…', options: ['Recalls a whole stored sound', 'Moves one knob at a time, slowly', 'Starts the synth\'s sequencer'], answer: 0, explain: 'It loads a complete patch.' },
     { question: 'Program 1 on the synth\'s screen is sent as…', options: ['0', '1', '128'], answer: 0, explain: 'Messages count from 0.' },
   ],
 };
@@ -365,7 +365,7 @@ const l4: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'A knob shows "CC19/51". Why two numbers?',
-        options: ['It is a 14-bit control: CC 19 carries the coarse part, CC 51 the fine part', 'It controls two synths', 'It is a typing mistake'], answer: 0,
+        options: ['It is a 14-bit control: CC 19 carries the coarse part, CC 51 the fine part', 'It controls two synths: CC 19 goes to the first one, CC 51 to the second', 'It is a range: the knob can be set to any CC number from 19 up to 51'], answer: 0,
         explain: 'Fine-grained parameters such as the Subsequent 37\'s cutoff use two CCs 32 apart (MSB and LSB): 16,384 steps instead of 128, so sweeps are smooth.',
       },
     },
@@ -398,7 +398,7 @@ const l4: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'Your controller knob sends CC 21; your synth\'s cutoff is CC 43. What does MIDI learn do?',
-        options: ['Links CC 21 to the panel knob, which sends CC 43 to the synth', 'Changes your synth to listen on CC 21', 'Nothing: the numbers must match'], answer: 0,
+        options: ['Links CC 21 to the panel knob, which sends CC 43 to the synth', 'Reprograms your synth, so its cutoff listens on CC 21', 'Nothing: the two CC numbers must match before it works'], answer: 0,
         explain: 'The panel knob sits in the middle: MIDI learn ties your controller\'s CC to it, and the knob map turns it into the CC your synth expects. Neither device needs reprogramming.',
       },
     },
@@ -422,8 +422,8 @@ const l4: Lesson = {
     },
   ],
   review: [
-    { question: 'Where do you find which CC a synth uses for cutoff?', options: ['Its MIDI chart: in the manual or a template', 'It is always CC 74', 'In the audio interface settings'], answer: 0, explain: 'Each synth defines its own numbers.' },
-    { question: 'A 14-bit control uses…', options: ['Two CCs, 32 apart (MSB and LSB)', 'Fourteen CCs', 'A program change'], answer: 0, explain: 'MSB + LSB give 16,384 steps.' },
+    { question: 'Where do you find which CC a synth uses for cutoff?', options: ['Its MIDI chart: in the manual or a template', 'Nowhere: cutoff is CC 74 on every synth', 'In the settings of your audio interface'], answer: 0, explain: 'Each synth defines its own numbers.' },
+    { question: 'A 14-bit control uses…', options: ['Two CCs, 32 apart (MSB and LSB)', 'Fourteen CCs, one for every bit', 'A program change and a CC'], answer: 0, explain: 'MSB + LSB give 16,384 steps.' },
     { question: 'MIDI learn on a controller knob…', options: ['Ties its CC to a control on screen', 'Reprograms the controller', 'Changes the synth\'s CC numbers'], answer: 0, explain: 'The mapping lives in Synth Studio.' },
   ],
 };
@@ -472,7 +472,7 @@ const l5: Lesson = {
       instruction: 'Turn GATE down to about 15%.',
       predict: {
         question: 'GATE sets how long each note is held. What will 15% do?',
-        options: ['Make short, clipped notes', 'Slow the steps down', 'Make the notes quieter'], answer: 0,
+        options: ['Make short, clipped notes', 'Slow the steps down to 15%', 'Make all of the notes quieter'], answer: 0,
         explain: 'Each note-off now comes after 15% of a 16th. The steps keep their timing, which the tempo sets, and loudness comes from velocity.',
       },
       principle: 'Gate length is how long a note is held, separate from when it starts.',
@@ -481,7 +481,7 @@ const l5: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
       quiz: {
         question: 'At 120 BPM, how long is one step?',
-        options: ['0.125 s, a 16th note', '0.5 s, a beat', '1 second'], answer: 0,
+        options: ['0.125 s, a 16th note', '0.5 s, a quarter note', '1 s, half a bar'], answer: 0,
         explain: 'A beat is 0.5 s at 120 BPM, and a step is a 16th note: a quarter of a beat.',
       },
     },
@@ -490,7 +490,7 @@ const l5: Lesson = {
       instruction: 'Set LENGTH to 12 steps.',
       predict: {
         question: 'The studio\'s bar is 16 steps. What happens with a 12-step loop?',
-        options: ['It starts at a different place in the bar each time round', 'It plays slower', 'It stops after 12 steps'], answer: 0,
+        options: ['It starts at a different place in the bar each time round', 'It plays slower, stretched to fill the 16-step bar', 'It stops after 12 steps and waits for the next bar'], answer: 0,
         explain: 'Twelve against sixteen lines up again only every three bars: a polymeter. It keeps a short pattern moving.',
       },
       principle: 'Loops of different lengths drift against each other and meet again later.',
@@ -509,9 +509,9 @@ const l5: Lesson = {
     },
   ],
   review: [
-    { question: 'Each step of this sequencer is…', options: ['A 16th note', 'A beat', 'A bar'], answer: 0, explain: 'Four steps per beat.' },
+    { question: 'Each step of this sequencer is…', options: ['A 16th note', 'A whole beat', 'A whole bar'], answer: 0, explain: 'Four steps per beat.' },
     { question: 'GATE controls…', options: ['How long each note is held', 'When the next step starts', 'How loud the notes are'], answer: 0, explain: 'Length, not timing or loudness.' },
-    { question: 'A 12-step loop against a 16-step bar…', options: ['Shifts against the bar each time round', 'Plays slower', 'Plays louder'], answer: 0, explain: 'A polymeter: they realign every 48 steps.' },
+    { question: 'A 12-step loop against a 16-step bar…', options: ['Shifts against the bar each time round', 'Plays slower, stretched to fill the bar', 'Plays louder on every repeat'], answer: 0, explain: 'A polymeter: they realign every 48 steps.' },
     { question: 'TRANSPOSE +12 moves the pattern…', options: ['Up an octave', '12 steps later', 'To channel 12'], answer: 0, explain: '12 semitones is an octave.' },
   ],
 };
@@ -548,7 +548,7 @@ const l6: Lesson = {
       instruction: 'Turn on Click in the top bar, then press ▶ there (or PLAY here). Listen to the arpeggio against the click.',
       predict: {
         question: 'No clock is sent yet. Will the arpeggio stay in time with the click?',
-        options: ['No: it runs at its own tempo and drifts', 'Yes: it hears the studio anyway', 'It stops'], answer: 0,
+        options: ['No: it runs at its own tempo and drifts', 'Yes: it follows the studio\'s notes anyway', 'No: it stops until a clock arrives'], answer: 0,
         explain: 'Without clock the synth only knows its own tempo (the Practice synth\'s is 104 BPM) and has no idea where the studio\'s beat is, so the two drift apart.',
       },
       principle: 'Two separate clocks never stay together for long.',
@@ -595,10 +595,10 @@ const l6: Lesson = {
     },
   ],
   review: [
-    { question: 'MIDI clock sends…', options: ['24 pulses per beat, plus Start and Stop', 'The notes to play', 'Audio'], answer: 0, explain: 'Timing only, no notes.' },
-    { question: 'Without clock, a synth\'s arpeggiator…', options: ['Runs at its own tempo and drifts from the studio', 'Stops', 'Follows the studio anyway'], answer: 0, explain: 'It has no way to know the studio\'s tempo.' },
-    { question: 'At 24 PPQN, one 16th note is…', options: ['6 clock pulses', '24 pulses', '1 pulse'], answer: 0, explain: '24 / 4 = 6.' },
-    { question: 'To make a hardware synth follow clock, set it to…', options: ['External or auto clock', 'Omni mode', 'Local off'], answer: 0, explain: 'Clock source, usually in a Sync or MIDI menu.' },
+    { question: 'MIDI clock sends…', options: ['24 pulses per beat, plus Start and Stop', 'The notes to play, one on every clock pulse', 'Audio, at the studio\'s tempo'], answer: 0, explain: 'Timing only, no notes.' },
+    { question: 'Without clock, a synth\'s arpeggiator…', options: ['Runs at its own tempo and drifts from the studio', 'Stops until the first clock pulse arrives', 'Follows the studio anyway, through the notes it gets'], answer: 0, explain: 'It has no way to know the studio\'s tempo.' },
+    { question: 'At 24 PPQN, one 16th note is…', options: ['6 clock pulses', '24 clock pulses', '1 single clock pulse'], answer: 0, explain: '24 / 4 = 6.' },
+    { question: 'To make a hardware synth follow clock, set it to…', options: ['External or auto clock', 'Omni mode, on all channels', 'Local off, keys disconnected'], answer: 0, explain: 'Clock source, usually in a Sync or MIDI menu.' },
   ],
 };
 
@@ -652,7 +652,7 @@ const st1: Lesson = {
       instruction: 'Press PLAY: both synths play their own patterns from one transport.',
       predict: {
         question: 'Both panels send to the same output. Why don\'t their notes mix up?',
-        options: ['Each message carries its channel, and each part listens to one channel', 'They take turns', 'The second panel is ignored'], answer: 0,
+        options: ['Each message carries its channel, and each part listens to one channel', 'The two panels take turns, so only one of them sends at any moment', 'The second panel is ignored for as long as the first one is playing'], answer: 0,
         explain: 'The bass part only answers channel 1 and the keys part channel 2, so one cable carries both parts cleanly. Watch each panel\'s monitor: ch1 and ch2.',
       },
       principle: 'One transport, many instruments: every sequencer follows the same clock.',
@@ -661,7 +661,7 @@ const st1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'Two synths share an output and both listen on channel 1. What happens?',
-        options: ['Both play every note from both panels', 'Only the first one plays', 'MIDI picks one at random'], answer: 0,
+        options: ['Both play every note from both panels', 'Only the first one in the chain plays', 'MIDI picks one of the two for each note'], answer: 0,
         explain: 'Each synth reacts to everything on its channel, so both play both parts. Setup warns you when two panels share an output and channel.',
       },
     },
@@ -674,9 +674,9 @@ const st1: Lesson = {
     },
   ],
   review: [
-    { question: 'Two synths on one cable need…', options: ['Different channels', 'Different tempos', 'Different velocities'], answer: 0, explain: 'Channels address each one.' },
-    { question: 'Naming a Your synth…', options: ['Labels it in the rack and every routing menu', 'Changes its MIDI channel', 'Changes the synth\'s own patch name'], answer: 0, explain: 'The name is for you and the studio.' },
-    { question: 'One ▶ starts…', options: ['Every instrument that follows the studio clock', 'Only the focused one', 'Only the drums'], answer: 0, explain: 'They all share the transport.' },
+    { question: 'Two synths on one cable need…', options: ['Different channels', 'Different clock tempos', 'Different velocities'], answer: 0, explain: 'Channels address each one.' },
+    { question: 'Naming a Your synth…', options: ['Labels it in the rack and every routing menu', 'Changes the MIDI channel it sends on', 'Changes the patch name on the synth\'s own screen'], answer: 0, explain: 'The name is for you and the studio.' },
+    { question: 'One ▶ starts…', options: ['Every instrument that follows the studio clock', 'Only the instrument whose tab is open at the moment', 'Only the drums, which lead the others'], answer: 0, explain: 'They all share the transport.' },
   ],
 };
 

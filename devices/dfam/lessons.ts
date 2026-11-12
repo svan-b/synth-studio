@@ -67,7 +67,7 @@ const f1: Lesson = {
       instruction: 'Turn VCO 1 FREQUENCY up one octave, from 131 Hz to about 262 Hz.',
       predict: {
         question: 'What will turning VCO 1 FREQUENCY up do?',
-        options: ['Raise the pitch', 'Make it louder', 'Make each hit longer'], answer: 0,
+        options: ['Raise the pitch', 'Make every hit louder', 'Make each hit longer'], answer: 0,
         explain: 'FREQUENCY sets how many cycles the oscillator makes each second, and more cycles sound higher. One octave up doubles it, from 131 Hz to 262 Hz. Loudness and length belong to the VCA, not the oscillator.',
       },
       principle: 'Pitch is frequency: doubling the cycles per second raises a note by one octave.',
@@ -137,8 +137,8 @@ const f1: Lesson = {
     },
   ],
   review: [
-    { question: 'Raising an oscillator one octave…', options: ['Doubles its frequency', 'Adds 12 Hz', 'Makes it louder'], answer: 0, explain: 'An octave is a 2:1 frequency ratio.' },
-    { question: 'Square versus triangle at the same pitch: the square…', options: ['Has stronger harmonics and sounds buzzier', 'Is an octave higher', 'Has no harmonics'], answer: 0, explain: 'Same fundamental, more and stronger harmonics.' },
+    { question: 'Raising an oscillator one octave…', options: ['Doubles its frequency', 'Adds 12 Hz to its frequency', 'Makes it twice as loud'], answer: 0, explain: 'An octave is a 2:1 frequency ratio.' },
+    { question: 'Square versus triangle at the same pitch: the square…', options: ['Has stronger harmonics and sounds buzzier', 'Is an octave higher and sounds thinner', 'Has no harmonics, so it sounds purer and softer'], answer: 0, explain: 'Same fundamental, more and stronger harmonics.' },
     { question: 'Two oscillators a fifth apart have a frequency ratio of…', options: ['3:2', '2:1', '5:1'], answer: 0, explain: 'A fifth is 3:2; an octave is 2:1.' },
   ],
 };
@@ -159,7 +159,7 @@ const f2: Lesson = {
       instruction: 'Turn NOISE / EXT LEVEL up to about 70%.',
       predict: {
         question: 'Noise contains every frequency at once. What will adding it do?',
-        options: ['Add a hiss, like a snare or a breath', 'Raise the pitch', 'Make the hits longer'], answer: 0,
+        options: ['Add a hiss, like a snare or a breath', 'Raise the pitch of each hit a little', 'Make the hits ring for longer'], answer: 0,
         explain: 'White noise is random, with all frequencies at equal strength, so it has no pitch. Mixed with a tone it adds hiss: the "wires" of a snare. Pitch and length do not change.',
       },
       principle: 'Noise has energy at every frequency and no pitch: the raw material of snares, hats and breath.',
@@ -188,7 +188,7 @@ const f2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'mixing',
       quiz: {
         question: 'A snare is a drum body plus rattling wires. Which mix makes one?',
-        options: ['Some VCO plus some noise', 'Only noise', 'Only a VCO'], answer: 0,
+        options: ['Some VCO plus some noise', 'Only noise, with both VCOs off', 'Only a VCO, with the noise off'], answer: 0,
         explain: 'The VCO gives the drum its body and the noise copies the wires. Noise alone sounds like a hi-hat or a clap, and a VCO alone sounds like a tom.',
       },
     },
@@ -233,9 +233,9 @@ const f2: Lesson = {
     },
   ],
   review: [
-    { question: 'White noise has…', options: ['Energy at all frequencies and no pitch', 'One pitch', 'Only low frequencies'], answer: 0, explain: 'It is random, so it has no repeating pitch.' },
+    { question: 'White noise has…', options: ['Energy at all frequencies and no pitch', 'One clear pitch, like a sine wave', 'Only low frequencies, like a rumble'], answer: 0, explain: 'It is random, so it has no repeating pitch.' },
     { question: 'To make a snare from a tom sound, you add…', options: ['Noise', 'More VCO DECAY', 'A slower tempo'], answer: 0, explain: 'Noise supplies the wires.' },
-    { question: 'Switching a VCO from triangle to square at the same level makes it…', options: ['Louder and buzzier', 'Quieter', 'Lower in pitch'], answer: 0, explain: 'The square carries more energy and harmonics.' },
+    { question: 'Switching a VCO from triangle to square at the same level makes it…', options: ['Louder and buzzier', 'Quieter and softer', 'Lower in pitch'], answer: 0, explain: 'The square carries more energy and harmonics.' },
   ],
 };
 
@@ -282,7 +282,7 @@ const f3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'filter-cutoff',
       quiz: {
         question: 'A square wave through a low-pass filter set below its second harmonic sounds…',
-        options: ['Almost like a sine wave', 'Brighter', 'An octave higher'], answer: 0,
+        options: ['Almost like a sine wave', 'Brighter and buzzier', 'An octave higher than before'], answer: 0,
         explain: 'Only the fundamental gets through, and a lone fundamental is a sine. The pitch stays the same.',
       },
     },
@@ -291,7 +291,7 @@ const f3: Lesson = {
       instruction: 'Flip the VCF switch up to HP (high-pass).',
       predict: {
         question: 'High-pass keeps what is above CUTOFF. What happens to this low note?',
-        options: ['It goes thin - the body disappears', 'It gets deeper', 'Nothing changes'], answer: 0,
+        options: ['It goes thin - the body disappears', 'It gets deeper - the top disappears', 'Nothing changes - the note is too low'], answer: 0,
         explain: 'With CUTOFF at 1.5 kHz, high-pass throws away the fundamental and the lower harmonics, the body of the sound. What is left is the thin, buzzy top. That is why hats and snares often use HP.',
       },
       principle: 'A high-pass filter removes everything below the cutoff, keeping only the bright top.',
@@ -307,7 +307,7 @@ const f3: Lesson = {
       instruction: 'Turn RESONANCE fully clockwise.',
       predict: {
         question: 'Past about 3 o\'clock the filter starts to whistle on its own. What is it doing?',
-        options: ['Oscillating - it has become a sine-wave source', 'Distorting the VCO', 'Echoing the last hit'], answer: 0,
+        options: ['Oscillating - it has become a sine-wave source', 'Distorting - it is overdriving the VCO\'s own wave', 'Echoing - it repeats the last hit like a delay'], answer: 0,
         explain: 'With enough feedback the filter feeds itself and oscillates at the cutoff frequency, even with no input. The DFAM manual uses this as a third sound source in its preset "Filter As An Oscillator".',
       },
       principle: 'With enough feedback a filter oscillates by itself, producing a sine wave at the cutoff.',
@@ -326,9 +326,9 @@ const f3: Lesson = {
     },
   ],
   review: [
-    { question: 'Turning CUTOFF down on a low-pass filter…', options: ['Removes high harmonics (darker)', 'Lowers the pitch', 'Adds distortion'], answer: 0, explain: 'Pitch is set by the VCO.' },
+    { question: 'Turning CUTOFF down on a low-pass filter…', options: ['Removes high harmonics (darker)', 'Lowers the pitch (deeper)', 'Adds distortion (grittier)'], answer: 0, explain: 'Pitch is set by the VCO.' },
     { question: 'Which filter mode suits a thin hi-hat?', options: ['High-pass', 'Low-pass', 'Either - mode does not matter'], answer: 0, explain: 'HP removes the low body.' },
-    { question: 'A self-oscillating filter produces…', options: ['A sine wave at the cutoff frequency', 'White noise', 'A square wave'], answer: 0, explain: 'Feedback makes it ring by itself.' },
+    { question: 'A self-oscillating filter produces…', options: ['A sine wave at the cutoff frequency', 'White noise above the cutoff frequency', 'A square wave at half the cutoff frequency'], answer: 0, explain: 'Feedback makes it ring by itself.' },
     { question: 'Raising RESONANCE on a Moog ladder also tends to…', options: ['Thin out the lows', 'Raise the pitch', 'Lengthen the decay'], answer: 0, explain: 'The classic ladder bass loss.' },
   ],
 };
@@ -422,7 +422,7 @@ const f4: Lesson = {
   ],
   review: [
     { question: 'A closed hi-hat needs a…', options: ['Short VCA DECAY', 'Long VCA DECAY', 'SLOW attack'], answer: 0, explain: 'It is choked quickly.' },
-    { question: 'The DFAM\'s VCA EG switch changes…', options: ['The attack (1 ms or 100 ms)', 'The decay', 'The tempo'], answer: 0, explain: 'FAST = 1 ms, SLOW = 100 ms.' },
+    { question: 'The DFAM\'s VCA EG switch changes…', options: ['The attack (1 ms or 100 ms)', 'The decay (short or long)', 'The tempo (half or double)'], answer: 0, explain: 'FAST = 1 ms, SLOW = 100 ms.' },
     { question: 'If VCA DECAY is longer than the gap between steps…', options: ['The hits overlap', 'Steps are skipped', 'The tempo slows down'], answer: 0, explain: 'Each hit is still ringing when the next starts.' },
   ],
 };
@@ -478,7 +478,7 @@ const f5: Lesson = {
       instruction: 'Turn VCO 1 EG AMOUNT counter-clockwise to about -50%.',
       predict: {
         question: 'A negative amount flips the envelope upside down. What will each hit do?',
-        options: ['Dip below the note and rise back', 'Get quieter', 'Jump even higher'], answer: 0,
+        options: ['Dip below the note and rise back', 'Fade in instead of fading out', 'Jump even higher, then fall'], answer: 0,
         explain: 'The same envelope, inverted, pulls the pitch down first and lets it rise back. That gives a "bloop" or a reversed-sounding hit.',
       },
       principle: 'A negative modulation amount inverts the envelope, so the pitch dips and recovers.',
@@ -499,7 +499,7 @@ const f5: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'modulation-source',
       quiz: {
         question: 'You want a bright click at the start of a kick but a dark tail. Which control does it?',
-        options: ['VCF EG AMOUNT with a short VCF DECAY', 'A longer VCA DECAY', 'More RESONANCE'], answer: 0,
+        options: ['VCF EG AMOUNT with a short VCF DECAY', 'A longer VCA DECAY with VCA EG on SLOW', 'More RESONANCE with a lower CUTOFF'], answer: 0,
         explain: 'The filter envelope opens the filter only for an instant, giving brightness at the start and darkness afterwards. A longer VCA DECAY only makes the whole hit longer.',
       },
     },
@@ -517,9 +517,9 @@ const f5: Lesson = {
     },
   ],
   review: [
-    { question: 'A kick\'s "thump" comes mainly from…', options: ['A fast pitch drop from the VCO EG', 'A long VCA DECAY', 'High RESONANCE'], answer: 0, explain: 'VCO EG AMOUNT plus a short VCO DECAY.' },
+    { question: 'A kick\'s "thump" comes mainly from…', options: ['A fast pitch drop from the VCO EG', 'A long VCA DECAY that lets it ring', 'High RESONANCE on the filter'], answer: 0, explain: 'VCO EG AMOUNT plus a short VCO DECAY.' },
     { question: 'A long VCO DECAY with a big EG AMOUNT sounds like…', options: ['A laser zap', 'A closed hi-hat', 'Silence'], answer: 0, explain: 'You hear the slide.' },
-    { question: 'A negative EG AMOUNT makes the pitch…', options: ['Dip down and rise back', 'Jump up and fall', 'Stay still'], answer: 0, explain: 'The envelope is inverted.' },
+    { question: 'A negative EG AMOUNT makes the pitch…', options: ['Dip down and rise back', 'Jump up and fall back', 'Stay where it is'], answer: 0, explain: 'The envelope is inverted.' },
     { question: 'Which envelope adds a bright click without changing pitch?', options: ['VCF EG', 'VCO EG', 'None'], answer: 0, explain: 'It opens the filter briefly.' },
   ],
 };
@@ -578,7 +578,7 @@ const f6: Lesson = {
       instruction: 'Press RUN / STOP to stop the sequencer.',
       predict: {
         question: 'When you start it again, where will it carry on from?',
-        options: ['Where it stopped: the next step plays first', 'Always step 1', 'A random step'], answer: 0,
+        options: ['Where it stopped: the next step plays first', 'Always step 1: stopping resets the sequencer', 'A random step: the position is lost when it stops'], answer: 0,
         explain: 'The DFAM has no reset: it carries on from where it stopped, and the first clock moves it on one step before it plays. So to start on step 1, park it on step 8 with ADVANCE.',
       },
       principle: 'A step sequencer remembers its position; starting moves to the next step and plays it.',
@@ -612,7 +612,7 @@ const f6: Lesson = {
   review: [
     { question: 'At 120 BPM with 16th-note steps, how many steps play per second?', options: ['8', '2', '16'], answer: 0, explain: '2 beats per second × 4 sixteenths.' },
     { question: 'A step with VELOCITY 0…', options: ['Is a rest', 'Plays at full volume', 'Is skipped and shortens the loop'], answer: 0, explain: 'It still takes its time slot.' },
-    { question: 'ADVANCE versus TRIGGER:', options: ['ADVANCE moves without playing; TRIGGER plays without moving', 'They do the same thing', 'ADVANCE plays; TRIGGER moves'], answer: 0, explain: 'Use them together to tune one step.' },
+    { question: 'ADVANCE versus TRIGGER:', options: ['ADVANCE moves without playing; TRIGGER plays without moving', 'They do the same thing; ADVANCE is just the quieter of the two', 'ADVANCE plays without moving; TRIGGER moves without playing'], answer: 0, explain: 'Use them together to tune one step.' },
   ],
 };
 
@@ -639,7 +639,7 @@ const f7: Lesson = {
       instruction: 'Patch PITCH (bottom-right output) into VCO 1 CV.',
       predict: {
         question: 'PITCH carries each step\'s voltage. What will VCO 1 do?',
-        options: ['Play the melody - its pitch follows the voltage', 'Get louder on high steps', 'Nothing - it is a drum'], answer: 0,
+        options: ['Play the melody - its pitch follows the voltage', 'Get louder on high steps - its level follows the voltage', 'Nothing - a drum voice ignores pitch voltages'], answer: 0,
         explain: 'VCO 1 CV is a 1 volt-per-octave pitch input. Each step\'s voltage now transposes VCO 1, so the drum plays the PITCH knobs as a melody.',
       },
       principle: '1 V per octave: each extra volt into a pitch input raises the oscillator one octave.',
@@ -649,7 +649,7 @@ const f7: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'What does "1 V per octave" mean?',
-        options: ['Each extra volt raises the pitch one octave', 'The input needs exactly 1 volt', 'Each volt adds one semitone'], answer: 0,
+        options: ['Each extra volt raises the pitch one octave', 'The input needs exactly 1 volt to make a sound', 'Each extra volt raises the pitch one semitone'], answer: 0,
         explain: 'It is a scale: +1 V is one octave up and +1/12 V is one semitone. That is why the PITCH readout can show semitones.',
       },
     },
@@ -665,7 +665,7 @@ const f7: Lesson = {
       instruction: 'Patch VCO 2 (output) into VCF MOD.',
       predict: {
         question: 'A cable in VCF MOD replaces its normal. What happens to the grit?',
-        options: ['It stops - VCO 2 replaces the noise', 'It gets twice as gritty', 'Nothing changes'], answer: 0,
+        options: ['It stops - VCO 2 replaces the noise', 'It doubles - VCO 2 is added to the noise', 'Nothing changes - the jack is only an output'], answer: 0,
         explain: 'VCF MOD is normalled to the noise. With VCO 2 plugged in, the knob sets how hard VCO 2\'s wave moves the cutoff instead. At audio rate that sweeps out vowel-like tones.',
       },
       principle: 'Plugging into a normalled input disconnects the internal signal it was receiving.',
@@ -704,10 +704,10 @@ const f7: Lesson = {
     },
   ],
   review: [
-    { question: 'A normalled input with a cable in it…', options: ['Uses the cable instead of its internal signal', 'Adds both signals', 'Ignores the cable'], answer: 0, explain: 'The cable breaks the normal.' },
-    { question: 'The DFAM\'s VCF MOD jack is normalled to…', options: ['The noise generator', 'VCO 1', 'The VCA EG'], answer: 0, explain: 'NOISE / VCF MOD sets its depth.' },
+    { question: 'A normalled input with a cable in it…', options: ['Uses the cable instead of its internal signal', 'Adds the cable to its internal signal', 'Ignores the cable until the knob is at zero'], answer: 0, explain: 'The cable breaks the normal.' },
+    { question: 'The DFAM\'s VCF MOD jack is normalled to…', options: ['The noise generator', 'The VCO 1 output', 'The VCA envelope'], answer: 0, explain: 'NOISE / VCF MOD sets its depth.' },
     { question: '+1 V into a 1 V/oct input raises the pitch by…', options: ['One octave', 'One semitone', 'Nothing'], answer: 0, explain: '1 V per octave.' },
-    { question: 'An oscillator moving the filter cutoff at audio rate makes…', options: ['Vowel-like, talking tones', 'A slower tempo', 'Pure silence'], answer: 0, explain: 'That is the Talking Drum.' },
+    { question: 'An oscillator moving the filter cutoff at audio rate makes…', options: ['Vowel-like, talking tones', 'A slower, dragging tempo', 'A smooth, pure sine tone'], answer: 0, explain: 'That is the Talking Drum.' },
   ],
 };
 
@@ -736,7 +736,7 @@ const sd1: Lesson = {
       instruction: 'Turn VCO 1 EG AMOUNT up to about +45%.',
       predict: {
         question: 'What turns this low beep into a kick?',
-        options: ['A fast pitch drop at the start - the thump', 'A longer tail', 'More volume'], answer: 0,
+        options: ['A fast pitch drop at the start - the thump', 'A longer tail at the end - the boom', 'More volume all the way through - the weight'], answer: 0,
         explain: 'The drop from high to low at the start of the note is what the ear reads as the beater hitting the skin. The tail only adds length.',
       },
       principle: 'Kick punch is a fast downward pitch sweep at the start of a low note.',
@@ -790,7 +790,7 @@ const sd1: Lesson = {
     },
   ],
   review: [
-    { question: 'The size of a kick\'s thump is set by…', options: ['VCO 1 EG AMOUNT', 'VOLUME', 'TEMPO'], answer: 0, explain: 'How far the pitch drops.' },
+    { question: 'The size of a kick\'s thump is set by…', options: ['VCO 1 EG AMOUNT', 'The main VOLUME knob', 'The sequencer\'s TEMPO'], answer: 0, explain: 'How far the pitch drops.' },
     { question: 'An 808-style boom has…', options: ['A long VCA DECAY', 'A very short VCA DECAY', 'High-pass filtering'], answer: 0, explain: 'It rings for a second or more.' },
     { question: 'The click of a kick can come from…', options: ['A short VCF EG', 'A long VCO DECAY', 'SLOW attack'], answer: 0, explain: 'A brief filter opening.' },
   ],
@@ -812,7 +812,7 @@ const sd2: Lesson = {
       instruction: 'Turn NOISE / EXT LEVEL up to about 75%.',
       predict: {
         question: 'Which part of a real snare does the noise copy?',
-        options: ['The rattling wires under the drum', 'The wooden shell', 'The drummer\'s stick'], answer: 0,
+        options: ['The rattling wires under the drum', 'The wooden shell around the drum\'s skin', 'The drummer\'s stick hitting the rim'], answer: 0,
         explain: 'Snare wires buzz against the bottom skin with a noisy hiss. The shell and skin give the pitched body, which is VCO 1 here.',
       },
       principle: 'Noise copies the buzz of snare wires; the oscillator copies the drum\'s body.',
@@ -839,7 +839,7 @@ const sd2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'mixing',
       quiz: {
         question: 'Your snare sounds like a tom with a little hiss. What do you turn up?',
-        options: ['NOISE / EXT LEVEL', 'VCO 1 LEVEL', 'VCO DECAY'], answer: 0,
+        options: ['NOISE / EXT LEVEL', 'VCO 1 LEVEL', 'VCO 1 EG AMOUNT'], answer: 0,
         explain: 'More noise moves the balance from tom to snare. More VCO 1 would make it even more tom-like.',
       },
     },
@@ -879,8 +879,8 @@ const sd2: Lesson = {
   ],
   review: [
     { question: 'In a snare patch, noise copies…', options: ['The wires', 'The shell', 'The room'], answer: 0, explain: 'Noise is the buzz of the wires.' },
-    { question: 'Two VCOs that are not an octave apart give a snare…', options: ['A more drum-like body', 'More hiss', 'A longer decay'], answer: 0, explain: 'Like a drum\'s inharmonic overtones.' },
-    { question: 'An envelope patched into NOISE LEVEL makes the noise…', options: ['Fade along with the envelope', 'Stay constant', 'Change pitch'], answer: 0, explain: 'The level follows the CV.' },
+    { question: 'Two VCOs that are not an octave apart give a snare…', options: ['A more drum-like body', 'More hiss on top', 'A longer, ringing decay'], answer: 0, explain: 'Like a drum\'s inharmonic overtones.' },
+    { question: 'An envelope patched into NOISE LEVEL makes the noise…', options: ['Fade along with the envelope', 'Stay at one constant level', 'Change pitch on every hit'], answer: 0, explain: 'The level follows the CV.' },
   ],
 };
 
@@ -900,7 +900,7 @@ const sd3: Lesson = {
       instruction: 'Flip the VCF switch up to HP.',
       predict: {
         question: 'High-pass removes everything below CUTOFF. What happens to the noise bursts?',
-        options: ['Thinner and sizzlier - like a hi-hat', 'Deeper and boomier', 'They become pitched'], answer: 0,
+        options: ['Thinner and sizzlier - like a hi-hat', 'Deeper and boomier - like a kick', 'Pitched and ringing - like a tom'], answer: 0,
         explain: 'Removing the lows leaves only the bright sizzle. Cymbals and hats have almost no low end, and that is why they cut through a mix.',
       },
       principle: 'High-passed noise sounds like metal: all sizzle, no body.',
@@ -917,7 +917,7 @@ const sd3: Lesson = {
         a: { vca_decay: 45 }, b: { vca_decay: 600 }, labels: ['Closed', 'Open'],
         question: {
           question: 'What makes the open hat "open"?',
-          options: ['It rings longer', 'It is higher', 'It is louder'], answer: 0,
+          options: ['It rings longer', 'It is higher in pitch', 'It is louder'], answer: 0,
           explain: 'An open hat\'s two cymbals ring freely; closing them chokes the ring almost at once. The tone is the same and only the decay changes.',
         },
       },
@@ -926,7 +926,7 @@ const sd3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-decay',
       quiz: {
         question: 'On the DFAM, closed and open hats differ mainly in…',
-        options: ['VCA DECAY', 'CUTOFF', 'TEMPO'], answer: 0,
+        options: ['VCA DECAY', 'CUTOFF', 'VCO DECAY'], answer: 0,
         explain: 'Same noise, same filter, different length. Next you will give each step its own length.',
       },
     },
@@ -972,7 +972,7 @@ const sd3: Lesson = {
   review: [
     { question: 'Hi-hats are usually made from…', options: ['High-passed noise', 'Low-passed square waves', 'A self-oscillating filter'], answer: 0, explain: 'All sizzle, no body.' },
     { question: 'An open hat differs from a closed one mainly in…', options: ['Decay length', 'Pitch', 'Filter mode'], answer: 0, explain: 'It rings longer.' },
-    { question: 'In Quick Hats, the PITCH knobs control…', options: ['Each step\'s decay length', 'Each step\'s pitch', 'The tempo'], answer: 0, explain: 'PITCH is patched into VCA DECAY.' },
+    { question: 'In Quick Hats, the PITCH knobs control…', options: ['Each step\'s decay length', 'Each step\'s pitch, as usual', 'The tempo of the pattern'], answer: 0, explain: 'PITCH is patched into VCA DECAY.' },
   ],
 };
 
@@ -992,7 +992,7 @@ const sd4: Lesson = {
       instruction: 'Turn 1→2 FM AMOUNT up to about 40%.',
       predict: {
         question: 'VCO 1 now wobbles VCO 2\'s frequency hundreds of times a second. What will you hear?',
-        options: ['New metallic overtones, like a bell', 'A slow vibrato', 'Two separate notes'], answer: 0,
+        options: ['New metallic overtones, like a bell', 'A slow vibrato, like a singer', 'Two separate notes, like a chord'], answer: 0,
         explain: 'When the wobble is too fast to hear as vibrato, it creates sidebands: new frequencies above and below VCO 2. They are rarely in tune with each other, so the tone sounds metallic.',
       },
       principle: 'Audio-rate frequency modulation creates sidebands, new partials that make tones metallic or bell-like.',
@@ -1019,7 +1019,7 @@ const sd4: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'frequency-modulation',
       quiz: {
         question: '1→2 FM AMOUNT controls…',
-        options: ['How hard VCO 1 modulates VCO 2\'s frequency', 'The volume of VCO 1', 'The speed of the sequencer'], answer: 0,
+        options: ['How hard VCO 1 modulates VCO 2\'s frequency', 'How loud VCO 1 is in the mixer', 'How fast the sequencer steps from 1 to 2'], answer: 0,
         explain: 'VCO 1 is the modulator and VCO 2 is the carrier you hear. VCO 1 LEVEL is at 0, so you never hear VCO 1 directly.',
       },
     },
@@ -1033,7 +1033,7 @@ const sd4: Lesson = {
       instruction: 'Flip HARD SYNC to ON.',
       predict: {
         question: 'With sync on, VCO 2 restarts its wave every time VCO 1 starts a cycle. What sets the pitch now?',
-        options: ['VCO 1 - VCO 2 only changes the tone', 'VCO 2 alone', 'Both - you hear two notes'], answer: 0,
+        options: ['VCO 1 - VCO 2 only changes the tone', 'VCO 2 - VCO 1 only changes the tone', 'Both - you hear two separate notes at once'], answer: 0,
         explain: 'VCO 2 is forced to repeat at VCO 1\'s rate, so VCO 1 sets the pitch. VCO 2\'s own frequency now decides how much of its wave fits into each cycle, and that changes the harmonics.',
       },
       principle: 'Hard sync locks the slave oscillator to the master\'s pitch; the slave\'s frequency becomes a timbre control.',
@@ -1065,7 +1065,7 @@ const sd4: Lesson = {
     },
   ],
   review: [
-    { question: 'Audio-rate FM adds…', options: ['Sidebands - new metallic partials', 'A slower tempo', 'Noise'], answer: 0, explain: 'Frequencies above and below the carrier.' },
+    { question: 'Audio-rate FM adds…', options: ['Sidebands - new metallic partials', 'Swing - a slower, looser tempo', 'Hiss - noise at every frequency'], answer: 0, explain: 'Frequencies above and below the carrier.' },
     { question: 'With hard sync on, VCO 2 FREQUENCY changes…', options: ['The tone, not the pitch', 'The pitch, not the tone', 'Nothing'], answer: 0, explain: 'VCO 1 sets the pitch.' },
     { question: 'FM clearest when HARD SYNC is…', options: ['Off', 'On', 'It makes no difference'], answer: 0, explain: 'Sync resets the phase every cycle and masks the FM.' },
   ],
@@ -1134,7 +1134,7 @@ const e1: Lesson = {
   ],
   review: [
     { question: 'A laser "pew" means VCO DECAY is…', options: ['Long', 'Short', 'At zero'], answer: 0, explain: 'You hear the slow slide.' },
-    { question: 'To compare two decays by ear, listen to…', options: ['When each tail fades out', 'The attack', 'The tempo'], answer: 0, explain: 'The attacks are identical.' },
+    { question: 'To compare two decays by ear, listen to…', options: ['When each tail fades out', 'How hard each attack hits', 'How fast the pattern runs'], answer: 0, explain: 'The attacks are identical.' },
     { question: 'A tick with no tail has a VCA DECAY of about…', options: ['Under 100 ms', 'About 1 s', 'About 5 s'], answer: 0, explain: 'Very short.' },
   ],
 };
@@ -1156,7 +1156,7 @@ const e2: Lesson = {
         a: { vcf_cutoff: 800 }, b: { vcf_cutoff: 2500 }, labels: ['800 Hz', '2.5 kHz'],
         question: {
           question: 'How do the two differ?',
-          options: ['B is brighter and more buzzy', 'B is higher in pitch', 'B is longer'], answer: 0,
+          options: ['B is brighter and more buzzy', 'B is higher in pitch, by an octave', 'B is longer and rings on'], answer: 0,
           explain: 'The pitch is the same in both. The higher cutoff lets more harmonics through, so the tone is brighter.',
         },
       },
@@ -1177,7 +1177,7 @@ const e2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'filter-cutoff',
       quiz: {
         question: 'Why does the CUTOFF knob feel "even" even though it goes from 20 Hz to 20 kHz?',
-        options: ['It is logarithmic: each step of travel multiplies the frequency', 'It only uses the middle of the range', 'The filter ignores high frequencies'], answer: 0,
+        options: ['It is logarithmic: each step of travel multiplies the frequency', 'It is linear, and it only uses the middle of that range', 'It is stepped: the filter ignores most of the high frequencies'], answer: 0,
         explain: 'Hearing works in ratios. Each octave doubles the frequency, so the knob gives every octave the same amount of travel.',
       },
     },
@@ -1202,9 +1202,9 @@ const e2: Lesson = {
     },
   ],
   review: [
-    { question: 'Raising CUTOFF changes…', options: ['Brightness', 'Pitch', 'Length'], answer: 0, explain: 'More harmonics pass.' },
-    { question: 'With resonance up, the cutoff…', options: ['Rings at its own pitch', 'Stops working', 'Lowers the VCO'], answer: 0, explain: 'The ring is easy to hear and match.' },
-    { question: 'The CUTOFF knob is logarithmic because…', options: ['We hear frequency in ratios', 'It saves power', 'Filters need it'], answer: 0, explain: 'Each octave gets equal travel.' },
+    { question: 'Raising CUTOFF changes…', options: ['Brightness', 'The pitch', 'The note length'], answer: 0, explain: 'More harmonics pass.' },
+    { question: 'With resonance up, the cutoff…', options: ['Rings at its own pitch', 'Stops having any effect', 'Lowers the VCO\'s pitch'], answer: 0, explain: 'The ring is easy to hear and match.' },
+    { question: 'The CUTOFF knob is logarithmic because…', options: ['We hear frequency in ratios', 'Linear knobs wear out faster', 'Filters can\'t work in Hz'], answer: 0, explain: 'Each octave gets equal travel.' },
   ],
 };
 
@@ -1225,7 +1225,7 @@ const e3: Lesson = {
         a: { vco1_eg_amount: 25, vco_decay: 30 }, b: { vco1_eg_amount: 70, vco_decay: 300 }, labels: ['Small and fast', 'Big and slow'],
         question: {
           question: 'Which knob made B sound like a laser?',
-          options: ['VCO DECAY - the sweep is slow enough to hear', 'VCA DECAY', 'CUTOFF'], answer: 0,
+          options: ['VCO DECAY - the sweep is slow enough to hear', 'VCA DECAY - the hit rings for longer', 'CUTOFF - the filter opens far enough to whistle'], answer: 0,
           explain: 'EG AMOUNT is how far the pitch falls and VCO DECAY is how fast it falls. When the fall is slow, your ear hears it as a slide, a "pew".',
         },
       },
@@ -1266,8 +1266,8 @@ const e3: Lesson = {
   ],
   review: [
     { question: 'Kick punch = …', options: ['Moderate EG AMOUNT + short VCO DECAY', 'Big EG AMOUNT + long VCO DECAY', 'No EG'], answer: 0, explain: 'A fast drop.' },
-    { question: 'EG AMOUNT sets…', options: ['How far the pitch moves', 'How fast it moves', 'How loud it is'], answer: 0, explain: 'Depth of the sweep.' },
-    { question: 'VCO DECAY sets…', options: ['How fast the pitch sweep falls', 'The filter brightness', 'The tempo'], answer: 0, explain: 'Speed of the sweep.' },
+    { question: 'EG AMOUNT sets…', options: ['How far the pitch moves', 'How fast the pitch moves', 'How loud the hit is'], answer: 0, explain: 'Depth of the sweep.' },
+    { question: 'VCO DECAY sets…', options: ['How fast the pitch sweep falls', 'How bright the filter starts', 'How fast the sequencer runs'], answer: 0, explain: 'Speed of the sweep.' },
   ],
 };
 
@@ -1300,7 +1300,7 @@ const e4: Lesson = {
         a: {}, b: { vcf_resonance: 75 }, labels: ['A', 'B'],
         question: {
           question: 'What changed from A to B?',
-          options: ['RESONANCE - B rings at one pitch', 'CUTOFF - B is darker', 'NOISE - B hisses'], answer: 0,
+          options: ['RESONANCE - B rings at one pitch', 'CUTOFF - B is darker all over', 'NOISE - B has a hiss on top'], answer: 0,
           explain: 'B has a whistling ring that A lacks: that is resonance. A pure CUTOFF change would make the whole tone darker or brighter, with no ring.',
         },
       },
@@ -1315,7 +1315,7 @@ const e4: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-decay',
       quiz: {
         question: 'A hit has a brighter START but the same tail. Which control most likely changed?',
-        options: ['VCF EG AMOUNT', 'VCA DECAY', 'TEMPO'], answer: 0,
+        options: ['VCF EG AMOUNT', 'VCA DECAY', 'VCO 1 EG AMOUNT'], answer: 0,
         explain: 'Brightness that only lasts for the start of the hit comes from the filter envelope. VCA DECAY would change the tail.',
       },
     },
@@ -1336,8 +1336,8 @@ const e4: Lesson = {
   review: [
     { question: 'Same attack, longer tail means…', options: ['Longer VCA DECAY', 'Higher CUTOFF', 'More FM'], answer: 0, explain: 'An envelope change.' },
     { question: 'A new whistling ring at one pitch means…', options: ['More RESONANCE', 'More NOISE', 'Longer VCO DECAY'], answer: 0, explain: 'Resonance rings at the cutoff.' },
-    { question: 'Brighter only at the start of each hit means…', options: ['More VCF EG AMOUNT', 'Higher CUTOFF', 'More VOLUME'], answer: 0, explain: 'The filter envelope.' },
-    { question: 'The best order to match several controls is…', options: ['One at a time, the most obvious first', 'All at once', 'Randomly'], answer: 0, explain: 'Isolate and compare.' },
+    { question: 'Brighter only at the start of each hit means…', options: ['More VCF EG AMOUNT', 'A higher CUTOFF setting', 'More VOLUME'], answer: 0, explain: 'The filter envelope.' },
+    { question: 'The best order to match several controls is…', options: ['One at a time, the most obvious first', 'All at once, in small steps', 'In any order, the quietest first'], answer: 0, explain: 'Isolate and compare.' },
   ],
 };
 
@@ -1384,7 +1384,7 @@ const sq1: Lesson = {
       instruction: 'Turn VELOCITY 4 down to about 50%.',
       predict: {
         question: 'Velocity also scales the filter envelope. What happens to step 4 besides getting quieter?',
-        options: ['It gets darker - less filter sweep', 'It gets brighter', 'Its pitch drops'], answer: 0,
+        options: ['It gets darker - less filter sweep', 'It gets brighter - more filter sweep', 'Its pitch drops by an octave'], answer: 0,
         explain: 'On the DFAM velocity scales all three envelopes. A soft step gets a smaller filter sweep, so it is darker. Accents are louder and brighter, like a real accent.',
       },
       principle: 'An accent is louder and brighter; velocity scaling the filter envelope gives both at once.',
@@ -1393,7 +1393,7 @@ const sq1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'velocity-dynamics',
       quiz: {
         question: 'Why does an acid line need some quiet steps?',
-        options: ['Contrast makes the loud, bright steps squelch', 'Quiet steps are faster', 'Quiet steps change the key'], answer: 0,
+        options: ['Contrast makes the loud, bright steps squelch', 'Quiet steps play faster, so the line speeds up', 'Quiet steps change the key of the pattern'], answer: 0,
         explain: 'If every step is accented, nothing stands out. Groove comes from the difference between strong and weak steps.',
       },
     },
@@ -1445,7 +1445,7 @@ const sq2: Lesson = {
       instruction: 'Patch PITCH into NOISE LEVEL.',
       predict: {
         question: 'Which steps will get noise now?',
-        options: ['Steps whose PITCH knob is turned up', 'Every step equally', 'Only step 1'], answer: 0,
+        options: ['Steps whose PITCH knob is turned up', 'Every step, by the same amount', 'Only step 1, where the pattern starts'], answer: 0,
         explain: 'NOISE LEVEL adds the incoming voltage to the knob. A step with a high PITCH knob opens the noise, and a step at 0 V adds none.',
       },
       principle: 'One voltage can do two jobs: raise the pitch and open the noise at the same time.',
@@ -1465,7 +1465,7 @@ const sq2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'Why does step 5 get noise but step 1 does not?',
-        options: ['PITCH 5 is high, and PITCH now also sets NOISE LEVEL', 'Step 5 is louder', 'Noise only plays on odd steps'], answer: 0,
+        options: ['PITCH 5 is high, and PITCH now also sets NOISE LEVEL', 'VELOCITY 5 is higher, and louder steps always add noise', 'Noise only plays in the second half of the pattern'], answer: 0,
         explain: 'The cable carries each step\'s PITCH voltage into NOISE LEVEL, and step 1\'s knob is at 0 V.',
       },
     },
@@ -1483,7 +1483,7 @@ const sq2: Lesson = {
       instruction: 'Turn PITCH 2 up to +5 st (about +0.4 V).',
       predict: {
         question: 'PITCH now sets the clock speed during each step. What happens to step 2?',
-        options: ['It gets shorter - the next step comes sooner', 'It gets longer', 'It gets louder'], answer: 0,
+        options: ['It gets shorter - the next step comes sooner', 'It gets longer - the next step comes later', 'It gets louder - the clock adds velocity'], answer: 0,
         explain: 'A positive voltage speeds the clock up, so the step ends sooner. Moog\'s FAQ puts it this way: the higher the knob, the shorter the step.',
       },
       principle: 'Swing is unequal step lengths: long-short, long-short.',
@@ -1509,7 +1509,7 @@ const sq2: Lesson = {
   ],
   review: [
     { question: 'PITCH into TEMPO lets the PITCH knobs set…', options: ['Each step\'s length', 'Each step\'s pitch only', 'The volume'], answer: 0, explain: 'Higher knob = faster clock = shorter step.' },
-    { question: 'Swing is…', options: ['Alternating long and short steps', 'A faster tempo', 'Louder off-beats only'], answer: 0, explain: 'Unequal step lengths.' },
+    { question: 'Swing is…', options: ['Alternating long and short steps', 'A faster tempo on every bar', 'Louder off-beats, with even timing'], answer: 0, explain: 'Unequal step lengths.' },
     { question: 'With PITCH patched into NOISE LEVEL, high steps get…', options: ['More noise', 'Less noise', 'No sound'], answer: 0, explain: 'The voltage adds to the knob.' },
   ],
 };
@@ -1539,7 +1539,7 @@ const p1: Lesson = {
       instruction: 'Now sweep CUTOFF back up to about 5 kHz.',
       predict: {
         question: 'Why does opening the filter after a dark section feel like a lift?',
-        options: ['Contrast: the brightness comes back', 'It plays faster', 'It adds more notes'], answer: 0,
+        options: ['Contrast: the brightness comes back', 'Speed: the pattern plays faster', 'Density: it adds more notes'], answer: 0,
         explain: 'Our ears judge energy relative to what came before. The filter sweep is the oldest build-up in dance music for that reason.',
       },
       principle: 'Energy is relative: taking something away makes its return hit harder.',
@@ -1558,7 +1558,7 @@ const p1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'velocity-dynamics',
       quiz: {
         question: 'You want to mute some steps live without stopping. Which knobs?',
-        options: ['VELOCITY - 0 is a rest', 'PITCH', 'TEMPO'], answer: 0,
+        options: ['VELOCITY - 0 is a rest', 'PITCH - fully down is silent', 'TEMPO - 0 skips a step'], answer: 0,
         explain: 'Velocity at 0 silences a step and keeps the time. Bring it back up on a later pass to unmute.',
       },
     },
@@ -1592,8 +1592,8 @@ const p1: Lesson = {
     },
   ],
   review: [
-    { question: 'A classic build-up is…', options: ['Slowly opening the filter', 'Stopping the clock', 'Lowering VOLUME to 0'], answer: 0, explain: 'Brightness returns.' },
-    { question: 'To mute a step live, turn its…', options: ['VELOCITY to 0', 'PITCH to 0', 'TEMPO down'], answer: 0, explain: 'A rest keeps the time.' },
+    { question: 'A classic build-up is…', options: ['Slowly opening the filter', 'Stopping the clock', 'Slowly lowering VOLUME to 0'], answer: 0, explain: 'Brightness returns.' },
+    { question: 'To mute a step live, turn its…', options: ['VELOCITY to 0', 'PITCH fully down', 'TEMPO down'], answer: 0, explain: 'A rest keeps the time.' },
     { question: 'Doubling the tempo briefly makes…', options: ['A roll / fill', 'A longer decay', 'A key change'], answer: 0, explain: 'Twice as many hits.' },
   ],
 };
@@ -1640,7 +1640,7 @@ const st1: Lesson = {
       instruction: 'Press RUN / STOP on the DFAM.',
       predict: {
         question: 'ADV / CLOCK is patched but the studio is not playing yet. What will the DFAM do?',
-        options: ['Wait silently for clock pulses', 'Play at its own TEMPO', 'Play one step and stop'], answer: 0,
+        options: ['Wait silently for clock pulses', 'Play at its own TEMPO until pulses arrive', 'Play one step and then stop'], answer: 0,
         explain: 'A cable in ADV / CLOCK replaces the internal clock, so TEMPO is ignored. RUN arms it, and it plays one step per pulse once the clock runs. Moog\'s sync instructions say to press RUN / STOP on the DFAM first.',
       },
       principle: 'An external clock replaces the internal one; the follower must be armed before the leader starts.',
@@ -1678,7 +1678,7 @@ const st1: Lesson = {
   review: [
     { question: 'With a cable in ADV / CLOCK, the DFAM\'s TEMPO knob…', options: ['Is ignored', 'Sets the clock speed', 'Sets the volume'], answer: 0, explain: 'The external clock replaces it.' },
     { question: 'To start the DFAM on step 1 with an external clock, first…', options: ['Park it on step 8', 'Turn TEMPO to zero', 'Unplug the cable'], answer: 0, explain: 'The first pulse advances to step 1.' },
-    { question: 'CLOCK DIV 1/8T gives the DFAM…', options: ['Three steps per beat (triplets)', 'Four steps per beat', 'One step per bar'], answer: 0, explain: 'Triplet 8ths.' },
+    { question: 'CLOCK DIV 1/8T gives the DFAM…', options: ['Three steps per beat (triplets)', 'Four steps per beat (16ths)', 'One step per bar (whole notes)'], answer: 0, explain: 'Triplet 8ths.' },
   ],
 };
 
@@ -1713,7 +1713,7 @@ const st2: Lesson = {
       instruction: 'On the DFAM, turn PITCH 3 to +7 st.',
       predict: {
         question: 'Which instruments change pitch on step 3?',
-        options: ['Both - one voltage drives both', 'Only the DFAM', 'Only the Mother-32'], answer: 0,
+        options: ['Both - one voltage drives both', 'Only the DFAM - its PITCH jack is just an input', 'Only the Mother-32 - the DFAM is a drum'], answer: 0,
         explain: 'SEQ PITCH MOD sends PITCH to the DFAM\'s VCOs, and the same voltage leaves the PITCH jack for the Mother-32. One knob moves both.',
       },
       principle: 'One control voltage can drive several instruments at once, keeping them in key.',
@@ -1722,7 +1722,7 @@ const st2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'Why does the Mother-32 play exactly in time with the DFAM?',
-        options: ['Its GATE is the DFAM\'s TRIGGER output', 'They share a TEMPO knob', 'Over MIDI'], answer: 0,
+        options: ['Its GATE is the DFAM\'s TRIGGER output', 'Both TEMPO knobs are set to the same speed', 'The DFAM sends it MIDI clock'], answer: 0,
         explain: 'Every DFAM step sends a trigger pulse, and the Mother-32\'s envelope fires on it. No MIDI and no shared clock are needed.',
       },
     },
@@ -1752,8 +1752,8 @@ const st2: Lesson = {
   ],
   review: [
     { question: 'DFAM PITCH into Mother-32 1V/OCT works because…', options: ['Both use 1 volt per octave', 'They are made by Moog', 'It is MIDI'], answer: 0, explain: 'The same pitch standard.' },
-    { question: 'The Mother-32 GATE input fed by DFAM TRIGGER…', options: ['Fires its envelope on every DFAM step', 'Changes its tempo', 'Mutes it'], answer: 0, explain: 'A trigger per step.' },
-    { question: 'With SEQ PITCH MOD off, the DFAM PITCH jack…', options: ['Still outputs the step pitches', 'Goes silent', 'Outputs noise'], answer: 0, explain: 'The jack is always live.' },
+    { question: 'The Mother-32 GATE input fed by DFAM TRIGGER…', options: ['Fires its envelope on every DFAM step', 'Changes the tempo of its sequencer', 'Mutes it until the DFAM stops'], answer: 0, explain: 'A trigger per step.' },
+    { question: 'With SEQ PITCH MOD off, the DFAM PITCH jack…', options: ['Still outputs the step pitches', 'Goes silent, at 0 V on every step', 'Outputs the noise generator instead'], answer: 0, explain: 'The jack is always live.' },
   ],
 };
 

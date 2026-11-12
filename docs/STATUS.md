@@ -141,6 +141,13 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - **iPad coach:** buttons at least 44 px tall; Back / Next are a footer outside the part that scrolls; a quiz, a reflect, a prediction not yet made and the summary hide the scope and let the coach grow, so the whole question and Next are on screen without scrolling. An ear challenge gets room for its Check button.
   - Gate: audit 0 findings; lesson runner 0 failed on all ten devices and the studio (studio manual steps 2 → 1); core e2e 51/51, with a new `lesson-flow.cjs` check (shuffled answers, "Next lesson", a step that waits, and a question by touch on an iPad-sized screen) and both iPad Producer walkthroughs.
   - The A4 output check now measures TRACK 3 and accepts a smaller drop when the energy shows up on the new channel: TRACK 1 was too close to the threshold and failed one run in three.
+- **Answer length no longer gives the answer away.** The right option was the longest in 72 % of the 1,137 questions, and far longer than every wrong one in 461 of them, so "pick the longest" scored about 72 %.
+  - The wrong options of 729 questions are rewritten with the same length and detail as the right one: each keeps its wrong claim and gains its own false reason ("Yes: the meter follows the fader").
+  - Now the right answer is the longest option in 32 % of questions and the shortest in 21 %, per instrument between 30 and 35 % (the five studio lessons: 12 %), and it is nowhere far longer. It averages 1.05 times the wrong options' length, down from about 2.
+  - Right answers keep their wording, so Daily Review progress carries over: it recognises a question by its text and its right answer. The two exceptions are A/B questions in one Subharmonicon ear lesson, which Daily Review never asks.
+  - Options are longer to read: 79 characters per question on average, up from 55. The longest three still fit the iPad coach with Next on screen (checked in `lesson-flow.cjs`).
+  - The lesson audit enforces it (`--lengths` prints the shares), and `docs/PEDAGOGY.md` has the writing rule.
+  - Gate: audit 0 findings; core e2e 51/51; lesson runner 0 failed on the Subharmonicon and the studio lessons (the runner answers by index, so option wording cannot change its result).
 - **Project files carry user samples.** An instrument can declare `assets` (`has`, `collect`, `restore`); project files embed them as mono 16-bit PCM, base64.
   - Opening a project restores them before the studio loads.
   - The Rytm's user samples now travel to another browser or the iPad Home Screen app, which keeps its own storage.
@@ -209,8 +216,7 @@ git push origin --delete $(git ls-remote --heads origin 'wip/*' | awk '{print $2
 ```
 
 **Next up, in order:**
-1. **Answer length gives the answer away.** In about 70 % of questions the right option is the longest one (chance would be a third). The shuffle hides its position, not its length. Fix by rewriting distractors to the same length and detail, an instrument at a time; `scripts/lesson-audit.ts` is the place to count it.
-2. **Intermittent A4 click flags in audio QA** (Arp Garden, Bubble Cycle, Metallic AM). Each is clean in most re-runs, so it is likely a voice-steal or envelope-retrigger edge case.
+1. **Intermittent A4 click flags in audio QA** (Arp Garden, Bubble Cycle, Metallic AM). Each is clean in most re-runs, so it is likely a voice-steal or envelope-retrigger edge case.
 
 `vercel.json` no longer builds previews for `wip/*` branches. `git.deploymentEnabled` turns them off, and an `ignoreCommand` cancels any that start anyway. The working branch and `main` build as before.
 

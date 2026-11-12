@@ -75,6 +75,7 @@ Aim for 14–20 lessons per instrument, with at least 4 in ear-training. Use `pr
 - **Predict and quiz options:** 3–4 options, all plausible, with exactly one correct. `explain` says why the right answer is right *and* why the tempting wrong one is wrong. An A/B question may have two ("A" or "B").
 - **Option order:** write the options in whatever order reads best. The coach and Daily Review show them shuffled (`components/teaching/optionOrder.ts`), with a new order each session, so nobody learns "it is always the first one". Two things keep their place: options that name the sides of an A/B ("A", "B, with the cut") stay in the lesson's order, and "Both", "Neither", "None of them" and "All of them" stay last. Never refer to an option by its position ("the second option"): name what it says.
 - **Match targets:** must be clearly distinguishable by ear. Differ by at least about 20% of knob travel per control at the easy levels and about 8% at the hard ones. Set every other control from the target, which `match` does automatically. Keep `controls` to 1–3.
+- **Options of one length.** Write the wrong options with the same length, form and detail as the right one. If the right answer gives a reason ("No: it reads before the fader"), each wrong option gives its own, false one ("Yes: the meter follows the fader"). A learner who picks the longest option must do no better than chance, so over an instrument the right answer is the longest option about one time in three, and the shortest about as often. To even a question out, rewrite the wrong options and leave the right one's wording alone: Daily Review recognises a question by its text and its right answer, so rewording that sends it back to the first box for everyone who has answered it. When you replace a wrong option, check that the `explain` does not still argue against the old one.
 - **Challenges:** describe a musical goal, not numbers ("Make the kick short enough that it doesn't boom between beats"). Write checklist checks with generous tolerances.
 - **A step is the learner's to do.** No step may be finished when it begins. The guided steps often build exactly what the closing challenge asks for, so give the challenge a `setup` that takes the defining controls away again (and say so: "The EQ is flat again."), or ask for more than the guided steps reached. A `do` step whose target lies within 3 % of the knob's travel from where the knob already is needs its own `tolerance` (3 semitones on a ten-octave pitch knob is 2.5 %).
 - **Hints:** 2–3 per hard step (an ear challenge, or a challenge with more than one thing to get right), from vague to specific ("Think about how long it rings" → "Look at VCA DECAY" → "Try below 300 ms").
@@ -83,7 +84,7 @@ Aim for 14–20 lessons per instrument, with at least 4 in ear-training. Use `pr
 
 ## The lesson audit
 
-`npm run validate` ends with `scripts/lesson-audit.ts` (also `npm run audit:lessons [device ...] [--table]`). It reads every lesson against this document and fails on any finding:
+`npm run validate` ends with `scripts/lesson-audit.ts` (also `npm run audit:lessons [device ...] [--table] [--lengths]`). It reads every lesson against this document and fails on any finding:
 
 | Group | What it catches |
 |---|---|
@@ -91,7 +92,7 @@ Aim for 14–20 lessons per instrument, with at least 4 in ear-training. Use `pr
 | shape | No objective, no starting point, no hands-on step among the first four, no predict or listen, no quiz, no match or challenge, no closing reflect or challenge, fewer than 3 or more than 5 review questions |
 | words | Instructions over 25 words, principles over 20, questions without 3–4 options, hard steps without a hint ladder, ear challenges on more than 3 controls |
 | sequence | Lessons sharing an order, a prerequisite that comes later, paths out of order, and a walk along "Next lesson" from nothing done, which must reach every lesson with its prerequisites finished |
-| options | The shuffled order is a permutation, and the right answer does not sit in one position |
+| options | The shuffled order is a permutation, and the right answer does not sit in one position. Length: no right answer far longer than every wrong one (1.6 times and 12 characters), and per instrument the right answer is the longest or the shortest option in at most 45 % of questions. `--lengths` prints the shares |
 
 Checks that read the instrument's data or the studio around it (Elektron patterns, routes, sync) are not walked: the lesson runner plays those for real. `--table` prints each instrument's sequence with its step kinds.
 

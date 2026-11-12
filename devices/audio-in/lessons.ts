@@ -71,7 +71,7 @@ const l1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'Video calls clean up voices with echo cancellation, noise suppression and auto gain. What would they do to a synth?',
-        options: ['Pump the level, cut quiet notes and smear the sound', 'Make it sound better', 'Nothing at all'], answer: 0,
+        options: ['Pump the level, cut quiet notes and smear the sound', 'Make it sound cleaner, with less hum, hiss and room noise', 'Nothing at all: they only react to voices'], answer: 0,
         explain: 'They are tuned for speech: noise suppression treats a held note as noise, auto gain pushes the level up and down, and echo cancellation removes sound that also comes out of your speakers. Audio input turns all three off.',
       },
     },
@@ -80,7 +80,7 @@ const l1: Lesson = {
       instruction: 'Set MODE to STEREO.',
       predict: {
         question: 'A synth\'s left and right outputs go into inputs 1 and 2. Which MODE keeps its stereo image?',
-        options: ['STEREO: input 1 left, input 2 right', 'IN 1', 'L+R'], answer: 0,
+        options: ['STEREO: input 1 left, input 2 right', 'IN 1: input 1 alone, in both speakers', 'L+R: both inputs summed in the middle'], answer: 0,
         explain: 'IN 1 plays only the first cable, in the middle; L+R folds both into the middle. STEREO keeps left and right apart. A mono synth on one cable wants IN 1.',
       },
       principle: 'Match MODE to the cables: one cable is mono, two cables are stereo.',
@@ -117,10 +117,10 @@ const l1: Lesson = {
     },
   ],
   review: [
-    { question: 'An audio interface…', options: ['Turns the sound on a cable into numbers the computer can record', 'Sends MIDI notes', 'Powers the synth'], answer: 0, explain: 'It converts analog to digital (and back).' },
-    { question: 'Noise suppression on a synth can…', options: ['Cut held notes it mistakes for noise', 'Make it brighter', 'Change its pitch'], answer: 0, explain: 'It is tuned for speech.' },
+    { question: 'An audio interface…', options: ['Turns the sound on a cable into numbers the computer can record', 'Turns the keys you play into MIDI notes for the computer', 'Supplies power to the synth through its audio cable'], answer: 0, explain: 'It converts analog to digital (and back).' },
+    { question: 'Noise suppression on a synth can…', options: ['Cut held notes it mistakes for noise', 'Make every note a little brighter and thinner', 'Change its pitch by a few cents up or down'], answer: 0, explain: 'It is tuned for speech.' },
     { question: 'A stereo synth on inputs 1 and 2 needs MODE…', options: ['STEREO', 'IN 1', 'IN 2'], answer: 0, explain: 'Input 1 left, input 2 right.' },
-    { question: 'MUTE on this input…', options: ['Silences it in the studio but keeps the meter and takes', 'Disconnects it', 'Turns it up'], answer: 0, explain: 'Monitoring off, recording on.' },
+    { question: 'MUTE on this input…', options: ['Silences it in the studio but keeps the meter and takes', 'Disconnects it, so the meter and takes stop too', 'Turns it up in the studio while a take is recording'], answer: 0, explain: 'Monitoring off, recording on.' },
   ],
 };
 
@@ -166,7 +166,7 @@ const l2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'gain-staging',
       quiz: {
         question: 'Why aim for -12 dBFS rather than as close to 0 as possible?',
-        options: ['Headroom: louder notes and resonance peaks still fit below 0 dBFS', 'It sounds brighter', 'Digital audio is louder at -12'], answer: 0,
+        options: ['Headroom: louder notes and resonance peaks still fit below 0 dBFS', 'Tone: a recording made at -12 dBFS sounds brighter than a hot one', 'Loudness: digital audio plays back loudest at about -12 dBFS'], answer: 0,
         explain: 'A recording has plenty of room above its noise; the danger is the ceiling. A synth\'s peaks jump with velocity, resonance and chords, and anything over 0 dBFS is clipped flat.',
       },
     },
@@ -183,7 +183,7 @@ const l2: Lesson = {
       instruction: 'Turn GAIN up to +22 dB.',
       predict: {
         question: 'What will the CLIP light do?',
-        options: ['Light up and stay lit', 'Nothing', 'Turn the input off'], answer: 0,
+        options: ['Light up and stay lit', 'Nothing at this level', 'Turn the whole input off'], answer: 0,
         explain: '-20 + 22 = +2 dBFS, over the ceiling: in a recording the tops of the wave are cut off, a harsh distortion. CLIP stays lit until you tap it, so you never miss a short peak.',
       },
       principle: 'Clipping flattens the peaks into harsh distortion, and it cannot be undone later.',
@@ -211,10 +211,10 @@ const l2: Lesson = {
     },
   ],
   review: [
-    { question: '0 dBFS is…', options: ['The loudest a digital signal can be', 'Silence', 'A normal speaking level'], answer: 0, explain: 'Full scale: the ceiling.' },
+    { question: '0 dBFS is…', options: ['The loudest a digital signal can be', 'The level of digital silence', 'The level of a normal speaking voice'], answer: 0, explain: 'Full scale: the ceiling.' },
     { question: 'A tone at -20 dBFS with +8 dB of gain peaks at…', options: ['-12 dBFS', '-28 dBFS', '+8 dBFS'], answer: 0, explain: 'Decibels add.' },
-    { question: 'Headroom is…', options: ['The space between your peaks and 0 dBFS', 'The noise floor', 'The input latency'], answer: 0, explain: 'Room for louder moments.' },
-    { question: 'CLIP and IN light up. What do you turn down first?', options: ['The gain on your interface', 'Your speakers', 'Nothing'], answer: 0, explain: 'IN means it clipped before GAIN, in the interface.' },
+    { question: 'Headroom is…', options: ['The space between your peaks and 0 dBFS', 'The hiss you hear under a quiet recording', 'The delay through your interface'], answer: 0, explain: 'Room for louder moments.' },
+    { question: 'CLIP and IN light up. What do you turn down first?', options: ['The gain on your interface', 'The volume of your speakers', 'Nothing: it clears itself in time'], answer: 0, explain: 'IN means it clipped before GAIN, in the interface.' },
   ],
 };
 
@@ -251,7 +251,7 @@ const l3: Lesson = {
       instruction: 'Press MUTE.',
       predict: {
         question: 'Your interface has direct monitoring on. With MUTE on here, what do you hear?',
-        options: ['The synth with almost no delay, straight from the interface', 'Nothing at all', 'The synth twice'], answer: 0,
+        options: ['The synth with almost no delay, straight from the interface', 'Nothing at all: MUTE silences the interface as well', 'The synth twice: once direct and once through the studio'], answer: 0,
         explain: 'Direct monitoring sends the input to your headphones inside the interface, before the computer. MUTE stops the delayed copy from the studio, and the meter and takes still work.',
       },
       principle: 'Direct monitoring skips the computer, so it has no round-trip delay.',
@@ -266,7 +266,7 @@ const l3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'You hear your synth twice, like a short slap echo. Why?',
-        options: ['Direct monitoring and studio monitoring are both on', 'The cable is faulty', 'MIDI clock is wrong'], answer: 0,
+        options: ['Direct monitoring and studio monitoring are both on', 'The audio cable is faulty and reflects the signal', 'MIDI clock is wrong, so each note is sent twice'], answer: 0,
         explain: 'One copy comes straight from the interface and the other a round trip later. Turn one off: direct monitoring on the interface, or MUTE here.',
       },
     },
@@ -289,10 +289,10 @@ const l3: Lesson = {
     },
   ],
   review: [
-    { question: 'Round-trip latency is…', options: ['The delay from the instrument through the computer back to your ears', 'The time MIDI takes to start', 'How long a note lasts'], answer: 0, explain: 'In + processing + out.' },
-    { question: 'Smaller audio buffers give…', options: ['Less latency but more CPU load', 'More latency', 'Better sound quality'], answer: 0, explain: 'Too small and it crackles.' },
-    { question: 'Direct monitoring…', options: ['Sends the input to your headphones inside the interface, with almost no delay', 'Records the input', 'Mutes the synth'], answer: 0, explain: 'It skips the computer.' },
-    { question: 'Hearing the synth twice means…', options: ['Direct and studio monitoring are both on', 'It is in stereo', 'The gain is too high'], answer: 0, explain: 'Turn one of them off.' },
+    { question: 'Round-trip latency is…', options: ['The delay from the instrument through the computer back to your ears', 'The time MIDI takes to reach the instrument after you press Play', 'How long a note rings on after the key has been released'], answer: 0, explain: 'In + processing + out.' },
+    { question: 'Smaller audio buffers give…', options: ['Less latency but more CPU load', 'More latency but less CPU load', 'Better sound quality at any load'], answer: 0, explain: 'Too small and it crackles.' },
+    { question: 'Direct monitoring…', options: ['Sends the input to your headphones inside the interface, with almost no delay', 'Records the input straight to a file on the interface, without the computer', 'Mutes the synth in your headphones while the computer is recording it'], answer: 0, explain: 'It skips the computer.' },
+    { question: 'Hearing the synth twice means…', options: ['Direct and studio monitoring are both on', 'The input MODE is set to STEREO, not IN 1', 'The input gain is set too high'], answer: 0, explain: 'Turn one of them off.' },
   ],
 };
 
@@ -335,7 +335,7 @@ const l4: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'mixing',
       quiz: {
         question: 'Why record the synth on its own, as well as the whole mix?',
-        options: ['You can mix, edit or replace it later without touching the rest', 'It sounds louder', 'It uses less memory'], answer: 0,
+        options: ['You can mix, edit or replace it later without touching the rest', 'A part recorded on its own always sounds louder in the mix', 'Two small recordings use less memory than one large one'], answer: 0,
         explain: 'A separate track (a stem) keeps your options open: fix one note, change its EQ or send it to a collaborator. REC in the top bar records only the finished mix.',
       },
     },
@@ -344,7 +344,7 @@ const l4: Lesson = {
       instruction: 'Press Record take, let a few bars play, then press it again. The WAV file goes to your downloads.',
       predict: {
         question: 'Record take starts the studio too. What will the file contain?',
-        options: ['Only this input, after GAIN', 'The whole mix', 'The MIDI notes'], answer: 0,
+        options: ['Only this input, after GAIN', 'The whole studio mix, after the master', 'The MIDI notes that it played'], answer: 0,
         explain: 'A take records this input alone, after GAIN and before MUTE, so it works while you monitor directly. The studio starts so your sequencer plays the synth during the take.',
       },
       check: s => d(s).takes.length >= 1,
@@ -370,8 +370,8 @@ const l4: Lesson = {
     },
   ],
   review: [
-    { question: 'A mixer channel gives an instrument…', options: ['Its own gain, EQ, filter and fader', 'A new tempo', 'More notes'], answer: 0, explain: 'Independent control in the mix.' },
-    { question: 'A take of one input is often called…', options: ['A stem or track', 'A patch', 'A preset'], answer: 0, explain: 'One part, recorded alone.' },
+    { question: 'A mixer channel gives an instrument…', options: ['Its own gain, EQ, filter and fader', 'A tempo of its own, apart from the clock', 'More notes to play at the same time'], answer: 0, explain: 'Independent control in the mix.' },
+    { question: 'A take of one input is often called…', options: ['A stem or track', 'A patch or a kit', 'A preset or bank'], answer: 0, explain: 'One part, recorded alone.' },
     { question: 'Record take reads the input…', options: ['After GAIN and before MUTE', 'After the master limiter', 'Before the interface'], answer: 0, explain: 'So it records while you monitor directly.' },
   ],
 };
@@ -447,7 +447,7 @@ const st1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
       quiz: {
         question: 'Through the studio, the hardware sounds a little late compared with the twins. Why?',
-        options: ['Its audio makes a round trip through the interface and the computer', 'MIDI is slow', 'The mixer adds an echo'], answer: 0,
+        options: ['Its audio makes a round trip through the interface and the computer', 'MIDI is slow: each note takes a few milliseconds per metre of cable', 'The mixer adds a short echo to every input that is not a twin'], answer: 0,
         explain: 'MIDI arrives on time (it is sent early with timestamps), but the sound then takes the input latency to come back. A small negative Offset in MIDI settings lines it up.',
       },
     },
@@ -460,9 +460,9 @@ const st1: Lesson = {
     },
   ],
   review: [
-    { question: 'To record a hardware synth, its sound must…', options: ['Come back in through an audio input', 'Travel over MIDI', 'Be sent as clock'], answer: 0, explain: 'MIDI carries no audio.' },
-    { question: 'MIDI clock to the synth makes…', options: ['Its arpeggiator and sequencer follow the studio tempo', 'Its sound louder', 'Its audio come back'], answer: 0, explain: 'Clock is timing only.' },
-    { question: 'Hardware sounds late through the studio because of…', options: ['Input latency on the way back', 'Slow MIDI', 'The mixer'], answer: 0, explain: 'Fix it with a small negative offset.' },
+    { question: 'To record a hardware synth, its sound must…', options: ['Come back in through an audio input', 'Travel back over the same MIDI cable', 'Be sent along with the clock'], answer: 0, explain: 'MIDI carries no audio.' },
+    { question: 'MIDI clock to the synth makes…', options: ['Its arpeggiator and sequencer follow the studio tempo', 'Its sound louder on every beat of the studio tempo', 'Its audio come back to the studio without a cable'], answer: 0, explain: 'Clock is timing only.' },
+    { question: 'Hardware sounds late through the studio because of…', options: ['Input latency on the way back', 'Slow MIDI on the way out to it', 'The mixer\'s own delay'], answer: 0, explain: 'Fix it with a small negative offset.' },
   ],
 };
 

@@ -78,7 +78,7 @@ const l1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'You paste the URL of a plugin from a site you don\'t know. What do you think about first?',
-        options: ['Whether you trust that site: its code runs with the same access as this page', 'Whether it is free', 'Nothing: browser plugins are sandboxed'], answer: 0,
+        options: ['Whether you trust that site: its code runs with the same access as this page', 'Whether it is free: paid plugins stop working after a trial period ends', 'Nothing: browser plugins are sandboxed and can\'t reach your projects'], answer: 0,
         explain: 'A web plugin is JavaScript running inside this page, and Synth Studio cannot sandbox it: it could read your projects in this browser. Built-in plugins need no trust.',
       },
     },
@@ -87,7 +87,7 @@ const l1: Lesson = {
       instruction: 'Load Studio Echo instead (Change…), then play the keys.',
       predict: {
         question: 'Studio Echo is an effect. What will the keys do now?',
-        options: ['Nothing: an effect needs sound coming in, not notes', 'Play a synth with an echo', 'Play Studio Mono'], answer: 0,
+        options: ['Nothing: an effect needs sound coming in, not notes', 'Play a built-in synth with an echo on every note', 'Play Studio Mono, the instrument loaded before it'], answer: 0,
         explain: 'An instrument turns notes into sound; an effect changes sound that arrives on its IN. With nothing patched into IN, an effect is silent.',
       },
       check: s => w(s).url === BUILTIN_ECHO,
@@ -119,9 +119,9 @@ const l1: Lesson = {
     },
   ],
   review: [
-    { question: 'A plugin runs…', options: ['Inside a host such as a DAW or this panel', 'On its own, without a host', 'Inside your audio interface'], answer: 0, explain: 'The host feeds it notes, audio and tempo.' },
+    { question: 'A plugin runs…', options: ['Inside a host such as a DAW or this panel', 'On its own, without any host around it', 'Inside the chip of your audio interface'], answer: 0, explain: 'The host feeds it notes, audio and tempo.' },
     { question: 'An effect plugin with nothing patched into IN…', options: ['Is silent', 'Plays its own notes', 'Plays the keys'], answer: 0, explain: 'It needs sound to process.' },
-    { question: 'Before loading a plugin from an unknown site you should…', options: ['Decide whether you trust that site', 'Turn the volume down', 'Nothing'], answer: 0, explain: 'Its code runs inside this page.' },
+    { question: 'Before loading a plugin from an unknown site you should…', options: ['Decide whether you trust that site', 'Turn the studio\'s volume all the way down', 'Do nothing: it is always safe'], answer: 0, explain: 'Its code runs inside this page.' },
   ],
 };
 
@@ -191,9 +191,9 @@ const l2: Lesson = {
     },
   ],
   review: [
-    { question: 'Notes reach a plugin instrument as…', options: ['MIDI events from the host', 'Audio', 'Clock pulses'], answer: 0, explain: 'The same messages a hardware synth gets.' },
-    { question: 'Closing the plugin window here…', options: ['Saves its settings with the project', 'Resets the plugin', 'Unloads it'], answer: 0, explain: 'Total recall.' },
-    { question: 'A plugin\'s settings come back when…', options: ['The project is opened again', 'You restart the computer', 'Never'], answer: 0, explain: 'The host restores the saved state.' },
+    { question: 'Notes reach a plugin instrument as…', options: ['MIDI events from the host', 'Audio from the mixer', 'Clock pulses on a patch cable'], answer: 0, explain: 'The same messages a hardware synth gets.' },
+    { question: 'Closing the plugin window here…', options: ['Saves its settings with the project', 'Resets the plugin to its defaults', 'Unloads it from the slot'], answer: 0, explain: 'Total recall.' },
+    { question: 'A plugin\'s settings come back when…', options: ['The project is opened again', 'You restart the whole computer', 'Never: they are lost on close'], answer: 0, explain: 'The host restores the saved state.' },
   ],
 };
 
@@ -225,7 +225,7 @@ const l3: Lesson = {
         a: { bypass: false }, b: { bypass: true }, labels: ['Echo on', 'Bypassed'],
         question: {
           question: 'What does BYPASS do?',
-          options: ['Passes the sound through untouched, so you can compare', 'Silences the plugin', 'Doubles the echo'], answer: 0,
+          options: ['Passes the sound through untouched, so you can compare', 'Silences the plugin and everything that goes into it', 'Doubles the echo, so the effect is easier to judge'], answer: 0,
           explain: 'Bypass skips the effect but keeps the sound flowing. Comparing with and without is how engineers judge whether an effect really helps.',
         },
       },
@@ -235,7 +235,7 @@ const l3: Lesson = {
       instruction: 'Keep "Sync to studio clock" ticked (Studio tab), then change the tempo in the top bar and press Test sound.',
       predict: {
         question: 'The echo is set to a dotted 8th, synced. What happens to the repeats when the tempo goes up?',
-        options: ['They get closer together and stay on the beat', 'They stay the same length', 'They stop'], answer: 0,
+        options: ['They get closer together and stay on the beat', 'They keep the same gaps and drift off the beat', 'They stop until the tempo is steady again'], answer: 0,
         explain: 'A synced delay takes its time from the tempo: a dotted 8th is three quarters of a beat, so a faster beat means shorter gaps. The host sends the tempo to the plugin as transport events.',
       },
       check: synced,
@@ -274,9 +274,9 @@ const l3: Lesson = {
     },
   ],
   review: [
-    { question: 'BYPASS on an effect…', options: ['Passes the sound through unchanged', 'Mutes it', 'Doubles it'], answer: 0, explain: 'For before/after comparisons.' },
+    { question: 'BYPASS on an effect…', options: ['Passes the sound through unchanged', 'Mutes the sound completely', 'Doubles the amount of effect you hear'], answer: 0, explain: 'For before/after comparisons.' },
     { question: 'A 1/8 echo at 120 BPM repeats every…', options: ['250 ms', '500 ms', '1 s'], answer: 0, explain: 'Half of a 500 ms beat.' },
-    { question: 'Feedback on a delay sets…', options: ['How many repeats you hear', 'The delay time', 'The pitch'], answer: 0, explain: 'More feedback, more repeats.' },
+    { question: 'Feedback on a delay sets…', options: ['How many repeats you hear', 'How far apart the repeats are', 'How high the repeats sound'], answer: 0, explain: 'More feedback, more repeats.' },
   ],
 };
 
@@ -313,7 +313,7 @@ const l4: Lesson = {
       instruction: 'Load Studio Echo here (Change… if something is loaded).',
       predict: {
         question: 'You need an echo on three different instruments. With plugins you…',
-        options: ['Load three instances, each with its own settings', 'Need three computers', 'Can only use one'], answer: 0,
+        options: ['Load three instances, each with its own settings', 'Need three computers, one for each echo', 'Can only use one, shared at the same settings'], answer: 0,
         explain: 'Each Web Audio plugin slot is its own instance: add more from Instruments… and each keeps its own settings. With hardware you would need three boxes, or a mixer\'s send.',
       },
       check: s => w(s).url === BUILTIN_ECHO,
@@ -346,10 +346,10 @@ const l4: Lesson = {
     },
   ],
   review: [
-    { question: 'Signal flow in software and hardware is…', options: ['The same: source, processing, mixer', 'Completely different', 'Reversed'], answer: 0, explain: 'The jobs are the same.' },
-    { question: 'Plugins have no input round trip because…', options: ['Their audio is made inside the computer', 'They are faster', 'They use MIDI'], answer: 0, explain: 'Only hardware audio has to come back in.' },
-    { question: 'Total recall means…', options: ['Every setting comes back with the project', 'The plugin remembers your playing', 'Undo works'], answer: 0, explain: 'The host saves the plugin\'s state.' },
-    { question: 'Running three echoes on three instruments takes…', options: ['Three plugin instances', 'Three computers', 'One echo only'], answer: 0, explain: 'Each instance has its own settings.' },
+    { question: 'Signal flow in software and hardware is…', options: ['The same: source, processing, mixer', 'Completely different: no mixer', 'Reversed: mixer, processing, source'], answer: 0, explain: 'The jobs are the same.' },
+    { question: 'Plugins have no input round trip because…', options: ['Their audio is made inside the computer', 'They run faster than hardware', 'They send MIDI where hardware sends audio'], answer: 0, explain: 'Only hardware audio has to come back in.' },
+    { question: 'Total recall means…', options: ['Every setting comes back with the project', 'The plugin remembers every note you have played', 'Undo works on every knob'], answer: 0, explain: 'The host saves the plugin\'s state.' },
+    { question: 'Running three echoes on three instruments takes…', options: ['Three plugin instances', 'Three separate computers', 'One echo, used three times'], answer: 0, explain: 'Each instance has its own settings.' },
   ],
 };
 

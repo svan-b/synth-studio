@@ -133,7 +133,7 @@ const f1: Lesson = {
       solution: { presses: ['pad:ch'] },
       predict: {
         question: 'OH and CH share one voice. What happens to the ringing open hat?',
-        options: ['It keeps ringing under the closed hat', 'It stops: the closed hat takes over the voice', 'Both get quieter', 'CH waits until the open hat ends'],
+        options: ['It keeps ringing under the closed hat', 'It stops: the closed hat takes over the voice', 'Both get quieter: they split the voice\'s level', 'The closed hat waits until the open hat has ended'],
         answer: 1,
         explain: 'One voice makes one sound at a time, so the closed hat replaces the open one. Layering would need two voices, and a new hit never waits.',
       },
@@ -160,7 +160,7 @@ const f1: Lesson = {
         a: { oh_dec: 30 }, b: { oh_dec: 100 }, labels: ['OH DEC 30', 'OH DEC 100'],
         question: {
           question: 'They sound almost the same length in this groove. Why?',
-          options: ['The closed hat on the next step cuts the long one off', 'DEC does nothing on the open hat', 'The compressor shortens it'], answer: 0,
+          options: ['The closed hat on the next step cuts the long one off', 'DEC does nothing on the open hat, whatever its setting', 'The compressor shortens every sound to the same length'], answer: 0,
           explain: 'The CH on step 16 takes over the shared voice, so however long the OH could ring, it stops one step later. The compressor changes level, not length.',
         },
       },
@@ -191,8 +191,8 @@ const f1: Lesson = {
   ],
   review: [
     { question: 'How many analog voices does the Rytm MKII have?', options: ['8', '12', '16'], answer: 0, explain: '12 tracks share 8 voices.' },
-    { question: 'CH and OH trig on the same step. Which plays?', options: ['OH: the right-hand track wins', 'CH', 'Both'], answer: 0, explain: 'In each pair the right-hand track has priority (manual p.21).' },
-    { question: 'How do you select SD for editing?', options: ['Hold [TRK] and tap SD', 'Tap SD', 'Press [SRC]'], answer: 0, explain: '[TRK] + pad selects; a tap only plays it.' },
+    { question: 'CH and OH trig on the same step. Which plays?', options: ['OH: the right-hand track wins', 'CH: the left-hand track wins', 'Both: they are layered'], answer: 0, explain: 'In each pair the right-hand track has priority (manual p.21).' },
+    { question: 'How do you select SD for editing?', options: ['Hold [TRK] and tap SD', 'Tap SD on its own', 'Press [SRC] and then tap SD'], answer: 0, explain: '[TRK] + pad selects; a tap only plays it.' },
     { question: 'A ride on CY and an open hat on OH…', options: ['Can ring together', 'Cut each other off', 'Cannot be in one pattern'], answer: 0, explain: 'They are on different voices.' },
   ],
 };
@@ -235,7 +235,7 @@ const f2: Lesson = {
       instruction: 'Turn encoder E (FRQ) down to about 40 and tap BD.',
       predict: {
         question: 'The kick is already low. What will a low-pass FRQ of 40 do?',
-        options: ['Lower its pitch', 'Remove the click and the top, leaving a darker thump', 'Make it ring longer', 'Nothing'], answer: 1,
+        options: ['Lower its pitch, so the thump sounds deeper', 'Remove the click and the top, leaving a darker thump', 'Make it ring longer, with a boomier tail', 'Nothing: the kick is already below the cutoff'], answer: 1,
         explain: 'The filter strips the upper harmonics, the click included. Pitch comes from TUN on the SRC page. "Nothing" is tempting because the body is low, but the click is all highs.',
       },
       principle: 'A low-pass filter removes harmonics above its cutoff; the pitch stays put.',
@@ -271,7 +271,7 @@ const f2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'OVR is an encoder on the AMP page. Where does the overdrive act?',
-        options: ['After the amp', 'Before the filter', 'On the reverb'], answer: 1,
+        options: ['After the amp, on the output', 'Before the filter', 'On the reverb\'s return'], answer: 1,
         explain: 'The page groups it with the amp controls, but in the signal path the boost comes before the multimode filter, so the filter can tame its fizz (manual p.79).',
       },
     },
@@ -290,8 +290,8 @@ const f2: Lesson = {
     },
   ],
   review: [
-    { question: 'The first stage of a Rytm voice is…', options: ['The sound sources (SRC and SMPL)', 'The filter', 'The amp'], answer: 0, explain: 'Sources, then overdrive, filter and amp.' },
-    { question: 'AMP DEC at INF means…', options: ['The machine\'s decay sets the length', 'The sound never ends', 'The amp is muted'], answer: 0, explain: 'The amp stops shortening the sound.' },
+    { question: 'The first stage of a Rytm voice is…', options: ['The sound sources (SRC and SMPL)', 'The multimode filter (the FLTR page)', 'The amp (the AMP page)'], answer: 0, explain: 'Sources, then overdrive, filter and amp.' },
+    { question: 'AMP DEC at INF means…', options: ['The machine\'s decay sets the length', 'The sound never ends until you stop it', 'The amp is muted for that track'], answer: 0, explain: 'The amp stops shortening the sound.' },
     { question: 'Lowering FRQ with the filter on LP2…', options: ['Darkens the sound', 'Lowers the pitch', 'Adds reverb'], answer: 0, explain: 'It removes the highs.' },
     { question: 'With the FX track selected, [SRC] opens…', options: ['DELAY', 'REVERB', 'COMPRESSOR'], answer: 0, explain: 'The FX track\'s pages are DELAY, REVERB, DISTORTION, COMPRESSOR and LFO (manual p.81).' },
   ],
@@ -376,7 +376,7 @@ const s1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'modulation-depth',
       quiz: {
         question: 'On BD HARD, how do you change how far the pitch sweeps?',
-        options: ['Turn SNP', 'You can\'t: change SWT for speed, or switch to BD CLASSIC', 'Turn TIC', 'Turn HLD'], answer: 1,
+        options: ['Turn SNP: it sets how far the pitch falls at the start', 'You can\'t: change SWT for speed, or switch to BD CLASSIC', 'Turn TIC: it sets how high the pitch sweep begins', 'Turn HLD: it holds the pitch up before it falls'], answer: 1,
         explain: 'BD HARD\'s sweep range is built in. SNP adds a separate snap at the start, which is easy to mistake for a deeper sweep.',
       },
     },
@@ -401,7 +401,7 @@ const s1: Lesson = {
     },
   ],
   review: [
-    { question: 'SWT sets…', options: ['How fast the pitch falls', 'How long it rings', 'The click level'], answer: 0, explain: 'Sweep time.' },
+    { question: 'SWT sets…', options: ['How fast the pitch falls', 'How long the drum rings', 'How loud the click is'], answer: 0, explain: 'Sweep time.' },
     { question: 'BD HARD\'s sweep depth is…', options: ['Fixed', 'Encoder C', 'Set by TIC'], answer: 0, explain: 'Encoder C is SNP; the depth is built in (manual p.97).' },
     { question: 'For an 808-style boom, raise…', options: ['SRC DEC', 'TIC', 'AMP ATK'], answer: 0, explain: 'A long decay booms.' },
     { question: 'Open the MACHINE menu with…', options: ['[SRC] pressed twice', '[TRK] pressed twice', '[AMP] + [YES]'], answer: 0, explain: 'Or [FUNC] + [SRC] (manual p.21).' },
@@ -438,7 +438,7 @@ const s2: Lesson = {
       instruction: 'Turn encoder F (NOD) up to about 100 and tap.',
       predict: {
         question: 'What will a longer noise decay do?',
-        options: ['The drum\'s pitch drops', 'The wires ring longer: a washier snare', 'The snap gets sharper', 'It gets quieter'], answer: 1,
+        options: ['The drum\'s pitch drops lower', 'The wires ring longer: a washier snare', 'The snap gets sharper: a tighter snare', 'The whole snare gets quieter'], answer: 1,
         explain: 'NOD lengthens only the noise; the tone keeps its own DEC (D). A sharper snap is SNP (E).',
       },
       principle: 'Separate envelopes let the parts of one sound end at different times.',
@@ -505,8 +505,8 @@ const s2: Lesson = {
     },
   ],
   review: [
-    { question: 'NOL at 0 on SD CLASSIC leaves…', options: ['Only the drum-head tones', 'Only noise', 'Silence'], answer: 0, explain: 'The noise is the wires.' },
-    { question: 'NOD sets…', options: ['How long the noise rings', 'The noise pitch', 'The number of claps'], answer: 0, explain: 'Noise decay.' },
+    { question: 'NOL at 0 on SD CLASSIC leaves…', options: ['Only the drum-head tones', 'Only the noise of the wires', 'Silence on every hit'], answer: 0, explain: 'The noise is the wires.' },
+    { question: 'NOD sets…', options: ['How long the noise rings', 'How high the noise is pitched', 'How many claps are in the burst'], answer: 0, explain: 'Noise decay.' },
     { question: 'A clap\'s tail stands for…', options: ['The room', 'The hands', 'The stick'], answer: 0, explain: 'The reflections around the hands.' },
     { question: 'Which two can layer on one step?', options: ['SD and CP', 'RS and CP', 'CH and OH'], answer: 0, explain: 'Only tracks on separate voices layer.' },
   ],
@@ -578,7 +578,7 @@ const s3: Lesson = {
       solution: { data: addTrigs(lessonData(HATS), CH, [3, 7, 11, 15]) },
       predict: {
         question: 'OH plays on steps 3, 7, 11 and 15. What will a CH on each next step do?',
-        options: ['Cut each open hat after one 16th: a tight "tss-t"', 'Layer with it, so both ring', 'Make the OH louder', 'Nothing: different pads never interact'], answer: 0,
+        options: ['Cut each open hat after one 16th: a tight "tss-t"', 'Layer with each open hat, so both ring together', 'Make each open hat louder: the two hits add up', 'Nothing: sounds on different pads never interact'], answer: 0,
         explain: 'CH and OH share a voice, so each CH replaces the ringing OH. Separate pads don\'t mean separate voices.',
       },
       principle: 'Two tracks on one voice take turns; the newest hit wins.',
@@ -587,7 +587,7 @@ const s3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'CH and OH trig on the same step. Which one plays?',
-        options: ['CH: the closed hat always wins', 'OH: the right-hand track has priority', 'Both'], answer: 1,
+        options: ['CH: the closed hat always wins', 'OH: the right-hand track has priority', 'Both: the two are layered on that step'], answer: 1,
         explain: 'On a shared voice the right-hand track of the pair wins. CH cuts OH only when it comes later (manual p.21).',
       },
     },
@@ -623,9 +623,9 @@ const s3: Lesson = {
   ],
   review: [
     { question: 'Closed versus open hat is mostly…', options: ['DEC', 'TUN', 'PAN'], answer: 0, explain: 'Same metal, different length.' },
-    { question: 'HP2 on a hat…', options: ['Removes the lows and keeps the sizzle', 'Adds low end', 'Lowers the pitch'], answer: 0, explain: 'A high-pass passes the highs.' },
-    { question: 'Which tracks can load CY RIDE?', options: ['CY or CB', 'CH', 'LT'], answer: 0, explain: 'It lives on the CY/CB voice (manual p.96).' },
-    { question: 'Why does a later CH cut OH?', options: ['They share one voice', 'CH is louder', 'A choke switch'], answer: 0, explain: 'The CH/OH voice plays one sound at a time.' },
+    { question: 'HP2 on a hat…', options: ['Removes the lows and keeps the sizzle', 'Adds low end under the sizzle', 'Lowers the pitch of the whole hat'], answer: 0, explain: 'A high-pass passes the highs.' },
+    { question: 'Which tracks can load CY RIDE?', options: ['CY or CB', 'CH or OH', 'BT or LT'], answer: 0, explain: 'It lives on the CY/CB voice (manual p.96).' },
+    { question: 'Why does a later CH cut OH?', options: ['They share one voice', 'CH is always the louder one', 'A hidden choke switch'], answer: 0, explain: 'The CH/OH voice plays one sound at a time.' },
   ],
 };
 
@@ -672,7 +672,7 @@ const s4: Lesson = {
       instruction: 'On HT, turn encoder C (SWD) up to about 100 and tap.',
       predict: {
         question: 'What will a deeper sweep do to the high tom?',
-        options: ['Ring longer', 'Start much higher and swoop down: a "laser" tom', 'Get noisier', 'Drop an octave'], answer: 1,
+        options: ['Ring for longer: a boomier, slower tom', 'Start much higher and swoop down: a "laser" tom', 'Get noisier: more rattle on the skin', 'Drop an octave and stay there: a floor tom'], answer: 1,
         explain: 'SWD sets how far above TUN the pitch starts. The length is DEC (D) and the noise is NOL and NOD (G, F).',
       },
       principle: 'A pitch that starts high and falls fast is heard as an impact.',
@@ -712,7 +712,7 @@ const s4: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-decay',
       quiz: {
         question: 'AMP DEC is at INF. What decides how long the tom rings?',
-        options: ['FLTR REL', 'SRC DEC (the machine)', 'LFO DEP', 'AMP HLD'], answer: 1,
+        options: ['FLTR REL (the filter)', 'SRC DEC (the machine)', 'LFO DEP (the LFO)', 'AMP HLD (the amp)'], answer: 1,
         explain: 'At INF the amp shortens nothing, so the machine\'s decay sets the length. FLTR REL only shapes the tone after the trig ends.',
       },
     },
@@ -739,10 +739,10 @@ const s4: Lesson = {
     },
   ],
   review: [
-    { question: 'Positive ENV with a low FRQ gives…', options: ['A bright attack and a darker tail', 'A darker attack', 'A higher pitch'], answer: 0, explain: 'The filter opens, then closes.' },
-    { question: 'SWD on a tom sets…', options: ['How far the pitch starts above TUN', 'How long it rings', 'The noise'], answer: 0, explain: 'Sweep depth.' },
-    { question: 'AMP DEC = INF means…', options: ['The machine\'s decay sets the length', 'Silence', 'Endless reverb'], answer: 0, explain: 'The amp stops shortening the sound.' },
-    { question: 'AMP HLD on AUTO holds…', options: ['For as long as the pad is held or the trig lasts', 'Forever', 'For no time'], answer: 0, explain: 'AUTO follows the pad (manual p.79) and, on the sequencer, the trig length.' },
+    { question: 'Positive ENV with a low FRQ gives…', options: ['A bright attack and a darker tail', 'A dark attack and a brighter tail', 'A higher pitch on every hit'], answer: 0, explain: 'The filter opens, then closes.' },
+    { question: 'SWD on a tom sets…', options: ['How far the pitch starts above TUN', 'How long the tom rings after the hit', 'How much noise is mixed in'], answer: 0, explain: 'Sweep depth.' },
+    { question: 'AMP DEC = INF means…', options: ['The machine\'s decay sets the length', 'Silence: the amp never opens', 'An endless reverb tail on that track'], answer: 0, explain: 'The amp stops shortening the sound.' },
+    { question: 'AMP HLD on AUTO holds…', options: ['For as long as the pad is held or the trig lasts', 'Forever, until another trig cuts the sound off', 'For no time at all: the decay starts at once'], answer: 0, explain: 'AUTO follows the pad (manual p.79) and, on the sequencer, the trig length.' },
   ],
 };
 
@@ -791,7 +791,7 @@ const s5: Lesson = {
       instruction: 'Turn encoder D (FDB) up to about 130.',
       predict: {
         question: 'What will very high feedback do?',
-        options: ['The delay gets shorter', 'The echoes stop', 'The echoes keep coming and can swell louder', 'It adds reverb'], answer: 2,
+        options: ['The delay time gets shorter with every echo', 'The echoes stop after the first repeat', 'The echoes keep coming and can swell louder', 'It adds reverb behind every echo'], answer: 2,
         explain: 'With high feedback each repeat comes back about as loud as the last, or louder, so the echoes build into a dub swell. It doesn\'t change the time, which is TIM\'s job.',
       },
       principle: 'Feeding an effect\'s output back into its input repeats it again and again.',
@@ -826,7 +826,7 @@ const s5: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'effects',
       quiz: {
         question: 'Why use sends instead of one reverb on the whole mix?',
-        options: ['Sends are louder', 'Each drum gets its own amount, so the kick can stay dry and tight', 'Only sends sync to the tempo'], answer: 1,
+        options: ['Sends are louder, so the effect is easier to hear over the drums', 'Each drum gets its own amount, so the kick can stay dry and tight', 'Only sends sync to the tempo, so the echoes stay on the grid'], answer: 1,
         explain: 'Sends set an amount per track. Tempo sync is a feature of the delay, not of sends.',
       },
     },
@@ -851,10 +851,10 @@ const s5: Lesson = {
     },
   ],
   review: [
-    { question: 'DELAY TIM 32 is…', options: ['One beat', 'A 16th', 'A bar'], answer: 0, explain: 'TIM counts 128th notes, so 32 is a quarter note (manual p.81).' },
-    { question: 'DELAY TIM 24 is…', options: ['A dotted eighth', 'An eighth', 'A triplet'], answer: 0, explain: '24/128 of a bar = 3 sixteenths.' },
-    { question: 'X ON makes the repeats…', options: ['Alternate left and right', 'Longer', 'Darker'], answer: 0, explain: 'Ping-pong.' },
-    { question: 'On the FX track, TRACK LEVEL sets…', options: ['The delay and reverb return level', 'The kick volume', 'The tempo'], answer: 0, explain: 'One master level for both send returns (manual p.36).' },
+    { question: 'DELAY TIM 32 is…', options: ['One beat', 'One 16th', 'One whole bar'], answer: 0, explain: 'TIM counts 128th notes, so 32 is a quarter note (manual p.81).' },
+    { question: 'DELAY TIM 24 is…', options: ['A dotted eighth', 'A plain eighth note', 'An eighth triplet'], answer: 0, explain: '24/128 of a bar = 3 sixteenths.' },
+    { question: 'X ON makes the repeats…', options: ['Alternate left and right', 'A little longer on every echo', 'A little darker on every echo'], answer: 0, explain: 'Ping-pong.' },
+    { question: 'On the FX track, TRACK LEVEL sets…', options: ['The delay and reverb return level', 'The kick\'s volume in the whole mix', 'The tempo of the delay\'s own repeats'], answer: 0, explain: 'One master level for both send returns (manual p.36).' },
   ],
 };
 
@@ -896,7 +896,7 @@ const s6: Lesson = {
       instruction: 'Set encoder E (RAT) to MAX.',
       predict: {
         question: 'With the threshold down, what does a higher ratio do to the drums?',
-        options: ['They only get quieter', 'The tempo changes', 'They are squeezed harder: denser and flatter, with less punch', 'Nothing'], answer: 2,
+        options: ['They only get quieter: the balance between them stays the same', 'The tempo changes: the hits move closer together in time', 'They are squeezed harder: denser and flatter, with less punch', 'Nothing: the ratio only works with the threshold at the top'], answer: 2,
         explain: 'Higher ratios compress the signal more (manual p.83), so the loud hits and the quiet tails move closer together. It isn\'t only quieter: MUP or VOL can bring the level back.',
       },
       principle: 'A higher ratio squeezes everything above the threshold harder.',
@@ -959,10 +959,10 @@ const s6: Lesson = {
     },
   ],
   review: [
-    { question: 'COMP MIX fully left means…', options: ['Only the dry signal', 'Full compression', 'Silence'], answer: 0, explain: 'MIX blends dry and compressed (manual p.83).' },
-    { question: 'SEQ on HPF makes the compressor…', options: ['React less to the bass, so it pumps less', 'Pump harder', 'Louder'], answer: 0, explain: 'It filters what the detector hears.' },
-    { question: 'A slower ATK…', options: ['Lets transients through', 'Removes the click', 'Raises the threshold'], answer: 0, explain: 'The compressor reacts later.' },
-    { question: 'DIST SYM away from 0…', options: ['Offsets the wave so one side distorts first', 'Pans the mix', 'Retunes the kit'], answer: 0, explain: 'Asymmetric distortion (manual p.82).' },
+    { question: 'COMP MIX fully left means…', options: ['Only the dry signal', 'Only the compressed signal', 'Silence on the main outputs'], answer: 0, explain: 'MIX blends dry and compressed (manual p.83).' },
+    { question: 'SEQ on HPF makes the compressor…', options: ['React less to the bass, so it pumps less', 'React more to the bass, so it pumps harder', 'Louder, with more make-up gain'], answer: 0, explain: 'It filters what the detector hears.' },
+    { question: 'A slower ATK…', options: ['Lets transients through', 'Removes the click of each hit', 'Raises the threshold a little'], answer: 0, explain: 'The compressor reacts later.' },
+    { question: 'DIST SYM away from 0…', options: ['Offsets the wave so one side distorts first', 'Pans the mix so one side is louder than the other', 'Retunes the kit a little up or down'], answer: 0, explain: 'Asymmetric distortion (manual p.82).' },
     { question: 'By default the delay returns…', options: ['Before DIST and COMP', 'After DIST and COMP', 'Not at all'], answer: 0, explain: 'DEL is PRE by default; REV is POST (manual p.82).' },
   ],
 };
@@ -1030,7 +1030,7 @@ const e1: Lesson = {
   ],
   review: [
     { question: 'A longer SRC DEC on a kick…', options: ['Lengthens the boom', 'Raises the pitch', 'Adds click'], answer: 0, explain: 'Ring time.' },
-    { question: 'To judge decay, listen to…', options: ['The tail', 'The first click', 'The pan'], answer: 0, explain: 'The tail carries the length.' },
+    { question: 'To judge decay, listen to…', options: ['The tail', 'The first click', 'The stereo pan'], answer: 0, explain: 'The tail carries the length.' },
     { question: 'Closed versus open hat is mostly…', options: ['Decay', 'Tuning', 'Filter type'], answer: 0, explain: 'Ring time.' },
   ],
 };
@@ -1067,7 +1067,7 @@ const e2: Lesson = {
       instruction: 'Keep SWD at 100. Turn encoder B (SWT) from 64 down to 10 and tap.',
       predict: {
         question: 'What changes when SWT gets shorter?',
-        options: ['The drop starts higher', 'The drop is faster: a tight thump instead of a "pew"', 'The kick rings longer', 'Nothing'], answer: 1,
+        options: ['The drop starts higher: a deeper sweep', 'The drop is faster: a tight thump instead of a "pew"', 'The kick rings longer: a boomier tail', 'Nothing: SWT only works on the toms'], answer: 1,
         explain: 'SWT is the time the drop takes. The start height is SWD, which you didn\'t touch. Slow and deep is the electro "laser"; fast reads as punch.',
       },
       principle: 'How fast a pitch falls turns punch into a zap.',
@@ -1104,9 +1104,9 @@ const e2: Lesson = {
     },
   ],
   review: [
-    { question: 'SWD sets…', options: ['How high the pitch starts', 'How fast it falls', 'The decay'], answer: 0, explain: 'Depth.' },
-    { question: 'SWT sets…', options: ['How fast the pitch falls', 'The start height', 'The click'], answer: 0, explain: 'Time.' },
-    { question: 'A punchy techno sweep is…', options: ['Fast SWT with a moderate SWD', 'Slow and deep', 'No sweep at all'], answer: 0, explain: 'Fast drops punch.' },
+    { question: 'SWD sets…', options: ['How high the pitch starts', 'How fast the pitch falls', 'How long the drum rings'], answer: 0, explain: 'Depth.' },
+    { question: 'SWT sets…', options: ['How fast the pitch falls', 'How high the pitch starts', 'How loud the click is'], answer: 0, explain: 'Time.' },
+    { question: 'A punchy techno sweep is…', options: ['Fast SWT with a moderate SWD', 'Slow SWT with a deep SWD', 'No sweep at all, SWD at 0'], answer: 0, explain: 'Fast drops punch.' },
   ],
 };
 
@@ -1136,7 +1136,7 @@ const e3: Lesson = {
       instruction: 'Set TYP to BP and tap CP.',
       predict: {
         question: 'What will band-pass at FRQ 64 sound like?',
-        options: ['Fuller than before', 'Thin and nasal: only a band around the cutoff remains', 'Exactly like low-pass', 'Silent'], answer: 1,
+        options: ['Fuller than before: the band is boosted', 'Thin and nasal: only a band around the cutoff remains', 'Exactly like low-pass: only the top is cut', 'Silent: the clap has nothing in that band'], answer: 1,
         explain: 'Band-pass cuts both the lows and the highs, leaving a telephone-like band. It isn\'t silent: the clap has energy at the centre.',
       },
       principle: 'A band-pass filter keeps only the frequencies near its centre.',
@@ -1155,7 +1155,7 @@ const e3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'filter-type',
       quiz: {
         question: 'PK boosts a band. What does BS (band-stop) do?',
-        options: ['Boosts the lows', 'Cuts a notch, keeping the lows and highs', 'Removes everything above FRQ'], answer: 1,
+        options: ['Boosts the lows and cuts everything above them', 'Cuts a notch, keeping the lows and highs', 'Removes everything above FRQ'], answer: 1,
         explain: 'Band-stop is the opposite of band-pass, and RES sets how narrow the notch is. Removing everything above FRQ is low-pass.',
       },
     },
@@ -1180,7 +1180,7 @@ const e3: Lesson = {
   review: [
     { question: 'Lows gone, highs intact:', options: ['HP', 'LP', 'BP'], answer: 0, explain: 'High-pass.' },
     { question: 'Thin and telephone-like:', options: ['BP', 'LP2', 'PK'], answer: 0, explain: 'Band-pass.' },
-    { question: 'LP2 versus LP1:', options: ['LP1 has a gentler slope', 'LP1 is steeper', 'They are the same'], answer: 0, explain: 'All the types are resonant 2-pole filters; the 1-pole types roll off more gently (manual p.79).' },
+    { question: 'LP2 versus LP1:', options: ['LP1 has a gentler slope', 'LP1 has a steeper slope', 'They have the same slope'], answer: 0, explain: 'All the types are resonant 2-pole filters; the 1-pole types roll off more gently (manual p.79).' },
   ],
 };
 
@@ -1230,7 +1230,7 @@ const e4: Lesson = {
       instruction: 'Set encoder C (REL) to 0.1 s.',
       predict: {
         question: 'A very short release on heavy compression makes the kit…',
-        options: ['Sound like only the kick got shorter', 'Pump quickly: the tails jump back up between the hits', 'Just get quieter'], answer: 1,
+        options: ['Sound as if only the kick\'s tail got shorter', 'Pump quickly: the tails jump back up between the hits', 'Just get quieter: every hit drops by the same amount'], answer: 1,
         explain: 'Release is how fast the level recovers. A short release lets it spring back between hits, which is the audible pump, and that moves every sound, not only the kick.',
       },
       principle: 'A short release lets the level spring back quickly after each hit.',
@@ -1239,7 +1239,7 @@ const e4: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-decay',
       quiz: {
         question: 'The kick\'s tail sounds shorter. How do you tell a shorter SRC DEC from compression?',
-        options: ['They sound identical', 'DEC changes the hats too', 'Compression moves every sound and pumps; DEC changes only the kick'], answer: 2,
+        options: ['You can\'t by ear: the two sound identical in a full pattern', 'DEC changes the hats and the snare too; compression moves only the kick', 'Compression moves every sound and pumps; DEC changes only the kick'], answer: 2,
         explain: 'DEC belongs to one track. The bus compressor moves the whole mix at once.',
       },
     },
@@ -1258,8 +1258,8 @@ const e4: Lesson = {
     },
   ],
   review: [
-    { question: 'Heavy compression with a fast attack…', options: ['Flattens the transients', 'Adds click', 'Retunes the kit'], answer: 0, explain: 'It clamps at once.' },
-    { question: 'Pumping in time with the kick suggests…', options: ['Compression keyed by the lows', 'A longer decay', 'Reverb'], answer: 0, explain: 'SEQ on LPF, or bass-led detection.' },
+    { question: 'Heavy compression with a fast attack…', options: ['Flattens the transients', 'Adds click to every hit', 'Retunes the whole kit a little'], answer: 0, explain: 'It clamps at once.' },
+    { question: 'Pumping in time with the kick suggests…', options: ['Compression keyed by the lows', 'A longer decay on the kick', 'Reverb on the whole kit'], answer: 0, explain: 'SEQ on LPF, or bass-led detection.' },
     { question: 'Only the kick got shorter and nothing else changed:', options: ['Its DEC', 'The compressor', 'The reverb'], answer: 0, explain: 'A per-track change.' },
   ],
 };
@@ -1305,7 +1305,7 @@ const q1: Lesson = {
       solution: { values: { track: OH }, data: Q1_OH },
       predict: {
         question: 'These land between the kicks. How will they feel?',
-        options: ['Slower: the tempo seems to halve', 'Lifting: offbeat hats push the groove', 'Messy: they clash with the kick', 'The same as hats on the beat'], answer: 1,
+        options: ['Slower: the tempo seems to halve', 'Lifting: offbeat hats push the groove', 'Messy: they clash with the kick\'s tail', 'The same as hats on the beat'], answer: 1,
         explain: 'Offbeats fill the gaps between pulses, so the groove bounces, like a house hat. They don\'t change the tempo, and they land between the kicks, not on them.',
       },
       principle: 'Hits between the beats create motion against a steady pulse.',
@@ -1313,7 +1313,7 @@ const q1: Lesson = {
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
       quiz: {
-        question: 'Syncopation means…', options: ['Playing faster', 'Accenting positions between the beats', 'Playing every 16th'], answer: 1,
+        question: 'Syncopation means…', options: ['Playing faster than the written tempo', 'Accenting positions between the beats', 'Playing a hit on every 16th note'], answer: 1,
         explain: 'It is about where the accents fall, not speed or density.',
       },
     },
@@ -1350,9 +1350,9 @@ const q1: Lesson = {
   ],
   review: [
     { question: 'Four on the floor puts the kick on steps…', options: ['1, 5, 9, 13', '1, 3, 5, 7', 'Every step'], answer: 0, explain: 'One per beat.' },
-    { question: 'To place trigs with the trig keys you first…', options: ['Press [RECORD] for GRID RECORDING', 'Press [PLAY]', 'Hold [FUNC]'], answer: 0, explain: 'GRID RECORDING mode edits trigs (manual p.39).' },
+    { question: 'To place trigs with the trig keys you first…', options: ['Press [RECORD] for GRID RECORDING', 'Press [PLAY] to start the pattern', 'Hold [FUNC] and tap a pad'], answer: 0, explain: 'GRID RECORDING mode edits trigs (manual p.39).' },
     { question: 'Offbeat 8th hats sit on steps…', options: ['3, 7, 11, 15', '1, 5, 9, 13', '2, 4, 6, 8'], answer: 0, explain: 'The "and" of each beat.' },
-    { question: 'Syncopation…', options: ['Puts accents between the beats', 'Is a faster tempo', 'Is a filter effect'], answer: 0, explain: 'Off-beat emphasis.' },
+    { question: 'Syncopation…', options: ['Puts accents between the beats', 'Is a faster tempo on every other bar', 'Is a filter effect on the hats'], answer: 0, explain: 'Off-beat emphasis.' },
   ],
 };
 
@@ -1405,7 +1405,7 @@ const q2: Lesson = {
       solution: { data: Q2_SWING },
       predict: {
         question: 'Swing delays every second 16th. Which hits move?',
-        options: ['Every hit equally', 'Only the kick', 'The even steps: the ghosts on 8 and 16 and the hats between', 'Only steps 1, 5, 9 and 13'], answer: 2,
+        options: ['Every hit, by the same amount, so the bar starts later', 'Only the kick: the heaviest drum gets the swing', 'The even steps: the ghosts on 8 and 16 and the hats between', 'Only steps 1, 5, 9 and 13, where the main hits fall'], answer: 2,
         explain: 'Swing pushes steps 2, 4, 6… late. The main hits on 1, 5, 9 and 13 stay put, which is why swing grooves without losing the pulse (manual p.50).',
       },
       principle: 'Delaying every other 16th turns straight time into a shuffle.',
@@ -1426,7 +1426,7 @@ const q2: Lesson = {
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'velocity-dynamics',
       quiz: {
-        question: 'An accent is…', options: ['A hit moved late', 'A hit clearly louder than its neighbours', 'A hit with reverb'], answer: 1,
+        question: 'An accent is…', options: ['A hit moved a little late on the grid', 'A hit clearly louder than its neighbours', 'A hit with more reverb than the others'], answer: 1,
         explain: 'Accents are about level. The Rytm also has accent trigs ([FUNC] + [BANK F]), and TRACK LEVEL sets how strong they are (manual pp.49-50).',
       },
     },
@@ -1457,10 +1457,10 @@ const q2: Lesson = {
     },
   ],
   review: [
-    { question: 'Swing 50 % means…', options: ['Straight timing', 'Maximum swing', 'Half tempo'], answer: 0, explain: 'No delay on the swing steps (manual p.50).' },
-    { question: 'Ghost notes are…', options: ['Very quiet hits', 'Muted hits', 'Echoes'], answer: 0, explain: 'Low velocity.' },
-    { question: 'Holding a trig and pressing [RIGHT]…', options: ['Nudges it later (micro timing)', 'Copies it', 'Deletes it'], answer: 0, explain: 'Micro timing (manual p.39).' },
-    { question: 'The Rytm\'s swing goes from…', options: ['50 % (straight) to 80 %', '0 to 100 %', '25 to 75 %'], answer: 0, explain: '51-80 % swing, 50 % straight (manual p.50).' },
+    { question: 'Swing 50 % means…', options: ['Straight timing', 'The maximum swing', 'Half the usual tempo'], answer: 0, explain: 'No delay on the swing steps (manual p.50).' },
+    { question: 'Ghost notes are…', options: ['Very quiet hits', 'Hits on a muted track', 'Echoes from the delay'], answer: 0, explain: 'Low velocity.' },
+    { question: 'Holding a trig and pressing [RIGHT]…', options: ['Nudges it later (micro timing)', 'Copies it to the next step', 'Deletes it from the pattern'], answer: 0, explain: 'Micro timing (manual p.39).' },
+    { question: 'The Rytm\'s swing goes from…', options: ['50 % (straight) to 80 %', '0 % (straight) to 100 %', '25 % to 75 % (straight)'], answer: 0, explain: '51-80 % swing, 50 % straight (manual p.50).' },
   ],
 };
 
@@ -1509,7 +1509,7 @@ const q3: Lesson = {
       solution: { values: { play: true } },
       predict: {
         question: 'What happens on the next trig after step 23?',
-        options: ['It keeps the long DEC', 'It goes back to the kit\'s own DEC', 'It goes silent'], answer: 1,
+        options: ['It keeps the long DEC from then on', 'It goes back to the kit\'s own DEC', 'It goes silent for one hit'], answer: 1,
         explain: 'A lock belongs to its own trig. The next unlocked trig uses the kit value again.',
       },
       principle: 'A lock applies only to the trig that holds it.',
@@ -1555,8 +1555,8 @@ const q3: Lesson = {
   ],
   review: [
     { question: 'A lock applies to…', options: ['Its own trig only', 'The whole track', 'Every track'], answer: 0, explain: 'Per trig.' },
-    { question: 'A lock trig…', options: ['Changes settings without a new note', 'Plays twice', 'Mutes the track'], answer: 0, explain: 'It is trigless (manual p.39).' },
-    { question: 'To remove one lock from a trig…', options: ['Hold the trig and press that parameter\'s encoder', 'Press [PLAY]', 'Turn TRACK LEVEL'], answer: 0, explain: 'Hold the trig and press the encoder (manual p.47), or use the trig editor.' },
+    { question: 'A lock trig…', options: ['Changes settings without a new note', 'Plays its note twice in one step', 'Mutes the track for one step'], answer: 0, explain: 'It is trigless (manual p.39).' },
+    { question: 'To remove one lock from a trig…', options: ['Hold the trig and press that parameter\'s encoder', 'Press [PLAY] twice while the pattern runs', 'Hold the trig and turn TRACK LEVEL all the way to zero'], answer: 0, explain: 'Hold the trig and press the encoder (manual p.47), or use the trig editor.' },
   ],
 };
 
@@ -1627,7 +1627,7 @@ const q4: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
       quiz: {
         question: '25 % versus 1:4?',
-        options: ['No difference', '1:4 is random', '25 % is random; 1:4 is a fixed every-fourth-loop pattern'], answer: 2,
+        options: ['No difference: both play one loop in four, in a fixed order', '1:4 is random; 25 % is a fixed every-fourth-loop pattern', '25 % is random; 1:4 is a fixed every-fourth-loop pattern'], answer: 2,
         explain: 'A probability is rolled again every time. A:B follows a counter.',
       },
     },
@@ -1652,10 +1652,10 @@ const q4: Lesson = {
     },
   ],
   review: [
-    { question: '1:4 plays…', options: ['On the first of every four loops', '25 % of the time', 'Four times'], answer: 0, explain: 'Loop counting (manual p.48).' },
-    { question: 'FILL trigs play…', options: ['Only while FILL is active', 'Always', 'Never'], answer: 0, explain: 'FILL mode (manual p.49).' },
-    { question: 'PRE is true when…', options: ['The last condition evaluated on this track was true', 'The last step had a trig', 'The pattern restarts'], answer: 0, explain: 'It chains to the previous condition (manual p.48).' },
-    { question: 'NEI looks at…', options: ['The previous track\'s last condition', 'The next pattern', 'The kick'], answer: 0, explain: 'The neighbour is the track before (manual p.48).' },
+    { question: '1:4 plays…', options: ['On the first of every four loops', 'About 25 % of the time, at random', 'Four times in every loop'], answer: 0, explain: 'Loop counting (manual p.48).' },
+    { question: 'FILL trigs play…', options: ['Only while FILL is active', 'Always, like a normal trig', 'Never: they only mark a step'], answer: 0, explain: 'FILL mode (manual p.49).' },
+    { question: 'PRE is true when…', options: ['The last condition evaluated on this track was true', 'The step just before this one had a trig of any kind', 'The pattern has just started again from step 1'], answer: 0, explain: 'It chains to the previous condition (manual p.48).' },
+    { question: 'NEI looks at…', options: ['The previous track\'s last condition', 'The next pattern in the chain or the song', 'The kick track\'s last trig'], answer: 0, explain: 'The neighbour is the track before (manual p.48).' },
   ],
 };
 
@@ -1714,7 +1714,7 @@ const q5: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'parameter-locks',
       quiz: {
         question: 'Step 2 has no bass note, but your sweep passed it. What is on step 2 now?',
-        options: ['A lock trig: it changes FRQ without playing a note', 'A new bass note', 'Nothing'], answer: 0,
+        options: ['A lock trig: it changes FRQ without playing a note', 'A new bass note: recording a knob also adds note trigs', 'Nothing: locks are only stored on steps with a note'], answer: 0,
         explain: 'A lock trig holds locks on a step with no note (manual pp.39, 47). The note still ringing from step 1 changes under it, which is why the sweep sounds smooth.',
       },
     },
@@ -1747,10 +1747,10 @@ const q5: Lesson = {
     },
   ],
   review: [
-    { question: 'In LIVE RECORDING, turning an encoder over a step with no trig adds…', options: ['A lock trig holding the value', 'A note trig', 'Nothing'], answer: 0, explain: 'Lock trigs carry locks without notes (manual p.47).' },
-    { question: 'Holding [FUNC] + [NO] during LIVE RECORDING…', options: ['Erases the track\'s parameter locks on the steps it passes', 'Stops the sequencer', 'Saves the pattern'], answer: 0, explain: 'Sound locks stay (manual p.47).' },
+    { question: 'In LIVE RECORDING, turning an encoder over a step with no trig adds…', options: ['A lock trig holding the value', 'A note trig at full velocity', 'Nothing on that step'], answer: 0, explain: 'Lock trigs carry locks without notes (manual p.47).' },
+    { question: 'Holding [FUNC] + [NO] during LIVE RECORDING…', options: ['Erases the track\'s parameter locks on the steps it passes', 'Stops the sequencer and returns it to the first step of the pattern', 'Saves the pattern, with every lock recorded so far'], answer: 0, explain: 'Sound locks stay (manual p.47).' },
     { question: 'To end LIVE RECORDING but keep the pattern playing, press…', options: ['[PLAY]', '[STOP]', '[FUNC]'], answer: 0, explain: '[STOP] ends the recording and the playback (manual p.40).' },
-    { question: 'Live-recorded pad hits land exactly on the steps when…', options: ['Quantize is on ([RECORD] + [PLAY] twice)', 'The tempo is 120', 'FILL is held'], answer: 0, explain: 'Off, they keep their micro timing (manual pp.40, 67).' },
+    { question: 'Live-recorded pad hits land exactly on the steps when…', options: ['Quantize is on ([RECORD] + [PLAY] twice)', 'The tempo is set to a whole number of BPM', '[FILL] is held down while you play'], answer: 0, explain: 'Off, they keep their micro timing (manual pp.40, 67).' },
   ],
 };
 
@@ -1787,7 +1787,7 @@ const q6: Lesson = {
       solution: { values: { play: true }, data: Q6_ON },
       predict: {
         question: 'PL1 is 4 and PL2 is 0. What will RS play when EUC is on?',
-        options: ['Four hits spread evenly: steps 1, 5, 9 and 13', 'Four hits in a row: steps 1 to 4', 'Four random steps, new every loop'], answer: 0,
+        options: ['Four hits spread evenly: steps 1, 5, 9 and 13', 'Four hits in a row: steps 1, 2, 3 and 4', 'Four hits at random: new steps on every loop'], answer: 0,
         explain: 'A pulse generator spreads its hits as evenly as it can over the track. Four over sixteen steps is every fourth step, and nothing about it is random.',
       },
       principle: 'Hits spread evenly over a bar give a steady pulse; fewer hits leave longer, equal gaps.',
@@ -1825,7 +1825,7 @@ const q6: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
       quiz: {
         question: 'With OP set to SUB, RS plays…',
-        options: ['Generator 1\'s hits, except where generator 2 hits too', 'Only the steps both generators hit', 'Every step either generator hits'], answer: 0,
+        options: ['Generator 1\'s hits, except where generator 2 hits too', 'Only the steps that both generators hit together', 'Every step that either of the two generators hits'], answer: 0,
         explain: 'SUB takes generator 2\'s steps out of generator 1\'s (manual p.44). Only the shared steps is AND; every step of either is OR.',
       },
     },
@@ -1849,10 +1849,10 @@ const q6: Lesson = {
     },
   ],
   review: [
-    { question: 'Five Euclidean hits over sixteen steps leave gaps of…', options: ['3, 3, 3, 3 and 4 steps', '4 steps each', 'Random lengths'], answer: 0, explain: 'The hits spread as evenly as the steps allow.' },
-    { question: 'While a track is in Euclidean mode, the trigs you placed before…', options: ['Are hidden and come back when EUC goes off', 'Are deleted', 'Play along with the generated ones'], answer: 0, explain: 'They come back when you turn it off; [FUNC] held while turning it off keeps the generated trigs instead (manual p.44).' },
-    { question: 'XOR between the two generators…', options: ['Drops the steps both of them hit', 'Keeps only those steps', 'Plays those steps twice'], answer: 0, explain: 'Exclusive OR (manual p.44).' },
-    { question: 'In Euclidean mode you can still…', options: ['Parameter lock the generated trigs', 'Add note trigs by hand', 'Add a third generator'], answer: 0, explain: 'Generated trigs take locks; trigs can\'t be added by hand (manual p.44).' },
+    { question: 'Five Euclidean hits over sixteen steps leave gaps of…', options: ['3, 3, 3, 3 and 4 steps', '4, 4, 4, 2 and 2 steps', 'Random lengths each loop'], answer: 0, explain: 'The hits spread as evenly as the steps allow.' },
+    { question: 'While a track is in Euclidean mode, the trigs you placed before…', options: ['Are hidden and come back when EUC goes off', 'Are deleted and have to be placed again', 'Play along with the generated ones, on the same steps'], answer: 0, explain: 'They come back when you turn it off; [FUNC] held while turning it off keeps the generated trigs instead (manual p.44).' },
+    { question: 'XOR between the two generators…', options: ['Drops the steps both of them hit', 'Keeps only the steps both hit', 'Plays the shared steps twice'], answer: 0, explain: 'Exclusive OR (manual p.44).' },
+    { question: 'In Euclidean mode you can still…', options: ['Parameter lock the generated trigs', 'Add note trigs by hand on any step', 'Add a third pulse generator'], answer: 0, explain: 'Generated trigs take locks; trigs can\'t be added by hand (manual p.44).' },
   ],
 };
 
@@ -1897,7 +1897,7 @@ const p1: Lesson = {
       solution: { presses: ['seq:fill'] },
       predict: {
         question: 'What changes while FILL is held?',
-        options: ['The tempo doubles', 'FILL trigs play and !FILL trigs are skipped', 'Every track retriggers', 'The kit reloads'], answer: 1,
+        options: ['The tempo doubles for as long as you hold it', 'FILL trigs play and !FILL trigs are skipped', 'Every track retriggers on every step', 'The kit reloads from its saved state'], answer: 1,
         explain: 'FILL is a trig condition: it changes which trigs play, not the tempo or the kit. This pattern\'s snare on step 16 only plays in a fill.',
       },
       principle: 'Conditional trigs let one pattern hold both a groove and its fill.',
@@ -1922,7 +1922,7 @@ const p1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'velocity-dynamics',
       quiz: {
         question: 'You hold [RTRG] and press a pad harder. What changes?',
-        options: ['The retrig rate', 'The retrig velocity: the roll gets louder', 'Nothing'], answer: 1,
+        options: ['The retrig rate: the roll gets faster', 'The retrig velocity: the roll gets louder', 'Nothing: the roll ignores pressure'], answer: 1,
         explain: 'During a live retrig, pad pressure sets the velocity (on this twin: slide your finger up the held pad). The rate comes from the RETRIG menu (manual p.41).',
       },
     },
@@ -1946,9 +1946,9 @@ const p1: Lesson = {
     },
   ],
   review: [
-    { question: 'MUTE-mode pads…', options: ['Mute or unmute each track\'s sequencer', 'Play louder', 'Select patterns'], answer: 0, explain: 'Sequencer mutes (manual p.23).' },
-    { question: 'Retrig 1/16 means…', options: ['One hit per step', '16 hits per step', 'One hit per bar'], answer: 0, explain: 'The rate is a note value.' },
-    { question: 'A retrig velocity curve of -128…', options: ['Fades the roll out completely', 'Fades it in', 'Retunes it'], answer: 0, explain: 'Negative values fade out (manual p.41).' },
+    { question: 'MUTE-mode pads…', options: ['Mute or unmute each track\'s sequencer', 'Play each track at full velocity', 'Select patterns in the current bank'], answer: 0, explain: 'Sequencer mutes (manual p.23).' },
+    { question: 'Retrig 1/16 means…', options: ['One hit per step', '16 hits on every step', 'One hit in every bar'], answer: 0, explain: 'The rate is a note value.' },
+    { question: 'A retrig velocity curve of -128…', options: ['Fades the roll out completely', 'Fades the roll in from silence', 'Retunes the roll downwards'], answer: 0, explain: 'Negative values fade out (manual p.41).' },
   ],
 };
 
@@ -2016,7 +2016,7 @@ const p2: Lesson = {
       solution: { values: { pad_mode: 3, play: true }, presses: ['scene', 'scene'] },
       predict: {
         question: 'What happens to the kick?',
-        options: ['It fades out over a bar', 'It drops to silence at once, and comes back when the scene is off', 'It is deleted from the pattern', 'Nothing until the next pattern'], answer: 1,
+        options: ['It fades out over a bar, and fades back in when the scene is off', 'It drops to silence at once, and comes back when the scene is off', 'It is deleted from the pattern, and has to be placed again', 'Nothing changes until the next pattern starts playing'], answer: 1,
         explain: 'A scene applies its values instantly while it is on, and the kit underneath is untouched. A fade needs a macro or an LFO, and nothing is deleted.',
       },
       principle: 'Switching between stored values gives instant, repeatable changes.',
@@ -2033,7 +2033,7 @@ const p2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'modulation-depth',
       quiz: {
         question: 'Scene versus performance macro?',
-        options: ['They are the same', 'A scene jumps to fixed values; a macro offsets values by pressure', 'Scenes only affect samples'], answer: 1,
+        options: ['They are the same thing; only the pad mode\'s name differs', 'A scene jumps to fixed values; a macro offsets values by pressure', 'A scene only affects samples; a macro only affects the machines'], answer: 1,
         explain: 'Scenes are on or off. Macros are continuous, from nothing to the full depth.',
       },
     },
@@ -2057,8 +2057,8 @@ const p2: Lesson = {
   ],
   review: [
     { question: 'Scenes per kit:', options: ['12', '4', '64'], answer: 0, explain: 'One per pad (manual p.28).' },
-    { question: 'A macro\'s depth follows…', options: ['Pad pressure', 'Tempo', 'Swing'], answer: 0, explain: 'Pressure (manual p.30).' },
-    { question: 'Which knob drives macros outside PERF mode?', options: ['QUICK PERF AMOUNT', 'MAIN VOLUME', 'DATA ENTRY A'], answer: 0, explain: 'Choose its macros with [QPER] + pads (manual pp.30-31).' },
+    { question: 'A macro\'s depth follows…', options: ['Pad pressure', 'The pattern\'s tempo', 'The swing amount'], answer: 0, explain: 'Pressure (manual p.30).' },
+    { question: 'Which knob drives macros outside PERF mode?', options: ['QUICK PERF AMOUNT', 'The MAIN VOLUME knob', 'The DATA ENTRY A knob'], answer: 0, explain: 'Choose its macros with [QPER] + pads (manual pp.30-31).' },
   ],
 };
 
@@ -2108,7 +2108,7 @@ const t1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
       quiz: {
         question: 'The real Rytm can send DIN 24 from its MIDI OUT port. What is that for?',
-        options: ['Audio', 'Syncing vintage gear that uses DIN sync pulses', 'Program changes'], answer: 1,
+        options: ['Sending audio to another mixer over a MIDI cable', 'Syncing vintage gear that uses DIN sync pulses', 'Sending program changes to other synths'], answer: 1,
         explain: 'The OUT and THRU ports can send MIDI, DIN 24 or DIN 48. On the DIN settings the port sends sync pulses instead of MIDI data (manual p.62).',
       },
     },
@@ -2132,8 +2132,8 @@ const t1: Lesson = {
   ],
   review: [
     { question: 'MIDI clock ticks per quarter note:', options: ['24', '4', '96'], answer: 0, explain: '24 PPQN.' },
-    { question: 'While synced, the Rytm\'s tempo…', options: ['Follows the studio', 'Leads', 'Is random'], answer: 0, explain: 'It follows.' },
-    { question: 'Which Rytm setting makes it follow an external clock?', options: ['CLOCK RECEIVE', 'CLOCK SEND', 'PRG CH SEND'], answer: 0, explain: 'In MIDI SYNC (manual p.61).' },
+    { question: 'While synced, the Rytm\'s tempo…', options: ['Follows the studio', 'Leads the studio', 'Drifts at random'], answer: 0, explain: 'It follows.' },
+    { question: 'Which Rytm setting makes it follow an external clock?', options: ['CLOCK RECEIVE', 'CLOCK SEND', 'TRANSPORT SEND'], answer: 0, explain: 'In MIDI SYNC (manual p.61).' },
   ],
 };
 
@@ -2185,7 +2185,7 @@ const t2: Lesson = {
       solution: { values: { play: true }, data: { ...T2_CHAIN, mode: 'chain' } },
       predict: {
         question: 'When does the Rytm move from A01 to A02?',
-        options: ['Immediately', 'At the end of A01 (SEQUENTIAL change)', 'After 16 bars', 'Only when you tap a pad'], answer: 1,
+        options: ['Immediately, on the next step', 'At the end of A01 (SEQUENTIAL change)', 'After 16 bars, whatever its length', 'Only when you tap a pad to confirm'], answer: 1,
         explain: 'SEQUENTIAL is the default pattern mode: it waits for the playing pattern to finish, so phrases stay whole (manual p.38).',
       },
       principle: 'Changing at pattern ends keeps phrases complete.',
@@ -2202,7 +2202,7 @@ const t2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
       quiz: {
         question: 'What does DIRECT JUMP do?',
-        options: ['Waits for the end', 'Changes pattern at once, carrying on from the same position', 'Stops the sequencer'], answer: 1,
+        options: ['Waits for the end of the pattern, then changes', 'Changes pattern at once, carrying on from the same position', 'Stops the sequencer, ready to start the new pattern from step 1'], answer: 1,
         explain: 'DIRECT START restarts the new pattern from step 1; DIRECT JUMP keeps the position (manual p.38).',
       },
     },
@@ -2235,9 +2235,9 @@ const t2: Lesson = {
     },
   ],
   review: [
-    { question: 'SEQUENTIAL switches…', options: ['At the end of the pattern', 'Immediately', 'Randomly'], answer: 0, explain: 'It waits for the end (manual p.38).' },
-    { question: 'A song row\'s repeats are set with…', options: ['DATA ENTRY A on the row', 'TRACK LEVEL', '[PAGE]'], answer: 0, explain: 'Manual p.54; on this twin, the REPEAT field of the row.' },
-    { question: 'TEMP JUMP…', options: ['Plays another pattern once, then returns', 'Deletes a pattern', 'Is a sound lock'], answer: 0, explain: 'A temporary jump (manual p.39).' },
+    { question: 'SEQUENTIAL switches…', options: ['At the end of the pattern', 'Immediately, on the next step', 'At a random step'], answer: 0, explain: 'It waits for the end (manual p.38).' },
+    { question: 'A song row\'s repeats are set with…', options: ['DATA ENTRY A on the row', 'The TRACK LEVEL knob on the row', 'The [PAGE] key'], answer: 0, explain: 'Manual p.54; on this twin, the REPEAT field of the row.' },
+    { question: 'TEMP JUMP…', options: ['Plays another pattern once, then returns', 'Deletes a pattern from the chain while it plays', 'Is a sound lock on a single trig'], answer: 0, explain: 'A temporary jump (manual p.39).' },
   ],
 };
 

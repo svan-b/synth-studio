@@ -73,7 +73,7 @@ const f1: Lesson = {
       instruction: 'Turn FREQUENCY fully clockwise (+1 octave).',
       predict: {
         question: 'What will turning FREQUENCY up do to the pattern?',
-        options: ['Every note goes up in pitch', 'It gets louder', 'The notes get longer'], answer: 0,
+        options: ['Every note goes up in pitch', 'Every note gets louder', 'Every note rings for longer'], answer: 0,
         explain: 'FREQUENCY sets how many cycles the VCO makes each second, and more cycles sound higher. Fully clockwise is one octave up: twice the frequency. Loudness and length belong to the VCA and envelope, not the oscillator.',
       },
       principle: 'Doubling a wave\'s frequency raises its pitch by one octave.',
@@ -92,7 +92,7 @@ const f1: Lesson = {
         a: { vco_wave: 1 }, b: { vco_wave: 0 }, labels: ['SAW', 'PULSE'],
         question: {
           question: 'Which wave sounds hollow, a little like a clarinet?',
-          options: ['The saw', 'The pulse (a square at 50 %)'], answer: 1,
+          options: ['The saw (a ramp-shaped wave)', 'The pulse (a square at 50 %)'], answer: 1,
           explain: 'A square wave has only the odd harmonics (1, 3, 5...), and that gap is what the ear hears as hollow. A saw has every harmonic, so it sounds bright and buzzy, like brass.',
         },
       },
@@ -119,7 +119,7 @@ const f1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'oscillator-waveform',
       quiz: {
         question: 'At 50 % PULSE WIDTH (the centre) the pulse is a…',
-        options: ['Square wave', 'Sawtooth', 'Sine wave'], answer: 0,
+        options: ['Square wave', 'Sawtooth wave', 'Sine wave'], answer: 0,
         explain: 'Half up, half down is a square: odd harmonics only. The saw is the other wave on the switch, and the VCO has no sine.',
       },
     },
@@ -148,10 +148,10 @@ const f1: Lesson = {
     },
   ],
   review: [
-    { question: 'Raising an oscillator one octave…', options: ['Doubles its frequency', 'Adds 12 Hz', 'Makes it louder'], answer: 0, explain: 'An octave is a 2:1 frequency ratio.' },
+    { question: 'Raising an oscillator one octave…', options: ['Doubles its frequency', 'Adds 12 Hz to its frequency', 'Makes it twice as loud'], answer: 0, explain: 'An octave is a 2:1 frequency ratio.' },
     { question: 'Which wave has every harmonic and sounds brightest?', options: ['Sawtooth', 'Square', 'Narrow pulse'], answer: 0, explain: 'The saw has harmonics 1, 2, 3, 4...' },
-    { question: 'A square wave sounds hollow because it…', options: ['Has only odd harmonics', 'Has no harmonics', 'Is an octave lower'], answer: 0, explain: 'The missing even harmonics make the hollowness.' },
-    { question: 'Turning PULSE WIDTH from 50 % to 10 % makes the sound…', options: ['Thinner and more nasal', 'Lower', 'Longer'], answer: 0, explain: 'Energy moves to the upper harmonics.' },
+    { question: 'A square wave sounds hollow because it…', options: ['Has only odd harmonics', 'Has no harmonics at all', 'Is an octave lower'], answer: 0, explain: 'The missing even harmonics make the hollowness.' },
+    { question: 'Turning PULSE WIDTH from 50 % to 10 % makes the sound…', options: ['Thinner and more nasal', 'Lower and rounder', 'Longer and smoother'], answer: 0, explain: 'Energy moves to the upper harmonics.' },
   ],
 };
 
@@ -171,7 +171,7 @@ const f2: Lesson = {
       instruction: 'Turn MIX fully clockwise.',
       predict: {
         question: 'MIX crossfades the VCO against NOISE. What will you hear at the far right?',
-        options: ['A hiss with no pitch', 'A brighter VCO', 'Silence'], answer: 0,
+        options: ['A hiss with no pitch', 'A brighter, buzzier VCO', 'Silence on every step'], answer: 0,
         explain: 'White noise is random: every frequency at once and no repeating pattern, so you cannot sing it. Fully clockwise, MIX passes only the noise, so the notes keep their rhythm but lose their pitch.',
       },
       principle: 'White noise has energy at every frequency and no pitch: the raw material of snares and wind.',
@@ -219,7 +219,7 @@ const f2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'Why did the hiss disappear when you patched EXT. AUDIO?',
-        options: ['The cable replaced the normalled noise', 'MIX was turned down', 'The filter removed it'], answer: 0,
+        options: ['The cable replaced the normalled noise', 'The patch moved MIX back to the VCO side', 'The filter closed and removed the hiss'], answer: 0,
         explain: 'The noise reaches the mixer through EXT. AUDIO\'s normal. A cable there breaks that link. MIX was still in the middle the whole time.',
       },
     },
@@ -242,9 +242,9 @@ const f2: Lesson = {
     },
   ],
   review: [
-    { question: 'White noise has…', options: ['Energy at all frequencies and no pitch', 'One pitch', 'Only bass'], answer: 0, explain: 'It is random.' },
+    { question: 'White noise has…', options: ['Energy at all frequencies and no pitch', 'One clear pitch, like a sine wave', 'Only bass frequencies, like a rumble'], answer: 0, explain: 'It is random.' },
     { question: 'EXT. AUDIO on the Mother-32 is normalled to…', options: ['NOISE', 'The VCO saw', 'The EG'], answer: 0, explain: 'A cable there replaces the noise.' },
-    { question: 'MIX at 50 % gives…', options: ['An even blend of the two sources', 'Only the VCO', 'Silence'], answer: 0, explain: 'It is a crossfader.' },
+    { question: 'MIX at 50 % gives…', options: ['An even blend of the two sources', 'Only the VCO, at half its level', 'Silence: the two sources cancel'], answer: 0, explain: 'It is a crossfader.' },
   ],
 };
 
@@ -291,7 +291,7 @@ const f3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'filter-cutoff',
       quiz: {
         question: 'A square wave through a low-pass set below its second harmonic sounds…',
-        options: ['Almost like a sine wave', 'Brighter', 'An octave higher'], answer: 0,
+        options: ['Almost like a sine wave', 'Brighter and buzzier', 'An octave higher than before'], answer: 0,
         explain: 'Only the fundamental gets through, and a lone fundamental is a sine. The pitch stays the same.',
       },
     },
@@ -302,7 +302,7 @@ const f3: Lesson = {
       instruction: 'The VCO and noise are now muted (MIX right over, a silent cable in EXT. AUDIO). Turn RESONANCE to about 90 %.',
       predict: {
         question: 'Past about 3 o\'clock the filter whistles on its own. What is it doing?',
-        options: ['Oscillating - it has become a sine-wave source', 'Distorting the VCO', 'Echoing the last note'], answer: 0,
+        options: ['Oscillating - it has become a sine-wave source', 'Distorting - it is overdriving the VCO\'s own wave', 'Echoing - it repeats the last note like a delay'], answer: 0,
         explain: 'With enough feedback the ladder feeds itself and oscillates at the cutoff frequency with no input at all. The manual (p.14) suggests playing it as a sine oscillator.',
       },
       principle: 'With enough feedback a filter oscillates by itself, producing a sine at the cutoff frequency.',
@@ -321,7 +321,7 @@ const f3: Lesson = {
       instruction: 'Back to the bass line. Flip VCF MODE up to HI PASS.',
       predict: {
         question: 'High-pass keeps what is above CUTOFF. What happens to this bass line?',
-        options: ['It gets thinner - the lows drop away', 'It gets deeper', 'Nothing changes'], answer: 0,
+        options: ['It gets thinner - the lows drop away', 'It gets deeper - the highs drop away', 'Nothing changes - bass notes pass any filter'], answer: 0,
         explain: 'High-pass throws away the fundamental and the lowest harmonics, the body of the sound, so the line turns thin and buzzy. The lower the CUTOFF, the more of the body comes back.',
       },
       principle: 'A high-pass filter removes what is below the cutoff, leaving the thin, bright top.',
@@ -332,7 +332,7 @@ const f3: Lesson = {
       instruction: 'Still in HI PASS, turn RESONANCE up to about 80 %.',
       predict: {
         question: 'What will RESONANCE do in HI PASS on the Mother-32?',
-        options: ['Bring the bass back instead of ringing', 'Ring like the low-pass', 'Make it silent'], answer: 0,
+        options: ['Bring the bass back instead of ringing', 'Ring at the cutoff, as in LOW PASS', 'Close the filter until it is silent'], answer: 0,
         explain: 'HI PASS is non-resonant, and the manual warns that any RESONANCE will "reintroduce bottom end into a sound" (p.14), so the filter stops working as a high-pass. For a ringing high-pass it patches VCF back into EXT. AUDIO and uses MIX as the resonance.',
       },
       principle: 'Every filter design has its own character; read the manual, then trust your ears.',
@@ -352,9 +352,9 @@ const f3: Lesson = {
     },
   ],
   review: [
-    { question: 'Turning CUTOFF down on a low-pass filter…', options: ['Removes high harmonics (darker)', 'Lowers the pitch', 'Adds distortion'], answer: 0, explain: 'Pitch is set by the VCO.' },
-    { question: 'A self-oscillating ladder filter produces…', options: ['A sine wave at the cutoff frequency', 'White noise', 'A square wave'], answer: 0, explain: 'Feedback makes it ring by itself.' },
-    { question: 'On the Mother-32, RESONANCE in HI PASS mode…', options: ['Brings the bass back', 'Makes it ring', 'Mutes it'], answer: 0, explain: 'The HI PASS mode is non-resonant.' },
+    { question: 'Turning CUTOFF down on a low-pass filter…', options: ['Removes high harmonics (darker)', 'Lowers the pitch (deeper)', 'Adds distortion (grittier)'], answer: 0, explain: 'Pitch is set by the VCO.' },
+    { question: 'A self-oscillating ladder filter produces…', options: ['A sine wave at the cutoff frequency', 'White noise above the cutoff frequency', 'A square wave at half the cutoff frequency'], answer: 0, explain: 'Feedback makes it ring by itself.' },
+    { question: 'On the Mother-32, RESONANCE in HI PASS mode…', options: ['Brings the bass back', 'Makes the filter ring', 'Mutes the output'], answer: 0, explain: 'The HI PASS mode is non-resonant.' },
     { question: 'Raising RESONANCE on a Moog low-pass also tends to…', options: ['Thin out the lows', 'Raise the pitch', 'Lengthen the notes'], answer: 0, explain: 'The classic ladder bass loss.' },
   ],
 };
@@ -375,7 +375,7 @@ const f4: Lesson = {
       instruction: 'Turn DECAY up to about 2 seconds.',
       predict: {
         question: 'With SUSTAIN ON, DECAY is how long a note fades after its gate ends. What will you hear?',
-        options: ['The notes ring on and blur together', 'The notes come faster', 'The pitch drops'], answer: 0,
+        options: ['The notes ring on and blur together', 'The notes come faster, one after another', 'The pitch drops as each note fades away'], answer: 0,
         explain: 'Each note now fades for two seconds after its gate closes, so it is still sounding when the next one starts. When the notes happen is the sequencer\'s job, not DECAY\'s.',
       },
       principle: 'A decay or release stage sets how long a sound takes to fade out.',
@@ -392,7 +392,7 @@ const f4: Lesson = {
       instruction: 'Flip SUSTAIN down to OFF.',
       predict: {
         question: 'With SUSTAIN OFF the envelope falls as soon as it reaches the top, even while the gate is high. What happens to the long notes?',
-        options: ['They become short plucks like the others', 'They get longer', 'They get louder'], answer: 0,
+        options: ['They become short plucks like the others', 'They get longer and run into each other', 'They get louder than the short ones'], answer: 0,
         explain: 'SUSTAIN OFF makes an attack-decay envelope, so the gate length no longer matters. That is why the manual says SUSTAIN must be ON for gate lengths to sound.',
       },
       principle: 'An attack-decay envelope ignores how long the key is held; a sustaining one follows it.',
@@ -469,7 +469,7 @@ const f4: Lesson = {
   review: [
     { question: 'For gate lengths to sound on the Mother-32, SUSTAIN must be…', options: ['ON', 'OFF', 'Either'], answer: 0, explain: 'OFF makes every note an attack-decay pluck.' },
     { question: 'A slow ATTACK makes notes…', options: ['Swell in', 'Snap in', 'Repeat'], answer: 0, explain: 'Attack is the fade-in.' },
-    { question: 'VCA MODE ON gives…', options: ['A drone that needs no gate', 'Silence', 'A shorter decay'], answer: 0, explain: 'The VCA is held open.' },
+    { question: 'VCA MODE ON gives…', options: ['A drone that needs no gate', 'Silence until a key is pressed', 'A shorter decay on every note'], answer: 0, explain: 'The VCA is held open.' },
   ],
 };
 
@@ -489,7 +489,7 @@ const f5: Lesson = {
       instruction: 'Turn VCO MOD AMOUNT up to about 12 %.',
       predict: {
         question: 'VCO MOD SOURCE is on LFO and VCO MOD DEST on FREQUENCY. What will a little AMOUNT do?',
-        options: ['A wobble in pitch - vibrato', 'A "wah" in the tone', 'A tremolo in volume'], answer: 0,
+        options: ['A wobble in pitch - vibrato', 'A "wah" in the tone - filter sweep', 'A wobble in volume - tremolo'], answer: 0,
         explain: 'The LFO\'s slow wave now moves the VCO\'s pitch up and down a little, six times a second: vibrato. The filter and the VCA are not involved.',
       },
       principle: 'A small, slow modulation of pitch is heard as vibrato.',
@@ -522,7 +522,7 @@ const f5: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'modulation-source',
       quiz: {
         question: 'VCO MOD SOURCE on EG with VCO MOD DEST on FREQUENCY gives…',
-        options: ['A pitch sweep on every note', 'A steady vibrato', 'Pulse-width movement'], answer: 0,
+        options: ['A pitch sweep on every note', 'A steady vibrato on every note', 'Pulse-width movement on every note'], answer: 0,
         explain: 'The envelope rises and falls once per note, so the pitch jumps up and falls back each time: a drum thump or a zap. Vibrato needs the LFO.',
       },
     },
@@ -569,8 +569,8 @@ const f5: Lesson = {
   ],
   review: [
     { question: 'A little LFO on pitch is heard as…', options: ['Vibrato', 'Tremolo', 'Distortion'], answer: 0, explain: 'A pitch wobble.' },
-    { question: 'Pulse-width modulation sounds…', options: ['Wide and chorus-like', 'Lower', 'Shorter'], answer: 0, explain: 'The harmonics keep shifting.' },
-    { question: 'VCF MOD POLARITY − makes the envelope…', options: ['Close the filter instead of opening it', 'Faster', 'Louder'], answer: 0, explain: 'It inverts the sweep.' },
+    { question: 'Pulse-width modulation sounds…', options: ['Wide and chorus-like', 'Lower and darker', 'Shorter and drier'], answer: 0, explain: 'The harmonics keep shifting.' },
+    { question: 'VCF MOD POLARITY − makes the envelope…', options: ['Close the filter instead of opening it', 'Run faster, for a shorter sweep', 'Make each note louder instead of brighter'], answer: 0, explain: 'It inverts the sweep.' },
   ],
 };
 
@@ -667,8 +667,8 @@ const f6: Lesson = {
   review: [
     { question: 'SHIFT + RUN / STOP on the Mother-32 starts…', options: ['Recording (REC)', 'Swing', 'Pattern save'], answer: 0, explain: 'REC is RUN / STOP\'s second function.' },
     { question: 'While recording, HOLD / REST…', options: ['Stores a rest', 'Repeats a step', 'Stops recording'], answer: 0, explain: 'It is the REST half of HOLD / REST.' },
-    { question: 'You record three notes over a 16-step pattern without clearing it first. The pattern now has…', options: ['16 steps, the first three new', '3 steps', '19 steps'], answer: 0, explain: 'Step-write overwrites from step 1 and only moves the end when you write past it.' },
-    { question: 'SHIFT + RESET + PATTERN…', options: ['Initializes the working pattern to one step', 'Saves the pattern', 'Starts the sequencer'], answer: 0, explain: 'The saved patterns are untouched.' },
+    { question: 'You record three notes over a 16-step pattern without clearing it first. The pattern now has…', options: ['16 steps, the first three new', '3 steps, all of them new', '19 steps, three added at the end'], answer: 0, explain: 'Step-write overwrites from step 1 and only moves the end when you write past it.' },
+    { question: 'SHIFT + RESET + PATTERN…', options: ['Initializes the working pattern to one step', 'Saves the working pattern to its slot', 'Starts the sequencer from the first step'], answer: 0, explain: 'The saved patterns are untouched.' },
     { question: 'At 120 BPM with 16th-note steps, a step lasts…', options: ['0.125 s', '0.5 s', '1 s'], answer: 0, explain: 'A beat is 0.5 s; a 16th is a quarter of it.' },
   ],
 };
@@ -723,7 +723,7 @@ const f7: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'Which of these Mother-32 inputs is normalled - a cable replaces something?',
-        options: ['VCO MOD (the EG)', 'VCF CUTOFF', 'LFO RATE'], answer: 0,
+        options: ['VCO MOD (the EG)', 'VCF CUTOFF (the LFO)', 'LFO RATE (the KB voltage)'], answer: 0,
         explain: 'VCO MOD, EXT. AUDIO, MIX 1 and MIX 2 have normals. VCF CUTOFF and LFO RATE have none: a cable there adds to the knob.',
       },
     },
@@ -746,8 +746,8 @@ const f7: Lesson = {
     },
   ],
   review: [
-    { question: 'A cable in a normalled input…', options: ['Replaces the internal signal', 'Adds to it', 'Is ignored'], answer: 0, explain: 'That is what a normal is.' },
-    { question: 'With nothing patched into MIX 1 or MIX 2, VC MIX outputs…', options: ['0 to +5 V set by the knob', 'Noise', 'The LFO'], answer: 0, explain: 'MIX 1 is 0 V and MIX 2 is +5 V.' },
+    { question: 'A cable in a normalled input…', options: ['Replaces the internal signal', 'Adds to the internal signal there', 'Is ignored until the knob is at zero'], answer: 0, explain: 'That is what a normal is.' },
+    { question: 'With nothing patched into MIX 1 or MIX 2, VC MIX outputs…', options: ['0 to +5 V set by the knob', 'The noise generator\'s signal', 'The LFO\'s triangle wave'], answer: 0, explain: 'MIX 1 is 0 V and MIX 2 is +5 V.' },
     { question: 'Patch-bay outputs on the Mother-32 are printed…', options: ['Reversed, in a box', 'In red', 'Inside a circle'], answer: 0, explain: 'Circles mark gate inputs.' },
   ],
 };
@@ -782,7 +782,7 @@ const sd1: Lesson = {
       instruction: 'Turn RESONANCE up to about 75 %.',
       predict: {
         question: 'What gives an acid line its squelch?',
-        options: ['A ringing resonant peak that the envelope sweeps', 'A louder oscillator', 'A slow attack'], answer: 0,
+        options: ['A ringing resonant peak that the envelope sweeps', 'A louder oscillator that overdrives the mixer', 'A slow attack that lets every note swell in'], answer: 0,
         explain: 'The resonant peak "speaks" as the envelope sweeps it through the harmonics, like a vowel. Volume and attack do not add that rubbery bite.',
       },
       principle: 'A resonant peak swept quickly through the harmonics sounds like a vowel: the squelch.',
@@ -806,7 +806,7 @@ const sd1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'velocity-dynamics',
       quiz: {
         question: 'Accented steps on the Mother-32…',
-        options: ['Open the filter and the VCA a bit more', 'Play an octave higher', 'Are silent'], answer: 0,
+        options: ['Open the filter and the VCA a bit more', 'Play a full octave higher than the others', 'Are silent, like a rest in the pattern'], answer: 0,
         explain: 'Accent pushes the cutoff up and the VCA a little louder on that step, so accented notes squelch harder. The pitch is unchanged.',
       },
     },
@@ -843,9 +843,9 @@ const sd1: Lesson = {
     },
   ],
   review: [
-    { question: 'Acid squelch comes mainly from…', options: ['Resonance swept by a fast filter envelope', 'A slow LFO', 'Noise'], answer: 0, explain: 'The peak sweeps through the harmonics.' },
+    { question: 'Acid squelch comes mainly from…', options: ['Resonance swept by a fast filter envelope', 'A slow LFO on the oscillator\'s pitch', 'Noise mixed in with the oscillator'], answer: 0, explain: 'The peak sweeps through the harmonics.' },
     { question: 'On the Mother-32, glide is set…', options: ['Per step; GLIDE sets the time', 'Only for the whole pattern', 'With RESONANCE'], answer: 0, explain: 'A step glides only if glide is on for it.' },
-    { question: 'An accent on the Mother-32 opens…', options: ['The VCF and the VCA', 'Only the VCA', 'Neither'], answer: 0, explain: 'Brighter and louder.' },
+    { question: 'An accent on the Mother-32 opens…', options: ['The VCF and the VCA', 'The VCA, not the VCF', 'Neither of the two stages'], answer: 0, explain: 'Brighter and louder.' },
   ],
 };
 
@@ -929,9 +929,9 @@ const sd2: Lesson = {
     },
   ],
   review: [
-    { question: 'A kick\'s punch comes from…', options: ['A fast downward pitch sweep', 'Noise', 'A long attack'], answer: 0, explain: 'The EG on pitch.' },
-    { question: 'A MULT…', options: ['Copies one signal to two outputs', 'Mixes two signals', 'Inverts a signal'], answer: 0, explain: 'The manual says: only as a CV splitter.' },
-    { question: 'In this patch a high note becomes a snare because…', options: ['MIX moves toward noise and the filter opens', 'A second VCO takes over', 'The LFO speeds up'], answer: 0, explain: 'High notes push MIX toward noise and open the cutoff.' },
+    { question: 'A kick\'s punch comes from…', options: ['A fast downward pitch sweep', 'Noise mixed in at full level', 'A long, slow attack'], answer: 0, explain: 'The EG on pitch.' },
+    { question: 'A MULT…', options: ['Copies one signal to two outputs', 'Mixes two signals into one output', 'Inverts a signal, from top to bottom'], answer: 0, explain: 'The manual says: only as a CV splitter.' },
+    { question: 'In this patch a high note becomes a snare because…', options: ['MIX moves toward noise and the filter opens', 'A second VCO takes over above middle C', 'The LFO speeds up and adds a rattle'], answer: 0, explain: 'High notes push MIX toward noise and open the cutoff.' },
   ],
 };
 
@@ -965,7 +965,7 @@ const sd3: Lesson = {
       instruction: 'Turn VC MIX up to about 60 %.',
       predict: {
         question: 'VC MIX now sends the 344 Hz LFO into linear FM. What will you hear?',
-        options: ['Clangy, metallic overtones', 'A slow vibrato', 'Silence'], answer: 0,
+        options: ['Clangy, metallic overtones', 'A slow, gentle vibrato', 'A lower, darker tone'], answer: 0,
         explain: 'When the frequency wobbles hundreds of times a second you no longer hear a wobble. You hear sidebands: new partials above and below the note, rarely in tune with it, so it sounds like metal.',
       },
       principle: 'Audio-rate FM creates sidebands - new partials that make a tone metallic or bell-like.',
@@ -980,7 +980,7 @@ const sd3: Lesson = {
       instruction: 'Patch EG into VC MIX CTRL.',
       predict: {
         question: 'The envelope now turns VC MIX up on every note and lets it fall. What happens to the clang?',
-        options: ['It rings at the start and fades to a pure tone - a bell', 'It gets louder all the time', 'Nothing changes'], answer: 0,
+        options: ['It rings at the start and fades to a pure tone - a bell', 'It gets louder and harsher all the time - a siren', 'Nothing changes - the envelope only reaches the VCA'], answer: 0,
         explain: 'Real bells are richest at the strike and mellow as they ring. The envelope does that to the FM depth: lots of sidebands at the start, fewer and fewer as it decays.',
       },
       principle: 'A decaying FM depth makes the brightness fall over time, the signature of a struck bell.',
@@ -989,7 +989,7 @@ const sd3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'In this patch VC MIX acts as a…',
-        options: ['VCA: the EG sets how much LFO passes', 'Filter', 'Second envelope'], answer: 0,
+        options: ['VCA: the EG sets how much LFO passes', 'Filter: the EG sets how bright the LFO is', 'Second envelope: it adds its own attack and decay'], answer: 0,
         explain: 'VC MIX crossfades 0 V (MIX 1) against the LFO (MIX 2), and the EG on VC MIX CTRL moves the crossfade. That is a voltage-controlled amplifier for the modulator.',
       },
     },
@@ -1020,9 +1020,9 @@ const sd3: Lesson = {
     },
   ],
   review: [
-    { question: 'Audio-rate FM adds…', options: ['Sidebands - new partials', 'A slower tempo', 'Noise'], answer: 0, explain: 'Frequencies above and below the carrier.' },
-    { question: 'VC MIX with one input patched works as…', options: ['An attenuator / VCA', 'A filter', 'An oscillator'], answer: 0, explain: 'It scales the signal.' },
-    { question: 'Patching KB into LFO RATE in an FM patch keeps…', options: ['The same FM colour on every note', 'The LFO at one speed', 'The pitch fixed'], answer: 0, explain: 'The ratio stays constant.' },
+    { question: 'Audio-rate FM adds…', options: ['Sidebands - new partials', 'Swing - a looser tempo', 'Hiss - noise on every note'], answer: 0, explain: 'Frequencies above and below the carrier.' },
+    { question: 'VC MIX with one input patched works as…', options: ['An attenuator / VCA', 'A low-pass filter', 'A second oscillator'], answer: 0, explain: 'It scales the signal.' },
+    { question: 'Patching KB into LFO RATE in an FM patch keeps…', options: ['The same FM colour on every note', 'The LFO at one speed for every note', 'The pitch fixed while you play'], answer: 0, explain: 'The ratio stays constant.' },
   ],
 };
 
@@ -1063,7 +1063,7 @@ const e1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'filter-cutoff',
       quiz: {
         question: 'Why does the CUTOFF knob feel even, though it spans 20 Hz to 20 kHz?',
-        options: ['It is logarithmic: each bit of travel multiplies the frequency', 'It only uses the middle', 'The filter ignores high frequencies'], answer: 0,
+        options: ['It is logarithmic: each bit of travel multiplies the frequency', 'It is linear, and it only uses the middle of that range', 'It is stepped: the filter ignores most of the high frequencies'], answer: 0,
         explain: 'Hearing works in ratios. The knob gives every octave the same amount of travel, which is why the printed scale reads 20 Hz, 200 Hz, 2 kHz, 20 kHz at even steps.',
       },
     },
@@ -1082,9 +1082,9 @@ const e1: Lesson = {
     },
   ],
   review: [
-    { question: 'Raising CUTOFF changes…', options: ['Brightness', 'Pitch', 'Length'], answer: 0, explain: 'More harmonics pass.' },
-    { question: 'The CUTOFF knob is logarithmic because…', options: ['We hear frequency in ratios', 'It saves power', 'Filters need it'], answer: 0, explain: 'Each octave gets equal travel.' },
-    { question: 'A muffled bass has a cutoff around…', options: ['A few hundred Hz', '10 kHz', '20 kHz'], answer: 0, explain: 'Most harmonics are removed.' },
+    { question: 'Raising CUTOFF changes…', options: ['Brightness', 'The note\'s pitch', 'The note length'], answer: 0, explain: 'More harmonics pass.' },
+    { question: 'The CUTOFF knob is logarithmic because…', options: ['We hear frequency in ratios', 'Linear knobs wear out faster', 'Filters can\'t work in Hz'], answer: 0, explain: 'Each octave gets equal travel.' },
+    { question: 'A muffled bass has a cutoff around…', options: ['A few hundred Hz', 'About 10 kHz', 'The full 20 kHz'], answer: 0, explain: 'Most harmonics are removed.' },
   ],
 };
 
@@ -1138,9 +1138,9 @@ const e2: Lesson = {
     },
   ],
   review: [
-    { question: 'To compare two decays, listen to…', options: ['When each tail fades out', 'The attack', 'The tempo'], answer: 0, explain: 'The attacks are the same.' },
-    { question: 'With SUSTAIN OFF, DECAY sets…', options: ['How long each note rings', 'When notes start', 'The pitch'], answer: 0, explain: 'It is the fall after the attack.' },
-    { question: 'A pluck has a DECAY of roughly…', options: ['100-200 ms', '2 s', '7 s'], answer: 0, explain: 'Short.' },
+    { question: 'To compare two decays, listen to…', options: ['When each tail fades out', 'How hard each attack hits', 'How fast the pattern runs'], answer: 0, explain: 'The attacks are the same.' },
+    { question: 'With SUSTAIN OFF, DECAY sets…', options: ['How long each note rings', 'When each note starts', 'How high each note sounds'], answer: 0, explain: 'It is the fall after the attack.' },
+    { question: 'A pluck has a DECAY of roughly…', options: ['100-200 ms', 'About 2 s', 'About 7 s'], answer: 0, explain: 'Short.' },
   ],
 };
 
@@ -1202,8 +1202,8 @@ const e3: Lesson = {
   ],
   review: [
     { question: 'A ringing whistle at one pitch means…', options: ['RESONANCE', 'VCF MOD AMOUNT', 'GLIDE'], answer: 0, explain: 'The resonant peak.' },
-    { question: 'A bright snap at the start of each note means…', options: ['VCF MOD AMOUNT', 'RESONANCE', 'ATTACK'], answer: 0, explain: 'The envelope opens the filter.' },
-    { question: 'The best way to match two controls is…', options: ['One at a time, the most obvious first', 'Both at random', 'Always the left knob first'], answer: 0, explain: 'Isolate and compare.' },
+    { question: 'A bright snap at the start of each note means…', options: ['VCF MOD AMOUNT', 'RESONANCE', 'VCO MOD AMOUNT'], answer: 0, explain: 'The envelope opens the filter.' },
+    { question: 'The best way to match two controls is…', options: ['One at a time, the most obvious first', 'Both of them together, in small random moves', 'Always the left knob first, then the right'], answer: 0, explain: 'Isolate and compare.' },
   ],
 };
 
@@ -1224,7 +1224,7 @@ const e4: Lesson = {
         a: {}, b: { decay: 1000 }, labels: ['A', 'B'],
         question: {
           question: 'What changed from A to B?',
-          options: ['How long the notes ring (DECAY)', 'The brightness (CUTOFF)', 'The pulse width'], answer: 0,
+          options: ['How long the notes ring (DECAY)', 'How bright the notes are (CUTOFF)', 'How thin the wave is (PULSE WIDTH)'], answer: 0,
           explain: 'The start of each note is identical and only the tail is longer, so that is the envelope, not the filter or the oscillator.',
         },
       },
@@ -1236,7 +1236,7 @@ const e4: Lesson = {
         a: {}, b: { pulse_width: 12 }, labels: ['A', 'B'],
         question: {
           question: 'What changed from A to B?',
-          options: ['PULSE WIDTH - B is thinner and nasal', 'CUTOFF - B is darker', 'DECAY - B is shorter'], answer: 0,
+          options: ['PULSE WIDTH - B is thinner and nasal', 'CUTOFF - B is darker and duller', 'DECAY - B is shorter and tighter'], answer: 0,
           explain: 'B sounds thin and reedy all the way through the note, which is the oscillator\'s colour. A cutoff change would make it duller or brighter without that nasal quality.',
         },
       },
@@ -1271,8 +1271,8 @@ const e4: Lesson = {
   ],
   review: [
     { question: 'Same start, longer tail means…', options: ['A longer DECAY', 'A higher CUTOFF', 'A thinner pulse'], answer: 0, explain: 'An envelope change.' },
-    { question: 'A thin, nasal colour throughout the note means…', options: ['A narrow pulse width', 'A low cutoff', 'A short decay'], answer: 0, explain: 'The oscillator.' },
-    { question: 'Brighter only at the start of each note means…', options: ['More VCF MOD AMOUNT', 'A higher CUTOFF', 'More VOLUME'], answer: 0, explain: 'The filter envelope.' },
+    { question: 'A thin, nasal colour throughout the note means…', options: ['A narrow pulse width', 'A low filter cutoff', 'A short envelope decay'], answer: 0, explain: 'The oscillator.' },
+    { question: 'Brighter only at the start of each note means…', options: ['More VCF MOD AMOUNT', 'A higher CUTOFF setting', 'More VOLUME'], answer: 0, explain: 'The filter envelope.' },
   ],
 };
 
@@ -1310,7 +1310,7 @@ const sq1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
       quiz: {
         question: 'A step that is switched off…',
-        options: ['Keeps its time slot but plays nothing', 'Shortens the pattern', 'Plays more quietly'], answer: 0,
+        options: ['Keeps its time slot but plays nothing', 'Shortens the pattern by one step', 'Plays more quietly than the others'], answer: 0,
         explain: 'The pattern still takes the same time; that step is simply silent. The pattern length only changes with SET END.',
       },
     },
@@ -1319,7 +1319,7 @@ const sq1: Lesson = {
       instruction: 'Edit step 3: tap (SHIFT), then pad 3 (its LED blinks). Turn TEMPO - now GATE LENGTH - fully clockwise.',
       predict: {
         question: 'Steps 3 and 4 play the same note. What will a gate of 8/8 on step 3 do?',
-        options: ['Join them into one long note', 'Silence step 3', 'Play step 3 eight times'], answer: 0,
+        options: ['Join them into one long note', 'Silence step 3', 'Play step 3 eight times over'], answer: 0,
         explain: 'A gate that lasts the whole step is still open when step 4 begins, so the envelope never restarts: two steps of the same note sound as one long note. That is a tie.',
       },
       check: s => step(s, 2).gate === 8,
@@ -1333,7 +1333,7 @@ const sq1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-sustain',
       quiz: {
         question: 'Why must SUSTAIN be ON for gate lengths to matter?',
-        options: ['With SUSTAIN OFF the envelope decays whatever the gate does', 'SUSTAIN sets the tempo', 'It doubles the gate length'], answer: 0,
+        options: ['With SUSTAIN OFF the envelope decays whatever the gate does', 'With SUSTAIN OFF the sequencer runs at a fixed tempo', 'With SUSTAIN ON every gate is twice as long as it is set'], answer: 0,
         explain: 'With SUSTAIN OFF every note is an attack-decay pluck. Only a sustaining envelope follows the gate, so only then does its length change the note.',
       },
     },
@@ -1366,8 +1366,8 @@ const sq1: Lesson = {
   ],
   review: [
     { question: 'In STEP mode, SHIFT + a step pad…', options: ['Edits that step', 'Deletes the pattern', 'Changes the octave'], answer: 0, explain: 'The step LED blinks while it is edited.' },
-    { question: 'A gate length of 8/8 is…', options: ['A tie into the next step', 'A rest', 'A ratchet'], answer: 0, explain: 'The note is held into the next step.' },
-    { question: 'While a step is edited, TEMPO sets…', options: ['Its gate length', 'The tempo', 'Swing'], answer: 0, explain: 'TEMPO / GATE LENGTH.' },
+    { question: 'A gate length of 8/8 is…', options: ['A tie into the next step', 'A rest for the whole step', 'A ratchet of eight notes'], answer: 0, explain: 'The note is held into the next step.' },
+    { question: 'While a step is edited, TEMPO sets…', options: ['Its gate length', 'The tempo, as usual', 'Its swing amount'], answer: 0, explain: 'TEMPO / GATE LENGTH.' },
   ],
 };
 
@@ -1455,10 +1455,10 @@ const sq2: Lesson = {
     },
   ],
   review: [
-    { question: 'A ratchet…', options: ['Repeats a note inside one step', 'Lengthens a step', 'Transposes a step'], answer: 0, explain: '1-4 notes per step.' },
+    { question: 'A ratchet…', options: ['Repeats a note inside one step', 'Lengthens a step to two beats', 'Transposes a step by an octave'], answer: 0, explain: '1-4 notes per step.' },
     { question: 'Swing at 50 % is…', options: ['Straight', 'A full triplet shuffle', 'Silent'], answer: 0, explain: 'No delay.' },
-    { question: 'The Mother-32 stores…', options: ['64 patterns: 8 banks x 8', '8 patterns', 'One pattern'], answer: 0, explain: 'Plus the one you are editing.' },
-    { question: 'To save on the Mother-32 you start with…', options: ['SHIFT + RUN / STOP, held for a second', 'PATTERN + RESET', 'SHIFT + STEP'], answer: 0, explain: 'Then pick the slot and confirm with SHIFT + RUN / STOP.' },
+    { question: 'The Mother-32 stores…', options: ['64 patterns: 8 banks x 8', '8 patterns: 1 bank of 8', '32 patterns: 4 banks x 8'], answer: 0, explain: 'Plus the one you are editing.' },
+    { question: 'To save on the Mother-32 you start with…', options: ['SHIFT + RUN / STOP, held for a second', 'PATTERN + RESET, pressed together', 'SHIFT + STEP, tapped twice'], answer: 0, explain: 'Then pick the slot and confirm with SHIFT + RUN / STOP.' },
   ],
 };
 
@@ -1512,7 +1512,7 @@ const p1: Lesson = {
       instruction: 'Now sweep CUTOFF back up to about 2 kHz.',
       predict: {
         question: 'Why does opening the filter after a dark section feel like a lift?',
-        options: ['Contrast: the brightness comes back', 'It plays faster', 'It adds more notes'], answer: 0,
+        options: ['Contrast: the brightness comes back', 'Speed: the pattern plays faster', 'Density: it adds more notes'], answer: 0,
         explain: 'Ears judge energy against what came just before. The filter sweep is the oldest build-up in dance music for exactly that reason.',
       },
       principle: 'Energy is relative: taking something away makes its return hit harder.',
@@ -1521,7 +1521,7 @@ const p1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
       quiz: {
         question: 'While the pattern runs, HOLD / REST…',
-        options: ['Repeats the current step while held', 'Records a rest', 'Stops the sequencer'], answer: 0,
+        options: ['Repeats the current step while held', 'Records a rest on the current step', 'Stops the sequencer until released'], answer: 0,
         explain: 'REST is its recording and editing function; while playing it is HOLD.',
       },
     },
@@ -1544,9 +1544,9 @@ const p1: Lesson = {
     },
   ],
   review: [
-    { question: 'In KB mode while running, a key press…', options: ['Transposes the pattern', 'Records a note', 'Mutes the VCO'], answer: 0, explain: 'The whole pattern moves.' },
-    { question: 'A classic build-up is…', options: ['Slowly opening the filter', 'Stopping the clock', 'Turning VOLUME to 0'], answer: 0, explain: 'Brightness returns.' },
-    { question: 'SHIFT + RESET / ACCENT, held, gives…', options: ['Live accent on every step', 'A reset to step 1', 'Swing'], answer: 0, explain: 'Released, it goes back to normal.' },
+    { question: 'In KB mode while running, a key press…', options: ['Transposes the pattern', 'Records a note on the next step', 'Mutes the VCO for one step'], answer: 0, explain: 'The whole pattern moves.' },
+    { question: 'A classic build-up is…', options: ['Slowly opening the filter', 'Stopping the clock for a beat', 'Turning VOLUME down to 0'], answer: 0, explain: 'Brightness returns.' },
+    { question: 'SHIFT + RESET / ACCENT, held, gives…', options: ['Live accent on every step', 'A reset to step 1 on every bar', 'Swing on every second step'], answer: 0, explain: 'Released, it goes back to normal.' },
   ],
 };
 
@@ -1584,7 +1584,7 @@ const st1: Lesson = {
       instruction: 'Turn TEMPO: under studio sync it picks the step length. Set it to 1/8.',
       predict: {
         question: 'The studio tempo stays the same. What happens to the Mother-32\'s pattern?',
-        options: ['It plays at half speed - one step every 8th note', 'It plays twice as fast', 'It stops'], answer: 0,
+        options: ['It plays at half speed - one step every 8th note', 'It plays twice as fast - two steps every 16th note', 'It stops - the knob no longer matches the clock'], answer: 0,
         explain: 'Synced to an external clock, the Mother-32\'s TEMPO knob selects the clock division instead of the tempo. 1/8 steps are twice as long as 1/16. This is the reason Moog support gives for "half or double time" sync.',
       },
       principle: 'A clock division sets how many clock pulses make one step.',
@@ -1599,7 +1599,7 @@ const st1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
       quiz: {
         question: 'Your synced Mother-32 plays at half speed against the drums. What is the likely cause?',
-        options: ['TEMPO is selecting 1/8 instead of 1/16', 'The studio tempo is too low', 'A cable is loose'], answer: 0,
+        options: ['TEMPO is selecting 1/8 instead of 1/16', 'The studio tempo is set too low for it', 'A clock cable is loose in its jack'], answer: 0,
         explain: 'Under MIDI clock the TEMPO knob is a division selector, so its position decides the step length. The studio tempo would slow everything, not just the Mother-32.',
       },
     },
@@ -1614,7 +1614,7 @@ const st1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
       quiz: {
         question: 'With a clock in TEMPO, which clock does the Mother-32 follow?',
-        options: ['The pulses at TEMPO - an analog clock overrides MIDI clock', 'Only the studio transport', 'Its TEMPO knob'], answer: 0,
+        options: ['The pulses at TEMPO - an analog clock overrides MIDI clock', 'Only the studio transport - MIDI clock overrides everything', 'Its own TEMPO knob - the internal clock always comes first'], answer: 0,
         explain: 'The manual ranks them: analog clock at TEMPO first, then MIDI clock, then the internal clock. In the TEMPO input\'s default mode, SINGLE CLOCK ADVANCE, each rising edge plays one step.',
       },
     },
@@ -1634,8 +1634,8 @@ const st1: Lesson = {
     },
   ],
   review: [
-    { question: 'Under MIDI clock, the Mother-32\'s TEMPO knob…', options: ['Selects the step division', 'Sets the BPM', 'Does nothing'], answer: 0, explain: 'The tempo comes from the clock.' },
-    { question: 'Which clock wins on the Mother-32?', options: ['An analog clock at TEMPO', 'MIDI clock', 'The internal clock'], answer: 0, explain: 'Analog, then MIDI, then internal.' },
+    { question: 'Under MIDI clock, the Mother-32\'s TEMPO knob…', options: ['Selects the step division', 'Sets the BPM, as it always does', 'Does nothing until the clock stops'], answer: 0, explain: 'The tempo comes from the clock.' },
+    { question: 'Which clock wins on the Mother-32?', options: ['An analog clock at TEMPO', 'MIDI clock from the studio', 'Its own internal clock'], answer: 0, explain: 'Analog, then MIDI, then internal.' },
     { question: 'In SINGLE CLOCK ADVANCE mode (the default), a pulse at TEMPO…', options: ['Plays the next step', 'Resets to step 1', 'Changes the tempo'], answer: 0, explain: 'One step per rising edge.' },
   ],
 };
@@ -1689,7 +1689,7 @@ const st2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
       quiz: {
         question: 'Why do the two now stay in step?',
-        options: ['Every Mother-32 step sends a pulse that advances the DFAM', 'They share one TEMPO knob', 'Over MIDI'], answer: 0,
+        options: ['Every Mother-32 step sends a pulse that advances the DFAM', 'Both TEMPO knobs are at the same position, so they match', 'The Mother-32 sends MIDI clock to the DFAM\'s MIDI input'], answer: 0,
         explain: 'The DFAM has no MIDI; its ADV / CLOCK input moves it one step per pulse, and ASSIGN sends one pulse per Mother-32 step.',
       },
     },
@@ -1705,7 +1705,7 @@ const st2: Lesson = {
       instruction: 'In SETUP, set ASSIGN OUTPUT to 3: CLOCK / 2.',
       predict: {
         question: 'ASSIGN now pulses on every second step. What will the DFAM do?',
-        options: ['Step half as often - one DFAM step per two Mother-32 steps', 'Play twice as fast', 'Stop'], answer: 0,
+        options: ['Step half as often - one DFAM step per two Mother-32 steps', 'Play twice as fast - two DFAM steps per Mother-32 step', 'Stop - it needs a pulse on every step to keep running'], answer: 0,
         explain: 'Half the pulses means half the steps: the DFAM\'s 8 steps now last as long as 16 Mother-32 steps, a slower drum pattern under the same bass line.',
       },
       principle: 'Dividing a clock between two sequencers makes patterns of different lengths line up.',
@@ -1719,8 +1719,8 @@ const st2: Lesson = {
     },
   ],
   review: [
-    { question: 'To clock a DFAM from a Mother-32, patch…', options: ['ASSIGN (CLOCK) into ADV / CLOCK', 'GATE into TRIGGER', 'KB into TEMPO'], answer: 0, explain: 'Moog\'s sync sheet.' },
-    { question: 'With a clock in ADV / CLOCK, the DFAM must…', options: ['Be started first and wait for pulses', 'Have its TEMPO at noon', 'Be in HOLD'], answer: 0, explain: 'Start it, then the master.' },
+    { question: 'To clock a DFAM from a Mother-32, patch…', options: ['ASSIGN (CLOCK) into ADV / CLOCK', 'GATE into the DFAM\'s TRIGGER', 'KB into the DFAM\'s TEMPO'], answer: 0, explain: 'Moog\'s sync sheet.' },
+    { question: 'With a clock in ADV / CLOCK, the DFAM must…', options: ['Be started first and wait for pulses', 'Have its TEMPO knob set to noon', 'Be stopped until the first pulse'], answer: 0, explain: 'Start it, then the master.' },
     { question: 'ASSIGN on CLOCK / 2 makes the DFAM…', options: ['Step half as often', 'Step twice as often', 'Stop'], answer: 0, explain: 'Half the pulses.' },
   ],
 };

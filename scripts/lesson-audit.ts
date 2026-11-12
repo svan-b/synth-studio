@@ -1,6 +1,6 @@
 // ============================================================================
 // Lesson audit: every lesson against docs/PEDAGOGY.md, beyond what validate checks.
-//   npx tsx scripts/lesson-audit.ts [device ...] [--table] [--json]
+//   npx tsx scripts/lesson-audit.ts [device ...] [--table] [--lengths]
 // It walks each lesson the way a learner would (start state, then every step's target
 // applied in turn) and reports where the learning flow breaks the spec:
 //   flow      a step that is already done when it begins, an A/B with nothing to hear,
@@ -9,7 +9,8 @@
 //   words     instruction and principle lengths, option counts, hint ladders
 //   sequence  order, prerequisites and paths across an instrument's lessons, and a walk along
 //             "Next lesson" from nothing done: it reaches every lesson, each one unlocked
-//   options   the shuffled order questions are shown in keeps the right answer moving
+//   options   the shuffled order questions are shown in keeps the right answer moving, and its
+//             length does not give it away (--lengths prints how often it is the longest)
 // Exit code 1 when anything is found (so it can gate), 0 when clean.
 // ============================================================================
 import type { ControlSpec, ControlValue, Lesson, LessonCheckState, LessonStep, MultipleChoice } from '../types';
@@ -195,7 +196,7 @@ export function auditDevice(mod: DeviceModule, id: string): Finding[] {
   ls.forEach((l, i) => {
     if (i > 0 && !(l.prerequisites?.length) && l.path !== 'foundations') add(l.id, 'no-prereq', `${l.path} lesson with no prerequisites: it is open before the foundations it builds on`);
   });
-  out.push(...auditWalk(mod.lessons, id), ...auditOptions(mod.lessons, id));
+  out.push(...auditWalk(mod.lessons, id), ...auditOptions(mod.lessons, id), ...auditLengths(mod.lessons, id));
   const paths = [...byPath.keys()];
   const firstOrder = (p: string) => Math.min(...(byPath.get(p) ?? []).map(l => l.order ?? 999));
   paths.sort((a, b) => firstOrder(a) - firstOrder(b));
@@ -258,6 +259,51 @@ export function auditOptions(lessons: readonly Lesson[], name: string): Finding[
   return out;
 }
 
+/** Option lengths of one question: the right answer's, and the longest and shortest wrong one's */
+function lengths(mc: MultipleChoice) {
+  const len = mc.options.map(o => o.trim().length);
+  const wrong = len.filter((_, i) => i !== mc.answer);
+  return { right: len[mc.answer], longest: Math.max(...wrong), shortest: Math.min(...wrong) };
+}
+
+/** How often the right answer is the longest or the shortest option of its question, over a set of lessons */
+export function lengthStats(lessons: readonly Lesson[]) {
+  let n = 0, longest = 0, shortest = 0, ratio = 0;
+  lessons.forEach(l => allQuestions(l).forEach(([, mc]) => {
+    const { right, longest: mx, shortest: mn } = lengths(mc);
+    n++;
+    if (right > mx) longest++;
+    if (right < mn) shortest++;
+    ratio += right / (mc.options.filter((_, i) => i !== mc.answer).reduce((a, o) => a + o.trim().length, 0) / (mc.options.length - 1));
+  }));
+  return { n, longest, shortest, ratio: n ? ratio / n : 1 };
+}
+
+const allQuestions = (l: Lesson): [string, MultipleChoice][] => [
+  ...l.steps.flatMap((s, i): [string, MultipleChoice | undefined][] => [[`step ${i + 1}`, s.predict], [`step ${i + 1}`, s.quiz], [`step ${i + 1}`, s.listen?.question]]),
+  ...(l.review ?? []).map((m, i): [string, MultipleChoice | undefined] => [`review[${i}]`, m]),
+].filter((x): x is [string, MultipleChoice] => !!x[1]);
+
+/**
+ * Length must not give the answer away (docs/PEDAGOGY.md, "Options of one length"). A learner who
+ * picks the longest option should do no better than chance: no right answer far longer than every
+ * wrong one, and over an instrument the right answer is neither the longest nor the shortest option
+ * much more often than one in three.
+ */
+export function auditLengths(lessons: readonly Lesson[], name: string): Finding[] {
+  const out: Finding[] = [];
+  lessons.forEach(l => allQuestions(l).forEach(([where, mc]) => {
+    const { right, longest } = lengths(mc);
+    if (right >= 1.6 * longest && right - longest >= 12)
+      out.push({ lesson: l.id, cat: 'words', code: 'answer-far-longest', msg: `${where} "${mc.question}": the right answer (${right} characters) is far longer than every wrong one (${longest} at most): write the wrong options with the same detail` });
+  }));
+  const st = lengthStats(lessons);
+  const pct = (k: number) => Math.round((100 * k) / st.n);
+  if (st.n >= 20 && st.longest / st.n > 0.45) out.push({ lesson: name, cat: 'words', code: 'answer-longest', msg: `the right answer is the longest option in ${pct(st.longest)} % of ${st.n} questions (chance is about a third)` });
+  if (st.n >= 20 && st.shortest / st.n > 0.45) out.push({ lesson: name, cat: 'words', code: 'answer-shortest', msg: `the right answer is the shortest option in ${pct(st.shortest)} % of ${st.n} questions (chance is about a third)` });
+  return out;
+}
+
 const inOrder = (ls: readonly Lesson[]) => [...ls].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
 /** The shared studio lessons, or the Producer path: shape, words and sequence (their steps are not walked) */
@@ -273,7 +319,7 @@ export function auditStudio(lessons: readonly Lesson[], name: string): Finding[]
     }
     if (i === 0 && l.prerequisites?.length) out.push({ lesson: l.id, cat: 'sequence', code: 'first-locked', msg: `the first ${name} lesson has prerequisites` });
   });
-  out.push(...auditWalk(lessons, name), ...auditOptions(lessons, name));
+  out.push(...auditWalk(lessons, name), ...auditOptions(lessons, name), ...auditLengths(lessons, name));
   return out;
 }
 
@@ -281,6 +327,8 @@ if (require.main === module) (async () => {
   const args = process.argv.slice(2);
   const only = args.filter(a => !a.startsWith('--'));
   const table = args.includes('--table');
+  const showLengths = args.includes('--lengths');
+  const lengthLine = (ls: readonly Lesson[]) => { const st = lengthStats(ls); return `  right answer: longest option in ${Math.round((100 * st.longest) / st.n)} %, shortest in ${Math.round((100 * st.shortest) / st.n)} % of ${st.n} questions; ${st.ratio.toFixed(2)} times the wrong options' length on average`; };
   let total = 0;
   const tally: Record<string, number> = {};
   if (!only.length || only.includes('studio') || only.includes('producer')) {
@@ -290,6 +338,7 @@ if (require.main === module) (async () => {
       const f = auditStudio(ls, name);
       total += f.length;
       console.log(`\n${name}: ${ls.length} lessons, ${f.length} findings`);
+      if (showLengths) console.log(lengthLine(ls));
       if (table) inOrder(ls).forEach(l => console.log(`  ${String(l.order ?? '-').padStart(3)} ${(l.path ?? '-').padEnd(13)} ${l.difficulty.padEnd(12)} ${l.id.padEnd(34)} ${l.steps.map(s => kindOf(s)[0]).join('')}  <- ${(l.prerequisites ?? []).join(', ')}`));
       f.forEach(x => { tally[x.code] = (tally[x.code] ?? 0) + 1; console.log(`  [${x.cat}] ${x.lesson}${x.step ? ` step ${x.step}` : ''}: ${x.msg}`); });
     }
@@ -301,6 +350,7 @@ if (require.main === module) (async () => {
     const f = auditDevice(mod, entry.id);
     total += f.length;
     console.log(`\n${entry.id}: ${mod.lessons.length} lessons, ${f.length} findings`);
+    if (showLengths) console.log(lengthLine(mod.lessons));
     if (table) [...mod.lessons].sort((a, b) => (a.order ?? 999) - (b.order ?? 999)).forEach(l =>
       console.log(`  ${String(l.order ?? '-').padStart(3)} ${(l.path ?? '-').padEnd(13)} ${l.difficulty.padEnd(12)} ${l.id.padEnd(34)} ${l.steps.map(s => kindOf(s)[0]).join('')}  <- ${(l.prerequisites ?? []).join(', ')}`));
     f.forEach(x => { tally[x.code] = (tally[x.code] ?? 0) + 1; console.log(`  [${x.cat}] ${x.lesson}${x.step ? ` step ${x.step}` : ''}: ${x.msg}`); });

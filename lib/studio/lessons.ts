@@ -169,7 +169,7 @@ export const STUDIO_LESSONS: Lesson[] = [
         instruction: 'Quick check.',
         quiz: {
           question: 'What is the RESET OUT jack for?',
-          options: ['Starting sequencers on step 1 together', 'Making the clock louder', 'Changing the tempo'],
+          options: ['Starting sequencers on step 1 together', 'Making the clock pulses stronger on long cables', 'Changing the tempo of the patched instruments'],
           answer: 0,
           explain: 'RESET fires once on Play; patched into a sequencer reset it makes every part start from the top together.',
         },
@@ -259,8 +259,8 @@ export const STUDIO_LESSONS: Lesson[] = [
       },
     ],
     review: [
-      { question: 'MIDI clock runs at…', options: ['24 ticks per quarter note', '1 tick per bar', '4 ticks per beat'], answer: 0, explain: '24 PPQN.' },
-      { question: 'A synced instrument follows…', options: ["The leader's tempo and transport", 'Its own tempo knob', 'Whichever is faster'], answer: 0, explain: 'It locks to the master clock.' },
+      { question: 'MIDI clock runs at…', options: ['24 ticks per quarter note', '1 tick at the start of every bar', '4 ticks per beat, one per 16th'], answer: 0, explain: '24 PPQN.' },
+      { question: 'A synced instrument follows…', options: ['The leader\'s tempo and transport', 'Its own tempo knob, started by hand', 'Whichever of the two tempos is faster'], answer: 0, explain: 'It locks to the master clock.' },
       { question: 'Besides ticks, MIDI sync sends…', options: ['Start and stop', 'Audio', 'Filter settings'], answer: 0, explain: 'Start/stop/continue and song position.' },
     ],
   },
@@ -296,7 +296,7 @@ export const STUDIO_LESSONS: Lesson[] = [
         instruction: 'Press ▶ and watch that channel\'s meter on the Xone:96.',
         predict: {
           question: 'Before you touch the fader, what should you set first on a new channel?',
-          options: ['The GAIN, so the meter peaks around 0', 'The crossfader', 'The master volume'],
+          options: ['The GAIN, so the meter peaks around 0', 'The crossfader, so the channel is assigned', 'The master volume, so nothing can clip'],
           answer: 0,
           explain: 'Gain staging comes first: set each channel\'s input level, then balance with faders. Starting at the right level leaves headroom and keeps noise low.',
         },
@@ -320,7 +320,7 @@ export const STUDIO_LESSONS: Lesson[] = [
         instruction: 'Quick check.',
         quiz: {
           question: 'Why route the drums into the mixer instead of straight to the master?',
-          options: ['To control their level, EQ and filter separately', 'Because it is louder', 'To change their tempo'],
+          options: ['To control their level, EQ and filter separately', 'Because a mixer channel always makes them louder', 'To change their tempo without the studio clock'],
           answer: 0,
           explain: 'A channel gives you independent control over that part of the track.',
         },
@@ -336,8 +336,8 @@ export const STUDIO_LESSONS: Lesson[] = [
     ],
     review: [
       { question: 'Set first on a new mixer channel:', options: ['Input gain', 'Crossfader', 'FX send'], answer: 0, explain: 'Gain staging before balance.' },
-      { question: 'A meter that hits the top constantly means…', options: ['Clipping - turn the gain down', 'Perfect level', 'Too quiet'], answer: 0, explain: 'Leave headroom.' },
-      { question: 'Routing an instrument to a mixer channel lets you…', options: ['Shape it independently', 'Change its pitch', 'Sync it'], answer: 0, explain: 'Each channel has its own EQ, filter and fader.' },
+      { question: 'A meter that hits the top constantly means…', options: ['Clipping - turn the gain down', 'A perfect level - leave it there', 'Too quiet - turn the gain up'], answer: 0, explain: 'Leave headroom.' },
+      { question: 'Routing an instrument to a mixer channel lets you…', options: ['Shape it independently', 'Change its pitch from the mixer', 'Sync it to the clock'], answer: 0, explain: 'Each channel has its own EQ, filter and fader.' },
     ],
   },
   {
@@ -417,8 +417,8 @@ export const STUDIO_LESSONS: Lesson[] = [
     ],
     review: [
       { question: 'Dance music sections are usually…', options: ['8 or 16 bars', '3 or 5 bars', 'Random lengths'], answer: 0, explain: 'Phrases of 8/16 bars.' },
-      { question: 'A drop feels bigger after…', options: ['A break that removes parts', 'A louder intro', 'A tempo change'], answer: 0, explain: 'Contrast.' },
-      { question: 'Bouncing a track means…', options: ['Recording the mix to an audio file', 'Making it louder', 'Speeding it up'], answer: 0, explain: 'Rendering to WAV.' },
+      { question: 'A drop feels bigger after…', options: ['A break that removes parts', 'An intro that is louder than the drop', 'A sudden change of tempo'], answer: 0, explain: 'Contrast.' },
+      { question: 'Bouncing a track means…', options: ['Recording the mix to an audio file', 'Making the mix louder on the master', 'Speeding the song up to save time'], answer: 0, explain: 'Rendering to WAV.' },
     ],
   },
 ];

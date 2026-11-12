@@ -113,7 +113,7 @@ const firstBeat: Lesson = {
       instruction: 'Compare the beat with and without the off-beat hats.',
       listen: {
         a: { ch_amp_vol: 80 }, b: { ch_amp_vol: 0 }, labels: ['With hats', 'Without'],
-        question: mc('What do the off-beat hats add?', ['A faster tempo', 'Movement between the kicks', 'More bass'], 1,
+        question: mc('What do the off-beat hats add?', ['A faster tempo for the whole beat', 'Movement between the kicks', 'More bass under each of the kicks'], 1,
           'The tempo is the same in both. The hats are high and short, so they add motion in the gaps, not weight: the weight comes from the kick.'),
       },
     },
@@ -146,11 +146,11 @@ const firstBeat: Lesson = {
     },
   ],
   review: [
-    mc('Four on the floor means…', ['A kick on every beat', 'Four drums at once', 'Four kicks anywhere in the pattern'], 0, 'One kick per beat, four beats per bar.'),
+    mc('Four on the floor means…', ['A kick on every beat', 'Four drums playing at once', 'Four kicks anywhere in the pattern'], 0, 'One kick per beat, four beats per bar.'),
     mc('In a 16-step bar, beat 3 is step…', ['3', '9', '12'], 1, 'The beats are steps 1, 5, 9 and 13.'),
-    mc('The backbeat is…', ['Beats 2 and 4 (steps 5 and 13)', 'Beats 1 and 3', 'The last step'], 0, 'The clap or snare answers the kick on 2 and 4.'),
+    mc('The backbeat is…', ['Beats 2 and 4 (steps 5 and 13)', 'Beats 1 and 3 (steps 1 and 9) only', 'The last step of the bar (step 16)'], 0, 'The clap or snare answers the kick on 2 and 4.'),
     mc('Off-beat hats sit…', ['On the beats', 'Halfway between the beats', 'Only at the end of the bar'], 1, 'Steps 3, 7, 11 and 15 are the "ands".'),
-    mc('124 BPM means…', ['124 bars per minute', '124 steps per minute', '124 beats per minute'], 2, 'BPM is beats per minute.'),
+    mc('124 BPM means…', ['124 full bars per minute', '124 16th steps per minute', '124 beats per minute'], 2, 'BPM is beats per minute.'),
   ],
 };
 
@@ -182,7 +182,7 @@ const groove: Lesson = {
       listen: {
         a: {}, b: {}, labels: ['Feel A', 'Feel B'],
         demo: { demo: 'low-tide-lights', excerpt: 'drop-17-20', a: 'drums-straight', b: 'drums' },
-        question: mc('What is different about B?', ['It is louder', 'It has more drums', 'The timing and loudness of the small notes'], 2,
+        question: mc('What is different about B?', ['It plays a little louder than A all the way through', 'It has more drums playing at once', 'The timing and loudness of the small notes'], 2,
           'The same drums play in both, at the same loudness. B delays every second 16th a little (swing, 54 %) and plays the in-between notes softly (ghost notes); A is straight, with its ghost notes at velocity 1, so you barely hear them.'),
       },
     },
@@ -215,7 +215,7 @@ const groove: Lesson = {
       check: s => between(pswing(s, RYTM), 55, 62),
       solution: { patterns: { [RYTM]: { swing: 58 } } },
       hints: ['SWING belongs to the pattern, not to a knob.', 'Tap [FUNC], then [BANK G]: the SWING menu opens. While it is open the trig keys pick the swing steps.', '[UP] raises it one percent at a time.'],
-      predict: mc('Swing delays every second 16th. What will you hear?', ['The hats get louder', 'A bouncier, shuffled feel at the same tempo', 'A faster tempo'], 1,
+      predict: mc('Swing delays every second 16th. What will you hear?', ['The hats get louder on every second step', 'A bouncier, shuffled feel at the same tempo', 'A faster tempo, with the same straight feel'], 1,
         'Only the timing of steps 2, 4, 6… moves later, so the groove lopes while the beats stay put. Loudness is velocity, not swing.'),
       principle: 'Delaying every second 16th turns straight time into a shuffle.',
       explanation: 'SWING runs from 50 % (straight) to 80 %. At 58 % every even step plays 16 % of a step late: about 19 ms at 124 BPM. The SWING in the top bar is the studio\'s: it would swing every synced instrument on top of this, so leave it at 50 %.',
@@ -243,7 +243,7 @@ const groove: Lesson = {
     {
       kind: 'quiz', concept: 'timing-tempo', instruction: 'Quick check.',
       quiz: mc('What is the difference between swing and micro timing?',
-        ['Swing changes velocity; micro timing changes pitch', 'Swing moves every second 16th by the same amount; micro timing moves one chosen trig', 'They are the same control'], 1,
+        ['Swing changes the velocity of every second 16th; micro timing changes one trig\'s pitch', 'Swing moves every second 16th by the same amount; micro timing moves one chosen trig', 'They are the same control: one is the pattern\'s name for it, the other the trig\'s'], 1,
         'Swing is a pattern-wide timing rule; micro timing is a per-trig nudge. Neither changes pitch or velocity.'),
     },
     {
@@ -284,8 +284,8 @@ const groove: Lesson = {
   review: [
     mc('SWING 50 % means…', ['Straight timing', 'Maximum shuffle', 'Half tempo'], 0, 'Both 16ths of each pair are equal.'),
     mc('A ghost note is…', ['A muted track', 'A quiet in-between hit', 'A note with no sound'], 1, 'It is played softly, not silent.'),
-    mc('Micro timing on one trig moves…', ['Every second step', 'Only that trig, a little early or late', 'The whole pattern'], 1, 'It is a per-trig offset.'),
-    mc('Swing near 66 % sounds like…', ['Straight 16ths', 'Triplets, a heavy shuffle', 'Double tempo'], 1, 'The late 16th reaches the triplet position.'),
+    mc('Micro timing on one trig moves…', ['Every second step, like swing', 'Only that trig, a little early or late', 'The whole pattern, a little early or late'], 1, 'It is a per-trig offset.'),
+    mc('Swing near 66 % sounds like…', ['Straight 16ths, a little louder', 'Triplets, a heavy shuffle', 'Double tempo, twice as busy'], 1, 'The late 16th reaches the triplet position.'),
     mc('To make a clap feel laid back, nudge it…', ['Early', 'Late', 'Louder'], 1, 'Late notes relax a groove; early notes push it.'),
   ],
 };
@@ -322,7 +322,7 @@ const bassKick: Lesson = {
     },
     {
       kind: 'quiz', concept: 'timing-tempo', instruction: 'Warm-up.',
-      quiz: mc('Swing moves…', ['The tempo up', 'Every second 16th a little later', 'The hats\' velocity'], 1, 'Swing is timing only: the even steps move late, the beats and the tempo stay.'),
+      quiz: mc('Swing moves…', ['The tempo up by a few BPM', 'Every second 16th a little later', 'The hats\' velocity up and down'], 1, 'Swing is timing only: the even steps move late, the beats and the tempo stay.'),
     },
     {
       kind: 'do', concept: 'sequencer-pattern', instance: A4, focus: ['seq:trig:3', 'seq:trig:7', 'seq:trig:11', 'seq:trig:15'],
@@ -339,7 +339,7 @@ const bassKick: Lesson = {
       check: s => trigs(s, A4, T1).includes(1),
       solution: { sequence: [{ track: T1, trigs: { 1: {} } }] },
       predict: mc('Bass and kick both hit on step 1. What happens to the low end?',
-        ['It just gets punchier, with no downside', 'Nothing: they are different instruments', 'The two low sounds blur and fight for the same space'], 2,
+        ['It just gets punchier and tighter, with no downside at all', 'Nothing: different instruments never get in each other\'s way', 'The two low sounds blur and fight for the same space'], 2,
         'Both put most of their energy below about 100 Hz. On the same step they add up to a louder, muddier thump that can clip. Being different instruments doesn\'t help: frequency and time are what separate sounds.'),
       principle: 'Two low sounds at the same moment mask each other.',
     },
@@ -380,7 +380,7 @@ const bassKick: Lesson = {
     },
     {
       kind: 'quiz', concept: 'envelope-decay', instruction: 'Quick check.',
-      quiz: mc('Why end bass notes before the next kick?', ['To save CPU', 'Because the sequencer requires it', 'So the kick\'s attack isn\'t blurred by a ringing bass'], 2,
+      quiz: mc('Why end bass notes before the next kick?', ['To save CPU: shorter notes cost the synth less', 'Because the sequencer can\'t play two long notes in a row', 'So the kick\'s attack isn\'t blurred by a ringing bass'], 2,
         'Overlap smears the kick\'s click and thump; the sequencer and the CPU don\'t care.'),
     },
     {
@@ -416,10 +416,10 @@ const bassKick: Lesson = {
     },
   ],
   review: [
-    mc('Bass notes on the off-beats…', ['Double the kick', 'Answer the kick instead of clashing', 'Slow the groove'], 1, 'They fill the gaps the kick leaves.'),
-    mc('Two low sounds on the same step tend to…', ['Blur and fight for space', 'Cancel out completely', 'Get brighter'], 0, 'Both crowd the same frequencies at the same moment.'),
-    mc('A trig\'s LEN sets…', ['Its loudness', 'How long the note is held', 'Its pitch'], 1, 'LEN is the gate time.'),
-    mc('Tuning the kick to the song\'s key helps because…', ['It makes the kick louder', 'Kick and bass blend into one low end', 'It changes the tempo'], 1, 'Matched pitches stop them beating against each other.'),
+    mc('Bass notes on the off-beats…', ['Double the kick on every beat', 'Answer the kick instead of clashing', 'Slow the groove down to half time'], 1, 'They fill the gaps the kick leaves.'),
+    mc('Two low sounds on the same step tend to…', ['Blur and fight for space', 'Cancel each other out completely', 'Get brighter'], 0, 'Both crowd the same frequencies at the same moment.'),
+    mc('A trig\'s LEN sets…', ['How loud the note plays', 'How long the note is held', 'How high the note is tuned'], 1, 'LEN is the gate time.'),
+    mc('Tuning the kick to the song\'s key helps because…', ['It makes the kick louder than the bass', 'Kick and bass blend into one low end', 'It keeps the tempo steady under the bass'], 1, 'Matched pitches stop them beating against each other.'),
     mc('Which note is NOT in A minor?', ['C', 'G', 'C#'], 2, 'A minor is A B C D E F G.'),
   ],
 };
@@ -525,7 +525,7 @@ const chords: Lesson = {
       instruction: 'On T2 and T3, press [AMP] and set ATK (knob A) to about 64 and REL (knob D) to about 100.',
       check: s => envOn(s, [50, 127], [85, 127]),
       solution: { values: { t2_amp_atk: 64, t2_amp_rel: 100, t3_amp_atk: 64, t3_amp_rel: 100 } },
-      predict: mc('What will the slow attack and long release do to the chord?', ['Raise its pitch', 'Turn the short stab into a soft, swelling pad', 'Speed up the pattern'], 1,
+      predict: mc('What will the slow attack and long release do to the chord?', ['Raise its pitch as each note fades', 'Turn the short stab into a soft, swelling pad', 'Speed the pattern up while notes overlap'], 1,
         'The attack is how long a note takes to reach full level and the release is how long it fades after the note ends. Slow and long turns a hit into a swell. Pitch and tempo are untouched.'),
       principle: 'The envelope decides whether a sound hits or swells.',
     },
@@ -589,9 +589,9 @@ const chords: Lesson = {
   review: [
     mc('A minor-seventh chord on A is…', ['A C# E G#', 'A C E G', 'A B C D'], 1, 'Root, minor third, fifth, minor seventh.'),
     mc('A minor third is how many semitones?', ['3', '4', '7'], 0, '4 is a major third, 7 a fifth.'),
-    mc('A pad differs from a stab mainly by…', ['Higher pitch', 'A slow attack and a long release', 'More distortion'], 1, 'The envelope makes the difference.'),
+    mc('A pad differs from a stab mainly by…', ['A higher pitch and more notes', 'A slow attack and a long release', 'More distortion on every note'], 1, 'The envelope makes the difference.'),
     mc('In A minor the home chord is…', ['Em7', 'Dm7', 'Am7'], 2, 'The tonic chord.'),
-    mc('When the bass plays each chord\'s root…', ['The harmony sounds solid', 'The chord changes key', 'The kick disappears'], 0, 'The lowest note defines how the chord is heard.'),
+    mc('When the bass plays each chord\'s root…', ['The harmony sounds solid', 'The chord changes to a new key', 'The kick disappears'], 0, 'The lowest note defines how the chord is heard.'),
   ],
 };
 
@@ -651,7 +651,7 @@ const hook: Lesson = {
       check: s => playing(s),
       solution: { transport: 'play' },
       predict: mc('The hook doesn\'t change, but the chords do. Why do E, D, C and A fit Am7, Dm7 and Em7?',
-        ['Any notes fit any chord', 'They come from A minor pentatonic, which shares notes with all three chords', 'Because the hook is quieter than the chords'], 1,
+        ['Any notes fit any chord as long as they are played above it', 'They come from A minor pentatonic, which shares notes with all three chords', 'Because the hook is quieter than the chords, so a clash can\'t be heard'], 1,
         'Every pentatonic note is also in A minor, and with no semitone steps none of them grinds against these chords. Not every note fits: an F# or a Bb would clash.'),
       principle: 'A melody built from the key\'s pentatonic scale fits every chord in the key.',
     },
@@ -676,7 +676,7 @@ const hook: Lesson = {
     {
       kind: 'quiz', concept: 'oscillator-pitch', instruction: 'Quick check.',
       quiz: mc('Your hook clashes with the Em7 chord in bar 4. What do you try first?',
-        ['Turn the hook up', 'Move the clashing note to a chord tone: E, G, B or D', 'Add more reverb'], 1,
+        ['Turn the hook up until it sits above the chord', 'Move the clashing note to a chord tone: E, G, B or D', 'Add more reverb to smooth the clash over'], 1,
         'The clash is a pitch problem, so fix the pitch; volume and reverb only make it louder or blurrier.'),
     },
     {
@@ -684,7 +684,7 @@ const hook: Lesson = {
       instruction: 'Hear the hook with and without its delay send.',
       listen: {
         a: { t4_amp_del: 0 }, b: { t4_amp_del: 70 }, labels: ['Dry', 'Delay'],
-        question: mc('What does the delay add?', ['Echoes that fill the gaps between notes', 'More bass', 'A faster tempo'], 0,
+        question: mc('What does the delay add?', ['Echoes that fill the gaps between notes', 'More bass under each note of the hook', 'A faster tempo for the hook alone'], 0,
           'Each echo arrives a dotted 8th later, three 16ths, and lands in the spaces of the three-step rhythm. Delay is covered properly in Space and depth.'),
       },
     },
@@ -739,9 +739,9 @@ const hook: Lesson = {
   review: [
     mc('A minor pentatonic is…', ['A B C D E F G', 'A C D E G', 'A C# E'], 1, 'Five notes of A minor with no semitone steps.'),
     mc('A chord tone on a strong beat sounds…', ['Stable', 'Clashing', 'Quieter'], 0, 'It belongs to the chord underneath.'),
-    mc('Why keep a hook above the chords?', ['So the parts don\'t mask each other', 'So it is louder', 'So it stays in key'], 0, 'Separate registers stay clear.'),
+    mc('Why keep a hook above the chords?', ['So the parts don\'t mask each other', 'So it is louder than the drums', 'So it stays in key with the bass'], 0, 'Separate registers stay clear.'),
     mc('A rhythm repeating every three steps over a four-beat bar creates…', ['A slower tempo', 'A cross-rhythm', 'A chord'], 1, 'Three-step groups shift against the beat.'),
-    mc('Most hooks are…', ['30 or more notes', 'One long note', '3-6 notes repeated with a variation'], 2, 'Short ideas are easy to remember.'),
+    mc('Most hooks are…', ['30 or more notes without a repeat', 'One long note held for four bars', '3-6 notes repeated with a variation'], 2, 'Short ideas are easy to remember.'),
   ],
 };
 
@@ -776,7 +776,7 @@ const movement: Lesson = {
     },
     {
       kind: 'quiz', concept: 'filter-cutoff', instruction: 'Warm-up.',
-      quiz: mc('A high-pass filter removes…', ['The highs', 'The lows below the cutoff', 'The middle'], 1, 'Highs pass through; everything below the cutoff is turned down.'),
+      quiz: mc('A high-pass filter removes…', ['The highs above the cutoff', 'The lows below the cutoff', 'The middle around the cutoff'], 1, 'Highs pass through; everything below the cutoff is turned down.'),
     },
     {
       kind: 'do', concept: 'parameter-locks', instance: A4, focus: ['key:FLTR', 'seq:trig:11'],
@@ -793,7 +793,7 @@ const movement: Lesson = {
       instruction: 'On the Rytm, tap the CH pad. Hold trig 16 and turn TRC (TRIG page, encoder D) to 1:2.',
       check: s => trig(s, RYTM, CH, 16)?.cond === '1:2',
       solution: { values: { track: CH }, sequence: [{ track: CH, trigs: { 16: { cond: '1:2' } } }] },
-      predict: mc('What will trig 16 do now?', ['Play half as loud', 'Play on the first of every two loops', 'Play at half speed'], 1,
+      predict: mc('What will trig 16 do now?', ['Play half as loud on every loop', 'Play on the first of every two loops', 'Play twice as long, at half speed'], 1,
         'A:B conditions count loops of the pattern: 1:2 plays on loops 1, 3, 5… Loudness is velocity; speed is the pattern\'s scale.'),
       principle: 'An A:B condition plays a trig on loop A of every B loops.',
       manualReference: 'Rytm MKII manual p.48: trig conditions',
@@ -827,7 +827,7 @@ const movement: Lesson = {
         a: { t2_lfo1_depa: 0, t3_lfo1_depa: 0 },
         b: { t2_lfo1_depa: 24, t2_lfo1_spd: 32, t2_lfo1_mul: 0, t3_lfo1_depa: 24, t3_lfo1_spd: 32, t3_lfo1_mul: 0 },
         labels: ['Still', 'LFO'],
-        question: mc('What is moving in the LFO side?', ['The pitch of the chords', 'The brightness of the chords, slowly up and down', 'The tempo'], 1,
+        question: mc('What is moving in the LFO side?', ['The pitch of the chords, slowly up and down', 'The brightness of the chords, slowly up and down', 'The tempo of the pattern, slowly up and down'], 1,
           'The LFO is routed to the filter, so only the tone changes. Pitch would need an oscillator destination.'),
       },
     },
@@ -836,7 +836,7 @@ const movement: Lesson = {
       instruction: 'On the Rytm, tap SD, add trig 13 and set its TRC to FILL. Leave GRID RECORDING with [RECORD], then hold [FILL] for a bar.',
       check: s => trig(s, RYTM, SD, 13)?.cond === 'FILL',
       solution: { values: { track: SD }, sequence: [{ track: SD, trigs: { 13: { vel: 96, cond: 'FILL' } } }] },
-      predict: mc('When does the snare on step 13 play now?', ['Only while FILL is held or latched', 'Every fourth bar', 'Never'], 0,
+      predict: mc('When does the snare on step 13 play now?', ['Only while FILL is held or latched', 'On every fourth bar of the pattern', 'Never, until the condition is removed'], 0,
         'FILL is true only while fill mode is on, so you can perform fills by hand without changing the pattern.'),
       principle: 'Fill trigs wait for your signal, so the variation lands where you choose.',
       manualReference: 'Rytm MKII manual p.49: FILL',
@@ -881,11 +881,11 @@ const movement: Lesson = {
     },
   ],
   review: [
-    mc('A parameter lock affects…', ['The whole track', 'Only the trig it is on', 'Every pattern'], 1, 'The next trig reverts it.'),
-    mc('Condition 1:2 plays…', ['On the first of every two loops', 'Half as loud', 'At half speed'], 0, 'A:B counts loops.'),
-    mc('Condition 4:4 suits…', ['The first beat', 'Random hits', 'Fills on the last bar of a four-bar phrase'], 2, 'It fires on loop 4 of every 4.'),
-    mc('A slow LFO is best for…', ['Gradual movement over many bars', 'A single accent', 'Changing the tempo'], 0, 'It moves continuously.'),
-    mc('A trig with the FILL condition plays…', ['Every bar', 'Never', 'Only while FILL is active'], 2, 'The condition is true in fill mode only.'),
+    mc('A parameter lock affects…', ['The whole track from then on', 'Only the trig it is on', 'Every pattern in the bank'], 1, 'The next trig reverts it.'),
+    mc('Condition 1:2 plays…', ['On the first of every two loops', 'Half as loud on every second loop', 'Every loop, at half speed'], 0, 'A:B counts loops.'),
+    mc('Condition 4:4 suits…', ['A kick on the first beat of every bar', 'Random hits that change on every loop', 'Fills on the last bar of a four-bar phrase'], 2, 'It fires on loop 4 of every 4.'),
+    mc('A slow LFO is best for…', ['Gradual movement over many bars', 'A single accent on one step', 'Changing the tempo during a fill'], 0, 'It moves continuously.'),
+    mc('A trig with the FILL condition plays…', ['On every bar, like a normal trig', 'Never: it only marks the step', 'Only while FILL is active'], 2, 'The condition is true in fill mode only.'),
   ],
 };
 
@@ -1095,7 +1095,7 @@ const capstone: Lesson = {
       check: s => val(s, XONE, 'booth_mono') === true && num(s, XONE, 'monitor_out') === 1,
       solution: { parts: { [XONE]: { booth_mono: true, monitor_out: 1 } } },
       predict: mc('Some club systems and phone speakers play in mono. What should stay strong when you fold the mix to mono?',
-        ['The kick and the bass', 'The reverb tails', 'The stereo width'], 0,
+        ['The kick and the bass', 'The long reverb tails on the pads', 'The stereo width'], 0,
         'The low end carries the track on every system, and the kick and bass are centred, so they should hold up in mono. Wide effects get quieter in mono, which is fine.'),
       principle: 'A mix that works in mono works everywhere.',
     },
@@ -1143,7 +1143,7 @@ const capstone: Lesson = {
     {
       kind: 'quiz', concept: 'equalization', instruction: 'The final check.',
       quiz: mc('Your track sounds great in headphones, but the bass vanishes on a phone speaker. What do you check first?',
-        ['The reverb send', 'The swing', 'The bass\'s harmonics: a little brightness or a higher octave so it is heard on small speakers'], 2,
+        ['The bass\'s reverb send: a wetter bass spreads out and carries further on small speakers', 'The pattern\'s swing: a looser groove leaves the bass more room to be heard between the hits', 'The bass\'s harmonics: a little brightness or a higher octave so it is heard on small speakers'], 2,
         'Small speakers can\'t play below about 100 Hz, so the ear finds the bass through its harmonics. Reverb and swing don\'t affect that.'),
     },
     {
@@ -1156,11 +1156,11 @@ const capstone: Lesson = {
     },
   ],
   review: [
-    mc('Kick and bass fight. The first fix to try…', ['More reverb on both', 'Put the bass between the kicks and shorten its notes', 'Raise the tempo'], 1, 'Separate them in time first (Bass locked to the kick).'),
-    mc('A loop sounds boring after 16 bars. Try…', ['Trig conditions, locks and a slow LFO', 'A louder master', 'More swing only'], 0, 'Movement without new parts (Movement).'),
-    mc('The break feels weak. Try…', ['Keeping the kick in', 'Removing the kick and bass so the drop brings them back', 'Making it 3 bars long'], 1, 'Contrast (Arrangement).'),
-    mc('The mix is muddy. Start with…', ['Boosting LO on every channel', 'High-passing the parts that don\'t need lows', 'Adding reverb'], 1, 'Frequency slots.'),
-    mc('Your master reads −7 LUFS for streaming. Do…', ['Nothing: louder is better', 'Lower the drive toward −14 LUFS and keep the punch', 'Raise the ceiling to 0 dBTP'], 1, 'Streaming turns loud masters down (Master and bounce).'),
+    mc('Kick and bass fight. The first fix to try…', ['More reverb on both, to blend them together', 'Put the bass between the kicks and shorten its notes', 'Raise the tempo, so the notes overlap for less time'], 1, 'Separate them in time first (Bass locked to the kick).'),
+    mc('A loop sounds boring after 16 bars. Try…', ['Trig conditions, locks and a slow LFO', 'A louder master and a brighter EQ', 'More swing on every pattern'], 0, 'Movement without new parts (Movement).'),
+    mc('The break feels weak. Try…', ['Keeping the kick in, so the energy never drops', 'Removing the kick and bass so the drop brings them back', 'Making it 3 bars long, so the drop arrives early'], 1, 'Contrast (Arrangement).'),
+    mc('The mix is muddy. Start with…', ['Boosting LO on every channel a little', 'High-passing the parts that don\'t need lows', 'Adding reverb to glue the parts together'], 1, 'Frequency slots.'),
+    mc('Your master reads −7 LUFS for streaming. Do…', ['Nothing: a louder master always sounds better', 'Lower the drive toward −14 LUFS and keep the punch', 'Raise the ceiling to 0 dBTP for more headroom'], 1, 'Streaming turns loud masters down (Master and bounce).'),
   ],
 };
 

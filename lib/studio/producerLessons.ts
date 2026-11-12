@@ -83,7 +83,7 @@ const oneClock: Lesson = {
       hints: ['Tap the CLOCK jack on the Studio Clock, then the ADV/CLOCK jack on the DFAM.', 'ADV/CLOCK is in the DFAM\'s bottom row of jacks.'],
       predict: {
         question: 'What will the cable do to the DFAM?',
-        options: ['Make it louder', 'Lock it to the studio: from now on it takes one step per pulse', 'Nothing until you turn its TEMPO knob to 124'],
+        options: ['Make it louder: the pulses add level to every step', 'Lock it to the studio: from now on it takes one step per pulse', 'Nothing until you turn its own TEMPO knob to 124 to match'],
         answer: 1,
         explain: 'A cable in ADV/CLOCK replaces the DFAM\'s own clock: it steps only when a pulse arrives, so it follows the studio exactly. Its TEMPO knob is ignored from now on, and setting it to 124 would still drift.',
       },
@@ -97,7 +97,7 @@ const oneClock: Lesson = {
       solution: { transport: 'stop', pressUntilDone: 'advance' },
       predict: {
         question: 'Why park the DFAM on its last step before pressing ▶?',
-        options: ['So the first clock pulse plays step 1, on the downbeat', 'So it plays louder', 'So it skips step 1'],
+        options: ['So the first clock pulse plays step 1, on the downbeat', 'So its first hit plays louder than the others', 'So it skips step 1 and starts the loop on step 2'],
         answer: 0,
         explain: 'Each pulse advances first, then plays. From step 8, the first pulse lands on step 1, exactly on bar 1 with the drums. Parked anywhere else, the loop starts in the wrong place and the accents fall off the beat.',
       },
@@ -118,7 +118,7 @@ const oneClock: Lesson = {
       solution: { transport: 'stop', studio: { sync: { [XONE]: false } }, parts: { [XONE]: { bpm: 123 } }, play: { seconds: 2 } },
       predict: {
         question: 'The studio clock runs at 124 BPM and the Xone\'s decks at 123. What happens over half a minute?',
-        options: ['Nothing: 1 BPM is too small to hear', 'The Xone speeds up to match', 'They drift apart until the drums land in the wrong place against the DFAM'],
+        options: ['Nothing: a difference of 1 BPM is too small to hear in half a minute', 'The Xone hears the studio and speeds its decks up to match it', 'They drift apart until the drums land in the wrong place against the DFAM'],
         answer: 2,
         explain: 'One beat a minute is lost, so after 30 seconds the drums are half a beat behind the DFAM. Machines never correct each other unless they share a clock.',
       },
@@ -136,7 +136,7 @@ const oneClock: Lesson = {
       instruction: 'Quick check.',
       quiz: {
         question: 'The DFAM has 8 steps and takes one step per 16th note. How long is one turn of its loop?',
-        options: ['Half a bar (2 beats)', 'One bar', 'Two bars'],
+        options: ['Half a bar (2 beats)', 'One bar (4 beats)', 'Two bars (8 beats)'],
         answer: 0,
         explain: 'Eight 16ths are two beats, so the loop plays twice in every bar and stays lined up with a 4/4 beat. A whole bar would need 16 steps.',
       },
@@ -146,7 +146,7 @@ const oneClock: Lesson = {
       instruction: 'Switch the Studio Clock\'s CLOCK DIV to 1/16T (16th-note triplets).',
       predict: {
         question: 'The DFAM now steps 6 times per beat instead of 4. What happens against the drums?',
-        options: ['It stops playing', 'A rolling cross-rhythm: its 8-step loop now fits three times into each bar', 'Nothing changes'],
+        options: ['It stops playing: 6 steps per beat is more than the clock can send', 'A rolling cross-rhythm: its 8-step loop now fits three times into each bar', 'Nothing you can hear: the loop still fits twice into each bar'],
         answer: 1,
         explain: '8 steps × 1/6 of a beat = 1⅓ beats, so three loops fill one 4-beat bar. Three loops against four beats is a polyrhythm: two pulse rates at once that meet again on every bar line.',
       },
@@ -205,11 +205,11 @@ const oneClock: Lesson = {
     },
   ],
   review: [
-    { question: 'Two machines set to 124 and 123 BPM…', options: ['Stay together', 'Play in a 4:3 ratio', 'Drift apart about a beat per minute'], answer: 2, explain: 'The 1 BPM difference adds up.' },
-    { question: 'Gear with no MIDI is synced with…', options: ['Clock pulses on a cable', 'The same BPM number', 'A faster computer'], answer: 0, explain: 'Each pulse advances one step.' },
+    { question: 'Two machines set to 124 and 123 BPM…', options: ['Stay together for the whole song', 'Play a 4-against-3 cross-rhythm', 'Drift apart about a beat per minute'], answer: 2, explain: 'The 1 BPM difference adds up.' },
+    { question: 'Gear with no MIDI is synced with…', options: ['Clock pulses on a cable', 'The same BPM number on both', 'A faster computer'], answer: 0, explain: 'Each pulse advances one step.' },
     { question: '8 steps at one per 16th last…', options: ['2 beats', '1 bar', '8 beats'], answer: 0, explain: 'Eight 16ths.' },
-    { question: 'Clocking an 8-step loop at 1/16T against 4/4 gives…', options: ['Double time', 'A 3-against-4 cross-rhythm', 'Silence'], answer: 1, explain: 'Three loops fit in one bar.' },
-    { question: 'Parking the DFAM on step 8 before starting makes…', options: ['The first pulse play step 1', 'It skip step 1', 'It play twice as fast'], answer: 0, explain: 'The next pulse advances to step 1.' },
+    { question: 'Clocking an 8-step loop at 1/16T against 4/4 gives…', options: ['The same loop in double time', 'A 3-against-4 cross-rhythm', 'Silence until the next bar line'], answer: 1, explain: 'Three loops fit in one bar.' },
+    { question: 'Parking the DFAM on step 8 before starting makes…', options: ['The first pulse play step 1', 'The loop skip step 1', 'The loop play twice as fast'], answer: 0, explain: 'The next pulse advances to step 1.' },
   ],
 };
 
@@ -242,7 +242,7 @@ const frequencySlots: Lesson = {
         demo: { demo: 'low-tide-lights', excerpt: 'drop-17-20', a: 'as-made', b: 'muddy' },
         question: {
           question: 'What makes B muddy?',
-          options: ['Too many parts pile up in the low end and the low mids', 'The tempo is slower', 'The hook is too loud'],
+          options: ['Too many parts pile up in the low end and the low mids', 'The tempo is slower, so the notes run into each other', 'The hook is too loud and covers the rest of the mix'],
           answer: 0,
           explain: 'In B every high-pass is off and the low mids are boosted: the stabs, the clap, the hats and the effect returns keep their lows, and all of it lands on top of the kick and the bass. The tempo and the parts are identical, and both play at the same loudness.',
         },
@@ -253,7 +253,7 @@ const frequencySlots: Lesson = {
       instruction: 'Warm-up from the clock lesson.',
       quiz: {
         question: 'The DFAM has no MIDI. What keeps it in time with the drums in this studio?',
-        options: ['Its TEMPO knob set to 124', 'Clock pulses from the Studio Clock on a cable', 'The Xone:96 crossfader'],
+        options: ['Its own TEMPO knob, set to the same number as the studio', 'Clock pulses from the Studio Clock on a cable', 'The Xone:96 crossfader, pushed to the DFAM\'s side'],
         answer: 1,
         explain: 'The Studio Clock sends one pulse per 16th into DFAM ADV/CLOCK, so the DFAM steps exactly with the studio. A TEMPO knob set to the same number would still drift, because two clocks never run at exactly the same speed.',
       },
@@ -280,8 +280,8 @@ const frequencySlots: Lesson = {
         question: 'Played alone, the high-passed perc will sound…',
         options: [
           'Thinner on its own, but in the full mix the low end gets clearer and you barely miss it',
-          'Louder and fuller',
-          'Exactly the same, only quieter',
+          'Louder and fuller on its own, and in the full mix it pushes the kick and the bass aside',
+          'Exactly the same on its own, only quieter, and in the full mix nothing changes',
         ],
         answer: 0,
         explain: 'Solo, a high-passed part loses weight. In the mix the kick and bass supply the weight, and the perc is heard by its knock and its tone, which live above 250 Hz. That is why you judge EQ in the mix, not in solo.',
@@ -323,8 +323,8 @@ const frequencySlots: Lesson = {
       quiz: {
         question: 'The kick and the bass both live below 120 Hz. Which plan is best?',
         options: [
-          'Boost both with LO so they are heard',
-          'High-pass the kick at 200 Hz',
+          'Boost both with LO, so each one is heard clearly above the other',
+          'High-pass the kick at 200 Hz, so the bass has the low end to itself',
           'Let them take turns: the kick owns the beat, the bass plays between the kicks',
         ],
         answer: 2,
@@ -375,9 +375,9 @@ const frequencySlots: Lesson = {
     },
   ],
   review: [
-    { question: 'A high-pass filter…', options: ['Removes highs', 'Removes the lows below its cutoff', 'Boosts bass'], answer: 1, explain: 'It lets the highs pass.' },
-    { question: 'Which parts usually keep their deepest lows?', options: ['Kick and bass', 'Hi-hats', 'Chord stabs'], answer: 0, explain: 'They carry the low end; everything else gets out of their way.' },
-    { question: 'Masking means…', options: ['A stereo effect', 'One sound hiding another in the same range', 'A mute button'], answer: 1, explain: 'The louder sound covers the quieter one where they overlap.' },
+    { question: 'A high-pass filter…', options: ['Removes the highs above its cutoff', 'Removes the lows below its cutoff', 'Boosts the bass below its cutoff point'], answer: 1, explain: 'It lets the highs pass.' },
+    { question: 'Which parts usually keep their deepest lows?', options: ['Kick and bass', 'Hi-hats and claps', 'Chord stabs'], answer: 0, explain: 'They carry the low end; everything else gets out of their way.' },
+    { question: 'Masking means…', options: ['A stereo effect that widens one sound', 'One sound hiding another in the same range', 'A mute button that silences one channel'], answer: 1, explain: 'The louder sound covers the quieter one where they overlap.' },
     { question: 'The Xone:96\'s LO MID band sits at about…', options: ['50 Hz', '350 Hz', '3 kHz'], answer: 1, explain: 'LO is a 180 Hz shelf, LO MID 350 Hz, HI MID 1.1 kHz, HI 3 kHz.' },
     { question: 'A good first EQ move is usually…', options: ['A big boost', 'Boosting everything a little', 'A small cut where parts overlap'], answer: 2, explain: 'Cuts remove the clash instead of adding level.' },
   ],
@@ -412,7 +412,7 @@ const spaceDepth: Lesson = {
         demo: { demo: 'low-tide-lights', excerpt: 'break-33-36', a: 'dry', b: 'as-made' },
         question: {
           question: 'What does B add?',
-          options: ['Depth: some parts sound further away than others', 'A faster tempo', 'More bass'],
+          options: ['Depth: some parts sound further away than others', 'Speed: the whole break plays at a faster tempo than A', 'Weight: the kick and the bass are louder'],
           answer: 0,
           explain: 'B is the break as made: the pads and the hook go into reverb and delay, the one deep kick into a long reverb. Distance is mostly reflections, so the wet parts move back and the dry ones stay in front. The tempo and the low end are the same; A has every effect return off.',
         },
@@ -486,7 +486,7 @@ const spaceDepth: Lesson = {
       instruction: 'Quick check.',
       quiz: {
         question: 'Which parts usually stay dry, with little or no reverb?',
-        options: ['Pads', 'Hook echoes', 'Kick and bass'],
+        options: ['Pads and strings', 'Hook echoes', 'Kick and bass'],
         answer: 2,
         explain: 'Reverb on low sounds smears the low end and blurs the groove. Keep them dry and centred, and put the space on the higher parts.',
       },
@@ -533,9 +533,9 @@ const spaceDepth: Lesson = {
   ],
   review: [
     { question: 'A dotted-8th delay at 124 BPM is about…', options: ['242 ms', '363 ms', '484 ms'], answer: 1, explain: 'An 8th (242 ms) plus half of it.' },
-    { question: 'A send is…', options: ['A mute', 'A copy of a channel sent to an effect', 'An EQ band'], answer: 1, explain: 'The dry sound stays as it is.' },
-    { question: 'To push a sound back you…', options: ['Make it louder and brighter', 'Add reverb, lower it a little and darken it', 'Pan it to the centre'], answer: 1, explain: 'Distance sounds wetter, quieter and duller.' },
-    { question: 'Why cut the lows of a delay or reverb return?', options: ['To keep echoes out of the low end', 'To make it louder', 'To change the tempo'], answer: 0, explain: 'Low echoes muddy the kick and bass.' },
+    { question: 'A send is…', options: ['A mute for one channel\'s delay and reverb', 'A copy of a channel sent to an effect', 'An extra EQ band above the HI'], answer: 1, explain: 'The dry sound stays as it is.' },
+    { question: 'To push a sound back you…', options: ['Make it louder, drier and brighter', 'Add reverb, lower it a little and darken it', 'Pan it to the centre and boost its highs'], answer: 1, explain: 'Distance sounds wetter, quieter and duller.' },
+    { question: 'Why cut the lows of a delay or reverb return?', options: ['To keep echoes out of the low end', 'To make the effect louder than the dry part', 'To keep the echoes in time with the tempo'], answer: 0, explain: 'Low echoes muddy the kick and bass.' },
     { question: 'On the Xone:96, SEND 2 feeds…', options: ['The delay, back on channel A', 'The reverb, back on channel B', 'The booth'], answer: 1, explain: 'SEND 1 is the delay on A; SEND 2 the reverb on B.' },
   ],
 };
@@ -575,7 +575,7 @@ const earLab: Lesson = {
         parts: { a: { dfam: { vcf_cutoff: 3000 } }, b: { dfam: { vcf_cutoff: 700 } } },
         question: {
           question: 'What changed between A and B?',
-          options: ['Note length', 'Filter brightness', 'Swing', 'Reverb send'],
+          options: ['Note length', 'Filter brightness', 'Swing amount', 'Reverb send level'],
           answer: 1,
           explain: 'B is darker but just as long and in the same place in time: the cutoff came down.',
         },
@@ -589,7 +589,7 @@ const earLab: Lesson = {
         parts: { a: { dfam: { vca_decay: 120 } }, b: { dfam: { vca_decay: 450 } } },
         question: {
           question: 'What changed?',
-          options: ['Note length', 'Filter', 'Pitch'],
+          options: ['Note length', 'Filter brightness', 'Pitch'],
           answer: 0,
           explain: 'B rings on into the next hit: same pitch and tone, a longer tail. That is VCA DECAY.',
         },
@@ -639,7 +639,7 @@ const earLab: Lesson = {
         matchLoudness: true,
         question: {
           question: 'What changed on the stabs channel?',
-          options: ['A high cut', 'The fader', 'A low-mid cut'],
+          options: ['A cut in the highs', 'The fader', 'A low-mid cut'],
           answer: 2,
           explain: 'B lost its boxiness but kept its lows and its highs. A fader would move everything equally (and the loudness is matched anyway).',
         },
@@ -657,7 +657,7 @@ const earLab: Lesson = {
       instruction: 'Quick check.',
       quiz: {
         question: 'A part sounds muddy and far away at the same time. Which change helps most?',
-        options: ['Boost its LO and add reverb', 'Raise the swing', 'Cut its lows or low mids, and lower its reverb send'],
+        options: ['Boost its LO to give it weight, and add more reverb', 'Raise the swing, so it sits between the other parts', 'Cut its lows or low mids, and lower its reverb send'],
         answer: 2,
         explain: 'Mud is low-end build-up and distance is reverb. Boosting LO and adding reverb makes both worse; swing doesn\'t touch either.',
       },
@@ -672,10 +672,10 @@ const earLab: Lesson = {
     },
   ],
   review: [
-    { question: 'A sound gets darker and duller. Most likely…', options: ['A longer decay', 'The filter cutoff came down', 'More swing'], answer: 1, explain: 'The cutoff removes upper harmonics.' },
+    { question: 'A sound gets darker and duller. Most likely…', options: ['The decay was made longer', 'The filter cutoff came down', 'The swing was turned up'], answer: 1, explain: 'The cutoff removes upper harmonics.' },
     { question: 'The groove starts to lope but the tempo stays the same…', options: ['The swing went up', 'The delay feedback went up', 'The kick got shorter'], answer: 0, explain: 'Swing moves every second 16th.' },
     { question: 'A part sounds further away…', options: ['More reverb send', 'More high-pass', 'A shorter decay'], answer: 0, explain: 'Distance is mostly reflections.' },
-    { question: 'The low mids sound boxy. Try…', options: ['Boosting 3 kHz', 'Raising the master', 'Cutting around 350 Hz'], answer: 2, explain: 'Boxiness lives in the low mids.' },
+    { question: 'The low mids sound boxy. Try…', options: ['Boosting around 3 kHz', 'Raising the master fader', 'Cutting around 350 Hz'], answer: 2, explain: 'Boxiness lives in the low mids.' },
   ],
 };
 
@@ -733,7 +733,7 @@ const arrangement: Lesson = {
       instruction: 'Warm-up from space and depth.',
       quiz: {
         question: 'Which parts usually stay dry?',
-        options: ['Pads', 'Kick and bass', 'Hook echoes'],
+        options: ['Pads and strings', 'Kick and bass', 'Hook echoes'],
         answer: 1,
         explain: 'Reverb on the low end smears the groove; space goes on the higher parts.',
       },
@@ -829,7 +829,7 @@ const arrangement: Lesson = {
       solution: { play: { from: 'Break', seconds: 36 } },
       predict: {
         question: 'What will make the moment Drop 2 arrives hit hardest?',
-        options: ['The tempo speeds up', 'The kick and the bass return together on the downbeat after being away', 'The chords change key'],
+        options: ['The tempo speeds up over the last bars of the build before it', 'The kick and the bass return together on the downbeat after being away', 'The chords change to a new key on the first beat of the drop'],
         answer: 1,
         explain: 'The release comes from contrast: the low end was missing for 16 bars and returns on beat 1. Tempo and key stay the same.',
       },
@@ -867,9 +867,9 @@ const arrangement: Lesson = {
   review: [
     { question: 'A 16-bar section at 124 BPM lasts about…', options: ['16 s', '31 s', '64 s'], answer: 1, explain: '64 beats at 124 per minute.' },
     { question: 'DJ-friendly intros usually start with…', options: ['The full mix', 'The hook alone', 'Drums only'], answer: 2, explain: 'Simple drums are easy to mix over.' },
-    { question: 'Section changes feel natural on…', options: ['Any bar', 'Every 3 bars', 'Multiples of 8 bars'], answer: 2, explain: 'Dance music phrases in 8s and 16s.' },
-    { question: 'A drop hits hardest when…', options: ['The kick and bass return on the downbeat after a break', 'Everything always plays', 'The tempo rises'], answer: 0, explain: 'Contrast.' },
-    { question: 'A section\'s snapshot holds…', options: ['Only for its first bar', 'Until another section changes the same setting', 'Until you press Stop'], answer: 1, explain: 'So every section should say what it plays.' },
+    { question: 'Section changes feel natural on…', options: ['Any bar you like', 'Every 3 or 5 bars', 'Multiples of 8 bars'], answer: 2, explain: 'Dance music phrases in 8s and 16s.' },
+    { question: 'A drop hits hardest when…', options: ['The kick and bass return on the downbeat after a break', 'Everything plays all the time, from the intro to the end', 'The tempo rises a few BPM just before it arrives'], answer: 0, explain: 'Contrast.' },
+    { question: 'A section\'s snapshot holds…', options: ['Only for the first bar of its section', 'Until another section changes the same setting', 'Until you press Stop, then everything resets'], answer: 1, explain: 'So every section should say what it plays.' },
   ],
 };
 
@@ -915,7 +915,7 @@ const transitions: Lesson = {
       instruction: 'Warm-up from the arrangement lesson.',
       quiz: {
         question: 'Section changes feel natural on…',
-        options: ['Any bar', 'Multiples of 8 bars', 'Every 3 bars'],
+        options: ['Any bar you like', 'Multiples of 8 bars', 'Every 3 or 5 bars'],
         answer: 1,
         explain: 'Dance music phrases in 8s and 16s, so changes on those lines feel inevitable. That is why the Fill is the eighth bar of the Build.',
       },
@@ -974,7 +974,7 @@ const transitions: Lesson = {
       instruction: 'Quick check.',
       quiz: {
         question: 'Why leave a short gap just before the drop?',
-        options: ['To rest the CPU', 'Silence makes the returning kick hit harder by contrast', 'To change the tempo'],
+        options: ['To give the computer time to load the next section', 'Silence makes the returning kick hit harder by contrast', 'To change the tempo where nobody can hear the jump'],
         answer: 1,
         explain: 'The ear judges loudness against what came just before. After a bar without drums, the kick on beat 1 sounds bigger than it is.',
       },
@@ -993,7 +993,7 @@ const transitions: Lesson = {
       },
       predict: {
         question: 'In the Fill bar, the DFAM will…',
-        options: ['Play twice as fast: a roll into the drop', 'Play at half speed', 'Stop'],
+        options: ['Play twice as fast: a roll into the drop', 'Play at half speed: a slow-down into the drop', 'Stop: a bar of silence before the drop'],
         answer: 0,
         explain: 'Twice as many pulses, twice as many steps: a 32nd-note roll, the DFAM\'s version of a snare roll. 32 pulses in one bar are exactly four turns of its 8 steps, so it lands back on step 1 for the drop.',
       },
@@ -1009,7 +1009,7 @@ const transitions: Lesson = {
         parts: { a: { [CLOCK]: { division: 2 } }, b: { [CLOCK]: { division: 3 } } },
         question: {
           question: 'What does the 1/32 roll do to the energy?',
-          options: ['Doubles the density: it pushes toward the next downbeat', 'Lowers the pitch', 'Nothing you can hear'],
+          options: ['Doubles the density: it pushes toward the next downbeat', 'Lowers the pitch: every hit sounds heavier than before', 'Nothing you can hear: the bar just lasts half as long'],
           answer: 0,
           explain: 'Twice the hits in the same time is more urgency. Held for a whole section it tires the ear; for one bar before a drop it is a signal.',
         },
@@ -1042,10 +1042,10 @@ const transitions: Lesson = {
     },
   ],
   review: [
-    { question: 'A high-pass sweep during a build…', options: ['Adds bass', 'Takes the low end away, building tension', 'Shortens the pattern'], answer: 1, explain: 'The low end leaves and returns at the drop.' },
+    { question: 'A high-pass sweep during a build…', options: ['Adds bass, making the build heavier', 'Takes the low end away, building tension', 'Shortens the pattern, bar by bar'], answer: 1, explain: 'The low end leaves and returns at the drop.' },
     { question: 'The classic pre-drop move is…', options: ['A tempo drop', 'More reverb on the kick', 'A short gap of silence'], answer: 2, explain: 'Contrast makes the return louder.' },
     { question: 'Snapshots in the arranger apply…', options: ['Gradually across the section', 'On the section\'s first beat', 'Only while you hold a key'], answer: 1, explain: 'Sections switch on bar lines.' },
-    { question: 'A section that switches a filter on needs…', options: ['A later section that switches it off', 'Nothing more', 'A faster tempo'], answer: 0, explain: 'A snapshot holds until another one changes it.' },
+    { question: 'A section that switches a filter on needs…', options: ['A later section that switches it off', 'Nothing more: it ends with the section', 'A faster tempo to cover the change'], answer: 0, explain: 'A snapshot holds until another one changes it.' },
     { question: 'Doubling the clock for one bar makes the DFAM…', options: ['Roll twice as fast', 'Play an octave lower', 'Stop'], answer: 0, explain: 'Twice the pulses, twice the steps.' },
   ],
 };
@@ -1091,7 +1091,7 @@ const mixdown: Lesson = {
         demo: { demo: 'low-tide-lights', excerpt: 'drop2-49-52', a: 'as-made', b: 'drums-down' },
         question: {
           question: 'In B, what is wrong?',
-          options: ['The chords are too quiet', 'The drums are buried, so the groove loses its push', 'The tempo dragged'],
+          options: ['The chords are too quiet, so the mood is lost', 'The drums are buried, so the groove loses its push', 'The tempo dragged, so the groove feels tired'],
           answer: 1,
           explain: 'Only the drums moved, 6 dB down. With the loudness matched everything else even sounds louder, yet the groove sags: a dance mix is built on the kick. The tempo can\'t change with a fader.',
         },
@@ -1102,7 +1102,7 @@ const mixdown: Lesson = {
       instruction: 'Warm-up from the transitions lesson.',
       quiz: {
         question: 'Snapshots in the song arranger apply…',
-        options: ['Gradually across the section', 'On the section\'s first beat, and hold until another snapshot changes them', 'Only while you hold a key'],
+        options: ['Gradually across the section, reaching their values on its last bar', 'On the section\'s first beat, and hold until another snapshot changes them', 'Only while you hold a key, and jump back as soon as you let go'],
         answer: 1,
         explain: 'Sections switch on bar lines, so a snapshot lands on the downbeat and stays until a later section sets the same control. That is why the drums snap back to full exactly on Drop 2.',
       },
@@ -1146,7 +1146,7 @@ const mixdown: Lesson = {
       solution: { parts: { [XONE]: { ch2_fader: 9.5 } } },
       predict: {
         question: 'When the bass is set right, the studio master meter will…',
-        options: ['Stay the same', 'Rise by a few dB, because two loud parts add up', 'Drop'],
+        options: ['Stay the same, because the drums already set the level', 'Rise by a few dB, because two loud parts add up', 'Drop by a few dB, because the bass masks the kick'],
         answer: 1,
         explain: 'Two strong low parts sum, so the master peaks climb. That is why you balance first and set the overall level last. Nothing in this move can make the master quieter.',
       },
@@ -1174,7 +1174,7 @@ const mixdown: Lesson = {
       solution: { parts: { [XONE]: { booth_mono: true, monitor_out: 1 } } },
       predict: {
         question: 'In mono, what should you listen for?',
-        options: ['The mix getting wider', 'Nothing important disappearing or getting much quieter', 'The tempo staying the same'],
+        options: ['The mix getting wider and more spacious', 'Nothing important disappearing or getting much quieter', 'The tempo staying the same from intro to outro'],
         answer: 1,
         explain: 'Mono adds left and right together. Phones, club systems and many speakers play mono, so a part that only works in stereo can vanish. Mono is never wider, and it can\'t change the tempo.',
       },
@@ -1187,7 +1187,7 @@ const mixdown: Lesson = {
       instruction: 'Quick check.',
       quiz: {
         question: 'Why keep the kick and bass in the centre?',
-        options: ['So the mix sounds wider', 'Because drums can\'t be panned', 'Because the low end carries most of the energy and must stay strong in mono'],
+        options: ['So the whole mix sounds wider, on headphones and on big systems alike', 'Because drums and bass synths have mono outputs and can\'t be panned', 'Because the low end carries most of the energy and must stay strong in mono'],
         answer: 2,
         explain: 'Off-centre lows lose power on mono systems and pull the speakers unevenly. Width belongs to the higher parts and the FX returns. Drums can be panned; the kick just shouldn\'t be.',
       },
@@ -1246,11 +1246,11 @@ const mixdown: Lesson = {
     },
   ],
   review: [
-    { question: 'Gain staging means…', options: ['Turning everything up', 'Setting healthy levels at each stage before balancing', 'Muting channels'], answer: 1, explain: 'Good input levels make every later stage easier.' },
+    { question: 'Gain staging means…', options: ['Turning every channel up as far as it will go before you balance', 'Setting healthy levels at each stage before balancing', 'Muting the channels you are not working on at the moment'], answer: 1, explain: 'Good input levels make every later stage easier.' },
     { question: 'Start a static mix from…', options: ['The reverb', 'The stabs', 'The drums'], answer: 2, explain: 'They are the reference everything else sits against.' },
-    { question: 'A mono check reveals…', options: ['Parts that vanish or thin out when left and right are summed', 'Tempo problems', 'Tuning'], answer: 0, explain: 'Wide or out-of-phase parts cancel in mono.' },
+    { question: 'A mono check reveals…', options: ['Parts that vanish or thin out when left and right are summed', 'Parts that drift out of time against the kick when the mix is busy', 'Parts that are tuned to the wrong key for the song'], answer: 0, explain: 'Wide or out-of-phase parts cancel in mono.' },
     { question: 'Before mastering, mix peaks of about…', options: ['0 dBFS', '−6 dBFS', '−30 dBFS'], answer: 1, explain: 'Room for the limiter without wasting resolution.' },
-    { question: 'The Xone\'s PK LED lights when…', options: ['The fader is at the top', 'The signal after GAIN is too hot', 'A channel is cued'], answer: 1, explain: 'Turn that channel\'s GAIN down.' },
+    { question: 'The Xone\'s PK LED lights when…', options: ['The channel fader is right at the top', 'The signal after GAIN is too hot', 'The channel is cued to headphones'], answer: 1, explain: 'Turn that channel\'s GAIN down.' },
   ],
 };
 
@@ -1349,7 +1349,7 @@ const masterBounce: Lesson = {
       solution: { master: { gain: 6 } },
       predict: {
         question: 'What will happen to the loudness and the peaks?',
-        options: ['The peaks go above the ceiling', 'Loudness rises; the peaks stay at the ceiling while the limiter works harder', 'Nothing changes'],
+        options: ['Loudness rises, and the peaks go above the ceiling by the same amount', 'Loudness rises; the peaks stay at the ceiling while the limiter works harder', 'Nothing changes: the limiter cancels every move of the fader'],
         answer: 1,
         explain: 'The fader is gain into the limiter. The ceiling holds, so the average rises and the GR meter shows the limiter working. No peak can pass the ceiling.',
       },
@@ -1377,7 +1377,7 @@ const masterBounce: Lesson = {
       instruction: 'Quick check.',
       quiz: {
         question: 'Spotify plays tracks at about −14 LUFS. Your master is −8 LUFS. What happens?',
-        options: ['It plays louder than other tracks', 'It is rejected', 'It is turned down about 6 dB and keeps its squashed dynamics'],
+        options: ['It plays about 6 dB louder than the other tracks in a playlist', 'It is rejected until you upload a quieter master', 'It is turned down about 6 dB and keeps its squashed dynamics'],
         answer: 2,
         explain: 'Normalisation turns loud masters down, and the punch the limiter took doesn\'t come back. Apple Music normalises to about −16 LUFS, so −14 is a good all-round target.',
       },
@@ -1438,11 +1438,11 @@ const masterBounce: Lesson = {
     },
   ],
   review: [
-    { question: 'LUFS measures…', options: ['Peak level only', 'Perceived loudness over time', 'Tempo'], answer: 1, explain: 'It weights frequencies the way ears do and averages over time.' },
-    { question: 'True peak catches…', options: ['Average loudness', 'The bass level', 'Peaks between samples that appear after conversion'], answer: 2, explain: 'The waveform can overshoot between samples.' },
-    { question: 'A common streaming target is about…', options: ['−14 LUFS integrated', '0 LUFS', '−30 LUFS'], answer: 0, explain: 'Spotify, YouTube and others normalise near −14.' },
-    { question: 'Keep the true peak at about…', options: ['+3 dBTP', '−1 dBTP or lower', '−20 dBTP'], answer: 1, explain: 'It leaves room for lossy encoding.' },
-    { question: 'Stems are…', options: ['MIDI files', 'Separate audio files for groups of parts that add up to the mix', 'A louder master'], answer: 1, explain: 'They let others rebalance or remix the track.' },
+    { question: 'LUFS measures…', options: ['The highest peak level and nothing else', 'Perceived loudness over time', 'The tempo in beats per minute'], answer: 1, explain: 'It weights frequencies the way ears do and averages over time.' },
+    { question: 'True peak catches…', options: ['The average loudness of the whole song, from start to end', 'The level of the bass below 100 Hz', 'Peaks between samples that appear after conversion'], answer: 2, explain: 'The waveform can overshoot between samples.' },
+    { question: 'A common streaming target is about…', options: ['−14 LUFS integrated', '0 LUFS integrated', '−30 LUFS integrated'], answer: 0, explain: 'Spotify, YouTube and others normalise near −14.' },
+    { question: 'Keep the true peak at about…', options: ['+3 dBTP or higher', '−1 dBTP or lower', '−20 dBTP or lower'], answer: 1, explain: 'It leaves room for lossy encoding.' },
+    { question: 'Stems are…', options: ['MIDI files of every part, without any audio, for other producers to edit', 'Separate audio files for groups of parts that add up to the mix', 'A second, louder master for clubs and big systems'], answer: 1, explain: 'They let others rebalance or remix the track.' },
   ],
 };
 

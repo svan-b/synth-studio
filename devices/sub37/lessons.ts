@@ -123,7 +123,7 @@ const f1: Lesson = {
         a: { osc1_wave: 33 }, b: { osc1_wave: 100 }, labels: ['Saw', 'Narrow pulse'],
         question: {
           question: 'The narrow pulse sounds…',
-          options: ['Thinner and more nasal', 'Lower in pitch', 'Rounder'], answer: 0,
+          options: ['Thinner and more nasal', 'Lower in pitch, by an octave', 'Rounder and warmer'], answer: 0,
           explain: 'Narrowing the pulse weakens the lower harmonics against the upper ones, so the tone turns thin and reedy, like an oboe. The pitch stays put: only the shape changed.',
         },
       },
@@ -159,7 +159,7 @@ const f1: Lesson = {
   review: [
     { question: 'Which wave contains every harmonic?', options: ['Sawtooth', 'Square', 'Triangle'], answer: 0, explain: 'A saw has all harmonics at 1/n; the square and triangle have odd ones only.' },
     { question: 'Switching OSC 1 from 8\' to 16\' changes the pitch by…', options: ['One octave down', 'One octave up', 'A fifth down'], answer: 0, explain: 'Doubling the footage halves the frequency.' },
-    { question: 'Turning WAVE from the saw to the narrow pulse makes the sound…', options: ['Thinner and more nasal', 'Lower', 'Rounder'], answer: 0, explain: 'The shape changes the balance of harmonics; the pitch stays.' },
+    { question: 'Turning WAVE from the saw to the narrow pulse makes the sound…', options: ['Thinner and more nasal', 'Lower and heavier', 'Rounder and smoother'], answer: 0, explain: 'The shape changes the balance of harmonics; the pitch stays.' },
     { question: 'A triangle sounds soft because its harmonics…', options: ['Fall away fast (1/n²)', 'Are all even', 'Are louder than the fundamental'], answer: 0, explain: 'Odd harmonics only, falling steeply.' },
   ],
 };
@@ -192,7 +192,7 @@ const f2: Lesson = {
       instruction: 'Turn BEAT FREQ to +3 Hz, then play a low key and a high key.',
       predict: {
         question: 'BEAT FREQ adds a fixed number of hertz to OSC 2. How will the beating compare on low and high keys?',
-        options: ['The same speed on every key', 'Faster on high keys', 'Faster on low keys'], answer: 0,
+        options: ['The same speed on every key', 'Faster on high keys', 'Faster on low keys, slower on high keys'], answer: 0,
         explain: 'A fixed 3 Hz offset makes the difference, and so the beat, three per second everywhere. "Faster on high keys" is what a detune in cents does: that is the FREQUENCY knob.',
       },
       principle: 'A fixed-hertz offset gives a constant beat rate; a fixed ratio does not.',
@@ -248,7 +248,7 @@ const f2: Lesson = {
   ],
   review: [
     { question: 'Tones at 220 Hz and 223 Hz beat…', options: ['3 times per second', '223 times per second', 'Not at all'], answer: 0, explain: 'The beat rate is the difference between the frequencies.' },
-    { question: 'OSC 2 FREQUENCY fully clockwise gives…', options: ['A perfect fifth', 'An octave', 'A semitone'], answer: 0, explain: 'The ±7-semitone range ends on a fifth.' },
+    { question: 'OSC 2 FREQUENCY fully clockwise gives…', options: ['A perfect fifth', 'One full octave up', 'A single semitone'], answer: 0, explain: 'The ±7-semitone range ends on a fifth.' },
     { question: 'For an even beat across the keyboard, use…', options: ['BEAT FREQ', 'FREQUENCY', 'OCTAVE'], answer: 0, explain: 'A fixed-hertz offset.' },
     { question: 'A fifth sounds smooth because…', options: ['Many of its harmonics coincide', 'It is quieter', 'The filter removes the beating'], answer: 0, explain: 'The 3:2 ratio lines the harmonics up.' },
   ],
@@ -353,10 +353,10 @@ const f3: Lesson = {
     },
   ],
   review: [
-    { question: 'On the Sub 37, mixer levels above 5…', options: ['Overdrive the filter input', 'Mute the channel', 'Change the pitch'], answer: 0, explain: 'Manual p.27: 5 or below is clean.' },
-    { question: 'The sub-oscillator is…', options: ['A square one octave below OSC 1', 'A sine two octaves below', 'A copy of OSC 2'], answer: 0, explain: 'It is locked to OSC 1 and WAVE never changes it.' },
-    { question: 'FDBK / EXT IN with nothing in EXT IN…', options: ['Feeds the mixer output back into the mixer', 'Is silent', 'Adds reverb'], answer: 0, explain: 'Internal feedback.' },
-    { question: 'Pink noise, compared with white noise, sounds…', options: ['Darker and softer', 'Brighter', 'Pitched'], answer: 0, explain: 'Equal energy per octave: it falls 3 dB per octave.' },
+    { question: 'On the Sub 37, mixer levels above 5…', options: ['Overdrive the filter input', 'Mute that mixer channel', 'Change the oscillator\'s pitch'], answer: 0, explain: 'Manual p.27: 5 or below is clean.' },
+    { question: 'The sub-oscillator is…', options: ['A square one octave below OSC 1', 'A sine wave two octaves below OSC 1', 'A copy of OSC 2, one octave down'], answer: 0, explain: 'It is locked to OSC 1 and WAVE never changes it.' },
+    { question: 'FDBK / EXT IN with nothing in EXT IN…', options: ['Feeds the mixer output back into the mixer', 'Is silent until a cable is plugged in', 'Adds a short reverb after the filter'], answer: 0, explain: 'Internal feedback.' },
+    { question: 'Pink noise, compared with white noise, sounds…', options: ['Darker and softer', 'Brighter and harsher', 'Pitched, like a tone'], answer: 0, explain: 'Equal energy per octave: it falls 3 dB per octave.' },
   ],
 };
 
@@ -416,7 +416,7 @@ const f4: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'filter-resonance',
       quiz: {
         question: 'RESONANCE above 7 makes the Sub 37\'s filter self-oscillate. That means it…',
-        options: ['Produces its own sine tone at the cutoff', 'Turns the oscillators off', 'Stops passing sound', 'Distorts the oscillators'], answer: 0,
+        options: ['Produces its own sine tone at the cutoff', 'Turns the oscillators off in the mixer', 'Stops passing any sound at all', 'Distorts the oscillators into a square'], answer: 0,
         explain: 'With enough feedback the filter rings by itself, a sine wave at the cutoff frequency. The oscillators keep playing unless you turn them down.',
       },
     },
@@ -446,10 +446,10 @@ const f4: Lesson = {
     },
   ],
   review: [
-    { question: 'Turning CUTOFF down…', options: ['Removes high harmonics', 'Lowers the pitch', 'Adds distortion'], answer: 0, explain: 'A low-pass filter darkens; the pitch comes from the oscillator.' },
+    { question: 'Turning CUTOFF down…', options: ['Removes high harmonics', 'Lowers the pitch a little', 'Adds some warm distortion'], answer: 0, explain: 'A low-pass filter darkens; the pitch comes from the oscillator.' },
     { question: 'At the same CUTOFF, -24 dB compared with -12 dB is…', options: ['Darker', 'Brighter', 'The same'], answer: 0, explain: 'More poles cut more above the cutoff.' },
-    { question: 'RESONANCE above 7 on the Sub 37…', options: ['Makes the filter self-oscillate', 'Mutes the filter', 'Adds sub bass'], answer: 0, explain: 'Manual p.28.' },
-    { question: 'KB TRACK at 1:1 makes the cutoff…', options: ['Move one octave per octave played', 'Stay fixed', 'Move two octaves per octave'], answer: 0, explain: 'Fully clockwise is 2:1.' },
+    { question: 'RESONANCE above 7 on the Sub 37…', options: ['Makes the filter self-oscillate', 'Mutes the filter\'s output', 'Adds an octave of sub bass'], answer: 0, explain: 'Manual p.28.' },
+    { question: 'KB TRACK at 1:1 makes the cutoff…', options: ['Move one octave per octave played', 'Stay fixed on every key', 'Move two octaves per octave played'], answer: 0, explain: 'Fully clockwise is 2:1.' },
   ],
 };
 
@@ -548,10 +548,10 @@ const f5: Lesson = {
     },
   ],
   review: [
-    { question: 'SUSTAIN is…', options: ['A level held while the key is down', 'A time', 'A pitch'], answer: 0, explain: 'Attack, decay and release are times; sustain is a level.' },
-    { question: 'EG AMT below centre makes the FILTER EG…', options: ['Pull the cutoff down', 'Do nothing', 'Change the pitch'], answer: 0, explain: 'EG AMT is bipolar.' },
+    { question: 'SUSTAIN is…', options: ['A level held while the key is down', 'A time, like attack and decay', 'A pitch the note settles on'], answer: 0, explain: 'Attack, decay and release are times; sustain is a level.' },
+    { question: 'EG AMT below centre makes the FILTER EG…', options: ['Pull the cutoff down', 'Do nothing at all', 'Change the oscillator pitch'], answer: 0, explain: 'EG AMT is bipolar.' },
     { question: 'AMP EG SUSTAIN at 0 means a held note…', options: ['Fades out', 'Sustains forever', 'Gets louder'], answer: 0, explain: 'It falls to the sustain level: silence.' },
-    { question: 'A slow AMP EG ATTACK makes notes…', options: ['Swell in', 'Click', 'Higher'], answer: 0, explain: 'The level takes time to reach its peak.' },
+    { question: 'A slow AMP EG ATTACK makes notes…', options: ['Swell in', 'Click at the start', 'Sound higher'], answer: 0, explain: 'The level takes time to reach its peak.' },
   ],
 };
 
@@ -586,7 +586,7 @@ const f6: Lesson = {
       instruction: 'With KNOB SHIFT lit, turn the FILTER EG HOLD (the DECAY knob) to about 150 ms.',
       predict: {
         question: 'HOLD keeps the envelope at its peak before it decays. What changes?',
-        options: ['The bright part of each note lasts longer', 'Notes start later', 'Notes get louder', 'The pitch rises'], answer: 0,
+        options: ['The bright part of each note lasts longer', 'Each note starts a moment later', 'Each note gets louder at its peak', 'The pitch rises while the key is held'], answer: 0,
         explain: 'HOLD keeps the cutoff fully open for 150 ms before the decay, so the bite lasts longer. Notes starting later is what DELAY does.',
       },
       principle: 'Hold stretches the peak; delay postpones the whole envelope.',
@@ -615,7 +615,7 @@ const f6: Lesson = {
       instruction: 'Press the FILTER EG MULTI TRIG so it lights, then play legato again.',
       predict: {
         question: 'With MULTI TRIG lit, overlapping notes will…',
-        options: ['Re-open the filter on every new note', 'Stop sounding', 'Glide into each other'], answer: 0,
+        options: ['Re-open the filter on every new note', 'Stop sounding until you lift every key', 'Glide smoothly into each other'], answer: 0,
         explain: 'MULTI TRIG restarts the envelope on every key. Off, the envelope is single-trigger: the classic Moog legato feel. Gliding is GLIDE\'s job.',
       },
       principle: 'Multi-trigger restarts an envelope on every new note, even when you play legato.',
@@ -632,7 +632,7 @@ const f6: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'lfo',
       quiz: {
         question: 'LOOP is lit and the filter pulses while you hold a key. You make DECAY and RELEASE longer. The pulse will…',
-        options: ['Slow down', 'Speed up', 'Stop looping'], answer: 0,
+        options: ['Slow down', 'Speed up a lot', 'Stop looping'], answer: 0,
         explain: 'One loop is delay + attack + hold + decay + release, so longer stages make a longer cycle: a slower pulse. Looping only stops when you let go or turn LOOP off.',
       },
     },
@@ -651,8 +651,8 @@ const f6: Lesson = {
   ],
   review: [
     { question: 'KNOB SHIFT turns the DECAY knob into…', options: ['HOLD', 'DELAY', 'VEL AMT', 'KB TRACK'], answer: 0, explain: 'ATTACK → DELAY, DECAY → HOLD, SUSTAIN → VEL AMT, RELEASE → KB TRACK.' },
-    { question: 'With MULTI TRIG off, legato notes…', options: ['Do not restart the envelope', 'Restart it', 'Are silent'], answer: 0, explain: 'Single triggering is the default.' },
-    { question: 'In LOOP, the Sub 37 envelope skips…', options: ['The sustain stage', 'The attack', 'The release'], answer: 0, explain: 'Delay, attack, hold, decay and release repeat.' },
+    { question: 'With MULTI TRIG off, legato notes…', options: ['Do not restart the envelope', 'Restart the envelope each time', 'Are silent after the first one'], answer: 0, explain: 'Single triggering is the default.' },
+    { question: 'In LOOP, the Sub 37 envelope skips…', options: ['The sustain stage', 'The attack stage', 'The release stage'], answer: 0, explain: 'Delay, attack, hold, decay and release repeat.' },
     { question: 'DELAY makes the envelope…', options: ['Wait before its attack', 'Hold its peak', 'Release more slowly'], answer: 0, explain: 'Hold is the stage at the peak.' },
   ],
 };
@@ -764,10 +764,10 @@ const f7: Lesson = {
     },
   ],
   review: [
-    { question: 'Vibrato is…', options: ['Periodic pitch modulation', 'A filter sweep', 'A loudness envelope'], answer: 0, explain: 'An LFO on pitch at about 5-7 Hz.' },
+    { question: 'Vibrato is…', options: ['Periodic pitch modulation', 'A slow sweep of the filter', 'A slow envelope on loudness'], answer: 0, explain: 'An LFO on pitch at about 5-7 Hz.' },
     { question: 'An S&H LFO produces…', options: ['Random steps', 'A smooth sine', 'Silence'], answer: 0, explain: 'A new random value every cycle.' },
     { question: 'MOD 1 PITCH AMT is up but you hear nothing. Most likely…', options: ['The MOD wheel is down', 'The filter is closed', 'SUSTAIN is 0'], answer: 0, explain: 'The wheel sets MOD 1\'s depth.' },
-    { question: 'DEST OSC 1+2 WAVE with a slow triangle gives…', options: ['A shimmering wave-shape movement', 'Vibrato', 'Tremolo'], answer: 0, explain: 'Tremolo would be DEST VCA LEVEL.' },
+    { question: 'DEST OSC 1+2 WAVE with a slow triangle gives…', options: ['A shimmering wave-shape movement', 'A slow wobble in pitch (vibrato)', 'A slow wobble in volume (tremolo)'], answer: 0, explain: 'Tremolo would be DEST VCA LEVEL.' },
   ],
 };
 
@@ -858,8 +858,8 @@ const f8: Lesson = {
   ],
   review: [
     { question: 'DUO MODE on, KB CTRL on HI: OSC 1 plays…', options: ['The lowest held key', 'The highest', 'The last pressed'], answer: 0, explain: 'OSC 2 takes the highest.' },
-    { question: 'Paraphonic means…', options: ['Separate pitches through one shared filter and VCA', 'One voice per key with its own envelopes', 'Two synths layered'], answer: 0, explain: 'The pitches are separate; the shaping is shared.' },
-    { question: 'KB CTRL off in DUO MODE makes OSC 2…', options: ['Drone at a fixed pitch', 'Go silent', 'Follow the low key'], answer: 0, explain: 'FREQUENCY then tunes the drone over ±3 octaves.' },
+    { question: 'Paraphonic means…', options: ['Separate pitches through one shared filter and VCA', 'One voice per key, each with its own filter and envelopes', 'Two complete synths layered on every key you press'], answer: 0, explain: 'The pitches are separate; the shaping is shared.' },
+    { question: 'KB CTRL off in DUO MODE makes OSC 2…', options: ['Drone at a fixed pitch', 'Go silent', 'Follow the lowest key held'], answer: 0, explain: 'FREQUENCY then tunes the drone over ±3 octaves.' },
     { question: 'How many notes can the Sub 37 sound at once?', options: ['Two', 'One', 'Four', '37'], answer: 0, explain: 'Two oscillators, two notes, in DUO MODE.' },
   ],
 };
@@ -908,7 +908,7 @@ const sd1: Lesson = {
       instruction: 'Turn CUTOFF down to about 260 Hz.',
       predict: {
         question: 'With CUTOFF at 260 Hz and EG AMT at 0, the bass will sound…',
-        options: ['Dark and dull, with no punch', 'Bright and punchy', 'Silent'], answer: 0,
+        options: ['Dark and dull, with no punch', 'Bright and punchy, with a click', 'Silent: the filter is closed'], answer: 0,
         explain: 'Only the lowest harmonics pass and nothing moves the cutoff, so it is static and dull. The punch comes next, from the FILTER EG. It is not silent: the fundamentals are below 260 Hz.',
       },
       principle: 'A static filter gives a static tone; a moving filter gives each note an articulation.',
@@ -962,8 +962,8 @@ const sd1: Lesson = {
     },
   ],
   review: [
-    { question: 'The punch of a classic Moog bass mostly comes from…', options: ['A short FILTER EG with positive EG AMT', 'High resonance', 'A slow attack'], answer: 0, explain: 'The filter opens and closes on every note.' },
-    { question: 'Mixer OSC 1 at 8 instead of 5 makes the bass…', options: ['Warmer and more compressed', 'Thinner', 'Out of tune'], answer: 0, explain: 'It overdrives the filter input.' },
+    { question: 'The punch of a classic Moog bass mostly comes from…', options: ['A short FILTER EG with positive EG AMT', 'High RESONANCE with the CUTOFF wide open', 'A slow attack on the AMP EG'], answer: 0, explain: 'The filter opens and closes on every note.' },
+    { question: 'Mixer OSC 1 at 8 instead of 5 makes the bass…', options: ['Warmer and more compressed', 'Thinner and brighter', 'Out of tune with OSC 2'], answer: 0, explain: 'It overdrives the filter input.' },
     { question: 'To make legato bass notes re-attack, light…', options: ['MULTI TRIG', 'LOOP', 'HARD SYNC'], answer: 0, explain: 'Single triggering is the default.' },
   ],
 };
@@ -1006,7 +1006,7 @@ const sd2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'oscillator-sync',
       quiz: {
         question: 'If OSC 1 is higher than OSC 2 with sync on, OSC 2 gives little or no output. Why?',
-        options: ['It is restarted before it can finish a cycle', 'The filter closes', 'The mixer mutes it'], answer: 0,
+        options: ['It is restarted before it can finish a cycle', 'The filter closes whenever sync is switched on', 'The mixer mutes the lower of the two oscillators'], answer: 0,
         explain: 'When the master\'s cycle is shorter than the slave\'s, the slave never gets far into its wave. Keep OSC 2 at or above OSC 1 (manual p.26).',
       },
     },
@@ -1061,7 +1061,7 @@ const sd2: Lesson = {
   review: [
     { question: 'In hard sync, the pitch you hear follows…', options: ['The master, OSC 1', 'The slave, OSC 2', 'The filter'], answer: 0, explain: 'The slave restarts on every master cycle.' },
     { question: 'To sweep only the timbre of a sync sound, modulate…', options: ['OSC 2\'s pitch', 'OSC 1\'s pitch', 'Both oscillators\' pitch'], answer: 0, explain: 'Moving the master would move the note.' },
-    { question: 'Sync with OSC 2 tuned below OSC 1 gives…', options: ['Little or no OSC 2 output', 'A louder OSC 2', 'An octave jump'], answer: 0, explain: 'The slave cannot complete a cycle.' },
+    { question: 'Sync with OSC 2 tuned below OSC 1 gives…', options: ['Little or no OSC 2 output', 'A louder, brighter OSC 2', 'A jump of one octave'], answer: 0, explain: 'The slave cannot complete a cycle.' },
   ],
 };
 
@@ -1094,7 +1094,7 @@ const sd3: Lesson = {
       instruction: 'Turn MULTIDRIVE up to 9.',
       predict: {
         question: 'MULTIDRIVE sits after the filter, and CUTOFF is at 500 Hz. Will the result have strong high frequencies?',
-        options: ['Yes: distortion after the filter creates new highs', 'No: the filter removes them', 'No: MULTIDRIVE only adds bass'], answer: 0,
+        options: ['Yes: distortion after the filter creates new highs', 'No: the filter removes everything above 500 Hz', 'No: MULTIDRIVE only adds weight to the low end'], answer: 0,
         explain: 'The OTA and FET drive stages sit between the filter and the amplifier, so the harmonics they create are never filtered and a dark patch turns buzzy. "No" would be true if the drive came before the filter.',
       },
       principle: 'Distortion after a filter adds highs that the filter can no longer remove.',
@@ -1160,9 +1160,9 @@ const sd3: Lesson = {
     },
   ],
   review: [
-    { question: 'MULTIDRIVE sits…', options: ['Between the filter and the amplifier', 'Before the oscillators', 'In the mixer'], answer: 0, explain: 'OTA and FET stages after the ladder.' },
-    { question: 'To add grit but keep a bass dark, distort…', options: ['Before the filter, with the mixer or FDBK', 'After it, with MULTIDRIVE', 'With noise'], answer: 0, explain: 'The filter then smooths the new highs.' },
-    { question: 'Before judging a distorted sound, you should…', options: ['Match its loudness to the clean one', 'Raise the cutoff', 'Add resonance'], answer: 0, explain: 'Louder fools the ear into hearing "better".' },
+    { question: 'MULTIDRIVE sits…', options: ['Between the filter and the amplifier', 'Between the oscillators and the mixer', 'Inside the mixer, on each of its channels'], answer: 0, explain: 'OTA and FET stages after the ladder.' },
+    { question: 'To add grit but keep a bass dark, distort…', options: ['Before the filter, with the mixer or FDBK', 'After the filter, with MULTIDRIVE', 'With NOISE turned up in the mixer'], answer: 0, explain: 'The filter then smooths the new highs.' },
+    { question: 'Before judging a distorted sound, you should…', options: ['Match its loudness to the clean one', 'Raise the cutoff until it is bright', 'Add resonance to bring out the grit'], answer: 0, explain: 'Louder fools the ear into hearing "better".' },
   ],
 };
 
@@ -1252,7 +1252,7 @@ const e2: Lesson = {
       instruction: 'Set the FILTER EG DECAY to about 160 ms and play short notes.',
       predict: {
         question: 'Compared with 300 ms, 160 ms will sound…',
-        options: ['Snappier: the brightness closes sooner', 'Louder', 'Lower in pitch'], answer: 0,
+        options: ['Snappier: the brightness closes sooner', 'Louder: the note reaches full level faster', 'Lower in pitch: the note has less time to rise'], answer: 0,
         explain: 'DECAY sets how fast the cutoff falls back, so halving it tightens the pluck. Loudness belongs to the AMP EG, and pitch to the oscillator.',
       },
       principle: 'Shorter envelope stages make sounds tighter; longer ones make them lazier.',
@@ -1286,8 +1286,8 @@ const e2: Lesson = {
     },
   ],
   review: [
-    { question: 'FILTER EG DECAY controls…', options: ['How fast the brightness falls after the attack', 'The loudness', 'The pitch'], answer: 0, explain: 'It is the time from the peak to the sustain level.' },
-    { question: 'A shorter FILTER EG DECAY makes a bass…', options: ['Snappier', 'Longer', 'Higher'], answer: 0, explain: 'The pluck closes sooner.' },
+    { question: 'FILTER EG DECAY controls…', options: ['How fast the brightness falls after the attack', 'How loud the note is while the key is held', 'How far the pitch bends at the start of a note'], answer: 0, explain: 'It is the time from the peak to the sustain level.' },
+    { question: 'A shorter FILTER EG DECAY makes a bass…', options: ['Snappier', 'Longer and softer', 'Higher in pitch'], answer: 0, explain: 'The pluck closes sooner.' },
     { question: 'On a log time knob, 50 → 100 ms and 2 → 4 s are…', options: ['The same distance', 'Very different distances', 'Impossible'], answer: 0, explain: 'Both are a doubling.' },
   ],
 };
@@ -1312,7 +1312,7 @@ const e3: Lesson = {
       instruction: 'Turn RESONANCE to 6.5.',
       predict: {
         question: 'With more resonance at the same CUTOFF, the sound will…',
-        options: ['Ring at the cutoff and lose a little bass', 'Get darker everywhere', 'Rise in pitch'], answer: 0,
+        options: ['Ring at the cutoff and lose a little bass', 'Get darker everywhere and gain bass', 'Rise in pitch by about a semitone'], answer: 0,
         explain: 'Resonance boosts a narrow band at the cutoff, so it rings, and a ladder thins its bass as resonance rises. The overall brightness does not drop, and the pitch is unchanged.',
       },
       principle: 'Resonance adds a peak at one frequency; cutoff sets where that peak sits.',
@@ -1346,8 +1346,8 @@ const e3: Lesson = {
     },
   ],
   review: [
-    { question: 'Raising RESONANCE at a fixed CUTOFF mainly…', options: ['Adds a peak at the cutoff', 'Lowers the cutoff', 'Adds sub bass'], answer: 0, explain: 'Feedback boosts the band at the cutoff.' },
-    { question: 'On the Sub 37, RESONANCE above 7…', options: ['Makes the filter self-oscillate', 'Mutes it', 'Changes the slope'], answer: 0, explain: 'Manual p.28.' },
+    { question: 'Raising RESONANCE at a fixed CUTOFF mainly…', options: ['Adds a peak at the cutoff', 'Lowers the cutoff a little', 'Adds bass below the cutoff'], answer: 0, explain: 'Feedback boosts the band at the cutoff.' },
+    { question: 'On the Sub 37, RESONANCE above 7…', options: ['Makes the filter self-oscillate', 'Mutes the filter\'s output', 'Changes the filter\'s slope'], answer: 0, explain: 'Manual p.28.' },
     { question: 'A dark sound with a strong whistle has…', options: ['Low CUTOFF and high RESONANCE', 'High CUTOFF and no resonance', 'High MULTIDRIVE only'], answer: 0, explain: 'Dark = low cutoff; whistle = resonance.' },
   ],
 };
@@ -1406,9 +1406,9 @@ const e4: Lesson = {
     },
   ],
   review: [
-    { question: 'Notes got shorter but the tone did not change. You moved…', options: ['AMP EG DECAY', 'OSC 1 WAVE', 'MULTIDRIVE'], answer: 0, explain: 'Envelopes change time, not tone.' },
+    { question: 'Notes got shorter but the tone did not change. You moved…', options: ['AMP EG DECAY', 'FILTER EG DECAY', 'MULTIDRIVE'], answer: 0, explain: 'Envelopes change time, not tone.' },
     { question: 'A hollow tone with only odd harmonics is the…', options: ['Square', 'Sawtooth', 'Narrow pulse'], answer: 0, explain: 'The square has odd harmonics only.' },
-    { question: 'New highs appeared although CUTOFF stayed low. Likely cause…', options: ['MULTIDRIVE after the filter', 'More RESONANCE', 'A slower attack'], answer: 0, explain: 'Distortion after the filter is not filtered.' },
+    { question: 'New highs appeared although CUTOFF stayed low. Likely cause…', options: ['MULTIDRIVE after the filter', 'More RESONANCE at the cutoff', 'A slower attack on the AMP EG'], answer: 0, explain: 'Distortion after the filter is not filtered.' },
   ],
 };
 
@@ -1474,7 +1474,7 @@ const sq1: Lesson = {
       instruction: 'Press INVERT.',
       predict: {
         question: 'With RANGE +1 and C-E-G held, INVERT plays…',
-        options: ['C, C an octave up, E, E up, G, G up', 'The same order reversed', 'Only the top octave'], answer: 0,
+        options: ['C, C an octave up, E, E up, G, G up', 'G, E, C, then G, E, C an octave up', 'C, E, G in the top octave only'], answer: 0,
         explain: 'INVERT plays each note in every octave of the range before moving to the next note (manual p.16). It does nothing at RANGE 0.',
       },
       principle: 'Reordering octaves changes a pattern\'s contour without changing its notes.',
@@ -1593,7 +1593,7 @@ const sq2: Lesson = {
       instruction: 'Press GLIDE ON. LEGATO is lit, TYPE is EXP and TIME is 2.',
       predict: {
         question: 'With LEGATO glide on, which steps will slide?',
-        options: ['Only the steps tied into a different note', 'Every step', 'Only the rests'], answer: 0,
+        options: ['Only the steps tied into a different note', 'Every step, whether it is tied or not', 'Only the steps that follow a rest'], answer: 0,
         explain: 'A tie keeps the gate on into the next note, so those two notes overlap. LEGATO glide slides only between overlapping notes, and the tied note does not retrigger the envelopes (manual p.17). Other steps jump and re-attack.',
       },
       principle: 'Overlapping notes plus legato glide put slides only where you want them.',
@@ -1632,9 +1632,9 @@ const sq2: Lesson = {
     },
   ],
   review: [
-    { question: 'To record a step sequence, set PATTERN to…', options: ['REC, with the arpeggiator off', 'SEQ', 'ORDR'], answer: 0, explain: 'SEQ plays it back.' },
-    { question: 'In step recording, the ON / REST button…', options: ['Adds a silent step', 'Stops recording', 'Deletes a step'], answer: 0, explain: 'Manual p.16.' },
-    { question: 'Tying into a different note…', options: ['Changes pitch without retriggering the envelopes', 'Restarts the envelopes', 'Mutes it'], answer: 0, explain: 'Manual p.17.' },
+    { question: 'To record a step sequence, set PATTERN to…', options: ['REC, with the arpeggiator off', 'SEQ, with the arpeggiator on', 'ORDR, with LATCH on'], answer: 0, explain: 'SEQ plays it back.' },
+    { question: 'In step recording, the ON / REST button…', options: ['Adds a silent step', 'Stops the recording', 'Deletes a step'], answer: 0, explain: 'Manual p.16.' },
+    { question: 'Tying into a different note…', options: ['Changes pitch without retriggering the envelopes', 'Restarts both envelopes on the new note', 'Mutes the second note of the pair'], answer: 0, explain: 'Manual p.17.' },
     { question: 'How many steps can a Sub 37 sequence hold?', options: ['64', '16', '32'], answer: 0, explain: 'Four pages of 16 in STEP EDIT.' },
   ],
 };
@@ -1692,7 +1692,7 @@ const p1: Lesson = {
       instruction: 'Set glide TYPE to LCR. Play a semitone step, then a two-octave leap.',
       predict: {
         question: 'LCR is linear constant rate. Compared with the semitone, the two-octave glide takes…',
-        options: ['Much longer', 'The same time', 'Less time'], answer: 0,
+        options: ['Much longer', 'The same time', 'A little less time'], answer: 0,
         explain: 'A constant rate means a fixed speed, so a bigger interval takes longer. LCT (constant time) would give both leaps the same time.',
       },
       principle: 'Constant-rate glides take longer for bigger leaps; constant-time glides do not.',
@@ -1747,10 +1747,10 @@ const p1: Lesson = {
     },
   ],
   review: [
-    { question: 'The Sub 37\'s default bend range is…', options: ['±2 semitones', '±12', '±7'], answer: 0, explain: 'Adjustable 0-24 each way in PRESET EDIT.' },
+    { question: 'The Sub 37\'s default bend range is…', options: ['±2 semitones', '±12 semitones', '±7 semitones'], answer: 0, explain: 'Adjustable 0-24 each way in PRESET EDIT.' },
     { question: 'LCR glide on a big leap, compared with a small one…', options: ['Takes longer', 'Takes the same time', 'Does not glide'], answer: 0, explain: 'A constant rate.' },
-    { question: 'LATCH ON on the AMP EG makes notes…', options: ['Hold at SUSTAIN after release', 'Stop instantly', 'Glide'], answer: 0, explain: 'As if the gate were on.' },
-    { question: 'LEGATO glide slides only when…', options: ['The next key goes down while the previous one is held', 'You play staccato', 'The arpeggiator runs'], answer: 0, explain: 'Overlapping notes.' },
+    { question: 'LATCH ON on the AMP EG makes notes…', options: ['Hold at SUSTAIN after release', 'Stop the instant you let go', 'Glide into the next key'], answer: 0, explain: 'As if the gate were on.' },
+    { question: 'LEGATO glide slides only when…', options: ['The next key goes down while the previous one is held', 'You play staccato, with a gap between the keys', 'The arpeggiator runs with LATCH switched on'], answer: 0, explain: 'Overlapping notes.' },
   ],
 };
 
@@ -1840,10 +1840,10 @@ const st1: Lesson = {
     },
   ],
   review: [
-    { question: 'With arpeggiator SYNC lit, the RATE knob…', options: ['Selects a clock division', 'Sets BPM', 'Sets the gate length'], answer: 0, explain: 'From 4 whole notes to a 1/64 triplet.' },
-    { question: 'MIDI clock runs at…', options: ['24 ticks per quarter note', '4 per beat', '1 per bar'], answer: 0, explain: '24 PPQN.' },
-    { question: '1/16 at 120 BPM gives…', options: ['8 notes per second', '4', '16'], answer: 0, explain: '2 beats × 4 sixteenths.' },
-    { question: 'On the Sub 37, which sections have their own SYNC switch?', options: ['The arpeggiator, both LFOs and both envelopes', 'Only the arpeggiator', 'Only the LFOs'], answer: 0, explain: 'Manual p.9.' },
+    { question: 'With arpeggiator SYNC lit, the RATE knob…', options: ['Selects a clock division', 'Sets BPM', 'Sets the length of each gate'], answer: 0, explain: 'From 4 whole notes to a 1/64 triplet.' },
+    { question: 'MIDI clock runs at…', options: ['24 ticks per quarter note', '4 ticks per beat, one per 16th', '1 tick at the start of every bar'], answer: 0, explain: '24 PPQN.' },
+    { question: '1/16 at 120 BPM gives…', options: ['8 notes per second', '4 notes per second', '16 notes per second'], answer: 0, explain: '2 beats × 4 sixteenths.' },
+    { question: 'On the Sub 37, which sections have their own SYNC switch?', options: ['The arpeggiator, both LFOs and both envelopes', 'Only the arpeggiator; the rest always run free', 'Only the two LFOs, with one shared switch'], answer: 0, explain: 'Manual p.9.' },
   ],
 };
 
@@ -1909,7 +1909,7 @@ const st2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'mixing',
       quiz: {
         question: 'The kick\'s weight sits around 50 Hz. The best first move to stop the bass masking it is…',
-        options: ['Keep bass notes short and off the kick\'s steps', 'Raise the bass RESONANCE to 9', 'Turn the bass VOLUME up', 'Add NOISE'], answer: 0,
+        options: ['Keep bass notes short and off the kick\'s steps', 'Raise the bass RESONANCE to 9 so it cuts through', 'Turn the bass VOLUME up until you hear it', 'Add NOISE to the bass in the mixer'], answer: 0,
         explain: 'Taking turns in time is the cleanest way to share the low end. More resonance or level makes the clash worse.',
       },
     },
@@ -1948,9 +1948,9 @@ const st2: Lesson = {
     },
   ],
   review: [
-    { question: 'A bassline between the kicks is called…', options: ['An off-beat bass', 'A sidechain', 'A drone'], answer: 0, explain: 'It plays on the off-beats.' },
-    { question: 'Two instruments that follow one clock…', options: ['Stay in time when the tempo changes', 'Drift', 'Must be muted'], answer: 0, explain: 'One leader, many followers.' },
-    { question: 'A shorter AMP EG DECAY on the bass helps the kick because…', options: ['The bass stops before the next kick', 'It gets louder', 'It raises the pitch'], answer: 0, explain: 'They take turns in time.' },
+    { question: 'A bassline between the kicks is called…', options: ['An off-beat bass', 'A sidechained bass', 'A drone'], answer: 0, explain: 'It plays on the off-beats.' },
+    { question: 'Two instruments that follow one clock…', options: ['Stay in time when the tempo changes', 'Drift apart over a few bars', 'Play at half each other\'s speed'], answer: 0, explain: 'One leader, many followers.' },
+    { question: 'A shorter AMP EG DECAY on the bass helps the kick because…', options: ['The bass stops before the next kick', 'The bass gets louder on the beat', 'The bass moves up out of the kick\'s range'], answer: 0, explain: 'They take turns in time.' },
   ],
 };
 

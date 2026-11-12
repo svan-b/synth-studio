@@ -137,7 +137,7 @@ const f1: Lesson = {
     mc('SUB FREQ fully clockwise is…', ['÷1, in unison with the VCO', '÷16, the lowest undertone', 'The sub switched off'], 0, 'Clockwise is ÷1; counter-clockwise steps down to ÷16.'),
     mc('Which divisors always give octaves?', ['2, 4, 8, 16', '3, 6, 9, 12', '5, 10, 15'], 0, 'Repeated halving gives octaves; 3, 6 and 12 give fifths.'),
     mc('VCO at 600 Hz, SUB at ÷3. The sub plays…', ['200 Hz', '1800 Hz', '300 Hz'], 0, 'Divide, do not multiply: 1800 Hz would be the third overtone.'),
-    mc('Why can a sub never beat against its own VCO?', ['It is an exact whole-number division of that VCO', 'The filter removes the beats', 'It is always quieter'], 0, 'Its cycles are counted from the VCO\'s cycles, so the ratio is locked.'),
+    mc('Why can a sub never beat against its own VCO?', ['It is an exact whole-number division of that VCO', 'The filter removes any beats before you hear them', 'It is always quieter than the VCO it follows'], 0, 'Its cycles are counted from the VCO\'s cycles, so the ratio is locked.'),
   ],
 };
 
@@ -156,7 +156,7 @@ const f2: Lesson = {
       instruction: 'Square and saw: the same pitch, a different colour.',
       listen: {
         a: { vco1_wave: 0 }, b: { vco1_wave: 2 }, labels: ['Square (UP)', 'Saw (DOWN)'],
-        question: mc('Which one sounds hollower?', ['The square', 'The saw', 'Neither'], 0,
+        question: mc('Which one sounds hollower?', ['The square', 'The saw', 'Neither of them'], 0,
           'A square has only odd harmonics, which sounds hollow, like a clarinet. A saw has every harmonic, so it is brighter and buzzier.'),
       },
     },
@@ -175,7 +175,7 @@ const f2: Lesson = {
       kind: 'predict', control: 'vco1_wave', targetValue: 1, concept: 'oscillator-waveform', setup: { vco1_sub1_level: 0 },
       instruction: 'SUB 1 is muted again. Set VCO 1 WAVE to the middle position.',
       predict: mc('In MIDDLE, SUB 1\'s saw sweeps VCO 1\'s pulse width. With SUB 1 LEVEL at zero, what do you hear?',
-        ['A plain square', 'A pulse whose shape repeats every second cycle, hinting at a lower pitch', 'Silence'], 1,
+        ['A plain square, because a muted SUB 1 can\'t move the pulse width', 'A pulse whose shape repeats every second cycle, hinting at a lower pitch', 'Silence, because VCO 1 needs SUB 1 in the mixer to sound at all'], 1,
         'The internal PWM link works even with SUB 1 muted, so VCO 1\'s wave only repeats every two cycles and a lower pitch appears (manual p.19 tip). It is not a plain square, because the pulse width keeps moving.'),
       principle: 'Modulating a wave at a fraction of its own frequency adds lower pitches to it.',
       manualReference: 'p.19 – Waveform switch, MIDDLE',
@@ -187,7 +187,7 @@ const f2: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'oscillator-waveform',
-      quiz: mc('Which move replaces the built-in PWM source?', ['Patching a signal into VCO 1 PWM', 'Raising SUB 1 LEVEL', 'Turning VCF EG AMT'], 0,
+      quiz: mc('Which move replaces the built-in PWM source?', ['Patching a signal into VCO 1 PWM', 'Raising SUB 1 LEVEL in the mixer', 'Turning VCF EG AMT past noon'], 0,
         'A cable in VCO 1 PWM overrides the SUB 1 saw (manual p.32). SUB 1 LEVEL only sets how loud SUB 1 is in the mixer.'),
     },
     {
@@ -197,7 +197,7 @@ const f2: Lesson = {
         a: { vco1_level: 40, vco1_sub1_level: 40, vco1_sub2_level: 0, volume: 40 },
         b: { vco1_level: 100, vco1_sub1_level: 100, vco1_sub2_level: 100, vco1_sub2_freq: D(3), volume: 22 },
         labels: ['Moderate', 'Pushed'],
-        question: mc('Besides loudness, what changes?', ['It thickens and distorts warmly', 'The pitch drops', 'Nothing'], 0,
+        question: mc('Besides loudness, what changes?', ['It thickens and distorts warmly', 'The pitch drops by an octave', 'Nothing but the volume'], 0,
           'Several sources near maximum overdrive the mixer before the filter (manual p.21). B is turned down so the two play at a similar volume - the grit is the saturation, not loudness.'),
       },
     },
@@ -221,10 +221,10 @@ const f2: Lesson = {
     },
   ],
   review: [
-    mc('WAVE up gives…', ['Square on the VCO and both subs', 'Saw on the VCO only', 'Noise'], 0, 'One switch per VCO sets all three waves (manual p.19).'),
+    mc('WAVE up gives…', ['Square on the VCO and both subs', 'Saw on the VCO, square on the subs', 'Noise in place of both subs'], 0, 'One switch per VCO sets all three waves (manual p.19).'),
     mc('In MIDDLE, the subs put out…', ['Saws', 'Squares', 'Nothing'], 0, 'MIDDLE means a pulse VCO with saw subs.'),
     mc('For a cleaner sound, set the mixer…', ['At moderate levels', 'With everything at maximum', 'With only the subs at maximum'], 0, 'Hot levels drive the mixer into distortion.'),
-    mc('A cable into VCO 1 PWM…', ['Replaces the SUB 1 saw as the PWM source', 'Changes VCO 1\'s pitch', 'Mutes SUB 1'], 0, 'It overrides the normal (manual p.32).'),
+    mc('A cable into VCO 1 PWM…', ['Replaces the SUB 1 saw as the PWM source', 'Changes VCO 1\'s pitch instead of its width', 'Mutes SUB 1 in the mixer'], 0, 'It overrides the normal (manual p.32).'),
   ],
 };
 
@@ -246,7 +246,7 @@ const f3: Lesson = {
     {
       kind: 'predict', control: 'cutoff', targetValue: 250, concept: 'filter-cutoff', scope: 'spectrum',
       instruction: 'Turn CUTOFF down to about 250 Hz.',
-      predict: mc('What will lowering CUTOFF do?', ['Make it darker and duller', 'Lower the pitch', 'Slow the rhythm'], 0,
+      predict: mc('What will lowering CUTOFF do?', ['Make it darker and duller', 'Lower the pitch of every note', 'Slow the rhythm down'], 0,
         'The filter removes the upper harmonics, so the tone darkens. The pitch comes from the VCO, not the filter - it can seem lower only because the brightness is gone.'),
       principle: 'Lowering cutoff removes upper harmonics, so the same note sounds darker.',
       manualReference: 'p.23 – CUTOFF',
@@ -273,7 +273,7 @@ const f3: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'modulation-depth',
-      quiz: mc('VCF EG AMT is turned to about -60%. Each note now…', ['Starts dark and brightens as the envelope decays', 'Starts bright and closes', 'Has no filter movement'], 0,
+      quiz: mc('VCF EG AMT is turned to about -60%. Each note now…', ['Starts dark and brightens as the envelope decays', 'Starts bright and closes again as the envelope decays', 'Has no filter movement until the knob passes noon'], 0,
         'Inverse amounts close the filter on the attack and open it again on the decay (manual p.24). "Starts bright" is what a positive amount does.'),
     },
     {
@@ -290,10 +290,10 @@ const f3: Lesson = {
     },
   ],
   review: [
-    mc('Lowering CUTOFF on this low-pass filter…', ['Removes high harmonics', 'Lowers the pitch', 'Adds distortion'], 0, 'Pitch is set by the VCO.'),
+    mc('Lowering CUTOFF on this low-pass filter…', ['Removes high harmonics', 'Lowers the pitch a little', 'Adds some warm distortion'], 0, 'Pitch is set by the VCO.'),
     mc('The Subharmonicon\'s filter is a…', ['4-pole ladder low-pass', 'Switchable low-pass / high-pass', '2-pole band-pass'], 0, 'Low-pass only, 24 dB per octave (manual p.23).'),
-    mc('VCF EG AMT at 12 o\'clock means…', ['No envelope effect', 'Full positive', 'Full negative'], 0, 'It is bipolar: centre is none.'),
-    mc('To make the filter ring at its cutoff, raise…', ['RESONANCE', 'VOLUME', 'TEMPO'], 0, 'Resonance feeds the output back around the cutoff.'),
+    mc('VCF EG AMT at 12 o\'clock means…', ['No envelope effect', 'Full positive effect', 'Full negative effect'], 0, 'It is bipolar: centre is none.'),
+    mc('To make the filter ring at its cutoff, raise…', ['RESONANCE', 'VCF EG AMT', 'VOLUME'], 0, 'Resonance feeds the output back around the cutoff.'),
   ],
 };
 
@@ -315,7 +315,7 @@ const f4: Lesson = {
     {
       kind: 'predict', control: 'vca_decay', targetValue: 1500, concept: 'envelope-decay',
       instruction: 'Turn VCA DECAY up to about 1.5 s.',
-      predict: mc('The notes still come at the same rate. What happens?', ['Notes ring into each other, smoother and longer', 'Notes get shorter', 'The pitch rises'], 0,
+      predict: mc('The notes still come at the same rate. What happens?', ['Notes ring into each other, smoother and longer', 'Notes get shorter and leave gaps between them', 'The pitch rises while each note fades'], 0,
         'A longer decay lets each note fade slowly, so it overlaps the next. Decay changes length, not pitch.'),
       principle: 'A longer decay makes each note fade out more slowly.',
       manualReference: 'p.25 – VCA DECAY',
@@ -329,7 +329,7 @@ const f4: Lesson = {
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-attack',
       quiz: mc('VCA ATTACK is 1 s but notes arrive every 0.4 s. What happens to triggers that land during the attack?',
-        ['They are ignored until the attack finishes', 'Each one restarts the attack', 'They double the volume'], 0,
+        ['They are ignored until the attack finishes', 'Each one restarts the attack from zero', 'Each one pushes the volume up a step'], 0,
         'On the Subharmonicon both envelopes ignore new triggers while they are in their attack (manual p.24). Many synths restart the attack instead, which makes that answer tempting.'),
     },
     {
@@ -380,11 +380,11 @@ const f4: Lesson = {
     },
   ],
   review: [
-    mc('The Subharmonicon\'s ATTACK and DECAY ranges are…', ['1 ms-10 s and 5 ms-10 s', 'Both 1 ms-1 s', '10 ms-100 s'], 0, 'Manual pp.24-25.'),
-    mc('EG blinking means…', ['HELD: both envelopes held at maximum', 'OFF', 'An error'], 0, 'Hold the EG button to enter HELD.'),
-    mc('With EG off, the TRIGGER button…', ['Acts as a gate', 'Does nothing', 'Resets the sequence'], 0, 'It holds the envelopes while pressed.'),
+    mc('The Subharmonicon\'s ATTACK and DECAY ranges are…', ['1 ms-10 s and 5 ms-10 s', '1 ms-1 s for both of them', '10 ms-100 s for both of them'], 0, 'Manual pp.24-25.'),
+    mc('EG blinking means…', ['HELD: both envelopes held at maximum', 'OFF: the envelopes ignore every trigger', 'An error: the sequencers lost the clock'], 0, 'Hold the EG button to enter HELD.'),
+    mc('With EG off, the TRIGGER button…', ['Acts as a gate', 'Does nothing at all', 'Resets the sequence'], 0, 'It holds the envelopes while pressed.'),
     mc('A trigger that arrives during the attack…', ['Is ignored', 'Restarts it', 'Inverts it'], 0, 'The attack cannot be retriggered on this instrument.'),
-    mc('EG is off and the sequencers are stopped. You hold a key down. You hear…', ['The note rise and stay at full VOLUME until you let go', 'One short pluck', 'Nothing: keys need EG lit'], 0,
+    mc('EG is off and the sequencers are stopped. You hold a key down. You hear…', ['The note rise and stay at full VOLUME until you let go', 'One short pluck, however long you hold the key', 'Nothing at all: the keys only work while EG is lit'], 0,
       'With EG off a key is a gate, like TRIGGER, so the envelopes hold at their peak while it is down. With EG lit a key plays a pluck.'),
   ],
 };
@@ -415,7 +415,7 @@ const f5: Lesson = {
       kind: 'predict', control: 'seq_oct', targetValue: 0, concept: 'oscillator-pitch',
       instruction: 'Press SEQ OCT until ±1 lights.',
       predict: mc('Each STEP knob can reach ±5 octaves right now. What does ±1 change?',
-        ['Each knob covers one octave up or down, so tuning is easier', 'The sequence plays an octave higher', 'Only step 1 changes'], 0,
+        ['Each knob covers one octave up or down, so tuning is easier', 'The whole sequence plays one octave higher than before', 'Only step 1 changes; the other steps keep ±5 octaves'], 0,
         'SEQ OCT sets the range of every STEP knob for both sequencers. It does not transpose anything: 12 o\'clock is still 0 V.'),
       principle: 'A smaller voltage range per knob gives finer control over pitch.',
       manualReference: 'p.28 – SEQ OCT',
@@ -450,7 +450,7 @@ const f5: Lesson = {
     play('Press PLAY.', 'A running clock loops the four steps.'),
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'oscillator-pitch',
-      quiz: mc('QUANTIZE is on and you turn VCO 1 FREQ. What happens?', ['The pitch steps from note to note of the scale', 'The pitch sweeps smoothly', 'Nothing - FREQ is never quantized'], 0,
+      quiz: mc('QUANTIZE is on and you turn VCO 1 FREQ. What happens?', ['The pitch steps from note to note of the scale', 'The pitch sweeps smoothly, as it does with QUANTIZE off', 'Nothing - FREQ is never quantized'], 0,
         'On the Subharmonicon the VCO FREQ knobs snap to the selected scale too (manual pp.18, 21). Many synths quantize only the sequencer, which makes "never quantized" tempting.'),
     },
     {
@@ -471,9 +471,9 @@ const f5: Lesson = {
   ],
   review: [
     mc('SEQ OCT is…', ['Shared by both sequencers', 'Set per sequencer', 'Only for Sequencer 2'], 0, 'One setting for both (manual p.28).'),
-    mc('A STEP knob at 12 o\'clock adds…', ['0 V - no change', '+1 octave', '-5 V'], 0, 'Centre means no offset.'),
-    mc('NEXT…', ['Advances a step without firing the envelopes', 'Plays a note', 'Resets to step 1'], 0, 'Manual p.29.'),
-    mc('8-ET is…', ['A diatonic (major) scale in equal temperament', 'Eight equal steps per octave', 'Just intonation'], 0, '"8 steps" counts the seven notes plus the octave.'),
+    mc('A STEP knob at 12 o\'clock adds…', ['0 V - no change', '+1 V - an octave up', '-5 V - the lowest note'], 0, 'Centre means no offset.'),
+    mc('NEXT…', ['Advances a step without firing the envelopes', 'Plays the current step\'s note again', 'Resets both sequencers to step 1'], 0, 'Manual p.29.'),
+    mc('8-ET is…', ['A diatonic (major) scale in equal temperament', 'A scale of eight equal steps per octave', 'A just-intonation scale of eight pure ratios'], 0, '"8 steps" counts the seven notes plus the octave.'),
   ],
 };
 
@@ -508,7 +508,7 @@ const f6: Lesson = {
       kind: 'predict', control: 'rhythm2_seq1', targetValue: true, concept: 'polyrhythm', setup: { rhythm2: D(3) },
       instruction: 'RHYTHM 2 is at ÷3. Light SEQ 1 under RHYTHM 2.',
       predict: mc('Two generators now drive Sequencer 1: ÷2 and ÷3. What happens?',
-        ['It steps whenever either fires: a lopsided, busier rhythm', 'It slows down to ÷6', 'Nothing until RESET'], 0,
+        ['It steps whenever either fires: a lopsided, busier rhythm', 'It slows down to ÷6: it steps only when both fire together', 'Nothing changes until you press RESET to line them up'], 0,
         'With OR logic the sequencer steps on any hit, and ÷2 and ÷3 merge into x.xxx. - four steps every six pulses. Only the hits that coincide merge, so it does not become ÷6.'),
       principle: 'Merging two pulse streams creates a new, uneven rhythm.',
       manualReference: 'p.15 – Creating a polyrhythm',
@@ -546,7 +546,7 @@ const f6: Lesson = {
   ],
   review: [
     mc('RHYTHM fully clockwise divides by…', ['1', '16', '8'], 0, 'Clockwise is ÷1 (manual p.30).'),
-    mc('The internal clock runs at…', ['20-3000 BPM, one pulse per beat', 'Only 60-180 BPM', 'A fixed 120 BPM'], 0, 'Manual p.25: .333 Hz to 50 Hz.'),
+    mc('The internal clock runs at…', ['20-3000 BPM, one pulse per beat', '60-180 BPM, with one pulse per beat', 'A fixed 120 BPM, four pulses per beat'], 0, 'Manual p.25: .333 Hz to 50 Hz.'),
     mc('÷2 and ÷3 on one sequencer (OR) give how many steps per 6 pulses?', ['4', '5', '6'], 0, 'The shared downbeat counts once.'),
     mc('One rhythm generator can drive…', ['SEQ 1, SEQ 2, both or neither', 'Only SEQ 1', 'Only one sequencer at a time'], 0, 'Two buttons per generator.'),
   ],
@@ -604,7 +604,7 @@ const sd1: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'oscillator-waveform',
-      quiz: mc('Why does WAVE up (square) suit a sub bass?', ['Square subs are strong in odd harmonics and stay defined when filtered', 'It raises the pitch', 'It switches the filter off'], 0,
+      quiz: mc('Why does WAVE up (square) suit a sub bass?', ['Square subs are strong in odd harmonics and stay defined when filtered', 'Square subs sound an octave higher, so the bass is easier to hear', 'Square subs bypass the filter, so no low end is lost'], 0,
         'Odd harmonics give a square bass its hollow punch. The pitch is set by the divisors, and the filter is always in the path.'),
     },
     {
@@ -630,8 +630,8 @@ const sd1: Lesson = {
     },
   ],
   review: [
-    mc('The lowest VCO FREQ setting is…', ['C4 (262 Hz)', 'C0', '20 Hz'], 0, 'Manual p.18.'),
-    mc('C4 ÷ 8 =', ['C1 (about 33 Hz)', 'C2', 'G1'], 0, 'Three octaves down.'),
+    mc('The lowest VCO FREQ setting is…', ['C4 (262 Hz)', 'C0 (16 Hz)', 'C1 (33 Hz)'], 0, 'Manual p.18.'),
+    mc('C4 ÷ 8 =', ['C1 (about 33 Hz)', 'C2 (about 65 Hz)', 'G1 (about 49 Hz)'], 0, 'Three octaves down.'),
     mc('A shorter VCA DECAY gives…', ['Tighter notes', 'A lower pitch', 'More resonance'], 0, 'It is the loudness tail.'),
   ],
 };
@@ -687,7 +687,7 @@ const sd2: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'subharmonics',
-      quiz: mc('Why does the equal-tempered major third beat here?', ['It is 13.7 cents wider than 5/4, so undertones that should coincide land slightly apart', 'Equal temperament is out of tune with itself', 'The filter adds beating'], 0,
+      quiz: mc('Why does the equal-tempered major third beat here?', ['It is 13.7 cents wider than 5/4, so undertones that should coincide land slightly apart', 'Equal temperament is out of tune with itself, so any two of its notes beat a little', 'The filter\'s resonance adds a slow beat of its own to every interval you play'], 0,
         'ET thirds are a compromise that works in every key; the subs reveal the mismatch as a slow beat. ET is self-consistent - it just is not whole-number ratios.'),
     },
     {
@@ -712,8 +712,8 @@ const sd2: Lesson = {
   ],
   review: [
     mc('The just major third is…', ['5/4', '4/3', '6/5'], 0, '6/5 is the minor third.'),
-    mc('With QUANTIZE on, VCO FREQ…', ['Snaps to scale steps', 'Sweeps smoothly', 'Is disabled'], 0, 'Manual p.18.'),
-    mc('Just intonation removes…', ['Beating between notes that should coincide', 'All the harmonics', 'The need for a filter'], 0, 'The manual calls out the beating in minor chords (p.17).'),
+    mc('With QUANTIZE on, VCO FREQ…', ['Snaps to scale steps', 'Sweeps smoothly, as before', 'Is disabled'], 0, 'Manual p.18.'),
+    mc('Just intonation removes…', ['Beating between notes that should coincide', 'All the harmonics above the fundamental', 'The need for a filter on chords'], 0, 'The manual calls out the beating in minor chords (p.17).'),
     mc('E4 (5/4 of C4) ÷ 5 equals…', ['C2', 'E2', 'A1'], 0, '5/4 ÷ 5 = 1/4 of C4.'),
   ],
 };
@@ -740,7 +740,7 @@ const sd3: Lesson = {
     {
       kind: 'predict', control: 'resonance', targetValue: 99, concept: 'filter-resonance',
       instruction: 'Turn RESONANCE to maximum.',
-      predict: mc('Nothing is feeding the filter. What will you hear?', ['A pitched note on each beat: the filter rings by itself', 'Nothing at all', 'White noise'], 0,
+      predict: mc('Nothing is feeding the filter. What will you hear?', ['A pitched note on each beat: the filter rings by itself', 'Nothing at all: a filter can only shape what goes into it', 'White noise on each beat: the VCA hisses whenever it opens'], 0,
         'At maximum resonance the ladder self-oscillates (manual p.23) and the VCA envelope gates that sine-like tone. No input is needed.'),
       principle: 'Enough resonance makes a filter oscillate on its own, like a sine oscillator.',
       manualReference: 'p.23 – RESONANCE',
@@ -765,8 +765,8 @@ const sd3: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-decay',
-      quiz: mc('Which knob mainly sets how long the kick booms?', ['VCA DECAY', 'CUTOFF', 'TEMPO'], 0,
-        'The VCA envelope ends the sound. CUTOFF sets the pitch, and TEMPO how often it hits.'),
+      quiz: mc('Which knob mainly sets how long the kick booms?', ['VCA DECAY', 'VCF DECAY', 'TEMPO'], 0,
+        'The VCA envelope ends the sound. VCF DECAY sets how fast the pitch drops at the start, and TEMPO how often it hits.'),
     },
     {
       kind: 'patch', patchFrom: 'out_seq2_clk', patchTo: 'in_vca', concept: 'signal-routing',
@@ -797,9 +797,9 @@ const sd3: Lesson = {
     },
   ],
   review: [
-    mc('With every mixer level at 0, sound can still come from…', ['A self-oscillating filter', 'The VCA', 'The sequencer'], 0, 'Maximum resonance rings.'),
-    mc('To tune the filter kick, turn…', ['CUTOFF', 'VCO 1 FREQ', 'TEMPO'], 0, 'The cutoff is its pitch.'),
-    mc('SEQ CLK into VCA IN gives…', ['Short accents on that sequencer\'s steps', 'Silence', 'A pitch change'], 0, 'It is summed with the envelope.'),
+    mc('With every mixer level at 0, sound can still come from…', ['A self-oscillating filter', 'The VCA\'s envelope', 'The sequencer\'s clock'], 0, 'Maximum resonance rings.'),
+    mc('To tune the filter kick, turn…', ['CUTOFF', 'VCO 1 FREQ', 'RESONANCE'], 0, 'The cutoff is its pitch.'),
+    mc('SEQ CLK into VCA IN gives…', ['Short accents on that sequencer\'s steps', 'Silence on that sequencer\'s steps', 'A pitch change on every clock pulse'], 0, 'It is summed with the envelope.'),
   ],
 };
 
@@ -837,7 +837,7 @@ const et1: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'subharmonics',
-      quiz: mc('÷3 below C5 sounds as…', ['An F, an octave and a fifth below', 'A C two octaves below', 'An E'], 0, '523 ÷ 3 ≈ 174 Hz, F3. Two octaves down would be ÷4.'),
+      quiz: mc('÷3 below C5 sounds as…', ['An F, an octave and a fifth below', 'A C, exactly two octaves below', 'An E, a major sixth below'], 0, '523 ÷ 3 ≈ 174 Hz, F3. Two octaves down would be ÷4.'),
     },
     {
       kind: 'match', instruction: 'Again, a different target.', concept: 'subharmonics', setup: { vco1_sub1_freq: D(6) },
@@ -860,7 +860,7 @@ const et1: Lesson = {
   review: [
     mc('÷4 below a VCO is…', ['Two octaves down', 'A fourth down', 'Four semitones down'], 0, 'Halve twice.'),
     mc('Which one sounds like a new note?', ['÷3', '÷2', '÷8'], 0, '3 is not a power of 2.'),
-    mc('÷6 is…', ['÷3 dropped one more octave', 'A sixth below', 'Unison'], 0, '6 = 3 × 2.'),
+    mc('÷6 is…', ['÷3 dropped one more octave', 'A sixth below the VCO', 'The same note as the VCO'], 0, '6 = 3 × 2.'),
   ],
 };
 
@@ -879,7 +879,7 @@ const et2: Lesson = {
       instruction: 'Add ÷5 under the C reference.',
       listen: {
         a: { vco1_sub2_level: 0 }, b: { vco1_sub2_level: 60, vco1_sub2_freq: D(5) }, labels: ['Reference', '+ ÷5'],
-        question: mc('What did ÷5 add?', ['A note a major third below the C', 'A higher octave', 'Nothing'], 0, '1046.5 ÷ 5 ≈ 209 Hz, a slightly sharp A♭: a major third below C.'),
+        question: mc('What did ÷5 add?', ['A note a major third below the C', 'A C one octave above the first', 'Nothing you can hear'], 0, '1046.5 ÷ 5 ≈ 209 Hz, a slightly sharp A♭: a major third below C.'),
       },
     },
     {
@@ -929,7 +929,7 @@ const et2: Lesson = {
     mc('The ÷5 undertone of C is near…', ['A♭', 'E', 'B'], 0, 'The mirror of the 5th harmonic.'),
     mc('÷6 relates to ÷3 as…', ['An octave lower', 'A fifth higher', 'Unrelated'], 0, '6 = 3 × 2.'),
     mc('÷7 is off the equal-tempered note by about…', ['31 cents', '0 cents', '50 cents'], 0, 'A septimal interval.'),
-    mc('Which undertones are fifths of the VCO\'s note name?', ['÷3, ÷6 and ÷12', '÷5', '÷7'], 0, 'A factor of 3 means fifths.'),
+    mc('Which undertones are fifths of the VCO\'s note name?', ['÷3, ÷6 and ÷12', '÷5 and ÷10', '÷7 and ÷14'], 0, 'A factor of 3 means fifths.'),
   ],
 };
 
@@ -954,7 +954,7 @@ const et3: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'polyrhythm',
-      quiz: mc('÷3 against ÷4: in one shared cycle, how many notes does each line play?', ['4 on ÷3 and 3 on ÷4', '3 and 4', '12 each'], 0,
+      quiz: mc('÷3 against ÷4: in one shared cycle, how many notes does each line play?', ['4 on ÷3 and 3 on ÷4', '3 on ÷3 and 4 on ÷4', '12 on each of them'], 0,
         'In 12 pulses ÷3 fires 4 times and ÷4 fires 3 times. The bigger divisor plays fewer notes.'),
     },
     {
@@ -978,7 +978,7 @@ const et3: Lesson = {
   review: [
     mc('÷2 and ÷5 line up again every…', ['10 pulses', '7 pulses', '5 pulses'], 0, 'lcm(2, 5) = 10.'),
     mc('Which plays the most notes per cycle: ÷3, ÷4 or ÷6?', ['÷3', '÷4', '÷6'], 0, 'A smaller divisor fires more often.'),
-    mc('Changing the master tempo changes a polyrhythm\'s…', ['Speed but not its ratio', 'Ratio', 'Pitch'], 0, 'Both lines scale together.'),
+    mc('Changing the master tempo changes a polyrhythm\'s…', ['Speed but not its ratio', 'Ratio but not its speed', 'Pitch and its ratio'], 0, 'Both lines scale together.'),
   ],
 };
 
@@ -1003,13 +1003,13 @@ const et4: Lesson = {
     {
       kind: 'predict', control: 'quantize', targetValue: 4, concept: 'oscillator-pitch', setup: { quantize: 3 },
       instruction: 'QUANTIZE is on 12-JI. Press it once more, to 8-JI.',
-      predict: mc('The chord uses G and E over C. What changes in 8-JI?', ['Nothing: both notes are in the just major scale', 'It starts beating', 'It falls silent'], 0,
+      predict: mc('The chord uses G and E over C. What changes in 8-JI?', ['Nothing: both notes are in the just major scale', 'It starts beating: 8-JI retunes the third and the fifth', 'It falls silent: neither note is in the 8-note scale'], 0,
         '8-JI is just C major, which contains 5/4 and 3/2 (manual p.17). It only removes the chromatic notes.'),
       principle: 'A diatonic scale is a subset of the chromatic one, with the same ratios.',
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'subharmonics',
-      quiz: mc('Beats come from…', ['Two nearly equal frequencies interfering', 'The filter\'s resonance', 'A fast envelope'], 0,
+      quiz: mc('Beats come from…', ['Two nearly equal frequencies interfering', 'The filter\'s resonance ringing on each note', 'A fast envelope retriggering the VCA'], 0,
         'The beat rate is the difference between the frequencies: 65.93 - 65.33 ≈ 0.6 Hz.'),
     },
     {
@@ -1037,8 +1037,8 @@ const et4: Lesson = {
   ],
   review: [
     mc('A slow throb between two low notes means…', ['They are slightly mistuned', 'They are an octave apart', 'The VCA is closing'], 0, 'A beat is the frequency difference.'),
-    mc('8-JI includes the ratios…', ['9/8, 5/4, 4/3, 3/2, 5/3, 15/8', 'Every semitone', 'Only octaves'], 0, 'The manual\'s just C major (p.17).'),
-    mc('The equal-tempered major third is ___ than 5/4.', ['About 14 cents wider', 'Exactly equal', 'An octave lower'], 0, '400 cents against 386.3.'),
+    mc('8-JI includes the ratios…', ['9/8, 5/4, 4/3, 3/2, 5/3, 15/8', 'Every semitone from 1/1 to 2/1', 'Only the octaves: 2/1, 4/1, 8/1'], 0, 'The manual\'s just C major (p.17).'),
+    mc('The equal-tempered major third is ___ than 5/4.', ['About 14 cents wider', 'About 14 cents narrower', 'An octave lower'], 0, '400 cents against 386.3.'),
   ],
 };
 
@@ -1058,7 +1058,7 @@ const et5: Lesson = {
       instruction: 'What changed?',
       listen: {
         a: { vco1_sub1_freq: D(4) }, b: { vco1_sub1_freq: D(3) },
-        question: mc('What changed between A and B?', ['Pitch', 'Brightness', 'Length'], 0, 'A new divisor is a new note.'),
+        question: mc('What changed between A and B?', ['The pitch', 'Brightness', 'The length'], 0, 'A new divisor is a new note.'),
       },
     },
     {
@@ -1066,7 +1066,7 @@ const et5: Lesson = {
       instruction: 'And now?',
       listen: {
         a: { cutoff: 400 }, b: { cutoff: 1500 },
-        question: mc('What changed between A and B?', ['Pitch', 'Brightness', 'Length'], 1, 'The note stays the same; only the harmonics change.'),
+        question: mc('What changed between A and B?', ['The pitch', 'Brightness', 'The length'], 1, 'The note stays the same; only the harmonics change.'),
       },
     },
     {
@@ -1074,7 +1074,7 @@ const et5: Lesson = {
       instruction: 'One more.',
       listen: {
         a: { vca_decay: 150 }, b: { vca_decay: 600 },
-        question: mc('What changed between A and B?', ['Pitch', 'Brightness', 'Length'], 2, 'The tail gets longer; pitch and colour stay.'),
+        question: mc('What changed between A and B?', ['The pitch', 'Brightness', 'The length'], 2, 'The tail gets longer; pitch and colour stay.'),
       },
     },
     {
@@ -1098,7 +1098,7 @@ const et5: Lesson = {
   review: [
     mc('Same note, longer tail →', ['VCA DECAY', 'CUTOFF', 'SUB FREQ'], 0, 'The amplitude envelope sets the length.'),
     mc('Different note, same tone →', ['SUB FREQ', 'RESONANCE', 'VOLUME'], 0, 'A divisor change is a pitch change.'),
-    mc('Brighter, same note →', ['CUTOFF up', 'VCA ATTACK up', 'TEMPO up'], 0, 'More harmonics pass the filter.'),
+    mc('Brighter, same note →', ['CUTOFF up', 'VCA ATTACK up', 'VCA DECAY up'], 0, 'More harmonics pass the filter.'),
   ],
 };
 
@@ -1125,7 +1125,7 @@ const sq1: Lesson = {
     {
       kind: 'predict', control: 'rhythm_logic', targetValue: 1, concept: 'polyrhythm',
       instruction: 'Switch LOGIC to XOR.',
-      predict: mc('XOR steps only when exactly one generator fires. Which hit disappears?', ['The downbeat, where ÷2 and ÷3 coincide', 'Every ÷3 hit', 'None'], 0,
+      predict: mc('XOR steps only when exactly one generator fires. Which hit disappears?', ['The downbeat, where ÷2 and ÷3 coincide', 'Every ÷3 hit, because ÷2 has priority', 'None: XOR only changes the accents'], 0,
         'XOR rejects pulses where both fire (manual p.44), so the shared downbeat vanishes and the riff now takes 24 pulses to come round.'),
       principle: 'XOR keeps a hit only when exactly one source fires.',
       explanation: 'On the hardware this is a global setting sent as MIDI CC 113; the twin gives it a switch.',
@@ -1140,7 +1140,7 @@ const sq1: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'polyrhythm',
-      quiz: mc('÷2 and ÷4 on one sequencer with XOR give…', ['Only the off-beat 8ths', 'Every 8th', 'Nothing'], 0,
+      quiz: mc('÷2 and ÷4 on one sequencer with XOR give…', ['Only the off-beat 8ths', 'Every 8th note, as with OR', 'Nothing: they cancel completely'], 0,
         'Every ÷4 hit coincides with a ÷2 hit and cancels, so only the ÷2 hits between them remain: ..x.'),
     },
     {
@@ -1162,9 +1162,9 @@ const sq1: Lesson = {
     },
   ],
   review: [
-    mc('OR logic steps when…', ['One or more generators fire', 'Exactly one fires', 'All of them fire'], 0, 'Manual p.44.'),
+    mc('OR logic steps when…', ['One or more generators fire', 'Exactly one generator fires', 'All the assigned generators fire'], 0, 'Manual p.44.'),
     mc('XOR removes…', ['Coinciding hits', 'The off-beats', 'Every hit'], 0, 'Only a single hit counts.'),
-    mc('On the hardware, the rhythm logic is set by…', ['MIDI CC 113 (a global setting)', 'A front-panel switch', 'The TEMPO knob'], 0, 'The twin shows it as a switch for convenience.'),
+    mc('On the hardware, the rhythm logic is set by…', ['MIDI CC 113 (a global setting)', 'A front-panel switch by the TEMPO knob', 'The TEMPO knob, turned fully up'], 0, 'The twin shows it as a switch for convenience.'),
   ],
 };
 
@@ -1182,7 +1182,7 @@ const sq2: Lesson = {
     {
       kind: 'predict', patchFrom: 'out_seq2', patchTo: 'in_vco1', concept: 'signal-routing',
       instruction: 'Patch SEQ 2 into VCO 1\'s input.',
-      predict: mc('What happens when SEQ 2 also feeds VCO 1?', ['Sequencer 1\'s loop is transposed each time Sequencer 2 steps', 'The two sequences take turns', 'Only Sequencer 2 is heard'], 0,
+      predict: mc('What happens when SEQ 2 also feeds VCO 1?', ['Sequencer 1\'s loop is transposed each time Sequencer 2 steps', 'The two sequences take turns, four steps of one and then the other', 'Only Sequencer 2 is heard, because a cable in VCO 1 replaces Sequencer 1'], 0,
         'The VCO 1 input is summed with the FREQ knob and Sequencer 1 (manual p.31), so SEQ 2 shifts the whole loop.'),
       principle: 'Control voltages patched to the same input add together.',
     },
@@ -1217,7 +1217,7 @@ const sq2: Lesson = {
   ],
   review: [
     mc('Two CVs into one VCO input…', ['Add together', 'Take turns', 'Cancel out'], 0, 'Inputs are summed.'),
-    mc('VCO 1 IN is normalled to…', ['VCO 2\'s pitch input', 'The filter', 'Nothing'], 0, 'Manual p.31.'),
+    mc('VCO 1 IN is normalled to…', ['VCO 2\'s pitch input', 'The filter\'s cutoff', 'Nothing at all'], 0, 'Manual p.31.'),
     mc('To transpose a loop once per cycle, the transposing sequencer runs…', ['4 times slower', '4 times faster', 'At the same rate'], 0, 'Four steps of the riff per root.'),
   ],
 };
@@ -1247,7 +1247,7 @@ const sq3: Lesson = {
     {
       kind: 'predict', control: 'seq1_step2', targetValue: 60, concept: 'subharmonics',
       instruction: 'Turn STEP 2 further clockwise, to about +60.',
-      predict: mc('Turning a STEP clockwise makes SUB 1\'s divisor…', ['Smaller, so that note moves up the undertone series', 'Larger, so it drops', 'Unchanged - only OSC moves pitch'], 0,
+      predict: mc('Turning a STEP clockwise makes SUB 1\'s divisor…', ['Smaller, so that note moves up the undertone series', 'Larger, so that note drops down the undertone series', 'Unchanged - only the OSC assignment can move a pitch'], 0,
         'Positive voltage raises the pitch, and for a divider that means a smaller divisor. SUB assign changes the whole number even with OSC dark (manual p.26).'),
       principle: 'Raising a divider\'s control lowers its divisor, so the sub\'s pitch rises.',
     },
@@ -1261,7 +1261,7 @@ const sq3: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'subharmonics',
-      quiz: mc('With only SUB 1 assigned, which part stays fixed?', ['VCO 1 and SUB 2', 'SUB 1', 'Nothing'], 0, 'Only SUB 1\'s divisor moves; the VCO and the other sub keep their settings.'),
+      quiz: mc('With only SUB 1 assigned, which part stays fixed?', ['VCO 1 and SUB 2', 'SUB 1 and SUB 2', 'None of the three'], 0, 'Only SUB 1\'s divisor moves; the VCO and the other sub keep their settings.'),
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern',
@@ -1284,7 +1284,7 @@ const sq3: Lesson = {
     },
   ],
   review: [
-    mc('SEQ ASSIGN SUB 1 changes…', ['SUB 1\'s whole number', 'VCO 1\'s pitch', 'The filter'], 0, 'Manual p.26.'),
+    mc('SEQ ASSIGN SUB 1 changes…', ['SUB 1\'s whole number', 'VCO 1\'s own pitch', 'The filter\'s cutoff'], 0, 'Manual p.26.'),
     mc('A smaller divisor means…', ['A higher sub pitch', 'A lower sub pitch', 'A quieter sub'], 0, 'f/2 is higher than f/3.'),
     mc('The SEQ ASSIGN buttons can be combined…', ['In any combination', 'Only one at a time', 'Only OSC with SUB 2'], 0, 'Manual p.26.'),
   ],
@@ -1308,7 +1308,7 @@ const pf1: Lesson = {
     {
       kind: 'predict', control: 'rhythm2_seq1', targetValue: false, concept: 'polyrhythm',
       instruction: 'Turn off RHYTHM 2\'s SEQ 1 button mid-phrase.',
-      predict: mc('What happens?', ['The extra hits drop out, leaving the plain ÷2 pulse', 'The sequencer stops', 'It resets to step 1'], 0,
+      predict: mc('What happens?', ['The extra hits drop out, leaving the plain ÷2 pulse', 'The sequencer stops until you assign a rhythm again', 'The sequence jumps back to step 1 and starts over'], 0,
         'Assignments take effect on the next pulse. Only RESET returns the sequence to step 1.'),
       principle: 'Removing a pulse source thins a rhythm at once without stopping it.',
     },
@@ -1326,7 +1326,7 @@ const pf1: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
-      quiz: mc('While RESET is held, the envelopes…', ['Keep firing from the assigned rhythms', 'Stop', 'Hold at maximum'], 0,
+      quiz: mc('While RESET is held, the envelopes…', ['Keep firing from the assigned rhythms', 'Stop until RESET is released', 'Hold at maximum, like a drone'], 0,
         'The hold only freezes the step position; the rhythm generators keep triggering notes, which is how you get the stutter.'),
     },
     {
@@ -1354,9 +1354,9 @@ const pf1: Lesson = {
     },
   ],
   review: [
-    mc('Holding RESET…', ['Freezes on step 1 while notes keep firing', 'Stops everything', 'Mutes the VCA'], 0, 'Manual p.29.'),
-    mc('Tapping RESET while playing restarts…', ['On the next clock pulse', 'After one bar', 'Only when stopped'], 0, 'Manual p.29.'),
-    mc('A change of assignment takes effect…', ['On the next pulse', 'After RESET', 'At power-up'], 0, 'The generators are read on every pulse.'),
+    mc('Holding RESET…', ['Freezes on step 1 while notes keep firing', 'Stops the clock and both sequencers', 'Mutes the VCA until you let go'], 0, 'Manual p.29.'),
+    mc('Tapping RESET while playing restarts…', ['On the next clock pulse', 'At the end of the bar', 'Only once PLAY is off'], 0, 'Manual p.29.'),
+    mc('A change of assignment takes effect…', ['On the next pulse', 'After the next RESET', 'At the next power-up'], 0, 'The generators are read on every pulse.'),
   ],
 };
 
@@ -1383,15 +1383,15 @@ const st1: Lesson = {
     {
       kind: 'predict', concept: 'timing-tempo', check: s => s.transport.playing,
       instruction: 'Press ▶ in the top bar.',
-      predict: mc('Synced at 120 BPM, RHYTHM 4 is ÷4. How often does Sequencer 2 step?', ['Every quarter note, twice a second', 'Every 16th note', 'Once a bar'], 0,
+      predict: mc('Synced at 120 BPM, RHYTHM 4 is ÷4. How often does Sequencer 2 step?', ['Every quarter note, twice a second', 'Every 16th note, eight times a second', 'Once a bar, every two seconds'], 0,
         'A 16th-note pulse ÷4 is a quarter note. On the internal clock the same ÷4 would follow TEMPO, which counts beats.'),
       principle: 'A follower divides the leader\'s clock, so divisions turn straight into note values.',
       solution: { transport: 'play' },
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
-      quiz: mc('Why does TEMPO do nothing now?', ['The studio\'s MIDI-style clock overrides the internal clock', 'PLAY is off', 'TEMPO only works with CLOCK IN'], 0,
-        'MIDI clock outranks TEMPO (manual p.25). "Only works with CLOCK IN" is backwards: a CLOCK cable also overrides TEMPO.'),
+      quiz: mc('Why does TEMPO do nothing now?', ['The studio\'s MIDI-style clock overrides the internal clock', 'PLAY is off, and TEMPO is only read while it runs', 'TEMPO only works with a cable in CLOCK IN'], 0,
+        'MIDI clock outranks TEMPO (manual p.25). "Only with a cable in CLOCK IN" is backwards: a CLOCK cable also overrides TEMPO.'),
     },
     {
       kind: 'challenge', instance: 'studio-clock', focus: ['out_clock'], concept: 'signal-routing',
@@ -1421,10 +1421,10 @@ const st1: Lesson = {
     },
   ],
   review: [
-    mc('Under MIDI clock the master pulse is…', ['A 16th note', 'A beat', 'A bar'], 0, 'Manual p.25.'),
-    mc('On the hardware the clock priority is…', ['MIDI > CLOCK IN > TEMPO', 'TEMPO > MIDI', 'CLOCK IN > MIDI'], 0, 'Manual p.25.'),
+    mc('Under MIDI clock the master pulse is…', ['A 16th note', 'A whole beat', 'A whole bar'], 0, 'Manual p.25.'),
+    mc('On the hardware the clock priority is…', ['MIDI > CLOCK IN > TEMPO', 'TEMPO > MIDI > CLOCK IN', 'CLOCK IN > MIDI > TEMPO'], 0, 'Manual p.25.'),
     mc('CLOCK OUT sends pulses…', ['Only while playing', 'Always', 'Only when stopped'], 0, 'Manual p.37.'),
-    mc('A gate into PLAY IN…', ['Plays while high and stops when it falls', 'Toggles on each edge', 'Resets the sequence'], 0, 'Rising edge = play, falling edge = stop (manual p.34).'),
+    mc('A gate into PLAY IN…', ['Plays while high and stops when it falls', 'Toggles play and stop on each rising edge', 'Resets the sequence to step 1'], 0, 'Rising edge = play, falling edge = stop (manual p.34).'),
   ],
 };
 
@@ -1463,7 +1463,7 @@ const st2: Lesson = {
     play('Now press the Subharmonicon\'s PLAY.', 'One leader clock keeps every instrument in time.'),
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'polyrhythm',
-      quiz: mc('RHYTHM 1 (÷2) and RHYTHM 2 (÷3) both drive Sequencer 1 with OR. On which master pulses does the DFAM step?', ['On the merged x.xxx. pattern', 'On every pulse', 'Only on the downbeat'], 0,
+      quiz: mc('RHYTHM 1 (÷2) and RHYTHM 2 (÷3) both drive Sequencer 1 with OR. On which master pulses does the DFAM step?', ['On the merged x.xxx. pattern', 'On every master pulse', 'Only on the shared downbeat'], 0,
         'SEQ 1 CLK pulses whenever Sequencer 1 moves, so the DFAM inherits its lopsided rhythm. CLOCK OUT would give every pulse.'),
     },
     {
@@ -1485,9 +1485,9 @@ const st2: Lesson = {
     },
   ],
   review: [
-    mc('Moog\'s order for syncing the DFAM is…', ['DFAM RUN/STOP first, then Subharmonicon PLAY', 'PLAY first, then RUN/STOP', 'Any order'], 0, 'Manual p.38.'),
-    mc('For a polyrhythmic DFAM, clock it from…', ['SEQ 1 CLK, SEQ 2 CLK or TRIGGER', 'VCA', 'MIDI IN'], 0, 'Manual p.38 tip.'),
-    mc('SEQ 1 CLK pulses…', ['Each time Sequencer 1 moves', 'On every master pulse', 'Once a bar'], 0, 'Manual p.36.'),
+    mc('Moog\'s order for syncing the DFAM is…', ['DFAM RUN/STOP first, then Subharmonicon PLAY', 'Subharmonicon PLAY first, then DFAM RUN/STOP', 'Any order, as long as both are running'], 0, 'Manual p.38.'),
+    mc('For a polyrhythmic DFAM, clock it from…', ['SEQ 1 CLK, SEQ 2 CLK or TRIGGER', 'CLOCK OUT, on every master pulse', 'MIDI IN on the back panel'], 0, 'Manual p.38 tip.'),
+    mc('SEQ 1 CLK pulses…', ['Each time Sequencer 1 moves', 'On every master pulse', 'Once on every bar line'], 0, 'Manual p.36.'),
     mc('With a cable in the DFAM\'s ADV/CLOCK, its TEMPO knob…', ['Is ignored', 'Sets the speed', 'Sets the volume'], 0, 'The external clock replaces it.'),
   ],
 };

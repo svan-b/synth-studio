@@ -100,7 +100,7 @@ const f1: Lesson = {
       instruction: 'Push the channel 1 fader all the way up.',
       predict: {
         question: 'The channel meter is already moving. What happens when the fader goes up?',
-        options: ['You hear TRACK A, and the channel meter stays the same', 'The channel meter jumps higher', 'Nothing: the master is off'], answer: 0,
+        options: ['You hear TRACK A, and the channel meter stays the same', 'You hear TRACK A, and the channel meter jumps higher', 'Nothing you can hear: the master section is still off'], answer: 0,
         explain: 'The channel meter reads before the fader (after GAIN and EQ), so it does not change. The fader decides how much reaches the LR MIX, and the LR MIX meters on the right jump up.',
       },
       principle: 'A fader is a variable attenuator after the meter: fully up is unity, fully down is silence.',
@@ -111,7 +111,7 @@ const f1: Lesson = {
       instruction: 'Set channel 1 INPUT to USB 1.',
       predict: {
         question: 'No audio file is loaded on USB 1. What will you hear?',
-        options: ['Silence: nothing is plugged into that input', 'TRACK A, as before', 'The deck on channel 2'], answer: 0,
+        options: ['Silence: nothing is plugged into that input', 'TRACK A, as before: the deck keeps feeding it', 'TRACK B: the deck on channel 2 takes over instead'], answer: 0,
         explain: 'The input switch picks which socket feeds the channel. USB 1 is the computer input, and nothing is playing on it, so the channel goes quiet however high the fader is.',
       },
       principle: 'An input selector is the first switch in the chain: wrong position, no signal.',
@@ -129,7 +129,7 @@ const f1: Lesson = {
       instruction: 'Turn MASTER 1 down to about 6. Watch the LR MIX meters.',
       predict: {
         question: 'Will the LR MIX meters drop when you turn MASTER 1 down?',
-        options: ['No: they read the mix before MASTER 1', 'Yes, by the same amount', 'They switch off'], answer: 0,
+        options: ['No: they read the mix before MASTER 1', 'Yes: they fall by the same amount', 'They switch off until it is turned up'], answer: 0,
         explain: 'On the Xone:96 the LR MIX meters show the mix bus before the master control. MASTER 1 only sets how hard the mix drives the amplifier, so it gets quieter while the meters stay put.',
       },
       principle: 'The master sets the output level, not the balance inside the mix.',
@@ -159,7 +159,7 @@ const f1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'gain-staging',
       quiz: {
         question: 'Where does a Xone:96 channel meter read the signal?',
-        options: ['After GAIN and EQ, before the fader', 'After the fader', 'After MASTER 1'], answer: 0,
+        options: ['After GAIN and EQ, before the fader', 'After the fader, before the crossfader', 'After MASTER 1, at the outputs'], answer: 0,
         explain: 'Post-GAIN, post-EQ, pre-fader: you can set and check a channel before anyone hears it. The LR MIX meters read the summed mix, also before MASTER 1.',
       },
     },
@@ -183,10 +183,10 @@ const f1: Lesson = {
     },
   ],
   review: [
-    { question: 'A Xone:96 channel meter reads…', options: ['After GAIN and EQ, before the fader', 'After the fader', 'After MASTER 1'], answer: 0, explain: 'Pre-fader, so you can set levels silently.' },
+    { question: 'A Xone:96 channel meter reads…', options: ['After GAIN and EQ, before the fader', 'After the fader, before the crossfader', 'After MASTER 1, at the outputs'], answer: 0, explain: 'Pre-fader, so you can set levels silently.' },
     { question: 'INPUT is on USB 1 with no file loaded. You hear…', options: ['Silence', 'The built-in deck', 'The master'], answer: 0, explain: 'Wrong input, no signal.' },
-    { question: 'Turning MASTER 1 down changes…', options: ['The output level, not the LR MIX meters', 'The LR MIX meters', 'The channel meters'], answer: 0, explain: 'The meters read before MASTER 1.' },
-    { question: 'A channel fader fully up means…', options: ['Unity gain', '+10 dB', 'Mute'], answer: 0, explain: 'Off at the bottom, unity at the top.' },
+    { question: 'Turning MASTER 1 down changes…', options: ['The output level, not the LR MIX meters', 'The LR MIX meters, not the output level', 'The channel meters and the cue level'], answer: 0, explain: 'The meters read before MASTER 1.' },
+    { question: 'A channel fader fully up means…', options: ['Unity gain', '+10 dB of boost', 'A muted channel'], answer: 0, explain: 'Off at the bottom, unity at the top.' },
   ],
 };
 
@@ -206,7 +206,7 @@ const f2: Lesson = {
       instruction: 'TRACK B plays into channel 2 with its fader down. Turn channel 2 GAIN fully anticlockwise (-∞).',
       predict: {
         question: 'Where is GAIN in the channel?',
-        options: ['First, right after the input switch', 'After the fader', 'On the master'], answer: 0,
+        options: ['First, right after the input switch', 'Last, right after the channel fader', 'On the master, after the LR MIX'], answer: 0,
         explain: 'GAIN is the first stage after the input. The channel 2 meter goes dark because nothing passes GAIN at -∞, even though TRACK B is still playing.',
       },
       principle: 'Gain is multiplication: at zero, nothing reaches the rest of the channel.',
@@ -224,7 +224,7 @@ const f2: Lesson = {
       instruction: 'Turn channel 2 GAIN up to +10 dB and watch the top of its meter and the PK! LED beside GAIN.',
       predict: {
         question: 'What will the meter show?',
-        options: ['The +10 LED and the PK! LED flash: little headroom is left', 'It stays the same', 'It switches off'], answer: 0,
+        options: ['The +10 LED and the PK! LED flash: little headroom is left', 'It stays the same: the meter reads before the GAIN knob', 'It switches off: the channel mutes itself above +10'], answer: 0,
         explain: '+10 dB of gain lifts the peaks to around +18 dBu, right under the channel\'s +20 dBu ceiling. PK! sits right after GAIN and warns you (the twin lights it from +15 dBu); the guide\'s fix for a lit PK! is to turn that channel\'s GAIN down.',
       },
       principle: 'Headroom is the space between your normal level and the point where the circuit clips.',
@@ -246,7 +246,7 @@ const f2: Lesson = {
         labels: ['Clean', 'Over-driven'],
         question: {
           question: 'Apart from loudness, what gives the over-driven one away?',
-          options: ['A harsh, crunchy edge on the kick and bass', 'More reverb', 'A lower pitch'], answer: 0,
+          options: ['A harsh, crunchy edge on the kick and bass', 'More reverb around the kick and bass', 'A lower pitch on the kick and bass'], answer: 0,
           explain: 'Clipping flattens the tops of the loudest waves, which adds harmonics that were never in the music. Matching the loudness lets you hear the damage instead of just "louder".',
         },
       },
@@ -261,7 +261,7 @@ const f2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'gain-staging',
       quiz: {
         question: 'Why match two tracks\' meters with GAIN before you blend?',
-        options: ['So the same fader position means the same loudness and the blend stays even', 'It makes their tempos match', 'It stops the EQ working'], answer: 0,
+        options: ['So the same fader position means the same loudness and the blend stays even', 'So their tempos line up and the beats of the two tracks stay together', 'So the EQ of the quieter track has less work to do during the blend'], answer: 0,
         explain: 'Records are mastered at different levels. Matching them at GAIN means you can blend with the faders fully up, and neither track jumps out. Tempo is set by the decks, not GAIN.',
       },
     },
@@ -285,10 +285,10 @@ const f2: Lesson = {
     },
   ],
   review: [
-    { question: 'The manual\'s target for a channel meter is…', options: ['Average about 0, peaks about +6', 'Always on +10', 'As low as possible'], answer: 0, explain: 'Room for peaks and boosts.' },
-    { question: 'The PK! LED beside a channel\'s GAIN lights. You turn down…', options: ['That channel\'s GAIN', 'Its fader', 'MASTER 1'], answer: 0, explain: 'PK! reads right after GAIN, before the EQ. If the meter\'s +10 LED stays lit, take back GAIN or an EQ boost.' },
-    { question: 'EQ boosts…', options: ['Raise the level, just like gain', 'Never change the level', 'Lower the level'], answer: 0, explain: 'They add energy.' },
-    { question: 'Clipping sounds…', options: ['Harsh and crunchy', 'Muffled', 'Slower'], answer: 0, explain: 'Flattened peaks add harmonics.' },
+    { question: 'The manual\'s target for a channel meter is…', options: ['Average about 0, peaks about +6', 'Always on +10, PK! just lit', 'As low as possible, to be safe'], answer: 0, explain: 'Room for peaks and boosts.' },
+    { question: 'The PK! LED beside a channel\'s GAIN lights. You turn down…', options: ['That channel\'s GAIN', 'That channel\'s fader', 'The MASTER 1 level knob'], answer: 0, explain: 'PK! reads right after GAIN, before the EQ. If the meter\'s +10 LED stays lit, take back GAIN or an EQ boost.' },
+    { question: 'EQ boosts…', options: ['Raise the level, just like gain', 'Never change the level at all', 'Lower the level a little'], answer: 0, explain: 'They add energy.' },
+    { question: 'Clipping sounds…', options: ['Harsh and crunchy', 'Muffled and distant', 'Slower and deeper'], answer: 0, explain: 'Flattened peaks add harmonics.' },
   ],
 };
 
@@ -308,7 +308,7 @@ const f3: Lesson = {
       instruction: 'Turn channel 1 LO fully anticlockwise, to KILL. Watch the left end of the spectrum.',
       predict: {
         question: 'FULL MIX is a whole band. Which parts will disappear?',
-        options: ['The kick\'s thump and the bassline', 'The hi-hats', 'The chords'], answer: 0,
+        options: ['The kick\'s thump and the bassline', 'The hi-hats and the shaker', 'The chords and the melody'], answer: 0,
         explain: 'LO covers everything below about 180 Hz: the kick and the bass notes. Hats and chords live higher, so they stay.',
       },
       principle: 'Pitch is frequency: drum thumps and low notes sit below about 180 Hz.',
@@ -324,7 +324,7 @@ const f3: Lesson = {
       instruction: 'Now kill HI (fully anticlockwise).',
       predict: {
         question: 'What goes this time?',
-        options: ['The hats, the shaker and the sparkle on top', 'The kick', 'Everything'], answer: 0,
+        options: ['The hats, the shaker and the sparkle on top', 'The kick, the bassline and the weight below', 'Everything except the chords in the middle'], answer: 0,
         explain: 'HI covers above about 3 kHz: hats, shakers and the air and edge of every sound. What is left sounds dull, as if a door were shut.',
       },
       principle: 'High frequencies carry sizzle, air and the sharp starts of sounds.',
@@ -354,7 +354,7 @@ const f3: Lesson = {
         a: { ch1_himid: 0 }, b: { ch1_himid: -1 }, labels: ['Flat', 'HI MID cut'],
         question: {
           question: 'What did the HI MID cut take away?',
-          options: ['The crack of the clap and the bite of the chords', 'The kick\'s thump', 'The hi-hat sizzle'], answer: 0,
+          options: ['The crack of the clap and the bite of the chords', 'The thump of the kick and the weight of the bass', 'The sizzle of the hi-hats and the air on top'], answer: 0,
           explain: 'Around 1 kHz is where presence lives: snare crack, vocal clarity and the attack of synths. The kick sits much lower and the hats much higher.',
         },
       },
@@ -363,7 +363,7 @@ const f3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'equalization',
       quiz: {
         question: 'A kick drum\'s thump is mostly in which band?',
-        options: ['LO, below 180 Hz', 'HI MID, around 1.1 kHz', 'HI, above 3 kHz'], answer: 0,
+        options: ['LO, below 180 Hz', 'HI MID, around 1.1 kHz', 'HI, above about 3 kHz'], answer: 0,
         explain: 'The thump is 40-100 Hz. The click of the beater is higher (2-4 kHz), which is why a kick with HI killed still thumps.',
       },
     },
@@ -393,9 +393,9 @@ const f3: Lesson = {
     },
   ],
   review: [
-    { question: 'LO on the Xone:96 covers…', options: ['Below 180 Hz', 'Around 1.1 kHz', 'Above 3 kHz'], answer: 0, explain: 'Kick and bass.' },
-    { question: 'Killing HI removes…', options: ['Hats and air', 'The kick', 'Nothing'], answer: 0, explain: 'Everything above about 3 kHz.' },
-    { question: 'The Xone:96 mid bands can…', options: ['Cut -27 dB and boost +10 dB', 'Kill completely', 'Only boost'], answer: 0, explain: 'The asymmetric EQ.' },
+    { question: 'LO on the Xone:96 covers…', options: ['Below 180 Hz', 'Around 1.1 kHz', 'Above about 3 kHz'], answer: 0, explain: 'Kick and bass.' },
+    { question: 'Killing HI removes…', options: ['Hats and air', 'The kick\'s thump', 'Nothing you can hear'], answer: 0, explain: 'Everything above about 3 kHz.' },
+    { question: 'The Xone:96 mid bands can…', options: ['Cut -27 dB and boost +10 dB', 'Kill completely, like HI and LO', 'Only boost, up to +10 dB'], answer: 0, explain: 'The asymmetric EQ.' },
     { question: 'A muddy blend usually has too much…', options: ['LO MID', 'HI', 'Reverb'], answer: 0, explain: 'Body piles up around 200-500 Hz.' },
   ],
 };
@@ -418,7 +418,7 @@ const f4: Lesson = {
         a: { ch2_fader: 0 }, b: { ch2_fader: 10 }, labels: ['Drums alone', 'Drums + bass'],
         question: {
           question: 'With the bass added, what happens to the kick\'s thump?',
-          options: ['It blurs: both fight for the low end', 'It gets brighter', 'Nothing changes'], answer: 0,
+          options: ['It blurs: both fight for the low end', 'It gets brighter: the bass adds highs', 'Nothing changes: the two never overlap'], answer: 0,
           explain: 'The kick and the bass notes both sit below about 180 Hz. Your ear cannot separate two loud sounds in the same band - that is masking.',
         },
       },
@@ -428,7 +428,7 @@ const f4: Lesson = {
       instruction: 'Try the obvious fix: turn channel 2 LO up to +6 dB to make the bass stand out.',
       predict: {
         question: 'What will boosting the bass do?',
-        options: ['The low end gets boomier and the kick blurs even more', 'The kick gets clearer', 'The bass gets quieter'], answer: 0,
+        options: ['The low end gets boomier and the kick blurs even more', 'The kick gets clearer, because the bass now sits above it', 'The bass gets quieter, because the boost eats its headroom'], answer: 0,
         explain: 'A boost adds even more energy exactly where the clash is. It also eats headroom: watch channel 2\'s meter climb.',
       },
       principle: 'Boosting adds level where the clash is; it rarely creates space.',
@@ -454,7 +454,7 @@ const f4: Lesson = {
         a: { ch2_lo: 1, ch1_lomid: 0 }, b: { ch2_lo: -0.29, ch1_lomid: -0.5 }, labels: ['Boosted', 'Carved'],
         question: {
           question: 'Which one lets you hear both the kick and the bass clearly?',
-          options: ['Carved: the cuts made room for both', 'Boosted: louder is clearer', 'They are the same'], answer: 0,
+          options: ['Carved: the cuts made room for both', 'Boosted: louder is always clearer', 'Neither: they sound the same'], answer: 0,
           explain: 'Carving gives each part its own frequency range. The boosted one is louder, and louder always sounds "better" for a moment, but the kick and bass are still smeared together.',
         },
       },
@@ -463,7 +463,7 @@ const f4: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'gain-staging',
       quiz: {
         question: 'Why do DJs and mix engineers cut more often than they boost?',
-        options: ['Cuts make room without eating headroom; boosts add level and can clip', 'Boosting is impossible on the Xone:96', 'Cuts keep the tracks in time'], answer: 0,
+        options: ['Cuts make room without eating headroom; boosts add level and can clip', 'Boosting is impossible on the Xone:96: its EQ knobs only turn down', 'Cuts keep two tracks in time; boosts make their beats drift apart'], answer: 0,
         explain: 'The Xone can boost, +6 dB on HI/LO and +10 dB on the mids, but every boost uses up headroom. A cut solves masking by removing the clash instead of shouting over it.',
       },
     },
@@ -494,10 +494,10 @@ const f4: Lesson = {
     },
   ],
   review: [
-    { question: 'Kick and bass blur together because…', options: ['They share the low frequencies', 'Their tempos differ', 'The filter is on'], answer: 0, explain: 'Masking in the same band.' },
-    { question: 'LO at -6 dB means…', options: ['Half the amplitude below 180 Hz', 'A full kill', 'A boost'], answer: 0, explain: '-6 dB is about half.' },
-    { question: 'Boosting the bass to fix a clash usually…', options: ['Makes the low end boomier and eats headroom', 'Makes the kick clearer', 'Changes the key'], answer: 0, explain: 'More energy in the clash.' },
-    { question: 'Carving means…', options: ['Cutting one sound where another needs space', 'Boosting everything', 'Raising MASTER 1'], answer: 0, explain: 'Each part gets its own band.' },
+    { question: 'Kick and bass blur together because…', options: ['They share the low frequencies', 'Their tempos differ slightly', 'The filter is switched on'], answer: 0, explain: 'Masking in the same band.' },
+    { question: 'LO at -6 dB means…', options: ['Half the amplitude below 180 Hz', 'A full kill below 180 Hz', 'A small boost in level below 180 Hz'], answer: 0, explain: '-6 dB is about half.' },
+    { question: 'Boosting the bass to fix a clash usually…', options: ['Makes the low end boomier and eats headroom', 'Makes the kick clearer and adds headroom', 'Changes the key of the bassline'], answer: 0, explain: 'More energy in the clash.' },
+    { question: 'Carving means…', options: ['Cutting one sound where another needs space', 'Boosting every band of every channel a little', 'Raising MASTER 1 until the mix is clear'], answer: 0, explain: 'Each part gets its own band.' },
   ],
 };
 
@@ -531,7 +531,7 @@ const f5: Lesson = {
       instruction: 'Turn FILTER 1 FREQ up to about 800 Hz.',
       predict: {
         question: 'FILTER 1 is a high-pass. What will turning FREQ up do?',
-        options: ['Remove the lows: the kick and bass thin out', 'Remove the highs', 'Lower the pitch'], answer: 0,
+        options: ['Remove the lows: the kick and bass thin out', 'Remove the highs: the hats and chords dull', 'Lower the pitch: the whole track drops'], answer: 0,
         explain: 'A high-pass passes what is above its cutoff and removes what is below. At 800 Hz the kick and bass are gone and the track sounds thin, like a phone.',
       },
       principle: 'A high-pass filter removes frequencies below its cutoff.',
@@ -558,7 +558,7 @@ const f5: Lesson = {
         a: { f1_type: 0, f1_res: 3 }, b: { f1_type: 2, f1_res: 3 }, labels: ['HPF at 800 Hz', 'LPF at 800 Hz'],
         question: {
           question: 'Which one sounds thin, like a phone speaker?',
-          options: ['The HPF: only the top is left', 'The LPF', 'Neither'], answer: 0,
+          options: ['The HPF: only the top is left', 'The LPF: only the bass is left', 'Neither: both of them keep the bass'], answer: 0,
           explain: 'A phone speaker cannot reproduce bass, so a high-pass sounds like it. The low-pass keeps the bass and sounds muffled, like music through a wall.',
         },
       },
@@ -606,10 +606,10 @@ const f5: Lesson = {
     },
   ],
   review: [
-    { question: 'A channel assigned to FILTER 1 while FILTER 1 is OFF…', options: ['Passes through unfiltered', 'Goes silent', 'Gets distorted'], answer: 0, explain: 'OFF means not affected.' },
+    { question: 'A channel assigned to FILTER 1 while FILTER 1 is OFF…', options: ['Passes through unfiltered', 'Goes silent until it is on', 'Gets a little distorted'], answer: 0, explain: 'OFF means not affected.' },
     { question: 'A high-pass filter…', options: ['Removes the lows', 'Removes the highs', 'Changes the tempo'], answer: 0, explain: 'It passes the highs.' },
-    { question: 'RES near WILD…', options: ['Adds a resonant peak at the cutoff', 'Removes everything', 'Adds reverb'], answer: 0, explain: 'Output fed back to the input: about +7.6 dB at FREQ.' },
-    { question: 'CRUNCH is…', options: ['Distortion before the filter', 'A delay', 'A second fader'], answer: 0, explain: 'Harmonic distortion, pre-filter.' },
+    { question: 'RES near WILD…', options: ['Adds a resonant peak at the cutoff', 'Removes everything above the cutoff', 'Adds a reverb tail to the filter'], answer: 0, explain: 'Output fed back to the input: about +7.6 dB at FREQ.' },
+    { question: 'CRUNCH is…', options: ['Distortion before the filter', 'A delay after the filter', 'A second fader for the filter'], answer: 0, explain: 'Harmonic distortion, pre-filter.' },
   ],
 };
 
@@ -639,7 +639,7 @@ const f6: Lesson = {
       instruction: 'Set channel 2\'s XFADER switch to Y.',
       predict: {
         question: 'The crossfader is fully on X. What happens to TRACK B?',
-        options: ['It goes silent: the Y side is closed', 'It gets louder', 'Nothing'], answer: 0,
+        options: ['It goes silent: the Y side is closed', 'It gets louder: Y takes over the mix', 'Nothing: it plays on at the same level'], answer: 0,
         explain: 'A crossfader is two linked faders: X fully open means Y fully closed. Channels on OFF ignore it.',
       },
       principle: 'A crossfader is a pair of linked faders: as one side opens, the other closes.',
@@ -659,7 +659,7 @@ const f6: Lesson = {
         a: { xf_curve: 0, xfader: 5 }, b: { xf_curve: 1, xfader: 5 }, labels: ['CONST PWR', 'TRANSITION'],
         question: {
           question: 'In the middle, the TRANSITION curve sounds…',
-          options: ['Louder: both tracks stay at full level', 'Quieter', 'Muted'], answer: 0,
+          options: ['Louder: both tracks stay at full level', 'Quieter: both tracks dip to half level', 'Muted: neither track passes the middle'], answer: 0,
           explain: 'TRANSITION holds both sides at full level across the middle; each side only fades in the last stretch of travel, close to the far end (the guide\'s curve graph). CONST PWR dips each side to about -3 dB in the middle.',
         },
       },
@@ -706,11 +706,11 @@ const f6: Lesson = {
     },
   ],
   review: [
-    { question: 'A channel with its XFADER switch on OFF…', options: ['Ignores the crossfader', 'Is muted', 'Follows X'], answer: 0, explain: 'It goes straight to the LR MIX.' },
+    { question: 'A channel with its XFADER switch on OFF…', options: ['Ignores the crossfader', 'Is muted in the main mix', 'Follows the X side'], answer: 0, explain: 'It goes straight to the LR MIX.' },
     { question: 'CONST PWR in the middle puts each side at about…', options: ['-3 dB', '-20 dB', '+6 dB'], answer: 0, explain: 'Equal power.' },
-    { question: 'TRANSITION in the middle puts each side at…', options: ['Full level', '-3 dB', 'Silence'], answer: 0, explain: 'It fades each side only near the far end.' },
-    { question: 'FAST CUT is for…', options: ['Cuts and scratching', 'Long blends', 'Recording'], answer: 0, explain: 'Almost instant cut-in.' },
-    { question: 'The crossfader sits after the channel fader, so it also sets…', options: ['The level into the filters', 'The GAIN', 'The cue level'], answer: 0, explain: 'It is a VCA before the FILTER assign.' },
+    { question: 'TRANSITION in the middle puts each side at…', options: ['Full level', '-3 dB each', 'Complete silence'], answer: 0, explain: 'It fades each side only near the far end.' },
+    { question: 'FAST CUT is for…', options: ['Cuts and scratching', 'Long, smooth blends', 'Recording a mix'], answer: 0, explain: 'Almost instant cut-in.' },
+    { question: 'The crossfader sits after the channel fader, so it also sets…', options: ['The level into the filters', 'The GAIN of the channel', 'The level in the headphones'], answer: 0, explain: 'It is a VCA before the FILTER assign.' },
   ],
 };
 
@@ -730,7 +730,7 @@ const f7: Lesson = {
       instruction: 'Turn channel 3 SEND 1 up to 6.',
       predict: {
         question: 'SEND 1 feeds the delay, which returns on channel A. What will you hear?',
-        options: ['Echoes of the stabs, in time with the beat', 'The stabs get louder', 'Nothing: channel A is off'], answer: 0,
+        options: ['Echoes of the stabs, in time with the beat', 'The stabs get louder, with no echoes', 'Nothing new: channel A is switched off'], answer: 0,
         explain: 'A send copies part of the channel to the effect. The delay\'s repeats come back on channel A, whose INPUT is on RTN and whose fader is up. The dry stabs keep playing on channel 3.',
       },
       principle: 'A send copies part of a channel to an effect; the effect comes back on a return.',
@@ -754,7 +754,7 @@ const f7: Lesson = {
       instruction: 'Pull channel 3\'s fader all the way down.',
       predict: {
         question: 'Channel 3\'s PRE is off, and SEND 2 is always post-fader. What happens to the echoes and the reverb?',
-        options: ['Their input stops, so they ring out and fade', 'They keep going at full level', 'They get louder'], answer: 0,
+        options: ['Their input stops, so they ring out and fade', 'They keep going at full level, fed as before', 'They get louder, as the dry sound drops away'], answer: 0,
         explain: 'Post-fader sends are taken after the channel fader. Fader down means nothing new goes in, and the tails die away naturally.',
       },
       principle: 'A post-fader send follows the channel fader.',
@@ -774,7 +774,7 @@ const f7: Lesson = {
         a: { ch3_pre: false, ch3_fader: 0 }, b: { ch3_pre: true, ch3_fader: 0 }, labels: ['POST', 'PRE'],
         question: {
           question: 'Why do you hear echoes only with PRE?',
-          options: ['PRE taps the channel before its fader', 'PRE turns the fader up', 'PRE adds reverb'], answer: 0,
+          options: ['PRE taps the channel before its fader', 'PRE turns the channel\'s fader up', 'PRE adds reverb to the send'], answer: 0,
           explain: 'With PRE the send sits before the fader, so the delay still gets the stabs. With POST the fader is the gate.',
         },
       },
@@ -783,7 +783,7 @@ const f7: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
       quiz: {
         question: 'Channel A\'s INPUT is on RTN. What is playing on it?',
-        options: ['The delay\'s output (the return of SEND 1)', 'Channel 1\'s dry signal', 'A microphone'], answer: 0,
+        options: ['The delay\'s output (the return of SEND 1)', 'Channel 1\'s dry signal (a copy of its fader)', 'A microphone (on the front-panel MIC input)'], answer: 0,
         explain: 'RTN is the return input. In the twin, SEND 1 drives the stand-in delay and its output comes back on RTN A; SEND 2 drives the reverb, back on RTN B.',
       },
     },
@@ -810,8 +810,8 @@ const f7: Lesson = {
   review: [
     { question: 'A send…', options: ['Copies part of a channel to an effect', 'Moves a channel to the other side', 'Mutes a channel'], answer: 0, explain: 'The dry signal keeps playing.' },
     { question: 'SEND 2 on the Xone:96 is…', options: ['Always post-fader', 'Always pre-fader', 'Switchable'], answer: 0, explain: 'Only SEND 1 has PRE.' },
-    { question: 'SEND 1 on PRE with the fader down, the delay…', options: ['Still gets signal', 'Gets nothing', 'Doubles'], answer: 0, explain: 'PRE is before the fader.' },
-    { question: 'In the twin the effects return on…', options: ['Channels A and B (RTN)', 'The master only', 'The headphones only'], answer: 0, explain: 'RTN A and RTN B.' },
+    { question: 'SEND 1 on PRE with the fader down, the delay…', options: ['Still gets signal', 'Gets no signal at all', 'Gets twice the signal'], answer: 0, explain: 'PRE is before the fader.' },
+    { question: 'In the twin the effects return on…', options: ['Channels A and B (RTN)', 'The master mix only', 'The headphones only (CUE)'], answer: 0, explain: 'RTN A and RTN B.' },
   ],
 };
 
@@ -841,7 +841,7 @@ const f8: Lesson = {
       instruction: 'Press channel 2\'s CUE.',
       predict: {
         question: 'What do you hear in the headphones now?',
-        options: ['TRACK B, even though the room cannot hear it', 'TRACK A, as before', 'Nothing'], answer: 0,
+        options: ['TRACK B, even though the room cannot hear it', 'TRACK A, as before: cue only changes the meters', 'Nothing: the headphones mute until the fader is up'], answer: 0,
         explain: 'Once a CUE is on, the headphones switch from the program to the cue. CUE taps the channel before its fader and the crossfader, so you hear TRACK B while the room still hears only TRACK A. The CUE ACTIVE LED in the MONITOR section lights.',
       },
       principle: 'Cue listens to a channel before its fader, so you can preview it silently.',
@@ -868,7 +868,7 @@ const f8: Lesson = {
         a: { split_cue: false, cue_mix: 0 }, b: { split_cue: true }, labels: ['Cue only', 'Split cue'],
         question: {
           question: 'In split cue, where is TRACK A?',
-          options: ['In the right ear (the master mix)', 'In both ears', 'Nowhere'], answer: 0,
+          options: ['In the right ear (the master mix)', 'In both ears (the full mix)', 'In the left ear (the cue)'], answer: 0,
           explain: 'SPLIT CUE sends the cued channel to the left and the LR MIX to the right. TRACK A is the live mix, so it sits on the right.',
         },
       },
@@ -877,7 +877,7 @@ const f8: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'gain-staging',
       quiz: {
         question: 'While a CUE is on (no split), what do the LR MIX meters show?',
-        options: ['The cued channel\'s level', 'The master only', 'Nothing'], answer: 0,
+        options: ['The cued channel\'s level', 'The master mix, as always', 'Nothing: they go dark'], answer: 0,
         explain: 'Cueing switches the main meters to the cued channels (their sum, if several are cued), so you can check the incoming level before it goes out. With nothing cued they read the LR MIX before MASTER 1; SPLIT CUE shows both, cue left and mix right.',
       },
       manualReference: REF.master,
@@ -908,11 +908,11 @@ const f8: Lesson = {
     },
   ],
   review: [
-    { question: 'CUE sends a channel to…', options: ['The headphones (MONITOR)', 'The master', 'The booth'], answer: 0, explain: 'Preview only.' },
-    { question: 'SPLIT CUE puts…', options: ['The cue in one ear, the mix in the other', 'Both tracks in both ears', 'The booth in the headphones'], answer: 0, explain: 'Left cue, right mix.' },
-    { question: 'Pressing a new CUE on the Xone:96 (AUTO-CUE)…', options: ['Cancels the previous one', 'Adds to it', 'Mutes the master'], answer: 0, explain: 'One cue at a time by default.' },
-    { question: 'CUE/MST turned fully clockwise plays…', options: ['The cue and the LR MIX together', 'Only the LR MIX', 'Only the cue'], answer: 0, explain: 'It adds the mix to the cue; the cue never fades out.' },
-    { question: 'With no CUE pressed, the MONITOR headphones play…', options: ['The LR MIX (the program)', 'Silence', 'Channel 1'], answer: 0, explain: 'The cue takes over only while a CUE is on.' },
+    { question: 'CUE sends a channel to…', options: ['The headphones (MONITOR)', 'The master mix (MASTER 1)', 'The booth (BOOTH)'], answer: 0, explain: 'Preview only.' },
+    { question: 'SPLIT CUE puts…', options: ['The cue in one ear, the mix in the other', 'Both tracks in both ears, at half level', 'The booth mix in both of the headphones'], answer: 0, explain: 'Left cue, right mix.' },
+    { question: 'Pressing a new CUE on the Xone:96 (AUTO-CUE)…', options: ['Cancels the previous one', 'Adds to the previous one', 'Mutes the master output'], answer: 0, explain: 'One cue at a time by default.' },
+    { question: 'CUE/MST turned fully clockwise plays…', options: ['The cue and the LR MIX together', 'Only the LR MIX, without the cue', 'Only the cue, without the LR MIX'], answer: 0, explain: 'It adds the mix to the cue; the cue never fades out.' },
+    { question: 'With no CUE pressed, the MONITOR headphones play…', options: ['The LR MIX (the program)', 'Silence (nothing is cued)', 'Channel 1 (the first deck)'], answer: 0, explain: 'The cue takes over only while a CUE is on.' },
   ],
 };
 
@@ -953,7 +953,7 @@ const p1: Lesson = {
       instruction: 'Before the blend, kill channel 2\'s LO.',
       predict: {
         question: 'Why kill TRACK B\'s bass before it comes in?',
-        options: ['Two basslines and kicks at once clash and boom', 'It makes TRACK B louder', 'It changes the tempo'], answer: 0,
+        options: ['Two basslines and kicks at once clash and boom', 'It makes TRACK B louder when it arrives', 'It pulls TRACK B\'s tempo towards TRACK A\'s'], answer: 0,
         explain: 'Both tracks have a kick and a bass in the same band. Bringing B in without its lows keeps the low end clean until you swap them.',
       },
       principle: 'Only one track should own the low end at a time.',
@@ -1001,7 +1001,7 @@ const p1: Lesson = {
     { question: 'A bar of 4/4 has…', options: ['4 beats', '8 beats', '16 beats'], answer: 0, explain: 'Four quarter notes.' },
     { question: 'A phrase in house music is usually…', options: ['8 bars', '2 beats', '100 bars'], answer: 0, explain: '32 beats.' },
     { question: 'TRACK A marks each phrase with…', options: ['A crash cymbal', 'Silence', 'A tempo change'], answer: 0, explain: 'On the first beat.' },
-    { question: 'Start a blend…', options: ['On the first bar of a phrase', 'Halfway through a bar', 'Anywhere'], answer: 0, explain: 'Where the music changes.' },
+    { question: 'Start a blend…', options: ['On the first bar of a phrase', 'Halfway through any bar you like', 'Anywhere in the track'], answer: 0, explain: 'Where the music changes.' },
   ],
 };
 
@@ -1038,7 +1038,7 @@ const p2: Lesson = {
         a: { ch1_lo: 0, ch2_lo: -1 }, b: { ch1_lo: -1, ch2_lo: 0 }, labels: ['Before', 'After'],
         question: {
           question: 'What moved from one track to the other?',
-          options: ['The kick and the bassline', 'The hi-hats', 'The tempo'], answer: 0,
+          options: ['The kick and the bassline', 'The hi-hats and the claps', 'The tempo and the key'], answer: 0,
           explain: 'Only the LO band swapped. Above 180 Hz both tracks still play.',
         },
       },
@@ -1059,7 +1059,7 @@ const p2: Lesson = {
       instruction: 'Over a phrase, sweep FILTER 1 FREQ up to about 1.5 kHz.',
       predict: {
         question: 'What does a rising high-pass do to TRACK A?',
-        options: ['Thins it out until only the top is left', 'Makes it bassier', 'Speeds it up'], answer: 0,
+        options: ['Thins it out until only the top is left', 'Makes it bassier until only the lows are left', 'Speeds it up until it matches TRACK B'], answer: 0,
         explain: 'The cutoff climbs through the mids, so less and less of TRACK A is left, while TRACK B keeps playing in full.',
       },
       principle: 'Sweeping a high-pass up removes more and more of a sound, starting from the bottom.',
@@ -1074,7 +1074,7 @@ const p2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'equalization',
       quiz: {
         question: 'Why swap the bass instead of letting both tracks play it?',
-        options: ['Two basslines at once clash and overload the low end', 'The mixer requires it', 'It keeps the hats in time'], answer: 0,
+        options: ['Two basslines at once clash and overload the low end', 'The mixer only passes one LO band at a time', 'It keeps the hats of the two tracks in time'], answer: 0,
         explain: 'Two kicks and two bass parts pile up below 180 Hz: boomy, muddy and hot on the meters. One owner at a time keeps it clean.',
       },
     },
@@ -1098,9 +1098,9 @@ const p2: Lesson = {
     },
   ],
   review: [
-    { question: 'A bass swap moves…', options: ['The LO band from one track to the other', 'The tempo', 'The hats'], answer: 0, explain: 'Kick and bass change owner.' },
+    { question: 'A bass swap moves…', options: ['The LO band from one track to the other', 'The tempo from one deck to the other', 'The hats from one channel to the other'], answer: 0, explain: 'Kick and bass change owner.' },
     { question: 'A filter exit on the old track usually uses…', options: ['A high-pass sweeping up', 'A low-pass sweeping up', 'No filter'], answer: 0, explain: 'It thins the track away.' },
-    { question: 'The best moment for a bass swap is…', options: ['The first beat of a phrase', 'Any off-beat', 'The middle of a bar'], answer: 0, explain: 'Where the music changes.' },
+    { question: 'The best moment for a bass swap is…', options: ['The first beat of a phrase', 'Any off-beat, between two kicks', 'The middle of a bar'], answer: 0, explain: 'Where the music changes.' },
   ],
 };
 
@@ -1126,7 +1126,7 @@ const p3: Lesson = {
       instruction: 'TRACK B reads too hot. Set channel 2 GAIN to about -1.5 dB, level with TRACK A.',
       predict: {
         question: 'What happens if you blend without fixing TRACK B\'s gain?',
-        options: ['TRACK B jumps out, and the mix gets hot', 'Nothing', 'TRACK B gets quieter'], answer: 0,
+        options: ['TRACK B jumps out, and the mix gets hot', 'Nothing: the faders even it out', 'TRACK B gets quieter as it comes in'], answer: 0,
         explain: 'At +4 dB of GAIN, TRACK B is about 5 dB hotter than TRACK A. Through the blend, the room would hear a jump in level instead of a smooth change.',
       },
       principle: 'Match levels before you mix, not during.',
@@ -1159,7 +1159,7 @@ const p3: Lesson = {
         a: { xfader: 5, ch1_lo: -1, ch2_lo: 0 }, b: { xfader: 10, ch1_lo: -1, ch2_lo: 0 }, labels: ['Mid-blend', 'Blend done'],
         question: {
           question: 'What is still left of TRACK A in the mid-blend?',
-          options: ['Its hats and mids, without its low end', 'Everything', 'Nothing'], answer: 0,
+          options: ['Its hats and mids, without its low end', 'Everything it had, only at half the level', 'Nothing but its kick and bass'], answer: 0,
           explain: 'Its LO is killed, so it contributes only the upper bands until the crossfader takes it out.',
         },
       },
@@ -1173,7 +1173,7 @@ const p3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'dj-mixing',
       quiz: {
         question: 'In which order does a blend usually go?',
-        options: ['Cue and match gain, kill the bass, bring in on a phrase, swap, take out', 'Fader up, then think about gain', 'Swap the bass first, then cue'], answer: 0,
+        options: ['Cue and match gain, kill the bass, bring in on a phrase, swap, take out', 'Fader up, bring in on any bar, then match gain and kill the bass', 'Swap the bass first, then cue, match gain and bring in the fader'], answer: 0,
         explain: 'Preparation (cue, gain, EQ) happens before the crowd hears anything; then the moves land on phrase boundaries.',
       },
     },
@@ -1197,9 +1197,9 @@ const p3: Lesson = {
     },
   ],
   review: [
-    { question: 'Gain-match the incoming track…', options: ['Before the blend, in the cue', 'During the blend', 'After the blend'], answer: 0, explain: 'Prepare first.' },
-    { question: 'Mid-blend, the outgoing track keeps…', options: ['Its upper bands, with LO killed', 'Its bass only', 'Nothing'], answer: 0, explain: 'One low end at a time.' },
-    { question: 'A finished blend means…', options: ['One track playing in full', 'Both at half', 'Silence'], answer: 0, explain: 'Clean hand-over.' },
+    { question: 'Gain-match the incoming track…', options: ['Before the blend, in the cue', 'During the blend, by ear', 'After the blend, on the master'], answer: 0, explain: 'Prepare first.' },
+    { question: 'Mid-blend, the outgoing track keeps…', options: ['Its upper bands, with LO killed', 'Its bass only, with HI killed', 'Nothing: it is already out'], answer: 0, explain: 'One low end at a time.' },
+    { question: 'A finished blend means…', options: ['One track playing in full', 'Both tracks at half level', 'Silence before the next track'], answer: 0, explain: 'Clean hand-over.' },
   ],
 };
 
@@ -1238,7 +1238,7 @@ const e1: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'equalization',
       quiz: {
         question: 'What is the quickest way to tell a LO kill from a HI kill?',
-        options: ['Listen for the kick (LO) and the hats (HI)', 'Look at the fader', 'Count the bars'], answer: 0,
+        options: ['Listen for the kick (LO) and the hats (HI)', 'Look at where the channel\'s fader sits', 'Count the bars until the next phrase'], answer: 0,
         explain: 'The kick and the hats are the clearest landmarks at each end of the spectrum.',
       },
     },
@@ -1249,7 +1249,7 @@ const e1: Lesson = {
         a: {}, b: { ch1_hi: -1, ch1_lo: -1 }, labels: ['A', 'B'],
         question: {
           question: 'What is B missing?',
-          options: ['Both the lows and the highs', 'Only the lows', 'Only the highs'], answer: 0,
+          options: ['Both the lows and the highs', 'Only the lows: the kick and bass', 'Only the highs: the hats'], answer: 0,
           explain: 'B has no thump and no sizzle: only the mids are left, like a small radio.',
         },
       },
@@ -1276,7 +1276,7 @@ const e1: Lesson = {
   ],
   review: [
     { question: 'No kick thump means…', options: ['LO is cut or killed', 'HI is killed', 'The fader is down'], answer: 0, explain: 'The thump lives below 180 Hz.' },
-    { question: 'No hi-hat sizzle means…', options: ['HI is cut or killed', 'LO is killed', 'RES is up'], answer: 0, explain: 'Above 3 kHz.' },
+    { question: 'No hi-hat sizzle means…', options: ['HI is cut or killed', 'LO is cut or killed', 'RES is turned up'], answer: 0, explain: 'Above 3 kHz.' },
     { question: 'Only the mids left sounds like…', options: ['A small radio', 'A club system', 'Silence'], answer: 0, explain: 'No lows, no highs.' },
   ],
 };
@@ -1298,7 +1298,7 @@ const e2: Lesson = {
         a: {}, b: { ch1_lomid: -1 }, labels: ['Flat', 'LO MID cut'],
         question: {
           question: 'What did the LO MID cut take away?',
-          options: ['Body and warmth: the bass and chords sound thinner', 'The kick\'s thump', 'The air on top'], answer: 0,
+          options: ['Body and warmth: the bass and chords sound thinner', 'Punch and weight: the kick loses its thump', 'Air and sparkle: the hats sound dull'], answer: 0,
           explain: 'Around 350 Hz is where the body of the bass and chords sits. The thump is lower and the air higher.',
         },
       },
@@ -1310,7 +1310,7 @@ const e2: Lesson = {
         a: {}, b: { ch1_himid: -1 }, labels: ['Flat', 'HI MID cut'],
         question: {
           question: 'And HI MID?',
-          options: ['Bite and presence: the clap and stabs go soft', 'Deep bass', 'Nothing'], answer: 0,
+          options: ['Bite and presence: the clap and stabs go soft', 'Depth and weight: the deep bass goes', 'Nothing you can hear in this track'], answer: 0,
           explain: 'Around 1.1 kHz is presence. Cutting it makes things sound distant and soft.',
         },
       },
@@ -1331,7 +1331,7 @@ const e2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'equalization',
       quiz: {
         question: 'A mix sounds muddy and boxy. Which band do you reach for first?',
-        options: ['LO MID, cut', 'HI, boost', 'LO, boost'], answer: 0,
+        options: ['LO MID, cut', 'HI MID, boost', 'LO, boost'], answer: 0,
         explain: 'Mud is too much energy around 200-500 Hz. Cutting LO MID clears it; boosting the top only adds harshness on top of the mud.',
       },
     },
@@ -1356,9 +1356,9 @@ const e2: Lesson = {
     },
   ],
   review: [
-    { question: 'LO MID (350 Hz) carries…', options: ['Body and warmth', 'Air', 'Sub bass'], answer: 0, explain: 'And mud when overdone.' },
-    { question: 'HI MID (1.1 kHz) carries…', options: ['Presence and bite', 'Sub bass', 'Room reverb'], answer: 0, explain: 'Claps, voices, attacks.' },
-    { question: 'Muddy mix: first move?', options: ['Cut LO MID', 'Boost HI', 'Boost LO'], answer: 0, explain: 'Remove the build-up.' },
+    { question: 'LO MID (350 Hz) carries…', options: ['Body and warmth', 'Air and sparkle', 'Sub bass only'], answer: 0, explain: 'And mud when overdone.' },
+    { question: 'HI MID (1.1 kHz) carries…', options: ['Presence and bite', 'Sub bass and weight', 'The room\'s reverb'], answer: 0, explain: 'Claps, voices, attacks.' },
+    { question: 'Muddy mix: first move?', options: ['Cut LO MID', 'Boost the HI', 'Boost the LO'], answer: 0, explain: 'Remove the build-up.' },
     { question: 'The Xone:96 mid bands boost up to…', options: ['+10 dB', '+6 dB', '+20 dB'], answer: 0, explain: 'HI and LO boost +6.' },
   ],
 };
@@ -1415,7 +1415,7 @@ const e3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'filter-type',
       quiz: {
         question: 'A low-pass sweeping down from 20 kHz to 200 Hz sounds like…',
-        options: ['The track moving behind a wall, getting more muffled', 'The track getting thinner and brighter', 'The tempo slowing'], answer: 0,
+        options: ['The track moving behind a wall, getting more muffled', 'The track coming out of a phone, getting thinner', 'The track slowing down, as the tempo drops with it'], answer: 0,
         explain: 'Lowering a low-pass removes more and more of the top. A high-pass going up is the one that gets thinner.',
       },
     },
@@ -1465,7 +1465,7 @@ const e4: Lesson = {
         labels: ['Clean', 'Over-driven'],
         question: {
           question: 'At the same loudness, what gives B away?',
-          options: ['Flattened, crunchy hits and a buzzy edge', 'It is quieter', 'A slower tempo'], answer: 0,
+          options: ['Flattened, crunchy hits and a buzzy edge', 'Softer, rounder hits and less top end', 'A slower tempo and longer notes'], answer: 0,
           explain: 'B runs into the +20 dBu ceiling: the loudest waves are flattened, which adds harsh harmonics. At equal loudness that grit is the only difference.',
         },
       },
@@ -1500,7 +1500,7 @@ const e4: Lesson = {
         labels: ['A', 'B'],
         question: {
           question: 'Which one lights the PK! LED beside channel 1\'s GAIN?',
-          options: ['A: it is the channel running out of headroom', 'B', 'Both'], answer: 0,
+          options: ['A: it is the channel running out of headroom', 'B: its CRUNCH is distorting the channel', 'Both: any distortion lights it'], answer: 0,
           explain: 'CRUNCH distorts inside the filter section, after the channel\'s GAIN, EQ and meter, so PK! stays dark. A is the channel itself driven too hot at GAIN, and PK! says so.',
         },
       },
@@ -1525,10 +1525,10 @@ const e4: Lesson = {
     },
   ],
   review: [
-    { question: 'Over-gain on a channel sounds…', options: ['Crunchy and flattened on the loudest hits', 'Muffled', 'Delayed'], answer: 0, explain: 'Clipping adds harmonics.' },
+    { question: 'Over-gain on a channel sounds…', options: ['Crunchy and flattened on the loudest hits', 'Muffled and dull on the quietest hits', 'Delayed, with an echo after each hit'], answer: 0, explain: 'Clipping adds harmonics.' },
     { question: 'A channel\'s PK! LED keeps lighting. Fix it with…', options: ['Its GAIN', 'MASTER 1', 'The crossfader'], answer: 0, explain: 'PK! reads right after GAIN, before the EQ.' },
-    { question: 'CRUNCH distortion happens…', options: ['In the filter section, after the channel meter', 'Before GAIN', 'In the headphones'], answer: 0, explain: 'Pre-filter, post-fader.' },
-    { question: 'Compare distortion at…', options: ['Matched loudness', 'Full volume', 'Any level'], answer: 0, explain: 'Loudness fools the ear.' },
+    { question: 'CRUNCH distortion happens…', options: ['In the filter section, after the channel meter', 'At the input, before the channel\'s GAIN', 'In the headphone amp, after MASTER 1'], answer: 0, explain: 'Pre-filter, post-fader.' },
+    { question: 'Compare distortion at…', options: ['Matched loudness', 'Full volume on both', 'Any level you like'], answer: 0, explain: 'Loudness fools the ear.' },
   ],
 };
 
@@ -1582,7 +1582,7 @@ const st1: Lesson = {
       instruction: 'Set channel 4 INPUT to PHONO.',
       predict: {
         question: 'The DFAM is plugged into CH 4\'s LINE input. What does channel 4 play on PHONO?',
-        options: ['Its built-in deck (PERC) instead of the DFAM', 'The DFAM', 'Silence'], answer: 0,
+        options: ['Its built-in deck (PERC) instead of the DFAM', 'The DFAM, as on every other input position', 'Silence, because nothing is plugged into PHONO'], answer: 0,
         explain: 'INPUT picks the socket. The DFAM is on LINE; PHONO is the built-in deck here. The DFAM keeps running, you just are not listening to it on this channel.',
       },
       principle: 'The input selector picks which socket feeds the channel.',
@@ -1615,8 +1615,8 @@ const st1: Lesson = {
   ],
   review: [
     { question: 'A routed studio instrument arrives on channel 1-4\'s…', options: ['LINE input', 'PHONO input', 'USB 1 input'], answer: 0, explain: 'RTN on A and B.' },
-    { question: 'Unrouting an instrument from CH 4 makes channel 4…', options: ['Play its built-in deck again', 'Go silent forever', 'Keep the instrument'], answer: 0, explain: 'The deck is the channel\'s own source.' },
-    { question: 'Why route drums into the mixer instead of the master?', options: ['To control their level, EQ and filter separately', 'To change their tempo', 'Because it is louder'], answer: 0, explain: 'Independent control.' },
+    { question: 'Unrouting an instrument from CH 4 makes channel 4…', options: ['Play its built-in deck again', 'Go silent until you route it again', 'Keep on playing the instrument'], answer: 0, explain: 'The deck is the channel\'s own source.' },
+    { question: 'Why route drums into the mixer instead of the master?', options: ['To control their level, EQ and filter separately', 'To change their tempo without the studio clock', 'Because a mixer channel always makes them louder'], answer: 0, explain: 'Independent control.' },
   ],
 };
 
@@ -1653,7 +1653,7 @@ const st2: Lesson = {
       instruction: 'Pull channel 2\'s fader down so you hear the drums alone.',
       predict: {
         question: 'Does channel 2\'s meter stop moving with its fader down?',
-        options: ['No: it reads before the fader, so you can still set GAIN', 'Yes', 'It shows the drums instead'], answer: 0,
+        options: ['No: it reads before the fader, so you can still set GAIN', 'Yes: the meter follows the fader, so it goes dark', 'No: it switches to show the drums on channel 1 instead'], answer: 0,
         explain: 'Pre-fader metering is what lets you gain-stage a part silently, then bring it in at the right level.',
       },
       principle: 'Set every channel\'s input level before you balance the faders.',
@@ -1691,7 +1691,7 @@ const st2: Lesson = {
         a: { ch2_lo: 0 }, b: { ch2_lo: -0.29 }, labels: ['Flat', 'LO -6 dB'],
         question: {
           question: 'Which one lets the kick punch through?',
-          options: ['LO trimmed: the synth leaves the kick its band', 'Flat', 'No difference'], answer: 0,
+          options: ['LO trimmed: the synth leaves the kick its band', 'Flat: the synth\'s full low end supports the kick', 'No difference: EQ on channel 2 can\'t affect the kick'], answer: 0,
           explain: 'Synths often carry more low end than they need in a mix. Trimming it frees the band the kick lives in.',
         },
       },
@@ -1700,7 +1700,7 @@ const st2: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'gain-staging',
       quiz: {
         question: 'The LR MIX meters keep lighting their top LED, PK!. What do you turn down first?',
-        options: ['Channel GAIN, EQ boosts or faders', 'MASTER 1', 'The booth'], answer: 0,
+        options: ['Channel GAIN, EQ boosts or faders', 'MASTER 1, on the right of the mixer', 'The BOOTH level, next to MASTER 1'], answer: 0,
         explain: 'The LR MIX meters read before MASTER 1, so only the channels feeding the mix can bring them down: check that no channel is clipping at GAIN or EQ, then take the faders down if needed. MASTER 1 changes how loud the output is, not how hot the mix bus runs.',
       },
       manualReference: REF.master,
@@ -1726,10 +1726,10 @@ const st2: Lesson = {
     },
   ],
   review: [
-    { question: 'Balance a mix starting from…', options: ['The leading part, usually the drums', 'The quietest part', 'The master'], answer: 0, explain: 'Fit the rest under it.' },
-    { question: 'LR MIX on PK!: first fix?', options: ['Channel GAIN, EQ or faders', 'MASTER 1', 'Headphone level'], answer: 0, explain: 'The meters read before MASTER 1.' },
+    { question: 'Balance a mix starting from…', options: ['The leading part, usually the drums', 'The quietest part, so it is heard', 'The master level, then work back'], answer: 0, explain: 'Fit the rest under it.' },
+    { question: 'LR MIX on PK!: first fix?', options: ['Channel GAIN, EQ or faders', 'MASTER 1, on the right-hand side', 'The headphone level'], answer: 0, explain: 'The meters read before MASTER 1.' },
     { question: 'A synth masking the kick usually needs…', options: ['A LO cut', 'A LO boost', 'More reverb'], answer: 0, explain: 'Free the kick\'s band.' },
-    { question: 'Gain-stage a channel with its fader…', options: ['Down, using the pre-fader meter', 'Fully up', 'At half'], answer: 0, explain: 'Silently, by the meter.' },
+    { question: 'Gain-stage a channel with its fader…', options: ['Down, using the pre-fader meter', 'Fully up, using the LR MIX meter', 'At half, using your ears'], answer: 0, explain: 'Silently, by the meter.' },
   ],
 };
 
@@ -1789,7 +1789,7 @@ const st3: Lesson = {
       instruction: 'Drop: on the "1" of the next phrase, snap FILTER 1 FREQ back to 20 Hz.',
       predict: {
         question: 'Why does snapping the filter open feel like a drop?',
-        options: ['The bass and kick return all at once after being held back', 'The tempo doubles', 'The track gets quieter'], answer: 0,
+        options: ['The bass and kick return all at once after being held back', 'The tempo doubles for a moment as the filter opens up', 'The track gets quieter, so the next section sounds bigger'], answer: 0,
         explain: 'The build removed the low end bit by bit, so its sudden return is a big contrast - the release after the tension.',
       },
       principle: 'Tension and release: take something away, then give it back at once.',
@@ -1803,7 +1803,7 @@ const st3: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'effects',
       quiz: {
         question: 'For a washed-out ending, which send do you raise as you pull the faders down?',
-        options: ['SEND 2 (reverb) - but it is post-fader, so raise it before the faders come down', 'SEND 1 on PRE only', 'No send: use MASTER 1'], answer: 0,
+        options: ['SEND 2 (reverb) - but it is post-fader, so raise it before the faders come down', 'SEND 1 (delay) on PRE - it is pre-fader, so raise it after the faders are down', 'No send at all - turn MASTER 1 down slowly, and the reverb tail follows it'], answer: 0,
         explain: 'SEND 2 is post-fader: push it up while the fader is still up, then fade the fader and the reverb tail rings out. A PRE SEND 1 would keep feeding the delay with the fader down, which is a different effect.',
       },
     },
@@ -1832,7 +1832,7 @@ const st3: Lesson = {
     },
   ],
   review: [
-    { question: 'A filter build that snaps open on the "1" creates…', options: ['A drop: tension then release', 'A tempo change', 'A key change'], answer: 0, explain: 'Contrast.' },
+    { question: 'A filter build that snaps open on the "1" creates…', options: ['A drop: tension then release', 'A tempo change: faster then slower', 'A key change: up by a semitone'], answer: 0, explain: 'Contrast.' },
     { question: 'For a reverb-washed ending with a post-fader send…', options: ['Raise the send, then fade the fader', 'Fade first, then raise the send', 'Use MASTER 1'], answer: 0, explain: 'Post-fader sends follow the fader.' },
     { question: 'An intro usually starts…', options: ['Sparse', 'With everything', 'With the outro'], answer: 0, explain: 'Leave room for entries.' },
   ],

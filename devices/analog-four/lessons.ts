@@ -142,7 +142,7 @@ const f1: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
-      quiz: mc('You want to change track 3\'s envelope. What do you press first?', ['T3, then AMP', 'AMP, then turn a knob', 'FUNC + AMP'], 0,
+      quiz: mc('You want to change track 3\'s envelope. What do you press first?', ['T3, then AMP', 'AMP, then turn a knob', 'FUNC + AMP, then T3'], 0,
         'Pick the track first, then the page: the knobs follow both. AMP alone would edit whichever track is selected now.'),
     },
     {
@@ -164,7 +164,7 @@ const f1: Lesson = {
     },
   ],
   review: [
-    mc('On the Analog Four, the DATA ENTRY knobs A-J edit…', ['The selected track\'s selected page', 'Always track 1', 'Only the filter'], 0, 'Track key + page key decide what the knobs do.'),
+    mc('On the Analog Four, the DATA ENTRY knobs A-J edit…', ['The selected track\'s selected page', 'Track 1\'s page, whatever is selected', 'The filter page of every track'], 0, 'Track key + page key decide what the knobs do.'),
     mc('How many synth tracks does the Analog Four have?', ['Four', 'Six', 'Eight'], 0, 'T1-T4 are synth voices; FX and CV are special tracks.'),
     mc('Turning filter 1 FRQ down makes a sound…', ['Darker', 'Lower in pitch', 'Longer'], 0, 'A low-pass removes the high harmonics; the note stays the same.'),
   ],
@@ -200,7 +200,7 @@ const f2: Lesson = {
     {
       kind: 'predict', control: 't1_osc1_pw', targetValue: 48, tolerance: 8, concept: 'oscillator-waveform',
       instruction: 'Turn knob H (PW) to about +48 to narrow the pulse.',
-      predict: mc('Narrowing the pulse will make it sound…', ['Thinner and more nasal', 'An octave lower', 'Louder and fuller'], 0,
+      predict: mc('Narrowing the pulse will make it sound…', ['Thinner and more nasal', 'An octave lower and darker', 'Louder and fuller'], 0,
         'A narrow pulse brings even harmonics back and weakens the fundamental, so it gets thin and reedy. The pitch does not change.'),
       principle: 'Pulse width changes the balance of harmonics, not the pitch.',
     },
@@ -223,7 +223,7 @@ const f2: Lesson = {
     {
       kind: 'predict', control: 't1_osc2_det', targetValue: 10, tolerance: 5, concept: 'oscillator-pitch',
       instruction: 'Turn knob C (DET) to about +10.',
-      predict: mc('Two oscillators slightly out of tune with each other sound…', ['Wider, with a slow beating', 'An octave higher', 'Quieter'], 0,
+      predict: mc('Two oscillators slightly out of tune with each other sound…', ['Wider, with a slow beating', 'An octave higher, and thinner', 'Quieter, as they cancel out'], 0,
         'The waves drift in and out of phase, so the tone swirls and thickens. A lot of detune just sounds out of tune.'),
       principle: 'A small detune between oscillators makes a moving, thicker sound.',
     },
@@ -248,10 +248,10 @@ const f2: Lesson = {
     },
   ],
   review: [
-    mc('Which wave has only odd harmonics?', ['Square (PUL at 50%)', 'Sawtooth', 'Noise'], 0, 'That is why it sounds hollow.'),
-    mc('A sub-oscillator…', ['Adds a tone below the oscillator', 'Adds noise', 'Changes the filter'], 0, 'It divides the frequency: an octave or more down.'),
-    mc('Changing pulse width changes…', ['The tone colour', 'The pitch', 'The tempo'], 0, 'The harmonics change; the note does not.'),
-    mc('A little detune between two oscillators gives…', ['A slow beating, a thicker sound', 'A chord', 'Silence'], 0, 'The waves drift in and out of phase.'),
+    mc('Which wave has only odd harmonics?', ['Square (PUL at 50%)', 'Sawtooth (SAW)', 'Noise (on the NOISE page)'], 0, 'That is why it sounds hollow.'),
+    mc('A sub-oscillator…', ['Adds a tone below the oscillator', 'Adds noise above the oscillator', 'Changes the filter\'s cutoff'], 0, 'It divides the frequency: an octave or more down.'),
+    mc('Changing pulse width changes…', ['The tone colour', 'The note\'s pitch', 'The note\'s length'], 0, 'The harmonics change; the note does not.'),
+    mc('A little detune between two oscillators gives…', ['A slow beating, a thicker sound', 'A chord, two clearly separate notes', 'Silence, as they cancel'], 0, 'The waves drift in and out of phase.'),
   ],
 };
 
@@ -274,7 +274,7 @@ const f3: Lesson = {
     {
       kind: 'predict', control: 't1_flt1_frq', targetValue: 56, tolerance: 8, concept: 'filter-cutoff',
       instruction: 'Turn knob A (FRQ) down to about 56.',
-      predict: mc('Filter 1 is a low-pass. Turning FRQ down will…', ['Remove the high harmonics: darker', 'Lower the pitch', 'Remove the bass'], 0,
+      predict: mc('Filter 1 is a low-pass. Turning FRQ down will…', ['Remove the high harmonics: darker', 'Lower the pitch: deeper', 'Remove the bass and the low mids: thinner'], 0,
         'A low-pass passes what is below the cutoff and removes what is above, so the tone gets darker. The note stays the same.'),
       principle: 'A low-pass filter removes harmonics above its cutoff, so the tone darkens.',
       manualReference: 'Manual: FILTERS page - filter 1 FRQ',
@@ -289,20 +289,20 @@ const f3: Lesson = {
       instruction: 'Compare low and high resonance. Listen to the low end too.',
       listen: {
         a: { t1_flt1_res: 20 }, b: { t1_flt1_res: 115 }, labels: ['RES 20', 'RES 115'],
-        question: mc('With high RES, the ladder filter…', ['Rings at the cutoff and loses some bass', 'Gets louder everywhere', 'Plays a different note'], 0,
+        question: mc('With high RES, the ladder filter…', ['Rings at the cutoff and loses some bass', 'Gets louder at every frequency', 'Plays a different note on each trig'], 0,
           'Ladder resonance is feedback around the filter: it peaks at the cutoff and thins the bass, the classic ladder sound.'),
       },
     },
     {
       kind: 'predict', control: 't1_flt1_dep', targetValue: 40, tolerance: 8, concept: 'modulation-depth',
       instruction: 'Turn knob E (DEP) up to about +40.',
-      predict: mc('DEP lets ENV F move filter 1 on every note. Each note will…', ['Start brighter and close down', 'Bend in pitch', 'Get louder'], 0,
+      predict: mc('DEP lets ENV F move filter 1 on every note. Each note will…', ['Start brighter and close down', 'Bend up in pitch and fall back', 'Get louder as it rings'], 0,
         'ENV F jumps up at each note and falls back, and DEP decides how far it pushes FRQ. The filter opens and closes: the "wow" of analog bass.'),
       principle: 'An envelope on the cutoff makes the brightness change over each note.',
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'filter-type',
-      quiz: mc('Filter 1 removes the highs and filter 2 (a high-pass) removes the lows. What is left?', ['A band in the middle', 'Everything', 'Only the bass'], 0,
+      quiz: mc('Filter 1 removes the highs and filter 2 (a high-pass) removes the lows. What is left?', ['A band in the middle', 'Everything, as before', 'Only the low bass'], 0,
         'Filters in series stack up: each one takes its share away, so a low-pass then a high-pass leaves a band between them.'),
     },
     {
@@ -331,10 +331,10 @@ const f3: Lesson = {
     },
   ],
   review: [
-    mc('Filter 1 on the Analog Four is…', ['A 4-pole ladder low-pass', 'A high-pass', 'A band-pass only'], 0, 'Filter 2 is the multimode one.'),
-    mc('Raising RES on a ladder filter…', ['Adds a ringing peak at the cutoff', 'Changes the note', 'Adds a sub-oscillator'], 0, 'Feedback around the filter makes it ring.'),
+    mc('Filter 1 on the Analog Four is…', ['A 4-pole ladder low-pass', 'A 2-pole high-pass', 'A 2-pole multimode filter'], 0, 'Filter 2 is the multimode one.'),
+    mc('Raising RES on a ladder filter…', ['Adds a ringing peak at the cutoff', 'Changes the note that plays', 'Adds a sub-oscillator below the note'], 0, 'Feedback around the filter makes it ring.'),
     mc('A high-pass filter removes…', ['The frequencies below its cutoff', 'The frequencies above its cutoff', 'Only noise'], 0, 'It passes the highs.'),
-    mc('Filter 1 DEP sets…', ['How far ENV F moves the cutoff', 'The resonance', 'The filter type'], 0, 'Envelope depth.'),
+    mc('Filter 1 DEP sets…', ['How far ENV F moves the cutoff', 'How much the filter rings', 'Which filter type is used'], 0, 'Envelope depth.'),
   ],
 };
 
@@ -357,7 +357,7 @@ const f4: Lesson = {
     {
       kind: 'predict', control: 't1_amp_atk', targetValue: 72, tolerance: 8, concept: 'envelope-attack',
       instruction: 'On the AMP page, turn knob A (ATK) up to about 72.',
-      predict: mc('A longer attack makes each note…', ['Fade in instead of starting hard', 'Ring on after you let go', 'Higher in pitch'], 0,
+      predict: mc('A longer attack makes each note…', ['Fade in instead of starting hard', 'Ring on long after you let go', 'Start higher and fall in pitch'], 0,
         'Attack is the time from silence to full level. Long attacks fade in, like bowed strings; ringing after release is REL\'s job.'),
       principle: 'Attack sets how long a note takes to reach full level.',
       manualReference: 'Manual: AMP page - ATK',
@@ -386,7 +386,7 @@ const f4: Lesson = {
       kind: 'predict', control: 't1_envf_dec', targetValue: 48, tolerance: 6, setup: { t1_flt1_frq: 50, t1_flt1_dep: 50, t1_envf_sus: 0, t1_amp_dec: 64, t1_amp_sus: 100 },
       concept: 'envelope-decay',
       instruction: 'Filter 1 is now dark with DEP up, and AMP holds the notes again. Press ENV and turn knob B (DEC) to about 48.',
-      predict: mc('With a short ENV F decay, each note will…', ['Open bright for a moment, then go dark', 'Stay bright', 'Drop in pitch'], 0,
+      predict: mc('With a short ENV F decay, each note will…', ['Open bright for a moment, then go dark', 'Stay bright for as long as it lasts', 'Drop in pitch for a moment, then rise'], 0,
         'ENV F jumps up at the start of the note and falls back quickly, so the filter opens briefly: a pluck in the tone, while the level stays up.'),
       principle: 'A short filter envelope makes a pluck in the tone itself.',
       manualReference: 'Manual: ENV page - ENV F',
@@ -414,9 +414,9 @@ const f4: Lesson = {
   ],
   review: [
     mc('A long AMP ATK makes notes…', ['Fade in', 'Stop sooner', 'Brighter'], 0, 'Attack is the rise time.'),
-    mc('SUS is…', ['A level held while the note lasts', 'A time', 'The release'], 0, 'The other three stages are times.'),
+    mc('SUS is…', ['A level held while the note lasts', 'A time, like ATK and DEC', 'The fade after the note ends'], 0, 'The other three stages are times.'),
     mc('For a pluck, you usually set…', ['SUS low and DEC short', 'ATK long', 'REL to the maximum'], 0, 'The note dies away by itself.'),
-    mc('ENV F mainly shapes…', ['The filter over time', 'The tempo', 'The panning'], 0, 'Through filter 1 DEP, and its own destinations.'),
+    mc('ENV F mainly shapes…', ['The filter over time', 'The pattern\'s tempo over time', 'The panning over time'], 0, 'Through filter 1 DEP, and its own destinations.'),
   ],
 };
 
@@ -439,7 +439,7 @@ const f5: Lesson = {
     {
       kind: 'predict', control: 't1_lfo1_depa', targetValue: 40, tolerance: 8, concept: 'lfo',
       instruction: 'On the LFO page, DST A (knob G) is F1 FRQ. Turn knob H (DEP) up to about 40.',
-      predict: mc('What will you hear?', ['The brightness sweeping up and down, over and over', 'The pitch bending', 'Each note repeating'], 0,
+      predict: mc('What will you hear?', ['The brightness sweeping up and down, over and over', 'The pitch bending up once at the start of each note', 'Each note repeating faster and faster until it stops'], 0,
         'An LFO is a slow, repeating wave. Sent to filter 1 FRQ, it opens and closes the filter in a loop.'),
       principle: 'An LFO repeats a movement; its depth sets how far the destination moves.',
       manualReference: 'Manual: LFO page - DST and DEP',
@@ -473,7 +473,7 @@ const f5: Lesson = {
     {
       kind: 'predict', control: 't1_env2_depa', targetValue: 50, tolerance: 8, setup: { t1_env2_sus: 0, t1_env2_dec: 56 }, concept: 'modulation-depth',
       instruction: 'ENV 2 has a short decay and no sustain. Turn knob H (DEP) up to about +50.',
-      predict: mc('Each note will…', ['Start high and drop quickly to its pitch', 'Wobble up and down all the time', 'Get quieter'], 0,
+      predict: mc('Each note will…', ['Start high and drop quickly to its pitch', 'Wobble up and down for as long as it sounds', 'Get quieter and then louder again'], 0,
         'ENV 2 jumps up at the note and decays to zero, so the pitch starts above the note and falls back: a zap. An LFO would keep wobbling.'),
       principle: 'A fast envelope on pitch makes a drop or zap at the start of every note.',
     },
@@ -500,7 +500,7 @@ const f5: Lesson = {
   review: [
     mc('An LFO with a depth of 0…', ['Does nothing', 'Moves its destination fully', 'Stops the sequencer'], 0, 'Depth sets how far the destination moves.'),
     mc('On the Analog Four, SPD x MUL = 128 means…', ['One cycle per bar', 'One cycle per step', '128 cycles per bar'], 0, 'The LFO is locked to the tempo.'),
-    mc('ENV 2 with a fast decay sent to pitch gives…', ['A pitch drop at each note', 'A vibrato', 'A chord'], 0, 'It fires once per note.'),
+    mc('ENV 2 with a fast decay sent to pitch gives…', ['A pitch drop at each note', 'A steady vibrato on each note', 'A second note, like a chord'], 0, 'It fires once per note.'),
     mc('Which LFO wave jumps to a new random value each cycle?', ['RND', 'TRI', 'SIN'], 0, 'Random steps: sample & hold.'),
   ],
 };
@@ -539,7 +539,7 @@ const sd1: Lesson = {
     {
       kind: 'predict', control: 't1_flt1_dep', targetValue: 45, tolerance: 8, concept: 'modulation-depth',
       instruction: 'Turn knob E (DEP) up to about +45.',
-      predict: mc('On a dark, ringing filter, an envelope sweep on every note sounds…', ['Squelchy: a "yow" on each note', 'Like a drum', 'Out of tune'], 0,
+      predict: mc('On a dark, ringing filter, an envelope sweep on every note sounds…', ['Squelchy: a "yow" on each note', 'Like a drum: a thud on each note', 'Out of tune: each note bends flat'], 0,
         'The ringing peak sweeps up and back down with ENV F on every note, so each note talks. That vowel-like squelch is the acid sound.'),
       principle: 'A resonant filter swept by an envelope makes a vowel-like "yow".',
     },
@@ -550,13 +550,13 @@ const sd1: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-decay',
-      quiz: mc('Which control sets how long each squelch lasts?', ['ENV F DEC', 'Filter 1 RES', 'AMP VOL'], 0,
+      quiz: mc('Which control sets how long each squelch lasts?', ['ENV F DEC', 'Filter 1 RES', 'TRACK LEVEL'], 0,
         'The squelch is the filter envelope: its decay time sets how fast the filter closes. RES sets how strongly it rings, not how long.'),
     },
     {
       kind: 'predict', control: 'trig_mode', targetValue: 2, concept: 'glide', focus: ['key:FUNC'],
       instruction: 'Hold FUNC and press BANK G (Note Slide). Tapping a trig key now adds or removes a slide.',
-      predict: mc('A slide trig makes its note…', ['Glide in pitch from the previous note', 'Repeat quickly', 'Play louder'], 0,
+      predict: mc('A slide trig makes its note…', ['Glide in pitch from the previous note', 'Repeat quickly, like a roll', 'Play louder and brighter than the rest'], 0,
         'A slide bends smoothly from the last note to this one instead of jumping. Louder is what an accent does (FUNC + BANK F).'),
       principle: 'A slide glides from one note\'s pitch to the next instead of jumping.',
       explanation: 'SLI on the OSC 1&2 page sets the glide time. Press FUNC + BANK G again to go back to normal trigs.',
@@ -586,9 +586,9 @@ const sd1: Lesson = {
     },
   ],
   review: [
-    mc('The acid "squelch" comes mainly from…', ['A resonant filter swept by an envelope', 'Noise', 'Reverb'], 0, 'Resonance plus a filter envelope.'),
-    mc('A slide trig…', ['Glides the pitch into its note', 'Doubles the tempo', 'Mutes the track'], 0, 'The glide time is SLI on OSC 1&2.'),
-    mc('ENV F SUS at 0 makes the filter…', ['Close after each note', 'Stay open', 'Self-oscillate'], 0, 'Every note gets its own blip.'),
+    mc('The acid "squelch" comes mainly from…', ['A resonant filter swept by an envelope', 'Noise mixed in with the oscillators', 'A long reverb on the bass track'], 0, 'Resonance plus a filter envelope.'),
+    mc('A slide trig…', ['Glides the pitch into its note', 'Doubles the tempo for one step', 'Mutes the track until the next trig'], 0, 'The glide time is SLI on OSC 1&2.'),
+    mc('ENV F SUS at 0 makes the filter…', ['Close after each note', 'Stay open between notes', 'Ring on by itself'], 0, 'Every note gets its own blip.'),
   ],
 };
 
@@ -626,7 +626,7 @@ const sd2: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'oscillator-sync',
-      quiz: mc('In a hard-sync patch, which oscillator decides the note you hear?', ['The master (OSC 1 with 1>2)', 'The slave (OSC 2)', 'The louder one'], 0,
+      quiz: mc('In a hard-sync patch, which oscillator decides the note you hear?', ['The master (OSC 1 with 1>2)', 'The slave (OSC 2 with 1>2)', 'Whichever one is louder'], 0,
         'The slave restarts on every master cycle, so the sound repeats at the master\'s frequency: that is the pitch.'),
     },
     {
@@ -660,8 +660,8 @@ const sd2: Lesson = {
   ],
   review: [
     mc('With hard sync, tuning the slave oscillator changes…', ['The tone', 'The note', 'The tempo'], 0, 'The master keeps the pitch.'),
-    mc('The A4\'s sync mode is set on…', ['The OSC 1&2 page (SMD)', 'The AMP page', 'The LFO page'], 0, 'Press OSC 2 twice.'),
-    mc('A sync sweep on every note needs…', ['An envelope on the slave\'s pitch', 'Lots of reverb', 'A long attack'], 0, 'ENV 2 to O2 PIT, for example.'),
+    mc('The A4\'s sync mode is set on…', ['The OSC 1&2 page (SMD)', 'The AMP page (with the sends)', 'The LFO page (with SPD and MUL)'], 0, 'Press OSC 2 twice.'),
+    mc('A sync sweep on every note needs…', ['An envelope on the slave\'s pitch', 'Lots of reverb on the lead', 'A long attack on the AMP envelope'], 0, 'ENV 2 to O2 PIT, for example.'),
   ],
 };
 
@@ -693,7 +693,7 @@ const sd3: Lesson = {
       kind: 'predict', control: 't1_env2_depa', targetValue: 80, tolerance: 10,
       setup: { t1_env2_dsta: dest('O1 PIT'), t1_env2_sus: 0, t1_env2_dec: 46, t1_osc_trg: 1 }, concept: 'modulation-depth',
       instruction: 'ENV 2 now goes to O1 PIT with a very short decay. Press ENV twice and turn knob H (DEP) up to about +80.',
-      predict: mc('A very fast pitch drop at the start of each note sounds like…', ['The punch of a kick drum', 'A long laser zap', 'A chord'], 0,
+      predict: mc('A very fast pitch drop at the start of each note sounds like…', ['The punch of a kick drum', 'A long, slow laser zap', 'A chord of two notes'], 0,
         'Struck drums drop in pitch. A drop this fast is heard as punch and click; a slower drop would turn into a zap or a tom.'),
       principle: 'A fast pitch drop at the start of a note is heard as punch.',
       explanation: 'TRG on the OSC 1&2 page is ON, so the oscillator restarts at every trig and each kick clicks the same way.',
@@ -705,7 +705,7 @@ const sd3: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-decay',
-      quiz: mc('What gives a synth kick its click and punch?', ['A fast pitch drop at the start', 'A long attack', 'High resonance'], 0,
+      quiz: mc('What gives a synth kick its click and punch?', ['A fast pitch drop at the start', 'A long attack on the amp', 'High resonance on filter 1'], 0,
         'The quick drop from a high pitch is what you hear as the beater. A long attack would remove the punch altogether.'),
     },
     {
@@ -739,7 +739,7 @@ const sd3: Lesson = {
     },
   ],
   review: [
-    mc('A synth kick is usually…', ['A low wave with a fast pitch drop', 'Filtered noise only', 'A long pad'], 0, 'The drop is the punch.'),
+    mc('A synth kick is usually…', ['A low wave with a fast pitch drop', 'Filtered noise with a long tail', 'A long pad with a slow attack'], 0, 'The drop is the punch.'),
     mc('A hi-hat on a synth starts from…', ['Noise', 'A sub-oscillator', 'A triangle'], 0, 'High-passed noise.'),
     mc('Drum sounds normally have SUS at…', ['0', '127', 'Half'], 0, 'They decay after the hit.'),
   ],
@@ -767,7 +767,7 @@ const sd4: Lesson = {
     {
       kind: 'predict', control: 't1_osc2_tun', targetValue: 7, tolerance: 0.5, concept: 'oscillator-pitch',
       instruction: 'Turn knob A (TUN) to +7.',
-      predict: mc('OSC 2 seven semitones above OSC 1 sounds like…', ['A fifth: an open, chord-like stab', 'One note an octave up', 'Out of tune'], 0,
+      predict: mc('OSC 2 seven semitones above OSC 1 sounds like…', ['A fifth: an open, chord-like stab', 'An octave: one note, only brighter', 'A clash: two notes out of tune'], 0,
         'Seven semitones is a perfect fifth, the "power chord" interval. +3 or +4 would give a minor or major third, +12 an octave.'),
       principle: 'Tuning one oscillator to an interval turns a single voice into a two-note chord.',
     },
@@ -799,7 +799,7 @@ const sd4: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'effects',
-      quiz: mc('Where do you set how many times the echoes repeat?', ['FDB on the FX track\'s DELAY page', 'DEL on T1\'s AMP page', 'RES on the FILTER page'], 0,
+      quiz: mc('Where do you set how many times the echoes repeat?', ['FDB on the FX track\'s DELAY page', 'DEL on T1\'s AMP page, turned fully up', 'RES on T1\'s FILTER page, turned up'], 0,
         'DEL on T1 decides how much of T1 goes into the delay. FDB (feedback) on the FX track decides how long the echoes keep going, for every track.'),
     },
     {
@@ -825,8 +825,8 @@ const sd4: Lesson = {
   ],
   review: [
     mc('OSC 2 tuned +7 semitones above OSC 1 plays…', ['A fifth', 'An octave', 'The same note'], 0, 'Seven semitones is a fifth.'),
-    mc('On the A4, a track gets into the delay through…', ['Its DEL send on the AMP page', 'The FILTER page', 'The NOTE page'], 0, 'Sends are on the AMP page.'),
-    mc('Delay FDB controls…', ['How many times the echoes repeat', 'The delay send of T1', 'The pitch'], 0, 'Feedback.'),
+    mc('On the A4, a track gets into the delay through…', ['Its DEL send on the AMP page', 'Its RES on the FILTER page', 'Its LEN on the NOTE page'], 0, 'Sends are on the AMP page.'),
+    mc('Delay FDB controls…', ['How many times the echoes repeat', 'How much of T1 goes into the delay', 'How far up the echoes are pitched'], 0, 'Feedback.'),
     mc('The FX track\'s effects are…', ['Shared by all tracks', 'Only for T1', 'Only for the CV track'], 0, 'Send effects.'),
   ],
 };
@@ -886,7 +886,7 @@ const e1: Lesson = {
     },
   ],
   review: [
-    mc('Brightness is mostly about…', ['How many upper harmonics are left', 'The note', 'The tempo'], 0, 'The filter removes harmonics.'),
+    mc('Brightness is mostly about…', ['How many upper harmonics are left', 'Which note the track plays', 'How fast the pattern runs'], 0, 'The filter removes harmonics.'),
     mc('To make a sound duller, turn filter 1 FRQ…', ['Down', 'Up', 'To RES'], 0, 'Low-pass.'),
     mc('When matching by ear, the best first question is…', ['Is mine darker or brighter?', 'What colour is the screen?', 'How loud is the room?'], 0, 'Find the direction first.'),
   ],
@@ -925,7 +925,7 @@ const e2: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-decay',
-      quiz: mc('Two plucks differ only in DEC. What do you listen to?', ['How long each note takes to fade', 'How bright the start is', 'The pitch'], 0,
+      quiz: mc('Two plucks differ only in DEC. What do you listen to?', ['How long each note takes to fade', 'How bright the start of each note is', 'How high each note is'], 0,
         'Decay is a time: how quickly the level falls. The start stays the same.'),
     },
     {
@@ -942,9 +942,9 @@ const e2: Lesson = {
     },
   ],
   review: [
-    mc('With SUS at 0, DEC sets…', ['How long each note lasts', 'How loud it starts', 'Its pitch'], 0, 'The note fades to silence.'),
-    mc('A good reference when judging length is…', ['The gap to the next note', 'The screen', 'The filter'], 0, 'How much of the gap it fills.'),
-    mc('Longer DEC values…', ['Make longer tails', 'Make shorter tails', 'Change the pitch'], 0, 'Decay is time.'),
+    mc('With SUS at 0, DEC sets…', ['How long each note lasts', 'How loud each note starts', 'How high each note is'], 0, 'The note fades to silence.'),
+    mc('A good reference when judging length is…', ['The gap to the next note', 'The envelope on the screen', 'The filter\'s cutoff'], 0, 'How much of the gap it fills.'),
+    mc('Longer DEC values…', ['Make longer tails', 'Make shorter tails', 'Change the note\'s pitch'], 0, 'Decay is time.'),
   ],
 };
 
@@ -994,9 +994,9 @@ const e3: Lesson = {
     },
   ],
   review: [
-    mc('Resonance sounds like…', ['A ringing peak at the cutoff', 'More bass', 'A longer note'], 0, 'A narrow boost.'),
+    mc('Resonance sounds like…', ['A ringing peak at the cutoff', 'More bass under the note', 'A longer, slower note'], 0, 'A narrow boost.'),
     mc('When matching two controls, it helps to…', ['Adjust one at a time', 'Turn both at once quickly', 'Guess'], 0, 'Isolate them.'),
-    mc('Filter 1 FRQ mainly sets…', ['Brightness', 'Ringing', 'Length'], 0, 'Cutoff = brightness.'),
+    mc('Filter 1 FRQ mainly sets…', ['Brightness', 'The ringing', 'The length'], 0, 'Cutoff = brightness.'),
   ],
 };
 
@@ -1046,8 +1046,8 @@ const e4: Lesson = {
     },
   ],
   review: [
-    mc('A hollow, woody tone points to…', ['A pulse or square wave', 'A long decay', 'A low cutoff'], 0, 'Odd harmonics only.'),
-    mc('A note that fades too quickly needs…', ['A longer AMP DEC', 'A higher cutoff', 'A different wave'], 0, 'Length is the envelope.'),
+    mc('A hollow, woody tone points to…', ['A pulse or square wave', 'A long amp decay', 'A low filter cutoff'], 0, 'Odd harmonics only.'),
+    mc('A note that fades too quickly needs…', ['A longer AMP DEC', 'A higher filter cutoff', 'A different waveform'], 0, 'Length is the envelope.'),
     mc('Good practice when three things differ:', ['Fix one section at a time', 'Turn everything at once', 'Start over'], 0, 'Divide and compare.'),
   ],
 };
@@ -1111,7 +1111,7 @@ const sq1: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
-      quiz: mc('With no trig held you change NOT on the NOTE page. Which trigs get the new note?', ['Only the trigs you place from now on', 'Every trig on the track', 'None of them'], 0,
+      quiz: mc('With no trig held you change NOT on the NOTE page. Which trigs get the new note?', ['Only the trigs you place from now on', 'Every trig already on the track', 'None: NOT only works on a held trig'], 0,
         'A trig keeps the NOT, VEL and LEN it was placed with: the NOTE page sets them for new trigs. To change one trig, hold it and set its note.'),
     },
     {
@@ -1140,9 +1140,9 @@ const sq1: Lesson = {
     },
   ],
   review: [
-    mc('In GRID RECORDING, tapping a trig key…', ['Adds or removes a trig on that step', 'Plays the whole pattern', 'Mutes the track'], 0, 'REC lit = grid recording.'),
-    mc('To give one trig a new note…', ['Hold it and press a keyboard key', 'Turn TRACK LEVEL', 'Press FUNC + PLAY'], 0, 'The held trig stores the note.'),
-    mc('LEN on the NOTE page sets…', ['How long the note lasts', 'The tempo', 'The swing'], 0, 'Note length, in steps.'),
+    mc('In GRID RECORDING, tapping a trig key…', ['Adds or removes a trig on that step', 'Plays the pattern from that step', 'Mutes the track on that step'], 0, 'REC lit = grid recording.'),
+    mc('To give one trig a new note…', ['Hold it and press a keyboard key', 'Hold it and turn TRACK LEVEL', 'Select it and press FUNC + PLAY'], 0, 'The held trig stores the note.'),
+    mc('LEN on the NOTE page sets…', ['How long the note lasts', 'How fast the pattern runs', 'How much swing the track has'], 0, 'Note length, in steps.'),
   ],
 };
 
@@ -1170,7 +1170,7 @@ const sq2: Lesson = {
     {
       kind: 'predict', concept: 'parameter-locks',
       instruction: 'Hold trig key 3 and turn knob A (FRQ) up to about 100, then let go.',
-      predict: mc('What happens to the other steps?', ['They keep the knob\'s own value: only step 3 is brighter', 'They all get brighter', 'Step 3 is muted'], 0,
+      predict: mc('What happens to the other steps?', ['They keep the knob\'s own value: only step 3 is brighter', 'They all get brighter: a lock changes the whole track', 'Nothing changes for them, but step 3 is muted from now on'], 0,
         'A parameter lock stores a value on one trig. Every other trig keeps using the knob\'s normal value.'),
       principle: 'A parameter lock gives one trig its own value; the others keep the knob\'s value.',
       check: s => (stepsOf(s, 0)[2]?.locks?.flt1_frq ?? 0) >= 85,
@@ -1178,7 +1178,7 @@ const sq2: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'parameter-locks',
-      quiz: mc('Now you turn FRQ without holding a trig. What changes?', ['Every trig except the locked one', 'Only the locked trig', 'Nothing'], 0,
+      quiz: mc('Now you turn FRQ without holding a trig. What changes?', ['Every trig except the locked one', 'Only the trig that has the lock', 'Nothing, until a trig is held'], 0,
         'The knob sets the track\'s value; the lock overrides it on its own step only.'),
     },
     {
@@ -1194,7 +1194,7 @@ const sq2: Lesson = {
     {
       kind: 'predict', concept: 'parameter-locks',
       instruction: 'Hold the empty trig key 13 and turn knob B (RES) up to about 115.',
-      predict: mc('Step 13 has no trig. What will you hear there?', ['No new note: the long note starts to ring from there', 'A new note', 'Nothing will ever change'], 0,
+      predict: mc('Step 13 has no trig. What will you hear there?', ['No new note: the long note starts to ring from there', 'A new note: turning a knob there places a note trig', 'Nothing: an empty step can\'t hold a lock of any kind'], 0,
         'Turning a knob on an empty step places a lock trig: it changes parameters at that step without playing a note, so the long note changes halfway.'),
       principle: 'A lock trig changes parameters at a step without starting a new note.',
       check: s => { const st = stepsOf(s, 0)[12]; return !!st?.trigless && (st.locks?.flt1_res ?? 0) >= 95; },
@@ -1209,9 +1209,9 @@ const sq2: Lesson = {
     },
   ],
   review: [
-    mc('A parameter lock affects…', ['Only the trig it is on', 'The whole track', 'Every pattern'], 0, 'One trig, one value.'),
-    mc('To place a lock, you…', ['Hold a trig and turn a knob', 'Press FUNC + PLAY', 'Turn MAIN VOLUME'], 0, 'Hold, turn, let go.'),
-    mc('A lock trig (trigless lock)…', ['Changes parameters without a new note', 'Plays a note twice', 'Mutes the track'], 0, 'No note, just locks.'),
+    mc('A parameter lock affects…', ['Only the trig it is on', 'The whole track from then on', 'Every pattern in the bank'], 0, 'One trig, one value.'),
+    mc('To place a lock, you…', ['Hold a trig and turn a knob', 'Press FUNC + PLAY on that step', 'Turn MAIN VOLUME while it plays'], 0, 'Hold, turn, let go.'),
+    mc('A lock trig (trigless lock)…', ['Changes parameters without a new note', 'Plays its note twice in one step', 'Mutes the track for one step'], 0, 'No note, just locks.'),
   ],
 };
 
@@ -1238,7 +1238,7 @@ const sq3: Lesson = {
     {
       kind: 'predict', concept: 'sequencer-pattern',
       instruction: 'T2 is selected. Hold trig key 15 and turn knob E (TRC) to 1:2.',
-      predict: mc('A trig with the condition 1:2 plays…', ['On the first of every two loops', 'Half as loud', 'At half speed'], 0,
+      predict: mc('A trig with the condition 1:2 plays…', ['On the first of every two loops', 'Half as loud on every loop', 'Every loop, at half speed'], 0,
         'A:B means "play on loop A of every B loops". 1:2 plays every other time round, so the bar alternates.'),
       explanation: 'TRC on the NOTE page edits the held trig. You can also open the trig editor with a long press on the trig key.',
       principle: 'A trig condition decides, every time round, whether the trig plays.',
@@ -1247,7 +1247,7 @@ const sq3: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
-      quiz: mc('What does a 50% condition do?', ['Plays on about half the loops, at random', 'Plays every second loop exactly', 'Plays at half volume'], 0,
+      quiz: mc('What does a 50% condition do?', ['Plays on about half the loops, at random', 'Plays on every second loop, exactly', 'Plays on every loop, at half volume'], 0,
         'Percentages are chances, rolled every time the trig comes round. 1:2 is the exact every-other-loop version.'),
     },
     {
@@ -1260,7 +1260,7 @@ const sq3: Lesson = {
     {
       kind: 'predict', concept: 'timing-tempo',
       instruction: 'Hold trig key 7 and turn knob D (µTM) to about +8.',
-      predict: mc('Pushing one hat a little late makes the groove…', ['Lazier, more laid back', 'Faster', 'Louder'], 0,
+      predict: mc('Pushing one hat a little late makes the groove…', ['Lazier, more laid back', 'Faster, more urgent', 'Louder, more driving'], 0,
         'Micro timing moves a trig off the grid in 1/24-step units. Late hats drag behind the beat, which feels relaxed.'),
       principle: 'Small timing offsets change the feel of a groove without changing its notes.',
       check: s => noteTrigs(s, 1).some(([, st]) => (st.micro ?? 0) >= 4),
@@ -1286,9 +1286,9 @@ const sq3: Lesson = {
     },
   ],
   review: [
-    mc('The condition 1:4 plays…', ['On the first of every four loops', 'Four times a loop', 'At 25% volume'], 0, 'A:B = loop A of every B.'),
-    mc('A FILL trig plays…', ['Only while fill mode is on', 'Always', 'Never'], 0, 'Hold FILL to hear it.'),
-    mc('Micro timing moves a trig…', ['Slightly early or late', 'To another track', 'An octave up'], 0, 'Off the grid, in 1/24-step units.'),
+    mc('The condition 1:4 plays…', ['On the first of every four loops', 'Four times in every loop', 'On every loop, at 25% volume'], 0, 'A:B = loop A of every B.'),
+    mc('A FILL trig plays…', ['Only while fill mode is on', 'Always, like a normal trig', 'Never: it only marks a step'], 0, 'Hold FILL to hear it.'),
+    mc('Micro timing moves a trig…', ['Slightly early or late', 'Across to another track', 'Up or down an octave'], 0, 'Off the grid, in 1/24-step units.'),
     mc('Which is random?', ['50%', '1:2', 'FILL'], 0, 'Percentages are chances.'),
   ],
 };
@@ -1324,7 +1324,7 @@ const sq4: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
-      quiz: mc('You pick a new pattern while the A4 plays. When does it start?', ['When the current pattern reaches its end', 'Immediately, mid-bar', 'After you press STOP'], 0,
+      quiz: mc('You pick a new pattern while the A4 plays. When does it start?', ['When the current pattern reaches its end', 'Immediately, in the middle of the bar', 'Only after you press STOP and PLAY'], 0,
         'In SEQUENTIAL change mode (the default) the A4 finishes the pattern first, so changes land on the bar line.'),
     },
     {
@@ -1342,7 +1342,7 @@ const sq4: Lesson = {
     {
       kind: 'predict', concept: 'sequencer-pattern',
       instruction: 'Hold FUNC and press SONG M (Edit Song) to open the song editor, then add a row.', focus: ['key:FUNC', 'key:SONGMODE'],
-      predict: mc('A song row that says A02 x2 plays…', ['A02 twice, then the next row', 'A02 and A03 together', 'A02 at double speed'], 0,
+      predict: mc('A song row that says A02 x2 plays…', ['A02 twice, then the next row', 'A02 and A03 at the same time', 'A02 once, at double speed'], 0,
         'Each song row is a pattern and a repeat count. The song plays the rows from top to bottom.'),
       principle: 'A song lists patterns with repeat counts, so a whole track plays by itself.',
       check: s => proj(s).song.rows.length >= 1,
@@ -1370,9 +1370,9 @@ const sq4: Lesson = {
     },
   ],
   review: [
-    mc('In SEQUENTIAL mode a newly selected pattern starts…', ['When the current one ends', 'Immediately', 'Never'], 0, 'Changes land on the bar line.'),
-    mc('A chain is…', ['A list of patterns played in order', 'A kind of LFO', 'A trig condition'], 0, 'FUNC + CHAIN starts a new one.'),
-    mc('A song row sets…', ['A pattern and how many times it repeats', 'The filter cutoff', 'The kit'], 0, 'Rows play top to bottom.'),
+    mc('In SEQUENTIAL mode a newly selected pattern starts…', ['When the current one ends', 'Immediately, on the next step', 'Only after STOP and then PLAY'], 0, 'Changes land on the bar line.'),
+    mc('A chain is…', ['A list of patterns played in order', 'A kind of LFO that links two tracks', 'A trig condition that links two trigs'], 0, 'FUNC + CHAIN starts a new one.'),
+    mc('A song row sets…', ['A pattern and how many times it repeats', 'The filter cutoff for every track', 'The kit that every pattern uses'], 0, 'Rows play top to bottom.'),
   ],
 };
 
@@ -1419,7 +1419,7 @@ const sq5: Lesson = {
     {
       kind: 'predict', concept: 'sequencer-pattern', focus: ['seq:trig:1', 'key:KB'],
       instruction: 'Close the menu. Hold trig key 1, then hold the keyboard\'s A and press C and E while A is still down.',
-      predict: mc('What does trig 1 store when you press three keys together?', ['A chord: all three notes on one trig', 'Only the last key\'s note', 'Three trigs on three steps'], 0,
+      predict: mc('What does trig 1 store when you press three keys together?', ['A chord: all three notes on one trig', 'One note: only the last key you pressed', 'Three trigs: one on each of three steps'], 0,
         'Keys pressed while another is still down join the trig\'s chord. A track playing polyphonically sounds them together, each on its own voice.'),
       principle: 'A chord trig stores several notes on one step; a poly track plays them on separate voices.',
       explanation: 'With a mouse, long-press trig 1 so it stays held, then press the notes together on the computer keyboard. STEP RECORDING ([RECORD] + [STOP]) takes chords the same way.',
@@ -1432,13 +1432,13 @@ const sq5: Lesson = {
       instruction: 'Compare the chord trig with POLY on and off.',
       listen: {
         a: POLY3, b: { poly_v1: false, poly_v2: false, poly_v3: false }, labels: ['POLY: the chord', 'Mono: its first note'],
-        question: mc('With POLY off, the chord trig plays…', ['Only its first note: one voice', 'The chord, quieter', 'Nothing'], 0,
+        question: mc('With POLY off, the chord trig plays…', ['Only its first note: one voice', 'The whole chord, only a lot quieter', 'Nothing: it needs three voices'], 0,
           'A mono track has one voice, so a chord trig can only play its first note. The chord is still stored on the trig and comes back with POLY.'),
       },
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
-      quiz: mc('Three voices are in the pool and all three are playing. A fourth note starts. What happens?', ['The voice used least recently is taken for it', 'The fourth note is skipped', 'All the notes stop'], 0,
+      quiz: mc('Three voices are in the pool and all three are playing. A fourth note starts. What happens?', ['The voice used least recently is taken for it', 'The fourth note is skipped until a voice is free', 'All four notes stop, and the pool resets'], 0,
         'This is voice stealing: with no free voice, the A4 takes the one that has been playing longest. Every allocation method does it.'),
     },
     {
@@ -1455,7 +1455,7 @@ const sq5: Lesson = {
     {
       kind: 'predict', control: 'poly_alloc', targetValue: 3, concept: 'oscillator-pitch', focus: ['poly_alloc', 'key:MIX'],
       instruction: 'Open POLY CONFIG again (FUNC + MIX) and set ALLOCATION to UNISON.',
-      predict: mc('With UNISON, each chord trig plays…', ['Its first note on all three voices, detuned: one thick note', 'Every note three times as loud', 'Its notes one after another'], 0,
+      predict: mc('With UNISON, each chord trig plays…', ['Its first note on all three voices, detuned: one thick note', 'Every note of the chord three times as loud as before', 'Its notes one after another, like an arpeggio of three'], 0,
         'UNISON puts every pool voice on the same note, each slightly detuned and panned. Three voices become one wide, thick sound, so chords collapse to their first note.'),
       principle: 'Several slightly detuned copies of one note beat against each other, which sounds thick and wide.',
       manualReference: 'Manual p.29, ALLOCATION: UNISON',
@@ -1475,10 +1475,10 @@ const sq5: Lesson = {
     },
   ],
   review: [
-    mc('To play a chord on one A4 track you need…', ['Several voices in the POLY CONFIG pool', 'A longer LEN', 'The arpeggiator'], 0, 'One note, one voice.'),
-    mc('With no free voice, a new note…', ['Takes the voice used least recently', 'Is skipped', 'Stops the pattern'], 0, 'Voice stealing.'),
-    mc('UNISON plays…', ['One note on every pool voice, detuned', 'Each note twice', 'Only on track 1'], 0, 'A thick, wide single note.'),
-    mc('A chord trig on a mono track plays…', ['Only its first note', 'The whole chord', 'Nothing'], 0, 'One voice, one note.'),
+    mc('To play a chord on one A4 track you need…', ['Several voices in the POLY CONFIG pool', 'A longer LEN on the NOTE page for each trig', 'The arpeggiator switched on'], 0, 'One note, one voice.'),
+    mc('With no free voice, a new note…', ['Takes the voice used least recently', 'Is skipped until a voice is free', 'Stops the pattern on that step'], 0, 'Voice stealing.'),
+    mc('UNISON plays…', ['One note on every pool voice, detuned', 'Each note of the chord twice, an octave apart', 'Every chord on track 1 only'], 0, 'A thick, wide single note.'),
+    mc('A chord trig on a mono track plays…', ['Only its first note', 'The whole chord, quietly', 'Nothing at all'], 0, 'One voice, one note.'),
   ],
 };
 
@@ -1507,7 +1507,7 @@ const p1: Lesson = {
     {
       kind: 'predict', concept: 'sequencer-pattern', focus: ['key:FUNC', 'key:T1'],
       instruction: 'Hold FUNC and press T1.',
-      predict: mc('Muting a track…', ['Silences its trigs; the pattern is untouched', 'Deletes its trigs', 'Stops the whole A4'], 0,
+      predict: mc('Muting a track…', ['Silences its trigs; the pattern is untouched', 'Deletes its trigs from the pattern', 'Stops the whole A4 until you unmute it'], 0,
         'A mute only stops the track from playing. Its trigs stay, so unmuting brings it straight back.'),
       principle: 'Muting removes a part without losing it, so it can come back at any time.',
       check: s => muted(s, 0),
@@ -1532,13 +1532,13 @@ const p1: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
-      quiz: mc('The A4\'s keyboard plays…', ['The selected track\'s sound', 'Always track 1', 'Only the FX track'], 0,
+      quiz: mc('The A4\'s keyboard plays…', ['The selected track\'s sound', 'Track 1\'s sound, always', 'The FX track\'s sound'], 0,
         'Select a track, then play: the keys use that track\'s sound, and holding a trig makes them write notes instead.'),
     },
     {
       kind: 'predict', control: 'perf_a', targetValue: 80, tolerance: 8, concept: 'filter-cutoff',
       instruction: 'Turn the QUICK PERF knob (top left) up to about 80.',
-      predict: mc('QUICK PERF moves macro A, LP SWEEP. What happens?', ['Every track\'s filter closes at once', 'Only T4 changes', 'The tempo drops'], 0,
+      predict: mc('QUICK PERF moves macro A, LP SWEEP. What happens?', ['Every track\'s filter closes at once', 'Only T4\'s filter closes', 'The tempo drops with the knob'], 0,
         'A performance macro offsets the same parameter on every track at once, here filter 1 FRQ, so the whole mix goes dark.'),
       principle: 'A macro moves several parameters at once, so one knob reshapes the whole mix.',
       explanation: 'QPER + trig keys 1-10 picks which macro QUICK PERF controls; the PERF page shows all ten on the knobs.',
@@ -1568,8 +1568,8 @@ const p1: Lesson = {
     },
   ],
   review: [
-    mc('FUNC + a track key…', ['Mutes or unmutes that track', 'Deletes the track', 'Copies the track'], 0, 'The trigs stay.'),
-    mc('A performance macro…', ['Moves a parameter on every track at once', 'Changes the pattern', 'Sets the tempo'], 0, 'One knob, the whole mix.'),
+    mc('FUNC + a track key…', ['Mutes or unmutes that track', 'Deletes that track\'s trigs', 'Copies that track\'s sound'], 0, 'The trigs stay.'),
+    mc('A performance macro…', ['Moves a parameter on every track at once', 'Changes the pattern on the bar line', 'Sets the tempo for the whole project'], 0, 'One knob, the whole mix.'),
     mc('The keyboard plays…', ['The selected track', 'Track 1 only', 'Nothing while the sequencer runs'], 0, 'Select a track, then play.'),
   ],
 };
@@ -1614,7 +1614,7 @@ const p2: Lesson = {
     {
       kind: 'predict', concept: 'parameter-locks', focus: ['t1_flt1_frq'],
       instruction: 'Turn knob A (FRQ) slowly up from about 45 to about 95 over half a bar, then let go.',
-      predict: mc('What does the A4 record while you turn the knob?', ['A lock with the knob\'s value on each step the playhead passes', 'One new knob position for the whole track', 'Nothing until the pattern stops'], 0,
+      predict: mc('What does the A4 record while you turn the knob?', ['A lock with the knob\'s value on each step the playhead passes', 'One new knob position, used by the whole track from then on', 'Nothing until the pattern stops; then it stores the last value'], 0,
         'Each step that plays while the knob moves gets a parameter lock with the value at that moment: note trigs take the lock, empty steps get a lock trig. That is how the move plays back.'),
       principle: 'A recorded knob move is a row of parameter locks, one per step.',
       explanation: 'Locks hold one value per step, so a recorded move is stepped, not smooth. A PARAMETER SLIDE trig can glide between two of them.',
@@ -1624,7 +1624,7 @@ const p2: Lesson = {
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'parameter-locks',
-      quiz: mc('Live recording ends and FRQ shows its old value again. Why does the sweep still play?', ['It is stored as locks on the steps; the knob holds the kit\'s own value', 'The A4 plays back an audio recording', 'It does not: the sweep is lost'], 0,
+      quiz: mc('Live recording ends and FRQ shows its old value again. Why does the sweep still play?', ['It is stored as locks on the steps; the knob holds the kit\'s own value', 'The A4 plays back an audio recording of the sweep over the pattern', 'It does not: the sweep is lost as soon as the knob springs back'], 0,
         'Recording knob moves writes locks into the pattern and leaves the kit\'s value alone. Steps with a lock play the lock; steps without one play the knob.'),
     },
     {
@@ -1657,9 +1657,9 @@ const p2: Lesson = {
     },
   ],
   review: [
-    mc('In LIVE RECORDING, turning a knob…', ['Locks its value on the steps the playhead passes', 'Changes the tempo', 'Mutes the track'], 0, 'One lock per step.'),
+    mc('In LIVE RECORDING, turning a knob…', ['Locks its value on the steps the playhead passes', 'Changes the tempo of the steps the playhead passes', 'Mutes the track until recording stops'], 0, 'One lock per step.'),
     mc('An empty step that a recorded knob move passes gets…', ['A lock trig', 'A note trig', 'Nothing'], 0, 'Locks without a note.'),
-    mc('After recording, the knob\'s own value sets…', ['The steps without a lock for it', 'Every step', 'Nothing any more'], 0, 'Locks win on their steps.'),
+    mc('After recording, the knob\'s own value sets…', ['The steps without a lock for it', 'Every step, locked or not', 'Nothing any more: locks replace it'], 0, 'Locks win on their steps.'),
     mc('To erase recorded locks as the pattern plays, hold…', ['FUNC + NO', 'TRK + PTN', 'BANK A'], 0, 'Real-time erase.'),
   ],
 };
@@ -1709,7 +1709,7 @@ const st1: Lesson = {
     {
       kind: 'predict', control: 'play', targetValue: true, concept: 'timing-tempo',
       instruction: 'Press PLAY on the Analog Four (or ▶ in the top bar).',
-      predict: mc('Both machines are synced. Pressing PLAY on one of them…', ['Starts both together, on the same downbeat', 'Starts only the Analog Four', 'Starts them a bar apart'], 0,
+      predict: mc('Both machines are synced. Pressing PLAY on one of them…', ['Starts both together, on the same downbeat', 'Starts only the Analog Four; the Rytm waits', 'Starts them one bar apart'], 0,
         'Synced machines share one transport: start one and every synced machine starts on the same beat.'),
       principle: 'Synced machines share one transport, so they start and stay together.',
     },
@@ -1739,8 +1739,8 @@ const st1: Lesson = {
   ],
   review: [
     mc('Two synced Elektrons…', ['Start and stay together', 'Need the same patterns', 'Share one sound'], 0, 'One clock, one transport.'),
-    mc('When the Rytm plays the drums, the A4\'s drum track should be…', ['Muted (or used for something else)', 'Doubled', 'Louder'], 0, 'One home per part.'),
-    mc('MIDI clock carries…', ['Tempo and start/stop', 'Audio', 'Sounds'], 0, 'Timing only.'),
+    mc('When the Rytm plays the drums, the A4\'s drum track should be…', ['Muted (or used for something else)', 'Doubled, an octave above the Rytm', 'Louder than the Rytm\'s kick'], 0, 'One home per part.'),
+    mc('MIDI clock carries…', ['Tempo and start/stop', 'Audio from each track', 'Sounds and kits'], 0, 'Timing only.'),
   ],
 };
 
@@ -1800,13 +1800,13 @@ const st2: Lesson = {
     {
       kind: 'predict', control: 'play', targetValue: true, concept: 'sequencer-pattern',
       instruction: 'Press PLAY on the Analog Four (or ▶ in the top bar) and listen through the sections.',
-      predict: mc('When the next section starts, the Analog Four…', ['Switches to that section\'s pattern at the bar line', 'Keeps looping A01', 'Stops'], 0,
+      predict: mc('When the next section starts, the Analog Four…', ['Switches to that section\'s pattern at the bar line', 'Keeps looping A01 until you change it by hand', 'Stops, and waits for you to press PLAY again'], 0,
         'With the arranger on, each section picks the A4\'s pattern, and the change lands on the section boundary.'),
       principle: 'An arranger turns loops into a song by switching patterns at section boundaries.',
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'sequencer-pattern',
-      quiz: mc('With the arranger on, who chooses the Analog Four\'s pattern?', ['The arranger\'s section', 'The A4\'s song mode', 'The Analog Rytm'], 0,
+      quiz: mc('With the arranger on, who chooses the Analog Four\'s pattern?', ['The arranger\'s section', 'The A4\'s own song mode', 'The Analog Rytm'], 0,
         'The arranger sends each instrument its pattern for the section; the A4 follows it like a song row.'),
     },
     {
@@ -1818,8 +1818,8 @@ const st2: Lesson = {
     },
   ],
   review: [
-    mc('An arranger section holds…', ['A pattern choice for each instrument', 'One sound', 'A tempo only'], 0, 'Every instrument gets its part.'),
-    mc('A break before the drop…', ['Makes the drop hit harder', 'Ends the track', 'Changes the key'], 0, 'Tension and release.'),
+    mc('An arranger section holds…', ['A pattern choice for each instrument', 'One sound for each instrument', 'A tempo and nothing else'], 0, 'Every instrument gets its part.'),
+    mc('A break before the drop…', ['Makes the drop hit harder', 'Ends the track early', 'Changes the track\'s key'], 0, 'Tension and release.'),
     mc('To arrange several machines together, use…', ['The studio arranger', 'One machine\'s chain', 'Track mutes only'], 0, 'One timeline for all.'),
   ],
 };
