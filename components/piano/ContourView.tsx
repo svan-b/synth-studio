@@ -8,7 +8,7 @@ import type { NoteMark, ScoreViewHandle } from './ScoreView';
 export interface ContourViewProps {
   score: Score;
   steps?: Step[];
-  /** What to write on each note. */
+  /** What to write on each note: the letter, the letter with its finger number, or nothing. */
   label?: 'finger' | 'letter' | 'none';
   className?: string;
 }
@@ -35,7 +35,7 @@ const ContourView = forwardRef<ScoreViewHandle, ContourViewProps>(function Conto
     const beatW = (W - padX * 2) / Math.max(1, score.totalBeats);
     const boxes = notes.map((n) => {
       const d = diatonicIndex(n.pitch);
-      const w = Math.max(rowH * 1.1, n.dur * beatW - 6);
+      const w = Math.max(rowH * (label === 'finger' && n.finger ? 1.9 : 1.1), n.dur * beatW - 6);
       return {
         id: n.id,
         x: padX + n.start * beatW,
@@ -43,7 +43,8 @@ const ContourView = forwardRef<ScoreViewHandle, ContourViewProps>(function Conto
         w,
         h: rowH - 6,
         hand: n.hand,
-        text: label === 'finger' ? (n.finger ? String(n.finger) : pitchLabel(n.pitch)) : label === 'letter' ? pitchLabel(n.pitch) : '',
+        text: label === 'none' ? '' : pitchLabel(n.pitch),
+        finger: label === 'finger' && n.finger ? String(n.finger) : '',
       };
     });
     const bars = score.measureStarts.slice(1).map((b) => padX + b * beatW - 3);
@@ -89,8 +90,22 @@ const ContourView = forwardRef<ScoreViewHandle, ContourViewProps>(function Conto
         {layout.boxes.map((b) => (
           <g key={b.id} data-note={b.id} className={`mc-contour-note ${b.hand === 'L' ? 'mc-contour-left' : ''}`}>
             <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={b.h / 2} />
+            {b.finger && (
+              <>
+                <circle className="mc-contour-finger" cx={b.x + b.h / 2} cy={b.y + b.h / 2} r={b.h * 0.34} />
+                <text className="mc-contour-finger-text" x={b.x + b.h / 2} y={b.y + b.h / 2 + 0.5} textAnchor="middle" dominantBaseline="central" fontSize={b.h * 0.44}>
+                  {b.finger}
+                </text>
+              </>
+            )}
             {b.text && (
-              <text x={b.x + Math.min(b.w / 2, b.h / 2 + 2)} y={b.y + b.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={b.h * 0.56}>
+              <text
+                x={b.finger ? b.x + b.h * 1.28 : b.x + Math.min(b.w / 2, b.h / 2 + 2)}
+                y={b.y + b.h / 2}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={b.h * 0.56}
+              >
                 {b.text}
               </text>
             )}

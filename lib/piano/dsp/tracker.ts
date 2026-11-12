@@ -556,11 +556,35 @@ export class PitchTracker {
         .reduce((a, b) => a + b, 0);
       crest = total > 0 ? top8 / total : 0;
       if (peaks.length > 0 && crest >= 0.3 && novelty >= 0.03) {
+        // Notes that were sounding before this strike. Striking one of them
+        // again mostly adds to its upper harmonics, which can look like the
+        // octave above, so those need gentler rules.
+        const prePeaks = this.findPeaks(pre);
+        const preVals = new Float32Array(prePeaks.length);
+        let preLoud = 0;
+        for (let i = 0; i < prePeaks.length; i++) {
+          preVals[i] = Math.pow(prePeaks[i].a, 0.6);
+          preLoud += prePeaks[i].a;
+        }
+        // Clearly sounding, not a chance line up of peaks in room noise.
+        const ringing = (m: number): boolean => {
+          if (prePeaks.length === 0) return false;
+          const r = this.scoreNote(m, prePeaks, preVals);
+          return r.score > 0 && r.completeness >= 0.6 && r.loud >= 0.25 * preLoud && r.maxA >= 0.15 * loudest;
+        };
         expected.forEach((e) => {
           if (e < this.minMidi || e > this.maxMidi) return;
           const s = this.scoreNote(e, peaks, vals);
           // The note must be complete for its register and among the loud new sounds.
-          if (s.score <= 0 || s.completeness < 0.5 || s.maxA < 0.2 * loudest) return;
+          if (s.score <= 0 || s.completeness < 0.5 || s.maxA < 0.2 * loudest) {
+            // Unless it was already ringing and its octave has clearly been struck.
+            if (!ringing(e)) return;
+            const above = this.scoreNote(e + 12, peaks, vals);
+            if (above.score <= 0 || above.maxA < 0.3 * loudest || expected.has(e + 12)) return;
+            accepted.push(e);
+            this.emit(e, time, strength, above.score, true, out);
+            return;
+          }
           for (const step of HARMONIC_STEPS) {
             // A stronger note below, not asked for, with harmonics of its own
             // means this one is only its overtone.
@@ -572,7 +596,7 @@ export class PitchTracker {
             // A note above that carries all of this one's peaks means this
             // one is a phantom beneath it.
             const u = e + step;
-            if (u <= this.maxMidi) {
+            if (u <= this.maxMidi && !ringing(e)) {
               const su = this.scoreNote(u, peaks, vals);
               if (su.score >= 0.5 * s.score && !this.ownSupport(s, step, peaks, vals, e)) return;
             }
@@ -691,6 +715,19 @@ export class PitchTracker {
     // dropped pencil is gone almost at once.
     const persists = job.newEnergy > 0 && lasting / job.newEnergy >= 0.12;
     const peaks = this.findPeaks(diff);
+    const prePeaks = this.findPeaks(pre);
+    const preVals = new Float32Array(prePeaks.length);
+    let preLoud = 0;
+    for (let i = 0; i < prePeaks.length; i++) {
+      preVals[i] = Math.pow(prePeaks[i].a, 0.6);
+      preLoud += prePeaks[i].a;
+    }
+    // Clearly sounding before the strike, and loud enough to matter beside the new note.
+    const wasRinging = (m: number, beside: number): boolean => {
+      if (prePeaks.length === 0 || m < this.minMidi) return false;
+      const r = this.scoreNote(m, prePeaks, preVals);
+      return r.score > 0 && r.completeness >= 0.6 && r.loud >= 0.25 * preLoud && r.maxA >= 0.2 * beside;
+    };
     if (peaks.length > 0 && job.novelty >= 0.05 && persists) {
       const vals = new Float32Array(peaks.length);
       let total = 0;
@@ -727,7 +764,9 @@ export class PitchTracker {
           const phantom =
             !isExpected(midi) &&
             (accepted.some((a) => related(a.midi) && s.score < 0.75 * a.score) ||
-              this.recent.some((r) => r.time !== time && related(r.midi) && s.score < 0.75 * r.score));
+              this.recent.some((r) => r.time !== time && related(r.midi) && s.score < 0.75 * r.score) ||
+              // A held note that is struck again brightens, which reads as its octave.
+              HARMONIC_STEPS.slice(0, 3).some((step) => wasRinging(midi - step, s.maxA)));
           this.damp(s.matched, vals);
           if (phantom) continue;
           accepted.push({ midi, score: s.score, f1: s.f1 });

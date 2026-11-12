@@ -28,9 +28,9 @@ function Shell({ title, progress, onClose, children }: { title: string; progress
         <div className="min-w-0 flex-1">
           <ProgressBar value={progress} tone="ok" />
         </div>
-        <div className="w-40 truncate text-right text-sm font-medium text-mc-muted">{title}</div>
+        <div className="max-w-[18rem] truncate text-right text-sm font-medium text-mc-muted">{title}</div>
       </header>
-      <main className="min-h-0 flex-1">{children}</main>
+      <div className="min-h-0 flex-1">{children}</div>
     </div>
   );
 }
@@ -165,7 +165,7 @@ function ReadingDrill({ onClose }: { onClose: () => void }) {
           )}
         </div>
         <div className="mx-auto min-h-0 w-full max-w-xl flex-1 py-4">
-          <ScoreView key={card.id} score={score} showFingering={false} showMeasureNumbers={false} maxZoom={2.2} minZoom={1.4} />
+          <ScoreView key={card.id} score={score} showFingering={false} showMeasureNumbers={false} showTime={false} maxZoom={2.2} minZoom={1.4} />
         </div>
         <div ref={kbRef} className="shrink-0">
           <Keyboard

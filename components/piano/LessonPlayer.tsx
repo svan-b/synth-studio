@@ -536,20 +536,20 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
         <div className="min-w-0 flex-1">
           <ProgressBar value={finished ? 1 : index / lesson.steps.length} tone="ok" />
         </div>
-        <div className="w-40 truncate text-right text-sm font-medium text-mc-muted">{lesson.title}</div>
+        <div className="max-w-[18rem] truncate text-right text-sm font-medium text-mc-muted">{lesson.title}</div>
         {index > 0 && !finished && (
           <IconButton label="Previous step" onClick={back}>
             <Icon.Left size={20} />
           </IconButton>
         )}
       </header>
-      <main className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1">
         {finished ? (
           <Complete lesson={lesson} onDone={() => onClose(true)} />
         ) : (
           <StepView key={`${lessonId}-${index}`} step={step} onNext={next} />
         )}
-      </main>
+      </div>
     </div>
   );
 }

@@ -286,10 +286,17 @@ describe('daily plan', () => {
     expect(readsStaff(lessons)).toBe(true);
   });
 
-  it('holds back new lessons when many pieces are unfinished', () => {
+  it('offers exactly one new lesson, then work on a piece already met', () => {
     const lessons = doneUpTo(6);
     expect(introducedPieces(lessons).length).toBeGreaterThanOrEqual(4);
     const plan = planSession({ minutes: 30, lessons, pieces: {}, cards: {}, now: new Date('2026-03-02T09:00:00') });
+    expect(plan.filter((b) => b.kind === 'lesson')).toHaveLength(1);
+    expect(plan.find((b) => b.kind === 'piece')).toMatchObject({ id: 'hot-cross-buns' });
+  });
+
+  it('ends once the course is finished with pieces and exercises only', () => {
+    const lessons = doneUpTo(order.length);
+    const plan = planSession({ minutes: 20, lessons, pieces: {}, cards: {}, now: new Date('2026-03-02T09:00:00') });
     expect(plan.some((b) => b.kind === 'lesson')).toBe(false);
     expect(plan.some((b) => b.kind === 'piece')).toBe(true);
   });

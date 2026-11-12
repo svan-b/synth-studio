@@ -85,10 +85,9 @@ export function planSession(input: PlanInput): Block[] {
     });
   }
 
-  // New material while fresh, unless there is already plenty in progress.
+  // One new lesson, early, while attention is fresh. Never more than one a session.
   const next = lessonOrder().find((id) => !isDone(id) && lessonUnlocked(id, isDone));
-  const inProgress = introducedPieces(input.lessons).filter((id) => !input.pieces[id]?.learned).length;
-  if (next && inProgress < 4) {
+  if (next) {
     const lesson = getLesson(next);
     blocks.push({ kind: 'lesson', id: next, minutes: lesson.minutes, title: lesson.title, detail: lesson.summary });
   }

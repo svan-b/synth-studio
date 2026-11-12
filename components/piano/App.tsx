@@ -137,6 +137,12 @@ export default function App() {
     }
   }, []);
 
+  // Keep the app and its piano samples on the device, so it opens without a connection.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/piano-sw.js', { scope: '/piano' }).catch(() => undefined);
+  }, []);
+
   const close = useCallback(() => setActivity(null), []);
 
   return (

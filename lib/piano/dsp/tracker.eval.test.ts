@@ -409,6 +409,33 @@ describe.skipIf(!DIR)('tracker on real piano recordings', () => {
     }
   });
 
+  it('hears a note struck again while the octave below it is held', () => {
+    const tally = newTally();
+    const groups: Array<{ t: number; notes: number[] }> = [];
+    const evs: Ev[] = [];
+    let t = 0.5;
+    for (const [low, high] of [[48, 60], [43, 55], [50, 62], [53, 65], [45, 57], [36, 60]]) {
+      // both together, then the upper note again, twice, while the lower one rings
+      evs.push({ midi: low, t, dur: 3, layer: 8 });
+      evs.push({ midi: high, t: t + 0.01, dur: 0.6, layer: 8 });
+      groups.push({ t, notes: [low, high] });
+      for (const dt of [0.75, 1.5]) {
+        evs.push({ midi: high, t: t + dt, dur: 0.6, layer: 8 });
+        groups.push({ t: t + dt, notes: [high] });
+      }
+      t += 3.4;
+    }
+    const expectedAt = (time: number) => {
+      let cur = groups[0].notes;
+      for (const g of groups) if (g.t - 0.3 <= time) cur = g.notes;
+      return cur;
+    };
+    score(tally, evs, detect(render(evs, t + 0.5), SR, expectedAt, 'restrike-octave'), 0.12);
+    report('struck again over a held octave', tally);
+    expect(tally.hit / tally.truth).toBeGreaterThan(0.9);
+    expect(tally.extra / tally.truth).toBeLessThan(0.1);
+  });
+
   it('does not credit an expected note that was not played', () => {
     // The learner plays one note while the music expects another.
     const cases: Array<{ play: number[]; expect: number[]; mustNot: number[] }> = [];

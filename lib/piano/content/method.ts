@@ -60,8 +60,8 @@ export const PRINCIPLES: Principle[] = [
     ],
   },
   {
-    title: 'New material is not crowded out',
-    what: 'The app holds back new lessons when several pieces are still unfinished.',
+    title: 'One new thing at a time',
+    what: 'A session has at most one new lesson, and then goes back to pieces you are already learning.',
     evidence: 'In one study, learning a second melody straight after the first wiped out the overnight gain on the first, unless the first was played again before stopping.',
     strength: 'limited',
     sources: ['Allen, 2013, Psychology of Music'],

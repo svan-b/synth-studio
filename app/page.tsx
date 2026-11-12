@@ -88,6 +88,9 @@ export default function Home() {
             <p className="text-sm text-hardware-label">
               Digital Twin Learning System • Pixel-Perfect Hardware Replicas
             </p>
+            <a href="/piano" className="mt-1 inline-block text-sm text-teaching-current hover:underline">
+              Learning piano? Open Middle C
+            </a>
           </div>
 
           {/* Controls */}

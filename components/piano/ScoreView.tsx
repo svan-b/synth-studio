@@ -41,6 +41,8 @@ export interface ScoreViewProps {
   maxZoom?: number;
   minZoom?: number;
   showMeasureNumbers?: boolean;
+  /** Draw the time signature. Off for single notes shown as flash cards. */
+  showTime?: boolean;
   className?: string;
 }
 
@@ -110,11 +112,11 @@ function measureWidths(score: Score): number[] {
   return out;
 }
 
-function planLayout(score: Score, width: number, opts: { fingering: boolean; names: boolean; chords: boolean }): Plan {
+function planLayout(score: Score, width: number, opts: { fingering: boolean; names: boolean; chords: boolean; time: boolean }): Plan {
   const natural = measureWidths(score);
   const sig = Math.abs(keyInfo(score.key).signature);
   const clefLead = 40 + (sig > 0 ? sig * 11 + 8 : 0);
-  const timeLead = 30;
+  const timeLead = opts.time ? 30 : 0;
   const available = Math.max(200, width - LEFT_PAD - RIGHT_PAD);
 
   const systems: SystemPlan[] = [];
@@ -197,6 +199,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     maxZoom = 1.9,
     minZoom = 1.05,
     showMeasureNumbers = true,
+    showTime = true,
     className,
   },
   ref,
@@ -309,7 +312,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     systemBoxes.current = [];
 
     const hasFingering = showFingering && score.notes.some((n) => n.finger !== undefined);
-    const planOpts = { fingering: hasFingering, names: showNames, chords: score.chords.length > 0 };
+    const planOpts = { fingering: hasFingering, names: showNames, chords: score.chords.length > 0, time: showTime };
 
     // Pick the largest zoom whose layout fits the available height.
     let z = zoom ?? minZoom;
@@ -366,7 +369,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
           if (first) {
             stave.addClef(score.clefs[hand]);
             stave.addKeySignature(score.key);
-            if (si === 0) stave.addTimeSignature(timeSpec);
+            if (si === 0 && showTime) stave.addTimeSignature(timeSpec);
           } else {
             stave.setBegBarType(Barline.type.NONE);
           }
@@ -461,7 +464,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
         if (score.hands.length === 2) {
           new StaveConnector(list[0], list[1]).setType(StaveConnector.type.SINGLE_RIGHT).setContext(ctx).draw();
         }
-        if (showMeasureNumbers && first && score.measureCount > 4) {
+        if (showMeasureNumbers && first && si > 0) {
           ctx.save();
           ctx.setFont('Arial', 9, 'normal');
           ctx.setFillStyle(mutedColor);
@@ -559,7 +562,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     marks.current.forEach((state, id) => applyMark(id, state));
     applyCursor(cursorStep.current, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [score, size.w, size.h, showFingering, showNames, focusHand, zoom, maxZoom, minZoom, showMeasureNumbers, themeKey]);
+  }, [score, size.w, size.h, showFingering, showNames, focusHand, zoom, maxZoom, minZoom, showMeasureNumbers, showTime, themeKey]);
 
   // The cursor follows a different step list when the active hands change.
   useEffect(() => {

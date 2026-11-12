@@ -81,7 +81,16 @@ function StaffFigure({ fig }: { fig: Extract<Figure, { kind: 'staff' }> }) {
   const height = score.hands.length === 2 ? 250 : 170;
   return (
     <div className="mx-auto w-full max-w-xl rounded-xl bg-mc-surface px-4 py-2" style={{ height }}>
-      <ScoreView score={score} showFingering={false} showNames={fig.names} maxZoom={1.75} minZoom={1.2} showMeasureNumbers={false} />
+      <ScoreView
+        score={score}
+        showFingering={false}
+        showNames={fig.names}
+        maxZoom={1.75}
+        minZoom={1.2}
+        showMeasureNumbers={false}
+        // A lone note is a picture of a pitch, so the time signature would only distract.
+        showTime={!(score.measureCount === 1 && score.notes.length <= 1) || fig.music.time !== undefined}
+      />
     </div>
   );
 }

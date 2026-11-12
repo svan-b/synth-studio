@@ -34,6 +34,10 @@ Pixel-perfect digital replicas of hardware synthesizers with real-time teaching 
 - Moog Sub 37
 - Allen & Heath Xone:96
 
+## 🎹 Middle C, a piano teacher
+
+The same app also holds **Middle C**, a piano course for an iPad on the music stand, at `/piano`. It follows your playing over MIDI or by listening, teaches a six stage course, and coaches practice on real pieces. See [docs/PIANO.md](docs/PIANO.md).
+
 ## 🚀 Tech Stack
 
 - **Framework:** Next.js 14 with App Router

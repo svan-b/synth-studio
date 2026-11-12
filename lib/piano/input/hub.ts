@@ -54,8 +54,12 @@ class InputHub {
     return 'touch';
   }
 
+  /** The notes the current activity is waiting for, if any. */
+  expected: number[] | null = null;
+
   /** Tell the listening input which notes the music expects next. */
   expect(notes: number[] | null): void {
+    this.expected = notes;
     listener.expect(notes);
   }
 }

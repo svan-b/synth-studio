@@ -1,0 +1,17 @@
+{
+  "name": "Middle C",
+  "short_name": "Middle C",
+  "description": "A piano teacher for your music stand, built on the science of how people learn to play.",
+  "start_url": "/piano",
+  "scope": "/piano",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F6F3EC",
+  "theme_color": "#F6F3EC",
+  "categories": ["music", "education"],
+  "icons": [
+    { "src": "/piano/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/piano/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/piano/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

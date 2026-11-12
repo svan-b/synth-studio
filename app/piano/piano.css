@@ -378,6 +378,13 @@ html:has(.mc-root[data-theme='dark']) body {
   font-weight: 700;
   font-family: -apple-system, system-ui, sans-serif;
 }
+.mc-contour-finger {
+  fill: rgb(var(--mc-ink));
+  stroke: none;
+}
+.mc-contour-note .mc-contour-finger-text {
+  fill: rgb(var(--mc-bg));
+}
 .mc-contour-left rect {
   fill: rgb(var(--mc-hint) / 0.16);
   stroke: rgb(var(--mc-hint) / 0.6);
