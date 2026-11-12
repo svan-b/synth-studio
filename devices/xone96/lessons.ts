@@ -375,7 +375,8 @@ const f3: Lesson = {
     },
     {
       kind: 'challenge', concept: 'equalization', scope: 'spectrum',
-      instruction: 'Make channel 1 sound like it is playing in the next room: dull and muffled, but with the bass still there.',
+      setup: { ch1_hi: 0, ch1_himid: 0, ch1_lomid: 0, ch1_lo: 0 },
+      instruction: 'The EQ is flat again. Make channel 1 sound like it plays in the next room: dull and muffled, the bass still there.',
       checklist: [
         { text: 'The top is gone (HI at -12 dB or lower)', check: s => num(s, 'ch1_hi') <= -0.5 },
         { text: 'The bass is still there (LO no lower than -3 dB)', check: s => num(s, 'ch1_lo') >= -0.15 },
@@ -474,7 +475,8 @@ const f4: Lesson = {
     },
     {
       kind: 'challenge', concept: 'equalization',
-      instruction: 'Make the kick punch through the bass without boosting anything.',
+      setup: { ch1_lo: 0, ch2_lo: 0, ch1_lomid: 0, ch2_lomid: 0 },
+      instruction: 'The EQ is flat again. Make the kick punch through the bass without boosting anything.',
       checklist: [
         { text: 'The kick keeps its low end (channel 1 LO at 0 dB or near)', check: s => num(s, 'ch1_lo') >= -0.1 },
         { text: 'The bass gives up some lows (channel 2 LO cut)', check: s => num(s, 'ch2_lo') <= -0.2 },
@@ -887,13 +889,14 @@ const f8: Lesson = {
     },
     {
       kind: 'challenge', concept: 'dj-mixing',
-      instruction: 'Get TRACK B ready: cue it in split cue while the room keeps hearing only TRACK A.',
+      setup: { ch2_cue: false, split_cue: false },
+      instruction: 'The cue buttons are off again. Get TRACK B ready: cue it in split cue while the room hears only TRACK A.',
       checklist: [
         { text: 'Channel 2 cued', check: s => !!s.values.ch2_cue },
         { text: 'SPLIT CUE on', check: s => !!s.values.split_cue },
         { text: 'The crossfader keeps TRACK B out of the room', check: s => num(s, 'xfader') <= 1 && num(s, 'ch2_xf') === 2 },
       ],
-      hints: ['You set most of this already.', 'Check the crossfader is still on X.', 'CUE 2 on, SPLIT CUE on, crossfader fully left.'],
+      hints: ['Two buttons: one picks what you preview, one splits your headphones.', 'Check the crossfader is still on X.', 'CUE 2 on, SPLIT CUE on, crossfader fully left.'],
       solution: { values: { ch2_cue: true, split_cue: true, xfader: 0, ch2_xf: 2 } },
     },
     {
@@ -918,7 +921,7 @@ const f8: Lesson = {
 // ============================================================================
 
 const p1: Lesson = {
-  id: 'xone96-phrasing', device: 'xone96', path: 'performance', order: O(9), difficulty: 'intermediate',
+  id: 'xone96-phrasing', device: 'xone96', path: 'performance', order: O(13), difficulty: 'intermediate',
   name: 'Phrasing: mix on the 8-bar line',
   description: 'Count beats, bars and phrases, and start a blend where the music expects a change.',
   objective: 'Count bars and phrases, and start a blend on the first bar of a phrase.',
@@ -1003,7 +1006,7 @@ const p1: Lesson = {
 };
 
 const p2: Lesson = {
-  id: 'xone96-bass-swap', device: 'xone96', path: 'performance', order: O(10), difficulty: 'intermediate',
+  id: 'xone96-bass-swap', device: 'xone96', path: 'performance', order: O(14), difficulty: 'intermediate',
   name: 'Transitions: the bass swap and the filter out',
   description: 'Two classic transitions: swap the bass between tracks, then filter the old one away.',
   objective: 'Perform a bass swap and a high-pass filter exit between two tracks.',
@@ -1102,7 +1105,7 @@ const p2: Lesson = {
 };
 
 const p3: Lesson = {
-  id: 'xone96-full-blend', device: 'xone96', path: 'performance', order: O(11), difficulty: 'advanced',
+  id: 'xone96-full-blend', device: 'xone96', path: 'performance', order: O(15), difficulty: 'advanced',
   name: 'A full blend from A to B',
   description: 'Everything together: cue, match the gain, kill, blend on the phrase, swap and finish.',
   objective: 'Mix from TRACK A into TRACK B over a phrase using cue, GAIN, EQ and the crossfader.',
@@ -1205,7 +1208,7 @@ const p3: Lesson = {
 // ============================================================================
 
 const e1: Lesson = {
-  id: 'xone96-e1-which-band', device: 'xone96', path: 'ear-training', order: O(12), difficulty: 'beginner',
+  id: 'xone96-e1-which-band', device: 'xone96', path: 'ear-training', order: O(9), difficulty: 'beginner',
   name: 'Ear training 1: lows or highs?',
   description: 'Wide differences first: was the LO or the HI killed?',
   objective: 'Hear whether the low or the high band was killed, and recreate it.',
@@ -1279,7 +1282,7 @@ const e1: Lesson = {
 };
 
 const e2: Lesson = {
-  id: 'xone96-e2-mid-bands', device: 'xone96', path: 'ear-training', order: O(13), difficulty: 'intermediate',
+  id: 'xone96-e2-mid-bands', device: 'xone96', path: 'ear-training', order: O(10), difficulty: 'intermediate',
   name: 'Ear training 2: which mid?',
   description: 'Finer differences: LO MID or HI MID, cuts and boosts, then two bands at once.',
   objective: 'Tell LO MID from HI MID by ear and match partial cuts and boosts.',
@@ -1363,7 +1366,7 @@ const e2: Lesson = {
 const FILTER_ON = { ch1_filter: 0, f1_on: true, f1_res: 3, f1_crunch: 0 };
 
 const e3: Lesson = {
-  id: 'xone96-e3-filter-type', device: 'xone96', path: 'ear-training', order: O(14), difficulty: 'intermediate',
+  id: 'xone96-e3-filter-type', device: 'xone96', path: 'ear-training', order: O(11), difficulty: 'intermediate',
   name: 'Ear training 3: hear the filter type',
   description: 'HPF, BPF or LPF? Then find the cutoff by ear.',
   objective: 'Recognise HPF, BPF and LPF by ear and match the filter frequency.',
@@ -1444,7 +1447,7 @@ const e3: Lesson = {
 };
 
 const e4: Lesson = {
-  id: 'xone96-e4-over-gain', device: 'xone96', path: 'ear-training', order: O(15), difficulty: 'advanced',
+  id: 'xone96-e4-over-gain', device: 'xone96', path: 'ear-training', order: O(12), difficulty: 'advanced',
   name: 'Ear training 4: hear over-gain',
   description: 'Clean or clipped? Hear distortion at matched loudness, then mix gain, EQ and filter clues.',
   objective: 'Hear when a channel is over-driven, set GAIN by ear, and tell clipping from a filter.',
@@ -1658,17 +1661,20 @@ const st2: Lesson = {
     },
     {
       kind: 'challenge', concept: 'gain-staging',
-      instruction: 'Set channel 1 and channel 2 GAIN so each meter averages around 0 with peaks near +6.',
+      // both trims start wrong (one starved, one too hot) and both faders down: gain-staging by the
+      // meters is the task, and bringing the drums up is the next step's move
+      setup: { ch1_gain: -20, ch2_gain: 10, ch1_fader: 0 },
+      instruction: 'Both GAINs are off now, one low and one hot, and the faders are down. Set each so its meter averages around 0.',
       checklist: [
-        { text: 'Channel 1 GAIN between -12 and +10 dB', check: s => num(s, 'ch1_gain') >= -12 && num(s, 'ch1_gain') <= 10 },
-        { text: 'Channel 2 GAIN between -12 and +10 dB', check: s => num(s, 'ch2_gain') >= -12 && num(s, 'ch2_gain') <= 10 },
+        { text: 'Channel 1 GAIN between -12 and +8 dB', check: s => num(s, 'ch1_gain') >= -12 && num(s, 'ch1_gain') <= 8 },
+        { text: 'Channel 2 GAIN between -12 and +8 dB', check: s => num(s, 'ch2_gain') >= -12 && num(s, 'ch2_gain') <= 8 },
       ],
       hints: ['Watch each channel meter, not the master.', 'If PK! flashes, turn that GAIN down; if only the green LEDs light, turn it up.', 'Most instruments land within a few dB of 0.'],
       solution: { values: { ch1_gain: 0, ch2_gain: 0 } },
     },
     {
       kind: 'do', control: 'ch1_fader', targetValue: 10, concept: 'mixing',
-      instruction: 'The drums lead: channel 1 fader fully up.',
+      instruction: 'The drums lead: push channel 1\'s fader fully up.',
       principle: 'Start the balance from the part that drives the track.',
     },
     {
@@ -1813,7 +1819,7 @@ const st3: Lesson = {
     },
     {
       kind: 'info', concept: 'mixing',
-      instruction: 'Now do it for real: press REC in the top bar, play your mix-down from intro to outro, then press REC again to save the WAV.',
+      instruction: 'Now for real: press REC in the top bar, play your mix-down from intro to outro, then press REC again to save the WAV.',
       principle: 'Recording a take makes you commit, and lets you listen back with fresh ears.',
       explanation: 'Tip: the song arranger (Studio tab) can store these fader moves per section as snapshots, so the mix-down plays itself.',
     },
@@ -1832,4 +1838,4 @@ const st3: Lesson = {
   ],
 };
 
-export const XONE96_LESSONS: Lesson[] = [f1, f2, f3, f4, f5, f6, f7, f8, p1, p2, p3, e1, e2, e3, e4, st1, st2, st3];
+export const XONE96_LESSONS: Lesson[] = [f1, f2, f3, f4, f5, f6, f7, f8, e1, e2, e3, e4, p1, p2, p3, st1, st2, st3];

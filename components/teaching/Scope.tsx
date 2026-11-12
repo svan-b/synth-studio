@@ -245,7 +245,7 @@ export default function Scope({ height = 120, mode: initial = 'both', stepMode }
             key={m}
             onClick={() => setMode(m)}
             aria-pressed={mode === m}
-            className={`px-1.5 py-0.5 rounded text-[10px] leading-tight focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 ${mode === m ? 'bg-green-700 text-white' : 'bg-black/70 text-gray-300 hover:text-white'}`}
+            className={`px-1.5 py-0.5 coarse:px-3 coarse:py-2 coarse:text-xs rounded text-[10px] leading-tight focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 ${mode === m ? 'bg-green-700 text-white' : 'bg-black/70 text-gray-300 hover:text-white'}`}
           >
             {m}
           </button>

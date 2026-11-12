@@ -553,7 +553,7 @@ const earLab: Lesson = {
   order: 10,
   difficulty: 'intermediate',
   name: 'Ear lab: what changed?',
-  description: 'Five quick rounds that mix filter, swing, note length, sends and EQ, then two ear challenges: name the change first, then put it right.',
+  description: 'Five quick rounds that mix filter, swing, note length, sends and EQ, with two ear challenges among them: name the change first, then put it right.',
   objective: 'Tell apart, by ear, changes in filter, swing, note length, sends and EQ, and put each one right.',
   source: 'Synth Studio · Producer path (curriculum L10)',
   estimatedMinutes: 10,
@@ -582,22 +582,8 @@ const earLab: Lesson = {
       },
     },
     {
-      kind: 'listen', concept: 'timing-tempo',
-      instruction: 'Round 2: listen to the hats and the perc between the beats.',
-      listen: {
-        a: {}, b: {},
-        studio: { a: { swing: 0 }, b: { swing: 0.2 } },
-        question: {
-          question: 'What changed?',
-          options: ['Reverb', 'Volume', 'Swing'],
-          answer: 2,
-          explain: 'In B every second 16th arrives later, so the groove lopes. Nothing got louder or wetter.',
-        },
-      },
-    },
-    {
       kind: 'listen', concept: 'envelope-decay',
-      instruction: 'Round 3: the perc again.',
+      instruction: 'Round 2: the perc again.',
       listen: {
         a: {}, b: {},
         parts: { a: { dfam: { vca_decay: 120 } }, b: { dfam: { vca_decay: 450 } } },
@@ -606,6 +592,27 @@ const earLab: Lesson = {
           options: ['Note length', 'Filter', 'Pitch'],
           answer: 0,
           explain: 'B rings on into the next hit: same pitch and tone, a longer tail. That is VCA DECAY.',
+        },
+      },
+    },
+    {
+      kind: 'match', concept: 'filter-cutoff', instance: 'dfam',
+      instruction: 'Now fix it. Both changes at once: put the perc back by ear with CUTOFF and VCA DECAY.',
+      setup: { vcf_cutoff: 700, vca_decay: 60 },
+      match: { target: { vcf_cutoff: 3000, vca_decay: 250 }, controls: ['vcf_cutoff', 'vca_decay'] },
+      hints: ['One control is tone, one is length.', 'It is brighter and rings longer.'],
+    },
+    {
+      kind: 'listen', concept: 'timing-tempo',
+      instruction: 'Round 3: listen to the hats and the perc between the beats.',
+      listen: {
+        a: {}, b: {},
+        studio: { a: { swing: 0 }, b: { swing: 0.2 } },
+        question: {
+          question: 'What changed?',
+          options: ['Reverb', 'Volume', 'Swing'],
+          answer: 2,
+          explain: 'In B every second 16th arrives later, so the groove lopes. Nothing got louder or wetter.',
         },
       },
     },
@@ -639,15 +646,8 @@ const earLab: Lesson = {
       },
     },
     {
-      kind: 'match', concept: 'filter-cutoff', instance: 'dfam',
-      instruction: 'Two changes this time: put the perc back by ear. CUTOFF and VCA DECAY.',
-      setup: { vcf_cutoff: 700, vca_decay: 60 },
-      match: { target: { vcf_cutoff: 3000, vca_decay: 250 }, controls: ['vcf_cutoff', 'vca_decay'] },
-      hints: ['One control is tone, one is length.', 'It is brighter and rings longer.'],
-    },
-    {
       kind: 'match', concept: 'equalization', instance: XONE,
-      instruction: 'Three changes on the stabs channel: LO MID, SEND 2 and HI.',
+      instruction: 'Fix this one too. Three changes on the stabs channel: LO MID, SEND 2 and HI.',
       setup: { ch3_lomid: 0, ch3_snd2: 1, ch3_hi: 0 },
       match: { target: { ch3_lomid: midKnob(-12), ch3_snd2: 6, ch3_hi: killKnob(3) }, controls: ['ch3_lomid', 'ch3_snd2', 'ch3_hi'] },
       hints: ['Listen to the body, then the space, then the top, one at a time.', 'Less boxy, further back, a little brighter.'],

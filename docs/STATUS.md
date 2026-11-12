@@ -1,4 +1,4 @@
-# Synth Studio: status and next actions (updated 2026-10-29, everything merged)
+# Synth Studio: status and next actions (updated 2026-11-12, everything merged)
 
 Working branch: `claude/dfam-documentation-review-iYhxN` (PR #54). Everything below
 marked **merged** is on this branch, built and verified. Everything marked **in progress** is on
@@ -130,8 +130,17 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - A voice with its output on plays there in stereo, after its level and pan, and leaves the main mix and the output stage; its chorus, delay and reverb sends stay (VOICE ROUTING TO MAIN off, TO FX on, p.29).
   - The outputs sit at the main output's level for the default MAIN VOLUME, so turning one on keeps the balance. MAIN VOLUME does not reach them.
   - No output on: the audio graph is as before, so the main output is unchanged.
-  - Why the first attempt looked broken: the reroute was right, but the demo song opens on an intro where TRACK 1 is silent, and its sections change level between the test's windows. `outputs-device.cjs` now takes a pattern to hold (PATTERN mode), and the A4 check holds the groove, A02.
+  - Why the first attempt looked broken: the reroute was right, but the demo song opens on an intro where TRACK 1 is silent, and its sections change level between the test's windows. `outputs-device.cjs` now takes a pattern to hold (PATTERN mode), and the A4 check holds the groove, A02, and measures TRACK 3 (the bass: TRACK 1 is too small a part of the groove to measure reliably).
   - Gate: e2e 50/50 (both instrument output checks); A4 lessons 22, 0 failed, 0 manual; A4 audio QA exit 0 (Arp Garden's intermittent click flag showed once, then 0 of 47 on a re-run).
+- **Learning flow pass** (every lesson against `docs/PEDAGOGY.md`; no instrument, engine or default changed).
+  - New `scripts/lesson-audit.ts`, now the last part of `npm run validate`: it walks each lesson as a learner would and checks flow, shape, wording, sequence and answer order. It covers all 177 lessons (157 on the instruments and own-gear devices, 5 studio, 15 Producer path). Everything it found is fixed, and it reports 0.
+  - **Answers were always "A".** The right option was first in 77 % of quiz, prediction and A/B questions (every one on the DFAM, Sub 37, Analog Four and Xone:96) and in all 563 Daily Review questions outside the Producer path. The coach and Daily Review now show options in a shuffled order, new each session (`components/teaching/optionOrder.ts`); A/B side labels keep their order and "Both" / "Neither" stay last. Answers are still stored by the lesson's own index, so review scheduling and the lesson runner are unchanged.
+  - **One recommended sequence** (`lib/studio/lessonSequence.ts`). The Subharmonicon and the Rytm numbered their lessons per path, so "Next lesson" after the first foundations lesson opened a sound-design lesson whose prerequisites were five lessons away. Both now use one order across the instrument, and the Xone:96's ear training comes before performance, as the spec has it. "Next lesson", "Recommended next" and "Start the first lesson" share one rule: the next lesson not done whose prerequisites are.
+  - **17 steps finished themselves.** 13 closing challenges already passed on arrival, because the guided steps had built exactly what they ask for. Each now takes the defining controls away again or asks for more. 4 `do` / `predict` steps were on target before the learner moved (DFAM "+3 st", Sub 37 FILTER EG DECAY, the Xone channel fader, the MIDI program).
+  - **To spec:** the five shared studio lessons gained the "your turn" step or the prediction they lacked; the Producer path's ear lab alternates naming a change and fixing it; four lessons get hands-on sooner; 27 instructions and principles are within their word limits.
+  - **iPad coach:** buttons at least 44 px tall; Back / Next are a footer outside the part that scrolls; a quiz, a reflect, a prediction not yet made and the summary hide the scope and let the coach grow, so the whole question and Next are on screen without scrolling. An ear challenge gets room for its Check button.
+  - Gate: audit 0 findings; lesson runner 0 failed on all ten devices and the studio (studio manual steps 2 → 1); core e2e 51/51, with a new `lesson-flow.cjs` check (shuffled answers, "Next lesson", a step that waits, and a question by touch on an iPad-sized screen) and both iPad Producer walkthroughs.
+  - The A4 output check now measures TRACK 3 and accepts a smaller drop when the energy shows up on the new channel: TRACK 1 was too close to the threshold and failed one run in three.
 - **Project files carry user samples.** An instrument can declare `assets` (`has`, `collect`, `restore`); project files embed them as mono 16-bit PCM, base64.
   - Opening a project restores them before the studio loads.
   - The Rytm's user samples now travel to another browser or the iPad Home Screen app, which keeps its own storage.
@@ -200,7 +209,8 @@ git push origin --delete $(git ls-remote --heads origin 'wip/*' | awk '{print $2
 ```
 
 **Next up, in order:**
-1. **Intermittent A4 click flags in audio QA** (Arp Garden, Bubble Cycle, Metallic AM). Each is clean in most re-runs, so it is likely a voice-steal or envelope-retrigger edge case.
+1. **Answer length gives the answer away.** In about 70 % of questions the right option is the longest one (chance would be a third). The shuffle hides its position, not its length. Fix by rewriting distractors to the same length and detail, an instrument at a time; `scripts/lesson-audit.ts` is the place to count it.
+2. **Intermittent A4 click flags in audio QA** (Arp Garden, Bubble Cycle, Metallic AM). Each is clean in most re-runs, so it is likely a voice-steal or envelope-retrigger edge case.
 
 `vercel.json` no longer builds previews for `wip/*` branches. `git.deploymentEnabled` turns them off, and an `ignoreCommand` cancels any that start anyway. The working branch and `main` build as before.
 

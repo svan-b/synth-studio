@@ -36,10 +36,11 @@ npx next start -p 3100 &   # stop with: fuser -k 3100/tcp
 Then run only the checks that apply:
 - **Core e2e:** `node scripts/e2e/run.cjs http://localhost:3100`. Add `--full` only at milestones.
 - **Lessons for one device:** `node scripts/lesson-runner.cjs http://localhost:3100 <device>`. It must report 0 failed.
+- **Lesson audit:** `npm run audit:lessons [device ...]` (part of `npm run validate`). Every lesson against `docs/PEDAGOGY.md`; it must report 0 findings. `scripts/e2e/lesson-flow.cjs` checks the same flow in the browser, by touch on an iPad-sized screen too (it runs in the core e2e).
 - **Audio QA for one device:** `node scripts/audio-qa.cjs http://localhost:3100 <device> --target -18`. It must exit 0. See `docs/AUDIO_QA.md`.
 - **Separate outputs:**
   - `node scripts/e2e/outputs.cjs http://localhost:3100` (the studio side)
-  - `node scripts/e2e/outputs-device.cjs http://localhost:3100 [device] [outputId] [pattern]` (a real instrument's output; the default is the Rytm's BD. For the A4 use `analog-four t1 A02`: the pattern holds the groove, since the demo song's intro has no TRACK 1)
+  - `node scripts/e2e/outputs-device.cjs http://localhost:3100 [device] [outputId] [pattern]` (a real instrument's output; the default is the Rytm's BD. For the A4 use `analog-four t3 A02`: the pattern holds the groove, since the demo song's sections change level, and TRACK 3, the bass, is a large enough part of it to measure)
 - **Sequencer:** `npm run test:seq`.
 
 Devices: `dfam`, `mother32`, `subharmonicon`, `sub37`, `analog-four`, `analog-rytm`, `xone96`.

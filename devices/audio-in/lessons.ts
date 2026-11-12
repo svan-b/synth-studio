@@ -247,12 +247,6 @@ const l3: Lesson = {
       },
     },
     {
-      kind: 'info', concept: 'timing-tempo', focus: ['latency'],
-      instruction: 'Under 10 ms feels instant; up to 20 ms is fine for most playing. More than that, lower your interface\'s buffer size.',
-      principle: 'Smaller buffers mean less delay, but more work for the computer.',
-      explanation: 'Buffer size is in the interface\'s control panel (or the computer\'s sound settings), often in samples: 128 samples at 48 kHz is under 3 ms. Too small and the audio crackles.',
-    },
-    {
       kind: 'predict', control: 'mute', targetValue: true, concept: 'signal-routing', focus: ['mute', 'latency'],
       instruction: 'Press MUTE.',
       predict: {
@@ -261,6 +255,12 @@ const l3: Lesson = {
         explain: 'Direct monitoring sends the input to your headphones inside the interface, before the computer. MUTE stops the delayed copy from the studio, and the meter and takes still work.',
       },
       principle: 'Direct monitoring skips the computer, so it has no round-trip delay.',
+    },
+    {
+      kind: 'info', concept: 'timing-tempo', focus: ['latency'],
+      instruction: 'Under 10 ms feels instant; up to 20 ms is fine for most playing. More than that, lower your interface\'s buffer size.',
+      principle: 'Smaller buffers mean less delay, but more work for the computer.',
+      explanation: 'Buffer size is in the interface\'s control panel (or the computer\'s sound settings), often in samples: 128 samples at 48 kHz is under 3 ms. Too small and the audio crackles.',
     },
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'signal-routing',
@@ -393,7 +393,7 @@ const st1: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'signal-routing',
-      instruction: 'The loop: the studio sends MIDI notes and clock to the synth, and the synth\'s audio comes back in here. No gear? The Practice synth plays both parts.',
+      instruction: 'The loop: the studio sends notes and clock to the synth; its audio comes back here. No gear? The Practice synth plays both.',
       principle: 'MIDI goes out, audio comes back: two different cables doing two different jobs.',
       explanation: 'With hardware: USB or a MIDI interface carries MIDI to the synth; a cable from the synth\'s output to your audio interface brings the sound back.',
     },

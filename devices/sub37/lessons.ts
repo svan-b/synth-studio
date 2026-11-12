@@ -266,7 +266,7 @@ const f3: Lesson = {
   steps: [
     {
       kind: 'info', autoplay: true, concept: 'mixing', focus: ['mix_osc1', 'mix_sub', 'mix_osc2', 'mix_noise', 'mix_feedback'],
-      instruction: 'Five channels feed the filter: OSC 1, SUB OSC, OSC 2, NOISE and FDBK / EXT IN. Each has a level knob and an ON button.',
+      instruction: 'Five channels feed the filter: OSC 1, SUB OSC, OSC 2, NOISE and FDBK / EXT IN, each with a level knob and ON button.',
       principle: 'A mixer adds signals; each knob sets how much of one source reaches the filter.',
       manualReference: P.mixer,
     },
@@ -461,7 +461,8 @@ const f5: Lesson = {
   source: `${SRC} pp.28-33`, estimatedMinutes: 9,
   prerequisites: ['sub37-f4-filter'],
   concepts: ['envelope-attack', 'envelope-decay', 'envelope-sustain', 'envelope-release', 'modulation-depth'],
-  start: { reset: true, values: { cutoff: 300, resonance: 20 } },
+  // FILTER EG DECAY starts long, so shortening it in step 3 is a move the learner hears
+  start: { reset: true, values: { cutoff: 300, resonance: 20, feg_decay: 2000 } },
   steps: [
     {
       kind: 'do', control: 'filter_eg_amt', targetValue: 60, concept: 'modulation-depth',
@@ -478,7 +479,7 @@ const f5: Lesson = {
     },
     {
       kind: 'do', control: 'feg_decay', targetValue: 250, concept: 'envelope-decay',
-      instruction: 'Set the FILTER EG DECAY to about 250 ms.',
+      instruction: 'Shorten the FILTER EG DECAY to about 250 ms.',
       principle: 'Decay is the time to fall from the peak to the sustain level.',
       explanation: 'Each note now starts bright and darkens: a pluck in brightness, while the loudness stays.',
       manualReference: P.feg,
@@ -1139,7 +1140,9 @@ const sd3: Lesson = {
     },
     {
       kind: 'challenge', concept: 'gain-staging',
-      instruction: 'Make an aggressive bass that stays dark: plenty of grit, but nothing hissy or fizzy on top.',
+      // the opposite sound to start from: clean into the filter, distorted after it, bright
+      setup: { mix_osc1: 50, mix_feedback: 0, multidrive: 80, cutoff: 2500 },
+      instruction: 'Now it fizzes: the grit sits after the filter. Make an aggressive bass that stays dark, with nothing fizzy on top.',
       checklist: [
         { text: 'Grit before the filter: mixer OSC 1 at 7+ or FDBK / EXT IN at 3+', check: s => num(s, 'mix_osc1') >= 70 || num(s, 'mix_feedback') >= 30 },
         { text: 'MULTIDRIVE at 4 or less', check: s => num(s, 'multidrive') <= 40 },
@@ -1863,7 +1866,7 @@ const st2: Lesson = {
     },
     {
       kind: 'info', instance: 'analog-rytm', concept: 'sequencer-pattern',
-      instruction: 'On the Analog Rytm, put a kick on steps 1, 5, 9 and 13 (four on the floor), or pick a kit pattern that has one.',
+      instruction: 'On the Analog Rytm, put a kick on steps 1, 5, 9 and 13 (four on the floor), or pick a pattern with one.',
       principle: 'A kick on every beat gives the bass a grid to play between.',
     },
     {

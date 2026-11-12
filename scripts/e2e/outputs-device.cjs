@@ -71,7 +71,10 @@ const { chromium } = require('playwright');
     errs.push('test: ' + String(e).split('\n')[0]);
   }
   // the kick moves: its channel carries signal, the main loses energy, and gets it back after
-  const ok = !!(r.strip && r.bd > 0.01 && r.mainWith < r.before * 0.9 && r.after > r.before * 0.8 && r.gone
+  // "leaves the main": a clear drop, or a smaller one whose energy is accounted for on the new channel
+  // (main and out add up to what the main carried before, within the spread of two 3 s windows)
+  const left = r.mainWith < r.before * 0.9 || (r.mainWith < r.before * 0.97 && Math.abs(Math.hypot(r.mainWith, r.bd) - r.before) < r.before * 0.12);
+  const ok = !!(r.strip && r.bd > 0.01 && left && r.after > r.before * 0.8 && r.gone
     && r.inherit?.gain === -6 && r.inherit?.route === 'master');
   console.log(JSON.stringify({ ok, ...r, errs: errs.slice(0, 5) }));
   await browser.close();

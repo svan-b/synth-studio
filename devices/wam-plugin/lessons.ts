@@ -296,7 +296,7 @@ const l4: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'signal-routing',
-      instruction: 'A plugin and a hardware box do the same jobs, so the signal flow is the same: notes into an instrument, its sound into effects, then the mixer.',
+      instruction: 'Plugins and hardware boxes do the same jobs in the same signal flow: notes into an instrument, its sound into effects, then the mixer.',
       principle: 'Signal flow is the same in software and hardware: source, processing, mixer.',
       explanation: 'A delay pedal and Studio Echo both take audio in and send audio out; a hardware synth and Studio Mono both take notes in.',
     },
@@ -322,9 +322,9 @@ const l4: Lesson = {
     },
     {
       kind: 'info', concept: 'effects',
-      instruction: 'Save the project and open it again: the plugin comes back exactly as you left it. A hardware synth needs its patch saved on the synth, or a program change.',
+      instruction: 'Save the project and reopen it: the plugin comes back as you left it. A hardware synth needs its patch saved on the synth.',
       principle: 'Plugins give total recall; hardware recalls only what it stores itself.',
-      explanation: 'Hardware has its own strengths: knobs under your hands, no load on the computer, and the character of its circuits.',
+      explanation: 'A program change can recall that stored patch from here. Hardware has its own strengths: knobs under your hands, no load on the computer, and the character of its circuits.',
     },
     {
       kind: 'challenge', concept: 'effects', focus: ['window'],

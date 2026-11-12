@@ -6,6 +6,7 @@ import { useStudioStore, dueReviewItems, registerLessons, resolveReviewItem, que
 import { hub } from '@/lib/studio/hub';
 import { loadProducerLessons } from '@/lib/studio/producerIndex';
 import { DEVICES } from '@/devices';
+import { optionOrder } from './optionOrder';
 
 interface Item { id: string; lesson: Lesson; mc: MultipleChoice }
 
@@ -24,6 +25,7 @@ export default function ReviewSession({ onClose }: { onClose: () => void }) {
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState<number | null>(null);
   const [score, setScore] = useState({ right: 0, total: 0 });
+  const [seed] = useState(() => Math.floor(Math.random() * 0x7fffffff));
 
   // Load every module so review can pull questions from any instrument, then settle the queue
   // (the Producer path's lessons load on demand too)
@@ -62,12 +64,14 @@ export default function ReviewSession({ onClose }: { onClose: () => void }) {
           {nextDue ? `Next questions come back ${new Date(nextDue).toLocaleDateString()}.` : 'Finish lessons to add questions here.'}
           {' '}Short, spaced reviews beat long cramming sessions.
         </p>
-        <button onClick={onClose} className="mt-4 px-4 py-2 rounded bg-teaching-current text-black font-bold text-sm">Done</button>
+        <button onClick={onClose} className="coarse:min-h-[44px] mt-4 px-4 py-2 rounded bg-teaching-current text-black font-bold text-sm">Done</button>
       </div>
     );
   }
 
   const item = items[index];
+  // Options in a new order every review session, so the answer is recalled, not its position
+  const order = optionOrder(item.mc, seed + index);
   const answered = answer !== null;
   const correct = answered && answer === item.mc.answer;
 
@@ -92,19 +96,19 @@ export default function ReviewSession({ onClose }: { onClose: () => void }) {
       </div>
       <p className="text-[15px] text-white font-medium leading-snug">{item.mc.question}</p>
       <div className="mt-3 space-y-2" role="group" aria-label="Your answer">
-        {item.mc.options.map((opt, i) => (
+        {order.map((i, shown) => (
           <button
             key={i}
             onClick={() => choose(i)}
             disabled={answered}
             aria-pressed={answer === i}
-            className={`w-full text-left px-3 py-2.5 rounded border text-[13px] ${
+            className={`coarse:min-h-[44px] w-full text-left px-3 py-2.5 rounded border text-[13px] ${
               answered && i === item.mc.answer ? 'border-green-500 bg-green-950/50 text-green-100'
                 : answered && i === answer ? 'border-red-500 bg-red-950/40 text-red-100'
                 : 'border-[#333] bg-[#1b1b1b] text-gray-100 hover:border-[#555]'
             }`}
           >
-            <b className="mr-1">{String.fromCharCode(65 + i)}</b> {opt}
+            <b className="mr-1">{String.fromCharCode(65 + shown)}</b> {item.mc.options[i]}
           </button>
         ))}
       </div>
@@ -113,7 +117,7 @@ export default function ReviewSession({ onClose }: { onClose: () => void }) {
           <p className={`text-[12px] ${correct ? 'text-green-200' : 'text-orange-100'}`} role="status">
             {correct ? 'Recalled - it comes back later, at a longer gap.' : 'Missed - it comes back tomorrow.'} {item.mc.explain}
           </p>
-          <button onClick={() => { setAnswer(null); setIndex(i => i + 1); }} className="mt-3 w-full py-2 rounded bg-teaching-current text-black font-bold text-sm">
+          <button onClick={() => { setAnswer(null); setIndex(i => i + 1); }} className="coarse:min-h-[44px] mt-3 w-full py-2 rounded bg-teaching-current text-black font-bold text-sm">
             {index + 1 < items.length ? 'Next question' : 'Finish'}
           </button>
         </div>

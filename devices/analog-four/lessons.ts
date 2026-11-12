@@ -229,7 +229,8 @@ const f2: Lesson = {
     },
     {
       kind: 'challenge', concept: 'oscillator-waveform',
-      instruction: 'Make a thick bass: OSC 2 clearly audible and a little detuned (not out of tune), with the sub on.',
+      setup: { t1_osc2_lev: 0, t1_osc2_det: 0, t1_osc1_sub: 0 },
+      instruction: 'OSC 2 and the sub are off again. Make a thick bass: OSC 2 clearly audible, a little detuned, with the sub on.',
       checklist: [
         { text: 'OSC 2 LEV 60 or more', check: s => num(s, 't1_osc2_lev') >= 60 },
         { text: 'OSC 2 DET between 3 and 30 (either direction)', check: s => Math.abs(num(s, 't1_osc2_det')) >= 3 && Math.abs(num(s, 't1_osc2_det')) <= 30 },

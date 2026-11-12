@@ -10,6 +10,7 @@ import { useStudioStore, dueReviewItems } from '@/store/studio';
 import { hub } from '@/lib/studio/hub';
 import { arranger } from '@/lib/studio/arranger';
 import { STUDIO_LESSONS } from '@/lib/studio/lessons';
+import { lessonAfter, recommendedLesson } from '@/lib/studio/lessonSequence';
 import { downloadProject, importProject, newProject, lastProjectExport } from '@/lib/studio/project';
 import { history } from '@/lib/studio/history';
 import { showNotice } from '@/lib/studio/notices';
@@ -168,11 +169,10 @@ function App() {
 
   const nextLesson = useMemo(() => {
     if (!currentLesson) return undefined;
+    // The next lesson that is ready (prerequisites done, not finished yet), in the recommended order
     const pool = currentLesson.device === 'studio' ? STUDIO_LESSONS : lessons;
-    const sorted = [...pool].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-    const i = sorted.findIndex(l => l.id === currentLesson.id);
-    return i >= 0 ? sorted[i + 1] : undefined;
-  }, [lessons, currentLesson]);
+    return lessonAfter(pool, currentLesson, completed);
+  }, [lessons, currentLesson, completed]);
 
   const focus = (instance: string) => {
     setCurrentDevice(instance);
@@ -218,9 +218,7 @@ function App() {
   useEffect(() => {
     if (!startFirstOn || focusDevice !== startFirstOn || !lessons.length) return;
     setStartFirstOn(null);
-    const ready = [...lessons]
-      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
-      .find(l => !completed.includes(l.id) && (l.prerequisites ?? []).every(p => completed.includes(p)));
+    const ready = recommendedLesson(lessons, completed);
     if (ready) beginRef.current(ready);
     else setLessonsOpen(true);
   }, [startFirstOn, focusDevice, lessons, completed]);

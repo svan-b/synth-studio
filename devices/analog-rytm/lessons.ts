@@ -302,7 +302,7 @@ const f2: Lesson = {
 // ============================================================================
 
 const s1: Lesson = {
-  id: 'analog-rytm-s1-kick', device: 'analog-rytm', path: 'sound-design', order: O(1), difficulty: 'beginner',
+  id: 'analog-rytm-s1-kick', device: 'analog-rytm', path: 'sound-design', order: O(3), difficulty: 'beginner',
   name: 'Anatomy of a kick: BD HARD and BD CLASSIC',
   description: 'Build a punchy kick from pitch, pitch sweep and decay, and choose between two kick machines.',
   objective: 'Build a punchy kick from pitch, pitch sweep and decay, and choose between BD HARD and BD CLASSIC.',
@@ -411,7 +411,7 @@ const s1: Lesson = {
 const SD_CLASSIC = machineSound(SD, M.SD_CLASSIC);
 
 const s2: Lesson = {
-  id: 'analog-rytm-s2-snare-clap', device: 'analog-rytm', path: 'sound-design', order: O(2), difficulty: 'beginner',
+  id: 'analog-rytm-s2-snare-clap', device: 'analog-rytm', path: 'sound-design', order: O(4), difficulty: 'beginner',
   name: 'Snare and clap: tone plus noise',
   description: 'Balance the drum-head tones against the wires on SD CLASSIC, then shape a clap\'s bursts and room.',
   objective: 'Balance tone and noise on SD CLASSIC, and shape a clap\'s bursts and room tail on CP CLASSIC.',
@@ -515,7 +515,7 @@ const s2: Lesson = {
 const HATS = rowsPattern({ bd: 'x...x...x...x...', oh: '..x...x...x...x.' });
 
 const s3: Lesson = {
-  id: 'analog-rytm-s3-hats-cymbals-choke', device: 'analog-rytm', path: 'sound-design', order: O(3), difficulty: 'beginner',
+  id: 'analog-rytm-s3-hats-cymbals-choke', device: 'analog-rytm', path: 'sound-design', order: O(5), difficulty: 'beginner',
   name: 'Hats and cymbals, with the choke on purpose',
   description: 'Shape closed and open hats with decay, colour and a high-pass filter, and use the CH/OH choke as a groove tool.',
   objective: 'Shape closed and open hats with DEC, COL and a high-pass filter, and use the CH/OH choke as a groove tool.',
@@ -630,7 +630,7 @@ const s3: Lesson = {
 };
 
 const s4: Lesson = {
-  id: 'analog-rytm-s4-toms-envelopes', device: 'analog-rytm', path: 'sound-design', order: O(4), difficulty: 'intermediate',
+  id: 'analog-rytm-s4-toms-envelopes', device: 'analog-rytm', path: 'sound-design', order: O(6), difficulty: 'intermediate',
   name: 'Toms and the filter and amp envelopes',
   description: 'Tune three toms against each other, then shape every hit\'s tone and length with the filter and amp envelopes.',
   objective: 'Tune three toms against each other, then shape each hit\'s tone and length with the filter and amp envelopes.',
@@ -749,7 +749,7 @@ const s4: Lesson = {
 const SENDS = rowsPattern({ bd: 'x...x...x...x...', cp: '....x.......x...', ch: '..x...x...x...x.', rs: '......x.......x.' });
 
 const s5: Lesson = {
-  id: 'analog-rytm-s5-sends', device: 'analog-rytm', path: 'sound-design', order: O(5), difficulty: 'intermediate',
+  id: 'analog-rytm-s5-sends', device: 'analog-rytm', path: 'sound-design', order: O(7), difficulty: 'intermediate',
   name: 'Delay and reverb sends',
   description: 'Send chosen drums into the FX track\'s delay and reverb, and set delay times that lock to the tempo.',
   objective: 'Send chosen drums into the delay and reverb, and set tempo-synced delay times.',
@@ -865,7 +865,7 @@ const DROP_VALUES = proj0.kits!['02'].values;
 const DROP_MASTER = Object.fromEntries(Object.entries(DROP_VALUES).filter(([k]) => k.startsWith('fx_cmp') || k === 'fx_dis_amt'));
 
 const s6: Lesson = {
-  id: 'analog-rytm-s6-dist-comp', device: 'analog-rytm', path: 'sound-design', order: O(6), difficulty: 'intermediate',
+  id: 'analog-rytm-s6-dist-comp', device: 'analog-rytm', path: 'sound-design', order: O(8), difficulty: 'intermediate',
   name: 'The master bus: distortion and compressor',
   description: 'Glue the kit with the compressor and add grit with the distortion, without losing the kick\'s punch.',
   objective: 'Glue the kit with the compressor and add grit with the distortion, without losing the kick\'s punch.',
@@ -972,7 +972,7 @@ const s6: Lesson = {
 // ============================================================================
 
 const e1: Lesson = {
-  id: 'analog-rytm-e1-decay', device: 'analog-rytm', path: 'ear-training', order: O(1), difficulty: 'beginner',
+  id: 'analog-rytm-e1-decay', device: 'analog-rytm', path: 'ear-training', order: O(9), difficulty: 'beginner',
   name: 'Ear training: how long is that hit?',
   description: 'Hear and match decay lengths on a kick and an open hat, from wide differences down to fine ones.',
   objective: 'Hear and match decay lengths on a kick and an open hat, to within 8 % of knob travel.',
@@ -1038,7 +1038,7 @@ const e1: Lesson = {
 const BD_CL = { ...machineSound(BD, M.BD_CLASSIC), bd_dec: 60 };
 
 const e2: Lesson = {
-  id: 'analog-rytm-e2-pitch-sweep', device: 'analog-rytm', path: 'ear-training', order: O(2), difficulty: 'intermediate',
+  id: 'analog-rytm-e2-pitch-sweep', device: 'analog-rytm', path: 'ear-training', order: O(10), difficulty: 'intermediate',
   name: 'Ear training: sweep depth and sweep time',
   description: 'Tell how far a kick\'s pitch falls from how fast it falls, and match both on BD CLASSIC.',
   objective: 'Tell sweep depth from sweep time by ear, and match both on BD CLASSIC.',
@@ -1111,7 +1111,7 @@ const e2: Lesson = {
 };
 
 const e3: Lesson = {
-  id: 'analog-rytm-e3-filter-type', device: 'analog-rytm', path: 'ear-training', order: O(3), difficulty: 'intermediate',
+  id: 'analog-rytm-e3-filter-type', device: 'analog-rytm', path: 'ear-training', order: O(11), difficulty: 'intermediate',
   name: 'Ear training: which filter type?',
   description: 'Identify low-pass, high-pass, band-pass and band-stop by ear on a clap, then match type and cutoff.',
   objective: 'Identify LP2, BP, HP2 and BS by ear on a clap, and match the type plus the cutoff.',
@@ -1185,7 +1185,7 @@ const e3: Lesson = {
 };
 
 const e4: Lesson = {
-  id: 'analog-rytm-e4-compression', device: 'analog-rytm', path: 'ear-training', order: O(4), difficulty: 'advanced',
+  id: 'analog-rytm-e4-compression', device: 'analog-rytm', path: 'ear-training', order: O(12), difficulty: 'advanced',
   name: 'Ear training: compression, and compression versus decay',
   description: 'Hear how much and how fast the compressor works, then tell compression apart from a shorter kick.',
   objective: 'Hear the compression amount and attack, and tell compression apart from a shorter kick decay.',
@@ -1274,7 +1274,7 @@ const Q1_OH = addTrigs(Q1_CP, OH, [2, 6, 10, 14]);
 const Q1_RS = addTrigs(Q1_OH, RS, [3, 10, 15]);
 
 const q1: Lesson = {
-  id: 'analog-rytm-q1-rhythm-basics', device: 'analog-rytm', path: 'sequencing', order: O(1), difficulty: 'beginner',
+  id: 'analog-rytm-q1-rhythm-basics', device: 'analog-rytm', path: 'sequencing', order: O(13), difficulty: 'beginner',
   name: 'Four on the floor, backbeat and syncopation',
   description: 'Program a four-on-the-floor kick, a backbeat and a syncopated rim in GRID RECORDING.',
   objective: 'Program a four-on-the-floor kick, a backbeat and one syncopated part in grid recording.',
@@ -1374,7 +1374,7 @@ const Q2_HATS = (() => {
 })();
 
 const q2: Lesson = {
-  id: 'analog-rytm-q2-groove', device: 'analog-rytm', path: 'sequencing', order: O(2), difficulty: 'intermediate',
+  id: 'analog-rytm-q2-groove', device: 'analog-rytm', path: 'sequencing', order: O(14), difficulty: 'intermediate',
   name: 'Groove: ghost notes, accents, swing and micro timing',
   description: 'Turn a stiff boom bap beat into a groove with velocity, swing and micro timing.',
   objective: 'Turn a stiff beat into a groove with velocity (accents and ghosts), swing and micro timing.',
@@ -1478,7 +1478,7 @@ const Q3_LOCKTRIG = setStep(Q3_DEC, 'A01', BD, 26, { trigless: true, locks: { fl
 const Q3_LINE = patchStep(patchStep(Q3_LOCKTRIG, BD, 10, { note: 58 }), BD, 29, { note: 65 });
 
 const q3: Lesson = {
-  id: 'analog-rytm-q3-parameter-locks', device: 'analog-rytm', path: 'sequencing', order: O(3), difficulty: 'intermediate',
+  id: 'analog-rytm-q3-parameter-locks', device: 'analog-rytm', path: 'sequencing', order: O(15), difficulty: 'intermediate',
   name: 'Parameter locks: a different sound on every step',
   description: 'Lock notes and sound parameters on single steps, add a lock trig, and turn an 808 kick into a bass line.',
   objective: 'Lock sound parameters on single steps, and add a lock trig, to turn the kick into a bass line.',
@@ -1570,7 +1570,7 @@ const Q4_FILL = patchStep(addTrigs(Q4_RS, SD, [15]), SD, 15, { cond: 'FILL' });
 const Q4_EVOLVE = patchStep(patchStep(patchStep(addTrigs(Q4_FILL, LT, [6, 10]), LT, 6, { cond: '2:4' }), LT, 10, { cond: '3:4' }), CY, 8, { cond: '4:4' });
 
 const q4: Lesson = {
-  id: 'analog-rytm-q4-trig-conditions', device: 'analog-rytm', path: 'sequencing', order: O(4), difficulty: 'intermediate',
+  id: 'analog-rytm-q4-trig-conditions', device: 'analog-rytm', path: 'sequencing', order: O(16), difficulty: 'intermediate',
   name: 'Trig conditions: patterns that change over time',
   description: 'Use A:B counts, probability and FILL so a 16-step loop evolves over four bars.',
   objective: 'Use A:B, probability and FILL conditions so a 16-step loop evolves over four bars.',
@@ -1673,7 +1673,7 @@ const Q5_TWO = liveMove(Q5_SWEEP, CH, 'dec', s => 18 + s * 4);
 const frqLocks = (s: LessonCheckState) => { const p = proj(s); return lockedSteps(p, p.active, BD, 'flt_frq'); };
 
 const q5: Lesson = {
-  id: 'analog-rytm-q5-live-locks', device: 'analog-rytm', path: 'sequencing', order: O(5), difficulty: 'intermediate',
+  id: 'analog-rytm-q5-live-locks', device: 'analog-rytm', path: 'sequencing', order: O(17), difficulty: 'intermediate',
   name: 'Live recording: knob moves become locks',
   description: 'Record a filter sweep on a synth bassline in LIVE RECORDING, then add a second recorded move on the hats.',
   objective: 'Record encoder moves in live recording, so a filter sweep plays back as parameter locks every loop.',
@@ -1766,7 +1766,7 @@ const eucOf = (s: LessonCheckState, track: number) => { const p = proj(s); retur
 const eucTracks = (s: LessonCheckState) => { const p = proj(s); return getPattern(p, p.active).tracks.map((t, i) => (euclidOn(t) ? i : -1)).filter(i => i >= 0); };
 
 const q6: Lesson = {
-  id: 'analog-rytm-q6-euclidean', device: 'analog-rytm', path: 'sequencing', order: O(6), difficulty: 'intermediate',
+  id: 'analog-rytm-q6-euclidean', device: 'analog-rytm', path: 'sequencing', order: O(18), difficulty: 'intermediate',
   name: 'Euclidean rhythms: spread the hits',
   description: 'Use TRIG page 2\'s two pulse generators and the Boolean operator to grow a percussion groove over a kick.',
   objective: 'Use the Euclidean pulse generators, their rotation and the Boolean operator to build percussion parts.',
@@ -1865,7 +1865,7 @@ const P1_ROLL = patchStep(P1_START, SD, 15, { retrig: { rate: 12, len: 14, vel: 
 const P1_RISE = patchStep(P1_START, SD, 15, { retrig: { rate: 12, len: 14, vel: 40 } });
 
 const p1: Lesson = {
-  id: 'analog-rytm-p1-mutes-fills-rolls', device: 'analog-rytm', path: 'performance', order: O(1), difficulty: 'intermediate',
+  id: 'analog-rytm-p1-mutes-fills-rolls', device: 'analog-rytm', path: 'performance', order: O(19), difficulty: 'intermediate',
   name: 'Live: mutes, fills and retrig rolls',
   description: 'Perform an eight-bar build with track mutes, a fill and a snare roll that grows into the downbeat.',
   objective: 'Perform an 8-bar build with track mutes, a fill and a retrig roll.',
@@ -1979,7 +1979,7 @@ const sceneHas = (s: LessonCheckState, test: (x: Record<string, number>) => bool
 const perfHas = (s: LessonCheckState, test: (x: Record<string, number>) => boolean) => (kitOf(s)?.perfs ?? []).some(x => !!x && test(x));
 
 const p2: Lesson = {
-  id: 'analog-rytm-p2-scenes-perf', device: 'analog-rytm', path: 'performance', order: O(2), difficulty: 'advanced',
+  id: 'analog-rytm-p2-scenes-perf', device: 'analog-rytm', path: 'performance', order: O(20), difficulty: 'advanced',
   name: 'Scenes and performance macros',
   description: 'Build a scene for an instant breakdown, and a pressure-controlled performance macro for a build.',
   objective: 'Build a scene for an instant breakdown, and a pressure-controlled performance macro for a filter build.',

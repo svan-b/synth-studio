@@ -21,6 +21,18 @@ const routedToMixer = (s: LessonCheckState, device: string) => {
   return !!id && (s.routes[id] ?? 'master') !== 'master';
 };
 
+const synced = (s: LessonCheckState, device: string) => {
+  const id = instanceOf(s, device);
+  return !!id && s.sync[id] !== false;
+};
+/** The fader (0-10) of the Xone:96 channel a device is routed to; NaN when it is not routed to one */
+const mixerFader = (s: LessonCheckState, device: string) => {
+  const id = instanceOf(s, device);
+  const [mixer, input] = ((id && s.routes[id]) || '').split(':');
+  const ch = /^studio_([1-4a-d])$/.exec(input ?? '')?.[1];
+  return ch && s.instances[mixer]?.device === 'xone96' ? Number(s.instances[mixer].values[`ch${ch}_fader`]) : NaN;
+};
+
 export const STUDIO_LESSONS: Lesson[] = [
   {
     id: 'studio-1-one-clock',
@@ -74,6 +86,16 @@ export const STUDIO_LESSONS: Lesson[] = [
         },
       },
       {
+        kind: 'challenge',
+        instruction: 'Set the studio up for a house track: playing, at a tempo you could dance to.',
+        checklist: [
+          { text: 'The studio is playing', check: s => s.transport.playing },
+          { text: 'Tempo between 120 and 128 BPM', check: s => s.transport.bpm >= 120 && s.transport.bpm <= 128 },
+        ],
+        hints: ['House sits a little above two beats per second.', 'Raise the BPM in the top bar from 90.', 'Try 124 BPM, with ▶ on.'],
+        solution: { studio: { bpm: 124 }, transport: 'play' },
+      },
+      {
         kind: 'reflect',
         instruction: 'Explain it.',
         reflect: {
@@ -125,10 +147,11 @@ export const STUDIO_LESSONS: Lesson[] = [
       },
       {
         kind: 'do',
-        instruction: 'Press ▶ in the top bar. It presses the DFAM\'s RUN / STOP for you, and the DFAM now steps in time with the studio instead of its own TEMPO knob.',
+        instruction: 'Press ▶ in the top bar. It presses the DFAM\'s RUN / STOP for you, and the DFAM steps in time with the studio.',
         check: s => s.transport.playing,
         solution: { transport: 'play' },
-        principle: 'An external clock replaces the instrument\'s own tempo knob. RUN still starts and stops it: on the hardware you press RUN first, then it waits for pulses.',
+        principle: 'An external clock replaces the instrument\'s own tempo knob; RUN still starts and stops it.',
+        explanation: 'The DFAM\'s TEMPO knob no longer sets the speed. On the hardware you press RUN first, then it waits for pulses.',
       },
       {
         kind: 'challenge',
@@ -189,10 +212,7 @@ export const STUDIO_LESSONS: Lesson[] = [
       {
         kind: 'do',
         instruction: 'In the Studio tab, make sure "Sync to studio clock" is ticked for the Analog Rytm and the Analog Four.',
-        check: s => ['analog-rytm', 'analog-four'].every(d => {
-          const id = instanceOf(s, d);
-          return !!id && s.sync[id] !== false;
-        }),
+        check: s => synced(s, 'analog-rytm') && synced(s, 'analog-four'),
         principle: 'A synced instrument ignores its own tempo and follows the leader.',
       },
       {
@@ -206,6 +226,18 @@ export const STUDIO_LESSONS: Lesson[] = [
         },
         check: s => s.transport.playing,
         solution: { transport: 'play' },
+        principle: 'A tempo change at the leader reaches every follower at the same moment.',
+      },
+      {
+        kind: 'challenge',
+        instruction: 'Test it: while both play, push the track to a faster, more urgent tempo.',
+        checklist: [
+          { text: 'Both machines still follow the studio clock', check: s => synced(s, 'analog-rytm') && synced(s, 'analog-four') },
+          { text: 'The studio is playing', check: s => s.transport.playing },
+          { text: 'Tempo at 130 BPM or more', check: s => s.transport.bpm >= 130 },
+        ],
+        hints: ['One number sets the speed of everything that is synced.', 'Raise the BPM in the top bar while it plays.', 'Try 132 BPM.'],
+        solution: { studio: { bpm: 132, sync: { 'analog-rytm': true, 'analog-four': true } }, transport: 'play' },
       },
       {
         kind: 'quiz',
@@ -270,6 +302,18 @@ export const STUDIO_LESSONS: Lesson[] = [
         },
         check: s => s.transport.playing,
         solution: { transport: 'play' },
+        principle: 'Set the level going into a channel before you balance what comes out of it.',
+      },
+      {
+        kind: 'challenge',
+        instruction: 'Leave room for the parts to come: while it plays, bring the drums\' channel fader down from the top.',
+        checklist: [
+          { text: 'The Analog Rytm plays through a Xone:96 channel', check: s => routedToMixer(s, 'analog-rytm') },
+          { text: 'Its channel fader sits between 6 and 9', check: s => mixerFader(s, 'analog-rytm') >= 6 && mixerFader(s, 'analog-rytm') <= 9 },
+          { text: 'The studio is playing', check: s => s.transport.playing },
+        ],
+        hints: ['A fader at the top has nowhere left to go.', 'Find the channel whose meter moves with the drums.', 'Pull that fader down to about 7.5.'],
+        solution: { studio: { routes: { 'analog-rytm': 'xone96:studio_1' } }, parts: { xone96: { ch1_fader: 7.5 } }, transport: 'play' },
       },
       {
         kind: 'quiz',
@@ -323,6 +367,7 @@ export const STUDIO_LESSONS: Lesson[] = [
           { text: 'Every section is 4, 8, 16 or 32 bars', check: s => s.arrangement.sections.length > 0 && s.arrangement.sections.every(x => [4, 8, 16, 32].includes(x.bars)) },
         ],
         hints: ['Press "+ Section" four times; the names fill in automatically.', 'Use 8 bars for each to start.'],
+        solution: { arrangement: { sections: [{ name: 'Intro', bars: 8 }, { name: 'Build', bars: 8 }, { name: 'Drop', bars: 16 }, { name: 'Break', bars: 8 }] } },
       },
       {
         kind: 'challenge',
@@ -342,6 +387,19 @@ export const STUDIO_LESSONS: Lesson[] = [
           answer: 0,
           explain: 'Energy is relative. Taking something away and bringing it back is the oldest trick in dance music.',
         },
+      },
+      {
+        kind: 'predict',
+        instruction: 'Press ▶ and listen through the first change of section.',
+        predict: {
+          question: 'Song mode is on. When does the studio move on from the Intro?',
+          options: ['On the bar line after the Intro\'s last bar', 'The moment you tap another section', 'After a fixed number of seconds'],
+          answer: 0,
+          explain: 'Each section plays its bars, then the next starts on the downbeat. Changes on bar lines are why an arrangement feels intended. Seconds never enter into it: slow the tempo and the section lasts longer.',
+        },
+        check: s => s.transport.playing,
+        solution: { transport: 'play' },
+        principle: 'Sections change on bar lines, so every change lands on a downbeat.',
       },
       {
         kind: 'info',

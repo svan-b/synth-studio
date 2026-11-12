@@ -41,7 +41,7 @@ review      3–5 multiple-choice questions for spaced review
 
 Not every lesson needs every part. Every lesson **must** have:
 - an objective
-- a first win
+- a first win: a hands-on step among the first four (a hook, a warm-up question from the lesson before and one line of orientation may come first)
 - at least one `predict` or `listen`
 - at least one `quiz`
 - a `challenge` or `match`
@@ -64,18 +64,36 @@ Organise lessons by `path`, and use `order` to set the recommended sequence:
 
 Aim for 14–20 lessons per instrument, with at least 4 in ear-training. Use `prerequisites` so the recommended path makes sense.
 
+**One sequence.** `order` runs across the whole instrument, not within a path, and no two lessons share one. A prerequisite always has a lower order than the lesson that needs it. `lib/studio/lessonSequence.ts` is the one place that reads it: the lesson browser's "Recommended next", the Welcome's "Start the first lesson" and the coach's "Next lesson" all go to the next lesson that is not done and whose prerequisites are. "Next lesson" never opens a locked or a finished lesson; when nothing later is open it goes back to one that was skipped.
+
 ## Writing rules
 
 - **Instruction:** at most 25 words, imperative, using the panel's own label exactly ("Turn CUTOFF to about 800 Hz"). One move per step.
 - **Principle:** at most 20 words, true on *any* synth, and stated as cause and effect ("Lower cutoff removes upper harmonics, so the sound gets darker").
 - **Explanation:** 1–3 sentences on the why, the physics or the musical use. Define jargon the first time it appears ("harmonics, the quieter higher pitches that give a sound its colour").
 - **Describing sound:** use paired descriptors (bright/dark, thick/thin, punchy/soft, short/long) and real musical contexts ("the squelch in acid house"). Don't quote copyrighted lyrics or melodies.
-- **Predict and quiz options:** 3–4 options, all plausible, with exactly one correct. `explain` says why the right answer is right *and* why the tempting wrong one is wrong.
+- **Predict and quiz options:** 3–4 options, all plausible, with exactly one correct. `explain` says why the right answer is right *and* why the tempting wrong one is wrong. An A/B question may have two ("A" or "B").
+- **Option order:** write the options in whatever order reads best. The coach and Daily Review show them shuffled (`components/teaching/optionOrder.ts`), with a new order each session, so nobody learns "it is always the first one". Two things keep their place: options that name the sides of an A/B ("A", "B, with the cut") stay in the lesson's order, and "Both", "Neither", "None of them" and "All of them" stay last. Never refer to an option by its position ("the second option"): name what it says.
 - **Match targets:** must be clearly distinguishable by ear. Differ by at least about 20% of knob travel per control at the easy levels and about 8% at the hard ones. Set every other control from the target, which `match` does automatically. Keep `controls` to 1–3.
 - **Challenges:** describe a musical goal, not numbers ("Make the kick short enough that it doesn't boom between beats"). Write checklist checks with generous tolerances.
-- **Hints:** 2–3 per hard step, from vague to specific ("Think about how long it rings" → "Look at VCA DECAY" → "Try below 300 ms").
+- **A step is the learner's to do.** No step may be finished when it begins. The guided steps often build exactly what the closing challenge asks for, so give the challenge a `setup` that takes the defining controls away again (and say so: "The EQ is flat again."), or ask for more than the guided steps reached. A `do` step whose target lies within 3 % of the knob's travel from where the knob already is needs its own `tolerance` (3 semitones on a ten-octave pitch knob is 2.5 %).
+- **Hints:** 2–3 per hard step (an ear challenge, or a challenge with more than one thing to get right), from vague to specific ("Think about how long it rings" → "Look at VCA DECAY" → "Try below 300 ms").
 - **Accessibility:** never say "the green one" or "the red light". Name the control, and keep text plain enough for a 12-year-old.
 - **Studio steps:** when a step needs another instrument, set `instance`. Check cables between instruments with `check: s => s.studioCables.some(...)`.
+
+## The lesson audit
+
+`npm run validate` ends with `scripts/lesson-audit.ts` (also `npm run audit:lessons [device ...] [--table]`). It reads every lesson against this document and fails on any finding:
+
+| Group | What it catches |
+|---|---|
+| flow | It walks each lesson as a learner would, start state first and then every step's target in turn. A `do` or `predict` step already on its target, a cable already in, a challenge or custom check that already passes, an A/B with two identical sides, an ear challenge whose target is the sound already playing |
+| shape | No objective, no starting point, no hands-on step among the first four, no predict or listen, no quiz, no match or challenge, no closing reflect or challenge, fewer than 3 or more than 5 review questions |
+| words | Instructions over 25 words, principles over 20, questions without 3–4 options, hard steps without a hint ladder, ear challenges on more than 3 controls |
+| sequence | Lessons sharing an order, a prerequisite that comes later, paths out of order, and a walk along "Next lesson" from nothing done, which must reach every lesson with its prerequisites finished |
+| options | The shuffled order is a permutation, and the right answer does not sit in one position |
+
+Checks that read the instrument's data or the studio around it (Elektron patterns, routes, sync) are not walked: the lesson runner plays those for real. `--table` prints each instrument's sequence with its step kinds.
 
 ## Feedback model
 
@@ -83,6 +101,7 @@ Aim for 14–20 lessons per instrument, with at least 4 in ear-training. Use `pr
 - `quiz`, `listen`, `reflect`, `match` and `challenge` steps never auto-advance; the learner presses Next.
 - The *first* answer to a quiz or prediction counts for review scheduling, so recall stays honest.
 - Ear challenges grade each control against a tolerance in knob travel (default 8%).
+- **On an iPad** the coach floats over the panel. Its buttons are at least 44 px tall, and Back / Next are its footer, outside the part that scrolls. Steps with nothing to watch or touch on the panel (a quiz, a reflect, a prediction not yet made, the summary) hide the scope and let the coach grow, so the whole question and Next are on screen at once. An ear challenge gets a little more height for its Check button. After the first step the title is cut to one line and the goal is hidden.
 
 ## Example (DFAM, foundations)
 

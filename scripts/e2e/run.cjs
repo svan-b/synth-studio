@@ -112,6 +112,11 @@ check('touch: a momentary-button do-step counts taps and completes', tm.before?.
 check('touch: spectrum scope draws the output while it plays', sp.playing?.mode === 'spectrum' && sp.flippedTo === 'wave' && sp.playing?.sized && sp.quiet?.lit < 40 && sp.playing?.cols > 0.3 * (sp.playing?.W ?? 1e9),
   { quiet: sp.quiet?.lit, playingCols: sp.playing?.cols, width: sp.playing?.W, mode: sp.playing?.mode, flip: sp.flippedTo });
 
+// ---- The learning flow: shuffled answers, "Next lesson", steps that wait for the learner ----
+const lf = run(path.join(__dirname, 'lesson-flow.cjs'), [base]);
+check('lessons: answers are shuffled and still count, "Next lesson" follows the open path, a small turn is not done for you, a question fits the iPad coach by touch', !lf.__error && lf.ok && (lf.errs ?? []).length === 0,
+  lf.__error ?? { shownFirst: lf.options?.shownFirst, sides: lf.options?.sides, bothLast: lf.options?.bothLast, next: lf.next?.then, waits: lf.waits?.before, ipad: lf.ipad && { fits: lf.ipad.fits, nextAfterAnswer: lf.ipad.nextAfterAnswer, right: lf.ipad.right, moved: lf.ipad.moved } });
+
 // ---- Separate outputs (DeviceModule.studio.outputs) ---------------------------
 const so = run(path.join(__dirname, 'outputs.cjs'), [base, path.join(outDir, 'outputs')]);
 check('separate outputs: a channel of its own that routes, mutes, shows in the mixer and goes when off', !so.__error && so.ok && (so.errs ?? []).length === 0,
@@ -119,8 +124,10 @@ check('separate outputs: a channel of its own that routes, mutes, shows in the m
 
 for (const [device, output, what, hold] of [
   ['analog-rytm', 'bd', 'the Rytm\'s BD TRACK OUT takes the kick'],
-  // the A4's demo song opens on an intro without TRACK 1: hold the groove (A02)
-  ['analog-four', 't1', 'the A4\'s TRACK 1 output takes its voice', 'A02'],
+  // the A4's demo song changes level from section to section: hold the groove (A02). TRACK 3 is
+  // the bass, a quarter of the groove's level, so its leaving the main channel is well clear of the
+  // measurement's spread (TRACK 1 is about a seventh, too close to call every time)
+  ['analog-four', 't3', 'the A4\'s TRACK 3 output takes its voice', 'A02'],
 ]) {
   const sr = run(path.join(__dirname, 'outputs-device.cjs'), [base, device, output, ...(hold ? [hold] : [])]);
   check(`separate outputs: ${what} to its own channel and back`, !sr.__error && sr.ok && (sr.errs ?? []).length === 0,

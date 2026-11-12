@@ -686,7 +686,7 @@ const f7: Lesson = {
     run('A semi-modular synth plays with no cables because its main path is wired inside.'),
     {
       kind: 'info', concept: 'signal-routing', focus: ['in_ext_audio', 'in_vco_mod', 'in_mix1', 'in_mix2'],
-      instruction: 'Inside, NOISE feeds EXT. AUDIO, the EG feeds VCO MOD, and MIX 1 and MIX 2 sit at 0 V and +5 V. These are normals.',
+      instruction: 'Inside, NOISE feeds EXT. AUDIO, the EG feeds VCO MOD, and MIX 1 and 2 sit at 0 V and +5 V: the normals.',
       principle: 'A normal is a default internal connection; a cable in that jack replaces it.',
       explanation: 'Every other input simply adds its voltage to the knob next to it. Inputs print plain; outputs print reversed, in a white box.',
       manualReference: 'Manual v2 p.46 - Patchbay',
@@ -827,12 +827,12 @@ const sd1: Lesson = {
       kind: 'challenge', concept: 'filter-resonance',
       instruction: 'Make it meaner: the resonance right on the edge of whistling, and very short notes.',
       checklist: [
-        { text: 'RESONANCE 70 % or more', check: s => num(s, 'resonance') >= 70 },
-        { text: 'DECAY 200 ms or less', check: s => num(s, 'decay') <= 200 },
+        { text: 'RESONANCE 80 % or more', check: s => num(s, 'resonance') >= 80 },
+        { text: 'DECAY 150 ms or less', check: s => num(s, 'decay') <= 150 },
         { text: 'SUSTAIN OFF', check: s => num(s, 'sustain') === 1 },
       ],
-      hints: ['Which knob rings? Which one shortens the notes?', 'Past 3 o\'clock the filter starts to whistle.', 'RESONANCE about 78 %, DECAY about 150 ms, SUSTAIN OFF.'],
-      solution: { values: { resonance: 78, decay: 150, sustain: 1 } },
+      hints: ['Which knob rings? Which one shortens the notes?', 'Past 3 o\'clock the filter starts to whistle.', 'RESONANCE about 85 %, DECAY about 120 ms, SUSTAIN OFF.'],
+      solution: { values: { resonance: 85, decay: 120, sustain: 1 } },
     },
     {
       kind: 'reflect', instruction: 'Explain it in your own words.',
@@ -909,7 +909,9 @@ const sd2: Lesson = {
     },
     {
       kind: 'challenge', concept: 'modulation-depth',
-      instruction: 'Tune the kit: a punchy kick with a big pitch drop, and hits short enough to leave space.',
+      // the cables stay; the two knobs that make the kit are the learner's to set again
+      setup: { vco_mod_amount: 0, decay: 600 },
+      instruction: 'The pitch drop is gone and the hits ring on. Tune the kit: a punchy kick, and hits short enough to leave space.',
       checklist: [
         { text: 'VCO MOD AMOUNT 35 % or more', check: s => num(s, 'vco_mod_amount') >= 35 },
         { text: 'DECAY 300 ms or less', check: s => num(s, 'decay') <= 300 },
@@ -994,7 +996,7 @@ const sd3: Lesson = {
     {
       kind: 'patch', patchFrom: 'out_kb', patchTo: 'in_lfo_rate', concept: 'frequency-modulation',
       instruction: 'Patch KB into LFO RATE, so the LFO follows the notes.',
-      principle: 'When the modulator tracks the carrier, the FM ratio - and the bell\'s colour - stays the same on every note.',
+      principle: 'When the modulator tracks the carrier, the FM ratio and the bell\'s colour stay the same on every note.',
       explanation: 'LFO RATE responds at about 1 V per octave, like the VCO, so both move together.',
       manualReference: 'Manual v2 p.13 - TIP: KB into LFO RATE',
     },
@@ -1429,11 +1431,11 @@ const sq2: Lesson = {
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern',
-      instruction: 'Save it to pattern 1-2: tap (SHIFT) and hold RUN / STOP for a second, pick slot 2 (pad 2 or the STEP arrow), then SHIFT + RUN / STOP.',
+      instruction: 'Save it to pattern 1-2: (SHIFT) + hold RUN / STOP for a second, pick slot 2, then (SHIFT) + RUN / STOP.',
       checklist: [
         { text: 'Pattern 1-2 holds this pattern', check: s => { const d = s.data as { bank?: unknown[] } | undefined; const p = d?.bank?.[1] as Record<string, unknown> | null | undefined; return !!p && p.seq_ratchet === patternOf(s.values).seq_ratchet && p.seq_glide === patternOf(s.values).seq_glide; } },
       ],
-      hints: ['Save mode starts with (SHIFT), then RUN / STOP held for a second.', 'A blinking OCTAVE / LOCATION LED shows the slot; the pads pick it.', 'Pad 2, then SHIFT + RUN / STOP saves.'],
+      hints: ['Save mode starts with (SHIFT), then RUN / STOP held for a second.', 'A blinking OCTAVE / LOCATION LED shows the slot; pad 2 or the STEP arrow picks slot 2.', 'Pad 2, then SHIFT + RUN / STOP saves.'],
       solution: { data: { v: 1, loc: 1, bank: [null, { ...patternOf({ ...SQ2, seq_ratchet: '113'.padEnd(32, '1'), seq_glide: '00001'.padEnd(32, '0') }) }, ...new Array(62).fill(null)] } },
     },
     {

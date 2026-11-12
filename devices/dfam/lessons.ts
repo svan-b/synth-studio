@@ -214,7 +214,9 @@ const f2: Lesson = {
     },
     {
       kind: 'challenge', concept: 'mixing',
-      instruction: 'Make a breathy tone: you can still hear the pitch, but a clear hiss sits on top.',
+      // the tone alone again: the hiss is the learner's to add, this time without numbers
+      setup: { noise_level: 0 },
+      instruction: 'The noise is off again. Make a breathy tone: you can still hear the pitch, but a clear hiss sits on top.',
       checklist: [
         { text: 'VCO 1 LEVEL at least 40%', check: s => num(s, 'vco1_level') >= 40 },
         { text: 'NOISE / EXT LEVEL between 20% and 60%', check: s => num(s, 'noise_level') >= 20 && num(s, 'noise_level') <= 60 },
@@ -848,8 +850,9 @@ const sd2: Lesson = {
     },
     {
       kind: 'patch', patchFrom: 'out_vca_eg', patchTo: 'in_noise_level', concept: 'signal-routing',
-      setup: { vco1_level: 0, vco2_level: 0, noise_level: 25, vcf_cutoff: 1800, vcf_resonance: 40, vcf_eg_amount: 30, vcf_decay: 60, vca_decay: 190 },
-      instruction: 'Now a clap: noise only, filtered. Patch VCA EG into NOISE LEVEL.',
+      // the filter stays open and flat here: tuning the clap is the challenge that follows
+      setup: { vco1_level: 0, vco2_level: 0, noise_level: 25, vcf_cutoff: 6500, vcf_resonance: 0, vcf_eg_amount: 30, vcf_decay: 60, vca_decay: 190 },
+      instruction: 'Now a clap: noise only. Patch VCA EG into NOISE LEVEL.',
       principle: 'An envelope patched into a level control makes that sound fade faster - a sharp slap.',
       explanation: 'Now the noise level falls along with the VCA envelope, as well as being shaped by it. The burst dies fast, like the slap of hands, and the resonant filter centres it around 1.8 kHz.',
       manualReference: 'Manual: Patch bay - NOISE LEVEL, VCA EG',
@@ -1364,7 +1367,9 @@ const sq1: Lesson = {
       principle: 'Twelve semitones make an octave: the same note name, twice the frequency.',
     },
     {
-      kind: 'do', control: 'pitch_5', targetValue: 0.25, concept: 'oscillator-pitch',
+      // 3 semitones is 2.5 % of this knob's travel, inside the default tolerance: without its own
+      // tolerance the step would be done before the learner turned anything
+      kind: 'do', control: 'pitch_5', targetValue: 0.25, tolerance: 0.05, concept: 'oscillator-pitch',
       instruction: 'Turn PITCH 5 to +3 st (a minor third).',
       principle: 'Intervals set the mood: a minor third (3 semitones) sounds dark, a major third (4) bright.',
       explanation: 'The knob covers ten octaves, so 3 semitones is a small turn. Watch the readout, and hold Shift on a desktop for fine moves.',

@@ -81,8 +81,10 @@ const l1: Lesson = {
       explanation: 'A USB synth shows its own name; a synth on a 5-pin MIDI cable shows your MIDI interface\'s port. On iPad and in Safari there is no Web MIDI, so the Practice synth is the output there.',
     },
     {
-      kind: 'info', concept: 'signal-routing', focus: ['monitor'],
+      // the first win: three notes played (and seen in the monitor) finish the step
+      kind: 'do', play: { count: 3 }, concept: 'signal-routing', focus: ['monitor'],
       instruction: 'Play a few keys on the on-screen keyboard, or A to K on your computer. Watch the MIDI monitor.',
+      solution: { notes: [48, 52, 55] },
       principle: 'A key sends a note-on when pressed and a note-off when released.',
       explanation: 'Each line in the monitor is one message: its channel, what it is, and its bytes. "Note on ch1 C3 (48)" is three bytes: 90 30 64.',
     },
@@ -274,7 +276,8 @@ const l3: Lesson = {
       hints: ['Does the target sound bright or dark? Does it ring?', 'It is darker than now, and it rings: that is resonance.', 'Cutoff about a quarter of the way up, Resonance near the top.'],
     },
     {
-      kind: 'predict', control: 'program', targetValue: 2, concept: 'signal-routing', focus: ['program'],
+      // program 3 is 2 % of the 0-127 travel from program 1: its own tolerance, or the step is done unpressed
+      kind: 'predict', control: 'program', targetValue: 2, tolerance: 0.5, concept: 'signal-routing', focus: ['program'],
       instruction: 'Press PROGRAM + until it shows 003, then play a few keys.',
       predict: {
         question: 'A CC moves one parameter. What will a program change do?',
@@ -345,7 +348,7 @@ const l4: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'signal-routing',
-      instruction: 'Every synth picks its own CC numbers. Cutoff is CC 19 on a Moog Subsequent 37, CC 43 on a Korg minilogue and CC 23 on an Arturia MicroFreak.',
+      instruction: 'Each synth has its own CC numbers: cutoff is CC 19 on a Subsequent 37, CC 43 on a minilogue, CC 23 on a MicroFreak.',
       principle: 'A CC number only means something to the synth that defines it.',
       explanation: 'CC 74 darkens the Practice synth, but on your synth it may do nothing or something else. A knob map, from a template or the manual\'s MIDI chart, makes the panel match the synth.',
     },
@@ -381,7 +384,7 @@ const l4: Lesson = {
     },
     {
       kind: 'info', concept: 'signal-routing', focus: ['setup'],
-      instruction: 'Needs a synth connected over MIDI: in Setup, press Learn next to a knob, then turn that knob on the synth. Skip it if you have none.',
+      instruction: 'With a synth connected over MIDI: in Setup, press Learn next to a knob, then turn that knob on the synth. No synth? Skip.',
       principle: 'Most synths send a CC when you turn their own knobs: Learn copies that number.',
       explanation: 'If nothing arrives, turn on "CC out" (sometimes called "MIDI out: CC" or "Local") in the synth\'s MIDI menu.',
     },
@@ -568,7 +571,7 @@ const l6: Lesson = {
     },
     {
       kind: 'info', concept: 'timing-tempo',
-      instruction: 'Change the tempo in the top bar while it plays: the arpeggio follows at once. Then press stop and ▶ again: it restarts on the beat.',
+      instruction: 'Change the tempo in the top bar while it plays: the arpeggio follows at once. Then press stop and ▶: it restarts on the beat.',
       principle: 'Start, Stop and Continue messages make followers start together, on the downbeat.',
       explanation: 'On hardware, set the synth\'s clock source to External or Auto (look for Sync or MIDI clock in its menu). Swing is not sent in the clock, so set swing on the synth itself.',
     },

@@ -5,6 +5,7 @@ import type { Lesson } from '@/types';
 import { useStudioStore } from '@/store/studio';
 import { loadProducerLessons, producerLessonsNow } from '@/lib/studio/producerIndex';
 import { conceptLabel } from './concepts';
+import { inSequence, isReady } from '@/lib/studio/lessonSequence';
 
 const PATHS: { id: NonNullable<Lesson['path']> | 'other'; title: string; blurb: string }[] = [
   { id: 'foundations', title: 'Foundations', blurb: 'What every control does, one idea at a time.' },
@@ -38,17 +39,16 @@ export default function LessonBrowser({ lessons, studioLessons = [], deviceName,
     return () => { alive = false; };
   }, [producer]);
 
-  const byOrder = (a: Lesson, b: Lesson) => (a.order ?? 999) - (b.order ?? 999);
-  const sorted = useMemo(() => [...lessons].sort(byOrder), [lessons]);
-  const studioSorted = useMemo(() => [...studioLessons].filter(l => l.path !== 'producer').sort(byOrder), [studioLessons]);
+  const sorted = useMemo(() => inSequence(lessons), [lessons]);
+  const studioSorted = useMemo(() => inSequence(studioLessons.filter(l => l.path !== 'producer')), [studioLessons]);
   const producerSorted = useMemo(() => {
     const all = [...(producer ?? []), ...studioLessons.filter(l => l.path === 'producer')];
     const seen = new Set<string>();
-    return all.filter(l => (seen.has(l.id) ? false : (seen.add(l.id), true))).sort(byOrder);
+    return inSequence(all.filter(l => (seen.has(l.id) ? false : (seen.add(l.id), true))));
   }, [producer, studioLessons]);
   // First lesson on this instrument not done whose prerequisites are done; studio lessons only after
   const recommended = useMemo(() => {
-    const ready = (l: Lesson) => !completed.includes(l.id) && (l.prerequisites ?? []).every(p => completed.includes(p));
+    const ready = (l: Lesson) => isReady(l, completed);
     return sorted.find(ready) ?? studioSorted.find(ready) ?? producerSorted.find(ready);
   }, [sorted, studioSorted, producerSorted, completed]);
   const filter = (ls: Lesson[]) => (difficulty === 'all' ? ls : ls.filter(l => l.difficulty === difficulty));

@@ -20,6 +20,9 @@ import { INITIALIZED_PATCH, SUBHARMONICON_PRESETS } from './presets';
 
 const DEV = 'subharmonicon';
 const D = (n: number) => -n;
+// Orders below 1, so the Subharmonicon's own path is recommended before the shared studio
+// curriculum (orders 1-5); its studio lessons (orders 6+) come after it and build on it.
+const O = (n: number) => n / 100;
 const SRC = 'Synth Studio · Moog Subharmonicon Owner\'s Manual';
 
 // ---------------------------------------------------------------- helpers
@@ -61,7 +64,7 @@ const play = (instruction: string, principle: string): LessonStep => ({
 // ============================================================================
 
 const f1: Lesson = {
-  id: 'subharmonicon-f1-undertones', device: DEV, path: 'foundations', order: 1, difficulty: 'beginner',
+  id: 'subharmonicon-f1-undertones', device: DEV, path: 'foundations', order: O(1), difficulty: 'beginner',
   name: 'One oscillator, many undertones',
   description: 'What a subharmonic is: one oscillator divided by whole numbers - ÷2 an octave down, ÷3 a new note below.',
   objective: 'Set SUB 1 FREQ to a chosen divisor and name the interval it makes under VCO 1.',
@@ -139,7 +142,7 @@ const f1: Lesson = {
 };
 
 const f2: Lesson = {
-  id: 'subharmonicon-f2-waves-mixer', device: DEV, path: 'foundations', order: 2, difficulty: 'beginner',
+  id: 'subharmonicon-f2-waves-mixer', device: DEV, path: 'foundations', order: O(2), difficulty: 'beginner',
   name: 'Waves, the hidden PWM and a hot mixer',
   description: 'The three WAVE positions - square, pulse swept by the sub, saw - and a mixer that saturates when pushed.',
   objective: 'Choose a WAVE position for a timbre, and use the mixer either clean or deliberately warm.',
@@ -226,7 +229,7 @@ const f2: Lesson = {
 };
 
 const f3: Lesson = {
-  id: 'subharmonicon-f3-filter', device: DEV, path: 'foundations', order: 3, difficulty: 'beginner',
+  id: 'subharmonicon-f3-filter', device: DEV, path: 'foundations', order: O(3), difficulty: 'beginner',
   name: 'The ladder filter and its envelope',
   description: 'CUTOFF, RESONANCE and VCF EG AMT on the Moog ladder: brightness, ring and movement.',
   objective: 'Use CUTOFF, RESONANCE and VCF EG AMT (both signs) to set brightness, ring and movement.',
@@ -295,7 +298,7 @@ const f3: Lesson = {
 };
 
 const f4: Lesson = {
-  id: 'subharmonicon-f4-envelopes', device: DEV, path: 'foundations', order: 4, difficulty: 'beginner',
+  id: 'subharmonicon-f4-envelopes', device: DEV, path: 'foundations', order: O(4), difficulty: 'beginner',
   name: 'Envelopes and the EG button',
   description: 'Attack and decay, the lock-out during the attack, and the EG button\'s OFF, ON and HELD.',
   objective: 'Shape notes with ATTACK and DECAY, and choose OFF, ON or HELD on the EG button.',
@@ -327,7 +330,7 @@ const f4: Lesson = {
       kind: 'quiz', instruction: 'Quick check.', concept: 'envelope-attack',
       quiz: mc('VCA ATTACK is 1 s but notes arrive every 0.4 s. What happens to triggers that land during the attack?',
         ['They are ignored until the attack finishes', 'Each one restarts the attack', 'They double the volume'], 0,
-        'On the Subharmonicon both envelopes ignore new triggers while they are in their attack (manual p.24). Many synths restart instead, which makes the second option tempting.'),
+        'On the Subharmonicon both envelopes ignore new triggers while they are in their attack (manual p.24). Many synths restart the attack instead, which makes that answer tempting.'),
     },
     {
       kind: 'do', control: 'eg_mode', targetValue: 0, concept: 'envelope-shape', setup: { vca_attack: 1, vca_decay: 400 },
@@ -387,7 +390,7 @@ const f4: Lesson = {
 };
 
 const f5: Lesson = {
-  id: 'subharmonicon-f5-sequencer', device: DEV, path: 'foundations', order: 5, difficulty: 'beginner',
+  id: 'subharmonicon-f5-sequencer', device: DEV, path: 'foundations', order: O(5), difficulty: 'beginner',
   name: 'Two four-step sequencers',
   description: 'Assign a sequencer to a VCO, set its range with SEQ OCT and lock it to a scale with QUANTIZE.',
   objective: 'Program a 4-step melody, set its range with SEQ OCT and lock it to a scale with QUANTIZE.',
@@ -448,7 +451,7 @@ const f5: Lesson = {
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'oscillator-pitch',
       quiz: mc('QUANTIZE is on and you turn VCO 1 FREQ. What happens?', ['The pitch steps from note to note of the scale', 'The pitch sweeps smoothly', 'Nothing - FREQ is never quantized'], 0,
-        'On the Subharmonicon the VCO FREQ knobs snap to the selected scale too (manual pp.18, 21). Many synths quantize only the sequencer, which makes the last option tempting.'),
+        'On the Subharmonicon the VCO FREQ knobs snap to the selected scale too (manual pp.18, 21). Many synths quantize only the sequencer, which makes "never quantized" tempting.'),
     },
     {
       kind: 'listen', concept: 'oscillator-pitch', focus: ['quantize'], setup: { seq1_step2: 21, seq1_step3: 46 },
@@ -475,7 +478,7 @@ const f5: Lesson = {
 };
 
 const f6: Lesson = {
-  id: 'subharmonicon-f6-rhythm', device: DEV, path: 'foundations', order: 6, difficulty: 'beginner',
+  id: 'subharmonicon-f6-rhythm', device: DEV, path: 'foundations', order: O(6), difficulty: 'beginner',
   name: 'Rhythm generators: dividing time',
   description: 'TEMPO, the four RHYTHM dividers and how two of them on one sequencer make a polyrhythm.',
   objective: 'Set RHYTHM divisions, assign them to a sequencer, and build a first polyrhythm.',
@@ -554,7 +557,7 @@ const f6: Lesson = {
 // ============================================================================
 
 const sd1: Lesson = {
-  id: 'subharmonicon-sd1-sub-bass', device: DEV, path: 'sound-design', order: 1, difficulty: 'intermediate',
+  id: 'subharmonicon-sd1-sub-bass', device: DEV, path: 'sound-design', order: O(7), difficulty: 'intermediate',
   name: 'Deep bass from undertones',
   description: 'The VCOs start at Middle C - the subharmonics take the riff down to real bass.',
   objective: 'Build a punchy bass from the SUB oscillators, a low filter and a short envelope.',
@@ -606,7 +609,9 @@ const sd1: Lesson = {
     },
     {
       kind: 'challenge', concept: 'subharmonics',
-      instruction: 'Make a bass that thumps but does not boom between notes.',
+      // back to the plain VCO with a long tail: the bass is the learner's to build again
+      setup: { vco1_level: 60, vco1_sub1_level: 0, vco1_sub2_level: 0, cutoff: 2000, vca_decay: 600 },
+      instruction: 'Back to the plain VCO. Make a bass that thumps but does not boom between notes.',
       checklist: [
         { text: 'A sub at ÷4 or lower is clearly audible', check: s => num(s, 'vco1_sub1_level') >= 40 && num(s, 'vco1_sub1_freq') <= -4 },
         { text: 'VCO 1 mostly out', check: s => num(s, 'vco1_level') <= 20 },
@@ -632,7 +637,7 @@ const sd1: Lesson = {
 };
 
 const sd2: Lesson = {
-  id: 'subharmonicon-sd2-just-chords', device: DEV, path: 'sound-design', order: 2, difficulty: 'intermediate',
+  id: 'subharmonicon-sd2-just-chords', device: DEV, path: 'sound-design', order: O(8), difficulty: 'intermediate',
   name: 'Beat-free chords in just intonation',
   description: 'Tune two VCOs a just fifth and third apart and their undertones lock into one lattice.',
   objective: 'Build a chord from two VCOs and their subs that does not beat, using 12-JI.',
@@ -714,7 +719,7 @@ const sd2: Lesson = {
 };
 
 const sd3: Lesson = {
-  id: 'subharmonicon-sd3-filter-drums', device: DEV, path: 'sound-design', order: 3, difficulty: 'intermediate',
+  id: 'subharmonicon-sd3-filter-drums', device: DEV, path: 'sound-design', order: O(9), difficulty: 'intermediate',
   name: 'Drums from a ringing filter',
   description: 'Turn the mixer off and the resonance up: the ladder itself becomes a tuned kick.',
   objective: 'Turn the self-oscillating ladder into a tuned kick, then add clock-driven accents.',
@@ -771,7 +776,9 @@ const sd3: Lesson = {
     },
     {
       kind: 'challenge', concept: 'filter-resonance',
-      instruction: 'Make a tight four-on-the-floor kick that does not smear into the next beat.',
+      // the filter stops ringing and the tail is long: the kick is the learner's to tune again
+      setup: { resonance: 40, cutoff: 600, vca_decay: 700 },
+      instruction: 'The filter has stopped ringing. Make a tight four-on-the-floor kick that does not smear into the next beat.',
       checklist: [
         { text: 'Mixer silent', check: s => ['vco1_level', 'vco1_sub1_level', 'vco1_sub2_level', 'vco2_level', 'vco2_sub1_level', 'vco2_sub2_level'].every(k => num(s, k) <= 5) },
         { text: 'RESONANCE 85% or more', check: s => num(s, 'resonance') >= 85 },
@@ -801,7 +808,7 @@ const sd3: Lesson = {
 // ============================================================================
 
 const et1: Lesson = {
-  id: 'subharmonicon-et1-octave-or-not', device: DEV, path: 'ear-training', order: 1, difficulty: 'beginner',
+  id: 'subharmonicon-et1-octave-or-not', device: DEV, path: 'ear-training', order: O(10), difficulty: 'beginner',
   name: 'Octave, twelfth or double octave?',
   description: 'Tell ÷2, ÷3 and ÷4 apart by ear: same note lower, a new note, or two octaves down.',
   objective: 'Tell ÷2, ÷3 and ÷4 apart by ear.',
@@ -824,13 +831,13 @@ const et1: Lesson = {
       },
     },
     {
-      kind: 'quiz', instruction: 'Quick check.', concept: 'subharmonics',
-      quiz: mc('÷3 below C5 sounds as…', ['An F, an octave and a fifth below', 'A C two octaves below', 'An E'], 0, '523 ÷ 3 ≈ 174 Hz, F3. Two octaves down would be ÷4.'),
-    },
-    {
       kind: 'match', instruction: 'Set SUB 1 by ear.', concept: 'subharmonics', setup: { vco1_sub1_freq: D(8) },
       match: { target: { vco1_sub1_freq: D(2) }, controls: ['vco1_sub1_freq'], tolerance: 0.03 },
       hints: ['The same note, only lower.', 'It is the first octave down.'],
+    },
+    {
+      kind: 'quiz', instruction: 'Quick check.', concept: 'subharmonics',
+      quiz: mc('÷3 below C5 sounds as…', ['An F, an octave and a fifth below', 'A C two octaves below', 'An E'], 0, '523 ÷ 3 ≈ 174 Hz, F3. Two octaves down would be ÷4.'),
     },
     {
       kind: 'match', instruction: 'Again, a different target.', concept: 'subharmonics', setup: { vco1_sub1_freq: D(6) },
@@ -858,7 +865,7 @@ const et1: Lesson = {
 };
 
 const et2: Lesson = {
-  id: 'subharmonicon-et2-undertone-colours', device: DEV, path: 'ear-training', order: 2, difficulty: 'intermediate',
+  id: 'subharmonicon-et2-undertone-colours', device: DEV, path: 'ear-training', order: O(11), difficulty: 'intermediate',
   name: 'Name the undertone: ÷5, ÷6 or ÷7',
   description: 'The colours of the higher undertones: a major third, a fifth and a note between the piano keys.',
   objective: 'Recognise ÷5 (a major third below), ÷6 (a fifth below) and ÷7 (septimal, between the keys) by ear.',
@@ -874,6 +881,11 @@ const et2: Lesson = {
         a: { vco1_sub2_level: 0 }, b: { vco1_sub2_level: 60, vco1_sub2_freq: D(5) }, labels: ['Reference', '+ ÷5'],
         question: mc('What did ÷5 add?', ['A note a major third below the C', 'A higher octave', 'Nothing'], 0, '1046.5 ÷ 5 ≈ 209 Hz, a slightly sharp A♭: a major third below C.'),
       },
+    },
+    {
+      kind: 'match', instruction: 'Find the major-third undertone by ear.', concept: 'subharmonics', setup: { vco1_sub2_freq: D(7), vco1_sub2_level: 60 },
+      match: { target: { vco1_sub2_freq: D(5), vco1_sub2_level: 60 }, controls: ['vco1_sub2_freq'], tolerance: 0.03 },
+      hints: ['Sweet and major-sounding.', 'Two clicks clockwise from ÷7.'],
     },
     {
       kind: 'listen', concept: 'subharmonics', focus: ['vco1_sub2_freq'],
@@ -894,11 +906,6 @@ const et2: Lesson = {
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'subharmonics',
       quiz: mc('Under a C oscillator, ÷5 is closest to…', ['A♭', 'E', 'G'], 0, 'Undertones mirror overtones: the 5th harmonic is the E above, the 5th undertone the A♭ below.'),
-    },
-    {
-      kind: 'match', instruction: 'Find the major-third undertone by ear.', concept: 'subharmonics', setup: { vco1_sub2_freq: D(7), vco1_sub2_level: 60 },
-      match: { target: { vco1_sub2_freq: D(5), vco1_sub2_level: 60 }, controls: ['vco1_sub2_freq'], tolerance: 0.03 },
-      hints: ['Sweet and major-sounding.', 'Two clicks clockwise from ÷7.'],
     },
     {
       kind: 'match', instruction: 'Now the septimal one.', concept: 'subharmonics', setup: { vco1_sub2_freq: D(5), vco1_sub2_level: 60 },
@@ -927,7 +934,7 @@ const et2: Lesson = {
 };
 
 const et3: Lesson = {
-  id: 'subharmonicon-et3-polyrhythm-ears', device: DEV, path: 'ear-training', order: 3, difficulty: 'intermediate',
+  id: 'subharmonicon-et3-polyrhythm-ears', device: DEV, path: 'ear-training', order: O(12), difficulty: 'intermediate',
   name: 'Count the polyrhythm',
   description: 'Hear two rhythm divisions playing against each other, and set them by ear.',
   objective: 'Hear and set two rhythm divisions that play against each other.',
@@ -970,13 +977,13 @@ const et3: Lesson = {
   ],
   review: [
     mc('÷2 and ÷5 line up again every…', ['10 pulses', '7 pulses', '5 pulses'], 0, 'lcm(2, 5) = 10.'),
-    mc('Which plays more notes per cycle: ÷3 or ÷4?', ['÷3', '÷4'], 0, 'A smaller divisor fires more often.'),
+    mc('Which plays the most notes per cycle: ÷3, ÷4 or ÷6?', ['÷3', '÷4', '÷6'], 0, 'A smaller divisor fires more often.'),
     mc('Changing the master tempo changes a polyrhythm\'s…', ['Speed but not its ratio', 'Ratio', 'Pitch'], 0, 'Both lines scale together.'),
   ],
 };
 
 const et4: Lesson = {
-  id: 'subharmonicon-et4-just-vs-equal', device: DEV, path: 'ear-training', order: 4, difficulty: 'intermediate',
+  id: 'subharmonicon-et4-just-vs-equal', device: DEV, path: 'ear-training', order: O(13), difficulty: 'intermediate',
   name: 'Just or equal? Listen for beats',
   description: 'Tell 12-JI from 12-ET by the slow throb of undertones that almost coincide.',
   objective: 'Tell 12-JI from 12-ET by listening for beats, and set QUANTIZE by ear.',
@@ -1036,7 +1043,7 @@ const et4: Lesson = {
 };
 
 const et5: Lesson = {
-  id: 'subharmonicon-et5-mixed', device: DEV, path: 'ear-training', order: 5, difficulty: 'advanced',
+  id: 'subharmonicon-et5-mixed', device: DEV, path: 'ear-training', order: O(14), difficulty: 'advanced',
   name: 'Mixed ears: sub, filter or envelope?',
   description: 'Pitch, brightness or length? Identify the change, then recreate a sound that changed three ways.',
   objective: 'Identify and recreate a change made to SUB 1 FREQ, CUTOFF or VCA DECAY.',
@@ -1100,7 +1107,7 @@ const et5: Lesson = {
 // ============================================================================
 
 const sq1: Lesson = {
-  id: 'subharmonicon-sq1-or-xor', device: DEV, path: 'sequencing', order: 1, difficulty: 'intermediate',
+  id: 'subharmonicon-sq1-or-xor', device: DEV, path: 'sequencing', order: O(15), difficulty: 'intermediate',
   name: 'Combining rhythms: OR and XOR',
   description: 'Two rhythm generators on one sequencer, combined by OR or by XOR - and the downbeat that XOR removes.',
   objective: 'Predict and hear how OR and XOR logic combine two rhythm generators on one sequencer.',
@@ -1162,7 +1169,7 @@ const sq1: Lesson = {
 };
 
 const sq2: Lesson = {
-  id: 'subharmonicon-sq2-intertwined', device: DEV, path: 'sequencing', order: 2, difficulty: 'intermediate',
+  id: 'subharmonicon-sq2-intertwined', device: DEV, path: 'sequencing', order: O(16), difficulty: 'intermediate',
   name: 'Two sequencers, one melody',
   description: 'Patch SEQ 2 into VCO 1: a slow sequencer transposes a fast one into a 16-step phrase.',
   objective: 'Patch SEQ 2 into VCO 1 so a slow sequencer transposes a fast one into a 16-step phrase.',
@@ -1216,7 +1223,7 @@ const sq2: Lesson = {
 };
 
 const sq3: Lesson = {
-  id: 'subharmonicon-sq3-undertone-melodies', device: DEV, path: 'sequencing', order: 3, difficulty: 'advanced',
+  id: 'subharmonicon-sq3-undertone-melodies', device: DEV, path: 'sequencing', order: O(17), difficulty: 'advanced',
   name: 'Sequencing the undertones',
   description: 'SEQ ASSIGN SUB: the sequencer walks the undertone series while the VCO stays put.',
   objective: 'Use SEQ ASSIGN SUB so the sequencer walks the undertone series instead of moving the VCO.',
@@ -1258,7 +1265,8 @@ const sq3: Lesson = {
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern',
-      instruction: 'Write a four-step undertone melody in which VCO 1 never changes pitch.',
+      setup: { seq1_step1: 0, seq1_step2: 0, seq1_step3: 0, seq1_step4: 0 },
+      instruction: 'The four steps are level again. Write an undertone melody in which VCO 1 never changes pitch.',
       checklist: [
         { text: 'OSC 1 dark', check: s => !bool(s, 'seq1_osc') },
         { text: 'SUB 1 or SUB 2 assigned', check: s => bool(s, 'seq1_sub1') || bool(s, 'seq1_sub2') },
@@ -1287,7 +1295,7 @@ const sq3: Lesson = {
 // ============================================================================
 
 const pf1: Lesson = {
-  id: 'subharmonicon-pf1-live', device: DEV, path: 'performance', order: 1, difficulty: 'intermediate',
+  id: 'subharmonicon-pf1-live', device: DEV, path: 'performance', order: O(18), difficulty: 'intermediate',
   name: 'Live moves: RESET, hold and assignments',
   description: 'Perform an arrangement with the assign buttons, RESET tapped and held, and mixer rides.',
   objective: 'Perform a short arrangement using assign buttons, RESET (tap and hold) and mixer rides.',
@@ -1357,7 +1365,7 @@ const pf1: Lesson = {
 // ============================================================================
 
 const st1: Lesson = {
-  id: 'subharmonicon-st1-studio-clock', device: DEV, path: 'studio', order: 1, difficulty: 'intermediate',
+  id: 'subharmonicon-st1-studio-clock', device: DEV, path: 'studio', order: 6, difficulty: 'intermediate',
   name: 'Lock to the studio clock',
   description: 'MIDI-style sync makes the master pulse a 16th note; a Studio Clock cable into CLOCK takes over from it.',
   objective: 'Sync the Subharmonicon to the studio by MIDI-style sync and by a clock cable, and explain the 16th-note pulse.',
@@ -1383,7 +1391,7 @@ const st1: Lesson = {
     {
       kind: 'quiz', instruction: 'Quick check.', concept: 'timing-tempo',
       quiz: mc('Why does TEMPO do nothing now?', ['The studio\'s MIDI-style clock overrides the internal clock', 'PLAY is off', 'TEMPO only works with CLOCK IN'], 0,
-        'MIDI clock outranks TEMPO (manual p.25). The last option is backwards: a CLOCK cable also overrides TEMPO.'),
+        'MIDI clock outranks TEMPO (manual p.25). "Only works with CLOCK IN" is backwards: a CLOCK cable also overrides TEMPO.'),
     },
     {
       kind: 'challenge', instance: 'studio-clock', focus: ['out_clock'], concept: 'signal-routing',
@@ -1421,7 +1429,7 @@ const st1: Lesson = {
 };
 
 const st2: Lesson = {
-  id: 'subharmonicon-st2-clock-dfam', device: DEV, path: 'studio', order: 2, difficulty: 'advanced',
+  id: 'subharmonicon-st2-clock-dfam', device: DEV, path: 'studio', order: 7, difficulty: 'advanced',
   name: 'The Subharmonicon clocks the DFAM',
   description: 'Moog\'s pairing: the Subharmonicon\'s clock outputs step the DFAM - steadily, or with a polyrhythm.',
   objective: 'Clock the DFAM from the Subharmonicon, and make it follow one of its sequencers\' rhythms.',

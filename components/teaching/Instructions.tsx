@@ -14,6 +14,8 @@ import Scope from './Scope';
 import { DemoABToggle, DemoHearIt } from './DemoClips';
 import { canShowMe, cancelShowMe, showMe } from './coachActions';
 import { conceptLabel } from './concepts';
+import { optionOrder, sessionSeed } from './optionOrder';
+import { lessonAfter } from '@/lib/studio/lessonSequence';
 
 interface InstructionsProps {
   spec: DeviceSpec | null;
@@ -44,16 +46,15 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
   const instance = useStudioStore(s => s.lessonInstance);
   const lessonStudio = useStudioStore(s => s.lessonStudio);
   const backups = useStudioStore(s => s.lessonBackups);
+  const completedLessons = useStudioStore(s => s.completedLessons);
   const store = useStudioStore.getState();
   // The Producer path's next lesson (its lessons load on demand, so the page doesn't know them)
   const [producer, setProducer] = useState(producerLessonsNow());
   useEffect(() => onProducerLessons(setProducer), []);
   const producerNext = useMemo(() => {
     if (!lesson || lesson.path !== 'producer' || !producer) return undefined;
-    const sorted = [...producer].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-    const i = sorted.findIndex(l => l.id === lesson.id);
-    return i >= 0 ? sorted[i + 1] : undefined;
-  }, [lesson, producer]);
+    return lessonAfter(producer, lesson, completedLessons);
+  }, [lesson, producer, completedLessons]);
   const nextLesson = onNextLesson ?? (producerNext ? () => useStudioStore.getState().startLesson(producerNext) : undefined);
   const studioSaved = !!lessonStudio?.backupId && backups.some(b => b.id === lessonStudio.backupId);
   const [collapsed, setCollapsed] = useState(false);
@@ -105,12 +106,20 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
   if (!isTeaching || !lesson) return null;
   const steps = lesson.steps;
   const target = step?.instance ?? instance ?? lesson.device;
+  // Recall and explain steps, and the end-of-lesson summary, have no sound to watch and no control
+  // to reach: the scope gives its room to the question, and the iPad's floating coach may grow
+  // over the panel, so every answer and the Next button are on screen at once
+  // (a prediction not yet made is the same: the answer comes first, then the panel)
+  const kindNow = step ? stepKind(step) : undefined;
+  const quiet = finished || kindNow === 'quiz' || kindNow === 'reflect' || (kindNow === 'predict' && session?.answer === undefined);
+  // An ear challenge keeps the panel in reach but needs its Check button on screen: a little taller
+  const coachMax = quiet ? 'coarse-lg:max-h-[88dvh]' : kindNow === 'match' ? 'coarse-lg:max-h-[70dvh]' : 'coarse-lg:max-h-[58dvh]';
 
   if (collapsed) {
     return (
       <button
         onClick={() => setCollapsed(false)}
-        className={`w-full lg:w-12 lg:h-full bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-2 text-teaching-current text-xs font-bold lg:[writing-mode:vertical-rl] coarse-lg:fixed coarse-lg:bottom-3 coarse-lg:z-30 coarse-lg:w-auto coarse-lg:h-auto coarse-lg:rounded-full coarse-lg:px-4 coarse-lg:py-3 coarse-lg:shadow-2xl coarse-lg:[writing-mode:horizontal-tb] ${side === 'left' ? 'coarse-lg:left-3' : 'coarse-lg:right-3'}`}
+        className={`coarse:min-h-[44px] w-full lg:w-12 lg:h-full bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-2 text-teaching-current text-xs font-bold lg:[writing-mode:vertical-rl] coarse-lg:fixed coarse-lg:bottom-3 coarse-lg:z-30 coarse-lg:w-auto coarse-lg:h-auto coarse-lg:rounded-full coarse-lg:px-4 coarse-lg:py-3 coarse-lg:shadow-2xl coarse-lg:[writing-mode:horizontal-tb] ${side === 'left' ? 'coarse-lg:left-3' : 'coarse-lg:right-3'}`}
         aria-label={`Show the lesson coach: ${lesson.name}, ${finished ? 'done' : `step ${currentStep + 1} of ${steps.length}`}`}
       >
         {lesson.name} · {finished ? 'done' : `step ${currentStep + 1}/${steps.length}`} - show
@@ -121,19 +130,21 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
   return (
     <aside
       ref={asideRef}
-      className={`w-full lg:w-[22rem] shrink-0 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 shadow-2xl lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] flex flex-col overflow-y-auto coarse-lg:fixed coarse-lg:top-auto coarse-lg:bottom-3 coarse-lg:z-30 coarse-lg:w-[20rem] coarse-lg:max-h-[58dvh] ${side === 'left' ? 'coarse-lg:left-3' : 'coarse-lg:right-3'}`}
+      className={`w-full lg:w-[22rem] shrink-0 bg-hardware-panel border-2 border-[#3a3a3a] rounded-lg p-4 shadow-2xl lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] flex flex-col overflow-y-auto coarse-lg:overflow-hidden coarse-lg:fixed coarse-lg:top-auto coarse-lg:bottom-3 coarse-lg:z-30 coarse-lg:w-[20rem] ${coachMax} ${side === 'left' ? 'coarse-lg:left-3' : 'coarse-lg:right-3'}`}
       style={top !== null ? { top, bottom: 'auto' } : undefined}
       aria-label="Lesson coach"
     >
+      {/* The part that scrolls in the iPad's floating coach; elsewhere it is not a box of its own (display: contents) */}
+      <div className="contents coarse-lg:flex coarse-lg:flex-col coarse-lg:flex-1 coarse-lg:min-h-0 coarse-lg:overflow-y-auto coarse-lg:-mx-4 coarse-lg:px-4 coarse-lg:pb-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-teaching-current font-bold text-sm uppercase tracking-wider">{lesson.name}</h3>
-          {lesson.objective && <p className="text-[11px] text-gray-300 mt-1 leading-snug"><span className="text-gray-400">Goal:</span> {lesson.objective}</p>}
+          <h3 className={`text-teaching-current font-bold text-sm uppercase tracking-wider ${currentStep > 0 && !finished ? 'coarse-lg:truncate' : ''}`} title={lesson.name}>{lesson.name}</h3>
+          {lesson.objective && <p className={`text-[11px] text-gray-300 mt-1 leading-snug ${currentStep > 0 && !finished ? 'coarse-lg:hidden' : ''}`}><span className="text-gray-400">Goal:</span> {lesson.objective}</p>}
         </div>
         <div className="flex gap-1 shrink-0">
-          <button onClick={() => setSide(s => (s === 'right' ? 'left' : 'right'))} className="hidden coarse-lg:inline-block text-gray-400 hover:text-white px-2 py-1 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300" aria-label="Move the lesson coach to the other side" title="Move to the other side">⇆</button>
-          <button onClick={() => setCollapsed(true)} className="text-gray-400 hover:text-white px-2 py-1 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300" aria-label="Collapse lesson panel" title="Collapse">—</button>
-          <button onClick={store.resetLesson} className="text-gray-400 hover:text-white px-2 py-1 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300" aria-label="Stop lesson" title="Stop lesson">✕</button>
+          <button onClick={() => setSide(s => (s === 'right' ? 'left' : 'right'))} className="coarse:min-h-[44px] coarse:min-w-[40px] hidden coarse-lg:inline-block text-gray-400 hover:text-white px-2 py-1 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300" aria-label="Move the lesson coach to the other side" title="Move to the other side">⇆</button>
+          <button onClick={() => setCollapsed(true)} className="coarse:min-h-[44px] coarse:min-w-[40px] text-gray-400 hover:text-white px-2 py-1 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300" aria-label="Collapse lesson panel" title="Collapse">—</button>
+          <button onClick={store.resetLesson} className="coarse:min-h-[44px] coarse:min-w-[40px] text-gray-400 hover:text-white px-2 py-1 text-sm rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300" aria-label="Stop lesson" title="Stop lesson">✕</button>
         </div>
       </div>
 
@@ -159,7 +170,7 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
         </div>
       </div>
 
-      {showScope && <div className="mt-2"><Scope height={step?.scope === 'spectrum' ? 120 : 96} stepMode={finished ? undefined : step?.scope} /></div>}
+      {showScope && !quiet && <div className="mt-2"><Scope height={step?.scope === 'spectrum' ? 120 : 96} stepMode={finished ? undefined : step?.scope} /></div>}
 
       <div aria-live="polite" aria-atomic="true" className="sr-only">{announce}</div>
 
@@ -189,23 +200,11 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
         )
       )}
 
-      {!finished && (
-        <div className="flex gap-2 mt-2">
-          <button onClick={store.prevStep} disabled={currentStep === 0} className="flex-1 py-2 text-xs rounded bg-[#232323] text-gray-300 disabled:opacity-30 hover:bg-[#2f2f2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300">← Back</button>
-          <button
-            onClick={store.nextStep}
-            className={`flex-1 py-2 text-xs rounded font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 ${satisfied ? 'bg-teaching-current text-black' : 'bg-[#232323] text-gray-300 hover:bg-[#2f2f2f]'}`}
-          >
-            {satisfied ? 'Next →' : 'Skip →'}
-          </button>
-        </div>
-      )}
-
-      <button onClick={() => setShowList(v => !v)} className="mt-3 text-[11px] text-gray-400 hover:text-gray-200 text-left" aria-expanded={showList}>
+      <button onClick={() => setShowList(v => !v)} className="order-2 coarse:min-h-[44px] mt-3 text-[11px] text-gray-400 hover:text-gray-200 text-left" aria-expanded={showList}>
         {showList ? '▾' : '▸'} All steps
       </button>
       {showList && (
-        <ol className="mt-1 space-y-1">
+        <ol className="order-2 mt-1 space-y-1">
           {steps.map((s, i) => {
             const past = finished || i < currentStep;
             const cur = !finished && i === currentStep;
@@ -214,7 +213,7 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
               <li key={i}>
                 <button
                   onClick={() => store.goToStep(i)}
-                  className={`w-full text-left flex items-start gap-2 px-2 py-1 rounded text-[11px] leading-snug ${cur ? 'bg-[#16220f] text-white' : past ? 'text-gray-400' : 'text-gray-300 hover:bg-[#1f1f1f]'}`}
+                  className={`coarse:min-h-[44px] w-full text-left flex items-start gap-2 px-2 py-1 rounded text-[11px] leading-snug ${cur ? 'bg-[#16220f] text-white' : past ? 'text-gray-400' : 'text-gray-300 hover:bg-[#1f1f1f]'}`}
                   aria-current={cur ? 'step' : undefined}
                 >
                   <span className={`shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${done ? 'bg-teaching-current text-black' : cur ? 'bg-teaching-target text-black' : past ? 'bg-[#3a3a3a] text-gray-300' : 'bg-[#333] text-gray-400'}`}>
@@ -227,7 +226,21 @@ export default function Instructions({ spec, onNextLesson }: InstructionsProps) 
           })}
         </ol>
       )}
-      <p className="text-[10px] text-gray-500 mt-2 italic truncate">Source: {lesson.source}</p>
+      <p className="order-2 text-[10px] text-gray-500 mt-2 italic truncate">Source: {lesson.source}</p>
+      </div>
+      {/* Back / Next: on other screens they sit above "All steps" (order-1 / order-2). In the iPad's floating coach they
+          are its footer, outside the part that scrolls, so they are always in reach and never cover the step. */}
+      {!finished && (
+        <div className="order-1 shrink-0 flex gap-2 mt-2 coarse-lg:mt-0 coarse-lg:pt-3 coarse-lg:border-t coarse-lg:border-[#2f2f2f]">
+          <button onClick={store.prevStep} disabled={currentStep === 0} className="coarse:min-h-[44px] flex-1 py-2 text-xs rounded bg-[#232323] text-gray-300 disabled:opacity-30 hover:bg-[#2f2f2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300">← Back</button>
+          <button
+            onClick={store.nextStep}
+            className={`coarse:min-h-[44px] flex-1 py-2 text-xs rounded font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 ${satisfied ? 'bg-teaching-current text-black' : 'bg-[#232323] text-gray-300 hover:bg-[#2f2f2f]'}`}
+          >
+            {satisfied ? 'Next →' : 'Skip →'}
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
@@ -487,7 +500,7 @@ function StepCard({ lesson, stepIndex, step, spec, satisfied, session, instance,
       {kind === 'info' && step.info?.play && <DemoHearIt owner={lessonOwner(lesson.id, stepIndex)} refs={step.info.play} />}
       {kind === 'info' && !step.info?.play && (
         <div className="mt-2 flex gap-2 items-center">
-          <button onClick={() => hub.audition(instance, null)} className="px-3 py-1.5 rounded bg-[#1e2a36] text-sky-200 text-xs hover:bg-[#263646]">▶ Hear it</button>
+          <button onClick={() => hub.audition(instance, null)} className="coarse:min-h-[44px] px-3 py-1.5 rounded bg-[#1e2a36] text-sky-200 text-xs hover:bg-[#263646]">▶ Hear it</button>
           <span className="text-[11px] text-gray-400">Read, listen, then press Next.</span>
         </div>
       )}
@@ -500,17 +513,17 @@ function StepCard({ lesson, stepIndex, step, spec, satisfied, session, instance,
           ))}
           <div className="flex items-center gap-3">
             {hintsShown < hints.length && (
-              <button onClick={showHint} className="text-[11px] text-sky-300 hover:text-sky-100 underline-offset-2 hover:underline">
+              <button onClick={showHint} className="coarse:min-h-[44px] text-[11px] text-sky-300 hover:text-sky-100 underline-offset-2 hover:underline">
                 {hintsShown === 0 ? 'Need a hint?' : 'Another hint'} ({hints.length - hintsShown} left)
               </button>
             )}
             {showMeReady && kind !== 'challenge' && (
-              <button onClick={runShowMe} disabled={demoRunning} className="text-[11px] text-amber-300 hover:text-amber-100 disabled:opacity-50 underline-offset-2 hover:underline">
+              <button onClick={runShowMe} disabled={demoRunning} className="coarse:min-h-[44px] text-[11px] text-amber-300 hover:text-amber-100 disabled:opacity-50 underline-offset-2 hover:underline">
                 {demoRunning ? 'Watch the panel…' : 'Show me'}
               </button>
             )}
             {showMeReady && kind === 'challenge' && step.solution && (
-              <button onClick={runShowMe} disabled={demoRunning} className="text-[11px] text-amber-300 hover:text-amber-100 disabled:opacity-50 underline-offset-2 hover:underline">
+              <button onClick={runShowMe} disabled={demoRunning} className="coarse:min-h-[44px] text-[11px] text-amber-300 hover:text-amber-100 disabled:opacity-50 underline-offset-2 hover:underline">
                 {demoRunning ? 'Watch the panel…' : 'Show me one way'}
               </button>
             )}
@@ -521,7 +534,7 @@ function StepCard({ lesson, stepIndex, step, spec, satisfied, session, instance,
 
       {(step.explanation || step.manualReference) && !needsPrediction && (
         <div className="mt-2">
-          <button onClick={() => setExpanded(e => !e)} className="text-[11px] text-gray-400 hover:text-white flex items-center gap-1" aria-expanded={expanded}>
+          <button onClick={() => setExpanded(e => !e)} className="coarse:min-h-[44px] text-[11px] text-gray-400 hover:text-white flex items-center gap-1" aria-expanded={expanded}>
             <span className="inline-block transition-transform motion-reduce:transition-none" style={{ transform: expanded ? 'rotate(90deg)' : undefined }}>▶</span>
             {expanded ? 'Less' : 'Why does this work?'}
           </button>
@@ -543,11 +556,14 @@ function noteName(n: number) {
 }
 
 function MultipleChoiceView({ mc, answer, onAnswer, reveal, predict }: { mc: MultipleChoice; answer?: number; onAnswer: (i: number) => void; reveal: boolean; predict?: boolean }) {
+  // Shown in a shuffled order (optionOrder.ts); `answer` and onAnswer stay the lesson's own indices
+  const order = useMemo(() => optionOrder(mc, sessionSeed()), [mc]);
   return (
     <div>
       <p className="text-[13px] text-white font-medium leading-snug">{mc.question}</p>
       <div className="mt-2 space-y-1.5" role="group" aria-label={predict ? 'Your prediction' : 'Your answer'}>
-        {mc.options.map((opt, i) => {
+        {order.map((i, shown) => {
+          const opt = mc.options[i];
           const chosen = answer === i;
           const correct = i === mc.answer;
           const show = reveal && answer !== undefined;
@@ -557,14 +573,14 @@ function MultipleChoiceView({ mc, answer, onAnswer, reveal, predict }: { mc: Mul
               onClick={() => onAnswer(i)}
               disabled={answer !== undefined}
               aria-pressed={chosen}
-              className={`w-full text-left px-2.5 py-2 rounded text-[12px] border transition-colors motion-reduce:transition-none ${
+              className={`coarse:min-h-[44px] w-full text-left px-2.5 py-2 rounded text-[12px] border transition-colors motion-reduce:transition-none ${
                 show && correct ? 'border-green-500 bg-green-950/50 text-green-100'
                   : show && chosen && !correct ? 'border-red-500 bg-red-950/40 text-red-100'
                   : chosen ? 'border-sky-500 bg-sky-950/40 text-sky-50'
                   : 'border-[#333] bg-[#1b1b1b] text-gray-200 hover:border-[#555]'
               }`}
             >
-              <span className="inline-block w-4 font-bold">{show && correct ? '✓' : show && chosen ? '✗' : String.fromCharCode(65 + i)}</span> {opt}
+              <span className="inline-block w-4 font-bold">{show && correct ? '✓' : show && chosen ? '✗' : String.fromCharCode(65 + shown)}</span> {opt}
             </button>
           );
         })}
@@ -618,7 +634,7 @@ function ABToggle({ instance, a, b, labels, patchesA, patternA }: {
           key={k}
           onClick={() => play(k)}
           aria-pressed={side === k}
-          className={`flex-1 py-2.5 font-bold text-sm transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 ${
+          className={`coarse:min-h-[44px] flex-1 py-2.5 font-bold text-sm transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 ${
             side === k ? (k === 'a' ? 'bg-purple-600 text-white' : 'bg-sky-600 text-white') : k === 'a' ? 'bg-[#2a1e36] text-purple-100 hover:bg-[#35264a]' : 'bg-[#1e2a36] text-sky-100 hover:bg-[#263646]'
           } ${i === 1 ? 'border-l border-[#2c3a48]' : ''}`}
         >
@@ -661,7 +677,7 @@ function StudioABToggle({ lesson, stepIndex, labels, match }: { lesson: Lesson; 
             key={k}
             onClick={() => studioAB.play(lesson, stepIndex, k)}
             aria-pressed={side === k}
-            className={`flex-1 py-2.5 font-bold text-sm transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 ${
+            className={`coarse:min-h-[44px] flex-1 py-2.5 font-bold text-sm transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 ${
               side === k ? (k === 'a' ? 'bg-purple-600 text-white' : 'bg-sky-600 text-white') : k === 'a' ? 'bg-[#2a1e36] text-purple-100 hover:bg-[#35264a]' : 'bg-[#1e2a36] text-sky-100 hover:bg-[#263646]'
             } ${i === 1 ? 'border-l border-[#2c3a48]' : ''}`}
           >
@@ -744,7 +760,7 @@ function WhereButton({ step }: { step: LessonStep }) {
   }
   if (!label) return null;
   return (
-    <button onClick={() => goTo({ instance: area ? undefined : step.instance, area })} className="mt-2 text-[11px] text-sky-300 hover:text-sky-100 underline-offset-2 hover:underline">
+    <button onClick={() => goTo({ instance: area ? undefined : step.instance, area })} className="coarse:min-h-[44px] mt-2 text-[11px] text-sky-300 hover:text-sky-100 underline-offset-2 hover:underline">
       {label} ↗
     </button>
   );
@@ -778,7 +794,7 @@ function CaptureRow({ capture }: { capture: NonNullable<LessonStep['capture']> }
               setFlash(sec.id);
               setTimeout(() => setFlash(f => (f === sec.id ? null : f)), 900);
             }}
-            className={`px-2 py-1 rounded text-[11px] border ${flash === sec.id ? 'bg-teaching-current text-black border-teaching-current' : holds(sec) ? 'bg-sky-950/60 text-sky-100 border-sky-700' : 'bg-[#1b1b1b] text-gray-200 border-[#333]'}`}
+            className={`coarse:min-h-[44px] px-2 py-1 rounded text-[11px] border ${flash === sec.id ? 'bg-teaching-current text-black border-teaching-current' : holds(sec) ? 'bg-sky-950/60 text-sky-100 border-sky-700' : 'bg-[#1b1b1b] text-gray-200 border-[#333]'}`}
             aria-label={`Capture into ${sec.name}${holds(sec) ? ' (has a snapshot)' : ''}`}
           >
             {holds(sec) ? '✓ ' : ''}{sec.name}
@@ -801,7 +817,7 @@ function StudioBanner({ lesson, own, saved, first }: { lesson: Lesson; own: bool
         This lesson set up its own studio.{saved ? ' Yours is saved: bring it back at the end, or any time from Lessons.' : ''}
       </p>
       {first && ownText && (
-        <button onClick={() => useStudioStore.getState().useOwnStudio()} className="mt-1 text-sky-300 hover:text-sky-100 underline underline-offset-2">
+        <button onClick={() => useStudioStore.getState().useOwnStudio()} className="coarse:min-h-[44px] mt-1 text-sky-300 hover:text-sky-100 underline underline-offset-2">
           Use my own studio instead ({ownText})
         </button>
       )}
@@ -849,7 +865,7 @@ function MatchView({ step, session, instance, labelOf, announce }: {
       </p>
       <ABToggle instance={instance} a={m.target} b={null} labels={['A · Target', 'B · Yours']} patchesA={m.patches} patternA={m.pattern?.target} />
       {!solved && (
-        <button onClick={store.checkMatch} className="w-full py-2 rounded bg-teaching-target text-black font-bold text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300">
+        <button onClick={store.checkMatch} className="coarse:min-h-[44px] w-full py-2 rounded bg-teaching-target text-black font-bold text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300">
           Check my sound
         </button>
       )}
@@ -866,7 +882,7 @@ function MatchView({ step, session, instance, labelOf, announce }: {
             if (m.pattern) setPatternSettings(instance, m.pattern.target);
             setTimeout(store.checkMatch, 50);
           }}
-          className="text-[11px] text-amber-300 underline"
+          className="coarse:min-h-[44px] text-[11px] text-amber-300 underline"
         >
           Show me the answer
         </button>
@@ -891,7 +907,7 @@ function ReflectView({ reflect, session }: { reflect: { prompt: string; model: s
         aria-label="Your explanation"
       />
       {!revealed ? (
-        <button onClick={store.revealStep} className="w-full py-1.5 rounded bg-[#262626] text-gray-200 text-xs hover:bg-[#2f2f2f]">
+        <button onClick={store.revealStep} className="coarse:min-h-[44px] w-full py-1.5 rounded bg-[#262626] text-gray-200 text-xs hover:bg-[#2f2f2f]">
           {text.trim() ? 'Compare with a model answer' : 'Write a sentence first, or peek at a model answer'}
         </button>
       ) : (
@@ -904,7 +920,7 @@ function ReflectView({ reflect, session }: { reflect: { prompt: string; model: s
                 key={r}
                 onClick={() => store.rateReflection(r)}
                 aria-pressed={session?.rating === r}
-                className={`flex-1 py-1.5 rounded text-[11px] ${session?.rating === r ? 'bg-teaching-current text-black font-bold' : 'bg-[#232323] text-gray-200'}`}
+                className={`coarse:min-h-[44px] flex-1 py-1.5 rounded text-[11px] ${session?.rating === r ? 'bg-teaching-current text-black font-bold' : 'bg-[#232323] text-gray-200'}`}
               >
                 {r === 'got-it' ? 'Got it' : r === 'partly' ? 'Partly' : 'Not yet'}
               </button>
@@ -1029,13 +1045,13 @@ function LessonSummary({ lesson, session, snapshot, studio, onFinish, onNext, on
       </p>
       <div className="flex flex-col gap-2 mt-3">
         <div className="flex gap-2">
-          <button onClick={onFinish} className="flex-1 py-2 bg-teaching-current text-black font-bold rounded text-xs hover:brightness-110">Finish</button>
+          <button onClick={onFinish} className="coarse:min-h-[44px] flex-1 py-2 bg-teaching-current text-black font-bold rounded text-xs hover:brightness-110">Finish</button>
           {onNext && (
-            <button onClick={onNext} className="flex-1 py-2 bg-[#2d2d2d] text-white font-bold rounded text-xs hover:bg-[#3a3a3a]">Next lesson →</button>
+            <button onClick={onNext} className="coarse:min-h-[44px] flex-1 py-2 bg-[#2d2d2d] text-white font-bold rounded text-xs hover:bg-[#3a3a3a]">Next lesson →</button>
           )}
         </div>
         {snapshot && (
-          <button onClick={onRestore} className="py-1.5 rounded text-[11px] bg-[#222] text-gray-200 hover:bg-[#2c2c2c]">
+          <button onClick={onRestore} className="coarse:min-h-[44px] py-1.5 rounded text-[11px] bg-[#222] text-gray-200 hover:bg-[#2c2c2c]">
             {studio ? 'Bring back the studio I had before this lesson' : 'Restore the patch I had before this lesson'}
           </button>
         )}

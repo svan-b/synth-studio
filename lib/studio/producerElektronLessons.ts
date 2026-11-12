@@ -352,12 +352,12 @@ const bassKick: Lesson = {
     },
     {
       kind: 'do', concept: 'envelope-decay', instance: A4, focus: ['seq:trig:3', 'seq:trig:7', 'seq:trig:11', 'seq:trig:15'],
-      instruction: 'Each bass note lasts 3 steps and runs into the next kick. Hold trig 3 and turn LEN (knob C) to 1/16. Do the same on 7, 11 and 15.',
+      instruction: 'The bass notes run into the next kick. Hold trig 3 and turn LEN (knob C) to 1/16. Repeat on 7, 11 and 15.',
       check: s => trigs(s, A4, T1).length >= 4 && trigs(s, A4, T1).every(n => (lenOf(s, A4, T1, n) ?? 99) <= 1.75),
       solution: { sequence: [{ track: T1, trigs: on([3, 7, 11, 15], { len: LEN.one }) }] },
       hints: ['LEN is knob C on the NOTE page.', 'Hold the trig key while you turn: the screen shows that trig\'s LEN.', '1/16 is one step.'],
       principle: 'Short bass notes leave silence for the kick, so both stay punchy.',
-      explanation: 'LEN (note length) is how long the note is held. On the Analog Four every trig keeps the LEN it was placed with, so you change placed trigs one by one. Set the NOTE page\'s LEN first and new trigs take it.',
+      explanation: 'Each note is held for 3 steps now. LEN (note length) is how long the note is held. On the Analog Four every trig keeps the LEN it was placed with, so you change placed trigs one by one. Set the NOTE page\'s LEN first and new trigs take it.',
       manualReference: 'A4 MKII manual p.45: NOTE menu',
     },
     {
@@ -456,7 +456,7 @@ const chords: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'oscillator-pitch', instance: A4,
-      instruction: 'Drums and bass make a groove; chords give it a mood. Press ▶ Hear it: at the drop the chords arrive, and the track suddenly has one.',
+      instruction: 'Drums and bass make a groove; chords give it a mood. Press ▶ Hear it: the chords arrive at the drop.',
       principle: 'Harmony is notes sounding together; chords set the emotional colour of a track.',
       explanation: 'The recording is the end of the groove and the start of the drop in the demo "Low Tide Lights". Your groove and bassline are loaded. Tracks 2 and 3 of the Analog Four are set up for chords: two saw oscillators each, a little filter envelope, into the A4\'s chorus, delay and reverb.',
       info: { play: { demo: 'low-tide-lights', excerpt: 'into-drop-15-18' } },
@@ -499,7 +499,7 @@ const chords: Lesson = {
     },
     {
       kind: 'do', concept: 'oscillator-pitch', instance: A4, focus: ['key:PAGE', 'seq:trig:3'],
-      instruction: 'On page 3, hold trig 3 on T2 and set its NOTE to D3, then the same on T3. On page 4 set both to E3.',
+      instruction: 'On page 3, hold trig 3 on T2 and set its NOTE to D3, then on T3. On page 4 set both to E3.',
       check: s => [T2, T3].every(t => barNotes(s, A4, t, 3).some(n => pc(n) === 2) && barNotes(s, A4, t, 4).some(n => pc(n) === 4)
         && [1, 2].every(b => barNotes(s, A4, t, b).every(n => pc(n) === 9))),
       solution: { sequence: [T2, T3].map(t => ({ track: t, trigs: { 35: { note: nn('D3') }, 51: { note: nn('E3') } } })) },
@@ -514,7 +514,7 @@ const chords: Lesson = {
     },
     {
       kind: 'do', concept: 'oscillator-pitch', instance: A4, focus: ['key:T1'],
-      instruction: 'Make the bass follow: on T1, set the first note of page 3 (trig 3) to D3 and the first note of page 4 to E3.',
+      instruction: 'Make the bass follow: on T1, set page 3\'s first note (trig 3) to D3 and page 4\'s first note to E3.',
       check: s => barNotes(s, A4, T1, 3).some(n => pc(n) === 2) && barNotes(s, A4, T1, 4).some(n => pc(n) === 4),
       solution: { values: { track: T1 }, sequence: [{ track: T1, trigs: { 35: { note: nn('D3') }, 51: { note: nn('E3') } } }] },
       principle: 'When the bass plays the chord\'s root, the harmony sounds solid and clear.',
@@ -663,7 +663,7 @@ const hook: Lesson = {
     },
     {
       kind: 'do', concept: 'sequencer-pattern', instance: A4, focus: ['key:PAGE', 'seq:trig:3', 'seq:trig:6', 'seq:trig:9', 'seq:trig:12'],
-      instruction: 'Answer it: on page 2 tap trigs 3, 6, 9 and 12. Set 6 to D5 and 9 to C5, and leave 12 on E5, so the phrase ends rising.',
+      instruction: 'Answer it: on page 2 tap trigs 3, 6, 9 and 12. Set 6 to D5 and 9 to C5; 12 stays on E5.',
       check: s => {
         const b1 = barNotes(s, A4, T4, 1), b2 = barNotes(s, A4, T4, 2);
         return b2.length >= 3 && b1.length > 0 && b2.join() !== b1.join() && b2[b2.length - 1] > b1[b1.length - 1];
@@ -769,7 +769,7 @@ const movement: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'sequencer-pattern', instance: A4,
-      instruction: 'Eight bars of the same loop: press ▶ Hear it and listen for the small changes that keep it alive. In yours, every bar is exactly the same.',
+      instruction: 'Press ▶ Hear it: eight bars of one loop, kept alive by small changes. In yours, every bar is exactly the same.',
       principle: 'The ear tires of exact repetition; small changes every few bars hold attention.',
       explanation: 'The recording is the first drop of the demo "Low Tide Lights": trig conditions add a rim and a tom on some loops, a snare fill closes the eighth bar, and a slow LFO moves the chords\' filter. Three tools, three time scales: a parameter lock changes one step, a trig condition changes some loops, and a slow LFO changes everything a little, all the time. None of them adds a part.',
       info: { play: { demo: 'low-tide-lights', excerpt: 'drop-17-24' } },
@@ -800,7 +800,7 @@ const movement: Lesson = {
     },
     {
       kind: 'do', concept: 'sequencer-pattern', instance: RYTM, focus: ['pad:sd', 'seq:trig:14', 'seq:trig:15', 'seq:trig:16', 'sd_trig_cond'],
-      instruction: 'Add a fill at the end of every four bars: tap the SD pad, add trigs 14, 15 and 16, and set each one\'s TRC to 4:4.',
+      instruction: 'A fill every four bars: tap the SD pad, add trigs 14, 15 and 16, and set each one\'s TRC to 4:4.',
       check: s => [14, 15, 16].every(n => trig(s, RYTM, SD, n)?.cond === '4:4'),
       solution: { values: { track: SD }, sequence: [{ track: SD, trigs: { 14: { vel: 70, cond: '4:4' }, 15: { vel: 86, cond: '4:4' }, 16: { vel: 104, cond: '4:4' } } }] },
       hints: ['Place the three trigs first, then hold each one.', 'TRC is encoder D while a trig is held.', 'Turn it until the screen reads 4:4.'],
@@ -813,12 +813,12 @@ const movement: Lesson = {
     },
     {
       kind: 'do', concept: 'lfo', instance: A4, focus: ['key:LFO', 't2_lfo1_spd', 't2_lfo1_mul', 't2_lfo1_depa'],
-      instruction: 'On T2, press [LFO]: set SPD to 8, MUL to x1 and DEP to about +12 (the destination is already F1 FRQ). Then do the same on T3.',
+      instruction: 'On T2, press [LFO]: set SPD to 8, MUL to x1 and DEP to about +12. Then do the same on T3.',
       check: s => [T2, T3].every(t => a4(s, t, 'lfo1_dsta') === dest('F1 FRQ') && Math.abs(a4(s, t, 'lfo1_depa')) >= 6 && lfoSlow(s, t)),
       solution: { values: { t2_lfo1_spd: 8, t2_lfo1_mul: 0, t2_lfo1_depa: 12, t3_lfo1_spd: 8, t3_lfo1_mul: 0, t3_lfo1_depa: 12 } },
       hints: ['SPD is knob A, MUL knob B, DEP knob H on the LFO page.', 'MUL x1 is the lowest setting.', 'SPD 8 x MUL 1 = one cycle every 16 bars.'],
       principle: 'A slow LFO moves a sound over many bars, so a loop breathes on its own.',
-      explanation: 'An LFO (low-frequency oscillator) is a slow wave that turns a knob for you. On the A4, SPD × MUL = 128 is one cycle a bar, so 8 × 1 takes 16 bars.',
+      explanation: 'An LFO (low-frequency oscillator) is a slow wave that turns a knob for you; here its destination is already F1 FRQ, the filter cutoff. On the A4, SPD × MUL = 128 is one cycle a bar, so 8 × 1 takes 16 bars.',
     },
     {
       kind: 'listen', concept: 'lfo', instance: A4,
@@ -833,7 +833,7 @@ const movement: Lesson = {
     },
     {
       kind: 'predict', concept: 'sequencer-pattern', instance: RYTM, focus: ['pad:sd', 'seq:trig:13', 'key:rec', 'key:fill'],
-      instruction: 'On the Rytm, tap SD, add trig 13 and set its TRC to FILL. Then press [RECORD] to leave GRID RECORDING and hold [FILL] for a bar.',
+      instruction: 'On the Rytm, tap SD, add trig 13 and set its TRC to FILL. Leave GRID RECORDING with [RECORD], then hold [FILL] for a bar.',
       check: s => trig(s, RYTM, SD, 13)?.cond === 'FILL',
       solution: { values: { track: SD }, sequence: [{ track: SD, trigs: { 13: { vel: 96, cond: 'FILL' } } }] },
       predict: mc('When does the snare on step 13 play now?', ['Only while FILL is held or latched', 'Every fourth bar', 'Never'], 0,
@@ -843,14 +843,14 @@ const movement: Lesson = {
     },
     {
       kind: 'match', concept: 'lfo', instance: A4, focus: ['key:T2', 'key:LFO', 't2_lfo1_depa'],
-      instruction: 'Match the filter movement by ear on T2: LFO 1 DEP. It runs one cycle a bar here, so you hear it in a few seconds.',
+      instruction: 'Match the filter movement by ear on T2: LFO 1 DEP. It runs one cycle a bar here, so you hear it quickly.',
       setup: { t2_lfo1_depa: 0, track: T2 },
       match: { target: { t2_lfo1_depa: 30, t2_lfo1_spd: 32, t2_lfo1_mul: 2 }, controls: ['t2_lfo1_depa'], tolerance: 0.06 },
       hints: ['More or less movement than yours?', 'More: the chords open and close clearly.', 'Between +20 and +40.'],
     },
     {
       kind: 'challenge', concept: 'parameter-locks', instance: A4,
-      instruction: 'Make eight bars that never repeat exactly, with the parts you have: add a lock on the Rytm, a chance trig, and an LFO on one more track.',
+      instruction: 'Make eight bars that never repeat exactly: add a lock on the Rytm, a chance trig, and an LFO on one more track.',
       checklist: [
         { text: 'A parameter lock on a Rytm trig (a longer hat, a brighter rim…)', check: s => lockCount(s, RYTM) >= 1 },
         { text: 'A probability condition (%): variation that never repeats exactly', check: s => [...conditions(s, RYTM), ...conditions(s, A4)].some(([, , c]) => /%$/.test(c)) },
@@ -1012,9 +1012,9 @@ const capstone: Lesson = {
   steps: [
     {
       kind: 'info', concept: 'sequencer-pattern', area: 'arranger',
-      instruction: 'Three tracks from this studio (▶ Hear it). Yours is next: two minutes or more, 100 to 140 BPM, one key, a clear energy curve, mixed and mastered.',
+      instruction: 'Three tracks from this studio (▶ Hear it). Yours is next: two minutes or more, one key, a clear energy curve, mixed and mastered.',
       principle: 'A finished track is many small decisions, made one at a time and checked by ear.',
-      explanation: 'The recordings are the peaks of the three demo tracks: Low Tide Lights (deep house), Three Clocks (a polyrhythmic Moog jam) and Copper Wire (electro breaks). It can be any style. This studio holds the course track as a bank of patterns: Rytm A01 GROOVE, A02 BREAK (no kick), A03 FILL, A04 INTRO; Analog Four A01 FULL, A02 BASS, A03 BREAK. The Sub 37 is a guest on channel 3. Or press "Use my own studio" and bring your own track. Each milestone saves as you go: do one a session.',
+      explanation: 'The recordings are the peaks of the three demo tracks: Low Tide Lights (deep house), Three Clocks (a polyrhythmic Moog jam) and Copper Wire (electro breaks). It can be any style, at 100 to 140 BPM. This studio holds the course track as a bank of patterns: Rytm A01 GROOVE, A02 BREAK (no kick), A03 FILL, A04 INTRO; Analog Four A01 FULL, A02 BASS, A03 BREAK. The Sub 37 is a guest on channel 3. Or press "Use my own studio" and bring your own track. Each milestone saves as you go: do one a session.',
       info: {
         play: [
           { demo: 'low-tide-lights', excerpt: 'drop2-49-52' },
@@ -1032,7 +1032,7 @@ const capstone: Lesson = {
     },
     {
       kind: 'challenge', concept: 'sequencer-pattern', area: 'rack',
-      instruction: 'Milestone 1, the loop: a beat with a kick, a bass, chords or a pad, and a hook or lead, all in one key and in time.',
+      instruction: 'Milestone 1, the loop: a beat with a kick, a bass, chords or a pad, and a hook, in one key and in time.',
       checklist: [
         { text: 'Tempo between 100 and 140 BPM', check: s => between(s.transport.bpm, 100, 140) },
         { text: 'A beat with a kick (the Rytm\'s BD, or a DFAM in the mix)', check: s => anyPattern(s, RYTM, p => trigs(s, RYTM, BD, p).length >= 2) || (has(s, 'dfam') && !!s.routes[inst(s, 'dfam')!]) },
