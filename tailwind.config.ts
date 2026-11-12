@@ -18,6 +18,19 @@ const config: Config = {
             off: '#333333',
           },
         },
+        mc: {
+          bg: 'rgb(var(--mc-bg) / <alpha-value>)',
+          surface: 'rgb(var(--mc-surface) / <alpha-value>)',
+          raised: 'rgb(var(--mc-raised) / <alpha-value>)',
+          ink: 'rgb(var(--mc-ink) / <alpha-value>)',
+          muted: 'rgb(var(--mc-muted) / <alpha-value>)',
+          faint: 'rgb(var(--mc-faint) / <alpha-value>)',
+          line: 'rgb(var(--mc-line) / <alpha-value>)',
+          accent: 'rgb(var(--mc-accent) / <alpha-value>)',
+          ok: 'rgb(var(--mc-ok) / <alpha-value>)',
+          bad: 'rgb(var(--mc-bad) / <alpha-value>)',
+          hint: 'rgb(var(--mc-hint) / <alpha-value>)',
+        },
         teaching: {
           current: '#00ff00',
           target: '#ffaa00',
@@ -27,6 +40,8 @@ const config: Config = {
       },
       fontFamily: {
         label: ['"Arial Narrow"', 'Arial', 'sans-serif'],
+        'mc-serif': ['ui-serif', '"New York"', '"Iowan Old Style"', '"Palatino Linotype"', 'Palatino', 'Georgia', 'serif'],
+        'mc-sans': ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', 'system-ui', '"Segoe UI"', 'Roboto', 'sans-serif'],
       },
     },
   },

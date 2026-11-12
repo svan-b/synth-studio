@@ -1,0 +1,364 @@
+/* Theme for the piano app. Colours are RGB channels so Tailwind can apply opacity. */
+
+.mc-root {
+  --mc-bg: 246 243 236;
+  --mc-surface: 255 254 251;
+  --mc-raised: 238 234 225;
+  --mc-ink: 30 28 25;
+  --mc-muted: 108 103 94;
+  --mc-faint: 166 160 149;
+  --mc-line: 224 219 208;
+  --mc-accent: 46 84 196;
+  --mc-ok: 42 138 88;
+  --mc-bad: 196 74 56;
+  --mc-hint: 201 140 30;
+  --mc-key-white: 255 254 250;
+  --mc-key-white-edge: 196 190 178;
+  --mc-key-black: 34 32 29;
+  --mc-shadow: 30 28 25;
+  color-scheme: light;
+}
+
+.mc-root[data-theme='dark'] {
+  --mc-bg: 18 17 16;
+  --mc-surface: 29 27 25;
+  --mc-raised: 40 37 34;
+  --mc-ink: 241 238 232;
+  --mc-muted: 164 158 148;
+  --mc-faint: 112 107 98;
+  --mc-line: 52 48 44;
+  --mc-accent: 126 156 255;
+  --mc-ok: 96 192 138;
+  --mc-bad: 238 127 109;
+  --mc-hint: 232 182 85;
+  --mc-key-white: 236 232 224;
+  --mc-key-white-edge: 150 144 132;
+  --mc-key-black: 12 11 10;
+  --mc-shadow: 0 0 0;
+  color-scheme: dark;
+}
+
+html:has(.mc-root),
+html:has(.mc-root) body {
+  background: rgb(246 243 236);
+  overscroll-behavior: none;
+}
+
+html:has(.mc-root[data-theme='dark']),
+html:has(.mc-root[data-theme='dark']) body {
+  background: rgb(18 17 16);
+}
+
+.mc-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: rgb(var(--mc-bg));
+  color: rgb(var(--mc-ink));
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.mc-root .mc-selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.mc-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.mc-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Safe areas for a home screen web app on iPad. */
+.mc-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.mc-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.mc-safe-x {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* ---------------------------------------------------------------- Keyboard */
+
+.mc-kb {
+  position: relative;
+  width: 100%;
+  touch-action: none;
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+  background: rgb(var(--mc-key-black));
+  box-shadow: 0 10px 30px -12px rgb(var(--mc-shadow) / 0.35);
+}
+
+.mc-kb::before {
+  /* felt strip along the top of the keys */
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(to bottom, rgb(120 30 34), rgb(92 22 26));
+  z-index: 3;
+}
+
+.mc-key {
+  position: absolute;
+  top: 0;
+  box-sizing: border-box;
+  transition:
+    background-color 90ms ease-out,
+    transform 60ms ease-out,
+    box-shadow 90ms ease-out;
+  will-change: transform;
+}
+
+.mc-key-w {
+  bottom: 0;
+  background: linear-gradient(to bottom, rgb(var(--mc-key-white) / 0.94) 0%, rgb(var(--mc-key-white)) 14%);
+  border-left: 1px solid rgb(var(--mc-key-white-edge));
+  box-shadow: inset 0 -5px 0 rgb(var(--mc-key-white-edge));
+  border-radius: 0 0 5px 5px;
+  z-index: 1;
+}
+
+.mc-key-b {
+  background: linear-gradient(to bottom, rgb(58 55 51) 0%, rgb(var(--mc-key-black)) 78%);
+  border-radius: 0 0 4px 4px;
+  border-bottom: 6px solid rgb(8 8 8);
+  box-shadow: 1px 2px 3px rgb(0 0 0 / 0.35);
+  z-index: 2;
+}
+
+.mc-key.is-down.mc-key-w {
+  background: rgb(var(--mc-accent) / 0.22);
+  box-shadow: inset 0 -2px 0 rgb(var(--mc-key-white-edge));
+  transform: translateY(1px);
+}
+.mc-key.is-down.mc-key-b {
+  background: rgb(var(--mc-accent));
+  border-bottom-width: 3px;
+  transform: translateY(1px);
+}
+
+.mc-key.mark-target.mc-key-w {
+  background: rgb(var(--mc-hint) / 0.3);
+}
+.mc-key.mark-target.mc-key-b {
+  background: rgb(var(--mc-hint));
+}
+.mc-key.mark-scale.mc-key-w {
+  background: rgb(var(--mc-accent) / 0.1);
+}
+.mc-key.mark-scale.mc-key-b {
+  background: rgb(var(--mc-accent) / 0.75);
+}
+.mc-key.mark-ok.mc-key-w,
+.mc-key.flash-ok.mc-key-w {
+  background: rgb(var(--mc-ok) / 0.38);
+}
+.mc-key.mark-ok.mc-key-b,
+.mc-key.flash-ok.mc-key-b {
+  background: rgb(var(--mc-ok));
+}
+.mc-key.mark-bad.mc-key-w,
+.mc-key.flash-bad.mc-key-w {
+  background: rgb(var(--mc-bad) / 0.4);
+}
+.mc-key.mark-bad.mc-key-b,
+.mc-key.flash-bad.mc-key-b {
+  background: rgb(var(--mc-bad));
+}
+
+.mc-key-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgb(108 103 94);
+  pointer-events: none;
+}
+.mc-key-b .mc-key-label {
+  color: rgb(236 232 224 / 0.85);
+  bottom: 10px;
+  font-size: 9px;
+}
+
+.mc-key-badge {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  background: rgb(var(--mc-hint));
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
+  pointer-events: none;
+}
+.mc-key-b .mc-key-badge {
+  bottom: 12px;
+  min-width: 22px;
+  height: 22px;
+  font-size: 12px;
+  background: white;
+  color: rgb(30 28 25);
+}
+.mc-key-badge.badge-accent {
+  background: rgb(var(--mc-accent));
+}
+.mc-key-badge.badge-ok {
+  background: rgb(var(--mc-ok));
+}
+.mc-key-badge.badge-ink {
+  background: rgb(30 28 25);
+}
+
+/* ---------------------------------------------------------------- Motion */
+
+@keyframes mc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.mc-fade-up {
+  animation: mc-fade-up 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes mc-pop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.mc-pop {
+  animation: mc-pop 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes mc-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--mc-accent) / 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgb(var(--mc-accent) / 0);
+  }
+}
+.mc-pulse {
+  animation: mc-pulse-ring 1.6s ease-out infinite;
+}
+
+@keyframes mc-beat {
+  0% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-fade-up,
+  .mc-pop,
+  .mc-pulse {
+    animation: none;
+  }
+  .mc-key {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------- Score */
+
+.mc-score svg {
+  display: block;
+}
+.mc-score .mc-note-ok path,
+.mc-score .mc-note-ok rect {
+  fill: rgb(var(--mc-ok)) !important;
+  stroke: rgb(var(--mc-ok)) !important;
+}
+.mc-score .mc-note-warn path,
+.mc-score .mc-note-warn rect {
+  fill: rgb(var(--mc-hint)) !important;
+  stroke: rgb(var(--mc-hint)) !important;
+}
+.mc-score .mc-note-bad path,
+.mc-score .mc-note-bad rect {
+  fill: rgb(var(--mc-bad)) !important;
+  stroke: rgb(var(--mc-bad)) !important;
+}
+.mc-score .mc-note-dim {
+  opacity: 0.28;
+}
+
+.mc-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 6px;
+  background: rgb(var(--mc-accent) / 0.13);
+  border: 1.5px solid rgb(var(--mc-accent) / 0.55);
+  pointer-events: none;
+  transition:
+    transform 110ms ease-out,
+    width 110ms ease-out,
+    height 110ms ease-out,
+    opacity 150ms;
+  will-change: transform;
+}
+
+/* Sliders */
+.mc-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(var(--mc-line));
+  outline: none;
+}
+.mc-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgb(var(--mc-surface));
+  border: 1.5px solid rgb(var(--mc-ink) / 0.5);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+}
