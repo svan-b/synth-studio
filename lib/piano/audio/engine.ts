@@ -8,6 +8,7 @@
 
 import { Emitter, clamp } from '../util/emitter';
 import { midiToFreq } from '../music/theory';
+import { CLICK_HZ } from './click';
 
 const SAMPLE_NOTES = [
   21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69, 72, 75, 78, 81, 84, 87, 90, 93, 96, 99, 102, 105,
@@ -76,6 +77,11 @@ class PianoEngine {
   }
 
   /** How long after scheduling a sound actually leaves the speaker. */
+  /** Everything the app plays, just before the speakers. Development tools tap it. */
+  get outlet(): AudioNode | null {
+    return this.master;
+  }
+
   outputLatency(): number {
     if (!this.ctx) return 0;
     const c = this.ctx as AudioContext & { outputLatency?: number };
@@ -367,7 +373,7 @@ class PianoEngine {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(accent ? 1760 : 1174.7, t);
+    osc.frequency.setValueAtTime(accent ? CLICK_HZ.accent : CLICK_HZ.beat, t);
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.exponentialRampToValueAtTime((accent ? 0.75 : 0.5) * level, t + 0.002);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);

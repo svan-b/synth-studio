@@ -23,6 +23,12 @@ export const instrument = {
     listener.suppress(t + seconds + 0.3);
   },
 
+  /** The small chime for finishing something. The listening input is told not to take it for playing. */
+  chime(): void {
+    piano.chime();
+    listener.suppress(piano.now() + 0.75);
+  },
+
   stop(): void {
     piano.allOff();
     midi.silence();

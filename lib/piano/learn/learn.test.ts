@@ -26,6 +26,7 @@ function result(patch: Partial<FlowResult> = {}): FlowResult {
     seconds: 10,
     clean: true,
     velocity: null,
+    byEar: false,
     ...patch,
   };
 }
@@ -124,6 +125,20 @@ describe('practice coach', () => {
     const out = applyResult(info, state, nextTask(info, state)!, late);
     expect(out.verdict.passed).toBe(false);
     expect(out.verdict.message).toMatch(/behind the beat/);
+  });
+
+  it('gives a pass judged by ear a little more room', () => {
+    const state = newPieceState(info, '2026-01-01');
+    state.sections[0].rung = 4;
+    const task = nextTask(info, state)!;
+    expect(task.mode).toBe('tempo');
+    // One note misheard in a short phrase: 7 of 8 matched and one stray.
+    const slip = { mode: 'tempo' as const, accuracy: 0.8125, onTime: 0.9, clean: false };
+    expect(applyResult(info, state, task, result(slip)).verdict.passed).toBe(false);
+    expect(applyResult(info, state, task, result({ ...slip, byEar: true })).verdict.passed).toBe(false);
+    const oneOff = { mode: 'tempo' as const, accuracy: 0.84, onTime: 0.9, clean: false };
+    expect(applyResult(info, state, task, result(oneOff)).verdict.passed).toBe(false);
+    expect(applyResult(info, state, task, result({ ...oneOff, byEar: true })).verdict.passed).toBe(true);
   });
 
   it('uses a shorter ladder for one hand', () => {

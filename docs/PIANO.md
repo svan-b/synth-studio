@@ -26,6 +26,12 @@ On a computer, Chrome and Edge read MIDI directly.
 
 For a Yamaha P-525: connect its USB TO HOST socket (USB C) to the iPad, or pair it over Bluetooth MIDI. With a cable the iPad's sound also plays through the piano's speakers. In Settings, **Play demonstrations on the piano** sends the app's examples to the piano over MIDI so they are heard in its own sound.
 
+### Listening
+
+Listening takes whatever sound input the iPad is using. That is its own microphone, or the piano itself when a USB cable is connected, since the P-525 also sends its sound down the cable. Settings shows which one is in use.
+
+The app's own sound reaches that input as well. Demonstrations are ignored while they play. The metronome click is pitched a quarter tone above D and A, between two keys where no string sounds, so the detector can tell a click from a key being struck and still hear a note that lands just after it. Because a microphone still mishears the odd note, a pass judged by ear is given a little more room than one judged over MIDI.
+
 Progress is stored in the browser where the app is used. Settings has **Save a backup** and **Restore from a backup** for moving between browsers or devices.
 
 ## Installing on the home screen
@@ -58,7 +64,7 @@ npm test
 
 runs the unit tests. The note detector also has an evaluation against real grand piano recordings, which are not stored in the repository. See the top of `lib/piano/dsp/tracker.eval.test.ts` for how to run it.
 
-Adding `?mcdebug=1` to the address loads development tools, including a robot pianist that plays whatever the app is waiting for.
+Adding `?mcdebug=1` to the address loads development tools, including a robot pianist that plays whatever the app is waiting for, over MIDI or as sound for the listening input.
 
 ## Credits
 

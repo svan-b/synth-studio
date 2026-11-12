@@ -1,8 +1,13 @@
 /**
  * Listening mode: hears a piano through the microphone when MIDI is not
  * available. Works in any browser, including Safari on iPad.
+ *
+ * The app's own sound reaches the microphone too. Demonstrations are ignored
+ * while they play (see `suppress`), and the detector is told what the
+ * metronome click sounds like so it can tell a click from a key being struck.
  */
 
+import { CLICK_FREQS } from '../audio/click';
 import { piano } from '../audio/engine';
 import { PitchTracker } from '../dsp/tracker';
 import { Emitter } from '../util/emitter';
@@ -17,11 +22,13 @@ export interface ListenStatus {
   tuning: number;
   /** Notes heard since listening began. */
   heard: number;
+  /** Name of the input the sound comes in through, as the device reports it. */
+  source: string;
 }
 
 class Listener {
   readonly status = new Emitter<ListenStatus>();
-  private current: ListenStatus = { state: 'idle', level: -100, error: null, tuning: 0, heard: 0 };
+  private current: ListenStatus = { state: 'idle', level: -100, error: null, tuning: 0, heard: 0, source: '' };
   private stream: MediaStream | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
   private node: AudioNode | null = null;
@@ -37,6 +44,11 @@ class Listener {
 
   get active(): boolean {
     return this.current.state === 'listening';
+  }
+
+  /** Where sound enters the detector. Development tools play straight into it. */
+  get inlet(): AudioNode | null {
+    return this.node;
   }
 
   private set(patch: Partial<ListenStatus>): void {
@@ -75,6 +87,8 @@ class Listener {
     this.tracker = new PitchTracker(ctx.sampleRate);
     this.tracker.expected = this.expected;
     this.tracker.suppressUntil = this.suppressUntil;
+    // The metronome reaches the microphone as well. Tell the detector what it sounds like.
+    this.tracker.clicks = CLICK_FREQS;
     this.source = ctx.createMediaStreamSource(this.stream);
     this.sink = ctx.createGain();
     this.sink.gain.value = 0;
@@ -104,7 +118,8 @@ class Listener {
     this.source.connect(node);
     node.connect(this.sink);
     this.node = node;
-    this.set({ state: 'listening', heard: 0 });
+    // With a piano on a USB cable this can be the piano itself rather than the microphone.
+    this.set({ state: 'listening', heard: 0, source: this.stream.getAudioTracks()[0]?.label ?? '' });
     return true;
   }
 

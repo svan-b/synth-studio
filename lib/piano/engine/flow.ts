@@ -88,6 +88,8 @@ export interface FlowResult {
   clean: boolean;
   /** Average strike strength of the right notes, 0 to 1, or null when the input cannot tell. */
   velocity: number | null;
+  /** The notes came through the microphone, which mishears the odd one. */
+  byEar: boolean;
 }
 
 /** Typical delay between an action and the app hearing about it. */
@@ -106,6 +108,8 @@ export class FlowSession {
   private transport = new Transport();
   private timers: Array<ReturnType<typeof setTimeout>> = [];
   private startedAt = 0;
+
+  private byEar = false;
 
   // wait mode
   private stepIndex = 0;
@@ -208,6 +212,7 @@ export class FlowSession {
 
   private onInput(ev: NoteInput): void {
     if (ev.type !== 'on' || this.phase !== 'playing') return;
+    if (ev.source === 'mic') this.byEar = true;
     // The top and bottom keys are buttons for the app, unless the music uses them.
     if (ev.source === 'midi' && input.remoteKeys && isRemoteKey(ev.midi) && !this.pitches.has(ev.midi) && !this.options.anyPitch) return;
     if (this.options.mode === 'wait') this.waitInput(ev);
@@ -527,6 +532,7 @@ export class FlowSession {
         seconds,
         clean: this.wrong === 0 && this.hinted === 0,
         velocity: this.velocityCount > 0 ? this.velocitySum / this.velocityCount : null,
+        byEar: this.byEar,
       };
     }
 
@@ -556,6 +562,7 @@ export class FlowSession {
       seconds,
       clean: accuracy >= 0.95 && this.missed.size === 0,
       velocity: this.velocityCount > 0 ? this.velocitySum / this.velocityCount : null,
+      byEar: this.byEar,
     };
   }
 }

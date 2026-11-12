@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PitchTracker, type Detected } from './tracker';
+import { CLICK_FREQS, CLICK_HZ } from '../audio/click';
 import { mulberry32 } from '../util/emitter';
 
 const DIR = process.env.PCM_DIR ?? '';
@@ -138,10 +139,15 @@ function resample(x: Float32Array, from: number, to: number): Float32Array {
   return out;
 }
 
+/** Sample rates to hear the metronome cases at. An iPad records at 48 kHz. */
+const RATES = [SR, 48000];
+
 const TRACE = (process.env.TRACE ?? '').split(',').filter(Boolean).map(Number);
 
 function detect(sig: Float32Array, rate: number, expectedAt?: (t: number) => number[] | null, label = ''): Detected[] {
   const tr = new PitchTracker(rate);
+  // As in the app, the detector knows what the metronome sounds like.
+  if (!process.env.NO_CLICK_GUARD) tr.clicks = CLICK_FREQS;
   if (TRACE.length === 2 && (!process.env.TRACE_LABEL || label.includes(process.env.TRACE_LABEL))) {
     tr.debug = (d) => {
       if (d.time >= TRACE[0] && d.time <= TRACE[1]) {
@@ -491,4 +497,108 @@ describe.skipIf(!DIR)('tracker on real piano recordings', () => {
     expect(got.length).toBeLessThanOrEqual(1);
     void rnd;
   });
+
+  it('is not fooled by the app counting in', () => {
+    // Before a timed run the app clicks a full measure. Nothing is being played yet.
+    let total = 0;
+    const bad: string[] = [];
+    const expectations: Array<number[] | null> = [null, [60], [62, 74], [69, 81], [57, 64], [86], [93], [74, 86], [81, 93]];
+    for (const rate of RATES) {
+      for (const bpm of [60, 90, 120, 160]) {
+        for (const level of [0.05, 0.2, 0.8]) {
+          const beat = 60 / bpm;
+          const made = new Float32Array(Math.ceil((0.5 + 9 * beat) * SR));
+          for (let k = 0; k < 8; k++) addClick(made, 0.5 + k * beat, k % 4 === 0, level);
+          const sig = rate === SR ? made : resample(made, SR, rate);
+          for (const e of expectations) {
+            const got = detect(sig, rate, e ? () => e : undefined);
+            total += got.length;
+            if (got.length) bad.push(`${rate} Hz ${bpm}bpm level ${level} expecting ${e ? e.join('+') : 'nothing'}: ${got.map((d) => `${d.midi}@${d.time.toFixed(2)}`).join(' ')}`);
+          }
+        }
+      }
+    }
+    // eslint-disable-next-line no-console
+    console.log(`count in clicks produced ${total} detections${bad.length ? '\n    ' + bad.join('\n    ') : ''}`);
+    expect(total).toBe(0);
+  });
+
+  it('hears playing through the metronome click', () => {
+    // The click comes out of the iPad next to its own microphone, so it can be
+    // louder than the piano. The learner plays near each click, never exactly on it.
+    const rows: Array<{ name: string; rate: number; recall: number; extras: number; err: number }> = [];
+    const peak = (() => {
+      const one = render([{ midi: 60, t: 0.1, dur: 0.5, layer: 8 }], 1);
+      let p = 0;
+      for (let i = 0; i < one.length; i++) p = Math.max(p, Math.abs(one[i]));
+      return p;
+    })();
+    for (const rate of RATES) {
+    for (const ratio of process.env.CLICK_RATIOS ? process.env.CLICK_RATIOS.split(',').map(Number) : [0, 0.25, 1, 4]) {
+      const tally = newTally();
+      const rnd = mulberry32(21);
+      for (const bpm of [66, 96, 132]) {
+        for (const lag of [-0.07, -0.035, 0, 0.035, 0.07]) {
+          const beat = 60 / bpm;
+          const evs: Ev[] = [];
+          const steps: Array<{ t: number; notes: number[] }> = [];
+          let m = 62;
+          const first = 0.5 + 4 * beat;
+          for (let i = 0; i < 24; i++) {
+            const step = [-4, -3, -2, -1, 1, 2, 3, 4, 5, -5][Math.floor(rnd() * 10)];
+            m = Math.min(84, Math.max(48, m + step));
+            const t = first + i * beat;
+            const notes = i % 6 === 5 ? [m - 12, m] : [m];
+            notes.forEach((n) => evs.push({ midi: n, t: t + lag + (rnd() - 0.5) * 0.02, dur: beat * 0.9, layer: [4, 8, 12][Math.floor(rnd() * 3)] }));
+            steps.push({ t, notes });
+          }
+          const made = render(evs, first + 24 * beat + 0.8);
+          if (ratio > 0) {
+            for (let k = 0; k < 28; k++) addClick(made, 0.5 + k * beat, k % 4 === 0, (ratio * peak) / 0.5);
+          }
+          const sig = rate === SR ? made : resample(made, SR, rate);
+          // The app tells the detector about this step and the next, a little ahead.
+          const expectedAt = (time: number) => {
+            let idx = -1;
+            for (let i = 0; i < steps.length; i++) if (steps[i].t - 0.35 * beat <= time) idx = i;
+            if (idx < 0) return steps[0].notes;
+            return [...steps[idx].notes, ...(steps[idx + 1]?.notes ?? [])];
+          };
+          const got = detect(sig, rate, expectedAt, `click-${rate}-${ratio}-${bpm}-${lag}`);
+          score(tally, evs, got, 0.1);
+          if (process.env.CLICK_DETAIL) {
+            const sub = newTally();
+            score(sub, evs, got, 0.1);
+            report(`  click ${ratio} bpm ${bpm} lag ${lag}`, sub);
+          }
+        }
+      }
+      report(`${rate} Hz, click at ${ratio} of piano level`, tally);
+      rows.push({ name: String(ratio), rate, recall: tally.hit / tally.truth, extras: tally.extra / tally.truth, err: tally.absErr / Math.max(1, tally.hit) });
+    }
+    }
+    for (const r of rows) {
+      // Each rate is held to its own run without a click.
+      const base = rows.find((b) => b.rate === r.rate && b.name === '0') ?? rows[0];
+      if (r === base) continue;
+      expect.soft(r.recall, `recall at ${r.rate} Hz with click at ${r.name}`).toBeGreaterThan(base.recall - 0.02);
+      expect.soft(r.extras, `extras at ${r.rate} Hz with click at ${r.name}`).toBeLessThan(base.extras + 0.03);
+      expect.soft(r.err, `timing at ${r.rate} Hz with click at ${r.name}`).toBeLessThan(0.02);
+    }
+  });
 });
+
+/** The app's own metronome click, shaped as the sound engine makes it. */
+function addClick(sig: Float32Array, at: number, accent: boolean, level: number): void {
+  const f = accent ? CLICK_HZ.accent : CLICK_HZ.beat;
+  const peak = (accent ? 0.75 : 0.5) * level;
+  const start = Math.round(at * SR);
+  const n = Math.floor(0.08 * SR);
+  for (let i = 0; i < n && start + i < sig.length; i++) {
+    const t = i / SR;
+    let g = 0.0001;
+    if (t < 0.002) g = 0.0001 * Math.pow(peak / 0.0001, t / 0.002);
+    else if (t < 0.055) g = peak * Math.pow(0.0001 / peak, (t - 0.002) / 0.053);
+    sig[start + i] += g * Math.sin(2 * Math.PI * f * t);
+  }
+}

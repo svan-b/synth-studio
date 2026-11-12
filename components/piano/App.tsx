@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { piano } from '@/lib/piano/audio/engine';
+import { instrument } from '@/lib/piano/audio/instrument';
 import { noteBus } from '@/lib/piano/input/bus';
 import { input } from '@/lib/piano/input/hub';
 import { midi } from '@/lib/piano/input/midi';
@@ -43,7 +44,7 @@ function SessionRunner({ blocks, onClose }: { blocks: Block[]; onClose: () => vo
     if (done && !marked.current) {
       marked.current = true;
       finishSession();
-      piano.chime();
+      instrument.chime();
     }
   }, [done, finishSession]);
 
@@ -128,6 +129,17 @@ export default function App() {
     events.forEach((e) => window.addEventListener(e, wake, true));
     return () => events.forEach((e) => window.removeEventListener(e, wake, true));
   }, [autoMidi, onboarded]);
+
+  // Once a piano has been connected by hand, later visits reconnect to it by
+  // themselves. Until then the browser is not asked for MIDI unprompted.
+  useEffect(
+    () =>
+      midi.status.subscribe((st) => {
+        const s = usePiano.getState();
+        if (st.state === 'connected' && st.inputs.length > 0 && !s.settings.autoMidi) s.setSettings({ autoMidi: true });
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.search.includes('mcdebug')) {

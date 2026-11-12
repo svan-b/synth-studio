@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { piano } from '@/lib/piano/audio/engine';
+import { instrument } from '@/lib/piano/audio/instrument';
 import { getPiece, pieceInfo, pieceScore } from '@/lib/piano/content/catalog';
 import type { FlowResult } from '@/lib/piano/engine/flow';
 import { applyResult, newPieceState, nextTask, pieceProgress, type PieceState, type Task, type Verdict } from '@/lib/piano/learn/coach';
@@ -78,7 +78,14 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
     return { from: task.from, to: task.to, hands: task.hands, mode: modelOnce ? ('listen' as const) : task.mode, tempoPct: task.mode === 'wait' ? 85 : task.tempoPct };
   }, [free, info, modelOnce, task]);
 
-  const score = useMemo(() => (view ? sliceScore(full, view.from, view.to) : full), [full, view]);
+  // The stand changes only when a run begins. While a verdict is on screen it
+  // still shows the music that was just played, marks and all, and the next
+  // run does not start underneath it.
+  const [stand, setStand] = useState({ run, view });
+  if (stand.run !== run) setStand({ run, view });
+  const shown = stand.run === run ? stand.view : view;
+
+  const score = useMemo(() => (shown ? sliceScore(full, shown.from, shown.to) : full), [full, shown]);
   // Early pieces are shown as a picture of their shape until reading has been taught.
   const display = piece.stage === 1 && !readsStaff(lessons) ? 'contour' : 'staff';
 
@@ -114,13 +121,14 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
       if (out.verdict.learned) {
         addCards([`piece:${pieceId}`]);
         reviewCard(`piece:${pieceId}`, 'good');
-        piano.chime();
+        instrument.chime();
         setStage('learned');
         return;
       }
-      if (out.verdict.passed) piano.chime();
+      if (out.verdict.passed) instrument.chime();
       setStage('verdict');
-      timer.current = setTimeout(proceed, out.verdict.passed ? 2600 : 4200);
+      // After a pass that fell short there is more to look at: the notes that slipped are marked.
+      timer.current = setTimeout(proceed, out.verdict.passed ? 2600 : 5500);
     },
     [addCards, info, pieceId, proceed, reviewCard, setPiece, state, task],
   );
@@ -255,19 +263,19 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
                 Continue
               </Button>
             )}
-            {view && view.to - view.from + 1 < info.measures && stage === 'play' && (
+            {shown && shown.to - shown.from + 1 < info.measures && stage === 'play' && (
               <Pill>
-                Measures {view.from + 1} to {view.to + 1}
+                Measures {shown.from + 1} to {shown.to + 1}
               </Pill>
             )}
           </div>
           <div className={`min-h-0 flex-1 transition-opacity duration-200 ${stage === 'play' ? '' : 'opacity-50'}`}>
-            {view && (
+            {shown && (
               <PlaySurface
                 score={score}
-                hands={view.hands}
-                mode={view.mode}
-                tempoPct={view.tempoPct}
+                hands={shown.hands}
+                mode={shown.mode}
+                tempoPct={shown.tempoPct}
                 display={display}
                 hints="delay"
                 runId={`${run}-${free ? 'free' : 'coach'}`}

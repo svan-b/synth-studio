@@ -139,6 +139,11 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
             Works well for single notes and simple chords at a steady pace. It cannot hear how long you hold a key or how hard you strike it, and fast
             or thick passages can be misheard. A cable or Bluetooth connection is exact.
           </p>
+          {l.source && (
+            <p className="mt-2 text-[15px] text-mc-muted">
+              Sound is coming in through <span className="font-semibold text-mc-ink">{l.source}</span>.
+            </p>
+          )}
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-mc-line">
             <div className="h-full rounded-full bg-mc-accent transition-[width] duration-100" style={{ width: `${Math.max(0, Math.min(100, (l.level + 60) * 1.8))}%` }} />
           </div>
@@ -207,6 +212,8 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
             onClick={() => {
               midi.disconnect();
               listener.stop();
+              // A deliberate choice, so the piano is not reconnected behind the learner's back.
+              setSettings({ autoMidi: false });
             }}
             className="rounded-2xl border border-mc-line bg-mc-surface p-5 text-left active:bg-mc-raised"
           >

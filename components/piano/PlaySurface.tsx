@@ -202,6 +202,7 @@ export default function PlaySurface({
 
   let status = '';
   if (mode === 'listen') status = phase === 'done' ? 'That was it' : 'Listen';
+  else if (phase === 'done') status = '';
   else if (phase === 'countin') status = 'Get ready';
   else if (mode === 'wait') status = anyKey ? 'Play each note, any key' : 'The music waits for you';
   else if (phase === 'ready') status = 'Get ready';

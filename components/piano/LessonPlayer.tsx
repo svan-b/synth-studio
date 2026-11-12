@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { piano } from '@/lib/piano/audio/engine';
+import { instrument } from '@/lib/piano/audio/instrument';
 import { getLesson, getPiece, resolveMusic } from '@/lib/piano/content/catalog';
 import type { Lesson, Step } from '@/lib/piano/content/types';
 import type { FlowResult } from '@/lib/piano/engine/flow';
@@ -175,7 +175,7 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
         setHave(total);
         if (total >= need) {
           setVerdict({ ok: true, text });
-          piano.chime();
+          instrument.chime();
           timer.current = setTimeout(onNext, 1700);
         } else {
           setVerdict({ ok: true, text: `${text} Once more to make it stick.` });
@@ -373,7 +373,7 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
           setCount(found.current.size);
           if (found.current.size >= step.count) {
             finished = true;
-            piano.chime();
+            instrument.chime();
             timer = setTimeout(onNext, 1000);
           }
         }
@@ -468,7 +468,7 @@ function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }
 function Complete({ lesson, onDone }: { lesson: Lesson; onDone: () => void }) {
   useRemote({ primary: onDone });
   useEffect(() => {
-    piano.chime();
+    instrument.chime();
   }, []);
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-8 text-center">

@@ -30,7 +30,7 @@ export interface Settings {
   latencyMs: number;
   /** Show letter names under the notes while reading is new. */
   noteNames: boolean;
-  /** Reconnect to MIDI on launch without asking again. */
+  /** Reconnect to MIDI on launch without asking again. Set once a piano has been connected by hand. */
   autoMidi: boolean;
 }
 
@@ -92,7 +92,7 @@ const defaultSettings: Settings = {
   clickVolume: 0.6,
   latencyMs: 0,
   noteNames: false,
-  autoMidi: true,
+  autoMidi: false,
 };
 
 export const usePiano = create<State>()(

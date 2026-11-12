@@ -240,8 +240,10 @@ export interface Verdict {
 
 /** Was this attempt good enough to count? */
 export function passes(task: Task, result: FlowResult): boolean {
-  if (task.mode === 'wait') return result.accuracy >= 0.9 && result.hintedSteps <= 1;
-  return result.accuracy >= 0.87 && result.onTime >= 0.6;
+  // A microphone mishears the odd note, so playing judged by ear gets a little more room.
+  const room = result.byEar ? 0.05 : 0;
+  if (task.mode === 'wait') return result.accuracy >= 0.9 - room && result.hintedSteps <= 1;
+  return result.accuracy >= 0.87 - room && result.onTime >= 0.6;
 }
 
 /** Record an attempt and return the new state with the coach's reply. */

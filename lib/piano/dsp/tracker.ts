@@ -11,6 +11,11 @@
  * When the caller says which notes the music expects, those are checked
  * first. That is far more reliable than transcribing blind, and it is the
  * normal case in lessons and pieces.
+ *
+ * The app's own metronome reaches the microphone as well, often louder than
+ * the piano. Its click is pitched between two piano keys, so it can be
+ * recognised, kept from starting an analysis of its own, and left out of
+ * the sound a struck note is judged by.
  */
 
 import { FFT, hann } from './fft';
@@ -68,6 +73,10 @@ const CONFIRM_S = 0.06;
 /** Onsets this close together are one event, such as a chord whose notes land slightly apart. */
 const GROUP_GAP_S = 0.1;
 const GROUP_MAX_S = 0.3;
+/** Share of the new sound that must sit on the click for an onset to count as a click. */
+const CLICK_SHARE = 0.65;
+/** A click spreads a little beyond the band that is blanked. This allows for the rest. */
+const CLICK_SKIRT = 1.25;
 /** Semitone distances to the 2nd through 8th harmonics. */
 const HARMONIC_STEPS = [12, 19, 24, 28, 31, 34, 36];
 const HARMONIC_NUMBER: Record<number, number> = { 12: 2, 19: 3, 24: 4, 28: 5, 31: 6, 34: 7, 36: 8 };
@@ -131,6 +140,12 @@ export class PitchTracker {
   levelDb = -100;
   /** Ignore anything struck before this time (used while the app itself plays). */
   suppressUntil = -Infinity;
+  /**
+   * Pitches of the app's own metronome click, which reaches the microphone
+   * too. Each sits between two piano keys, where no string sounds, and that
+   * is how a click is told from a strike.
+   */
+  clicks: number[] | null = null;
   /** Optional hook for tests and tuning. */
   debug: ((info: TrackerDebug) => void) | null = null;
 
@@ -154,6 +169,15 @@ export class PitchTracker {
   private readonly flux: number[] = [];
   private readonly fluxEnds: number[] = [];
   private lastOnsetIndex = -Infinity;
+  /** Recent onsets that were strikes, not clicks. */
+  private readonly strikes: number[] = [];
+  private readonly clickNow = new Float32Array(FLUX_N / 2 + 1);
+  private readonly clickWas = new Float32Array(FLUX_N / 2 + 1);
+  /** The sound just before the latest click, and where that click began. */
+  private readonly clickPre = new Float32Array(FFT_N / 2 + 1);
+  private clickPreAt = -Infinity;
+  /** Bin ranges, as start and end pairs, that hold a click in the spectrum now being read. */
+  private readonly clickBands: number[] = [];
 
   private readonly fft = new FFT(FFT_N);
   private readonly win = hann(WIN);
@@ -164,9 +188,10 @@ export class PitchTracker {
   private groupStart = -Infinity;
   private groupLast = -Infinity;
 
-  private jobs: Array<{ onset: number; due: number }> = [];
+  private jobs: Array<{ onset: number; due: number; click: boolean }> = [];
   private slow: Array<{
     onset: number;
+    click: boolean;
     time: number;
     strength: number;
     due: number;
@@ -208,16 +233,17 @@ export class PitchTracker {
 
     const out: Detected[] = [];
     while (this.count >= this.fluxEnd) {
-      const onset = this.fluxStep(this.fluxEnd);
-      if (onset !== null) {
-        this.onsetLog.push(onset);
-        this.jobs.push({ onset, due: onset + POST_OFFSET + WIN });
+      const found = this.fluxStep(this.fluxEnd);
+      if (found !== null) {
+        this.onsetLog.push(found.onset);
+        // A click waits a little longer, until it is known whether a strike followed it.
+        const wait = found.click ? Math.max(POST_OFFSET + WIN, Math.round(GROUP_GAP_S * this.rate) + 5 * FLUX_HOP) : POST_OFFSET + WIN;
+        this.jobs.push({ onset: found.onset, due: found.onset + wait, click: found.click });
       }
       this.fluxEnd += FLUX_HOP;
     }
     while (this.jobs.length > 0 && this.jobs[0].due <= this.count) {
-      const job = this.jobs.shift()!;
-      this.analyse(job.onset, out);
+      this.analyse(this.jobs.shift()!, out);
     }
     while (this.slow.length > 0 && this.slow[0].due <= this.count) {
       this.analyseSlow(this.slow.shift()!, out);
@@ -262,8 +288,8 @@ export class PitchTracker {
 
   // ----------------------------------------------------------------- onsets
 
-  /** One step of the fast onset detector. Returns an onset sample index or null. */
-  private fluxStep(end: number): number | null {
+  /** One step of the fast onset detector. Returns an onset sample index, or null. */
+  private fluxStep(end: number): { onset: number; click: boolean } | null {
     this.read(end - FLUX_N, this.fluxBuf, this.fluxWin);
     this.fluxFft.magnitudes(this.fluxBuf, this.fluxMag);
     const binHz = this.rate / FLUX_N;
@@ -300,8 +326,85 @@ export class PitchTracker {
     if (v < threshold) return null;
     const onset = this.fluxEnds[c] - Math.round(FLUX_HOP * 2.5);
     if (onset - this.lastOnsetIndex < MIN_GAP_S * this.rate) return null;
-    this.lastOnsetIndex = onset;
-    return onset;
+    // The app's own click is not a strike, so it must not hide one that follows it closely.
+    const click = this.clicks !== null && this.isClick(onset);
+    if (!click) {
+      this.lastOnsetIndex = onset;
+      this.strikes.push(onset);
+      if (this.strikes.length > 8) this.strikes.shift();
+    }
+    return { onset, click };
+  }
+
+  /** Is the sound that begins here the app's own click, and little else? */
+  private isClick(onset: number): boolean {
+    const clicks = this.clicks;
+    if (!clicks) return false;
+    // The 23 ms around the onset, against the 23 ms before them.
+    const start = onset - FLUX_HOP;
+    this.read(start, this.fluxBuf, this.fluxWin);
+    this.fluxFft.magnitudes(this.fluxBuf, this.clickNow);
+    this.read(start - FLUX_N, this.fluxBuf, this.fluxWin);
+    this.fluxFft.magnitudes(this.fluxBuf, this.clickWas);
+    const binHz = this.rate / FLUX_N;
+    const k0 = Math.max(1, Math.ceil(70 / binHz));
+    const k1 = Math.min(FLUX_N / 2 - 1, Math.floor(F_MAX / binHz));
+    const rise = this.clickNow;
+    let total = 0;
+    for (let k = k0; k <= k1; k++) {
+      const d = rise[k] - this.clickWas[k];
+      rise[k] = d > 0 ? d : 0;
+      total += rise[k] * rise[k];
+    }
+    if (total <= 0) return false;
+    for (const fc of clicks) {
+      const kc = fc / binHz;
+      const lo = Math.max(k0 + 1, Math.round(kc - 3));
+      const hi = Math.min(k1 - 1, Math.round(kc + 3));
+      let band = 0;
+      let kp = lo;
+      for (let k = lo; k <= hi; k++) {
+        band += rise[k] * rise[k];
+        if (rise[k] > rise[kp]) kp = k;
+      }
+      // Most of what is new sits at the click, and its peak is on the click's pitch.
+      if (band < CLICK_SHARE * total) continue;
+      const a = rise[kp - 1];
+      const b = rise[kp];
+      const c = rise[kp + 1];
+      const denom = a - 2 * b + c;
+      const shift = denom === 0 ? 0 : Math.max(-0.5, Math.min(0.5, (0.5 * (a - c)) / denom));
+      if (Math.abs((kp + shift) * binHz - fc) <= 14) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Find the app's click in a spectrum of new sound, so it cannot pass for
+   * part of a note or drown a soft one. The bins it covers are noted for the
+   * peak finder to pass over. Returns the energy they hold.
+   */
+  private findClicks(diff: Float32Array): number {
+    this.clickBands.length = 0;
+    const clicks = this.clicks;
+    if (!clicks) return 0;
+    const binHz = this.rate / FFT_N;
+    const reach = Math.round(45 / binHz);
+    const half = Math.round(75 / binHz);
+    let energy = 0;
+    for (const fc of clicks) {
+      const kc = Math.round(fc / binHz);
+      if (kc + half >= diff.length - 1 || kc - half < 1) continue;
+      let kp = kc;
+      for (let k = kc - reach; k <= kc + reach; k++) if (diff[k] > diff[kp]) kp = k;
+      const top = diff[kp];
+      // A lone bump right on the click's pitch. A string never sounds there.
+      if (top < 1.5e-4 || Math.abs(kp - kc) * binHz > 12) continue;
+      if (diff[kp - reach] > 0.75 * top || diff[kp + reach] > 0.75 * top) continue;
+      for (let k = kp - half; k <= kp + half; k++) energy += diff[k] * diff[k];
+      this.clickBands.push(kp - half, kp + half);
+    }
+    return energy;
   }
 
   // --------------------------------------------------------------- analysis
@@ -316,17 +419,23 @@ export class PitchTracker {
     return Math.sqrt(sumSq / WIN);
   }
 
-  private findPeaks(spec: Float32Array): Peak[] {
+  /** Peaks of a spectrum. Bins in `skip` (start and end pairs) are passed over. */
+  private findPeaks(spec: Float32Array, skip?: number[]): Peak[] {
     const binHz = this.rate / FFT_N;
     const k0 = Math.max(5, Math.floor(F_MIN / binHz));
     const k1 = Math.min(spec.length - 6, Math.ceil(F_MAX / binHz));
+    const skipped = (k: number): boolean => {
+      if (!skip) return false;
+      for (let i = 0; i < skip.length; i += 2) if (k >= skip[i] && k <= skip[i + 1]) return true;
+      return false;
+    };
     let max = 0;
-    for (let k = k0; k <= k1; k++) if (spec[k] > max) max = spec[k];
+    for (let k = k0; k <= k1; k++) if (spec[k] > max && !skipped(k)) max = spec[k];
     const floor = Math.max(max * 0.03, 1.5e-4);
     const peaks: Peak[] = [];
     for (let k = k0; k <= k1; k++) {
       const v = spec[k];
-      if (v < floor) continue;
+      if (v < floor || skipped(k)) continue;
       if (v <= spec[k - 1] || v < spec[k + 1] || v <= spec[k - 2] || v < spec[k + 2]) continue;
       // Parabolic interpolation on a log scale gives the true peak position.
       const a = Math.log(spec[k - 1] + 1e-12);
@@ -504,7 +613,8 @@ export class PitchTracker {
    * Only the notes the music asked for are decided here, so a right note is
    * confirmed quickly. Everything else waits for the second look.
    */
-  private analyse(onset: number, out: Detected[]): void {
+  private analyse(job: { onset: number; click: boolean }, out: Detected[]): void {
+    const onset = job.onset;
     const time = this.timeOfIndex(onset);
     const postStart = onset + POST_OFFSET;
     const postRms = this.spectrum(postStart, this.post);
@@ -513,12 +623,32 @@ export class PitchTracker {
     // before the event began, so a chord whose notes land a few hundredths
     // of a second apart is still compared with what came before all of it.
     const sameGroup = onset - this.groupLast < GROUP_GAP_S * this.rate && onset - this.groupStart < GROUP_MAX_S * this.rate;
-    if (!sameGroup) {
-      this.spectrum(onset - GUARD - WIN, this.groupPre);
-      this.groupStart = onset;
+    let pre = this.groupPre;
+    // A click on its own begins nothing. One that lands just after a strike
+    // is simply part of that strike's moment, and is treated like the rest of it.
+    const loneClick = job.click && !sameGroup;
+    if (loneClick) {
+      // Keep what was sounding just before it, for the strike that often
+      // follows a moment later. That strike is heard on its own terms, not from here.
+      this.spectrum(onset - GUARD - WIN, this.clickPre);
+      this.clickPreAt = onset;
+      pre = this.clickPre;
+      if (this.struckAfter(onset)) return;
+    } else {
+      if (!sameGroup) {
+        this.spectrum(onset - GUARD - WIN, this.groupPre);
+        const since = onset - this.clickPreAt;
+        if (since > 0 && since < WIN + GUARD + 0.03 * this.rate && !this.strikes.some((s) => s > this.clickPreAt && s < onset)) {
+          // The click is still in that stretch of sound. Where it is, what
+          // was there before it began is the truer picture.
+          const before = this.clickPre;
+          const g = this.groupPre;
+          for (let k = 0; k < g.length; k++) if (before[k] < g[k]) g[k] = before[k];
+        }
+        this.groupStart = onset;
+      }
+      this.groupLast = onset;
     }
-    this.groupLast = onset;
-    const pre = this.groupPre;
     if (time < this.suppressUntil || postRms < 0.0012) return;
 
     const diff = this.diff;
@@ -530,6 +660,14 @@ export class PitchTracker {
       newEnergy += diff[k] * diff[k];
       allEnergy += this.post[k] * this.post[k];
     }
+    if (this.clicks) {
+      // A click heard inside this stretch is not part of what was struck.
+      const gone = this.findClicks(diff);
+      if (gone > 0) {
+        allEnergy = Math.max(1e-12, allEnergy - gone);
+        newEnergy = Math.max(0, newEnergy - CLICK_SKIRT * gone);
+      }
+    }
     // A false alarm from the onset detector brings almost nothing new.
     const novelty = allEnergy > 0 ? newEnergy / allEnergy : 0;
     const strength = Math.max(0, Math.min(1, (20 * Math.log10(postRms + 1e-9) + 48) / 42));
@@ -540,7 +678,7 @@ export class PitchTracker {
     let crest = 0;
 
     if (expected && expected.size > 0) {
-      const peaks = this.findPeaks(diff);
+      const peaks = this.findPeaks(diff, this.clicks ? this.clickBands : undefined);
       dbgPeaks = peaks.length;
       const vals = new Float32Array(peaks.length);
       let total = 0;
@@ -617,9 +755,17 @@ export class PitchTracker {
       }
     }
 
+    if (loneClick && accepted.length > 0) {
+      // Something was struck together with the click after all.
+      this.groupPre.set(pre);
+      this.groupStart = onset;
+      this.groupLast = onset;
+    }
+
     const delay = Math.round(CONFIRM_S * this.rate);
     this.slow.push({
       onset,
+      click: loneClick,
       time,
       strength,
       due: postStart + delay + WIN,
@@ -684,6 +830,7 @@ export class PitchTracker {
   private analyseSlow(job: (typeof this.slow)[number], out: Detected[]): void {
     const { time, strength, post, pre } = job;
     if (time < this.suppressUntil) return;
+    if (job.click && this.struckAfter(job.onset)) return;
     this.spectrum(job.lateStart, this.late);
     const late = this.late;
     const diff = this.diff;
@@ -699,6 +846,7 @@ export class PitchTracker {
       }
       diff[k] = v;
     }
+    if (this.clicks) lasting = Math.max(0, lasting - this.findClicks(diff));
     const expected = this.expected;
     const isExpected = (m: number) => expected?.has(m) ?? false;
     this.recent = this.recent.filter((r) => time - r.time < 0.3);
@@ -714,7 +862,7 @@ export class PitchTracker {
     // A note keeps most of its energy for a while. A knock, a cough or a
     // dropped pencil is gone almost at once.
     const persists = job.newEnergy > 0 && lasting / job.newEnergy >= 0.12;
-    const peaks = this.findPeaks(diff);
+    const peaks = this.findPeaks(diff, this.clicks ? this.clickBands : undefined);
     const prePeaks = this.findPeaks(pre);
     const preVals = new Float32Array(prePeaks.length);
     let preLoud = 0;
@@ -765,8 +913,9 @@ export class PitchTracker {
             !isExpected(midi) &&
             (accepted.some((a) => related(a.midi) && s.score < 0.75 * a.score) ||
               this.recent.some((r) => r.time !== time && related(r.midi) && s.score < 0.75 * r.score) ||
-              // A held note that is struck again brightens, which reads as its octave.
-              HARMONIC_STEPS.slice(0, 3).some((step) => wasRinging(midi - step, s.maxA)));
+              // A held note that is struck again brightens, which reads as a note
+              // on one of its harmonics: the octave, the twelfth, or higher still.
+              HARMONIC_STEPS.some((step) => wasRinging(midi - step, s.maxA)));
           this.damp(s.matched, vals);
           if (phantom) continue;
           accepted.push({ midi, score: s.score, f1: s.f1 });
@@ -812,6 +961,12 @@ export class PitchTracker {
         .map((p) => `${p.f.toFixed(0)}:${(20 * Math.log10(p.a)).toFixed(0)}`)
         .join(' '),
     });
+  }
+
+  /** Did a strike follow this onset closely enough to be the same moment? */
+  private struckAfter(onset: number): boolean {
+    const span = GROUP_GAP_S * this.rate;
+    return this.strikes.some((s) => s > onset && s - onset < span);
   }
 
   private emit(midi: number, time: number, strength: number, score: number, assisted: boolean, out: Detected[]): void {

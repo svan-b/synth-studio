@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { piano } from '@/lib/piano/audio/engine';
+import { instrument } from '@/lib/piano/audio/instrument';
 import type { FlowResult } from '@/lib/piano/engine/flow';
 import { noteBus } from '@/lib/piano/input/bus';
 import { input, isRemoteKey } from '@/lib/piano/input/hub';
@@ -38,7 +39,7 @@ function Shell({ title, progress, onClose, children }: { title: string; progress
 function Summary({ title, lines, onDone }: { title: string; lines: string[]; onDone: () => void }) {
   useRemote({ primary: onDone });
   useEffect(() => {
-    piano.chime();
+    instrument.chime();
   }, []);
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-8 text-center">
