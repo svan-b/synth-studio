@@ -97,6 +97,10 @@ class PianoEngine {
       this.ctx = new Ctor({ latencyHint: 'interactive' });
       this.buildGraph();
       this.ctx.onstatechange = () => this.setStatus({ running: this.isRunning() });
+    } else if (this.isRunning()) {
+      // Already awake. Nothing to do but make sure the samples are on their way.
+      void this.load();
+      return;
     }
     this.setSessionType('playback');
     if (this.ctx.state !== 'running') {

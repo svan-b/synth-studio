@@ -342,13 +342,13 @@ export const PIECES: Piece[] = [
     time: [3, 4],
     tempo: 72,
     rh: 'rh. | rh. | rh. | rh. | rq F#5q:3 A5q:5 | G5q:4 F#5q:3 C#5q:1 | B4q:1 C#5q:2 D5q:3 | A4h.:1 | F#4h.:1~ | F#4h.~ | F#4h.~ | F#4h.',
-    lh: 'G2q:5 B3+D4+F#4h:421 | D2q:5 A3+C#4+F#4h:421 | G2q B3+D4+F#4h | D2q A3+C#4+F#4h | G2q B3+D4+F#4h | D2q A3+C#4+F#4h | G2q B3+D4+F#4h | D2q A3+C#4+F#4h | G2q B3+D4+F#4h | D2q A3+C#4+F#4h | G2q B3+D4+F#4h | D2q A3+C#4+F#4h',
+    lh: 'G2q:5 B3+D4+F#4h:421 | D2q:5 A3+C#4+F#4h:421 | G2q B3+D4+F#4h | D2q A3+C#4+F#4h | G2q B3+D4+F#4h | D2q A3+C#4+F#4h | G2q B3+D4+F#4h | D2q A3+C#4+F#4h | G2q:5 B3+D4h:42 | D2q:5 A3+C#4h:42 | G2q B3+D4h | D2q A3+C#4h',
     chords: 'Gmaj7 | Dmaj7 | Gmaj7 | Dmaj7 | Gmaj7 | Dmaj7 | Gmaj7 | Dmaj7 | Gmaj7 | Dmaj7 | Gmaj7 | Dmaj7',
     sections: [
       [1, 4],
       [5, 8],
       [9, 12],
     ],
-    note: 'Slow, quiet and unhurried. The left hand leaps from a low note to a chord, so learn that leap until you can do it without looking.',
+    note: 'Slow, quiet and unhurried. The left hand leaps from a low note to a chord, so learn that leap until you can do it without looking. In the last four measures the right hand holds the F sharp that tops each chord.',
   },
 ];

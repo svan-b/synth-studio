@@ -111,19 +111,22 @@ export default function App() {
   const [activity, setActivity] = useState<Activity | null>(null);
   useApplySettings();
 
-  // Sound can only start from a tap, so the first touch anywhere unlocks it
-  // and, where the browser has MIDI, reconnects the piano.
+  // Browsers only let sound start in answer to a deliberate action. On a
+  // touch screen that means lifting the finger, not putting it down. So every
+  // tap, click and key press wakes the sound if it is asleep, and the first
+  // one also reconnects the piano where the browser has MIDI.
   useEffect(() => {
-    let done = false;
-    const unlock = () => {
-      if (done) return;
-      done = true;
+    let reconnected = false;
+    const wake = () => {
       void piano.unlock();
-      if (autoMidi && onboarded && midi.getStatus().webMidi && midi.getStatus().state === 'idle') void midi.connect();
-      window.removeEventListener('pointerdown', unlock, true);
+      if (!reconnected) {
+        reconnected = true;
+        if (autoMidi && onboarded && midi.getStatus().webMidi && midi.getStatus().state === 'idle') void midi.connect();
+      }
     };
-    window.addEventListener('pointerdown', unlock, true);
-    return () => window.removeEventListener('pointerdown', unlock, true);
+    const events = ['pointerup', 'touchend', 'click', 'keydown'] as const;
+    events.forEach((e) => window.addEventListener(e, wake, true));
+    return () => events.forEach((e) => window.removeEventListener(e, wake, true));
   }, [autoMidi, onboarded]);
 
   useEffect(() => {

@@ -474,6 +474,17 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
   const [paste, setPaste] = useState('');
   const [backupNote, setBackupNote] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyBackup = async () => {
+    try {
+      await navigator.clipboard.writeText(exportData());
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   const download = () => {
     const blob = new Blob([exportData()], { type: 'application/json' });
@@ -574,7 +585,13 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
           Progress is kept in this browser on this device. Save a backup now and then, and use it to move to another browser or device.
         </p>
         <div className="mt-3 flex flex-wrap gap-3">
-          <Button variant="soft" onClick={download}>
+          <Button
+            variant="soft"
+            onClick={() => {
+              setCopied(false);
+              setSaving(true);
+            }}
+          >
             Save a backup
           </Button>
           <Button variant="soft" onClick={() => setBackup(true)}>
@@ -617,6 +634,27 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
               setSettings({ latencyMs: Math.round(next) });
               setTimingNote(`Done. Timing is now adjusted by ${Math.round(next)} milliseconds.`);
             }}
+          />
+        )}
+      </Sheet>
+
+      <Sheet open={saving} onClose={() => setSaving(false)} title="Save a backup">
+        <p className="mb-4 text-mc-muted">
+          Save your progress as a file, or copy it and paste it somewhere safe such as a note. Either can be restored later, here or in another
+          browser.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={download}>Save as a file</Button>
+          <Button variant="soft" onClick={() => void copyBackup()}>
+            {copied ? 'Copied' : 'Copy to the clipboard'}
+          </Button>
+        </div>
+        {saving && (
+          <textarea
+            readOnly
+            className="mc-selectable mt-4 h-32 w-full rounded-2xl border border-mc-line bg-mc-bg p-3 font-mono text-xs text-mc-muted"
+            value={exportData()}
+            onFocus={(e) => e.currentTarget.select()}
           />
         )}
       </Sheet>
