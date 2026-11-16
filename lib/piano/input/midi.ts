@@ -337,12 +337,46 @@ class MidiManager {
 
   // ------------------------------------------------------------- incoming
 
-  /** Raw bytes from a Web MIDI port. One event may carry one message. */
+  /**
+   * Raw bytes from a Web MIDI port. The standard promises one message per
+   * event, but browsers that add MIDI on an iPad can hand over a whole
+   * packet: several messages at once, as when a chord is struck, sometimes
+   * with the status byte left out of all but the first. Every one is read.
+   */
   handleBytes(data: Uint8Array, timeStamp: number, port: string): void {
-    if (data.length === 0) return;
-    const status = data[0];
-    if (status >= 0xf0) return; // system messages: clock, active sensing, sysex
-    this.handleMessage(status, data[1] ?? 0, data[2] ?? 0, timeStamp, port);
+    let status = 0;
+    let i = 0;
+    while (i < data.length) {
+      const b = data[i];
+      if (b >= 0xf8) {
+        i++; // clock and active sensing, which may fall anywhere
+        continue;
+      }
+      if (b >= 0xf0) {
+        status = 0;
+        if (b === 0xf0) {
+          while (i < data.length && data[i] !== 0xf7) i++;
+          i++;
+        } else {
+          i += b === 0xf2 ? 3 : b === 0xf1 || b === 0xf3 ? 2 : 1;
+        }
+        continue;
+      }
+      if (b & 0x80) {
+        status = b;
+        i++;
+      }
+      if (status === 0) {
+        i++; // a data byte with nothing to belong to
+        continue;
+      }
+      const type = status & 0xf0;
+      const need = type === 0xc0 || type === 0xd0 ? 1 : 2;
+      if (i + need > data.length) break;
+      if (data[i] & 0x80 || (need === 2 && data[i + 1] & 0x80)) continue; // cut short by a new status
+      this.handleMessage(status, data[i], need === 2 ? data[i + 1] : 0, timeStamp, port);
+      i += need;
+    }
   }
 
   private handleMessage(status: number, d1: number, d2: number, timeStamp: number, port: string): void {

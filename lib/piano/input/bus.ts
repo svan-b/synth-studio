@@ -28,8 +28,14 @@ noteBus.subscribe((ev) => {
   else heldNotes.delete(ev.midi);
 });
 
+/** The last few keys struck, so a run can pick up notes played a moment before it began. */
+export const recentNotes: NoteInput[] = [];
+
 export function emitNoteOn(midi: number, velocity: number, time: number, source: NoteSource): void {
-  noteBus.emit({ type: 'on', midi, velocity, time, source });
+  const ev: NoteInput = { type: 'on', midi, velocity, time, source };
+  recentNotes.push(ev);
+  if (recentNotes.length > 24) recentNotes.shift();
+  noteBus.emit(ev);
 }
 
 export function emitNoteOff(midi: number, time: number, source: NoteSource): void {

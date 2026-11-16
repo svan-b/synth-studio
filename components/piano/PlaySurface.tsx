@@ -34,6 +34,8 @@ export interface PlaySurfaceProps {
   onDone: (result: FlowResult | null) => void;
   /** What to write on the bars of the contour view. */
   contourLabel?: 'finger' | 'letter' | 'none';
+  /** Seconds of playing just before the run began to take in. For playing back what was just heard. */
+  catchUp?: number;
 }
 
 type Phase = 'ready' | 'countin' | 'playing' | 'done';
@@ -51,6 +53,7 @@ export default function PlaySurface({
   runId,
   onDone,
   contourLabel = 'finger',
+  catchUp,
 }: PlaySurfaceProps) {
   const inputMode = useInputMode();
   const settings = usePiano((s) => s.settings);
@@ -147,6 +150,8 @@ export default function PlaySurface({
         // Fill in the other hand when the app can play without being overheard.
         accompany: active.length < score.hands.length && inputMode !== 'listen',
         anyPitch: anyKey,
+        // The run is armed a moment after it appears. A note struck in that moment still counts.
+        catchUp: catchUp ?? 0.4,
         latency: { midi: 0.008 + extra, touch: 0.045 + extra, mic: 0.07 + extra, keys: 0.02 + extra },
       });
       const s = session;
@@ -182,7 +187,7 @@ export default function PlaySurface({
           doneRef.current(ev.result);
         }
       });
-      later(mode === 'tempo' ? 900 : 300, () => s.start());
+      later(mode === 'tempo' ? 900 : 150, () => s.start());
     }
 
     return () => {

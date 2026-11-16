@@ -294,7 +294,7 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
         timer.current = setTimeout(() => {
           setPhase('play');
           setRun((r) => r + 1);
-        }, 350);
+        }, 120);
         return;
       }
       if (!result) return;
@@ -342,6 +342,7 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
           mode={phase === 'listen' ? 'listen' : 'wait'}
           display="hidden"
           hints="never"
+          catchUp={2.2}
           runId={`${index}-${run}`}
           onDone={onDone}
         />

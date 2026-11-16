@@ -12,7 +12,7 @@
 
 import { piano } from '../audio/engine';
 import { Transport, clickEvents, scoreEvents, type TimedEvent } from '../audio/transport';
-import { noteBus, type NoteInput, type NoteSource } from '../input/bus';
+import { noteBus, recentNotes, type NoteInput, type NoteSource } from '../input/bus';
 import { input, isRemoteKey } from '../input/hub';
 import type { NoteEvent, Score, Step } from '../music/score';
 import { stepsFor } from '../music/score';
@@ -41,6 +41,12 @@ export interface FlowOptions {
   latency?: Partial<Record<NoteSource, number>>;
   /** Judge timing only and accept any key. Used for rhythm work. */
   anyPitch?: boolean;
+  /**
+   * Wait mode: seconds to look back when the run begins. A learner who starts
+   * a moment early, while the app is still getting ready, is not made to play
+   * it all again.
+   */
+  catchUp?: number;
 }
 
 export type FlowEvent =
@@ -150,6 +156,7 @@ export class FlowSession {
       accompany: opts.accompany ?? false,
       metronome: opts.metronome ?? true,
       anyPitch: opts.anyPitch ?? false,
+      catchUp: opts.catchUp ?? 0,
       latency: { ...DEFAULT_LATENCY, ...(opts.latency ?? {}) },
     };
     this.steps = stepsFor(score, this.options.hands);
@@ -237,6 +244,19 @@ export class FlowSession {
     this.setPhase('playing');
     this.stepIndex = 0;
     this.activateStep();
+    this.catchUp();
+  }
+
+  /** Take in what was played just before the run began, from the first right note on. */
+  private catchUp(): void {
+    const since = piano.now() - this.options.catchUp;
+    if (this.options.catchUp <= 0) return;
+    // A microphone also hears the app's own demonstration, so it is left out.
+    const early = recentNotes.filter((ev) => ev.time >= since && ev.source !== 'mic');
+    const first = this.steps[0].notes;
+    const from = early.findIndex((ev) => this.options.anyPitch || first.some((n) => n.midi === ev.midi));
+    if (from < 0) return;
+    for (const ev of early.slice(from)) this.onInput(ev);
   }
 
   private activateStep(): void {

@@ -281,7 +281,7 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
         timer.current = setTimeout(() => {
           setPhase('play');
           setRun((r) => r + 1);
-        }, 350);
+        }, 120);
         return;
       }
       if (!result) return;
@@ -380,6 +380,7 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
               mode={phase === 'listen' ? 'listen' : kind === 'ear' ? 'wait' : 'tempo'}
               display={kind === 'ear' ? 'hidden' : 'staff'}
               hints="never"
+              catchUp={kind === 'ear' ? 2.2 : undefined}
               anyKey={kind === 'rhythm'}
               runId={`${index}-${run}`}
               onDone={onDone}

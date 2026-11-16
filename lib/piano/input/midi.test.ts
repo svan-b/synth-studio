@@ -130,3 +130,33 @@ describe('MIDI messages from a piano', () => {
     expect(notes.filter((n) => n.type === 'off').map((n) => n.midi).sort()).toEqual([60, 67]);
   });
 });
+
+describe('MIDI packets that carry more than one message', () => {
+  const heard: NoteInput[] = [];
+  let off: () => void;
+  beforeEach(() => {
+    heard.length = 0;
+    off = noteBus.subscribe((e) => heard.push(e));
+  });
+  afterEach(() => {
+    midi.handleBytes(new Uint8Array([0xb0, 123, 0]), 0, 'test');
+    off();
+  });
+
+  it('hears every note of a chord sent as one packet', () => {
+    midi.handleBytes(new Uint8Array([0x90, 60, 80, 0x90, 64, 80, 0x90, 67, 80]), 0, 'test');
+    expect(heard.filter((e) => e.type === 'on').map((e) => e.midi)).toEqual([60, 64, 67]);
+  });
+
+  it('follows running status and steps over clock bytes', () => {
+    midi.handleBytes(new Uint8Array([0x90, 60, 80, 0xf8, 64, 80, 0xfe, 67, 80]), 0, 'test');
+    expect(heard.filter((e) => e.type === 'on').map((e) => e.midi)).toEqual([60, 64, 67]);
+    midi.handleBytes(new Uint8Array([0x80, 60, 0, 64, 0, 0x90, 67, 0]), 0, 'test');
+    expect(heard.filter((e) => e.type === 'off').map((e) => e.midi)).toEqual([60, 64, 67]);
+  });
+
+  it('reads a note that follows a pedal or a system message', () => {
+    midi.handleBytes(new Uint8Array([0xb0, 64, 127, 0x90, 62, 70, 0xf0, 1, 2, 3, 0xf7, 0x90, 65, 70]), 0, 'test');
+    expect(heard.filter((e) => e.type === 'on').map((e) => e.midi)).toEqual([62, 65]);
+  });
+});

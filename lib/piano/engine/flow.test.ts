@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FlowSession, troubleSpots, type FlowEvent, type FlowResult } from './flow';
-import { emitNoteOn } from '../input/bus';
+import { emitNoteOn, recentNotes } from '../input/bus';
 import { parseScore, sliceScore } from '../music/score';
 import { piano } from '../audio/engine';
 
@@ -19,6 +19,7 @@ const press = (midi: number, source: 'touch' | 'mic' = 'touch') => emitNoteOn(mi
 
 describe('flow, wait mode', () => {
   beforeEach(() => {
+    recentNotes.length = 0;
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance', 'Date'] });
   });
   afterEach(() => {
@@ -39,6 +40,39 @@ describe('flow, wait mode', () => {
     expect(result()!.accuracy).toBe(1);
     expect(events.filter((e) => e.type === 'step').map((e) => (e as { index: number }).index)).toEqual([0, 1, 2]);
     expect(s.phase).toBe('done');
+  });
+
+  it('takes in notes played a moment before the run began', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h' });
+    press(67); // something older, not part of this
+    vi.advanceTimersByTime(3000);
+    press(64);
+    vi.advanceTimersByTime(300);
+    press(62);
+    vi.advanceTimersByTime(300);
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity, catchUp: 2 });
+    const { result } = run(s);
+    expect(result()).toBeNull();
+    press(60);
+    expect(result()!.clean).toBe(true);
+  });
+
+  it('does not take in early notes heard by the microphone, or any without being asked', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h' });
+    press(64, 'mic');
+    const a = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity, catchUp: 2 });
+    const first = run(a);
+    press(62);
+    expect(first.result()).toBeNull();
+    expect(a.phase).toBe('playing');
+    a.stop();
+    press(64);
+    const b = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity });
+    run(b);
+    press(62);
+    press(60);
+    expect(b.phase).toBe('playing');
+    b.stop();
   });
 
   it('counts wrong notes, marks rescued notes, and shows a hint after two misses', () => {
