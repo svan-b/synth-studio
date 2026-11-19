@@ -339,7 +339,7 @@ export const STAGE5: Lesson[] = [
       {
         kind: 'say',
         title: 'Yours to use',
-        text: 'This is a pattern to keep. Any progression you know can be played this way, in any key, and with the pedal it fills a room.\n\nWhen Rolling Chords is easy, open the plan and options, choose your own practice, and try the ripple in a different order: top, middle, bottom, middle.',
+        text: 'This is a pattern to keep. Any progression you know can be played this way, in any key, and with the pedal it fills a room.\n\nWhen Rolling Chords is easy, take the ripple away from the page. Play it over any progression you know, and try it in another order, such as top, middle, bottom, middle. Nothing is checking you there, so let your ear be the judge.',
       },
       {
         kind: 'quiz',

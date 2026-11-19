@@ -68,11 +68,12 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   const cards = usePiano((s) => s.cards);
   const days = usePiano((s) => s.days);
   const sessionDoneOn = usePiano((s) => s.sessionDoneOn);
+  const drills = usePiano((s) => s.drills);
   const today = dayKey();
   const doneToday = sessionDoneOn === today;
   const plan = useMemo(
-    () => planSession({ minutes: profile.minutes, lessons, pieces, cards, days, again: doneToday }),
-    [profile.minutes, lessons, pieces, cards, days, doneToday],
+    () => planSession({ minutes: profile.minutes, lessons, pieces, cards, days, drills, again: doneToday }),
+    [profile.minutes, lessons, pieces, cards, days, drills, doneToday],
   );
   const minutesToday = Math.round((days[today]?.seconds ?? 0) / 60);
   const run = streak(days);

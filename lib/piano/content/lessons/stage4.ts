@@ -266,7 +266,7 @@ export const STAGE4: Lesson[] = [
       {
         kind: 'say',
         title: 'Yours to arrange',
-        text: 'Amazing Grace joins your practice with the left hand playing roots. Once that is easy, open Options, choose your own practice, and try broken chords under the tune.\n\nThat is arranging, and there is no single right answer.',
+        text: 'Amazing Grace joins your practice with the left hand playing roots. Once that is easy, play it away from the page with broken chords under the tune. Nothing is checking you there, so let your ear be the judge.\n\nThat is arranging, and there is no single right answer.',
       },
     ],
   },

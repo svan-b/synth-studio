@@ -309,6 +309,15 @@ describe('practice coach', () => {
       expect([next.mode, next.hands.join('')]).toEqual(['wait', 'RL']);
     });
 
+    it('forgives a hand that started a key out of place', () => {
+      const state = newPieceState(info, '2026-01-01');
+      // Two wrong keys on the first note, the key is shown, and from there it is right.
+      const stats = measures({ 0: { errors: 2, hints: 1 } });
+      const out = applyResult(info, state, nextTask(info, state)!, result({ perMeasure: stats, clean: false, accuracy: 0.97, wrongNotes: 2, hintedSteps: 1, pace: 0.7 }));
+      expect(out.state.sections.map((s) => s.rung)).toEqual([3, 6]);
+      expect(out.verdict.message).toMatch(/Phrase 2 is in your fingers/);
+    });
+
     it('starts a piece that is new from its beginning, without calling it a failure', () => {
       const state = newPieceState(info, '2026-01-01');
       const stats = measures({ 0: { hints: 2, played: 2 } }, 0);
@@ -726,6 +735,19 @@ describe('daily plan', () => {
         }
       }
     }
+  });
+
+  it('sets the exercise that has been left the longest', () => {
+    const now = new Date('2026-03-10T09:00:00');
+    const lessons = doneUpTo(12);
+    const drillOf = (drills?: Record<string, { lastOn?: string }>) =>
+      planSession({ minutes: 20, lessons, pieces: {}, cards: {}, drills, now }).find((b) => b.kind === 'drill' && b.id !== 'reading')?.id;
+    // Ear and rhythm were practised lately. Sight reading never, so it comes first.
+    expect(drillOf({ ear: { lastOn: '2026-03-09' }, rhythm: { lastOn: '2026-03-08' } })).toBe('sight');
+    expect(drillOf({ ear: { lastOn: '2026-03-09' }, rhythm: { lastOn: '2026-03-03' }, sight: { lastOn: '2026-03-08' } })).toBe('rhythm');
+    // With nothing known, they take turns by the day.
+    const days = [0, 1, 2].map((d) => planSession({ minutes: 20, lessons, pieces: {}, cards: {}, now: new Date(now.getTime() + d * 86400000) }).find((b) => b.kind === 'drill')?.id);
+    expect(new Set(days).size).toBe(3);
   });
 
   it('ends on a piece the learner already plays well, when there is one', () => {

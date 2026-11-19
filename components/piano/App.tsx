@@ -68,7 +68,7 @@ function recap(before: ReturnType<typeof usePiano.getState>, parts: Block[]): Ar
 /** What tomorrow's session opens with, to give the next visit something to come back to. */
 function tomorrow(): string | null {
   const s = usePiano.getState();
-  const plan = planSession({ minutes: s.profile.minutes, lessons: s.lessons, pieces: s.pieces, cards: s.cards, days: s.days, now: new Date(Date.now() + 86400000) });
+  const plan = planSession({ minutes: s.profile.minutes, lessons: s.lessons, pieces: s.pieces, cards: s.cards, days: s.days, drills: s.drills, now: new Date(Date.now() + 86400000) });
   const first = plan.find((b) => b.kind === 'lesson') ?? plan.find((b) => b.kind === 'piece') ?? plan[0];
   if (!first) return null;
   return first.kind === 'lesson' ? `Tomorrow brings a new lesson, ${first.title}.` : first.kind === 'piece' ? `Tomorrow carries on with ${first.title}.` : null;

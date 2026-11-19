@@ -455,9 +455,10 @@ function placeFromTrial(info: PieceInfo, state: PieceState, result: FlowResult):
     const errors = stats.reduce((a, m) => a + m.errors, 0);
     const hints = stats.reduce((a, m) => a + (m.hints ?? 0), 0);
     const pauses = stats.reduce((a, m) => a + m.hesitations, 0);
-    if (!reached || hints > 0) return 'new' as const;
-    if (errors === 0 && pauses <= 1) return 'known' as const;
-    return errors <= 2 && pauses <= 2 ? ('nearly' as const) : ('new' as const);
+    if (!reached) return 'new' as const;
+    if (errors === 0 && hints === 0 && pauses <= 1) return 'known' as const;
+    // A slip or two, or one key that had to be shown, as when the hand started a key out of place.
+    return errors <= 2 && hints <= 1 && pauses <= 2 ? ('nearly' as const) : ('new' as const);
   });
 
   levels.forEach((level, i) => {

@@ -24,6 +24,8 @@ export interface PlanInput {
   cards: Record<string, StoredCard>;
   /** Days on which something was practised, by date. Only the dates are read. */
   days?: Record<string, unknown>;
+  /** When each exercise was last practised, so the one left longest comes next. */
+  drills?: Record<string, { lastOn?: string } | undefined>;
   /** The day's session is already done. This is extra practice, with nothing new in it. */
   again?: boolean;
   now?: Date;
@@ -188,10 +190,15 @@ export function planSession(input: PlanInput): Block[] {
 
   // A different skill for contrast, turning through the kinds day by day.
   // Only kinds a lesson has prepared: an exercise never comes before what it exercises.
-  const kinds = openDrills(input.lessons);
+  const open = openDrills(input.lessons);
   const dayIndex = Math.floor(new Date(today + 'T12:00:00').getTime() / 86400000);
+  // They take turns by the day. Where it is known when each was last practised,
+  // the one left longest comes first, and one never tried comes before any.
+  const turn = open.map((_, i) => open[(dayIndex + i) % Math.max(1, open.length)]);
+  const last = (kind: DrillKind) => input.drills?.[kind]?.lastOn ?? '';
+  const kinds = input.drills ? turn.slice().sort((a, b) => last(a).localeCompare(last(b))) : turn;
   const drillOf = (kind: DrillKind): Block => ({ kind: 'drill', id: kind, minutes: 3, title: DRILL_LABEL[kind][0], detail: DRILL_LABEL[kind][1] });
-  const drill = kinds.length > 0 ? drillOf(kinds[dayIndex % kinds.length]) : null;
+  const drill = kinds.length > 0 ? drillOf(kinds[0]) : null;
 
   // Something already learned to finish with, when nothing learned is otherwise in the plan.
   const endId = review ? null : pieceToEndOn(input.pieces, today);
@@ -235,7 +242,7 @@ export function planSession(input: PlanInput): Block[] {
     main.minutes += more;
     spare -= more;
   }
-  const other = kinds.length > 1 ? kinds[(dayIndex + 1) % kinds.length] : null;
+  const other = kinds.length > 1 ? kinds[1] : null;
   if (spare >= 3 && drill && other && other !== drill.id && blocks.includes(drill)) {
     // Before the closing piece, so the session still ends on something that goes well.
     const at = ending && blocks.includes(ending) ? blocks.indexOf(ending) : blocks.length;

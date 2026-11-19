@@ -69,6 +69,8 @@ export interface DrillState {
   /** Recent results, newest last: 1 right, 0 wrong. */
   recent: number[];
   best?: number;
+  /** The day it was last practised. */
+  lastOn?: string;
 }
 
 interface State {
@@ -219,7 +221,7 @@ export const usePiano = create<State>()(
         set((s) => {
           const prev = s.drills[id] ?? { level: 1, recent: [] };
           const recent = [...prev.recent, correct ? 1 : 0].slice(-20);
-          return { drills: { ...s.drills, [id]: { ...prev, level: level ?? prev.level, recent } } };
+          return { drills: { ...s.drills, [id]: { ...prev, level: level ?? prev.level, recent, lastOn: dayKey() } } };
         }),
       setDrillLevel: (id, level) =>
         set((s) => ({ drills: { ...s.drills, [id]: { ...(s.drills[id] ?? { recent: [] }), level, recent: [] } } })),
