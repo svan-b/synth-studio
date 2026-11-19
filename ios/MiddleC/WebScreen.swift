@@ -1,17 +1,8 @@
 import CoreAudioKit
-import SwiftUI
 import UIKit
 import WebKit
 
-/// The web app, filling the screen.
-struct WebScreen: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> WebViewController {
-        WebViewController()
-    }
-
-    func updateUIViewController(_ controller: WebViewController, context: Context) {}
-}
-
+/// The web app, filling the screen, and everything that passes between it and the iPad.
 final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     private var webView: WKWebView!
     private let files = AppFiles()
@@ -199,7 +190,11 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     // MARK: - Web view housekeeping
 
-    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor action: WKNavigationAction,
+        decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+    ) {
         guard let url = action.request.url, let scheme = url.scheme?.lowercased() else {
             decisionHandler(.cancel)
             return
@@ -247,7 +242,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         requestMediaCapturePermissionFor origin: WKSecurityOrigin,
         initiatedByFrame frame: WKFrameInfo,
         type: WKMediaCaptureType,
-        decisionHandler: @escaping (WKPermissionDecision) -> Void
+        decisionHandler: @escaping @MainActor @Sendable (WKPermissionDecision) -> Void
     ) {
         decisionHandler(.grant)
     }

@@ -7,6 +7,7 @@ import WebKit
 /// It opens the web app, waits for it to come up, plays two notes on a
 /// pretend piano, and prints what it found. Lines begin with SELFTEST so a
 /// script can pick them out. The app then closes.
+@MainActor
 final class SelfTest {
     static var wanted: Bool { UserDefaults.standard.bool(forKey: "MCSelfTest") }
 
@@ -23,7 +24,7 @@ final class SelfTest {
         self.progress = progress
         say("START")
         // Whatever happens, do not hang.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 75) { [weak self] in
+        later(75) { [weak self] in
             self?.finish(note: "timed out")
         }
     }
@@ -65,19 +66,19 @@ final class SelfTest {
             webView?.evaluateJavaScript("__middleC.midi.ports([{ id: 'in:test', name: 'Test Piano', kind: 'input' }]);", completionHandler: nil)
         }
         // Give the page a moment to see the new instrument.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+        later(1.5) { [weak self] in
             guard let self = self else { return }
             self.say("PORTS \(self.piano.ports.map { "\($0.kind) \($0.name)" }.joined(separator: ", "))")
             let notes: [UInt8] = [60, 64]
             for (index, note) in notes.enumerated() {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 * Double(index)) {
+                self.later(0.3 * Double(index)) {
                     if made {
                         self.piano.playTestPiano(note: note, velocity: 90)
                     } else {
                         self.piano.inject(id: "in:test", bytes: [0x90, note, 90])
                     }
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3 * Double(index) + 0.15) {
+                self.later(0.3 * Double(index) + 0.15) {
                     if made {
                         self.piano.playTestPiano(note: note, velocity: 0)
                     } else {
@@ -85,7 +86,7 @@ final class SelfTest {
                     }
                 }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            self.later(1.6) {
                 self.webView?.evaluateJavaScript(Self.midiCheck(pretend: made), completionHandler: nil)
             }
         }
@@ -107,8 +108,17 @@ final class SelfTest {
         if !progress.has("middle-c-v1") { problems.append("progress did not reach the app's file") }
         say("SAVED \(progress.has("middle-c-v1") ? "progress file written" : "no progress file")")
         say(problems.isEmpty ? "RESULT PASS" : "RESULT FAIL: \(problems.joined(separator: "; "))")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            exit(problems.isEmpty ? 0 : 1)
+        let code: Int32 = problems.isEmpty ? 0 : 1
+        later(0.5) {
+            exit(code)
+        }
+    }
+
+    /// Do something on the main thread a little later.
+    private func later(_ seconds: Double, _ work: @escaping @MainActor () -> Void) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            work()
         }
     }
 

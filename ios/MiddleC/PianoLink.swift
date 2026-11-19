@@ -86,15 +86,50 @@ final class PianoLink {
 
     /// Send a short message to an instrument, now or a little in the future.
     func send(to id: String, bytes: [UInt8], delayMs: Double) {
-        guard let destination = destinations[id], !bytes.isEmpty, bytes.count <= 64 else { return }
-        var list = MIDIPacketList()
-        let first = MIDIPacketListInit(&list)
+        guard let destination = destinations[id] else { return }
+        let words = Self.words(from: bytes)
+        guard !words.isEmpty, words.count <= 32 else { return }
         var when: MIDITimeStamp = 0
         if delayMs > 1 {
             when = mach_absolute_time() + UInt64(delayMs * 1_000_000 / nanosPerTick)
         }
-        _ = MIDIPacketListAdd(&list, MemoryLayout<MIDIPacketList>.size, first, when, bytes.count, bytes)
-        _ = MIDISend(outPort, destination, &list)
+        var list = MIDIEventList()
+        let first = MIDIEventListInit(&list, ._1_0)
+        _ = MIDIEventListAdd(&list, MemoryLayout<MIDIEventList>.size, first, when, words.count, words)
+        _ = MIDISendEventList(outPort, destination, &list)
+    }
+
+    /// Plain MIDI bytes as the 32 bit words the system now sends. Only key,
+    /// pedal and other channel messages are passed on.
+    static func words(from bytes: [UInt8]) -> [UInt32] {
+        var out: [UInt32] = []
+        var status: UInt8 = 0
+        var index = 0
+        while index < bytes.count {
+            let byte = bytes[index]
+            if byte >= 0xF0 {
+                // System messages are not ours to send.
+                status = 0
+                index += 1
+                continue
+            }
+            if byte & 0x80 != 0 {
+                status = byte
+                index += 1
+            }
+            guard status != 0 else {
+                index += 1
+                continue
+            }
+            let family = status & 0xF0
+            let need = (family == 0xC0 || family == 0xD0) ? 1 : 2
+            guard index + need <= bytes.count else { break }
+            let first = UInt32(bytes[index] & 0x7F)
+            let second = need == 2 ? UInt32(bytes[index + 1] & 0x7F) : 0
+            out.append((UInt32(0x2) << 28) | (UInt32(status) << 16) | (first << 8) | second)
+            index += need
+        }
+        return out
     }
 
     // MARK: - Incoming
@@ -147,8 +182,9 @@ final class PianoLink {
             if age > 500 { age = 0 }
         }
         let arrived = wall - age
+        let message = bytes
         DispatchQueue.main.async { [weak self] in
-            self?.onBytes?(id, bytes, arrived)
+            self?.onBytes?(id, message, arrived)
         }
     }
 
