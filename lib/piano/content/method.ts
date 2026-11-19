@@ -44,7 +44,7 @@ export const PRINCIPLES: Principle[] = [
   },
   {
     title: 'Take trouble spots out and fix them',
-    what: 'After a run the coach says where the slips were and, when the playing shows it, why: long notes let go early, quick notes running ahead, one hand slipping. When the same measure trips you twice, the coach isolates it, has you play it right twice, and puts it back.',
+    what: 'After a run the coach says where the slips were and, when the playing shows it, why, such as long notes let go early, quick notes running ahead, or one hand slipping. When the same measure trips you twice, the coach isolates it, has you play it right twice, and puts it back.',
     evidence:
       'The best practisers in the same study stopped at errors, located their source precisely, and repeated the spot until it was correct and stable. Beginners left alone mostly play pieces straight through.',
     strength: 'moderate',
