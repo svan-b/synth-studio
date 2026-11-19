@@ -1,0 +1,1 @@
+{"id":"moog-minimoog-model-d","manufacturer":"Moog","device":"Minimoog Model D","source":"https://github.com/pencilresearch/midi/blob/main/Moog/Minimoog%20Model%20D.csv","params":[{"name":"Mod wheel","section":"General","cc":1,"lsb":33}],"suggested":[0]}

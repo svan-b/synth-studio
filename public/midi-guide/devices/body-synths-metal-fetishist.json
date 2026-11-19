@@ -1,0 +1,1 @@
+{"id":"body-synths-metal-fetishist","manufacturer":"Body Synths","device":"Metal Fetishist","source":"https://github.com/pencilresearch/midi/blob/main/Body%20Synths/Metal%20Fetishist.csv","params":[{"name":"Noise/ext","section":"General","cc":1},{"name":"Filter cut-off","section":"General","cc":74}],"suggested":[0,1]}

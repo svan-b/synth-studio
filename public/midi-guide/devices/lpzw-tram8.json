@@ -1,0 +1,1 @@
+{"id":"lpzw-tram8","manufacturer":"LPZW","device":"Tram8","source":"https://github.com/pencilresearch/midi/blob/main/LPZW/Tram8.csv","params":[{"name":"CC1","cc":69},{"name":"CC2","cc":70},{"name":"CC3","cc":71},{"name":"CC4","cc":72},{"name":"CC5","cc":73},{"name":"CC6","cc":74},{"name":"CC7","cc":75},{"name":"CC8","cc":76}],"suggested":[0,1,2,3,4,5,6,7]}

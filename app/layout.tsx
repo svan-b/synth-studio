@@ -3,7 +3,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Synth Studio | Digital Twin Learning System",
-  description: "Exact digital replicas of hardware synthesizers with teaching indicators",
+  description: "Play, patch and learn classic hardware synths as digital twins, then wire them into a studio and make full tracks.",
+  applicationName: "Synth Studio",
+  // Added to the iPad home screen it opens without browser bars, like an app
+  appleWebApp: { capable: true, title: "Synth Studio", statusBarStyle: "black" },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
@@ -11,6 +15,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#111111",
 };
 
 export default function RootLayout({

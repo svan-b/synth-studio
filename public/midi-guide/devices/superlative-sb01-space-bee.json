@@ -1,0 +1,1 @@
+{"id":"superlative-sb01-space-bee","manufacturer":"Superlative","device":"SB01 (Space Bee)","source":"https://github.com/pencilresearch/midi/blob/main/Superlative/SB01%20(Space%20Bee).csv","params":[{"name":"Mod wheel","section":"General","cc":1},{"name":"Sustain pedal","section":"General","cc":64}],"suggested":[0]}

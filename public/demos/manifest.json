@@ -1,0 +1,352 @@
+{
+ "about": "Recordings of the demo tracks for the lessons (info.play, listen.demo) and the demo cards. Written by scripts/render-demos.cjs (docs/DEMOS.md): do not edit by hand.",
+ "version": 1,
+ "rendered": "2026-10-29",
+ "commit": "3eb3762",
+ "codec": "AAC-LC in MP4 (.m4a)",
+ "sampleRate": 44100,
+ "totalBytes": 8845973,
+ "demos": {
+  "low-tide-lights": {
+   "title": "Low Tide Lights",
+   "bpm": 124,
+   "bars": 80,
+   "excerpts": {
+    "full": {
+     "bars": [
+      1,
+      80
+     ],
+     "variations": {
+      "as-made": {
+       "file": "low-tide-lights.m4a",
+       "label": "As made",
+       "seconds": 158.7,
+       "loop": 154.8387,
+       "frames": 6998511,
+       "lufs": -13.9,
+       "truePeak": -0.7,
+       "kbps": 96,
+       "bytes": 2064199
+      }
+     }
+    },
+    "groove-9-12": {
+     "bars": [
+      9,
+      12
+     ],
+     "variations": {
+      "kick-bass": {
+       "file": "ltl-groove-9-12-kick-bass.m4a",
+       "label": "Kick and bass",
+       "change": "every Rytm track but the kick muted; here the Analog Four plays only its bass",
+       "seconds": 8.54,
+       "loop": 7.7419,
+       "frames": 376699,
+       "lufs": -12.4,
+       "truePeak": -3.7,
+       "kbps": 128,
+       "bytes": 143920
+      }
+     }
+    },
+    "into-drop-15-18": {
+     "bars": [
+      15,
+      18
+     ],
+     "variations": {
+      "as-made": {
+       "file": "ltl-into-drop-15-18.m4a",
+       "label": "As made",
+       "seconds": 8.54,
+       "loop": 7.7419,
+       "frames": 376699,
+       "lufs": -13.2,
+       "truePeak": -1.7,
+       "kbps": 128,
+       "bytes": 157904
+      }
+     }
+    },
+    "drop-17-20": {
+     "bars": [
+      17,
+      20
+     ],
+     "variations": {
+      "as-made": {
+       "file": "ltl-drop-17-20.m4a",
+       "label": "As made",
+       "seconds": 8.54,
+       "loop": 7.7419,
+       "frames": 376700,
+       "lufs": -13.4,
+       "truePeak": -3.5,
+       "kbps": 128,
+       "bytes": 158047
+      },
+      "drums": {
+       "file": "ltl-drop-17-20-drums.m4a",
+       "label": "Drums only",
+       "change": "the Analog Rytm alone, the Analog Four's studio channel muted",
+       "seconds": 8.54,
+       "loop": 7.7419,
+       "frames": 376700,
+       "lufs": -16,
+       "truePeak": -3.8,
+       "kbps": 128,
+       "bytes": 154419
+      },
+      "drums-straight": {
+       "file": "ltl-drop-17-20-drums-straight.m4a",
+       "label": "Straight, no ghosts",
+       "change": "the drums alone, every pattern at SWING 50 % with no micro timing, the ghost notes (VEL below 56) at VEL 1",
+       "seconds": 8.54,
+       "loop": 7.7419,
+       "frames": 376700,
+       "lufs": -15.8,
+       "truePeak": -3.2,
+       "kbps": 128,
+       "bytes": 152125
+      },
+      "muddy": {
+       "file": "ltl-drop-17-20-muddy.m4a",
+       "label": "Muddy",
+       "change": "every high-pass off (the Rytm and Analog Four filters fully open, no low cut on the effects or the Xone:96 returns) and LO MID +6 dB on Xone:96 channels 1 and 2",
+       "seconds": 8.54,
+       "loop": 7.7419,
+       "frames": 376700,
+       "lufs": -13.2,
+       "truePeak": -3.3,
+       "kbps": 128,
+       "bytes": 156144
+      }
+     }
+    },
+    "drop-17-24": {
+     "bars": [
+      17,
+      24
+     ],
+     "variations": {
+      "as-made": {
+       "file": "ltl-drop-17-24.m4a",
+       "label": "As made",
+       "seconds": 16.28,
+       "loop": 15.4839,
+       "frames": 718119,
+       "lufs": -13.4,
+       "truePeak": -2.5,
+       "kbps": 128,
+       "bytes": 300544
+      }
+     }
+    },
+    "break-33-36": {
+     "bars": [
+      33,
+      36
+     ],
+     "variations": {
+      "as-made": {
+       "file": "ltl-break-33-36.m4a",
+       "label": "As made",
+       "seconds": 8.54,
+       "loop": 7.7419,
+       "frames": 376699,
+       "lufs": -16.5,
+       "truePeak": -3.2,
+       "kbps": 128,
+       "bytes": 147478
+      },
+      "dry": {
+       "file": "ltl-break-33-36-dry.m4a",
+       "label": "Dry",
+       "change": "every effect return off: the Rytm's delay and reverb, the Analog Four's chorus, delay and reverb, the Xone:96 returns A and B",
+       "seconds": 8.54,
+       "loop": 7.7419,
+       "frames": 376699,
+       "lufs": -16.3,
+       "truePeak": -1.9,
+       "kbps": 128,
+       "bytes": 148008
+      }
+     }
+    },
+    "build-45-49": {
+     "bars": [
+      45,
+      49
+     ],
+     "variations": {
+      "as-made": {
+       "file": "ltl-build-45-49.m4a",
+       "label": "As made",
+       "seconds": 10.48,
+       "loop": 9.6774,
+       "frames": 462054,
+       "lufs": -13.4,
+       "truePeak": -3.1,
+       "kbps": 128,
+       "bytes": 190042
+      }
+     }
+    },
+    "drop2-49-52": {
+     "bars": [
+      49,
+      52
+     ],
+     "variations": {
+      "as-made": {
+       "file": "ltl-drop2-49-52.m4a",
+       "label": "As made",
+       "seconds": 8.54,
+       "loop": 7.7419,
+       "frames": 376700,
+       "lufs": -13.4,
+       "truePeak": -2.9,
+       "kbps": 128,
+       "bytes": 154725
+      },
+      "drums-down": {
+       "file": "ltl-drop2-49-52-drums-down.m4a",
+       "label": "Drums 6 dB down",
+       "change": "the Analog Rytm's studio channel at −6 dB, into Xone:96 channel 1",
+       "seconds": 8.54,
+       "loop": 7.7419,
+       "frames": 376700,
+       "lufs": -14,
+       "truePeak": -3.4,
+       "kbps": 128,
+       "bytes": 153157
+      },
+      "crushed": {
+       "file": "ltl-drop2-49-52-crushed.m4a",
+       "label": "Pushed 9 dB",
+       "change": "the master driven 9 dB harder into the −1 dBTP limiter",
+       "seconds": 8.54,
+       "loop": 7.7419,
+       "frames": 376700,
+       "lufs": -11.9,
+       "truePeak": -3.1,
+       "kbps": 128,
+       "bytes": 154871
+      }
+     }
+    }
+   }
+  },
+  "three-clocks": {
+   "title": "Three Clocks",
+   "bpm": 110,
+   "bars": 72,
+   "excerpts": {
+    "full": {
+     "bars": [
+      1,
+      72
+     ],
+     "variations": {
+      "as-made": {
+       "file": "three-clocks.m4a",
+       "label": "As made",
+       "seconds": 161.04,
+       "loop": 157.0909,
+       "frames": 7101935,
+       "lufs": -16.5,
+       "truePeak": -1.5,
+       "kbps": 96,
+       "bytes": 2052011
+      }
+     }
+    },
+    "low-end-17-20": {
+     "bars": [
+      17,
+      20
+     ],
+     "variations": {
+      "as-made": {
+       "file": "tc-low-end-17-20.m4a",
+       "label": "As made",
+       "seconds": 9.53,
+       "loop": 8.7273,
+       "frames": 420153,
+       "lufs": -15.9,
+       "truePeak": -3.8,
+       "kbps": 128,
+       "bytes": 162573
+      }
+     }
+    },
+    "return-49-52": {
+     "bars": [
+      49,
+      52
+     ],
+     "variations": {
+      "as-made": {
+       "file": "tc-return-49-52.m4a",
+       "label": "As made",
+       "seconds": 9.53,
+       "loop": 8.7273,
+       "frames": 420152,
+       "lufs": -15.8,
+       "truePeak": -3.8,
+       "kbps": 128,
+       "bytes": 161571
+      }
+     }
+    }
+   }
+  },
+  "copper-wire": {
+   "title": "Copper Wire",
+   "bpm": 122,
+   "bars": 80,
+   "excerpts": {
+    "full": {
+     "bars": [
+      1,
+      80
+     ],
+     "variations": {
+      "as-made": {
+       "file": "copper-wire.m4a",
+       "label": "As made",
+       "seconds": 157.85,
+       "loop": 157.377,
+       "frames": 6961263,
+       "lufs": -13.8,
+       "truePeak": -1.6,
+       "kbps": 96,
+       "bytes": 2079330
+      }
+     }
+    },
+    "final-57-60": {
+     "bars": [
+      57,
+      60
+     ],
+     "variations": {
+      "as-made": {
+       "file": "cw-final-57-60.m4a",
+       "label": "As made",
+       "seconds": 8.67,
+       "loop": 7.8689,
+       "frames": 382296,
+       "lufs": -13,
+       "truePeak": -2.8,
+       "kbps": 128,
+       "bytes": 154905
+      }
+     }
+    }
+   }
+  }
+ }
+}

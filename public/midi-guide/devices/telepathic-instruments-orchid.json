@@ -1,0 +1,1 @@
+{"id":"telepathic-instruments-orchid","manufacturer":"Telepathic Instruments","device":"Orchid","source":"https://github.com/pencilresearch/midi/blob/main/Telepathic%20Instruments/Orchid.csv","params":[{"name":"Sustain pedal","section":"General","cc":64},{"name":"All sounds off","section":"General","cc":120},{"name":"All notes off","section":"General","cc":123}],"suggested":[]}

@@ -1,0 +1,213 @@
+// ============================================================================
+// Studio transport - the master clock every instrument can follow.
+//
+// Works like MIDI clock in a hardware studio: 24 pulses per quarter note (PPQN)
+// scheduled ahead on the audio clock, plus start/stop/continue/song-position
+// events. Instruments with MIDI sync (Elektrons, Sub 37 arp, Mother-32,
+// Subharmonicon) subscribe to it; clock-only gear (DFAM) is synced by patching
+// the Studio Clock's CLOCK OUT jack into its ADV/CLOCK input - exactly like
+// real hardware.
+//
+// Timing: ticks carry the audio-context time they should sound at, so
+// subscribers schedule audio sample-accurately. Never use the callback's
+// wall-clock moment as musical time.
+// ============================================================================
+
+export const PPQN = 24;
+
+export interface TransportTick {
+  /** Audio-context time of this tick */
+  time: number;
+  /** Absolute tick count since start (0-based) */
+  tick: number;
+  /** Seconds per tick at the current tempo (for gate lengths etc.) */
+  tickDuration: number;
+  /** Convenience: position in musical units */
+  beat: number;      // quarter notes since start (float)
+  bar: number;       // 0-based bar index (4/4)
+  sixteenth: number; // 0-based 16th index since start
+}
+
+export type TransportEvent =
+  | { type: 'start'; time: number }
+  | { type: 'stop'; time: number }
+  | { type: 'tempo'; bpm: number }
+  | { type: 'locate'; tick: number };
+
+type TickListener = (t: TransportTick) => void;
+type EventListener = (e: TransportEvent) => void;
+
+export class Transport {
+  private ctx: BaseAudioContext | null = null;
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private tickListeners = new Set<TickListener>();
+  private eventListeners = new Set<EventListener>();
+  private nextTickTime = 0;
+  private tickCount = 0;
+  private _bpm = 120;
+  private _swing = 0; // 0..0.75 - delays every second 16th
+  private _playing = false;
+  private startTime = 0;
+  private startTick = 0;
+  /** Recently scheduled ticks (time, tick), for "where are we now" displays */
+  private recentTime = new Float64Array(128);
+  private recentTick = new Float64Array(128);
+  private recentN = 0;
+  /** How far ahead ticks are scheduled, seconds. Raised while the page is hidden (setLookahead). */
+  lookahead = 0.1;
+  readonly interval = 0.02;
+  /** Normal look-ahead while the page is visible */
+  static readonly LOOKAHEAD = 0.1;
+  /**
+   * Look-ahead while the page is hidden. WebKit (iPad) aligns hidden pages' timers to
+   * one second even while audio plays, so 100 ms of look-ahead would run dry.
+   */
+  static readonly HIDDEN_LOOKAHEAD = 1.8;
+
+  attach(ctx: BaseAudioContext) {
+    this.ctx = ctx;
+  }
+
+  get bpm() { return this._bpm; }
+  get playing() { return this._playing; }
+  get swing() { return this._swing; }
+  /** Audio time playback (tick 0) started */
+  get startedAt() { return this.startTime; }
+  /** Tick playback started from (0, or a song position) */
+  get startedAtTick() { return this.startTick; }
+  get position() { return this.tickCount; }
+
+  /**
+   * The tick sounding at audio time `time` (the latest scheduled tick at or before it),
+   * or null before the first tick (stopped, or still counting in). Displays pass
+   * ctx.currentTime (+ output latency for what you hear).
+   */
+  tickAt(time: number): number | null {
+    if (!this._playing || time < this.startTime) return null;
+    const n = Math.min(this.recentN, 128);
+    for (let k = 1; k <= n; k++) {
+      const i = (this.recentN - k) & 127;
+      if (this.recentTime[i] <= time) return this.recentTick[i];
+    }
+    return null;
+  }
+
+  setBpm(bpm: number) {
+    const b = Math.max(20, Math.min(300, bpm));
+    if (b === this._bpm) return;
+    this._bpm = b;
+    this.eventListeners.forEach(l => l({ type: 'tempo', bpm: b }));
+  }
+
+  /** Change the scheduling look-ahead (seconds); takes effect on the next pump */
+  setLookahead(seconds: number) {
+    this.lookahead = Math.max(0.05, Math.min(3, seconds));
+    if (this._playing) this.pump();
+  }
+
+  /** Swing amount 0..0.75: fraction of a 16th that off-beat 16ths are delayed by */
+  setSwing(amount: number) {
+    this._swing = Math.max(0, Math.min(0.75, amount));
+  }
+
+  tickDuration(): number {
+    return 60 / this._bpm / PPQN;
+  }
+
+  /** Start from the top (or continue from the current position with `fromTick`) */
+  start(atTime?: number, fromTick = 0) {
+    if (!this.ctx || this._playing) return;
+    const t = Math.max(this.ctx.currentTime + 0.05, atTime ?? 0);
+    this._playing = true;
+    this.tickCount = fromTick;
+    this.nextTickTime = t;
+    this.startTime = t;
+    this.startTick = fromTick;
+    this.recentN = 0;
+    this.eventListeners.forEach(l => l({ type: 'start', time: t }));
+    this.timer = setInterval(() => this.pump(), this.interval * 1000);
+    this.pump();
+  }
+
+  /**
+   * Stop scheduling now. `atTime` (audio time, optional) is when the music stops: notes
+   * already scheduled before it still play (a song's end on its last bar line).
+   */
+  stop(atTime?: number) {
+    if (!this._playing || !this.ctx) return;
+    this._playing = false;
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+    const t = Math.max(this.ctx.currentTime, atTime ?? 0);
+    this.eventListeners.forEach(l => l({ type: 'stop', time: t }));
+  }
+
+  toggle() {
+    if (this._playing) this.stop();
+    else this.start();
+  }
+
+  /** Move the song position (applies on next start or immediately while playing) */
+  locate(tick: number) {
+    this.tickCount = Math.max(0, Math.floor(tick));
+    this.eventListeners.forEach(l => l({ type: 'locate', tick: this.tickCount }));
+  }
+
+  onTick(l: TickListener): () => void {
+    this.tickListeners.add(l);
+    return () => this.tickListeners.delete(l);
+  }
+
+  onEvent(l: EventListener): () => void {
+    this.eventListeners.add(l);
+    return () => this.eventListeners.delete(l);
+  }
+
+  /** Audio time of a future tick (assuming constant tempo) */
+  timeOfTick(tick: number): number {
+    return this.nextTickTime + (tick - this.tickCount) * this.tickDuration();
+  }
+
+  private pump() {
+    if (!this.ctx || !this._playing) return;
+    const horizon = this.ctx.currentTime + this.lookahead;
+    // Tab throttled for a long time: resync rather than firing a burst of stale ticks
+    if (this.nextTickTime < this.ctx.currentTime - 0.3) this.nextTickTime = this.ctx.currentTime + 0.01;
+    let guard = 0;
+    while (this.nextTickTime < horizon && guard++ < 2048) {
+      const tick = this.tickCount;
+      const dur = this.tickDuration();
+      // Swing: delay the off-beat 16th (ticks 6..11 of each 12-tick pair)
+      const in16th = tick % 12;
+      const swingOffset = in16th >= 6 ? this._swing * 6 * dur : 0;
+      const ev: TransportTick = {
+        time: this.nextTickTime + swingOffset,
+        tick,
+        tickDuration: dur,
+        beat: tick / PPQN,
+        bar: Math.floor(tick / (PPQN * 4)),
+        sixteenth: Math.floor(tick / (PPQN / 4)),
+      };
+      const r = this.recentN & 127;
+      this.recentTime[r] = ev.time;
+      this.recentTick[r] = tick;
+      this.recentN++;
+      // A listener may stop the transport (the song's end): nobody else gets that tick
+      for (const l of this.tickListeners) {
+        l(ev);
+        if (!this._playing) break;
+      }
+      if (!this._playing) return;
+      this.tickCount++;
+      this.nextTickTime += dur;
+    }
+  }
+}
+
+/** The app-wide studio transport */
+export const transport = new Transport();
+
+/** True on the first tick of every 16th note */
+export const isSixteenth = (t: TransportTick) => t.tick % (PPQN / 4) === 0;
+/** True on the first tick of every bar (4/4) */
+export const isBarStart = (t: TransportTick) => t.tick % (PPQN * 4) === 0;

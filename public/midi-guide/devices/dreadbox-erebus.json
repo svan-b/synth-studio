@@ -1,0 +1,1 @@
+{"id":"dreadbox-erebus","manufacturer":"Dreadbox","device":"Erebus","source":"https://github.com/pencilresearch/midi/blob/main/Dreadbox/Erebus.csv","params":[{"name":"Modulation wheel","section":"General","cc":1}],"suggested":[0]}
