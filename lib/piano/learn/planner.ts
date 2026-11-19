@@ -10,7 +10,7 @@ import { pieceProgress, type PieceState } from './coach';
 import { isDue, type StoredCard } from './srs';
 import type { LessonProgress } from './store';
 
-export type DrillKind = 'reading' | 'rhythm' | 'ear' | 'sight';
+export type DrillKind = 'reading' | 'rhythm' | 'ear' | 'sight' | 'chords';
 
 export type Block =
   | { kind: 'lesson'; id: string; minutes: number; title: string; detail: string }
@@ -64,6 +64,29 @@ export function readsStaff(lessons: Record<string, LessonProgress>): boolean {
   return lessons['steps-on-staff']?.done === true;
 }
 
+/** The lesson that prepares each exercise. Until it is done the exercise would ask for something not yet taught. */
+export const DRILL_LESSON: Record<Exclude<DrillKind, 'reading'>, string> = {
+  ear: 'five-fingers',
+  rhythm: 'steady-beat',
+  sight: 'steps-on-staff',
+  chords: 'triads',
+};
+
+/** The exercises the lessons have prepared the learner for, in the order they turn through the days. */
+export function openDrills(lessons: Record<string, LessonProgress>): DrillKind[] {
+  const order: Array<Exclude<DrillKind, 'reading'>> = ['ear', 'sight', 'rhythm', 'chords'];
+  return order.filter((kind) => lessons[DRILL_LESSON[kind]]?.done === true);
+}
+
+/** A learned piece to end on: the one left alone the longest, and not one played today. */
+export function pieceToEndOn(pieces: Record<string, PieceState>, today: string): string | null {
+  const learned = allPieces()
+    .map((p) => p.id)
+    .filter((id) => pieces[id]?.learned && pieces[id].lastOn !== today);
+  if (learned.length === 0) return null;
+  return learned.sort((a, b) => pieces[a].lastOn.localeCompare(pieces[b].lastOn))[0];
+}
+
 /** The piece to work on now: one in progress first, then the next not started. */
 export function currentPiece(lessons: Record<string, LessonProgress>, pieces: Record<string, PieceState>): string | null {
   const known = introducedPieces(lessons, pieces).filter((id) => !pieces[id]?.learned);
@@ -93,6 +116,15 @@ export function dueReadingCards(cards: Record<string, StoredCard>, now: Date): s
 /** How far a plan may run over the time chosen. A session of "10 minutes" is never 14. */
 const OVER = 2;
 
+/** What each exercise is called, and what it asks for. */
+export const DRILL_LABEL: Record<DrillKind, [string, string]> = {
+  ear: ['Play by ear', 'Hear a pattern and play it back'],
+  rhythm: ['Rhythm', 'Tap rhythms in time with the beat'],
+  sight: ['Sight reading', 'Read music you have never seen'],
+  reading: ['Note reading', 'Name notes on the staff'],
+  chords: ['Chords', 'Play chords and progressions from their symbols'],
+};
+
 export function planSession(input: PlanInput): Block[] {
   const now = input.now ?? new Date();
   const today = dayKey(now);
@@ -112,15 +144,23 @@ export function planSession(input: PlanInput): Block[] {
         }
       : null;
 
-  // One new lesson, early, while attention is fresh. Never more than one a day.
+  // One new lesson, early, while attention is fresh. Never more than one a day,
+  // with one exception: the very first lesson is a tour of the keyboard with
+  // no music in it, so the second follows on the same day and the first day
+  // ends with a tune.
+  const order = lessonOrder();
   const taken = Object.values(input.lessons).filter((l) => l.done && !l.skipped && l.doneOn);
   const lessonToday = taken.some((l) => l.doneOn === today);
-  const next = input.again || lessonToday ? undefined : lessonOrder().find((id) => !isDone(id) && lessonUnlocked(id, isDone));
-  let lesson: Block | null = null;
-  if (next) {
-    const l = getLesson(next);
-    lesson = { kind: 'lesson', id: next, minutes: l.minutes, title: l.title, detail: l.summary };
-  }
+  const takenIds = order.filter((id) => input.lessons[id]?.done && !input.lessons[id]?.skipped);
+  const onlyTheFirst = takenIds.length === 1 && takenIds[0] === order[0];
+  const mayTeach = !input.again && (!lessonToday || onlyTheFirst);
+  const next = mayTeach ? order.find((id) => !isDone(id) && lessonUnlocked(id, isDone)) : undefined;
+  const lessonBlock = (id: string): Block => {
+    const l = getLesson(id);
+    return { kind: 'lesson', id, minutes: l.minutes, title: l.title, detail: l.summary };
+  };
+  let lesson: Block | null = next ? lessonBlock(next) : null;
+  const second: Block | null = next === order[0] && order.length > 1 ? lessonBlock(order[1]) : null;
 
   // Work on a piece with the coach.
   const pieceId = currentPiece(input.lessons, input.pieces);
@@ -145,16 +185,16 @@ export function planSession(input: PlanInput): Block[] {
       : null;
 
   // A different skill for contrast, turning through the kinds day by day.
-  const kinds: DrillKind[] = readsStaff(input.lessons) ? ['ear', 'sight', 'rhythm'] : ['ear', 'rhythm'];
+  // Only kinds a lesson has prepared: an exercise never comes before what it exercises.
+  const kinds = openDrills(input.lessons);
   const dayIndex = Math.floor(new Date(today + 'T12:00:00').getTime() / 86400000);
-  const labels: Record<DrillKind, [string, string]> = {
-    ear: ['Play by ear', 'Hear a pattern and play it back'],
-    rhythm: ['Rhythm', 'Tap rhythms in time with the beat'],
-    sight: ['Sight reading', 'Read music you have never seen'],
-    reading: ['Note reading', 'Name notes on the staff'],
-  };
-  const drillOf = (kind: DrillKind): Block => ({ kind: 'drill', id: kind, minutes: 3, title: labels[kind][0], detail: labels[kind][1] });
-  const drill = drillOf(kinds[dayIndex % kinds.length]);
+  const drillOf = (kind: DrillKind): Block => ({ kind: 'drill', id: kind, minutes: 3, title: DRILL_LABEL[kind][0], detail: DRILL_LABEL[kind][1] });
+  const drill = kinds.length > 0 ? drillOf(kinds[dayIndex % kinds.length]) : null;
+
+  // Something already learned to finish with, when nothing learned is otherwise in the plan.
+  const endId = review ? null : pieceToEndOn(input.pieces, today);
+  const ending: Block | null =
+    endId && endId !== pieceId ? { kind: 'piece', id: endId, minutes: 2, title: pieceInfo(endId).title, detail: 'End on something you play well' } : null;
 
   // With little time, a new lesson and a piece under way do not both fit.
   // They take turns: when the last day of practice brought a new lesson,
@@ -179,9 +219,11 @@ export function planSession(input: PlanInput): Block[] {
   };
   add(reading);
   add(lesson);
+  if (lesson && blocks.includes(lesson)) add(second);
   add(piece);
   add(review);
   add(drill);
+  add(ending);
 
   // Time to spare goes to the piece first, then to a second kind of exercise.
   let spare = budget - total;
@@ -191,8 +233,12 @@ export function planSession(input: PlanInput): Block[] {
     main.minutes += more;
     spare -= more;
   }
-  const second = kinds[(dayIndex + 1) % kinds.length];
-  if (spare >= 3 && second !== drill.id && blocks.includes(drill)) blocks.push(drillOf(second));
+  const other = kinds.length > 1 ? kinds[(dayIndex + 1) % kinds.length] : null;
+  if (spare >= 3 && drill && other && other !== drill.id && blocks.includes(drill)) {
+    // Before the closing piece, so the session still ends on something that goes well.
+    const at = ending && blocks.includes(ending) ? blocks.indexOf(ending) : blocks.length;
+    blocks.splice(at, 0, drillOf(other));
+  }
   return blocks;
 }
 

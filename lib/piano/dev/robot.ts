@@ -21,6 +21,8 @@ export interface RobotOptions {
   missEvery?: number;
   /** Key velocity, 1 to 127. */
   velocity?: number;
+  /** Let every key go after this many milliseconds, however long its note. For playing that cuts long notes short. */
+  staccatoMs?: number;
 }
 
 function key(note: number, velocity: number, holdMs = 70): void {
@@ -68,7 +70,7 @@ export async function playCurrent(opts: RobotOptions = {}): Promise<string> {
         key(session.steps[i].notes[0].midi + 1, velocity);
         await new Promise((r) => setTimeout(r, gap));
       }
-      for (const n of session.steps[i].notes) key(n.midi, velocity);
+      for (const n of session.steps[i].notes) key(n.midi, velocity, opts.staccatoMs ?? Math.max(70, gap * 0.8));
       await new Promise((r) => setTimeout(r, gap));
     }
   } else {
@@ -78,7 +80,9 @@ export async function playCurrent(opts: RobotOptions = {}): Promise<string> {
     notes.forEach((n, i) => {
       if (opts.missEvery && (i + 1) % opts.missEvery === 0) return;
       const at = session.targetTime(n) + delay;
-      setTimeout(() => key(n.midi, velocity), Math.max(0, (at - piano.now()) * 1000));
+      // Like a careful player, hold each note for most of its written length.
+      const hold = opts.staccatoMs ?? Math.max(70, n.dur * (60 / session.options.bpm) * 850);
+      setTimeout(() => key(n.midi, velocity, hold), Math.max(0, (at - piano.now()) * 1000));
     });
   }
   await waitFor(() => session.phase === 'done' || session.phase === 'stopped', 120000);

@@ -41,7 +41,8 @@ export interface MusicRef {
 
 export type Music = MusicInline | MusicRef;
 
-export type Display = 'staff' | 'contour' | 'hidden';
+/** How music is shown: written on the staff, as a picture of its shape, as a chart of chord symbols, or not at all. */
+export type Display = 'staff' | 'contour' | 'chart' | 'hidden';
 export type Hints = 'always' | 'delay' | 'never';
 
 export type Figure =
@@ -71,6 +72,8 @@ export type Step =
       anyKey?: boolean;
       /** Ask for a soft or a loud touch, checked when the piano reports how hard keys are struck. */
       touch?: 'soft' | 'loud';
+      /** Ask for long notes to be held for their length, checked when the input reports keys coming up. */
+      hold?: boolean;
       why?: string;
     }
   | { kind: 'echo'; text: string; motifs: string[]; key?: string; hand?: Hand; why?: string }

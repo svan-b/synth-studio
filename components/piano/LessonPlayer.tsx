@@ -6,6 +6,7 @@ import { getLesson, getPiece, resolveMusic } from '@/lib/piano/content/catalog';
 import type { Lesson, Step } from '@/lib/piano/content/types';
 import type { FlowResult } from '@/lib/piano/engine/flow';
 import { noteBus } from '@/lib/piano/input/bus';
+import { diagnose } from '@/lib/piano/learn/coach';
 import { isRemoteKey } from '@/lib/piano/input/hub';
 import { usePiano } from '@/lib/piano/learn/store';
 import { pitchClass } from '@/lib/piano/music/theory';
@@ -117,7 +118,16 @@ function ListenStep({ step, onNext }: { step: StepOf<'listen'>; onNext: () => vo
         </Button>
       </Brief>
       <div className="min-h-0 flex-1">
-        <PlaySurface score={score} hands={step.hands} mode="listen" display={step.display ?? 'staff'} runId={run} onDone={() => setDone(true)} />
+        <PlaySurface
+          score={score}
+          hands={step.hands}
+          mode="listen"
+          display={step.display ?? 'staff'}
+          runId={run}
+          onDone={() => setDone(true)}
+          // The first time, leave a moment to read what to listen for. A longer line gets a little longer.
+          leadIn={run === 0 ? Math.min(3200, Math.max(1200, 500 + step.text.length * 26)) : 350}
+        />
       </div>
     </div>
   );
@@ -176,6 +186,14 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
           text = 'Right notes, but not yet full. Let the weight of your arm fall into the keys.';
         }
       }
+      // Where the step is about holding long notes, letting them go early is the thing to put right.
+      if (ok && step.hold && result.held !== null && result.held < 0.5) {
+        ok = false;
+        text = 'The rhythm was right, but the long notes were let go early. Keep each key down for all of its beats.';
+        setHave(0);
+        setVerdict({ ok: false, text });
+        return;
+      }
       if (ok) {
         const total = have + 1;
         setHave(total);
@@ -189,18 +207,20 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
         }
       } else {
         setHave(0);
+        // Say what went wrong where the playing shows it, and fall back on general advice where it does not.
+        const found = diagnose(result);
         setVerdict({
           ok: false,
           text:
             mode !== 'wait'
-              ? `${text} Try again and keep going through any slip.`
+              ? `${text} ${found ?? 'Try again and keep going through any slip.'}`
               : result.totalNotes === 1
                 ? `${text} Have another look at where it sits, then play it once more.`
-                : `${text} Go slower and look at each note before you play it.`,
+                : `${text} ${found ? `${found} Go slower there.` : 'Go slower and look at each note before you play it.'}`,
         });
       }
     },
-    [again, have, mode, need, onNext, step.touch],
+    [again, have, mode, need, onNext, step.hold, step.touch],
   );
 
   useRemote({ primary: verdict && !verdict.ok ? again : verdict ? onNext : undefined, secondary: again });
@@ -270,7 +290,8 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
   const [phase, setPhase] = useState<'listen' | 'play'>('listen');
   const [run, setRun] = useState(0);
   const [tries, setTries] = useState(0);
-  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  // The reply above the stand, with the few words shown on the stand itself to match it.
+  const [note, setNote] = useState<{ ok: boolean; text: string; stand: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -310,14 +331,14 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
       }
       if (!result) return;
       if (result.clean) {
-        setNote({ ok: true, text: 'Yes, that is it.' });
+        setNote({ ok: true, text: 'Yes, that is it.', stand: 'That is it' });
         timer.current = setTimeout(advance, 1100);
       } else if (tries < 1) {
         setTries((t) => t + 1);
-        setNote({ ok: false, text: 'Not quite. Listen once more.' });
+        setNote({ ok: false, text: 'Not quite. Listen once more.', stand: 'Listen again' });
         timer.current = setTimeout(hear, 1300);
       } else {
-        setNote({ ok: false, text: 'You found it in the end. On to the next.' });
+        setNote({ ok: false, text: 'You found it in the end. On to the next.', stand: 'On to the next' });
         timer.current = setTimeout(advance, 1500);
       }
     },
@@ -353,7 +374,8 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
           mode={phase === 'listen' ? 'listen' : 'wait'}
           display="hidden"
           hints="never"
-          hiddenPrompt="Now play what you heard"
+          // While a reply is up, the stand does not go on asking for the same thing.
+          hiddenPrompt={note ? note.stand : 'Now play what you heard'}
           catchUp={2.2}
           runId={`${index}-${run}`}
           onDone={onDone}

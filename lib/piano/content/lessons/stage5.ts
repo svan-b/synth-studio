@@ -2,7 +2,7 @@ import type { Lesson } from '../types';
 
 /**
  * Stage 5. Fluency: the pedal, minor keys, quicker notes, two independent
- * lines, and broken chord patterns.
+ * lines, broken chord patterns and arpeggios.
  */
 export const STAGE5: Lesson[] = [
   {
@@ -238,8 +238,120 @@ export const STAGE5: Lesson[] = [
       },
       {
         kind: 'say',
+        title: 'Next, the arpeggio travels',
+        text: 'The rocking left hand keeps a chord moving while staying in one place. In the next lesson the arpeggio leaves home and runs up and down the keyboard, in one hand and then in both.',
+      },
+    ],
+  },
+  {
+    id: 'arpeggios',
+    stage: 5,
+    title: 'Arpeggios',
+    summary: 'Chords spread across the keyboard, in one hand and then both.',
+    minutes: 12,
+    pieces: ['rolling-chords'],
+    steps: [
+      {
+        kind: 'say',
+        title: 'Up through the chord',
+        text: 'An **arpeggio** is a chord played one note at a time, and it can climb further than a hand can hold at once.\n\nThe right hand plays C, E, G and the C above with fingers **1, 2, 3 and 5**. Let the hand open as it goes, and let the wrist follow the fingers so that nothing has to stretch.',
+        figure: { kind: 'keys', low: 60, high: 72, marks: { 60: '1', 64: '2', 67: '3', 72: '5' }, labels: 'c', caption: 'Right hand, the arpeggio of C major' },
+      },
+      {
+        kind: 'play',
+        text: 'Up and back down. Every note the same length, the same loudness.',
+        music: { rh: 'C4q:1 E4q:2 G4q:3 C5q:5 | G4q:3 E4q:2 C4h:1', tempo: 80 },
+        hints: 'delay',
+        passes: 2,
+      },
+      {
+        kind: 'say',
+        title: 'The left hand',
+        text: 'The left hand plays the same four notes with fingers **5, 4, 2 and 1**, starting from the little finger.',
+        figure: { kind: 'keys', low: 48, high: 60, marks: { 48: '5', 52: '4', 55: '2', 60: '1' }, labels: 'c', caption: 'Left hand, the arpeggio of C major' },
+      },
+      {
+        kind: 'play',
+        text: 'Left hand, up and back down.',
+        music: { lh: 'C3q:5 E3q:4 G3q:2 C4q:1 | G3q:2 E3q:4 C3h:5', tempo: 80 },
+        hints: 'always',
+      },
+      {
+        kind: 'play',
+        text: 'Right hand again. Up the chord of C, up F, up G, and back down C. The whole hand moves to each new chord and keeps its shape.',
+        music: {
+          rh: 'C4q:1 E4q:2 G4q:3 C5q:5 | F4q:1 A4q:2 C5q:3 F5q:5 | G4q:1 B4q:2 D5q:3 G5q:5 | C5q:5 G4q:3 E4q:2 C4q:1',
+          chords: 'C | F | G | C',
+          tempo: 80,
+        },
+        hints: 'delay',
+      },
+      {
+        kind: 'play',
+        text: 'A minor chord works the same way. This is **A minor**, with the same fingers.',
+        music: { rh: 'A3q:1 C4q:2 E4q:3 A4q:5 | E4q:3 C4q:2 A3h:1', tempo: 80, key: 'Am' },
+        hints: 'always',
+      },
+      {
+        kind: 'say',
+        title: 'From one hand to the other',
+        text: 'Here is the arpeggio that makes a piano sound grand. The left hand plays the three notes of the chord, and the right hand carries straight on with the next four, as if one very large hand were playing.\n\nPut the right pedal down first, so that every note rings on. Aim for a join between the hands that nobody could hear.',
+      },
+      {
+        kind: 'play',
+        text: 'Left hand, then right hand, up to the top. Then back down the same way.',
+        music: {
+          rh: 'rq. C4e:1 E4e:2 G4e:3 C5q:5 | G4e:3 E4e:2 C4e:1 re rh',
+          lh: 'C3e:5 E3e:3 G3e:1 re rh | rq. G3e:1 E3e:3 C3q.:5',
+          tempo: 72,
+        },
+        hints: 'always',
+      },
+      {
+        kind: 'play',
+        text: 'Again, with the keys dark. Listen for the join.',
+        music: {
+          rh: 'rq. C4e:1 E4e:2 G4e:3 C5q:5 | G4e:3 E4e:2 C4e:1 re rh',
+          lh: 'C3e:5 E3e:3 G3e:1 re rh | rq. G3e:1 E3e:3 C3q.:5',
+          tempo: 72,
+        },
+        hints: 'delay',
+      },
+      {
+        kind: 'play',
+        text: 'Now with the beat, slowly. Even is what matters, not fast.',
+        music: {
+          rh: 'rq. C4e:1 E4e:2 G4e:3 C5q:5 | G4e:3 E4e:2 C4e:1 re rh',
+          lh: 'C3e:5 E3e:3 G3e:1 re rh | rq. G3e:1 E3e:3 C3q.:5',
+          tempo: 72,
+        },
+        mode: 'tempo',
+        tempoPct: 85,
+      },
+      {
+        kind: 'say',
+        title: 'Arpeggios over a progression',
+        text: 'Put arpeggios together with a chord progression and you have the sound of a great many songs. The left hand holds the bass note, and the right hand ripples through each chord.\n\n**Rolling Chords** does this over one, five, six, four, with the smooth chord shapes you already know.',
+      },
+      { kind: 'listen', text: 'Listen to the first four measures. One chord in each.', music: { piece: 'rolling-chords', from: 1, to: 4 } },
+      { kind: 'play', text: 'The right hand. Each measure is one hand shape, rocked up and down.', music: { piece: 'rolling-chords', from: 1, to: 4 }, hands: ['R'], hints: 'delay' },
+      { kind: 'play', text: 'Both hands. The left hand plays once in each measure and holds.', music: { piece: 'rolling-chords', from: 1, to: 4 }, hints: 'delay' },
+      {
+        kind: 'say',
+        title: 'Yours to use',
+        text: 'This is a pattern to keep. Any progression you know can be played this way, in any key, and with the pedal it fills a room.\n\nWhen Rolling Chords is easy, open the plan and options, choose your own practice, and try the ripple in a different order: top, middle, bottom, middle.',
+      },
+      {
+        kind: 'quiz',
+        question: 'Which fingers of the right hand play the arpeggio C, E, G and the C above?',
+        choices: ['1, 2, 3 and 5', '1, 2, 3 and 4', '1, 3, 4 and 5'],
+        answer: 0,
+        explain: 'Thumb, index and middle finger, then the little finger on the top C.',
+      },
+      {
+        kind: 'say',
         title: 'Stage five, done',
-        text: 'You have the pedal, minor keys, quick notes, independent hands and moving chords. One stage remains, and it is about becoming a musician as well as a player.',
+        text: 'You have the pedal, minor keys, quick notes, independent hands, moving chords and arpeggios. One stage remains, and it is about becoming a musician as well as a player.',
       },
     ],
   },

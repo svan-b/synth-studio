@@ -95,7 +95,7 @@ export const STAGE3: Lesson[] = [
       },
       { kind: 'listen', text: 'Listen to the first phrase.', music: { piece: 'largo', from: 1, to: 4 }, hands: ['R'] },
       { kind: 'play', text: 'Right hand, first phrase.', music: { piece: 'largo', from: 1, to: 4 }, hands: ['R'], hints: 'delay' },
-      { kind: 'play', text: 'With the beat. Hold each long note for its whole length.', music: { piece: 'largo', from: 1, to: 4 }, hands: ['R'], mode: 'tempo', tempoPct: 90 },
+      { kind: 'play', text: 'With the beat. Hold each long note for its whole length.', music: { piece: 'largo', from: 1, to: 4 }, hands: ['R'], mode: 'tempo', tempoPct: 90, hold: true },
     ],
   },
   {

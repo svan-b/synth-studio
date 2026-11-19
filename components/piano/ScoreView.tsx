@@ -76,6 +76,8 @@ interface Plan {
   staffTop: number;
   staffGap: number;
   height: number;
+  /** Extra room above the top staff taken by finger numbers stacked on chords. */
+  fingerRise: number;
 }
 
 const LEFT_PAD = 16;
@@ -178,11 +180,15 @@ function planLayout(score: Score, width: number, opts: { fingering: boolean; nam
     }
   }
   const labelRoom = (opts.fingering ? 16 : 0) + (opts.names ? 14 : 0);
-  const padTop = 18 + above * 5 + labelRoom + (opts.chords ? 20 : 0);
-  const padBottom = 16 + below * 5 + labelRoom;
+  // A chord carries one finger number for each of its notes, stacked. Each one past the first needs its own line.
+  const stack = (hand: Hand) => (opts.fingering ? Math.max(0, ...score.staff[hand].map((e) => e.fingers?.length ?? 0)) : 0);
+  const fingerRise = topHand === 'R' ? Math.max(0, stack('R') - 1) * 15 : 0;
+  const fingerDrop = bottomHand === 'L' ? Math.max(0, stack('L') - 1) * 15 : 0;
+  const padTop = 18 + above * 5 + labelRoom + fingerRise + (opts.chords ? 20 : 0);
+  const padBottom = 16 + below * 5 + labelRoom + fingerDrop;
   const staffGap = two ? 92 + Math.max(0, middleExtra) * 5 + (opts.fingering ? 12 : 0) : 0;
   const systemHeight = padTop + 40 + staffGap + padBottom + 14;
-  return { systems, systemHeight, staffTop: padTop, staffGap, height: systems.length * systemHeight + 6 };
+  return { systems, systemHeight, staffTop: padTop, staffGap, height: systems.length * systemHeight + 6, fingerRise };
 }
 
 function cssColor(el: HTMLElement, name: string, alpha = 1): string {
@@ -541,7 +547,8 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
         const note = ev ? eventNotes.get(ev) : undefined;
         if (!ev || !note) continue;
         const si = noteSystem.get(ev) ?? 0;
-        const y = systemBoxes.current[si].top - (planOpts.fingering ? 14 : 2);
+        // Above the finger numbers, however many are stacked.
+        const y = systemBoxes.current[si].top - (planOpts.fingering ? 14 + plan.fingerRise : 2);
         ctx.fillText(mark.symbol.replace(/b/g, '♭').replace(/#/g, '♯'), note.getAbsoluteX(), y);
       }
       ctx.restore();

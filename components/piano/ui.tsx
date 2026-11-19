@@ -155,6 +155,13 @@ export const Icon = {
       <path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3 1.5-4.5C9 10 10 11 10 11c0-3 1-5.500 2-8z" />
     </Svg>
   ),
+  Chord: (p: IconProps) => (
+    <Svg {...p}>
+      <rect x="4.500" y="4" width="15" height="4" rx="2" />
+      <rect x="4.500" y="10" width="15" height="4" rx="2" />
+      <rect x="4.500" y="16" width="15" height="4" rx="2" />
+    </Svg>
+  ),
   Clock: (p: IconProps) => (
     <Svg {...p}>
       <circle cx="12" cy="12" r="9" />

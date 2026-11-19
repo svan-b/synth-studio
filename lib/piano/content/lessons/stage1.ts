@@ -186,6 +186,7 @@ export const STAGE1: Lesson[] = [
         display: 'contour',
         mode: 'tempo',
         anyKey: true,
+        hold: true,
       },
       {
         kind: 'play',

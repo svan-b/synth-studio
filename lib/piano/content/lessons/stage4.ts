@@ -1,8 +1,9 @@
 import type { Lesson } from '../types';
 
 /**
- * Stage 4. Scales, chords and keys: the harmony behind most music the
- * learner already knows, and the skills to play songs from chord symbols.
+ * Stage 4. Scales, chords, keys and chord progressions: the harmony behind
+ * most music the learner already knows, and the skills to play songs from
+ * chord symbols.
  */
 export const STAGE4: Lesson[] = [
   {
@@ -325,6 +326,128 @@ export const STAGE4: Lesson[] = [
     ],
   },
   {
+    id: 'progressions',
+    stage: 4,
+    title: 'Chord progressions',
+    summary: 'Chords by number, so one pattern works in every key.',
+    minutes: 11,
+    steps: [
+      {
+        kind: 'say',
+        title: 'The order of the chords',
+        text: 'A **chord progression** is a run of chords in a set order. The order is what gives a song its sense of setting out and coming home.\n\nYou already know two of them. C, F, G, C is one. C, G, A minor, F is another.',
+      },
+      {
+        kind: 'say',
+        title: 'Numbers, not letters',
+        text: 'Musicians name the chords of a key by the step of the scale each one is built on. In the key of C, the chord on C is **one**, F is **four**, G is **five** and A minor is **six**.\n\nSo C, G, A minor, F is the progression **one, five, six, four**. It is written I, V, vi, IV, with small letters for a minor chord.\n\nNamed by number, a progression is no longer tied to C. It can be played in any key.',
+        figure: {
+          kind: 'keys',
+          low: 60,
+          high: 72,
+          marks: { 60: '1', 62: '2', 64: '3', 65: '4', 67: '5', 69: '6', 71: '7' },
+          labels: 'none',
+          caption: 'The steps of the C major scale. A chord takes its number from the step it is built on.',
+        },
+      },
+      {
+        kind: 'play',
+        text: '**One, four, five, one** in C. You have played these shapes before. Say the numbers as you go.',
+        music: {
+          rh: 'C4+E4+G4w:135 | C4+F4+A4w:135 | B3+D4+G4w:125 | C4+E4+G4w:135',
+          lh: 'C3w:1 | F2w:5 | G2w:4 | C3w:1',
+          chords: 'C | F | G | C',
+          tempo: 72,
+        },
+        hints: 'delay',
+      },
+      {
+        kind: 'say',
+        title: 'The same thing in G',
+        text: 'Now count up the scale of G. G is one, C is four, D is five and E minor is six.\n\nOne, four, five, one becomes **G, C, D, G**. The D chord takes its F sharp from the key signature.',
+        figure: {
+          kind: 'keys',
+          low: 67,
+          high: 79,
+          marks: { 67: '1', 69: '2', 71: '3', 72: '4', 74: '5', 76: '6', 78: '7' },
+          labels: 'none',
+          caption: 'The steps of the G major scale',
+        },
+      },
+      {
+        kind: 'play',
+        text: '**One, four, five, one** in G. The hand makes the same three shapes as in C, moved up the keyboard.',
+        music: {
+          rh: 'G4+B4+D5w:135 | G4+C5+E5w:135 | F#4+A4+D5w:125 | G4+B4+D5w:135',
+          lh: 'G3w:1 | C3w:5 | D3w:4 | G3w:1',
+          chords: 'G | C | D | G',
+          key: 'G',
+          tempo: 72,
+        },
+        hints: 'always',
+      },
+      {
+        kind: 'say',
+        title: 'One, five, six, four',
+        text: 'The four chords from the lesson on minor chords were C, G, A minor, F. That is **one, five, six, four**, and it may be the most used progression of the last sixty years.\n\nIn the key of G the same numbers give **G, D, E minor, C**.',
+      },
+      {
+        kind: 'play',
+        text: 'First in C, to remind your hands.',
+        music: {
+          rh: 'C4+E4+G4w:135 | B3+D4+G4w:125 | C4+E4+A4w:125 | C4+F4+A4w:135',
+          lh: 'C3w:1 | G2w:4 | A2w:3 | F2w:5',
+          chords: 'C | G | Am | F',
+          tempo: 72,
+        },
+        hints: 'delay',
+      },
+      {
+        kind: 'play',
+        text: 'Now in G. Same numbers, same shapes, new place.',
+        music: {
+          rh: 'G4+B4+D5w:135 | F#4+A4+D5w:125 | G4+B4+E5w:125 | G4+C5+E5w:135',
+          lh: 'G3w:1 | D3w:4 | E3w:3 | C3w:5',
+          chords: 'G | D | Em | C',
+          key: 'G',
+          tempo: 72,
+        },
+        hints: 'always',
+      },
+      {
+        kind: 'play',
+        text: 'Once more in G, with the keys dark.',
+        music: {
+          rh: 'G4+B4+D5w:135 | F#4+A4+D5w:125 | G4+B4+E5w:125 | G4+C5+E5w:135',
+          lh: 'G3w:1 | D3w:4 | E3w:3 | C3w:5',
+          chords: 'G | D | Em | C',
+          key: 'G',
+          tempo: 72,
+        },
+        hints: 'delay',
+      },
+      {
+        kind: 'say',
+        title: 'Why it is worth knowing',
+        text: 'A great many songs are built on a handful of progressions. Once your hands know one, five, six, four, you can accompany a lot of them from memory.\n\nAnd because the numbers stay the same, you can move a song to a key that suits a voice by changing the key and keeping the pattern.',
+      },
+      {
+        kind: 'quiz',
+        question: 'In the key of G, which chord is number four?',
+        choices: ['C', 'D', 'E minor'],
+        answer: 0,
+        explain: 'Count up the scale of G: G is one, A two, B three, C four.',
+      },
+      {
+        kind: 'quiz',
+        question: 'A song goes C, G, A minor, F. What is that in numbers?',
+        choices: ['One, four, five, one', 'One, five, six, four', 'One, six, four, five'],
+        answer: 1,
+        explain: 'In the key of C, C is one, G is five, A minor is six and F is four.',
+      },
+    ],
+  },
+  {
     id: 'blues',
     stage: 4,
     title: 'The blues',
@@ -335,7 +458,7 @@ export const STAGE4: Lesson[] = [
       {
         kind: 'say',
         title: 'Twelve measures',
-        text: 'The **twelve bar blues** is a pattern of three chords that runs for twelve measures and then starts again. It lies under blues, early rock and roll and a great deal of jazz.\n\nIn C it goes: four measures of C, two of F, two of C, then G, F, C, C.',
+        text: 'The **twelve bar blues** is a chord progression that runs for twelve measures and then starts again. It lies under blues, early rock and roll and a great deal of jazz.\n\nIn C it goes: four measures of C, two of F, two of C, then G, F, C, C. In numbers that is one, four, one, then five, four, one.',
       },
       {
         kind: 'say',
@@ -372,7 +495,7 @@ export const STAGE4: Lesson[] = [
       {
         kind: 'say',
         title: 'Stage four, done',
-        text: 'You can build scales and chords, change between them smoothly, play from chord symbols and play the blues. That is the working knowledge behind most popular music.',
+        text: 'You can build scales and chords, change between them smoothly, name a progression by its numbers, play from chord symbols and play the blues. That is the working knowledge behind most popular music.',
       },
     ],
   },

@@ -6,6 +6,7 @@ import { saveCopy, savedCopy } from '../native/bridge';
 import { dayKey, daysBetween } from '../util/emitter';
 import { newCard, review, type Outcome, type StoredCard } from './srs';
 import type { PieceState } from './coach';
+import type { Take } from '../engine/flow';
 
 export type Experience = 'new' | 'some' | 'returning';
 export type ThemeChoice = 'auto' | 'light' | 'dark';
@@ -50,6 +51,19 @@ export interface DayLog {
   activities: number;
 }
 
+/** The learner's own playing of a piece, kept to be heard again. */
+export interface Recording {
+  /** The day it was played. */
+  on: string;
+  take: Take;
+}
+
+/** The first time a piece was played through as learned, and the most recent time since. */
+export interface PieceRecordings {
+  first: Recording;
+  latest?: Recording;
+}
+
 export interface DrillState {
   level: number;
   /** Recent results, newest last: 1 right, 0 wrong. */
@@ -65,6 +79,7 @@ interface State {
   cards: Record<string, StoredCard>;
   days: Record<string, DayLog>;
   drills: Record<string, DrillState>;
+  recordings: Record<string, PieceRecordings>;
   /** Day the daily session was last finished. */
   sessionDoneOn: string | null;
 
@@ -75,6 +90,8 @@ interface State {
   /** Mark a lesson as known without taking it. */
   skipLesson: (id: string) => void;
   setPiece: (id: string, state: PieceState) => void;
+  /** Keep a take of a learned piece. The first is kept for good, later ones replace each other. */
+  keepRecording: (id: string, take: Take) => void;
   addCards: (ids: string[]) => void;
   reviewCard: (id: string, outcome: Outcome) => void;
   logPractice: (seconds: number, notes: number, activities?: number) => void;
@@ -156,6 +173,7 @@ export const usePiano = create<State>()(
       cards: {},
       days: {},
       drills: {},
+      recordings: {},
       sessionDoneOn: null,
 
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
@@ -167,6 +185,12 @@ export const usePiano = create<State>()(
       skipLesson: (id) =>
         set((s) => (s.lessons[id]?.done ? {} : { lessons: { ...s.lessons, [id]: { done: true, skipped: true, step: 0 } } })),
       setPiece: (id, state) => set((s) => ({ pieces: { ...s.pieces, [id]: state } })),
+      keepRecording: (id, take) =>
+        set((s) => {
+          const made: Recording = { on: dayKey(), take };
+          const had = s.recordings[id];
+          return { recordings: { ...s.recordings, [id]: had ? { first: had.first, latest: made } : { first: made } } };
+        }),
       addCards: (ids) =>
         set((s) => {
           const cards = { ...s.cards };
@@ -214,6 +238,7 @@ export const usePiano = create<State>()(
             cards: data.cards ?? {},
             days: data.days ?? {},
             drills: data.drills ?? {},
+            recordings: data.recordings ?? {},
             sessionDoneOn: data.sessionDoneOn ?? null,
           });
           return true;
@@ -231,6 +256,7 @@ export const usePiano = create<State>()(
           cards: {},
           days: {},
           drills: {},
+          recordings: {},
           sessionDoneOn: null,
         }),
     }),
@@ -246,6 +272,7 @@ export const usePiano = create<State>()(
         cards: s.cards,
         days: s.days,
         drills: s.drills,
+        recordings: s.recordings,
         sessionDoneOn: s.sessionDoneOn,
       }),
     },
@@ -266,6 +293,7 @@ export function exportData(): string {
       cards: s.cards,
       days: s.days,
       drills: s.drills,
+      recordings: s.recordings,
       sessionDoneOn: s.sessionDoneOn,
     },
     null,

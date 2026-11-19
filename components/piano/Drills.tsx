@@ -6,7 +6,19 @@ import { instrument } from '@/lib/piano/audio/instrument';
 import type { FlowResult } from '@/lib/piano/engine/flow';
 import { noteBus } from '@/lib/piano/input/bus';
 import { input, isRemoteKey } from '@/lib/piano/input/hub';
-import { EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS, daySeed, earExercise, rhythmExercise, sightExercise } from '@/lib/piano/learn/generators';
+import {
+  CHORD_LEVELS,
+  EAR_LEVELS,
+  RHYTHM_LEVELS,
+  SIGHT_LEVELS,
+  chordExercise,
+  chordLevelCap,
+  daySeed,
+  earExercise,
+  rhythmExercise,
+  sightExercise,
+  type ChordExercise,
+} from '@/lib/piano/learn/generators';
 import { dueReadingCards, type DrillKind } from '@/lib/piano/learn/planner';
 import { outcomeFromAnswer } from '@/lib/piano/learn/srs';
 import { usePiano } from '@/lib/piano/learn/store';
@@ -187,29 +199,38 @@ function ReadingDrill({ onClose }: { onClose: () => void }) {
 
 // --------------------------------------------------- generated exercises
 
+type Generated = 'rhythm' | 'ear' | 'sight' | 'chords';
+
+const CHORD_KEYS = { low: 48, high: 84 };
+
 interface Round {
-  kind: 'rhythm' | 'ear' | 'sight';
+  kind: Generated;
   title: string;
   count: number;
   maxLevel: number;
 }
 
-const ROUNDS: Record<'rhythm' | 'ear' | 'sight', Round> = {
+const ROUNDS: Record<Generated, Round> = {
   rhythm: { kind: 'rhythm', title: 'Rhythm', count: 3, maxLevel: RHYTHM_LEVELS },
   ear: { kind: 'ear', title: 'Play by ear', count: 5, maxLevel: EAR_LEVELS },
   sight: { kind: 'sight', title: 'Sight reading', count: 3, maxLevel: SIGHT_LEVELS },
+  chords: { kind: 'chords', title: 'Chords', count: 4, maxLevel: CHORD_LEVELS },
 };
 
-function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; onClose: () => void }) {
+function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => void }) {
   const round = ROUNDS[kind];
   const stored = usePiano((s) => s.drills[kind]);
+  const lessons = usePiano((s) => s.lessons);
   const recordDrill = usePiano((s) => s.recordDrill);
   const setDrillLevel = usePiano((s) => s.setDrillLevel);
-  const [level, setLevel] = useState(() => Math.max(1, Math.min(round.maxLevel, stored?.level ?? 1)));
+  // Chords climb only as far as the lessons have gone: no minor chords before the lesson on them, and so on.
+  const top = kind === 'chords' ? Math.min(round.maxLevel, chordLevelCap((id) => lessons[id]?.done === true)) : round.maxLevel;
+  const [level, setLevel] = useState(() => Math.max(1, Math.min(top, stored?.level ?? 1)));
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<'look' | 'listen' | 'play'>(kind === 'ear' ? 'listen' : kind === 'sight' ? 'look' : 'play');
   const [run, setRun] = useState(0);
-  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  // The reply above the stand. Where the music is out of sight, `stand` is what the stand itself says to match.
+  const [note, setNote] = useState<{ ok: boolean; text: string; stand?: string } | null>(null);
   const [good, setGood] = useState(0);
   const [tries, setTries] = useState(0);
   const [levelNote, setLevelNote] = useState<string | null>(null);
@@ -223,10 +244,11 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
     [],
   );
 
-  const score = useMemo(() => {
+  const { score, chord } = useMemo(() => {
     const seed = seedBase.current + index * 13;
-    const music = kind === 'rhythm' ? rhythmExercise(level, seed) : kind === 'ear' ? earExercise(level, seed) : sightExercise(level, seed);
-    return parseScore(music);
+    const made: ChordExercise | null = kind === 'chords' ? chordExercise(level, seed) : null;
+    const music = made ? made.music : kind === 'rhythm' ? rhythmExercise(level, seed) : kind === 'ear' ? earExercise(level, seed) : sightExercise(level, seed);
+    return { score: parseScore(music), chord: made };
     // A new exercise for each item. The level is read when the item starts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, kind]);
@@ -256,7 +278,7 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
       if (ok) {
         setGood((g) => g + 1);
         streakRef.current = Math.max(1, streakRef.current + 1);
-        if (streakRef.current >= 2 && level < round.maxLevel) {
+        if (streakRef.current >= 2 && level < top) {
           streakRef.current = 0;
           setLevel(level + 1);
           setDrillLevel(kind, level + 1);
@@ -272,7 +294,7 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
         }
       }
     },
-    [kind, level, recordDrill, round.maxLevel, setDrillLevel],
+    [kind, level, recordDrill, setDrillLevel, top],
   );
 
   const onDone = useCallback(
@@ -288,17 +310,31 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
       if (kind === 'ear') {
         if (result.clean) {
           adapt(true);
-          setNote({ ok: true, text: 'Yes, that is it.' });
+          setNote({ ok: true, text: 'Yes, that is it.', stand: 'That is it' });
           timer.current = setTimeout(advance, 1100);
         } else if (tries < 1) {
           setTries(1);
-          setNote({ ok: false, text: 'Not quite. Listen once more.' });
+          setNote({ ok: false, text: 'Not quite. Listen once more.', stand: 'Listen again' });
           timer.current = setTimeout(hear, 1300);
         } else {
           adapt(false);
-          setNote({ ok: false, text: 'You got there. On to the next.' });
+          setNote({ ok: false, text: 'You got there. On to the next.', stand: 'On to the next' });
           timer.current = setTimeout(advance, 1500);
         }
+        return;
+      }
+      if (kind === 'chords') {
+        const ok = result.clean;
+        adapt(ok);
+        setNote({
+          ok,
+          text: ok
+            ? 'Yes. Every chord found first time.'
+            : result.hintedSteps > 0
+              ? 'One of them had to be shown. It will come round again.'
+              : 'A wrong key or two on the way. Picture the shape before you press.',
+        });
+        timer.current = setTimeout(advance, ok ? 1500 : 3000);
         return;
       }
       // A run in which nothing was played is not an attempt, and changes nothing.
@@ -350,13 +386,19 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
   }
 
   const brief =
-    kind === 'rhythm'
-      ? 'Tap this rhythm in time with the clicks, on any key.'
-      : kind === 'ear'
-        ? 'Listen, then play it back. It starts on **C**.'
-        : phase === 'look'
-          ? 'Look it over before you play. Where does it start? Where does it step, skip or repeat?'
-          : 'Play it with the beat. Keep going whatever happens.';
+    kind === 'chords'
+      ? `${chord?.byNumber ? `In the key of **${chord.key}**. ` : ''}${
+          chord?.style === 'broken'
+            ? 'Play each chord one note at a time, from the note it is named after: bottom, middle, top, middle.'
+            : 'Play each chord, all three notes together. Any position on the keyboard will do.'
+        }`
+      : kind === 'rhythm'
+        ? 'Tap this rhythm in time with the clicks, on any key.'
+        : kind === 'ear'
+          ? 'Listen, then play it back. It starts on **C**.'
+          : phase === 'look'
+            ? 'Look it over before you play. Where does it start? Where does it step, skip or repeat?'
+            : 'Play it with the beat. Keep going whatever happens.';
 
   return (
     <Shell title={round.title} progress={index / round.count} onClose={onClose}>
@@ -388,10 +430,16 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
           ) : (
             <PlaySurface
               score={score}
-              mode={phase === 'listen' ? 'listen' : kind === 'ear' ? 'wait' : 'tempo'}
-              display={kind === 'ear' ? 'hidden' : 'staff'}
-              hints="never"
-              hiddenPrompt="Now play what you heard"
+              mode={phase === 'listen' ? 'listen' : kind === 'ear' || kind === 'chords' ? 'wait' : 'tempo'}
+              display={kind === 'ear' ? 'hidden' : kind === 'chords' ? 'chart' : 'staff'}
+              // A chord not found in a while is shown, so nobody is left stuck. It then counts as shown.
+              hints={kind === 'chords' ? 'delay' : 'never'}
+              hintMs={kind === 'chords' ? 7000 : undefined}
+              anyOctave={kind === 'chords'}
+              // Chords may be played anywhere, so three octaves of keys are shown to mirror them.
+              keys={kind === 'chords' ? CHORD_KEYS : undefined}
+              // While a reply is up, the stand does not go on asking for the same thing.
+              hiddenPrompt={note?.stand ?? 'Now play what you heard'}
               catchUp={kind === 'ear' ? 2.2 : undefined}
               // Sight reading starts when the learner says they have looked it over.
               autoStart={kind === 'sight'}

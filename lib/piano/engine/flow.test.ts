@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FlowSession, troubleSpots, type FlowEvent, type FlowResult } from './flow';
-import { emitNoteOn, recentNotes } from '../input/bus';
+import { emitNoteOff, emitNoteOn, recentNotes } from '../input/bus';
 import { parseScore, sliceScore } from '../music/score';
 import { piano } from '../audio/engine';
 
@@ -16,6 +16,7 @@ function run(session: FlowSession) {
 }
 
 const press = (midi: number, source: 'touch' | 'mic' = 'touch') => emitNoteOn(midi, 0.7, piano.now(), source);
+const release = (midi: number) => emitNoteOff(midi, piano.now(), 'touch');
 
 describe('flow, wait mode', () => {
   beforeEach(() => {
@@ -105,6 +106,23 @@ describe('flow, wait mode', () => {
     expect(events.some((e) => e.type === 'hint')).toBe(true);
   });
 
+  it('does not count the time taken to find the first note as a hesitation', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: 2000 });
+    const { events, result } = run(s);
+    vi.advanceTimersByTime(5000); // reading, and finding the hand position
+    expect(events.some((e) => e.type === 'hint')).toBe(true);
+    press(64);
+    vi.advanceTimersByTime(400);
+    press(62);
+    vi.advanceTimersByTime(400);
+    press(60);
+    const r = result()!;
+    expect(r.hintedSteps).toBe(0);
+    expect(r.clean).toBe(true);
+    expect(r.detail[0].state).toBe('ok');
+  });
+
   it('needs every note of a chord and both hands', () => {
     const score = parseScore({ rh: 'E4+G4h C5h', lh: 'C3w' });
     const s = new FlowSession(score, { mode: 'wait', hands: ['R', 'L'], hintDelayMs: Infinity });
@@ -118,6 +136,27 @@ describe('flow, wait mode', () => {
     press(72);
     expect(result()!.clean).toBe(true);
     expect(result()!.totalNotes).toBe(4);
+  });
+
+  it('takes a chord in any position when asked to go by note name', () => {
+    const score = parseScore({ rh: 'C4+E4+G4w | F4+A4+C5w' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity, anyOctave: true });
+    const { result } = run(s);
+    // C major with E at the bottom, an octave down. Then F major spread wide.
+    [52, 55, 60].forEach((m) => press(m));
+    expect(result()).toBeNull();
+    press(62); // D belongs to neither chord
+    [41, 60, 69].forEach((m) => press(m));
+    const r = result()!;
+    expect(r.wrongNotes).toBe(1);
+    expect(r.correctNotes).toBe(3);
+    // Without the option the same keys are simply wrong.
+    const strict = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity });
+    const second = run(strict);
+    [52, 55].forEach((m) => press(m));
+    strict.stop();
+    expect(second.result()).toBeNull();
+    expect(second.events.filter((e) => e.type === 'wrong')).toHaveLength(2);
   });
 
   it('follows one hand only when asked', () => {
@@ -154,6 +193,119 @@ describe('flow, wait mode', () => {
     const r = result()!;
     expect(r.fluency).toBeLessThan(1);
     expect(troubleSpots(r)[0].measure).toBe(1);
+  });
+
+  it('says what became of every note, and which wrong keys were pressed', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h | E4q D4q C4h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity });
+    const { result } = run(s);
+    press(64);
+    press(65); // wrong, where D was wanted
+    press(62);
+    [60, 64, 62, 60].forEach((m) => press(m));
+    const r = result()!;
+    expect(r.detail.map((d) => d.state)).toEqual(['ok', 'off', 'ok', 'ok', 'ok', 'ok']);
+    expect(r.detail[1]).toMatchObject({ measure: 0, midi: 62, hand: 'R' });
+    expect(r.wrong).toEqual([{ measure: 0, midi: 65, expected: [62] }]);
+    expect(r.perMeasure.map((m) => m.played)).toEqual([3, 3]);
+    expect(r.cutShort).toBe(false);
+  });
+
+  it('ends a first play through early once the learner is plainly stuck', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h | E4q D4q C4h | C4q C4q D4q D4q | E4q D4q C4h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: 3000, stopAfter: { hints: 2, wrong: 4 } });
+    const { result } = run(s);
+    // The first measure is known.
+    [64, 62, 60].forEach((m) => {
+      vi.advanceTimersByTime(400);
+      press(m);
+    });
+    // Then nothing comes: one hint, a note found, and a second hint.
+    vi.advanceTimersByTime(3100);
+    expect(result()).toBeNull();
+    press(64);
+    vi.advanceTimersByTime(3100);
+    const r = result()!;
+    expect(r.cutShort).toBe(true);
+    expect(r.clean).toBe(false);
+    expect(r.perMeasure.map((m) => m.played)).toEqual([3, 1, 0, 0]);
+    expect(r.perMeasure[1].hints).toBe(2);
+    expect(r.detail.filter((d) => d.state === 'missed')).toHaveLength(9);
+  });
+
+  it('ends it when a key that was shown is still not played', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: 3000, stopAfter: { hints: 2, wrong: 4 } });
+    const { result } = run(s);
+    // However long the first note takes, the run waits: that is the learner getting ready.
+    vi.advanceTimersByTime(20000);
+    expect(result()).toBeNull();
+    press(64);
+    vi.advanceTimersByTime(3100); // the next key is shown
+    expect(result()).toBeNull();
+    vi.advanceTimersByTime(4100); // and nothing is played
+    expect(result()!.cutShort).toBe(true);
+    expect(result()!.perMeasure[0].played).toBe(1);
+  });
+
+  it('also ends it after a run of wrong keys', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity, hintAfterWrong: 9, stopAfter: { hints: 2, wrong: 3 } });
+    const { result } = run(s);
+    [70, 71, 72].forEach((m) => press(m));
+    expect(result()!.cutShort).toBe(true);
+    expect(result()!.wrongNotes).toBe(3);
+  });
+
+  it('keeps a take of what was played, wrong keys and all, starting at the first key', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h', tempo: 60 });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity });
+    const { result } = run(s);
+    vi.advanceTimersByTime(5000); // a long look before starting
+    press(64);
+    vi.advanceTimersByTime(300);
+    release(64);
+    vi.advanceTimersByTime(200);
+    press(65); // wrong
+    vi.advanceTimersByTime(100);
+    release(65);
+    vi.advanceTimersByTime(400);
+    press(62);
+    vi.advanceTimersByTime(500);
+    release(62);
+    press(60);
+    const take = result()!.take!;
+    expect(take.bpm).toBe(0);
+    expect(take.notes.map((n) => n[0])).toEqual([64, 65, 62, 60]);
+    expect(take.notes[0][1]).toBe(0);
+    expect(take.notes[0][2]).toBeCloseTo(0.3, 2);
+    expect(take.notes[1][1]).toBeCloseTo(0.5, 2);
+    expect(take.notes[2][1]).toBeCloseTo(1.0, 2);
+    // The last key is still down as the run ends, so it gets its written length: a half note at 60.
+    expect(take.notes[3][2]).toBeCloseTo(2, 1);
+  });
+
+  it('keeps no take of playing heard through the microphone', () => {
+    const score = parseScore({ rh: 'E4h D4h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity });
+    const { result } = run(s);
+    press(64, 'mic');
+    vi.advanceTimersByTime(500);
+    press(62, 'mic');
+    expect(result()!.take).toBeNull();
+    expect(result()!.byEar).toBe(true);
+  });
+
+  it('measures how fast a passage was played against its written tempo', () => {
+    const score = parseScore({ rh: 'C4q D4q E4q F4q | G4q F4q E4q D4q', tempo: 120 });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity });
+    const { result } = run(s);
+    // One note a second where the music wants two: half speed.
+    [60, 62, 64, 65, 67, 65, 64, 62].forEach((m) => {
+      vi.advanceTimersByTime(1000);
+      press(m);
+    });
+    expect(result()!.pace).toBeCloseTo(0.5, 2);
   });
 
   it('reports measures relative to the whole piece for a slice', () => {
@@ -222,6 +374,57 @@ describe('flow, tempo mode', () => {
     expect(r.onTime).toBe(0.5);
     expect(r.biasMs).toBeGreaterThan(50);
     expect(r.clean).toBe(false);
+  });
+
+  it('records how far each note fell from the beat, and whether long notes were held', () => {
+    const score = parseScore({ rh: 'C4h D4h | E4h F4h', tempo: 60 });
+    const s = new FlowSession(score, { mode: 'tempo', hands: ['R'], bpm: 60 });
+    const t0 = performance.now() / 1000;
+    const { result } = run(s);
+    // Each half note lasts two seconds. The first two are held, the last two are let go at once.
+    playAt(s, t0, 60, 4, 0, 60);
+    vi.advanceTimersByTime(1800);
+    release(60);
+    playAt(s, t0, 60, 4, 2, 62, 0.2);
+    vi.advanceTimersByTime(1500);
+    release(62);
+    playAt(s, t0, 60, 4, 4, 64);
+    vi.advanceTimersByTime(300);
+    release(64);
+    playAt(s, t0, 60, 4, 6, 65);
+    vi.advanceTimersByTime(300);
+    release(65);
+    vi.advanceTimersByTime(4000);
+    const r = result()!;
+    expect(r.detail.map((d) => d.state)).toEqual(['ok', 'off', 'ok', 'ok']);
+    expect(r.detail[1].errMs).toBeGreaterThan(150);
+    expect(r.detail[0].held).toBeCloseTo(0.9, 1);
+    expect(r.detail[2].held).toBeCloseTo(0.15, 1);
+    expect(r.held).toBe(0.5);
+    const take = r.take!;
+    expect(take.bpm).toBe(60);
+    expect(take.notes).toHaveLength(4);
+    // The first note sounds on the first beat, which is `lead` seconds into the take.
+    expect(take.notes[0][1]).toBeCloseTo(take.lead, 1);
+    expect(take.notes[2][1] - take.notes[0][1]).toBeCloseTo(4, 1);
+  });
+
+  it('takes a long note still down at the end as held', () => {
+    const score = parseScore({ rh: 'C4h D4h | E4w', tempo: 120 });
+    const s = new FlowSession(score, { mode: 'tempo', hands: ['R'], bpm: 120 });
+    const t0 = performance.now() / 1000;
+    const { result } = run(s);
+    playAt(s, t0, 120, 4, 0, 60);
+    vi.advanceTimersByTime(900);
+    release(60);
+    playAt(s, t0, 120, 4, 2, 62);
+    vi.advanceTimersByTime(900);
+    release(62);
+    playAt(s, t0, 120, 4, 4, 64);
+    vi.advanceTimersByTime(6000);
+    const r = result()!;
+    expect(r.detail[2].held).toBeGreaterThanOrEqual(1);
+    expect(r.held).toBe(1);
   });
 
   it('counts in correctly before a pickup', () => {

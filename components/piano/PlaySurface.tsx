@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { piano } from '@/lib/piano/audio/engine';
 import { instrument } from '@/lib/piano/audio/instrument';
+import { TakePlayer } from '@/lib/piano/audio/replay';
 import { Transport, scoreEvents, type TimedEvent } from '@/lib/piano/audio/transport';
 import type { Display, Hints } from '@/lib/piano/content/types';
-import { FlowSession, waitingGate, type FlowResult } from '@/lib/piano/engine/flow';
+import { FlowSession, waitingGate, type FlowResult, type Take } from '@/lib/piano/engine/flow';
 import { emitNoteOff, emitNoteOn, noteBus } from '@/lib/piano/input/bus';
 import { REMOTE_SECONDARY, input } from '@/lib/piano/input/hub';
 import { usePiano } from '@/lib/piano/learn/store';
 import { scoreRange, stepsFor, type Score } from '@/lib/piano/music/score';
 import { pulsesPerMeasure, type Hand } from '@/lib/piano/music/theory';
+import ChordChart from './ChordChart';
 import ContourView from './ContourView';
 import { useInputMode } from './hooks';
 import { Keyboard, flashKey, keyboardRange, type KeyMark } from './Keyboard';
@@ -30,6 +32,12 @@ export interface PlaySurfaceProps {
   names?: boolean;
   /** Judge rhythm only and accept any key. */
   anyKey?: boolean;
+  /** Accept each note in any octave, so chords can be played in any position. */
+  anyOctave?: boolean;
+  /** Milliseconds of waiting before the key is shown, in place of the usual few seconds. */
+  hintMs?: number;
+  /** The keys to draw, in place of the stretch the music itself covers. */
+  keys?: { low: number; high: number };
   /** Change this to start again. */
   runId: number | string;
   onDone: (result: FlowResult | null) => void;
@@ -51,6 +59,16 @@ export interface PlaySurfaceProps {
   click?: boolean;
   /** What to say when the music is kept out of sight and it is the learner's turn. */
   hiddenPrompt?: string;
+  /** End a waiting run early once the learner is plainly stuck, as on a first play through. */
+  stopAfter?: { hints: number; wrong: number } | null;
+  /** Milliseconds before a demonstration begins, to leave time to read what to listen for. */
+  leadIn?: number;
+  /**
+   * Play back a take of the learner's own playing over the music as it stands,
+   * marks and all. Change `key` to play it again, set to null to stop.
+   */
+  replay?: { take: Take; key: number } | null;
+  onReplayDone?: () => void;
 }
 
 type Phase = 'ready' | 'gate' | 'countin' | 'playing' | 'done';
@@ -65,6 +83,9 @@ export default function PlaySurface({
   fingering = true,
   names = false,
   anyKey = false,
+  anyOctave = false,
+  hintMs,
+  keys,
   runId,
   onDone,
   contourLabel = 'finger',
@@ -74,6 +95,10 @@ export default function PlaySurface({
   veil = false,
   click = false,
   hiddenPrompt = 'Your turn',
+  stopAfter = null,
+  leadIn = 350,
+  replay = null,
+  onReplayDone,
 }: PlaySurfaceProps) {
   const inputMode = useInputMode();
   const settings = usePiano((s) => s.settings);
@@ -84,6 +109,9 @@ export default function PlaySurface({
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
   const gateRef = useRef<(() => void) | null>(null);
+  const replayDone = useRef(onReplayDone);
+  replayDone.current = onReplayDone;
+  const [replaying, setReplaying] = useState(false);
 
   const [phase, setPhase] = useState<Phase>('ready');
   const [count, setCount] = useState<number | null>(null);
@@ -99,9 +127,10 @@ export default function PlaySurface({
   const touch = inputMode === 'touch';
 
   const range = useMemo(() => {
+    if (keys) return keys;
     const r = scoreRange(score);
     return keyboardRange(r.low - 2, r.high + 2, touch ? 14 : 19);
-  }, [score, touch]);
+  }, [keys, score, touch]);
 
   useEffect(() => {
     viewRef.current?.clearMarks();
@@ -151,7 +180,7 @@ export default function PlaySurface({
       steps.forEach((step, index) => {
         events.push({ beat: step.start, run: (when) => atAudio(when, () => viewRef.current?.setCursor(index)) });
       });
-      later(350, () => {
+      later(leadIn, () => {
         setPhase('playing');
         transport.start(events, score.totalBeats + 0.5, {
           bpm,
@@ -171,14 +200,16 @@ export default function PlaySurface({
         mode,
         hands: active,
         bpm,
-        hintDelayMs: hints === 'always' ? 0 : hints === 'delay' ? 3500 : Infinity,
+        hintDelayMs: hints === 'always' ? 0 : hints === 'delay' ? (hintMs ?? 3500) : Infinity,
         hintAfterWrong: hints === 'never' ? 4 : 2,
         metronome: click || settings.metronome,
         // Fill in the other hand when the app can play without being overheard.
         accompany: active.length < score.hands.length && inputMode !== 'listen',
         anyPitch: anyKey,
+        anyOctave,
         // The run is armed a moment after it appears. A note struck in that moment still counts.
         catchUp: catchUp ?? 0.4,
+        stopAfter,
         latency: { midi: 0.008 + extra, touch: 0.045 + extra, mic: 0.07 + extra, keys: 0.02 + extra },
       });
       const s = session;
@@ -262,12 +293,50 @@ export default function PlaySurface({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId, score, mode, bpm, active, hints, anyKey, display, held, autoStart]);
 
+  // The learner's own take, played back over the music that was just played.
+  const replayKey = replay?.key ?? null;
+  useEffect(() => {
+    if (!replay) return;
+    const player = new TakePlayer();
+    const view = viewRef.current;
+    const tempo = replay.take.bpm > 0;
+    setReplaying(true);
+    player.play(replay.take, {
+      score,
+      click: tempo,
+      onKey: (midiNote, down) =>
+        setMarks((m) => {
+          const next = { ...m };
+          if (down) next[midiNote] = { kind: 'scale', badge: 'accent' };
+          else delete next[midiNote];
+          return next;
+        }),
+      steps,
+      onStep: tempo ? (index) => view?.setCursor(index) : undefined,
+      onDone: () => {
+        view?.setCursor(null);
+        setMarks({});
+        setReplaying(false);
+        replayDone.current?.();
+      },
+    });
+    return () => {
+      player.stop();
+      view?.setCursor(null);
+      setMarks({});
+      setReplaying(false);
+    };
+    // A new key means play it again. The take and the music belong to the run on the stand.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replayKey]);
+
   const pulses = pulsesPerMeasure(score.time);
   const showStaff = display === 'staff';
   const focusHand = score.hands.length === 2 && active.length === 1 ? active[0] : null;
 
   let status = '';
-  if (mode === 'listen') status = phase === 'done' ? 'That was it' : 'Listen';
+  if (replaying) status = 'Your own playing';
+  else if (mode === 'listen') status = phase === 'done' ? 'That was it' : 'Listen';
   else if (phase === 'done' || held) status = '';
   else if (phase === 'gate') status = 'It starts when you do';
   else if (phase === 'countin') status = 'Get ready';
@@ -282,6 +351,7 @@ export default function PlaySurface({
           <ScoreView ref={viewRef} score={score} steps={steps} showFingering={fingering} showNames={names} focusHand={focusHand} showChords={chordsTaught} />
         )}
         {display === 'contour' && <ContourView ref={viewRef} score={score} steps={steps} label={contourLabel} />}
+        {display === 'chart' && <ChordChart ref={viewRef} score={score} steps={steps} />}
         {display === 'hidden' && (
           <div className="flex h-full flex-col items-center justify-center gap-4 text-mc-muted">
             <div className={`flex h-24 w-24 items-center justify-center rounded-full bg-mc-raised ${mode === 'listen' && phase === 'playing' ? 'mc-pulse' : ''}`}>

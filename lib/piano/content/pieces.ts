@@ -297,6 +297,23 @@ export const PIECES: Piece[] = [
     ],
     note: 'From the notebook Bach kept for his wife. Two lines that talk to each other, so each hand has its own melody.',
   },
+  {
+    id: 'rolling-chords',
+    title: 'Rolling Chords',
+    stage: 5,
+    study: true,
+    key: 'C',
+    time: [4, 4],
+    tempo: 80,
+    rh: 'C4e:1 E4e:3 G4e:5 E4e:3 C4e E4e G4e E4e | B3e:1 D4e:2 G4e:5 D4e:2 B3e D4e G4e D4e | C4e:1 E4e:2 A4e:5 E4e:2 C4e E4e A4e E4e | C4e:1 F4e:3 A4e:5 F4e:3 C4e F4e A4e F4e | C4e:1 E4e:3 G4e:5 E4e:3 C4e E4e G4e E4e | B3e:1 D4e:2 G4e:5 D4e:2 B3e D4e G4e D4e | C4e:1 E4e:2 A4e:5 E4e:2 C4e:1 F4e:3 A4e:5 F4e:3 | C4+E4+G4w:135',
+    lh: 'C3w:1 | G2w:4 | A2w:3 | F2w:5 | C3w:1 | G2w:4 | A2h:3 F2h:5 | C3w:1',
+    chords: 'C | G | Am | F | C | G | Am F | C',
+    sections: [
+      [1, 4],
+      [5, 8],
+    ],
+    note: 'One, five, six, four, with the right hand rippling through each chord. Keep the ripple even, and let each left hand note ring underneath it.',
+  },
 
   // ------------------------------------------------------------- Stage 6
   {

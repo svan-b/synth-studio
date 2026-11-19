@@ -97,6 +97,26 @@ export class Transport {
   }
 }
 
+/**
+ * For a score, the beat at which the measure holding a given beat begins.
+ * Before the first full measure, bars are counted back from the pickup, so a
+ * count in lines up with the music it leads into.
+ */
+export function measureStartFor(score: Score): (beat: number) => number {
+  const mLen = measureBeats(score.time);
+  return (beat: number): number => {
+    if (beat < score.pickup - 1e-9 || beat < 0) {
+      const first = score.pickup > 0 ? score.pickup - mLen : 0;
+      return first + Math.floor((beat - first) / mLen + 1e-9) * mLen;
+    }
+    let start = 0;
+    for (let i = 0; i < score.measureStarts.length; i++) {
+      if (score.measureStarts[i] <= beat + 1e-9) start = score.measureStarts[i];
+    }
+    return start;
+  };
+}
+
 /** Metronome clicks covering [fromBeat, toBeat), aligned to measures. */
 export function clickEvents(
   time: TimeSig,

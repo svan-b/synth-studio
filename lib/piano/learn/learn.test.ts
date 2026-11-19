@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { applyResult, defaultSections, newPieceState, nextTask, pieceProgress, type PieceInfo } from './coach';
+import {
+  applyResult,
+  cleanPass,
+  defaultSections,
+  diagnose,
+  newPieceState,
+  nextTask,
+  pieceProgress,
+  planOutline,
+  skipTrial,
+  trialPending,
+  type PieceInfo,
+  type PieceState,
+} from './coach';
 import { isDue, newCard, outcomeFromAccuracy, outcomeFromAnswer, review } from './srs';
+import { milestones } from './milestones';
 import { streak } from './store';
-import type { FlowResult } from '../engine/flow';
+import type { FlowResult, MeasureStat, NoteOutcome } from '../engine/flow';
 
 const info: PieceInfo = { id: 'p', title: 'P', hands: ['R', 'L'], sections: [[0, 3], [4, 7]], measures: 8 };
 
@@ -27,19 +41,53 @@ function result(patch: Partial<FlowResult> = {}): FlowResult {
     clean: true,
     velocity: null,
     byEar: false,
+    detail: [],
+    wrong: [],
+    held: null,
+    pace: null,
+    cutShort: false,
+    take: null,
     ...patch,
   };
 }
 
+/** A pass that counts but is not spotless, so nothing is skipped. */
+const good = { clean: false, accuracy: 0.93, onTime: 0.7 };
+
+/** A piece already past its first play through, as most of these tests want. */
+function begun(i: PieceInfo = info, day = '2026-01-01'): PieceState {
+  return skipTrial(newPieceState(i, day));
+}
+
+/** Per measure figures for a play through of the eight measure test piece. */
+function measures(patch: Record<number, Partial<MeasureStat>> = {}, reached = 8): MeasureStat[] {
+  return Array.from({ length: 8 }, (_, m) => ({ measure: m, notes: 4, errors: 0, hesitations: 0, hints: 0, played: m < reached ? 4 : 0, ...(patch[m] ?? {}) }));
+}
+
+/** Notes on the beat, one a beat, with the timing errors given. */
+function timed(errs: number[], opts: { dur?: number; step?: number; hand?: 'R' | 'L' } = {}): NoteOutcome[] {
+  const step = opts.step ?? 1;
+  return errs.map((errMs, i) => ({
+    id: `${opts.hand ?? 'R'}${i}`,
+    hand: opts.hand ?? 'R',
+    measure: Math.floor((i * step) / 4),
+    start: i * step,
+    dur: opts.dur ?? step,
+    midi: 60,
+    state: Math.abs(errMs) <= 100 ? 'ok' : 'off',
+    errMs,
+  }));
+}
+
 describe('practice coach', () => {
   it('starts by listening, then each hand, then together, then with the beat', () => {
-    let state = newPieceState(info, '2026-01-01');
+    let state = begun();
     const seen: string[] = [];
     for (let i = 0; i < 12; i++) {
       const task = nextTask(info, state)!;
       if (task.scope.type !== 'section' || task.scope.index !== 0) break;
       seen.push(`${task.mode}:${task.hands.join('')}:${task.tempoPct}`);
-      state = applyResult(info, state, task, task.mode === 'listen' ? null : result({ mode: task.mode === 'tempo' ? 'tempo' : 'wait' }), '2026-01-01').state;
+      state = applyResult(info, state, task, task.mode === 'listen' ? null : result({ mode: task.mode === 'tempo' ? 'tempo' : 'wait', ...good }), '2026-01-01').state;
     }
     expect(seen).toEqual([
       'listen:RL:85',
@@ -58,8 +106,45 @@ describe('practice coach', () => {
     expect(task.mode).toBe('listen');
   });
 
+  it('does not ask for a clean pass twice, except at full tempo', () => {
+    let state = begun();
+    const seen: string[] = [];
+    let said = '';
+    for (let i = 0; i < 12; i++) {
+      const task = nextTask(info, state)!;
+      if (task.scope.type !== 'section' || task.scope.index !== 0) break;
+      seen.push(`${task.mode}:${task.hands.join('')}:${task.tempoPct}`);
+      const out = applyResult(info, state, task, task.mode === 'listen' ? null : result({ mode: task.mode === 'tempo' ? 'tempo' : 'wait' }));
+      if (task.mode === 'wait' && task.hands.length === 2) said = out.verdict.message;
+      state = out.state;
+    }
+    expect(seen).toEqual(['listen:RL:85', 'wait:R:0', 'wait:L:0', 'wait:RL:0', 'tempo:RL:60', 'tempo:RL:80']);
+    expect(said).toMatch(/once is enough/);
+
+    // The whole piece: 70 and 85 once each when clean, full tempo twice whatever happens.
+    state.sections.forEach((s) => (s.rung = 6));
+    state.joined = 1;
+    const tempi: number[] = [];
+    for (let i = 0; i < 8 && !state.learned; i++) {
+      const task = nextTask(info, state)!;
+      tempi.push(task.tempoPct);
+      state = applyResult(info, state, task, result({ mode: 'tempo' })).state;
+    }
+    expect(tempi).toEqual([70, 85, 100, 100]);
+  });
+
+  it('counts a pass as clean only when it is right, fluent and on the beat', () => {
+    const wait = nextTask(info, { ...begun(), sections: [{ rung: 3, streak: 0, fails: 0 }, { rung: 0, streak: 0, fails: 0 }] })!;
+    expect(cleanPass(wait, result())).toBe(true);
+    expect(cleanPass(wait, result({ fluency: 0.7 }))).toBe(false);
+    expect(cleanPass(wait, result({ clean: false }))).toBe(false);
+    const tempo = nextTask(info, { ...begun(), sections: [{ rung: 4, streak: 0, fails: 0 }, { rung: 0, streak: 0, fails: 0 }] })!;
+    expect(cleanPass(tempo, result({ mode: 'tempo', onTime: 0.9 }))).toBe(true);
+    expect(cleanPass(tempo, result({ mode: 'tempo', onTime: 0.7 }))).toBe(false);
+  });
+
   it('takes a trouble spot out after two poor tries, then puts it back', () => {
-    let state = newPieceState(info, '2026-01-01');
+    let state = begun();
     state.sections[0].rung = 3;
     const bad = result({ accuracy: 0.6, wrongNotes: 5, clean: false, perMeasure: [
       { measure: 0, notes: 4, errors: 0, hesitations: 0 },
@@ -83,7 +168,7 @@ describe('practice coach', () => {
   });
 
   it('steps the tempo down after two poor tries with the beat', () => {
-    let state = newPieceState(info, '2026-01-01');
+    let state = begun();
     state.sections[0].rung = 5;
     const bad = result({ mode: 'tempo', accuracy: 0.6, onTime: 0.4, clean: false });
     state = applyResult(info, state, nextTask(info, state)!, bad).state;
@@ -94,7 +179,7 @@ describe('practice coach', () => {
   });
 
   it('joins phrases, then climbs with the whole piece until it is learned', () => {
-    let state = newPieceState(info, '2026-01-01');
+    let state = begun();
     state.sections.forEach((s) => (s.rung = 6));
     let task = nextTask(info, state)!;
     expect(task.scope).toEqual({ type: 'join', upTo: 1 });
@@ -106,7 +191,7 @@ describe('practice coach', () => {
       task = nextTask(info, state)!;
       expect(task.scope.type).toBe('whole');
       tempi.push(task.tempoPct);
-      const out = applyResult(info, state, task, result({ mode: 'tempo' }), '2026-01-03');
+      const out = applyResult(info, state, task, result({ mode: 'tempo', ...good }), '2026-01-03');
       state = out.state;
       learned = out.verdict.learned;
     }
@@ -119,7 +204,7 @@ describe('practice coach', () => {
   });
 
   it('tells late notes from wrong notes', () => {
-    let state = newPieceState(info, '2026-01-01');
+    let state = begun();
     state.sections[0].rung = 4;
     // Late, but unevenly so: that is the playing.
     const late = result({ mode: 'tempo', accuracy: 0.95, onTime: 0.3, biasMs: 70, meanAbsMs: 150, clean: false });
@@ -129,7 +214,7 @@ describe('practice coach', () => {
   });
 
   it('does not slow the music down when every note is late by the same amount', () => {
-    let state = newPieceState(info, '2026-01-01');
+    let state = begun();
     state.sections[0].rung = 4;
     // 260 ms late on every note: a delay in the connection, not a tempo that is too quick.
     const lagging = result({ mode: 'tempo', accuracy: 1, onTime: 0, biasMs: 260, meanAbsMs: 262, clean: false });
@@ -143,7 +228,7 @@ describe('practice coach', () => {
   });
 
   it('gives a pass judged by ear a little more room', () => {
-    const state = newPieceState(info, '2026-01-01');
+    const state = begun();
     state.sections[0].rung = 4;
     const task = nextTask(info, state)!;
     expect(task.mode).toBe('tempo');
@@ -158,15 +243,178 @@ describe('practice coach', () => {
 
   it('uses a shorter ladder for one hand', () => {
     const solo: PieceInfo = { id: 's', title: 'S', hands: ['R'], sections: [[0, 3]], measures: 4 };
-    let state = newPieceState(solo);
+    let state = begun(solo);
     const modes: string[] = [];
     for (let i = 0; i < 9; i++) {
       const task = nextTask(solo, state)!;
       if (task.scope.type !== 'section') break;
       modes.push(task.mode);
-      state = applyResult(solo, state, task, task.mode === 'listen' ? null : result({ mode: task.mode === 'tempo' ? 'tempo' : 'wait' })).state;
+      state = applyResult(solo, state, task, task.mode === 'listen' ? null : result({ mode: task.mode === 'tempo' ? 'tempo' : 'wait', ...good })).state;
     }
     expect(modes).toEqual(['listen', 'wait', 'wait', 'tempo', 'tempo', 'tempo', 'tempo']);
+  });
+
+  describe('the first play through', () => {
+    it('comes first for a new piece, and ends early if the learner is stuck', () => {
+      const state = newPieceState(info, '2026-01-01');
+      expect(trialPending(state)).toBe(true);
+      const task = nextTask(info, state)!;
+      expect(task.scope).toEqual({ type: 'trial' });
+      expect([task.mode, task.from, task.to]).toEqual(['wait', 0, 7]);
+      expect(task.hands).toEqual(['R', 'L']);
+      expect(task.stopAfter).toEqual({ hints: 2, wrong: 4 });
+    });
+
+    it('skips the notes of a piece that is already known', () => {
+      const state = newPieceState(info, '2026-01-01');
+      const out = applyResult(info, state, nextTask(info, state)!, result({ perMeasure: measures(), pace: 0.8 }));
+      expect(out.verdict.passed).toBe(true);
+      expect(out.verdict.message).toMatch(/know the notes already/);
+      expect(trialPending(out.state)).toBe(false);
+      const next = nextTask(info, out.state)!;
+      expect(next.scope).toEqual({ type: 'whole' });
+      expect(next.tempoPct).toBe(70);
+      expect(pieceProgress(info, out.state)).toBeCloseTo(0.7, 5);
+    });
+
+    it('gives slow but right playing a slow beat before the whole piece', () => {
+      const state = newPieceState(info, '2026-01-01');
+      const out = applyResult(info, state, nextTask(info, state)!, result({ perMeasure: measures(), pace: 0.3 }));
+      const next = nextTask(info, out.state)!;
+      expect(next.scope).toEqual({ type: 'section', index: 0 });
+      expect([next.mode, next.tempoPct]).toEqual(['tempo', 60]);
+    });
+
+    it('works only on the phrase that is not known', () => {
+      const state = newPieceState(info, '2026-01-01');
+      // Phrase one is right. In phrase two the key had to be shown, and the run stopped there.
+      const stats = measures({ 4: { hints: 1, played: 4 }, 5: { hints: 1, played: 1 } }, 5);
+      const out = applyResult(info, state, nextTask(info, state)!, result({ perMeasure: stats, cutShort: true, clean: false, accuracy: 0.6, hintedSteps: 2, pace: 0.7 }));
+      expect(out.verdict.message).toMatch(/Phrase 1 is in your fingers/);
+      expect(out.state.sections.map((s) => s.rung)).toEqual([6, 0]);
+      const next = nextTask(info, out.state)!;
+      expect(next.scope).toEqual({ type: 'section', index: 1 });
+      expect(next.mode).toBe('listen');
+      // Once phrase two is secure, the two are joined.
+      const later = { ...out.state, sections: [out.state.sections[0], { rung: 6, streak: 0, fails: 0 }] };
+      expect(nextTask(info, later)!.scope).toEqual({ type: 'join', upTo: 1 });
+    });
+
+    it('lets a slip or two skip the single hand steps but not the notes', () => {
+      const state = newPieceState(info, '2026-01-01');
+      const stats = measures({ 1: { errors: 1 }, 6: { errors: 2 } });
+      const out = applyResult(info, state, nextTask(info, state)!, result({ perMeasure: stats, clean: false, accuracy: 0.9, wrongNotes: 3, pace: 0.7 }));
+      expect(out.state.sections.map((s) => s.rung)).toEqual([3, 3]);
+      const next = nextTask(info, out.state)!;
+      expect([next.mode, next.hands.join('')]).toEqual(['wait', 'RL']);
+    });
+
+    it('starts a piece that is new from its beginning, without calling it a failure', () => {
+      const state = newPieceState(info, '2026-01-01');
+      const stats = measures({ 0: { hints: 2, played: 2 } }, 0);
+      const out = applyResult(info, state, nextTask(info, state)!, result({ perMeasure: stats, cutShort: true, clean: false, accuracy: 0.05, hintedSteps: 2, pace: null }));
+      expect(out.verdict.plain).toBe(true);
+      expect(out.verdict.message).toMatch(/new to you/);
+      const next = nextTask(info, out.state)!;
+      expect(next.scope).toEqual({ type: 'section', index: 0 });
+      expect(next.mode).toBe('listen');
+    });
+
+    it('can be skipped, and is not asked of a piece already under way', () => {
+      const fresh = newPieceState(info, '2026-01-01');
+      expect(nextTask(info, skipTrial(fresh))!.mode).toBe('listen');
+      // A piece begun before the first play through existed has no record of one.
+      const old: PieceState = { ...fresh, trial: undefined };
+      expect(trialPending(old)).toBe(true);
+      expect(trialPending({ ...old, sections: [{ rung: 2, streak: 0, fails: 0 }, { rung: 0, streak: 0, fails: 0 }] })).toBe(false);
+      expect(trialPending({ ...old, learned: true })).toBe(false);
+    });
+  });
+
+  describe('saying what went wrong', () => {
+    it('names the measure where the slips were', () => {
+      const detail = timed([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).map((d, i) => (i >= 8 && i <= 10 ? { ...d, state: 'missed' as const, errMs: undefined } : d));
+      expect(diagnose(result({ mode: 'tempo', accuracy: 0.75, detail }))).toMatch(/measure 3/);
+    });
+
+    it('names the hand that slipped', () => {
+      const right = timed([0, 0, 0, 0, 0, 0, 0, 0]);
+      const left = timed([0, 0, 0, 0, 0, 0, 0, 0], { hand: 'L' }).map((d, i) => (i % 2 === 0 ? { ...d, state: 'missed' as const, errMs: undefined } : d));
+      expect(diagnose(result({ mode: 'tempo', hands: ['R', 'L'], accuracy: 0.75, detail: [...right, ...left] }))).toMatch(/left hand/);
+    });
+
+    /** Quarter notes on the beat, then half notes, each followed by a note that arrives well before its beat. */
+    const cutShort = () => [
+      ...timed([0, 10, -10, 0]),
+      ...timed([5, -140, -120, -150, -130], { step: 2, dur: 2 }).map((d, i) => ({ ...d, id: `h${i}`, start: 4 + i * 2 })),
+    ];
+
+    it('spots coming in early after long notes', () => {
+      expect(diagnose(result({ mode: 'tempo', accuracy: 1, onTime: 0.5, detail: cutShort() }))).toMatch(/early after the long notes/);
+      // When every note is early by the same amount there is nothing to tell the long notes by.
+      const all = timed([-140, -140, -120, -150, -130, -160], { step: 2, dur: 2 });
+      expect(diagnose(result({ mode: 'tempo', accuracy: 1, onTime: 0, detail: all }))).toBeNull();
+    });
+
+    it('names the measure and the hand together when both are clear', () => {
+      const right = timed([0, 0, 0, 0, 0, 0, 0, 0]);
+      const left = timed([0, 0, 0, 0, 0, 0, 0, 0], { hand: 'L' }).map((d, i) => (i >= 4 && i <= 6 ? { ...d, state: 'missed' as const, errMs: undefined } : d));
+      expect(diagnose(result({ mode: 'tempo', hands: ['R', 'L'], accuracy: 0.8, detail: [...right, ...left] }))).toBe('Most of the slips were in the left hand, in measure 2.');
+    });
+
+    it('spots quick notes running ahead of the beat', () => {
+      const quarters = timed([0, 10, -10, 0]);
+      const eighths = timed([-70, -80, -60, -90, -75, -85], { step: 0.5 }).map((d, i) => ({ ...d, id: `e${i}`, start: 4 + i * 0.5 }));
+      expect(diagnose(result({ mode: 'tempo', accuracy: 1, onTime: 0.4, detail: [...quarters, ...eighths] }))).toMatch(/quick notes ran ahead/);
+    });
+
+    it('spots speeding up from start to finish', () => {
+      const detail = timed([0, -15, -30, -50, -70, -85, -100, -120, -140, -160, -175, -190]);
+      expect(diagnose(result({ mode: 'tempo', accuracy: 1, onTime: 0.4, detail }))).toMatch(/sped up/);
+    });
+
+    it('says nothing when there is no clear pattern', () => {
+      const detail = timed([120, -130, 20, -110, 140, 0, -125, 115]);
+      expect(diagnose(result({ mode: 'tempo', accuracy: 1, onTime: 0.25, detail }))).toBeNull();
+      expect(diagnose(result({ detail: [] }))).toBeNull();
+    });
+
+    it('mentions long notes let go early, even after a pass', () => {
+      const state = begun();
+      state.sections[0].rung = 4;
+      const out = applyResult(info, state, nextTask(info, state)!, result({ mode: 'tempo', ...good, held: 0.2 }));
+      expect(out.verdict.passed).toBe(true);
+      expect(out.verdict.message).toMatch(/let go early/);
+    });
+
+    it('uses what it found in the coach\'s reply', () => {
+      const state = begun();
+      state.sections[0].rung = 4;
+      const out = applyResult(info, state, nextTask(info, state)!, result({ mode: 'tempo', accuracy: 1, onTime: 0.5, biasMs: -60, meanAbsMs: 65, clean: false, detail: cutShort() }));
+      expect(out.verdict.passed).toBe(false);
+      expect(out.verdict.message).toMatch(/The notes were right\. You came in early after the long notes/);
+    });
+  });
+
+  it('lays out the whole route to a learned piece', () => {
+    const fresh = newPieceState(info, '2026-01-01');
+    expect(planOutline(info, fresh)[0]).toEqual({ title: 'To begin', steps: [{ label: 'Play it through', state: 'now' }] });
+    const state = begun();
+    state.sections[0].rung = 2;
+    const rows = planOutline(info, state);
+    expect(rows.map((r) => r.title)).toEqual(['Phrase 1', 'Phrase 2', 'Join the phrases', 'The whole piece']);
+    expect(rows[0].detail).toBe('Measures 1 to 4');
+    expect(rows[0].steps.map((s) => `${s.label}:${s.state}`)).toEqual([
+      'Listen:done',
+      'Right hand:done',
+      'Left hand:now',
+      'Together:todo',
+      'Slow beat:todo',
+      'Faster:todo',
+    ]);
+    expect(rows[3].steps.map((s) => s.label)).toEqual(['70 percent', '85 percent', 'Full tempo']);
+    const solo: PieceInfo = { id: 's', title: 'S', hands: ['R'], sections: [[0, 3]], measures: 4 };
+    expect(planOutline(solo, begun(solo)).map((r) => r.title)).toEqual(['The notes and the beat', 'The whole piece']);
   });
 
   it('splits a piece into phrases of four measures', () => {
@@ -230,6 +478,28 @@ describe('spaced review', () => {
   });
 });
 
+describe('the path so far', () => {
+  it('lists the firsts, finished stages and learned pieces, newest first', () => {
+    const order = lessonOrder();
+    const lessons: Record<string, { done: boolean; doneOn?: string; skipped?: boolean; step: number }> = {};
+    order.slice(0, 6).forEach((id, i) => (lessons[id] = { done: true, doneOn: `2026-03-0${i + 1}`, step: 0 }));
+    const pieces = { 'hot-cross-buns': { ...newPieceState(pieceInfo('hot-cross-buns'), '2026-03-02'), learned: true, learnedOn: '2026-03-04' } };
+    const path = milestones('2026-03-01', lessons, pieces);
+    expect(path.map((m) => `${m.on} ${m.title}`)).toEqual([
+      '2026-03-06 Finished stage 1, First sounds',
+      '2026-03-06 Played with both hands at once',
+      '2026-03-04 Learned Hot Cross Buns',
+      '2026-03-02 Played a first tune',
+      '2026-03-01 Started with Middle C',
+    ]);
+  });
+
+  it('does not count lessons that were marked as known', () => {
+    const lessons = Object.fromEntries(lessonOrder().slice(0, 12).map((id) => [id, { done: true, skipped: true, step: 0 }]));
+    expect(milestones('2026-03-01', lessons, {}).map((m) => m.kind)).toEqual(['start']);
+  });
+});
+
 describe('streak', () => {
   it('counts days in a row, allowing today to be still to come', () => {
     const d = (seconds: number) => ({ seconds, notes: 0, activities: 0 });
@@ -241,8 +511,8 @@ describe('streak', () => {
   });
 });
 
-import { earExercise, rhythmExercise, sightExercise, EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS } from './generators';
-import { currentPiece, introducedPieces, planSession, readsStaff, skippedPieces } from './planner';
+import { chordExercise, chordLevelCap, earExercise, rhythmExercise, sightExercise, CHORD_LEVELS, EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS } from './generators';
+import { currentPiece, introducedPieces, openDrills, pieceToEndOn, planSession, readsStaff, skippedPieces } from './planner';
 import { parseScore, scoreRange } from '../music/score';
 import { lessonOrder, pieceInfo } from '../content/catalog';
 
@@ -274,6 +544,43 @@ describe('generated exercises', () => {
     }
   });
 
+  it('makes four chords of one key at every level, written from the note each is named after', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      for (let level = 1; level <= CHORD_LEVELS; level++) {
+        const ex = chordExercise(level, seed);
+        const s = parseScore(ex.music);
+        expect(s.measureCount, `chords level ${level} seed ${seed}`).toBe(4);
+        expect(s.chords).toHaveLength(4);
+        expect(s.notes).toHaveLength(ex.style === 'block' ? 12 : 16);
+        for (let m = 0; m < 4; m++) {
+          const notes = s.notes.filter((n) => n.measure === m);
+          // Three different notes, stacked in thirds: a triad in root position.
+          const classes = Array.from(new Set(notes.map((n) => n.midi))).sort((a, b) => a - b);
+          expect(classes).toHaveLength(3);
+          expect([3, 4]).toContain(classes[1] - classes[0]);
+          expect([3, 4]).toContain(classes[2] - classes[1]);
+          if (ex.style === 'broken') expect(notes.map((n) => n.midi)).toEqual([classes[0], classes[1], classes[2], classes[1]]);
+        }
+        const symbols = s.chords.map((c) => c.symbol);
+        if (ex.byNumber) for (const sym of symbols) expect(sym).toMatch(/^(I|ii|iii|IV|V|vi)$/);
+        else for (const sym of symbols) expect(sym).toMatch(/^[A-G][♯♭]?m?$/);
+      }
+    }
+    // The early levels stay in C, on its three main chords.
+    for (let seed = 1; seed <= 30; seed++) {
+      const symbols = parseScore(chordExercise(1, seed).music).chords.map((c) => c.symbol);
+      for (const sym of symbols) expect(['C', 'F', 'G']).toContain(sym);
+    }
+  });
+
+  it('lets chords climb only as far as the lessons have gone', () => {
+    const upTo = (ids: string[]) => (id: string) => ids.includes(id);
+    expect(chordLevelCap(upTo(['triads']))).toBe(2);
+    expect(chordLevelCap(upTo(['triads', 'minor-chords']))).toBe(4);
+    expect(chordLevelCap(upTo(['triads', 'minor-chords', 'keys']))).toBe(6);
+    expect(chordLevelCap(upTo(['triads', 'minor-chords', 'keys', 'progressions']))).toBe(CHORD_LEVELS);
+  });
+
   it('is repeatable for a seed and varies between seeds', () => {
     expect(sightExercise(2, 5)).toEqual(sightExercise(2, 5));
     const distinct = new Set(Array.from({ length: 20 }, (_, i) => sightExercise(2, i + 1).rh));
@@ -292,10 +599,54 @@ describe('daily plan', () => {
   const order = lessonOrder();
   const doneUpTo = (n: number) => Object.fromEntries(order.slice(0, n).map((id) => [id, { done: true, step: 0 }]));
 
-  it('starts a brand new learner with the first lesson', () => {
-    const plan = planSession({ minutes: 20, lessons: {}, pieces: {}, cards: {}, now: new Date('2026-03-02T09:00:00') });
-    expect(plan[0]).toMatchObject({ kind: 'lesson', id: order[0] });
-    expect(plan.some((b) => b.kind === 'piece')).toBe(false);
+  it('gives a brand new learner the first two lessons, so the first day ends with a tune', () => {
+    const now = new Date('2026-03-02T09:00:00');
+    const plan = planSession({ minutes: 20, lessons: {}, pieces: {}, cards: {}, now });
+    expect(plan.map((b) => `${b.kind}:${b.id}`)).toEqual([`lesson:${order[0]}`, `lesson:${order[1]}`]);
+    // With only ten minutes the tour of the keyboard is the day, and nothing untaught is tacked on.
+    const short = planSession({ minutes: 10, lessons: {}, pieces: {}, cards: {}, now });
+    expect(short.map((b) => `${b.kind}:${b.id}`)).toEqual([`lesson:${order[0]}`]);
+    // Having taken that first lesson today, the second is still offered today.
+    const lessons = { [order[0]]: { done: true, doneOn: '2026-03-02', step: 0 } };
+    const after = planSession({ minutes: 20, lessons, pieces: {}, cards: {}, now });
+    expect(after[0]).toMatchObject({ kind: 'lesson', id: order[1] });
+    // From then on it is one lesson a day.
+    const two = { ...lessons, [order[1]]: { done: true, doneOn: '2026-03-02', step: 0 } };
+    expect(planSession({ minutes: 20, lessons: two, pieces: {}, cards: {}, now }).some((b) => b.kind === 'lesson')).toBe(false);
+  });
+
+  it('never sets an exercise before the lesson that prepares it', () => {
+    expect(openDrills({})).toEqual([]);
+    expect(openDrills(doneUpTo(1))).toEqual([]);
+    expect(openDrills(doneUpTo(2))).toEqual(['ear']);
+    expect(openDrills(doneUpTo(3))).toEqual(['ear', 'rhythm']);
+    expect(openDrills(doneUpTo(8))).toEqual(['ear', 'sight', 'rhythm']);
+    expect(openDrills(doneUpTo(order.indexOf('triads') + 1))).toEqual(['ear', 'sight', 'rhythm', 'chords']);
+    const now = new Date('2026-03-02T09:00:00');
+    for (let day = 0; day < 4; day++) {
+      const at = new Date(now.getTime() + day * 86400000);
+      for (let n = 0; n <= order.length; n++) {
+        const lessons = doneUpTo(n);
+        const open = openDrills(lessons);
+        for (const b of planSession({ minutes: 30, lessons, pieces: {}, cards: {}, now: at })) {
+          if (b.kind === 'drill' && b.id !== 'reading') expect(open, `after ${n} lessons`).toContain(b.id);
+        }
+      }
+    }
+  });
+
+  it('ends on a piece the learner already plays well, when there is one', () => {
+    const now = new Date('2026-03-10T09:00:00');
+    const lessons = doneUpTo(6);
+    const learned = (id: string, lastOn: string) => ({ ...newPieceState(pieceInfo(id), '2026-03-01'), learned: true, wholeRung: 3, lastOn });
+    const pieces = { 'hot-cross-buns': learned('hot-cross-buns', '2026-03-08'), 'mary-lamb': learned('mary-lamb', '2026-03-05') };
+    expect(pieceToEndOn(pieces, '2026-03-10')).toBe('mary-lamb');
+    const plan = planSession({ minutes: 30, lessons, pieces, cards: {}, now });
+    const last = plan[plan.length - 1];
+    expect(last).toMatchObject({ kind: 'piece', id: 'mary-lamb', minutes: 2 });
+    expect(plan.reduce((a, b) => a + b.minutes, 0)).toBeLessThanOrEqual(32);
+    // One played today already is not offered again.
+    expect(pieceToEndOn({ 'mary-lamb': learned('mary-lamb', '2026-03-10') }, '2026-03-10')).toBeNull();
   });
 
   it('adds piece work once a lesson has introduced a piece', () => {

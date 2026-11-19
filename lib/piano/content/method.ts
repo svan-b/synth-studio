@@ -24,15 +24,27 @@ export const PRINCIPLES: Principle[] = [
   },
   {
     title: 'Right notes first, then the beat, then speed',
-    what: 'New notes are learned with no time pressure, because the music waits for you. A slow beat comes next, and the tempo rises only after two good passes in a row.',
+    what: 'New notes are learned with no time pressure, because the music waits for you. A slow beat comes next, and the tempo rises after two good passes in a row, or after one that is clean.',
     evidence:
       'Among 17 advanced pianists, practice time and number of repetitions did not predict how well a passage was played the next day. The share of correct attempts did, along with slowing down to get things right and fixing errors at once. This is one small study of advanced players, and no controlled trial has compared slow then faster against practising at speed.',
     strength: 'moderate',
     sources: ['Duke, Simmons and Cash, 2009, Journal of Research in Music Education', 'Allingham and Wöllner, 2022, Psychology of Music'],
   },
   {
+    title: 'Practise what you cannot yet play',
+    what: 'The first time you open a piece you play it through once. Phrases you already have are not drilled again, and a clean pass moves you on without a repeat. Only the last tempo always asks for two good passes, so that the piece is known to be stable.',
+    evidence:
+      'Accounts of how experts practise put the work on what cannot yet be done, not on what is already comfortable, and in the pianist study above neither time nor repetitions predicted the result. Across many studies, hours of this kind of practice explain about a fifth of the differences between musicians, so it matters a great deal without being everything. No trial has tested skipping ahead like this with beginners, which is why the final tempo is kept strict.',
+    strength: 'limited',
+    sources: [
+      'Ericsson, Krampe and Tesch-Römer, 1993, Psychological Review',
+      'Macnamara, Hambrick and Oswald, 2014, Psychological Science',
+      'Duke, Simmons and Cash, 2009',
+    ],
+  },
+  {
     title: 'Take trouble spots out and fix them',
-    what: 'When the same measure trips you twice, the coach isolates it, has you play it right twice, and puts it back.',
+    what: 'After a run the coach says where the slips were and, when the playing shows it, why: long notes let go early, quick notes running ahead, one hand slipping. When the same measure trips you twice, the coach isolates it, has you play it right twice, and puts it back.',
     evidence:
       'The best practisers in the same study stopped at errors, located their source precisely, and repeated the spot until it was correct and stable. Beginners left alone mostly play pieces straight through.',
     strength: 'moderate',
@@ -61,7 +73,7 @@ export const PRINCIPLES: Principle[] = [
   },
   {
     title: 'One new thing at a time',
-    what: 'A session has at most one new lesson, and then goes back to pieces you are already learning.',
+    what: 'A session brings one new lesson, and then goes back to pieces you are already learning. The first day is the one exception, because the first lesson has no music in it. You can take the next lesson early if you want to, and the app says plainly that it is your call.',
     evidence: 'In one study, learning a second melody straight after the first wiped out the overnight gain on the first, unless the first was played again before stopping.',
     strength: 'limited',
     sources: ['Allen, 2013, Psychology of Music'],
@@ -105,6 +117,14 @@ export const PRINCIPLES: Principle[] = [
     sources: ['Swinnen and colleagues, 1990, Journal of Experimental Psychology: Learning, Memory, and Cognition'],
   },
   {
+    title: 'Hear yourself from the outside',
+    what: 'After a run you can hear your own playing back, key for key, next to the model. The play through that finishes a piece is kept, and so is the latest one since, so you can hear how far you have come.',
+    evidence:
+      'Players judge their own playing differently once they hear a recording of it. In a study of 112 school musicians, ratings of their own pitch and rhythm changed after listening back, mostly toward the more critical. Whether listening back makes anyone improve faster is less clear. In a trial with young band players, judging their own playing helped when they also had a model to compare with. So the two buttons sit side by side.',
+    strength: 'limited',
+    sources: ['Silveira and Gavin, 2016, Psychology of Music', 'Hewitt, 2001, Journal of Research in Music Education'],
+  },
+  {
     title: 'Spaced review, for reading',
     what: 'Notes you have learned to read come back for review on a schedule that stretches as you get them right.',
     evidence:
@@ -122,11 +142,19 @@ export const PRINCIPLES: Principle[] = [
   },
   {
     title: 'Your choices and your progress',
-    what: 'You can open any piece at any time, practise your own way in Options, and see what you have learned.',
+    what: 'You can open any piece at any time, practise your own way, take a lesson early, see the plan the coach is following, and look back over the path you have travelled.',
     evidence:
       'Belief in your own ability is the strongest predictor of how music students perform, and people tend to give up an instrument when they feel neither capable nor in control of what they play.',
     strength: 'moderate',
     sources: ['McPherson and McCormick, 2006, Psychology of Music', 'Evans, McPherson and Davidson, 2013, Psychology of Music'],
+  },
+  {
+    title: 'End on something that goes well',
+    what: 'When there is time, a session closes with a piece you have already learned.',
+    evidence:
+      'People judge an experience largely by how it ended, and are more willing to repeat one that ended well. That finding comes from studies of discomfort, not of music practice, so this is a reasoned choice about wanting to come back tomorrow, not a tested one.',
+    strength: 'limited',
+    sources: ['Kahneman, Fredrickson, Schreiber and Redelmeier, 1993, Psychological Science'],
   },
 ];
 
@@ -156,4 +184,7 @@ export const TIPS: string[] = [
   'In time with the beat, a wrong note is a smaller mistake than a late one. Keep going.',
   'End each session by playing something you can already play well.',
   'What felt hard today will often feel easier tomorrow, with no extra work. That is your memory settling.',
+  'After a run with the beat, press Hear yours now and then. From the outside you hear things that are hidden while you play.',
+  'A new chord progression is worth playing three ways: as whole chords, as broken chords, and as arpeggios.',
+  'Hold long notes for all of their beats. Counting them out is what keeps the next note from arriving early.',
 ];

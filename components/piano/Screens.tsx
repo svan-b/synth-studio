@@ -1,13 +1,25 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { allPieces, allStages, getLesson, lessonOrder, lessonUnlocked, pieceInfo } from '@/lib/piano/content/catalog';
+import { TakePlayer } from '@/lib/piano/audio/replay';
+import { allPieces, allStages, getLesson, getPiece, lessonOrder, lessonUnlocked, pieceInfo } from '@/lib/piano/content/catalog';
 import { NOT_USED, PRINCIPLES, TIPS, type Strength } from '@/lib/piano/content/method';
 import type { FlowResult } from '@/lib/piano/engine/flow';
 import { pieceProgress } from '@/lib/piano/learn/coach';
-import { EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS } from '@/lib/piano/learn/generators';
-import { dueReadingCards, introducedPieces, planMinutes, planSession, readsStaff, skippedPieces, type Block, type DrillKind } from '@/lib/piano/learn/planner';
-import { exportData, streak, totalMinutes, usePiano } from '@/lib/piano/learn/store';
+import { CHORD_LEVELS, EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS } from '@/lib/piano/learn/generators';
+import { milestones } from '@/lib/piano/learn/milestones';
+import {
+  DRILL_LESSON,
+  dueReadingCards,
+  introducedPieces,
+  openDrills,
+  planMinutes,
+  planSession,
+  skippedPieces,
+  type Block,
+  type DrillKind,
+} from '@/lib/piano/learn/planner';
+import { exportData, streak, totalMinutes, usePiano, type Recording } from '@/lib/piano/learn/store';
 import { isNative, shareFile } from '@/lib/piano/native/bridge';
 import { parseScore } from '@/lib/piano/music/score';
 import { dayKey } from '@/lib/piano/util/emitter';
@@ -67,6 +79,10 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   const date = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const tip = TIPS[Math.floor(new Date(today + 'T12:00:00').getTime() / 86400000) % TIPS.length];
   const firstTime = Object.keys(lessons).length === 0 && Object.keys(days).length === 0;
+  const isDone = (id: string) => lessons[id]?.done === true;
+  // The next lesson, for a learner who wants more than the day's plan holds.
+  const upNext = lessonOrder().find((id) => !isDone(id) && lessonUnlocked(id, isDone));
+  const offerLesson = upNext !== undefined && !plan.some((b) => b.kind === 'lesson') && !firstTime;
 
   return (
     <Page title="Today" subtitle={date} right={<ConnectionChip onClick={() => onGo('settings')} />}>
@@ -77,8 +93,12 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
               <h2 className="font-mc-serif text-2xl">{doneToday ? 'Today is done' : firstTime ? 'Your first session' : 'Your session'}</h2>
               <p className="mt-1 text-mc-muted">
                 {doneToday
-                  ? 'Rest is part of learning. Come back tomorrow. If you want more today, this is extra practice with nothing new in it.'
-                  : `About ${planMinutes(plan)} minutes, in ${plan.length} ${plan.length === 1 ? 'part' : 'parts'}.`}
+                  ? plan.length > 0
+                    ? 'Rest is part of learning. Come back tomorrow. If you want more today, this is extra practice with nothing new in it.'
+                    : 'Rest is part of learning. Come back tomorrow.'
+                  : firstTime && plan.length > 1
+                    ? `About ${planMinutes(plan)} minutes. By the end of it you will have played your first tune.`
+                    : `About ${planMinutes(plan)} minutes, in ${plan.length} ${plan.length === 1 ? 'part' : 'parts'}.`}
               </p>
             </div>
             {doneToday && (
@@ -91,6 +111,8 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
             {plan.map((b, i) => (
               <li key={`${b.kind}-${b.id}`}>
                 <button
+                  // A lesson that waits on the one before it opens in its turn, when the session reaches it.
+                  disabled={b.kind === 'lesson' && !lessonUnlocked(b.id, isDone)}
                   onClick={() => onStart(b.kind === 'lesson' ? { kind: 'lesson', id: b.id } : b.kind === 'piece' ? { kind: 'piece', id: b.id, minutes: b.minutes } : { kind: 'drill', id: b.id })}
                   className="flex w-full items-center gap-4 rounded-2xl bg-mc-bg px-4 py-3 text-left active:bg-mc-raised"
                 >
@@ -106,9 +128,25 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
               </li>
             ))}
           </ol>
-          <Button size="lg" className="mt-6 w-full" onClick={() => onStart({ kind: 'session', blocks: plan })} icon={<Icon.Play size={20} />}>
-            {doneToday ? 'Practise some more' : firstTime ? 'Begin' : 'Start session'}
-          </Button>
+          {plan.length > 0 && (
+            <Button size="lg" className="mt-6 w-full" onClick={() => onStart({ kind: 'session', blocks: plan })} icon={<Icon.Play size={20} />}>
+              {doneToday ? 'Practise some more' : firstTime ? 'Begin' : 'Start session'}
+            </Button>
+          )}
+          {offerLesson && upNext && (
+            <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-mc-line px-4 py-3">
+              <div className="min-w-0">
+                <div className="font-semibold">Want something new?</div>
+                <div className="text-sm leading-snug text-mc-muted">
+                  The course moves at one new lesson a day, because that is what holds best. The next is <span className="text-mc-ink">{getLesson(upNext).title}</span>, and
+                  taking it early is your call.
+                </div>
+              </div>
+              <Button variant="soft" size="sm" className="shrink-0" onClick={() => onStart({ kind: 'lesson', id: upNext })}>
+                Take it now
+              </Button>
+            </div>
+          )}
         </Card>
 
         <div className="space-y-4">
@@ -318,6 +356,9 @@ export function TrainScreen({ onStart }: { onStart: (a: Activity) => void }) {
   const lessons = usePiano((s) => s.lessons);
   const due = dueReadingCards(cards, new Date()).length;
   const known = Object.keys(cards).filter((id) => id.startsWith('read:')).length;
+  const open = openDrills(lessons);
+  // What an exercise says under its name while the lesson that prepares it is still to come.
+  const waits = (kind: Exclude<DrillKind, 'reading'>, ready: string) => (open.includes(kind) ? ready : `Best after the lesson called ${getLesson(DRILL_LESSON[kind]).title}`);
   const items: Array<{ id: DrillKind; title: string; text: string; meta: string; icon: ReactNode }> = [
     {
       id: 'reading',
@@ -330,27 +371,34 @@ export function TrainScreen({ onStart }: { onStart: (a: Activity) => void }) {
       id: 'ear',
       title: 'Play by ear',
       text: 'Hear a short pattern and play it back, with nothing to look at.',
-      meta: `Level ${drills.ear?.level ?? 1} of ${EAR_LEVELS}`,
+      meta: waits('ear', `Level ${drills.ear?.level ?? 1} of ${EAR_LEVELS}`),
       icon: <Icon.Ear size={24} />,
     },
     {
       id: 'rhythm',
       title: 'Rhythm',
       text: 'Tap written rhythms in time with the beat, on any key.',
-      meta: `Level ${drills.rhythm?.level ?? 1} of ${RHYTHM_LEVELS}`,
+      meta: waits('rhythm', `Level ${drills.rhythm?.level ?? 1} of ${RHYTHM_LEVELS}`),
       icon: <Icon.Pulse size={24} />,
     },
     {
       id: 'sight',
       title: 'Sight reading',
       text: 'A new melody every time. Look it over, then play it once without stopping.',
-      meta: readsStaff(lessons) ? `Level ${drills.sight?.level ?? 1} of ${SIGHT_LEVELS}` : 'Best after the reading lessons',
+      meta: waits('sight', `Level ${drills.sight?.level ?? 1} of ${SIGHT_LEVELS}`),
       icon: <Icon.Pieces size={24} />,
+    },
+    {
+      id: 'chords',
+      title: 'Chords',
+      text: 'Chord symbols appear and you play them, whole or one note at a time, anywhere on the keyboard.',
+      meta: waits('chords', `Level ${drills.chords?.level ?? 1} of ${CHORD_LEVELS}`),
+      icon: <Icon.Chord size={24} />,
     },
   ];
   return (
     <Page title="Train" subtitle="Short exercises for one skill at a time. The difficulty follows how you do.">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((it) => (
           <button
             key={it.id}
@@ -370,12 +418,37 @@ export function TrainScreen({ onStart }: { onStart: (a: Activity) => void }) {
 
 // --------------------------------------------------------------- progress
 
+/** A day as people write it: 4 March, with the year only when it is not this one. */
+function dayText(day: string): string {
+  const d = new Date(day + 'T12:00:00');
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(undefined, sameYear ? { month: 'long', day: 'numeric' } : { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 export function ProgressScreen() {
   const days = usePiano((s) => s.days);
   const lessons = usePiano((s) => s.lessons);
   const pieces = usePiano((s) => s.pieces);
   const cards = usePiano((s) => s.cards);
   const profile = usePiano((s) => s.profile);
+  const recordings = usePiano((s) => s.recordings);
+  const path = useMemo(() => milestones(profile.startedOn, lessons, pieces), [profile.startedOn, lessons, pieces]);
+  const [allPath, setAllPath] = useState(false);
+  // One recording plays at a time. `hearing` names it.
+  const player = useRef<TakePlayer | null>(null);
+  const [hearing, setHearing] = useState<string | null>(null);
+  useEffect(() => () => player.current?.stop(), []);
+  const hear = (key: string, recording: Recording) => {
+    const p = (player.current ??= new TakePlayer());
+    p.stop();
+    if (hearing === key) {
+      setHearing(null);
+      return;
+    }
+    setHearing(key);
+    p.play(recording.take, { onDone: () => setHearing((now) => (now === key ? null : now)) });
+  };
+  const kept = allPieces().filter((p) => recordings[p.id]);
   const total = lessonOrder().length;
   const done = lessonOrder().filter((id) => lessons[id]?.done).length;
   const learned = Object.values(pieces).filter((p) => p.learned).length;
@@ -425,6 +498,67 @@ export function ProgressScreen() {
           ))}
         </div>
       </Card>
+      <div className="mt-6 grid gap-6 landscape:grid-cols-2">
+        <Card className="p-6">
+          <h2 className="font-mc-serif text-2xl">Your path so far</h2>
+          <ol className="mt-4">
+            {(allPath ? path : path.slice(0, 6)).map((m, i, shown) => (
+              <li key={`${m.on}-${m.title}`} className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${m.kind === 'start' ? 'bg-mc-line' : 'bg-mc-ok'}`} />
+                  {i < shown.length - 1 && <span className="w-px flex-1 bg-mc-line" />}
+                </div>
+                <div className="pb-4">
+                  <div className="font-semibold leading-snug">{m.title}</div>
+                  <div className="text-sm text-mc-muted">{dayText(m.on)}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+          {path.length > 6 && (
+            <Button variant="ghost" size="sm" className="-ml-4" onClick={() => setAllPath((v) => !v)}>
+              {allPath ? 'Show less' : `Show all ${path.length}`}
+            </Button>
+          )}
+        </Card>
+        <Card className="p-6">
+          <h2 className="font-mc-serif text-2xl">Your recordings</h2>
+          {kept.length === 0 ? (
+            <p className="mt-3 text-[15px] leading-relaxed text-mc-muted">
+              When you learn a piece, your own playing of it is kept here. Later play throughs are kept beside the first, so you can hear how far you have come.
+            </p>
+          ) : (
+            <ul className="mt-3 divide-y divide-mc-line">
+              {kept.map((p) => {
+                const r = recordings[p.id];
+                const takes: Array<[string, string, Recording]> = [[`${p.id}:first`, r.latest ? 'First' : 'Recorded', r.first]];
+                if (r.latest) takes.push([`${p.id}:latest`, 'Latest', r.latest]);
+                return (
+                  <li key={p.id} className="py-3">
+                    <div className="font-semibold">{getPiece(p.id).title}</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {takes.map(([key, label, recording]) => (
+                        <button
+                          key={key}
+                          onClick={() => hear(key, recording)}
+                          className={`flex h-11 items-center gap-2 rounded-full px-4 text-[15px] font-semibold active:scale-[0.97] ${
+                            hearing === key ? 'bg-mc-ink text-mc-bg' : 'bg-mc-raised text-mc-ink'
+                          }`}
+                        >
+                          {hearing === key ? <Icon.Close size={16} /> : <Icon.Play size={15} />}
+                          <span>
+                            {label}, {dayText(recording.on)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      </div>
       <div className="mt-6 space-y-4">
         {allStages().map((stage) => {
           const n = stage.lessons.filter((id) => lessons[id]?.done).length;

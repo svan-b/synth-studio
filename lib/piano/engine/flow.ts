@@ -11,9 +11,10 @@
  */
 
 import { piano } from '../audio/engine';
-import { Transport, clickEvents, scoreEvents, type TimedEvent } from '../audio/transport';
+import { Transport, clickEvents, measureStartFor, scoreEvents, type TimedEvent } from '../audio/transport';
 import { noteBus, recentNotes, type NoteInput, type NoteSource } from '../input/bus';
 import { input, isRemoteKey } from '../input/hub';
+import { midi } from '../input/midi';
 import type { NoteEvent, Score, Step } from '../music/score';
 import { stepsFor } from '../music/score';
 import { measureBeats, type Hand } from '../music/theory';
@@ -41,12 +42,20 @@ export interface FlowOptions {
   latency?: Partial<Record<NoteSource, number>>;
   /** Judge timing only and accept any key. Used for rhythm work. */
   anyPitch?: boolean;
+  /** Accept each note in any octave, so that a chord can be played in any position on the keyboard. */
+  anyOctave?: boolean;
   /**
    * Wait mode: seconds to look back when the run begins. A learner who starts
    * a moment early, while the app is still getting ready, is not made to play
    * it all again.
    */
   catchUp?: number;
+  /**
+   * Wait mode: end the run early once this many steps have needed a hint, or
+   * this many wrong keys have been pressed. For a first play through, which
+   * only has to show how much is already known.
+   */
+  stopAfter?: { hints: number; wrong: number } | null;
 }
 
 export type FlowEvent =
@@ -64,6 +73,58 @@ export interface MeasureStat {
   notes: number;
   errors: number;
   hesitations: number;
+  /** Steps in this measure where the key had to be shown. */
+  hints?: number;
+  /** Notes of this measure that were played. Fewer than `notes` when the run ended early or notes were missed. */
+  played?: number;
+}
+
+/** What became of one note the music asked for. */
+export interface NoteOutcome {
+  id: string;
+  hand: Hand;
+  /** Measure index in the full piece. */
+  measure: number;
+  /** Beats from the start of the passage. */
+  start: number;
+  /** Written length in beats. */
+  dur: number;
+  midi: number;
+  /**
+   * ok: right, and on the beat where there is one.
+   * off: the right note, but off the beat, or found only after a slip or a hint.
+   * missed: never played.
+   */
+  state: 'ok' | 'off' | 'missed';
+  /** Tempo mode: milliseconds from the beat. Positive is late. */
+  errMs?: number;
+  /** Tempo mode: share of the written length the key stayed down, when the input can tell. */
+  held?: number;
+}
+
+/** A key that was pressed where the music asked for something else. */
+export interface WrongPress {
+  /** Measure index in the full piece. */
+  measure: number;
+  midi: number;
+  /** The keys the music wanted at that moment. */
+  expected: number[];
+}
+
+/**
+ * Everything the learner played in a run, so that it can be played back.
+ * Times are in seconds from the start of the take.
+ */
+export interface Take {
+  /** Quarter notes per minute of the run, or 0 when the music waited. */
+  bpm: number;
+  /** Seconds from the start of the take to the first beat of the music. */
+  lead: number;
+  /** Every key pressed: the key, when, how long it was held, and how hard, 0 to 1. */
+  notes: Array<[number, number, number, number]>;
+  /** The right pedal: when, and 1 for down or 0 for up. */
+  pedal: Array<[number, number]>;
+  seconds: number;
 }
 
 export interface FlowResult {
@@ -96,6 +157,18 @@ export interface FlowResult {
   velocity: number | null;
   /** The notes came through the microphone, which mishears the odd one. */
   byEar: boolean;
+  /** Every note the music asked for, and what became of it. */
+  detail: NoteOutcome[];
+  /** Keys pressed that the music did not ask for. */
+  wrong: WrongPress[];
+  /** Tempo mode: share of the long notes that were held for most of their length, or null when it cannot be told. */
+  held: number | null;
+  /** Wait mode: how fast it was played, as a share of the written tempo, or null for a very short passage. */
+  pace: number | null;
+  /** The run was ended early, see `stopAfter`. */
+  cutShort: boolean;
+  /** What was played, for hearing it back. Null when it came through the microphone. */
+  take: Take | null;
 }
 
 /** Typical delay between an action and the app hearing about it. */
@@ -119,13 +192,29 @@ export class FlowSession {
   private startedAt = 0;
 
   private byEar = false;
+  private cutShort = false;
+  private offPedal: (() => void) | null = null;
+
+  // what was played, for hearing it back
+  private takeStart = 0;
+  private takeNotes: Array<[number, number, number, number]> = [];
+  private takePedal: Array<[number, number]> = [];
+  /** Keys that are down now, with their place in the take and when they went down. */
+  private down = new Map<number, { at: number; index: number; noteId: string | null }>();
+  private heldShare = new Map<string, number>();
+  private outcome = new Map<string, 'ok' | 'off'>();
+  private wrongPresses: WrongPress[] = [];
+  private measureHints = new Map<number, number>();
 
   // wait mode
   private stepIndex = 0;
   private pending = new Set<string>();
   private stepWrong = 0;
   private stepHinted = false;
+  /** The key was shown on this step, but as a guide to where to begin, not as a rescue. */
+  private stepGuided = false;
   private hintTimer: ReturnType<typeof setTimeout> | null = null;
+  private stallTimer: ReturnType<typeof setTimeout> | null = null;
   private stepTimes: number[] = [];
   private lastStepAt = 0;
 
@@ -159,7 +248,9 @@ export class FlowSession {
       accompany: opts.accompany ?? false,
       metronome: opts.metronome ?? true,
       anyPitch: opts.anyPitch ?? false,
+      anyOctave: opts.anyOctave ?? false,
       catchUp: opts.catchUp ?? 0,
+      stopAfter: opts.stopAfter ?? null,
       latency: { ...DEFAULT_LATENCY, ...(opts.latency ?? {}) },
     };
     this.steps = stepsFor(score, this.options.hands);
@@ -171,9 +262,22 @@ export class FlowSession {
     return this.options.mode;
   }
 
+  /** Does a key that was pressed count as this note of the music? */
+  private fits(note: NoteEvent, key: number): boolean {
+    if (this.options.anyPitch || note.midi === key) return true;
+    return this.options.anyOctave && (note.midi - key) % 12 === 0;
+  }
+
   start(): void {
     if (this.phase !== 'ready') return;
     this.unsub = noteBus.subscribe((ev) => this.onInput(ev));
+    this.offPedal = midi.pedals.subscribe((ev) => {
+      if (ev.pedal !== 'sustain' || this.phase !== 'playing') return;
+      const last = this.takePedal[this.takePedal.length - 1];
+      const state = ev.down ? 1 : 0;
+      if (last && last[1] === state) return;
+      this.takePedal.push([round3(ev.time - this.takeStart), state]);
+    });
     this.startedAt = piano.now();
     activeFlow.current = this;
     if (this.steps.length === 0) {
@@ -205,9 +309,13 @@ export class FlowSession {
     if (activeFlow.current === this) activeFlow.current = null;
     this.unsub?.();
     this.unsub = null;
+    this.offPedal?.();
+    this.offPedal = null;
     this.transport.stop();
     if (this.hintTimer) clearTimeout(this.hintTimer);
     this.hintTimer = null;
+    if (this.stallTimer) clearTimeout(this.stallTimer);
+    this.stallTimer = null;
     if (this.ticker) clearInterval(this.ticker);
     this.ticker = null;
     this.timers.forEach((t) => clearTimeout(t));
@@ -217,16 +325,58 @@ export class FlowSession {
 
   private setPhase(phase: FlowPhase): void {
     this.phase = phase;
+    if (phase === 'playing') {
+      // The take begins here. In tempo mode that is a moment before the first beat.
+      this.takeStart = piano.now();
+    }
     this.events.emit({ type: 'phase', phase });
   }
 
   private onInput(ev: NoteInput): void {
-    if (ev.type !== 'on' || this.phase !== 'playing') return;
+    if (this.phase !== 'playing') return;
+    if (ev.type === 'off') {
+      this.keyUp(ev);
+      return;
+    }
     if (ev.source === 'mic') this.byEar = true;
     // The top and bottom keys are buttons for the app, unless the music uses them.
     if (ev.source === 'midi' && input.remoteKeys && isRemoteKey(ev.midi) && !this.pitches.has(ev.midi) && !this.options.anyPitch) return;
     if (this.options.mode === 'wait') this.waitInput(ev);
     else this.tempoInput(ev);
+  }
+
+  /** When a key press is taken to have happened, on the clock the take is kept in. */
+  private heardAt(ev: NoteInput): number {
+    // With a beat, the delay of the input is taken off, as it is for judging.
+    return this.options.mode === 'tempo' ? ev.time - piano.outputLatency() - this.options.latency[ev.source] : ev.time;
+  }
+
+  private keyDown(ev: NoteInput, noteId: string | null): void {
+    // A key struck again before it was let go ends its first sounding here.
+    this.keyUp({ ...ev, type: 'off' });
+    const at = this.heardAt(ev);
+    // Without a beat the take begins with its first key, however long the learner took to start.
+    if (this.options.mode === 'wait' && this.takeNotes.length === 0) this.takeStart = at;
+    this.takeNotes.push([ev.midi, round3(Math.max(0, at - this.takeStart)), 0, Math.round(ev.velocity * 100) / 100]);
+    this.down.set(ev.midi, { at: ev.time, index: this.takeNotes.length - 1, noteId });
+  }
+
+  private keyUp(ev: NoteInput, atEnd = false): void {
+    const key = this.down.get(ev.midi);
+    if (!key) return;
+    this.down.delete(ev.midi);
+    let seconds = Math.max(0.03, ev.time - key.at);
+    if (atEnd && this.options.mode === 'wait') {
+      // The run ends as its last key goes down. Give that note its written length.
+      const note = key.noteId ? this.notes.find((n) => n.id === key.noteId) : undefined;
+      seconds = Math.max(seconds, note ? (note.dur * 60) / this.score.tempo : 0.4);
+    }
+    this.takeNotes[key.index][2] = round3(seconds);
+    if (key.noteId === null || this.options.mode !== 'tempo' || ev.source === 'mic') return;
+    // With the right pedal down the sound carries on after the key comes up, so nothing can be said.
+    if (!atEnd && midi.isPedalDown('sustain')) return;
+    const note = this.notes.find((n) => n.id === key.noteId);
+    if (note) this.heldShare.set(note.id, clamp(seconds / Math.max(0.05, note.dur * this.beatSeconds), 0, 1.5));
   }
 
   private noteVelocity(ev: NoteInput): void {
@@ -257,7 +407,7 @@ export class FlowSession {
     // A microphone also hears the app's own demonstration, so it is left out.
     const early = recentNotes.filter((ev) => ev.time >= since && ev.source !== 'mic');
     const first = this.steps[0].notes;
-    const from = early.findIndex((ev) => this.options.anyPitch || first.some((n) => n.midi === ev.midi));
+    const from = early.findIndex((ev) => first.some((n) => this.fits(n, ev.midi)));
     if (from < 0) return;
     for (const ev of early.slice(from)) this.onInput(ev);
   }
@@ -267,11 +417,14 @@ export class FlowSession {
     this.pending = new Set(step.notes.map((n) => n.id));
     this.stepWrong = 0;
     this.stepHinted = false;
+    this.stepGuided = false;
     this.lastStepAt = piano.now();
     input.expect(step.notes.map((n) => n.midi));
     this.events.emit({ type: 'step', index: this.stepIndex });
     if (this.hintTimer) clearTimeout(this.hintTimer);
     this.hintTimer = null;
+    if (this.stallTimer) clearTimeout(this.stallTimer);
+    this.stallTimer = null;
     const delay = this.options.hintDelayMs;
     if (delay <= 0) this.revealHint();
     else if (Number.isFinite(delay)) this.hintTimer = setTimeout(() => this.revealHint(), delay);
@@ -280,36 +433,72 @@ export class FlowSession {
   private revealHint(): void {
     if (this.phase !== 'playing' || this.stepHinted) return;
     this.stepHinted = true;
-    // A hint shown from the start is a guide, not a rescue, so it is not counted.
-    if (this.options.hintDelayMs > 0) this.hinted++;
     const step = this.steps[this.stepIndex];
+    // A hint shown from the start is a guide, not a rescue, so it is not counted.
+    // Nor is one on the very first note when nothing wrong was played: time
+    // spent finding the place to begin is not a hesitation.
+    this.stepGuided = this.stepIndex === 0 && this.stepWrong === 0;
+    if (this.options.hintDelayMs > 0 && !this.stepGuided) {
+      this.hinted++;
+      const m = step.measure + this.score.measureOffset;
+      this.measureHints.set(m, (this.measureHints.get(m) ?? 0) + 1);
+    }
     this.events.emit({ type: 'hint', index: this.stepIndex, notes: step.notes.filter((n) => this.pending.has(n.id)) });
+    this.stopIfEnough();
+    // On a first play through, a key that was shown and still not played says the learner has stopped.
+    if (this.options.stopAfter && !this.stepGuided && this.phase === 'playing') {
+      const at = this.stepIndex;
+      this.stallTimer = setTimeout(() => {
+        if (this.phase !== 'playing' || this.stepIndex !== at) return;
+        this.cutShort = true;
+        this.finish();
+      }, 4000);
+    }
+  }
+
+  /** A first play through has heard enough once the learner is plainly stuck. */
+  private stopIfEnough(): void {
+    const limit = this.options.stopAfter;
+    if (!limit || this.phase !== 'playing') return;
+    if (this.hinted >= limit.hints || this.wrong >= limit.wrong) {
+      this.cutShort = true;
+      this.finish();
+    }
   }
 
   private waitInput(ev: NoteInput): void {
     const step = this.steps[this.stepIndex];
-    const match = step.notes.find((n) => this.pending.has(n.id) && (n.midi === ev.midi || this.options.anyPitch));
+    const match = step.notes.find((n) => this.pending.has(n.id) && this.fits(n, ev.midi));
     if (match) {
       this.pending.delete(match.id);
       this.noteVelocity(ev);
-      const rescued = this.stepWrong > 0 || (this.stepHinted && this.options.hintDelayMs > 0);
+      this.keyDown(ev, match.id);
+      const rescued = this.stepWrong > 0 || (this.stepHinted && !this.stepGuided && this.options.hintDelayMs > 0);
       if (!rescued) this.firstTry++;
-      this.events.emit({ type: 'note', id: match.id, state: rescued ? 'warn' : 'ok', midi: match.midi });
+      this.outcome.set(match.id, rescued ? 'off' : 'ok');
+      // Where any octave will do, the key to light is the one that was pressed.
+      this.events.emit({ type: 'note', id: match.id, state: rescued ? 'warn' : 'ok', midi: this.options.anyOctave ? ev.midi : match.midi });
       if (this.pending.size === 0) this.completeStep();
       return;
     }
     // Pressing a chord note again is harmless.
-    if (step.notes.some((n) => n.midi === ev.midi)) return;
+    if (step.notes.some((n) => this.fits(n, ev.midi))) {
+      this.keyDown(ev, null);
+      return;
+    }
     // A microphone can report the previous note twice while it rings on.
     if (ev.source === 'mic' && this.stepIndex > 0) {
       const prev = this.steps[this.stepIndex - 1];
       if (prev.notes.some((n) => n.midi === ev.midi) && ev.time - this.lastStepAt < 0.35) return;
     }
+    this.keyDown(ev, null);
     this.stepWrong++;
     this.wrong++;
     this.addMeasureError(step.measure);
+    this.wrongPresses.push({ measure: step.measure + this.score.measureOffset, midi: ev.midi, expected: step.notes.map((n) => n.midi) });
     this.events.emit({ type: 'wrong', midi: ev.midi });
     if (this.stepWrong >= this.options.hintAfterWrong) this.revealHint();
+    this.stopIfEnough();
   }
 
   private completeStep(): void {
@@ -342,18 +531,7 @@ export class FlowSession {
     // Count in one full measure, shortened by any pickup the music starts with.
     const countIn = score.pickup > 0 ? mLen - score.pickup + mLen : mLen;
     const fromBeat = -countIn;
-    const measureStart = (beat: number): number => {
-      // Before the first full measure, bars are counted back from the pickup.
-      if (beat < score.pickup - 1e-9 || beat < 0) {
-        const first = score.pickup > 0 ? score.pickup - mLen : 0;
-        return first + Math.floor((beat - first) / mLen + 1e-9) * mLen;
-      }
-      let start = 0;
-      for (let i = 0; i < score.measureStarts.length; i++) {
-        if (score.measureStarts[i] <= beat + 1e-9) start = score.measureStarts[i];
-      }
-      return start;
-    };
+    const measureStart = measureStartFor(score);
 
     let pulseNumber = 0;
     let lastMeasure = NaN;
@@ -435,23 +613,25 @@ export class FlowSession {
     let best: NoteEvent | null = null;
     let bestErr = Infinity;
     for (const n of this.notes) {
-      if ((n.midi !== ev.midi && !this.options.anyPitch) || this.matched.has(n.id) || this.missed.has(n.id)) continue;
+      if (!this.fits(n, ev.midi) || this.matched.has(n.id) || this.missed.has(n.id)) continue;
       const err = t - this.transport.timeOfBeat(n.start);
       if (Math.abs(err) <= this.matchWindow && Math.abs(err) < Math.abs(bestErr)) {
         best = n;
         bestErr = err;
       }
     }
+    this.keyDown(ev, best ? best.id : null);
     if (best) {
       this.noteVelocity(ev);
       this.matched.set(best.id, bestErr);
       const onTime = Math.abs(bestErr) <= this.onTimeWindow;
-      this.events.emit({ type: 'note', id: best.id, state: onTime ? 'ok' : 'warn', midi: best.midi });
+      this.events.emit({ type: 'note', id: best.id, state: onTime ? 'ok' : 'warn', midi: this.options.anyOctave ? ev.midi : best.midi });
     } else {
       this.wrong++;
       const beat = this.transport.beatAt(t);
       const step = this.steps.reduce((a, s) => (s.start <= beat + 0.25 ? s : a), this.steps[0]);
       this.addMeasureError(step.measure);
+      this.wrongPresses.push({ measure: step.measure + this.score.measureOffset, midi: ev.midi, expected: step.notes.map((n) => n.midi) });
       this.events.emit({ type: 'wrong', midi: ev.midi });
     }
   }
@@ -483,13 +663,18 @@ export class FlowSession {
         }
       }
     }
+    // Keys still down are taken to have been held to the end.
+    const now = piano.now();
+    for (const midiNote of Array.from(this.down.keys())) {
+      this.keyUp({ type: 'off', midi: midiNote, velocity: 0, time: now, source: 'midi' }, true);
+    }
     const result = this.buildResult();
     this.cleanup();
     this.setPhase('done');
     this.events.emit({ type: 'done', result });
   }
 
-  private hesitations(): { count: number; byMeasure: Map<number, number> } {
+  private hesitations(): { count: number; byMeasure: Map<number, number>; median: number | null } {
     const byMeasure = new Map<number, number>();
     const rates: number[] = [];
     const info: Array<{ rate: number; dt: number; db: number; measure: number }> = [];
@@ -501,7 +686,7 @@ export class FlowSession {
       rates.push(rate);
       info.push({ rate, dt, db, measure: this.steps[i].measure });
     }
-    if (rates.length < 3) return { count: 0, byMeasure };
+    if (rates.length < 3) return { count: 0, byMeasure, median: null };
     const sorted = rates.slice().sort((a, b) => a - b);
     const median = sorted[Math.floor(sorted.length / 2)];
     let count = 0;
@@ -512,7 +697,20 @@ export class FlowSession {
         byMeasure.set(m, (byMeasure.get(m) ?? 0) + 1);
       }
     }
-    return { count, byMeasure };
+    return { count, byMeasure, median };
+  }
+
+  /** The take as it will be stored and played back, or null when the microphone was the ear. */
+  private buildTake(seconds: number): Take | null {
+    if (this.byEar || this.takeNotes.length === 0) return null;
+    const tempo = this.options.mode === 'tempo';
+    return {
+      bpm: tempo ? this.options.bpm : 0,
+      lead: tempo ? round3(Math.max(0, this.transport.timeOfBeat(0) - this.takeStart)) : 0,
+      notes: this.takeNotes,
+      pedal: this.takePedal,
+      seconds: round3(Math.max(0, seconds)),
+    };
   }
 
   private buildResult(): FlowResult {
@@ -523,7 +721,23 @@ export class FlowSession {
       const m = n.measure + this.score.measureOffset;
       perMeasureNotes.set(m, (perMeasureNotes.get(m) ?? 0) + 1);
     }
-    const hes = this.options.mode === 'wait' ? this.hesitations() : { count: 0, byMeasure: new Map<number, number>() };
+    const wait = this.options.mode === 'wait';
+    const hes = wait ? this.hesitations() : { count: 0, byMeasure: new Map<number, number>(), median: null };
+
+    // What became of each note.
+    const detail: NoteOutcome[] = this.notes.map((n) => {
+      const base = { id: n.id, hand: n.hand, measure: n.measure + this.score.measureOffset, start: n.start, dur: n.dur, midi: n.midi };
+      if (wait) return { ...base, state: this.outcome.get(n.id) ?? ('missed' as const) };
+      const err = this.matched.get(n.id);
+      if (err === undefined) return { ...base, state: 'missed' as const };
+      const out: NoteOutcome = { ...base, state: Math.abs(err) <= this.onTimeWindow ? 'ok' : 'off', errMs: Math.round(err * 1000) };
+      const share = this.heldShare.get(n.id);
+      if (share !== undefined) out.held = Math.round(share * 100) / 100;
+      return out;
+    });
+    const playedIn = new Map<number, number>();
+    for (const d of detail) if (d.state !== 'missed') playedIn.set(d.measure, (playedIn.get(d.measure) ?? 0) + 1);
+
     const perMeasure: MeasureStat[] = Array.from(perMeasureNotes.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([measure, notes]) => ({
@@ -531,7 +745,19 @@ export class FlowSession {
         notes,
         errors: this.measureErrors.get(measure) ?? 0,
         hesitations: hes.byMeasure.get(measure) ?? 0,
+        hints: this.measureHints.get(measure) ?? 0,
+        played: playedIn.get(measure) ?? 0,
       }));
+
+    // Long notes, and whether they were kept down for most of their length.
+    const long = detail.filter((d) => d.dur >= 2 - 1e-6 && d.held !== undefined);
+    const held = long.length >= 2 ? long.filter((d) => (d.held ?? 0) >= 0.6).length / long.length : null;
+    const shared = {
+      detail,
+      wrong: this.wrongPresses,
+      cutShort: this.cutShort,
+      take: this.buildTake(piano.now() - this.takeStart),
+    };
 
     if (this.options.mode === 'wait') {
       const accuracy = total === 0 ? 1 : this.firstTry / total;
@@ -553,9 +779,12 @@ export class FlowSession {
         fluency: 1 - hes.count / steps,
         perMeasure,
         seconds,
-        clean: this.wrong === 0 && this.hinted === 0,
+        clean: this.wrong === 0 && this.hinted === 0 && !this.cutShort,
         velocity: this.velocityCount > 0 ? this.velocitySum / this.velocityCount : null,
         byEar: this.byEar,
+        held: null,
+        pace: hes.median !== null && hes.median > 0 ? 60 / this.score.tempo / hes.median : null,
+        ...shared,
       };
     }
 
@@ -586,8 +815,15 @@ export class FlowSession {
       clean: accuracy >= 0.95 && this.missed.size === 0,
       velocity: this.velocityCount > 0 ? this.velocitySum / this.velocityCount : null,
       byEar: this.byEar,
+      held,
+      pace: null,
+      ...shared,
     };
   }
+}
+
+function round3(x: number): number {
+  return Math.round(x * 1000) / 1000;
 }
 
 /** Measures that gave the most trouble, worst first. */

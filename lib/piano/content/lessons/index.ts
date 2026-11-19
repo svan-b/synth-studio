@@ -14,7 +14,7 @@ export const STAGES: Stage[] = [
   { id: 1, title: 'First sounds', goal: 'Find your way around the keyboard and play real tunes by ear and by shape.', lessons: ids(1) },
   { id: 2, title: 'Reading', goal: 'Read notes and rhythms on both staves.', lessons: ids(2) },
   { id: 3, title: 'Hands together', goal: 'Play full pieces with both hands, and learn how to practise.', lessons: ids(3) },
-  { id: 4, title: 'Chords and keys', goal: 'Build scales and chords, and play songs from chord symbols.', lessons: ids(4) },
-  { id: 5, title: 'Fluency', goal: 'Use the pedal, play in minor keys and give each hand its own line.', lessons: ids(5) },
+  { id: 4, title: 'Chords and keys', goal: 'Build scales and chords, learn the progressions behind most songs, and play from chord symbols.', lessons: ids(4) },
+  { id: 5, title: 'Fluency', goal: 'Use the pedal, play in minor keys, give each hand its own line, and play arpeggios.', lessons: ids(5) },
   { id: 6, title: 'Musicianship', goal: 'Richer harmony, playing by ear, making music up, and pieces to keep.', lessons: ids(6) },
 ];

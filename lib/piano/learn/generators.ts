@@ -5,6 +5,7 @@
  */
 
 import type { MusicInline } from '../content/types';
+import { chordPitches, diatonicTriads, pitchName, pitchToMidi } from '../music/theory';
 import { mulberry32, pick } from '../util/emitter';
 
 type Rnd = () => number;
@@ -153,6 +154,96 @@ export function sightExercise(level: number, seed: number): MusicInline {
     out.lh = bass.map((b, i) => `${b}w${i === 0 ? ':5' : ''}`).join(' | ');
   }
   return out;
+}
+
+// ----------------------------------------------------------------- chords
+
+export interface ChordExercise {
+  music: MusicInline;
+  /** Whole chords, or each chord one note at a time from the note it is named after. */
+  style: 'block' | 'broken';
+  /** The chart shows scale steps, such as I, V, vi, IV, in place of letter names. */
+  byNumber: boolean;
+  key: string;
+}
+
+/** Progressions on the three main chords of a key, as scale steps. */
+const PLAIN: number[][] = [
+  [1, 4, 5, 1],
+  [1, 5, 4, 1],
+  [1, 4, 1, 5],
+  [1, 1, 4, 5],
+  [4, 5, 1, 1],
+  [1, 5, 1, 4],
+];
+
+/** Progressions that bring in the minor chords of the key. */
+const WITH_MINOR: number[][] = [
+  [1, 5, 6, 4],
+  [1, 6, 4, 5],
+  [6, 4, 1, 5],
+  [1, 4, 6, 5],
+  [2, 5, 1, 1],
+  [1, 6, 2, 5],
+  [4, 1, 5, 6],
+  [1, 4, 2, 5],
+];
+
+interface ChordSpec {
+  keys: string[];
+  pool: number[][];
+  style: 'block' | 'broken';
+  byNumber: boolean;
+}
+
+/**
+ * The ladder: whole chords, then the same chords broken into single notes,
+ * in C, then with minor chords, then in other keys, and last from numbers alone.
+ */
+const CHORD_LADDER: ChordSpec[] = [
+  { keys: ['C'], pool: PLAIN, style: 'block', byNumber: false },
+  { keys: ['C'], pool: PLAIN, style: 'broken', byNumber: false },
+  { keys: ['C'], pool: WITH_MINOR, style: 'block', byNumber: false },
+  { keys: ['C'], pool: WITH_MINOR, style: 'broken', byNumber: false },
+  { keys: ['G', 'F'], pool: [...PLAIN, ...WITH_MINOR], style: 'block', byNumber: false },
+  { keys: ['G', 'F', 'D'], pool: [...PLAIN, ...WITH_MINOR], style: 'broken', byNumber: false },
+  { keys: ['C', 'G', 'F', 'D'], pool: WITH_MINOR, style: 'block', byNumber: true },
+  { keys: ['C', 'G', 'F', 'D'], pool: WITH_MINOR, style: 'broken', byNumber: true },
+];
+
+export const CHORD_LEVELS = CHORD_LADDER.length;
+
+/** How far up the ladder the lessons taken so far reach. */
+export function chordLevelCap(done: (lessonId: string) => boolean): number {
+  if (done('progressions')) return 8;
+  if (done('keys')) return 6;
+  if (done('minor-chords')) return 4;
+  return 2;
+}
+
+/** Four chords of a key, to be played from their symbols. */
+export function chordExercise(level: number, seed: number): ChordExercise {
+  const spec = CHORD_LADDER[Math.max(0, Math.min(CHORD_LADDER.length - 1, level - 1))];
+  const rnd = mulberry32(seed * 49979687 + level * 53);
+  const key = pick(spec.keys, rnd);
+  const degrees = pick(spec.pool, rnd);
+  const triads = diatonicTriads(key, 4);
+  const measures: string[] = [];
+  const symbols: string[] = [];
+  for (const degree of degrees) {
+    const triad = triads[degree - 1];
+    // Written near the middle of the keyboard. The learner may play it anywhere.
+    const root = pitchToMidi(triad.root) > 71 ? { ...triad.root, octave: triad.root.octave - 1 } : triad.root;
+    const names = chordPitches(root, triad.quality).map(pitchName);
+    measures.push(spec.style === 'block' ? `${names.join('+')}w` : `${names[0]}q ${names[1]}q ${names[2]}q ${names[1]}q`);
+    symbols.push(spec.byNumber ? triad.roman : triad.symbol);
+  }
+  return {
+    music: { rh: measures.join(' | '), key, tempo: 72, chords: symbols.join(' | ') },
+    style: spec.style,
+    byNumber: spec.byNumber,
+    key,
+  };
 }
 
 /** A different seed each day and each round, stable within a round. */

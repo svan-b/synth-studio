@@ -5,10 +5,12 @@ A piano teacher that runs on an iPad on the music stand. It lives at `/piano` in
 ## What it does
 
 - **Follows your playing.** Over MIDI it sees every key, how hard it was struck, when it was released, and the pedals. Without MIDI it listens through the microphone.
-- **A course in six stages**, 35 short lessons, from finding middle C to Bach, Beethoven and Satie. Tunes are learned by ear and by shape first, and notation is introduced through music you can already play.
-- **A practice coach for pieces.** It works the way studies of effective practice describe: hear the phrase, learn the notes with no time pressure, put the hands together early, add a slow beat, speed up after two good passes, and take a trouble spot out to fix it.
-- **Drills** for note reading (spaced review), rhythm, playing by ear, and sight reading with fresh material every time.
-- **A daily session** sized to the time you have.
+- **A course in six stages**, 37 short lessons, from finding middle C to Bach, Beethoven and Satie. Tunes are learned by ear and by shape first, and notation is introduced through music you can already play. Reading has a stage of its own. Chords, chord progressions by number, and arpeggios each have lessons of their own.
+- **A practice coach for pieces.** The first time you open a piece you play it through, and whatever you already know is skipped. For the rest it works the way studies of effective practice describe: hear the phrase, learn the notes with no time pressure, put the hands together early, add a slow beat, speed up after two good passes or one clean one, and take a trouble spot out to fix it. The plan it is following can be seen at any time.
+- **Feedback that says what went wrong.** Over MIDI the app knows how far each note fell from the beat and how long each key was held. So it can say that the slips were in measure 3, that the quick notes ran ahead, that you came in early after the long notes, or that long notes were let go early.
+- **Hear yourself.** After a run, Hear yours plays your own take back, key for key, with the cursor following. The play through that finishes a piece is kept, with the latest one since, on the Progress page.
+- **Exercises** for note reading (spaced review), rhythm, playing by ear, sight reading, and chords from symbols in any position, with fresh material every time. Each opens once the lesson that prepares it is done.
+- **A daily session** sized to the time you have. The first day ends with a tune, every session ends with a short account of what changed, and when there is time it closes on a piece you already play well.
 - **Hands on the keys.** The top key of the piano means continue and the bottom key means again. With a three pedal unit the middle and left pedals do the same.
 - **The method page** in the app sets out each teaching choice and how strong the evidence for it is.
 
@@ -50,11 +52,11 @@ Open `/piano` in Safari, tap Share, then **Add to Home Screen**. It then opens f
 app/piano/                 route, theme, page shell
 components/piano/          screens and the playing surface
 lib/piano/music/           pitches, scales, chords, the score model and text notation
-lib/piano/audio/           sampled piano, metronome, scheduling
+lib/piano/audio/           sampled piano, metronome, scheduling, playing back a take
 lib/piano/input/           MIDI, Bluetooth MIDI, listening, the note bus, hands free control
 lib/piano/dsp/             note detection from audio
-lib/piano/engine/          the score follower (wait and tempo modes)
-lib/piano/learn/           progress store, spaced review, coach, planner, generators
+lib/piano/engine/          the score follower (wait and tempo modes), which also records each run
+lib/piano/learn/           progress store, spaced review, coach, planner, generators, milestones
 lib/piano/content/         lessons, pieces, the method
 lib/piano/native/          the few calls into the iPad app
 ios/                       the iPad app: web view shell, MIDI, progress file
