@@ -158,7 +158,7 @@ function ReadingDrill({ onClose }: { onClose: () => void }) {
       <div className="flex h-full min-h-0 flex-col">
         <div className="px-7 text-[1.15rem] text-mc-muted">
           {reveal ? (
-            <span className={reveal.ok ? 'text-mc-ok' : 'text-mc-hint'}>
+            <span className={reveal.ok ? 'text-mc-ok' : 'text-mc-hint-ink'}>
               {reveal.ok ? 'Yes.' : 'Not that one.'} This note is <strong>{midiLabel(reveal.midi)}</strong>.
             </span>
           ) : (
@@ -301,6 +301,13 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
         }
         return;
       }
+      // A run in which nothing was played is not an attempt, and changes nothing.
+      if (result.correctNotes === 0 && result.wrongNotes === 0) {
+        setNote(null);
+        if (kind === 'sight') setPhase('look');
+        setRun((r) => r + 1);
+        return;
+      }
       const ok = kind === 'rhythm' ? result.accuracy >= 0.85 && result.onTime >= 0.65 : result.accuracy >= 0.85;
       adapt(ok);
       const pct = Math.round(result.accuracy * 100);
@@ -311,9 +318,13 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
             ? `Steady. ${Math.round(result.onTime * 100)} percent on the beat.`
             : `${pct} percent, and you kept going.`
           : kind === 'rhythm'
-            ? result.biasMs > 0
-              ? 'A little behind the beat. Listen for the click and land with it.'
-              : 'A little ahead of the beat. Let the click lead you.'
+            ? result.onTime >= 0.65
+              ? 'The beat was steady, but some notes were missing or extra. Count each beat and hold the long notes for their full length.'
+              : result.biasMs > 25
+                ? 'A little behind the beat. Listen for the click and land with it.'
+                : result.biasMs < -25
+                  ? 'A little ahead of the beat. Let the click lead you.'
+                  : 'Uneven against the beat. Count along with the click.'
             : `${pct} percent. Reading at sight is about keeping going, so never stop to fix a note.`,
       });
       timer.current = setTimeout(advance, ok ? 2000 : 3200);
@@ -351,7 +362,7 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
     <Shell title={round.title} progress={index / round.count} onClose={onClose}>
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-center gap-4 px-7 pb-2 pt-1">
-          <div className={`min-w-0 flex-1 text-[1.15rem] leading-snug ${note ? (note.ok ? 'text-mc-ok' : 'text-mc-hint') : 'text-mc-muted'}`}>
+          <div className={`min-w-0 flex-1 text-[1.15rem] leading-snug ${note ? (note.ok ? 'text-mc-ok' : 'text-mc-hint-ink') : 'text-mc-muted'}`}>
             {note ? note.text : brief.split('**').map((part, i) => (i % 2 ? <strong key={i} className="text-mc-ink">{part}</strong> : <span key={i}>{part}</span>))}
           </div>
           <Pill>Level {level}</Pill>
@@ -380,7 +391,10 @@ function GeneratedDrill({ kind, onClose }: { kind: 'rhythm' | 'ear' | 'sight'; o
               mode={phase === 'listen' ? 'listen' : kind === 'ear' ? 'wait' : 'tempo'}
               display={kind === 'ear' ? 'hidden' : 'staff'}
               hints="never"
+              hiddenPrompt="Now play what you heard"
               catchUp={kind === 'ear' ? 2.2 : undefined}
+              // Sight reading starts when the learner says they have looked it over.
+              autoStart={kind === 'sight'}
               anyKey={kind === 'rhythm'}
               runId={`${index}-${run}`}
               onDone={onDone}

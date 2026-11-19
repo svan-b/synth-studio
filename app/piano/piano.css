@@ -12,6 +12,8 @@
   --mc-ok: 42 138 88;
   --mc-bad: 196 74 56;
   --mc-hint: 201 140 30;
+  /* The same amber, dark enough to read as text. */
+  --mc-hint-ink: 138 86 4;
   --mc-key-white: 255 254 250;
   --mc-key-white-edge: 196 190 178;
   --mc-key-black: 34 32 29;
@@ -31,6 +33,7 @@
   --mc-ok: 96 192 138;
   --mc-bad: 238 127 109;
   --mc-hint: 232 182 85;
+  --mc-hint-ink: 240 196 110;
   --mc-key-white: 236 232 224;
   --mc-key-white-edge: 150 144 132;
   --mc-key-black: 12 11 10;
@@ -326,6 +329,22 @@ html:has(.mc-root[data-theme='dark']) body {
 .mc-score .mc-note-dim {
   opacity: 0.28;
 }
+/* While the learner judges a run for themselves, the marks are kept back. */
+.mc-veil .mc-score .mc-note-ok path,
+.mc-veil .mc-score .mc-note-ok rect,
+.mc-veil .mc-score .mc-note-warn path,
+.mc-veil .mc-score .mc-note-warn rect,
+.mc-veil .mc-score .mc-note-bad path,
+.mc-veil .mc-score .mc-note-bad rect {
+  fill: rgb(var(--mc-ink)) !important;
+  stroke: rgb(var(--mc-ink)) !important;
+}
+.mc-veil .mc-contour-ok rect,
+.mc-veil .mc-contour-warn rect,
+.mc-veil .mc-contour-bad rect {
+  fill: rgb(var(--mc-accent) / 0.16);
+  stroke: rgb(var(--mc-accent) / 0.55);
+}
 
 .mc-cursor {
   position: absolute;
@@ -385,9 +404,10 @@ html:has(.mc-root[data-theme='dark']) body {
 .mc-contour-note .mc-contour-finger-text {
   fill: rgb(var(--mc-bg));
 }
+/* The left hand is told apart by a quieter, neutral bar. Amber is kept for a note that slipped. */
 .mc-contour-left rect {
-  fill: rgb(var(--mc-hint) / 0.16);
-  stroke: rgb(var(--mc-hint) / 0.6);
+  fill: rgb(var(--mc-ink) / 0.07);
+  stroke: rgb(var(--mc-ink) / 0.38);
 }
 .mc-contour-now rect {
   fill: rgb(var(--mc-accent) / 0.4);

@@ -6,7 +6,7 @@
  */
 
 import { piano } from '../audio/engine';
-import { activeFlow, type FlowSession } from '../engine/flow';
+import { activeFlow, waitingGate, type FlowSession } from '../engine/flow';
 import { listener } from '../input/listen';
 import { midi } from '../input/midi';
 
@@ -40,9 +40,22 @@ function waitFor(test: () => boolean, timeoutMs: number): Promise<boolean> {
   });
 }
 
+/** Say go at a timed run's gate, as a learner does by playing a key. Returns whether a gate was waiting. */
+export function openGate(): boolean {
+  const open = waitingGate.current;
+  if (!open) return false;
+  open();
+  return true;
+}
+
+function running(): boolean {
+  openGate();
+  return activeFlow.current !== null && activeFlow.current.phase !== 'ready';
+}
+
 /** Play the session that is running now. Resolves when it has finished. */
 export async function playCurrent(opts: RobotOptions = {}): Promise<string> {
-  const found = await waitFor(() => activeFlow.current !== null && activeFlow.current.phase !== 'ready', 6000);
+  const found = await waitFor(running, 6000);
   const session: FlowSession | null = activeFlow.current;
   if (!found || !session) return 'no session';
   const velocity = opts.velocity ?? 80;
@@ -170,7 +183,7 @@ async function sound(mix: GainNode, note: number, when: number, seconds: number,
  * Resolves when the session has finished.
  */
 export async function playCurrentAloud(opts: SoundOptions = {}): Promise<string> {
-  const found = await waitFor(() => activeFlow.current !== null && activeFlow.current.phase !== 'ready', 6000);
+  const found = await waitFor(running, 6000);
   const session: FlowSession | null = activeFlow.current;
   if (!found || !session) return 'no session';
   const mix = openRoom(opts.bleed ?? 0, (opts.micDelayMs ?? 70) / 1000);

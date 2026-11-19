@@ -102,7 +102,7 @@ export const STAGE4: Lesson[] = [
       {
         kind: 'say',
         title: 'Chord symbols',
-        text: 'The letters you saw above the staff are **chord symbols**. They tell you the harmony at a glance. You have seen them over the Ode to Joy already.\n\nOnce you can play chords from symbols, you can accompany almost any song from a simple chart.',
+        text: 'From now on, letters appear above the staff in pieces that have them. They are **chord symbols**, and they tell you the harmony at a glance. They are not the names of the notes below them.\n\nOnce you can play chords from symbols, you can accompany almost any song from a simple chart.',
       },
       {
         kind: 'quiz',

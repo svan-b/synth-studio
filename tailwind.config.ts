@@ -30,6 +30,7 @@ const config: Config = {
           ok: 'rgb(var(--mc-ok) / <alpha-value>)',
           bad: 'rgb(var(--mc-bad) / <alpha-value>)',
           hint: 'rgb(var(--mc-hint) / <alpha-value>)',
+          'hint-ink': 'rgb(var(--mc-hint-ink) / <alpha-value>)',
         },
         teaching: {
           current: '#00ff00',

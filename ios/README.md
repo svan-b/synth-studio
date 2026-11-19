@@ -31,7 +31,7 @@ Plug the piano's USB TO HOST socket into the iPad and open the app. It finds the
 ```
 MiddleC/MiddleCApp.swift     the app's entry point and its one window
 MiddleC/WebScreen.swift      the web view, and the messages between page and app
-MiddleC/AppFiles.swift       serves the web app from the `web` folder as middlec://app/piano
+MiddleC/AppFiles.swift       serves the web app from the `web` folder as middlec://localhost/piano
 MiddleC/PianoLink.swift      the piano, over the iPad's MIDI
 MiddleC/ProgressFile.swift   progress on disk, and the dated copies in Files
 MiddleC/Bridge.js            runs in the page first: adds MIDI and says this is the app

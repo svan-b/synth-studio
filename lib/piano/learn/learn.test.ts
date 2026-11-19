@@ -121,10 +121,25 @@ describe('practice coach', () => {
   it('tells late notes from wrong notes', () => {
     let state = newPieceState(info, '2026-01-01');
     state.sections[0].rung = 4;
-    const late = result({ mode: 'tempo', accuracy: 0.95, onTime: 0.3, biasMs: 90, clean: false });
+    // Late, but unevenly so: that is the playing.
+    const late = result({ mode: 'tempo', accuracy: 0.95, onTime: 0.3, biasMs: 70, meanAbsMs: 150, clean: false });
     const out = applyResult(info, state, nextTask(info, state)!, late);
     expect(out.verdict.passed).toBe(false);
     expect(out.verdict.message).toMatch(/behind the beat/);
+  });
+
+  it('does not slow the music down when every note is late by the same amount', () => {
+    let state = newPieceState(info, '2026-01-01');
+    state.sections[0].rung = 4;
+    // 260 ms late on every note: a delay in the connection, not a tempo that is too quick.
+    const lagging = result({ mode: 'tempo', accuracy: 1, onTime: 0, biasMs: 260, meanAbsMs: 262, clean: false });
+    for (let i = 0; i < 3; i++) {
+      const out = applyResult(info, state, nextTask(info, state)!, lagging);
+      expect(out.verdict.passed).toBe(false);
+      expect(out.verdict.message).toMatch(/timing check/);
+      state = out.state;
+    }
+    expect(state.sections[0].rung).toBe(4);
   });
 
   it('gives a pass judged by ear a little more room', () => {
@@ -227,9 +242,9 @@ describe('streak', () => {
 });
 
 import { earExercise, rhythmExercise, sightExercise, EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS } from './generators';
-import { currentPiece, introducedPieces, planSession, readsStaff } from './planner';
+import { currentPiece, introducedPieces, planSession, readsStaff, skippedPieces } from './planner';
 import { parseScore, scoreRange } from '../music/score';
-import { lessonOrder } from '../content/catalog';
+import { lessonOrder, pieceInfo } from '../content/catalog';
 
 describe('generated exercises', () => {
   it('always produce music that parses, at every level', () => {
@@ -297,8 +312,64 @@ describe('daily plan', () => {
     const cards = { 'read:T:60': newCard(new Date('2026-03-01T09:00:00')) };
     const plan = planSession({ minutes: 10, lessons, pieces: {}, cards, now: new Date('2026-03-02T09:00:00') });
     expect(plan[0]).toMatchObject({ kind: 'drill', id: 'reading' });
-    expect(plan.reduce((a, b) => a + b.minutes, 0)).toBeLessThanOrEqual(16);
+    expect(plan.reduce((a, b) => a + b.minutes, 0)).toBeLessThanOrEqual(12);
     expect(readsStaff(lessons)).toBe(true);
+  });
+
+  it('keeps to the minutes chosen at every point in the course', () => {
+    const now = new Date('2026-03-02T09:00:00');
+    for (const minutes of [10, 20, 30]) {
+      for (let n = 0; n <= order.length; n++) {
+        const lessons = doneUpTo(n);
+        const plan = planSession({ minutes, lessons, pieces: {}, cards: {}, now });
+        const total = plan.reduce((a, b) => a + b.minutes, 0);
+        // One block is always offered, even if a lesson alone runs a little long.
+        if (plan.length > 1) expect(total, `${minutes} minutes after ${n} lessons`).toBeLessThanOrEqual(minutes + 2);
+        expect(plan.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('uses the time when there is more of it', () => {
+    const lessons = doneUpTo(8);
+    const now = new Date('2026-03-02T09:00:00');
+    const short = planSession({ minutes: 20, lessons, pieces: {}, cards: {}, now });
+    const long = planSession({ minutes: 30, lessons, pieces: {}, cards: {}, now });
+    const sum = (p: typeof short) => p.reduce((a, b) => a + b.minutes, 0);
+    expect(sum(long)).toBeGreaterThanOrEqual(26);
+    expect(sum(long)).toBeGreaterThan(sum(short));
+  });
+
+  it('brings nothing new once the day is done, or once a lesson has been taken today', () => {
+    const now = new Date('2026-03-02T09:00:00');
+    const lessons = doneUpTo(6);
+    expect(planSession({ minutes: 20, lessons, pieces: {}, cards: {}, now, again: true }).some((b) => b.kind === 'lesson')).toBe(false);
+    const withToday = { ...lessons, [order[6]]: { done: true, doneOn: '2026-03-02', step: 0 } };
+    expect(planSession({ minutes: 20, lessons: withToday, pieces: {}, cards: {}, now }).some((b) => b.kind === 'lesson')).toBe(false);
+  });
+
+  it('with little time, lets a new lesson and the piece take turns', () => {
+    const now = new Date('2026-03-03T09:00:00');
+    const lessons: Record<string, { done: boolean; doneOn?: string; step: number }> = doneUpTo(5);
+    lessons[order[5]] = { done: true, doneOn: '2026-03-02', step: 0 };
+    const pieces = { 'hot-cross-buns': newPieceState(pieceInfo('hot-cross-buns'), '2026-03-01') };
+    // Yesterday brought a lesson, so today the piece is played.
+    const pieceDay = planSession({ minutes: 10, lessons, pieces, cards: {}, days: { '2026-03-02': {} }, now });
+    expect(pieceDay.some((b) => b.kind === 'lesson')).toBe(false);
+    expect(pieceDay.some((b) => b.kind === 'piece')).toBe(true);
+    // The day after, with no lesson since, the next lesson comes.
+    const lessonDay = planSession({ minutes: 10, lessons, pieces, cards: {}, days: { '2026-03-02': {}, '2026-03-03': {} }, now: new Date('2026-03-04T09:00:00') });
+    expect(lessonDay.some((b) => b.kind === 'lesson')).toBe(true);
+  });
+
+  it('does not offer the pieces of lessons that were marked as known', () => {
+    const lessons = Object.fromEntries(order.slice(0, 12).map((id) => [id, { done: true, skipped: true, step: 0 }]));
+    expect(introducedPieces(lessons)).toEqual([]);
+    expect(skippedPieces(lessons, {}).length).toBeGreaterThan(3);
+    expect(currentPiece(lessons, {})).toBeNull();
+    // One the learner opens anyway is theirs to practise.
+    const pieces = { 'hot-cross-buns': newPieceState(pieceInfo('hot-cross-buns'), '2026-03-01') };
+    expect(introducedPieces(lessons, pieces)).toEqual(['hot-cross-buns']);
   });
 
   it('offers exactly one new lesson, then work on a piece already met', () => {

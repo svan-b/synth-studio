@@ -104,6 +104,9 @@ const DEFAULT_LATENCY: Record<NoteSource, number> = { touch: 0.045, midi: 0.008,
 /** The session now running, for development tools and tests. */
 export const activeFlow: { current: FlowSession | null } = { current: null };
 
+/** A timed run that is waiting for the learner to say go. Calling it starts the run. */
+export const waitingGate: { current: (() => void) | null } = { current: null };
+
 export class FlowSession {
   readonly events = new Emitter<FlowEvent>();
   readonly steps: Step[];

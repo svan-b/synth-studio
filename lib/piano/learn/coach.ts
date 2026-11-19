@@ -238,6 +238,17 @@ export interface Verdict {
   learned: boolean;
 }
 
+/**
+ * How far off the beat the notes were, in milliseconds, when they were right
+ * and all off by much the same amount. Null when the timing was good or uneven.
+ */
+export function steadyLag(result: FlowResult): number | null {
+  if (result.mode !== 'tempo' || result.accuracy < 0.87 || result.onTime >= 0.6) return null;
+  const size = Math.abs(result.biasMs);
+  if (size < 90 || result.meanAbsMs - size > 40) return null;
+  return result.biasMs;
+}
+
 /** Was this attempt good enough to count? */
 export function passes(task: Task, result: FlowResult): boolean {
   // A microphone mishears the odd note, so playing judged by ear gets a little more room.
@@ -276,6 +287,19 @@ export function applyResult(
   next.bestAccuracy = Math.max(next.bestAccuracy, result.accuracy);
   let message = '';
   let learned = false;
+
+  // Right notes that all land off the beat by the same amount are not a sign
+  // that the tempo is too quick. Slowing down would not help, so nothing is
+  // stepped back. The cause is a delay, in the connection or in the habit of
+  // waiting for the click.
+  const lag = steadyLag(result);
+  if (!ok && task.mode === 'tempo' && lag !== null) {
+    message =
+      lag > 0
+        ? 'The notes were right, and each one landed late by about the same amount. If it sounded on the beat to you, run the timing check in Settings. If not, aim to land with the click, not after it.'
+        : 'The notes were right, and each one landed early by about the same amount. If it sounded on the beat to you, run the timing check in Settings. If not, let the click lead.';
+    return { state: next, verdict: { passed: false, message, learned } };
+  }
 
   if (task.scope.type === 'focus' && next.focus) {
     if (ok) {

@@ -51,6 +51,8 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   const [free, setFree] = useState<Free | null>(null);
   const [options, setOptions] = useState(false);
   const [modelOnce, setModelOnce] = useState(false);
+  // A quiet word in place of the task's prompt, as after a run in which nothing was played.
+  const [aside, setAside] = useState<string | null>(null);
   const startedAt = useRef(performance.now());
   const notesPlayed = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,6 +94,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   const proceed = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     setVerdict(null);
+    setAside(null);
     const elapsed = (performance.now() - startedAt.current) / 60000;
     if (minutes && elapsed >= minutes && !warned.current) {
       warned.current = true;
@@ -105,6 +108,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   const hearModel = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     setVerdict(null);
+    setAside(null);
     setModelOnce(true);
     setStage('play');
     setRun((r) => r + 1);
@@ -140,14 +144,23 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
         setRun((r) => r + 1);
         return;
       }
+      // A timed run in which no key was touched is not an attempt. Nothing is
+      // counted, and it waits at the gate until the learner is back.
+      const untouched = result !== null && result.mode === 'tempo' && result.correctNotes === 0 && result.wrongNotes === 0;
+      if (untouched) {
+        setAside('Nothing was played, so nothing was counted. It will wait for you.');
+        setRun((r) => r + 1);
+        return;
+      }
       if (free) {
         if (result) {
           notesPlayed.current += result.totalNotes;
           setVerdict({ v: { passed: result.accuracy >= 0.87, message: 'Your own practice. Nothing is recorded.', learned: false }, stats: statsLine(result) });
-          setStage('verdict');
         } else {
-          setRun((r) => r + 1);
+          // Heard once. It does not go round again by itself.
+          setVerdict({ v: { passed: true, message: 'That is how it goes.', learned: false }, stats: 'Continue to hear it again, or choose what to play in Options.' });
         }
+        setStage('verdict');
         return;
       }
       if (!task) return;
@@ -159,6 +172,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
         return;
       }
       notesPlayed.current += result.totalNotes;
+      setAside(null);
       if (task.mode === 'tempo') {
         // A moment to judge it yourself before the verdict appears.
         setStage('reflect');
@@ -171,8 +185,9 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   );
 
   useRemote({
-    primary: stage === 'verdict' || stage === 'timeup' ? proceed : stage === 'learned' ? onClose : undefined,
-    secondary: stage === 'timeup' ? onClose : hearModel,
+    // At time up the main choice is to stop, so the top key does that.
+    primary: stage === 'verdict' ? proceed : stage === 'timeup' || stage === 'learned' ? onClose : undefined,
+    secondary: stage === 'timeup' ? proceed : stage === 'learned' ? undefined : hearModel,
   });
 
   const progress = pieceProgress(info, state);
@@ -214,7 +229,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
             <h2 className="mt-2 font-mc-serif text-4xl">{piece.title}</h2>
           </div>
           <p className="mc-fade-up max-w-xl text-[1.1rem] leading-relaxed text-mc-muted">{verdict?.v.message}</p>
-          <Button size="lg" onClick={onClose} className="min-w-[220px]">
+          <Button size="lg" onClick={onClose} className="min-w-[220px]" hint={inputMode === 'midi' ? 'top key' : undefined}>
             Done
           </Button>
         </div>
@@ -225,29 +240,29 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
             That is the time set aside for this piece today. What you practised keeps settling after you stop, and a night of sleep helps it along. It will be easier tomorrow.
           </p>
           <div className="flex gap-3">
-            <Button variant="soft" size="lg" onClick={proceed} hint={inputMode === 'midi' ? 'top key' : undefined}>
+            <Button variant="soft" size="lg" onClick={proceed} hint={inputMode === 'midi' ? 'bottom key' : undefined}>
               Keep going
             </Button>
-            <Button size="lg" onClick={onClose} hint={inputMode === 'midi' ? 'bottom key' : undefined}>
+            <Button size="lg" onClick={onClose} hint={inputMode === 'midi' ? 'top key' : undefined}>
               Finish
             </Button>
           </div>
         </div>
       ) : (
         <>
-          <div className="flex shrink-0 items-center gap-4 px-7 pb-2">
+          <div className="flex min-h-[4.25rem] shrink-0 items-center gap-4 px-7 pb-2">
             <div className="min-w-0 flex-1">
               {stage === 'reflect' ? (
                 <div className="mc-fade-up text-[1.15rem] text-mc-muted">How did that go? Decide for yourself before you look.</div>
               ) : stage === 'verdict' && verdict ? (
                 <div className="mc-fade-up">
-                  <div className={`text-[1.15rem] font-medium ${verdict.v.passed ? 'text-mc-ok' : 'text-mc-hint'}`}>{verdict.v.message}</div>
+                  <div className={`text-[1.15rem] font-medium ${verdict.v.passed ? 'text-mc-ok' : 'text-mc-hint-ink'}`}>{verdict.v.message}</div>
                   <div className="text-sm text-mc-muted">{verdict.stats}</div>
                 </div>
               ) : (
                 <>
                   <div className="text-[1.15rem] font-semibold text-mc-ink">{title}</div>
-                  <div className="text-[1rem] text-mc-muted">{prompt}</div>
+                  <div className="text-[1rem] text-mc-muted">{aside ?? prompt}</div>
                 </>
               )}
             </div>
@@ -264,12 +279,10 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
               </Button>
             )}
             {shown && shown.to - shown.from + 1 < info.measures && stage === 'play' && (
-              <Pill>
-                Measures {shown.from + 1} to {shown.to + 1}
-              </Pill>
+              <Pill>{shown.from === shown.to ? `Measure ${shown.from + 1}` : `Measures ${shown.from + 1} to ${shown.to + 1}`}</Pill>
             )}
           </div>
-          <div className={`min-h-0 flex-1 transition-opacity duration-200 ${stage === 'play' ? '' : 'opacity-50'}`}>
+          <div className="min-h-0 flex-1">
             {shown && (
               <PlaySurface
                 score={score}
@@ -280,6 +293,8 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
                 hints="delay"
                 runId={`${run}-${free ? 'free' : 'coach'}`}
                 onDone={onDone}
+                held={options}
+                veil={stage === 'reflect'}
               />
             )}
           </div>

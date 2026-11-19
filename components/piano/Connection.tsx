@@ -88,6 +88,8 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
   const settings = usePiano((s) => s.settings);
   const setSettings = usePiano((s) => s.setSettings);
   const [tested, setTested] = useState(false);
+  // Neither answer is shown as chosen until the learner has given one.
+  const [answered, setAnswered] = useState(false);
   const noMidiAtAll = !m.webMidi && !m.bluetooth;
   // The iPad app has MIDI built in. It looks for the piano by itself, so there is nothing to switch on.
   const native = isNative();
@@ -182,10 +184,24 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
           {tested && (
             <div className="mt-3 flex items-center gap-3">
               <span className="text-[15px] text-mc-muted">Did the piano play three notes?</span>
-              <Button size="sm" variant={settings.demoOnPiano ? 'primary' : 'soft'} onClick={() => setSettings({ demoOnPiano: true })}>
+              <Button
+                size="sm"
+                variant={answered && settings.demoOnPiano ? 'primary' : 'soft'}
+                onClick={() => {
+                  setAnswered(true);
+                  setSettings({ demoOnPiano: true });
+                }}
+              >
                 Yes, use the piano
               </Button>
-              <Button size="sm" variant={!settings.demoOnPiano ? 'primary' : 'soft'} onClick={() => setSettings({ demoOnPiano: false })}>
+              <Button
+                size="sm"
+                variant={answered && !settings.demoOnPiano ? 'primary' : 'soft'}
+                onClick={() => {
+                  setAnswered(true);
+                  setSettings({ demoOnPiano: false });
+                }}
+              >
                 No, use the iPad
               </Button>
             </div>

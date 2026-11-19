@@ -43,6 +43,10 @@ export interface ScoreViewProps {
   showMeasureNumbers?: boolean;
   /** Draw the time signature. Off for single notes shown as flash cards. */
   showTime?: boolean;
+  /** Draw chord letters above the staff. Off until the course has explained them. */
+  showChords?: boolean;
+  /** Told the height the music needs once it is drawn, so a small frame can grow to hold it. */
+  onHeight?: (height: number) => void;
   className?: string;
 }
 
@@ -200,12 +204,15 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     minZoom = 1.05,
     showMeasureNumbers = true,
     showTime = true,
+    showChords = true,
+    onHeight,
     className,
   },
   ref,
 ) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
   const positions = useRef(new Map<string, NotePos>());
   const systemBoxes = useRef<SystemBox[]>([]);
@@ -269,12 +276,15 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     cur.style.width = `${(x1 - x0 + 12) * z}px`;
     cur.style.height = `${(box.bottom - box.top) * z}px`;
     cur.style.transform = `translate(${left}px, ${top}px)`;
-    // Keep the current system comfortably in view.
+    // Keep the line being played in view, and the line after it too, so the
+    // eye can read ahead. The page moves as the playing moves to a new line,
+    // never in the middle of one.
     const viewTop = wrap.scrollTop;
     const viewBottom = viewTop + wrap.clientHeight;
     const sysTop = box.top * z - 16;
-    const sysBottom = box.bottom * z + 16;
-    if (sysTop < viewTop || sysBottom > viewBottom) {
+    const next = systemBoxes.current[system + 1];
+    const wantBottom = (next ? next.bottom : box.bottom) * z + 16;
+    if (sysTop < viewTop || wantBottom > viewBottom) {
       wrap.scrollTo({ top: Math.max(0, sysTop - 8), behavior: smooth ? 'smooth' : 'auto' });
     }
   };
@@ -312,13 +322,16 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     systemBoxes.current = [];
 
     const hasFingering = showFingering && score.notes.some((n) => n.finger !== undefined);
-    const planOpts = { fingering: hasFingering, names: showNames, chords: score.chords.length > 0, time: showTime };
+    const withChords = showChords && score.chords.length > 0;
+    const planOpts = { fingering: hasFingering, names: showNames, chords: withChords, time: showTime };
 
     // Pick the largest zoom whose layout fits the available height.
     let z = zoom ?? minZoom;
     let plan = planLayout(score, size.w / z, planOpts);
     if (zoom === undefined) {
-      const candidates = [maxZoom, 1.75, 1.6, 1.45, 1.3, 1.18, minZoom].filter((c) => c <= maxZoom && c >= minZoom);
+      const candidates = [maxZoom, 1.75, 1.6, 1.45, 1.3, 1.18, 1.05, 0.95, minZoom].filter(
+        (c, i, all) => c <= maxZoom && c >= minZoom && all.indexOf(c) === i,
+      );
       for (const c of candidates) {
         const p = planLayout(score, size.w / c, planOpts);
         z = c;
@@ -406,6 +419,8 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
               auto_stem: true,
               align_center: onlyRest,
             });
+            // The short lines above and below the staff are part of reading the note, so they are drawn in full ink.
+            note.setLedgerLineStyle({ strokeStyle: ink, lineWidth: 1.4 });
             if (ev.dots > 0) Dot.buildAndAttach([note], { all: true });
             if (ev.kind === 'note') {
               const above = hand === 'R';
@@ -514,7 +529,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     }
 
     // Chord symbols above the top staff.
-    if (score.chords.length > 0) {
+    if (withChords) {
       const topHand = score.hands[0];
       ctx.save();
       ctx.setFont('Arial', 13, 'bold');
@@ -558,11 +573,14 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
       svg.setAttribute('aria-label', 'Sheet music');
     }
     void logicalW;
+    // A short score sits a little above the middle of the stand, not pressed against the top.
+    if (innerRef.current) innerRef.current.style.marginTop = `${Math.max(0, Math.round((size.h - plan.height * z) * 0.3))}px`;
 
     marks.current.forEach((state, id) => applyMark(id, state));
     applyCursor(cursorStep.current, false);
+    onHeight?.(Math.ceil(plan.height * z));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [score, size.w, size.h, showFingering, showNames, focusHand, zoom, maxZoom, minZoom, showMeasureNumbers, showTime, themeKey]);
+  }, [score, size.w, size.h, showFingering, showNames, focusHand, zoom, maxZoom, minZoom, showMeasureNumbers, showTime, showChords, themeKey]);
 
   // The cursor follows a different step list when the active hands change.
   useEffect(() => {
@@ -571,9 +589,11 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
   }, [activeSteps]);
 
   return (
-    <div ref={wrapRef} className={`mc-score mc-scroll relative h-full w-full ${className ?? ''}`}>
-      <div ref={hostRef} />
-      <div ref={cursorRef} className="mc-cursor" style={{ opacity: 0 }} />
+    <div ref={wrapRef} className={`mc-score mc-scroll h-full w-full ${className ?? ''}`}>
+      <div ref={innerRef} className="relative">
+        <div ref={hostRef} />
+        <div ref={cursorRef} className="mc-cursor" style={{ opacity: 0 }} />
+      </div>
     </div>
   );
 });

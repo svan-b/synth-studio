@@ -73,7 +73,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
           {step === 1 && (
             <>
               <h2 className="font-mc-serif text-4xl">Where are you starting from?</h2>
-              <p className="mb-6 mt-2 text-[1.1rem] text-mc-muted">This only sets where the course begins. You can skip ahead or go back at any time.</p>
+              <p className="mb-6 mt-2 text-[1.1rem] text-mc-muted">The course is the same for everyone. If you have played before, you can skip what you already know.</p>
               <div className="space-y-3">
                 {LEVELS.map((l) => (
                   <Choice key={l.value} selected={profile.experience === l.value} title={l.title} text={l.text} onClick={() => setProfile({ experience: l.value })} />
@@ -110,7 +110,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               </div>
               <h2 className="font-mc-serif text-5xl">You are set</h2>
               <div className="mx-auto mt-5 max-w-xl space-y-3 text-left text-[1.1rem] leading-relaxed text-mc-muted">
-                <p>Each day the app builds a short session for you. Press Start and it takes you through it.</p>
+                <p>Each day the app builds a short session for you. Start it from the Today page and it takes you through.</p>
                 {mode === 'midi' && (
                   <p>
                     <strong className="text-mc-ink">Your hands can stay on the piano.</strong> The very top key means continue. The very bottom key

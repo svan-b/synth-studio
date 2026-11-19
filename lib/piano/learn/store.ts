@@ -38,6 +38,8 @@ export interface Settings {
 export interface LessonProgress {
   done: boolean;
   doneOn?: string;
+  /** Marked as known without being taken. */
+  skipped?: boolean;
   /** Step to resume at. */
   step: number;
 }
@@ -70,6 +72,8 @@ interface State {
   setSettings: (patch: Partial<Settings>) => void;
   setLessonStep: (id: string, step: number) => void;
   completeLesson: (id: string) => void;
+  /** Mark a lesson as known without taking it. */
+  skipLesson: (id: string) => void;
   setPiece: (id: string, state: PieceState) => void;
   addCards: (ids: string[]) => void;
   reviewCard: (id: string, outcome: Outcome) => void;
@@ -160,6 +164,8 @@ export const usePiano = create<State>()(
         set((s) => ({ lessons: { ...s.lessons, [id]: { done: s.lessons[id]?.done ?? false, doneOn: s.lessons[id]?.doneOn, step } } })),
       completeLesson: (id) =>
         set((s) => ({ lessons: { ...s.lessons, [id]: { done: true, doneOn: s.lessons[id]?.doneOn ?? dayKey(), step: 0 } } })),
+      skipLesson: (id) =>
+        set((s) => (s.lessons[id]?.done ? {} : { lessons: { ...s.lessons, [id]: { done: true, skipped: true, step: 0 } } })),
       setPiece: (id, state) => set((s) => ({ pieces: { ...s.pieces, [id]: state } })),
       addCards: (ids) =>
         set((s) => {
@@ -217,7 +223,8 @@ export const usePiano = create<State>()(
       },
       resetAll: () =>
         set({
-          profile: { ...defaultProfile, startedOn: dayKey() },
+          // What the learner told the app about themselves is kept, with their settings.
+          profile: { ...get().profile, startedOn: dayKey() },
           settings: get().settings,
           lessons: {},
           pieces: {},

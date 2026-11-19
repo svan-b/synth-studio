@@ -181,7 +181,8 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 export function Button({ variant = 'primary', size = 'md', hint, icon, className, children, ...rest }: ButtonProps) {
   const base =
     'inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-[transform,opacity,background-color] duration-150 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100 select-none';
-  const sizes = { sm: 'h-9 px-4 text-sm', md: 'h-12 px-6 text-base', lg: 'h-14 px-8 text-lg' };
+  // The smallest is still a full finger tall: the iPad is at arm's length on the stand.
+  const sizes = { sm: 'h-11 px-4 text-[15px]', md: 'h-12 px-6 text-base', lg: 'h-14 px-8 text-lg' };
   const variants = {
     primary: 'bg-mc-ink text-mc-bg',
     soft: 'bg-mc-raised text-mc-ink',
@@ -193,7 +194,7 @@ export function Button({ variant = 'primary', size = 'md', hint, icon, className
       {icon}
       <span className="flex flex-col items-center leading-tight">
         <span>{children}</span>
-        {hint && <span className="text-[10px] font-medium uppercase tracking-wider opacity-60">{hint}</span>}
+        {hint && <span className="text-[11px] font-medium uppercase tracking-wider opacity-70">{hint}</span>}
       </span>
     </button>
   );
@@ -284,7 +285,7 @@ export function Segmented<T extends string | number>({
           role="tab"
           aria-selected={o.value === value}
           onClick={() => onChange(o.value)}
-          className={`h-9 rounded-full px-4 text-sm font-semibold transition-colors ${
+          className={`h-11 rounded-full px-4 text-[15px] font-semibold transition-colors ${
             o.value === value ? 'bg-mc-surface text-mc-ink shadow-sm' : 'text-mc-muted'
           }`}
         >
@@ -348,9 +349,9 @@ export function Sheet({ open, onClose, title, children, wide }: { open: boolean;
 export function Pill({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted' | 'ok' | 'accent' | 'hint' | 'bad' }) {
   const tones = {
     muted: 'bg-mc-raised text-mc-muted',
-    ok: 'bg-mc-ok/12 text-mc-ok',
+    ok: 'bg-mc-ok/15 text-mc-ok',
     accent: 'bg-mc-accent/10 text-mc-accent',
-    hint: 'bg-mc-hint/15 text-mc-hint',
+    hint: 'bg-mc-hint/15 text-mc-hint-ink',
     bad: 'bg-mc-bad/10 text-mc-bad',
   };
   return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>{children}</span>;

@@ -3,11 +3,12 @@ import WebKit
 
 /// Serves the web app from the `web` folder inside the app.
 ///
-/// Pages are opened as `middlec://app/piano`, which the web view treats like
-/// any site of its own: a secure origin with storage, sound and the microphone.
+/// Pages are opened as `middlec://localhost/piano`, which the web view treats
+/// like any site of its own: a secure origin with storage, sound and the
+/// microphone. This is the arrangement apps built with web views commonly use.
 final class AppFiles: NSObject, WKURLSchemeHandler {
     static let scheme = "middlec"
-    static let home = URL(string: "middlec://app/piano")!
+    static let home = URL(string: "middlec://localhost/piano")!
 
     private let root: URL? = Bundle.main.resourceURL?.appendingPathComponent("web", isDirectory: true)
 

@@ -51,9 +51,13 @@ function SessionRunner({ blocks, onClose }: { blocks: Block[]; onClose: () => vo
 
   const start = useCallback(() => setBetween(false), []);
   const afterBlock = useCallback(() => {
-    setIndex((i) => i + 1);
+    // A lesson that was closed part way is not finished. The session stays on
+    // it, so it can be picked up again or the session stopped.
+    const block = blocks[index];
+    const unfinished = block?.kind === 'lesson' && usePiano.getState().lessons[block.id]?.done !== true;
+    if (!unfinished) setIndex((i) => i + 1);
     setBetween(true);
-  }, []);
+  }, [blocks, index]);
   useRemote({ primary: done ? onClose : between ? start : undefined, secondary: between ? onClose : undefined }, between || done);
 
   if (!done && !between) return <BlockActivity key={index} block={blocks[index]} onClose={afterBlock} />;
@@ -71,7 +75,7 @@ function SessionRunner({ blocks, onClose }: { blocks: Block[]; onClose: () => vo
               That is today done. What you worked on keeps settling after you stop, and it will feel easier next time. Come back tomorrow.
             </p>
           </div>
-          <Button size="lg" onClick={onClose} className="min-w-[220px]">
+          <Button size="lg" onClick={onClose} className="min-w-[220px]" hint={mode === 'midi' ? 'top key' : undefined}>
             Finish
           </Button>
         </>
@@ -83,7 +87,7 @@ function SessionRunner({ blocks, onClose }: { blocks: Block[]; onClose: () => vo
             </div>
             <h2 className="mt-2 font-mc-serif text-5xl">{blocks[index].title}</h2>
             <p className="mt-3 text-[1.15rem] text-mc-muted">
-              {blocks[index].detail}. About {blocks[index].minutes} minutes.
+              {blocks[index].detail.replace(/[.\s]+$/, '')}. About {blocks[index].minutes} minutes.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -203,9 +207,9 @@ export default function App() {
                 key={item.view}
                 onClick={() => setView(item.view)}
                 aria-current={active ? 'page' : undefined}
-                className={`flex flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold transition-colors landscape:max-h-[76px] ${
+                className={`flex flex-1 flex-col items-center justify-center gap-1 text-xs font-semibold transition-colors landscape:max-h-[76px] ${
                   item.view === 'settings' ? 'landscape:mt-auto landscape:flex-none landscape:py-3' : ''
-                } ${active ? 'text-mc-ink' : 'text-mc-faint'}`}
+                } ${active ? 'text-mc-ink' : 'text-mc-muted'}`}
               >
                 <span className={`flex h-9 w-14 items-center justify-center rounded-full transition-colors ${active ? 'bg-mc-ink/10' : ''}`}>
                   <I size={22} />

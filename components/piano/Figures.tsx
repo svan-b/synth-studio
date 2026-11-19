@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { resolveMusic } from '@/lib/piano/content/catalog';
 import type { Figure } from '@/lib/piano/content/types';
 import { useInputMode } from './hooks';
@@ -78,19 +78,29 @@ function KeysFigure({ fig }: { fig: Extract<Figure, { kind: 'keys' }> }) {
 
 function StaffFigure({ fig }: { fig: Extract<Figure, { kind: 'staff' }> }) {
   const score = useMemo(() => resolveMusic(fig.music), [fig.music]);
-  const height = score.hands.length === 2 ? 250 : 170;
+  const base = score.hands.length === 2 ? 250 : 170;
+  // The frame grows when an example runs on to a second line, so that nothing is cut off.
+  const [height, setHeight] = useState(base);
+  useEffect(() => setHeight(base), [base, score]);
+  const fit = useCallback((needed: number) => setHeight((h) => (needed + 4 > h ? needed + 4 : h)), []);
+  // A busy example takes the full width of the column.
+  const wide = score.measureCount >= 3 || score.notes.length > 8;
   return (
-    <div className="mx-auto w-full max-w-xl rounded-xl bg-mc-surface px-4 py-2" style={{ height }}>
-      <ScoreView
-        score={score}
-        showFingering={false}
-        showNames={fig.names}
-        maxZoom={1.75}
-        minZoom={1.2}
-        showMeasureNumbers={false}
-        // A lone note is a picture of a pitch, so the time signature would only distract.
-        showTime={!(score.measureCount === 1 && score.notes.length <= 1) || fig.music.time !== undefined}
-      />
+    <div className={`mx-auto w-full rounded-xl bg-mc-surface px-4 py-2 ${wide ? 'max-w-3xl' : 'max-w-xl'}`}>
+      <div style={{ height }}>
+        <ScoreView
+          score={score}
+          showFingering={false}
+          showNames={fig.names}
+          maxZoom={1.75}
+          // A longer example is drawn smaller before it is allowed to wrap.
+          minZoom={0.9}
+          showMeasureNumbers={false}
+          // A lone note is a picture of a pitch, so the time signature would only distract.
+          showTime={!(score.measureCount === 1 && score.notes.length <= 1) || fig.music.time !== undefined}
+          onHeight={fit}
+        />
+      </div>
     </div>
   );
 }

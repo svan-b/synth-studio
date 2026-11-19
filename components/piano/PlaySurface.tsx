@@ -5,8 +5,9 @@ import { piano } from '@/lib/piano/audio/engine';
 import { instrument } from '@/lib/piano/audio/instrument';
 import { Transport, scoreEvents, type TimedEvent } from '@/lib/piano/audio/transport';
 import type { Display, Hints } from '@/lib/piano/content/types';
-import { FlowSession, type FlowResult } from '@/lib/piano/engine/flow';
-import { emitNoteOff, emitNoteOn } from '@/lib/piano/input/bus';
+import { FlowSession, waitingGate, type FlowResult } from '@/lib/piano/engine/flow';
+import { emitNoteOff, emitNoteOn, noteBus } from '@/lib/piano/input/bus';
+import { REMOTE_SECONDARY, input } from '@/lib/piano/input/hub';
 import { usePiano } from '@/lib/piano/learn/store';
 import { scoreRange, stepsFor, type Score } from '@/lib/piano/music/score';
 import { pulsesPerMeasure, type Hand } from '@/lib/piano/music/theory';
@@ -36,9 +37,23 @@ export interface PlaySurfaceProps {
   contourLabel?: 'finger' | 'letter' | 'none';
   /** Seconds of playing just before the run began to take in. For playing back what was just heard. */
   catchUp?: number;
+  /**
+   * A timed run waits for the learner to play a key before it counts in, so
+   * nothing starts while they are reading or away. Set this where they have
+   * just said they are ready.
+   */
+  autoStart?: boolean;
+  /** Start nothing and stop what is running, as while a sheet covers the stand. */
+  held?: boolean;
+  /** Keep the marks on the notes back, while the learner judges the run for themselves. */
+  veil?: boolean;
+  /** Always sound the click, whatever the setting, as the timing check needs. */
+  click?: boolean;
+  /** What to say when the music is kept out of sight and it is the learner's turn. */
+  hiddenPrompt?: string;
 }
 
-type Phase = 'ready' | 'countin' | 'playing' | 'done';
+type Phase = 'ready' | 'gate' | 'countin' | 'playing' | 'done';
 
 export default function PlaySurface({
   score,
@@ -54,13 +69,21 @@ export default function PlaySurface({
   onDone,
   contourLabel = 'finger',
   catchUp,
+  autoStart = false,
+  held = false,
+  veil = false,
+  click = false,
+  hiddenPrompt = 'Your turn',
 }: PlaySurfaceProps) {
   const inputMode = useInputMode();
   const settings = usePiano((s) => s.settings);
+  // Chord letters stay off the stand until the lesson that explains them has been opened.
+  const chordsTaught = usePiano((s) => Boolean(s.lessons['triads']));
   const viewRef = useRef<ScoreViewHandle>(null);
   const kbRef = useRef<HTMLDivElement>(null);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
+  const gateRef = useRef<(() => void) | null>(null);
 
   const [phase, setPhase] = useState<Phase>('ready');
   const [count, setCount] = useState<number | null>(null);
@@ -87,7 +110,11 @@ export default function PlaySurface({
     setCount(null);
     setBeat(null);
     setPhase('ready');
+    gateRef.current = null;
+    if (held) return;
     const timers: Array<ReturnType<typeof setTimeout>> = [];
+    let offGate: (() => void) | null = null;
+    let begin: (() => void) | null = null;
     let cancelled = false;
     let session: FlowSession | null = null;
     const transport = new Transport();
@@ -146,7 +173,7 @@ export default function PlaySurface({
         bpm,
         hintDelayMs: hints === 'always' ? 0 : hints === 'delay' ? 3500 : Infinity,
         hintAfterWrong: hints === 'never' ? 4 : 2,
-        metronome: settings.metronome,
+        metronome: click || settings.metronome,
         // Fill in the other hand when the app can play without being overheard.
         accompany: active.length < score.hands.length && inputMode !== 'listen',
         anyPitch: anyKey,
@@ -187,11 +214,45 @@ export default function PlaySurface({
           doneRef.current(ev.result);
         }
       });
-      later(mode === 'tempo' ? 900 : 150, () => s.start());
+      if (mode === 'tempo' && !autoStart) {
+        // The run waits at a gate. Any key on the piano opens it, or a tap.
+        let begun = false;
+        let armed = false;
+        const open = () => {
+          if (cancelled || begun) return;
+          begun = true;
+          offGate?.();
+          offGate = null;
+          if (waitingGate.current === open) waitingGate.current = null;
+          gateRef.current = null;
+          setPhase('ready');
+          // A breath between the key that said go and the first click.
+          later(450, () => s.start());
+        };
+        begin = open;
+        gateRef.current = open;
+        waitingGate.current = open;
+        setPhase('gate');
+        // The key that brought the learner here must not also start the run.
+        later(300, () => {
+          armed = true;
+        });
+        offGate = noteBus.subscribe((ev) => {
+          if (ev.type !== 'on' || !armed) return;
+          // The bottom key asks to hear it, so it is left to do that.
+          if (ev.source === 'midi' && input.remoteKeys && ev.midi === REMOTE_SECONDARY) return;
+          open();
+        });
+      } else {
+        later(mode === 'tempo' ? 600 : 150, () => s.start());
+      }
     }
 
     return () => {
       cancelled = true;
+      offGate?.();
+      if (begin && waitingGate.current === begin) waitingGate.current = null;
+      gateRef.current = null;
       timers.forEach((t) => clearTimeout(t));
       session?.stop();
       transport.stop();
@@ -199,7 +260,7 @@ export default function PlaySurface({
     };
     // Settings and input mode are read when a run starts. Changing them mid run would restart it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runId, score, mode, bpm, active, hints, anyKey, display]);
+  }, [runId, score, mode, bpm, active, hints, anyKey, display, held, autoStart]);
 
   const pulses = pulsesPerMeasure(score.time);
   const showStaff = display === 'staff';
@@ -207,17 +268,18 @@ export default function PlaySurface({
 
   let status = '';
   if (mode === 'listen') status = phase === 'done' ? 'That was it' : 'Listen';
-  else if (phase === 'done') status = '';
+  else if (phase === 'done' || held) status = '';
+  else if (phase === 'gate') status = 'It starts when you do';
   else if (phase === 'countin') status = 'Get ready';
   else if (mode === 'wait') status = anyKey ? 'Play each note, any key' : 'The music waits for you';
   else if (phase === 'ready') status = 'Get ready';
   else status = 'Play';
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className={`flex h-full min-h-0 flex-col ${veil ? 'mc-veil' : ''}`}>
       <div className="relative min-h-0 flex-1 px-5">
         {showStaff && (
-          <ScoreView ref={viewRef} score={score} steps={steps} showFingering={fingering} showNames={names} focusHand={focusHand} />
+          <ScoreView ref={viewRef} score={score} steps={steps} showFingering={fingering} showNames={names} focusHand={focusHand} showChords={chordsTaught} />
         )}
         {display === 'contour' && <ContourView ref={viewRef} score={score} steps={steps} label={contourLabel} />}
         {display === 'hidden' && (
@@ -225,14 +287,26 @@ export default function PlaySurface({
             <div className={`flex h-24 w-24 items-center justify-center rounded-full bg-mc-raised ${mode === 'listen' && phase === 'playing' ? 'mc-pulse' : ''}`}>
               {mode === 'listen' ? <Icon.Ear size={44} /> : <Icon.Piano size={44} />}
             </div>
-            <div className="font-mc-serif text-2xl text-mc-ink">{mode === 'listen' ? 'Listen closely' : 'Now play what you heard'}</div>
+            <div className="font-mc-serif text-2xl text-mc-ink">{mode === 'listen' ? 'Listen closely' : hiddenPrompt}</div>
           </div>
         )}
         {count !== null && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div key={`${count}-${beat?.n}`} className="mc-count font-mc-serif text-[9rem] leading-none text-mc-accent/80">
+          // In the corner, so the first notes stay in view while the count runs.
+          <div className="pointer-events-none absolute bottom-2 right-6 flex h-24 w-24 items-center justify-center rounded-full bg-mc-bg/85">
+            <div key={`${count}-${beat?.n}`} className="mc-count font-mc-serif text-[4.5rem] leading-none text-mc-accent">
               {count}
             </div>
+          </div>
+        )}
+        {phase === 'gate' && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+            <button
+              onClick={() => gateRef.current?.()}
+              className="mc-fade-up pointer-events-auto flex h-12 items-center gap-2.5 rounded-full bg-mc-ink px-6 text-[1.05rem] font-semibold text-mc-bg shadow-lg active:scale-[0.97]"
+            >
+              <Icon.Play size={18} />
+              {touch ? 'Tap here when you are ready' : anyKey ? 'Tap any key when you are ready' : 'Play any key when you are ready'}
+            </button>
           </div>
         )}
       </div>

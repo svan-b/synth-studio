@@ -5,7 +5,7 @@ A piano teacher that runs on an iPad on the music stand. It lives at `/piano` in
 ## What it does
 
 - **Follows your playing.** Over MIDI it sees every key, how hard it was struck, when it was released, and the pedals. Without MIDI it listens through the microphone.
-- **A course in six stages**, 36 short lessons, from finding middle C to Bach, Beethoven and Satie. Tunes are learned by ear and by shape first, and notation is introduced through music you can already play.
+- **A course in six stages**, 35 short lessons, from finding middle C to Bach, Beethoven and Satie. Tunes are learned by ear and by shape first, and notation is introduced through music you can already play.
 - **A practice coach for pieces.** It works the way studies of effective practice describe: hear the phrase, learn the notes with no time pressure, put the hands together early, add a slow beat, speed up after two good passes, and take a trouble spot out to fix it.
 - **Drills** for note reading (spaced review), rhythm, playing by ear, and sight reading with fresh material every time.
 - **A daily session** sized to the time you have.

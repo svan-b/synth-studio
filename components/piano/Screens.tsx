@@ -1,12 +1,12 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { allPieces, allStages, getLesson, lessonOrder, lessonUnlocked, pieceInfo } from '@/lib/piano/content/catalog';
 import { NOT_USED, PRINCIPLES, TIPS, type Strength } from '@/lib/piano/content/method';
 import type { FlowResult } from '@/lib/piano/engine/flow';
 import { pieceProgress } from '@/lib/piano/learn/coach';
 import { EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS } from '@/lib/piano/learn/generators';
-import { dueReadingCards, introducedPieces, planMinutes, planSession, readsStaff, type Block, type DrillKind } from '@/lib/piano/learn/planner';
+import { dueReadingCards, introducedPieces, planMinutes, planSession, readsStaff, skippedPieces, type Block, type DrillKind } from '@/lib/piano/learn/planner';
 import { exportData, streak, totalMinutes, usePiano } from '@/lib/piano/learn/store';
 import { isNative, shareFile } from '@/lib/piano/native/bridge';
 import { parseScore } from '@/lib/piano/music/score';
@@ -57,8 +57,11 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   const days = usePiano((s) => s.days);
   const sessionDoneOn = usePiano((s) => s.sessionDoneOn);
   const today = dayKey();
-  const plan = useMemo(() => planSession({ minutes: profile.minutes, lessons, pieces, cards }), [profile.minutes, lessons, pieces, cards]);
   const doneToday = sessionDoneOn === today;
+  const plan = useMemo(
+    () => planSession({ minutes: profile.minutes, lessons, pieces, cards, days, again: doneToday }),
+    [profile.minutes, lessons, pieces, cards, days, doneToday],
+  );
   const minutesToday = Math.round((days[today]?.seconds ?? 0) / 60);
   const run = streak(days);
   const date = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
@@ -74,7 +77,7 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
               <h2 className="font-mc-serif text-2xl">{doneToday ? 'Today is done' : firstTime ? 'Your first session' : 'Your session'}</h2>
               <p className="mt-1 text-mc-muted">
                 {doneToday
-                  ? 'Rest is part of learning. Come back tomorrow, or carry on below if you want more.'
+                  ? 'Rest is part of learning. Come back tomorrow. If you want more today, this is extra practice with nothing new in it.'
                   : `About ${planMinutes(plan)} minutes, in ${plan.length} ${plan.length === 1 ? 'part' : 'parts'}.`}
               </p>
             </div>
@@ -143,18 +146,24 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
 
 export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
   const lessons = usePiano((s) => s.lessons);
-  const completeLesson = usePiano((s) => s.completeLesson);
+  const skipLesson = usePiano((s) => s.skipLesson);
   const addCards = usePiano((s) => s.addCards);
   const [confirm, setConfirm] = useState<number | null>(null);
   const isDone = (id: string) => lessons[id]?.done === true;
   const nextId = lessonOrder().find((id) => !isDone(id));
+
+  // Open at the stage the learner has reached, not at the top of the course.
+  const here = useRef<HTMLElement>(null);
+  useEffect(() => {
+    here.current?.scrollIntoView({ block: 'start' });
+  }, []);
 
   const skipStage = (stageId: number) => {
     // Everything up to and including this stage is marked as known.
     for (const stage of allStages()) {
       if (stage.id > stageId) break;
       for (const id of stage.lessons) {
-        completeLesson(id);
+        skipLesson(id);
         const cards = getLesson(id).cards;
         if (cards) addCards(cards);
       }
@@ -168,7 +177,7 @@ export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
         {allStages().map((stage) => {
           const doneCount = stage.lessons.filter(isDone).length;
           return (
-            <section key={stage.id}>
+            <section key={stage.id} ref={stage.lessons.includes(nextId ?? '') ? here : undefined} className="scroll-mt-4">
               <div className="mb-3 flex items-end justify-between gap-4">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-widest text-mc-faint">Stage {stage.id}</div>
@@ -210,9 +219,14 @@ export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold">{lesson.title}</span>
-                        <span className="block truncate text-sm text-mc-muted">{lesson.summary}</span>
+                        <span className="line-clamp-2 text-sm text-mc-muted">{lesson.summary}</span>
                       </span>
-                      <span className="shrink-0 text-sm tabular-nums text-mc-muted">{lesson.minutes} min</span>
+                      {/* A lesson left part way through says so. */}
+                      {!done && (lessons[id]?.step ?? 0) > 0 ? (
+                        <Pill tone="accent">Started</Pill>
+                      ) : (
+                        <span className="shrink-0 text-sm tabular-nums text-mc-muted">{lesson.minutes} min</span>
+                      )}
                     </button>
                   );
                 })}
@@ -224,7 +238,7 @@ export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
       <Sheet open={confirm !== null} onClose={() => setConfirm(null)} title="Skip ahead?">
         <p className="text-[1.05rem] leading-relaxed text-mc-muted">
           This marks every lesson up to the end of stage {confirm} as done, and adds its notes to your reading review. You can still open any of those
-          lessons later.
+          lessons later, and their pieces stay on the Pieces page for when you want them.
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="soft" onClick={() => setConfirm(null)}>
@@ -242,12 +256,14 @@ export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
 export function PiecesScreen({ onStart }: { onStart: (a: Activity) => void }) {
   const lessons = usePiano((s) => s.lessons);
   const states = usePiano((s) => s.pieces);
-  const introduced = useMemo(() => introducedPieces(lessons), [lessons]);
+  const introduced = useMemo(() => introducedPieces(lessons, states), [lessons, states]);
+  const passed = useMemo(() => skippedPieces(lessons, states), [lessons, states]);
   const all = allPieces();
   const groups: Array<{ title: string; note: string; ids: string[] }> = [
     { title: 'In practice', note: 'Pieces from your lessons that you are still learning.', ids: introduced.filter((id) => !states[id]?.learned) },
     { title: 'Learned', note: 'These come back for a play through now and then, so they stay with you.', ids: all.filter((p) => states[p.id]?.learned).map((p) => p.id) },
-    { title: 'Ahead of you', note: 'You can open any of these whenever you like. The lessons will bring them in order.', ids: all.filter((p) => !introduced.includes(p.id) && !states[p.id]?.learned).map((p) => p.id) },
+    { title: 'From lessons you skipped', note: 'Easier pieces from the part of the course you marked as known. Open any you would like to play.', ids: passed.filter((id) => !states[id]?.learned) },
+    { title: 'Ahead of you', note: 'You can open any of these whenever you like. The lessons will bring them in order.', ids: all.filter((p) => !introduced.includes(p.id) && !passed.includes(p.id) && !states[p.id]?.learned).map((p) => p.id) },
   ];
   return (
     <Page title="Pieces" subtitle="Everything you can play, and everything still to come.">
@@ -454,6 +470,7 @@ function TimingCheck({ onDone }: { onDone: (biasMs: number | null) => void }) {
         display="contour"
         contourLabel="none"
         anyKey
+        click
         runId="timing"
         onDone={(r: FlowResult | null) => onDone(r && r.correctNotes >= 5 ? r.biasMs : null)}
       />
@@ -477,14 +494,14 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
   const [backupNote, setBackupNote] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<boolean | 'failed'>(false);
 
   const copyBackup = async () => {
     try {
       await navigator.clipboard.writeText(exportData());
       setCopied(true);
     } catch {
-      setCopied(false);
+      setCopied('failed');
     }
   };
 
@@ -637,7 +654,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
       </section>
 
       <Sheet open={timing} onClose={() => setTiming(false)} title="Timing check" wide>
-        <p className="mb-2 text-mc-muted">After the count in, play any key exactly with each click, eight times. Play as you normally would.</p>
+        <p className="mb-2 text-mc-muted">Play any key to begin. After the count in, play a key exactly with each click, eight times, as you normally would.</p>
         {timing && (
           <TimingCheck
             onDone={(bias) => {
@@ -662,9 +679,10 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
         <div className="flex flex-wrap gap-3">
           <Button onClick={download}>Save as a file</Button>
           <Button variant="soft" onClick={() => void copyBackup()}>
-            {copied ? 'Copied' : 'Copy to the clipboard'}
+            {copied === true ? 'Copied' : 'Copy to the clipboard'}
           </Button>
         </div>
+        {copied === 'failed' && <p className="mt-3 text-sm text-mc-muted">Copying is not allowed here. Select the text below and copy it by hand.</p>}
         {saving && (
           <textarea
             readOnly

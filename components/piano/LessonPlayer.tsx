@@ -88,7 +88,7 @@ function CheckStep({ step, onNext }: { step: StepOf<'check'>; onNext: () => void
 function Brief({ text, children, tone }: { text: string; children?: ReactNode; tone?: 'ok' | 'hint' }) {
   return (
     <div className="flex shrink-0 items-center gap-4 px-7 pb-2 pt-1">
-      <div className={`min-w-0 flex-1 text-[1.15rem] leading-snug ${tone === 'ok' ? 'text-mc-ok' : tone === 'hint' ? 'text-mc-hint' : 'text-mc-muted'}`}>
+      <div className={`min-w-0 flex-1 text-[1.15rem] leading-snug ${tone === 'ok' ? 'text-mc-ok' : tone === 'hint' ? 'text-mc-hint-ink' : 'text-mc-muted'}`}>
         <Prose text={text} />
       </div>
       <div className="flex shrink-0 items-center gap-2">{children}</div>
@@ -112,7 +112,7 @@ function ListenStep({ step, onNext }: { step: StepOf<'listen'>; onNext: () => vo
         <Button variant="soft" size="sm" onClick={again} icon={<Icon.Repeat size={16} />}>
           Again
         </Button>
-        <Button size="sm" onClick={onNext} className={done ? 'mc-pulse' : ''} hint={mode === 'midi' ? 'top key' : undefined}>
+        <Button variant={done ? 'primary' : 'ghost'} size="sm" onClick={onNext} className={done ? 'mc-pulse' : ''} hint={mode === 'midi' ? 'top key' : undefined}>
           {done ? 'My turn' : 'Skip'}
         </Button>
       </Brief>
@@ -125,7 +125,8 @@ function ListenStep({ step, onNext }: { step: StepOf<'listen'>; onNext: () => vo
 
 function describe(result: FlowResult): string {
   if (result.mode === 'wait') {
-    if (result.clean) return 'Every note right the first time.';
+    if (result.clean) return result.totalNotes === 1 ? 'That is the one.' : 'Every note right the first time.';
+    if (result.totalNotes === 1) return 'You found it on a later try.';
     return `${result.correctNotes} of ${result.totalNotes} right the first time.`;
   }
   const pct = Math.round(result.accuracy * 100);
@@ -159,6 +160,11 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
   const onDone = useCallback(
     (result: FlowResult | null) => {
       if (!result) return;
+      // A timed run in which no key was touched is not an attempt. It waits at the gate again.
+      if (result.mode === 'tempo' && result.correctNotes === 0 && result.wrongNotes === 0) {
+        again();
+        return;
+      }
       let ok = mode === 'wait' ? result.accuracy >= 0.6 : result.accuracy >= 0.7;
       let text = describe(result);
       if (ok && step.touch && result.velocity !== null) {
@@ -185,7 +191,12 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
         setHave(0);
         setVerdict({
           ok: false,
-          text: mode === 'wait' ? `${text} Go slower and look at each note before you play it.` : `${text} Try again and keep going through any slip.`,
+          text:
+            mode !== 'wait'
+              ? `${text} Try again and keep going through any slip.`
+              : result.totalNotes === 1
+                ? `${text} Have another look at where it sits, then play it once more.`
+                : `${text} Go slower and look at each note before you play it.`,
         });
       }
     },
@@ -342,6 +353,7 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
           mode={phase === 'listen' ? 'listen' : 'wait'}
           display="hidden"
           hints="never"
+          hiddenPrompt="Now play what you heard"
           catchUp={2.2}
           runId={`${index}-${run}`}
           onDone={onDone}
@@ -512,7 +524,12 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
   const indexRef = useRef(index);
   indexRef.current = index;
 
+  const lastNext = useRef(0);
   const next = useCallback(() => {
+    // Two quick taps on Continue are one wish to go on, not two.
+    const now = performance.now();
+    if (now - lastNext.current < 400) return;
+    lastNext.current = now;
     const n = indexRef.current + 1;
     if (n >= lesson.steps.length) {
       setFinished(true);
