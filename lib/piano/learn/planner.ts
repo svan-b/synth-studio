@@ -10,7 +10,7 @@ import { pieceProgress, type PieceState } from './coach';
 import { isDue, type StoredCard } from './srs';
 import type { LessonProgress } from './store';
 
-export type DrillKind = 'reading' | 'rhythm' | 'ear' | 'sight' | 'chords';
+export type DrillKind = 'reading' | 'rhythm' | 'ear' | 'sight' | 'chords' | 'technique';
 
 export type Block =
   | { kind: 'lesson'; id: string; minutes: number; title: string; detail: string }
@@ -70,11 +70,12 @@ export const DRILL_LESSON: Record<Exclude<DrillKind, 'reading'>, string> = {
   rhythm: 'steady-beat',
   sight: 'steps-on-staff',
   chords: 'triads',
+  technique: 'major-scale',
 };
 
 /** The exercises the lessons have prepared the learner for, in the order they turn through the days. */
 export function openDrills(lessons: Record<string, LessonProgress>): DrillKind[] {
-  const order: Array<Exclude<DrillKind, 'reading'>> = ['ear', 'sight', 'rhythm', 'chords'];
+  const order: Array<Exclude<DrillKind, 'reading'>> = ['ear', 'sight', 'rhythm', 'technique', 'chords'];
   return order.filter((kind) => lessons[DRILL_LESSON[kind]]?.done === true);
 }
 
@@ -123,6 +124,7 @@ export const DRILL_LABEL: Record<DrillKind, [string, string]> = {
   sight: ['Sight reading', 'Read music you have never seen'],
   reading: ['Note reading', 'Name notes on the staff'],
   chords: ['Chords', 'Play chords and progressions from their symbols'],
+  technique: ['Scales and arpeggios', 'Smooth, even runs with the right fingers'],
 };
 
 export function planSession(input: PlanInput): Block[] {

@@ -520,7 +520,21 @@ describe('streak', () => {
   });
 });
 
-import { chordExercise, chordLevelCap, earExercise, rhythmExercise, sightExercise, CHORD_LEVELS, EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS } from './generators';
+import {
+  chordExercise,
+  chordLevelCap,
+  earExercise,
+  evenness,
+  rhythmExercise,
+  sightExercise,
+  techniqueExercise,
+  techniqueLevelCap,
+  CHORD_LEVELS,
+  EAR_LEVELS,
+  RHYTHM_LEVELS,
+  SIGHT_LEVELS,
+  TECH_LEVELS,
+} from './generators';
 import { currentPiece, introducedPieces, openDrills, pieceToEndOn, planSession, readsStaff, skippedPieces } from './planner';
 import { parseScore, scoreRange } from '../music/score';
 import { lessonOrder, pieceInfo } from '../content/catalog';
@@ -582,6 +596,75 @@ describe('generated exercises', () => {
     }
   });
 
+  it('writes scales and arpeggios that parse, with a finger on every note', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      for (let level = 1; level <= TECH_LEVELS; level++) {
+        const ex = techniqueExercise(level, seed);
+        const s = parseScore(ex.music);
+        expect(ex.name.length, `level ${level}`).toBeGreaterThan(10);
+        for (const n of s.notes) expect(n.finger, `${ex.name} has a note without a finger`).toBeDefined();
+        for (const step of s.steps) {
+          const r = step.notes.filter((n) => n.hand === 'R').map((n) => n.midi);
+          const l = step.notes.filter((n) => n.hand === 'L').map((n) => n.midi);
+          if (r.length && l.length) expect(Math.min(...r)).toBeGreaterThan(Math.max(...l));
+        }
+        for (const n of s.notes) {
+          expect(n.midi).toBeGreaterThanOrEqual(41);
+          expect(n.midi).toBeLessThanOrEqual(84);
+        }
+      }
+    }
+  });
+
+  it('gives the C major scale its standard fingering, up and down', () => {
+    const right = parseScore(techniqueExercise(1, 3).music);
+    expect(right.notes.map((n) => n.midi)).toEqual([60, 62, 64, 65, 67, 69, 71, 72, 72, 71, 69, 67, 65, 64, 62, 60]);
+    expect(right.notes.map((n) => n.finger)).toEqual([1, 2, 3, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 3, 2, 1]);
+    const left = parseScore(techniqueExercise(2, 3).music);
+    expect(left.notes.map((n) => n.midi).slice(0, 8)).toEqual([48, 50, 52, 53, 55, 57, 59, 60]);
+    expect(left.notes.map((n) => n.finger).slice(0, 8)).toEqual([5, 4, 3, 2, 1, 3, 2, 1]);
+  });
+
+  it('gives arpeggios the fingers 1 2 3 5 and 5 4 2 1, and passes one between the hands', () => {
+    let sawRight = false;
+    let sawLeft = false;
+    for (let seed = 1; seed <= 30; seed++) {
+      const ex = techniqueExercise(5, seed);
+      const s = parseScore(ex.music);
+      const up = s.notes.slice(0, 4);
+      // Root, third, fifth and the root again an octave up.
+      expect(up[3].midi - up[0].midi).toBe(12);
+      expect(up[1].midi - up[0].midi).toBe(4);
+      expect(up[2].midi - up[0].midi).toBe(7);
+      if (s.hands[0] === 'R') {
+        sawRight = true;
+        expect(up.map((n) => n.finger)).toEqual([1, 2, 3, 5]);
+      } else {
+        sawLeft = true;
+        expect(up.map((n) => n.finger)).toEqual([5, 4, 2, 1]);
+      }
+    }
+    expect(sawRight && sawLeft).toBe(true);
+    const sweep = parseScore(techniqueExercise(7, 2).music);
+    expect(sweep.hands).toEqual(['R', 'L']);
+    // Thirteen notes, each sounding alone: up through both hands and back down.
+    expect(sweep.steps).toHaveLength(13);
+    expect(sweep.steps.every((st) => st.notes.length === 1)).toBe(true);
+    const line = sweep.steps.map((st) => st.notes[0].midi);
+    expect(line.slice(0, 7)).toEqual(line.slice(0, 7).slice().sort((a, b) => a - b));
+    expect(line.slice(6)).toEqual(line.slice(6).slice().sort((a, b) => b - a));
+  });
+
+  it('lets scales and arpeggios climb only as far as the lessons have gone, and measures evenness', () => {
+    const upTo = (ids: string[]) => (id: string) => ids.includes(id);
+    expect(techniqueLevelCap(upTo(['major-scale']))).toBe(2);
+    expect(techniqueLevelCap(upTo(['major-scale', 'keys']))).toBe(4);
+    expect(techniqueLevelCap(upTo(['major-scale', 'keys', 'arpeggios']))).toBe(TECH_LEVELS);
+    expect(evenness([10, 10, 10, 10])).toBe(0);
+    expect(evenness([-40, 40, -40, 40])).toBe(40);
+    expect(evenness([5, 5])).toBeNull();
+  });
+
   it('lets chords climb only as far as the lessons have gone', () => {
     const upTo = (ids: string[]) => (id: string) => ids.includes(id);
     expect(chordLevelCap(upTo(['triads']))).toBe(2);
@@ -630,7 +713,8 @@ describe('daily plan', () => {
     expect(openDrills(doneUpTo(2))).toEqual(['ear']);
     expect(openDrills(doneUpTo(3))).toEqual(['ear', 'rhythm']);
     expect(openDrills(doneUpTo(8))).toEqual(['ear', 'sight', 'rhythm']);
-    expect(openDrills(doneUpTo(order.indexOf('triads') + 1))).toEqual(['ear', 'sight', 'rhythm', 'chords']);
+    expect(openDrills(doneUpTo(order.indexOf('major-scale') + 1))).toEqual(['ear', 'sight', 'rhythm', 'technique']);
+    expect(openDrills(doneUpTo(order.indexOf('triads') + 1))).toEqual(['ear', 'sight', 'rhythm', 'technique', 'chords']);
     const now = new Date('2026-03-02T09:00:00');
     for (let day = 0; day < 4; day++) {
       const at = new Date(now.getTime() + day * 86400000);

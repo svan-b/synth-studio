@@ -162,6 +162,11 @@ export const Icon = {
       <rect x="4.500" y="16" width="15" height="4" rx="2" />
     </Svg>
   ),
+  Steps: (p: IconProps) => (
+    <Svg {...p}>
+      <path d="M3.500 19.500h4.500v-4.500h4.500v-4.500h4.500V6h3.500" />
+    </Svg>
+  ),
   Clock: (p: IconProps) => (
     <Svg {...p}>
       <circle cx="12" cy="12" r="9" />

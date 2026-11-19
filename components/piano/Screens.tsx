@@ -6,7 +6,7 @@ import { allPieces, allStages, getLesson, getPiece, lessonOrder, lessonUnlocked,
 import { NOT_USED, PRINCIPLES, TIPS, type Strength } from '@/lib/piano/content/method';
 import type { FlowResult } from '@/lib/piano/engine/flow';
 import { pieceProgress } from '@/lib/piano/learn/coach';
-import { CHORD_LEVELS, EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS } from '@/lib/piano/learn/generators';
+import { CHORD_LEVELS, EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS, TECH_LEVELS } from '@/lib/piano/learn/generators';
 import { milestones } from '@/lib/piano/learn/milestones';
 import {
   DRILL_LESSON,
@@ -389,6 +389,13 @@ export function TrainScreen({ onStart }: { onStart: (a: Activity) => void }) {
       icon: <Icon.Pieces size={24} />,
     },
     {
+      id: 'technique',
+      title: 'Scales and arpeggios',
+      text: 'A scale or an arpeggio, played with the beat. The app listens for an even run, every note the same length.',
+      meta: waits('technique', `Level ${drills.technique?.level ?? 1} of ${TECH_LEVELS}`),
+      icon: <Icon.Steps size={24} />,
+    },
+    {
       id: 'chords',
       title: 'Chords',
       text: 'Chord symbols appear and you play them, whole or one note at a time, anywhere on the keyboard.',
@@ -403,12 +410,13 @@ export function TrainScreen({ onStart }: { onStart: (a: Activity) => void }) {
           <button
             key={it.id}
             onClick={() => onStart({ kind: 'drill', id: it.id })}
-            className="rounded-2xl border border-mc-line bg-mc-surface p-6 text-left transition-transform active:scale-[0.99]"
+            // Cards in a row share a height. Their contents start from the top, so the icons and titles line up.
+            className="flex flex-col items-start rounded-2xl border border-mc-line bg-mc-surface p-6 text-left transition-transform active:scale-[0.99]"
           >
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-mc-raised text-mc-ink">{it.icon}</span>
             <div className="mt-4 font-mc-serif text-2xl">{it.title}</div>
             <p className="mt-1 text-mc-muted">{it.text}</p>
-            <div className="mt-4 text-sm font-semibold text-mc-faint">{it.meta}</div>
+            <div className="mt-auto pt-4 text-sm font-semibold text-mc-faint">{it.meta}</div>
           </button>
         ))}
       </div>

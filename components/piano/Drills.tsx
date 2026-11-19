@@ -11,12 +11,16 @@ import {
   EAR_LEVELS,
   RHYTHM_LEVELS,
   SIGHT_LEVELS,
+  TECH_LEVELS,
   chordExercise,
   chordLevelCap,
   daySeed,
   earExercise,
+  evenness,
   rhythmExercise,
   sightExercise,
+  techniqueExercise,
+  techniqueLevelCap,
   type ChordExercise,
 } from '@/lib/piano/learn/generators';
 import { dueReadingCards, type DrillKind } from '@/lib/piano/learn/planner';
@@ -199,7 +203,7 @@ function ReadingDrill({ onClose }: { onClose: () => void }) {
 
 // --------------------------------------------------- generated exercises
 
-type Generated = 'rhythm' | 'ear' | 'sight' | 'chords';
+type Generated = 'rhythm' | 'ear' | 'sight' | 'chords' | 'technique';
 
 const CHORD_KEYS = { low: 48, high: 84 };
 
@@ -215,6 +219,7 @@ const ROUNDS: Record<Generated, Round> = {
   ear: { kind: 'ear', title: 'Play by ear', count: 5, maxLevel: EAR_LEVELS },
   sight: { kind: 'sight', title: 'Sight reading', count: 3, maxLevel: SIGHT_LEVELS },
   chords: { kind: 'chords', title: 'Chords', count: 4, maxLevel: CHORD_LEVELS },
+  technique: { kind: 'technique', title: 'Scales and arpeggios', count: 3, maxLevel: TECH_LEVELS },
 };
 
 function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => void }) {
@@ -223,8 +228,10 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => voi
   const lessons = usePiano((s) => s.lessons);
   const recordDrill = usePiano((s) => s.recordDrill);
   const setDrillLevel = usePiano((s) => s.setDrillLevel);
-  // Chords climb only as far as the lessons have gone: no minor chords before the lesson on them, and so on.
-  const top = kind === 'chords' ? Math.min(round.maxLevel, chordLevelCap((id) => lessons[id]?.done === true)) : round.maxLevel;
+  // Chords, scales and arpeggios climb only as far as the lessons have gone: no minor chords before the lesson on them, and so on.
+  const lessonDone = (id: string) => lessons[id]?.done === true;
+  const top =
+    kind === 'chords' ? Math.min(round.maxLevel, chordLevelCap(lessonDone)) : kind === 'technique' ? Math.min(round.maxLevel, techniqueLevelCap(lessonDone)) : round.maxLevel;
   const [level, setLevel] = useState(() => Math.max(1, Math.min(top, stored?.level ?? 1)));
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<'look' | 'listen' | 'play'>(kind === 'ear' ? 'listen' : kind === 'sight' ? 'look' : 'play');
@@ -244,11 +251,20 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => voi
     [],
   );
 
-  const { score, chord } = useMemo(() => {
+  const { score, chord, named } = useMemo(() => {
     const seed = seedBase.current + index * 13;
     const made: ChordExercise | null = kind === 'chords' ? chordExercise(level, seed) : null;
-    const music = made ? made.music : kind === 'rhythm' ? rhythmExercise(level, seed) : kind === 'ear' ? earExercise(level, seed) : sightExercise(level, seed);
-    return { score: parseScore(music), chord: made };
+    const run = kind === 'technique' ? techniqueExercise(level, seed) : null;
+    const music = made
+      ? made.music
+      : run
+        ? run.music
+        : kind === 'rhythm'
+          ? rhythmExercise(level, seed)
+          : kind === 'ear'
+            ? earExercise(level, seed)
+            : sightExercise(level, seed);
+    return { score: parseScore(music), chord: made, named: run?.name ?? null };
     // A new exercise for each item. The level is read when the item starts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, kind]);
@@ -344,6 +360,28 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => voi
         setRun((r) => r + 1);
         return;
       }
+      if (kind === 'technique') {
+        const ok = result.accuracy >= 0.9 && result.onTime >= 0.7;
+        adapt(ok);
+        // How even the run was, from how far its notes strayed from one another around the beat.
+        const spread = evenness(result.detail.filter((d) => d.errMs !== undefined).map((d) => d.errMs as number));
+        setNote({
+          ok,
+          text: ok
+            ? spread !== null && spread <= 28
+              ? 'Even and steady, every note the same length. That is the sound to aim for.'
+              : 'Right notes, in time. Now listen for an even run, every note the same length.'
+            : result.accuracy < 0.9
+              ? 'Some notes went astray. Take it slower in your head and follow the finger numbers.'
+              : result.biasMs > 25
+                ? 'The notes were right but behind the beat. Land with the click.'
+                : result.biasMs < -25
+                  ? 'The notes were right but ahead of the beat. Let the click lead you.'
+                  : 'The notes were right but uneven. Feel each click and fit the notes to it.',
+        });
+        timer.current = setTimeout(advance, ok ? 2200 : 3400);
+        return;
+      }
       const ok = kind === 'rhythm' ? result.accuracy >= 0.85 && result.onTime >= 0.65 : result.accuracy >= 0.85;
       adapt(ok);
       const pct = Math.round(result.accuracy * 100);
@@ -392,13 +430,15 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => voi
             ? 'Play each chord one note at a time, from the note it is named after: bottom, middle, top, middle.'
             : 'Play each chord, all three notes together. Any position on the keyboard will do.'
         }`
-      : kind === 'rhythm'
-        ? 'Tap this rhythm in time with the clicks, on any key.'
-        : kind === 'ear'
-          ? 'Listen, then play it back. It starts on **C**.'
-          : phase === 'look'
-            ? 'Look it over before you play. Where does it start? Where does it step, skip or repeat?'
-            : 'Play it with the beat. Keep going whatever happens.';
+      : kind === 'technique'
+        ? `${named ?? 'A scale'}. Play it with the beat, every note the same length.`
+        : kind === 'rhythm'
+          ? 'Tap this rhythm in time with the clicks, on any key.'
+          : kind === 'ear'
+            ? 'Listen, then play it back. It starts on **C**.'
+            : phase === 'look'
+              ? 'Look it over before you play. Where does it start? Where does it step, skip or repeat?'
+              : 'Play it with the beat. Keep going whatever happens.';
 
   return (
     <Shell title={round.title} progress={index / round.count} onClose={onClose}>
