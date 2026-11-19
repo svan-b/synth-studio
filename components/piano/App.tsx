@@ -79,7 +79,7 @@ function tomorrow(): string | null {
   if (first.kind === 'lesson') return `Tomorrow brings a new lesson, ${first.title}.`;
   if (first.kind !== 'piece') return null;
   // Where the next lesson is waiting on the pieces, say so, so that a day without one is no surprise.
-  return day.held === 'pieces' ? `Tomorrow carries on with ${first.title}. The next lesson comes when one of your pieces is learned.` : `Tomorrow carries on with ${first.title}.`;
+  return day.held === 'pieces' ? `Tomorrow carries on with ${first.title}. The next lesson waits until your pieces are further along.` : `Tomorrow carries on with ${first.title}.`;
 }
 
 /** Runs the parts of a daily session one after another. */

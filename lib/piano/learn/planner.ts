@@ -162,8 +162,12 @@ export function planSession(input: PlanInput): Block[] {
   return planDay(input).blocks;
 }
 
-/** The day's plan, the lesson that comes next, and why it is held back if it is. */
-export function planDay(input: PlanInput): { blocks: Block[]; upNext: string | undefined; held: Held | null; waiting: string[] } {
+/**
+ * The day's plan, the lesson that comes next, and why it is held back if it
+ * is. Where it waits on the pieces, `comesIn` is the number of practice days
+ * after which it comes anyway, or null when only learning a piece will bring it.
+ */
+export function planDay(input: PlanInput): { blocks: Block[]; upNext: string | undefined; held: Held | null; waiting: string[]; comesIn: number | null } {
   const now = input.now ?? new Date();
   const today = dayKey(now);
   const isDone = done(input.lessons);
@@ -319,7 +323,8 @@ export function planDay(input: PlanInput): { blocks: Block[]; upNext: string | u
     const at = ending && blocks.includes(ending) ? blocks.indexOf(ending) : blocks.length;
     blocks.splice(at, 0, drillOf(other));
   }
-  return { blocks, upNext, held: upNext && !blocks.some((b) => b.kind === 'lesson') ? (held ?? 'taken') : null, waiting };
+  const comesIn = held === 'pieces' && waiting.length < MOST_WAITING ? Math.max(1, LONGEST_WAIT - daysSince) : null;
+  return { blocks, upNext, held: upNext && !blocks.some((b) => b.kind === 'lesson') ? (held ?? 'taken') : null, waiting, comesIn };
 }
 
 export function planMinutes(blocks: Block[]): number {

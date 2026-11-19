@@ -1131,12 +1131,22 @@ describe('daily plan', () => {
     order.slice(0, 4).forEach((id) => (lessons[id] = { done: true, doneOn: '2026-03-05', step: 0 }));
     const plan = (practised: string[], today: string) =>
       planDay({ minutes: 20, lessons, pieces: {}, cards: {}, days: Object.fromEntries(practised.map((d) => [d, {}])), now: new Date(`${today}T09:00:00`) });
-    // Three days of practice since the last lesson, and the pieces are still not learned: it waits.
-    expect(plan(['2026-03-05', '2026-03-06', '2026-03-07', '2026-03-08'], '2026-03-09').held).toBe('pieces');
+    // Three days of practice since the last lesson, and the pieces are still not learned: it waits, one more day at most.
+    const fourth = plan(['2026-03-05', '2026-03-06', '2026-03-07', '2026-03-08'], '2026-03-09');
+    expect(fourth.held).toBe('pieces');
+    expect(fourth.comesIn).toBe(1);
     // After a fourth, the lesson comes anyway.
     const fifth = plan(['2026-03-05', '2026-03-06', '2026-03-07', '2026-03-08', '2026-03-09'], '2026-03-10');
     expect(fifth.held).toBeNull();
     expect(fifth.blocks.some((b) => b.kind === 'lesson')).toBe(true);
+    // With four or more waiting, only learning one brings the next lesson, however many days go by.
+    const many: Record<string, { done: boolean; doneOn?: string; step: number }> = {};
+    order.slice(0, 6).forEach((id) => (many[id] = { done: true, doneOn: '2026-03-05', step: 0 }));
+    const days = Object.fromEntries(['2026-03-05', '2026-03-06', '2026-03-07', '2026-03-08', '2026-03-09', '2026-03-10'].map((d) => [d, {}]));
+    const stuck = planDay({ minutes: 20, lessons: many, pieces: {}, cards: {}, days, now: new Date('2026-03-11T09:00:00') });
+    expect(stuck.waiting.length).toBeGreaterThanOrEqual(4);
+    expect(stuck.held).toBe('pieces');
+    expect(stuck.comesIn).toBeNull();
   });
 
   it('does not offer the pieces of lessons that were marked as known', () => {

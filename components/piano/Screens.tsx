@@ -13,6 +13,7 @@ import {
   dueReadingCards,
   introducedPieces,
   openDrills,
+  PIECES_IN_HAND,
   planDay,
   planMinutes,
   skippedPieces,
@@ -85,10 +86,15 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   // The next lesson, for a learner who wants more than the day's plan holds, with the reason it is not in the plan.
   const upNext = day.upNext;
   const offerLesson = upNext !== undefined && day.held !== null && !firstTime;
-  const count = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][day.waiting.length] ?? String(day.waiting.length);
+  const word = (n: number) => ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][n] ?? String(n);
+  const count = word(day.waiting.length);
+  // How many of them have to be learned before the next lesson comes of itself.
+  const toLearn = Math.max(1, day.waiting.length - PIECES_IN_HAND + 1);
   const whyHeld =
     day.held === 'pieces'
-      ? `You have ${count} pieces still to learn, so today is for them. A new lesson comes when one of them is learned, so that what you are taught gets played.`
+      ? `You have ${count} pieces still to learn, so today is for them, and what you were taught gets played. A new lesson comes once ${
+          toLearn === 1 ? 'one of them is' : `${word(toLearn)} of them are`
+        } learned${day.comesIn === null ? '' : day.comesIn === 1 ? ', or after one more day of practice at the latest' : `, or after ${word(day.comesIn)} more days of practice at the latest`}.`
       : day.held === 'turn'
         ? `With ${profile.minutes} minutes a day, lessons and pieces take the days in turn, and today is the piece's.`
         : 'The course moves at one new lesson a day at most, because that is what holds best.';
