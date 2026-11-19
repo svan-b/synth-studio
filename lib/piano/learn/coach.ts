@@ -56,6 +56,8 @@ export interface PieceInfo {
   /** Sections as 0 based measure ranges, inclusive. */
   sections: Array<[number, number]>;
   measures: number;
+  /** The hands that have notes in each section. Given where some section has a hand that only rests. */
+  sectionHands?: Hand[][];
 }
 
 export type TaskScope =
@@ -155,9 +157,33 @@ function secure(info: PieceInfo, s: SectionState): boolean {
   return s.rung >= rungsFor(info).length;
 }
 
+/** The hands that have notes in a phrase. */
+function playing(info: PieceInfo, index: number): Hand[] {
+  const h = info.sectionHands?.[index];
+  return h && h.length > 0 ? h : info.hands;
+}
+
+/** A step for one hand alone has no place in a phrase where only one hand plays: there is nothing to put together. */
+function applies(info: PieceInfo, index: number, rung: Rung): boolean {
+  return rung.hands === 'both' || playing(info, index).length > 1;
+}
+
+/** The step a phrase is on: the first at or after `rung` that applies to it. */
+function settle(info: PieceInfo, index: number, rung: number): number {
+  const rungs = rungsFor(info);
+  let r = rung;
+  while (r < rungs.length && !applies(info, index, rungs[r])) r += 1;
+  return r;
+}
+
+/** A piece that is learned and in good order, as against one that was learned and has gone rusty. */
+export function isKept(state: PieceState): boolean {
+  return state.learned && state.wholeRung >= WHOLE_TEMPI.length;
+}
+
 /** The next thing to practise. */
 export function nextTask(info: PieceInfo, state: PieceState): Task | null {
-  if (state.learned && state.wholeRung >= WHOLE_TEMPI.length) {
+  if (isKept(state)) {
     // Keeping a learned piece alive: one play through at full tempo.
     return {
       mode: 'tempo',
@@ -209,9 +235,9 @@ export function nextTask(info: PieceInfo, state: PieceState): Task | null {
   for (let i = 0; i < info.sections.length; i++) {
     const s = state.sections[i];
     if (!secure(info, s)) {
-      const rung = rungs[s.rung];
+      const rung = rungs[settle(info, i, s.rung)];
       const [from, to] = info.sections[i];
-      const hands: Hand[] = rung.hands === 'both' ? info.hands : [rung.hands];
+      const hands: Hand[] = rung.hands === 'both' ? playing(info, i) : [rung.hands];
       const label = phraseLabel(info, i);
       let prompt: string;
       if (rung.mode === 'listen') {
@@ -220,7 +246,9 @@ export function nextTask(info: PieceInfo, state: PieceState): Task | null {
         prompt =
           hands.length === 2
             ? 'Now both hands. Take all the time you need, the music waits for you.'
-            : `Just the ${handsLabel(hands)}. No hurry, the music waits for you.`;
+            : info.hands.length === 1
+              ? 'In your own time. The music waits for you.'
+              : `Just the ${handsLabel(hands)}. No hurry, the music waits for you.`;
       } else {
         prompt = `With the beat now, at an easy pace. Keep going even if a note slips.`;
       }
@@ -267,9 +295,10 @@ export function nextTask(info: PieceInfo, state: PieceState): Task | null {
     tempoPct: pct,
     scope: { type: 'whole' },
     title: pct === 100 ? 'The whole piece, full tempo' : `The whole piece at ${pct} percent`,
-    prompt: pct === 100 ? 'Full tempo. Play it like a performance.' : 'Start to finish, steady and unhurried.',
-    need: 2,
-    have: state.wholeStreak,
+    prompt: state.learned && pct === 100 ? 'Once more from the top. It will come back.' : pct === 100 ? 'Full tempo. Play it like a performance.' : 'Start to finish, steady and unhurried.',
+    // A learned piece that went rusty has been here before. One good pass at each step brings it back.
+    need: state.learned ? 1 : 2,
+    have: state.learned ? 0 : state.wholeStreak,
   };
 }
 
@@ -300,8 +329,15 @@ export function steadyLag(result: FlowResult): number | null {
 export function passes(task: Task, result: FlowResult): boolean {
   // A microphone mishears the odd note, so playing judged by ear gets a little more room.
   const room = result.byEar ? 0.05 : 0;
-  if (task.mode === 'wait') return result.accuracy >= 0.9 - room && result.hintedSteps <= 1;
-  return result.accuracy >= 0.87 - room && result.onTime >= 0.6;
+  if (task.mode === 'wait') {
+    // Stopping to think is part of finding the notes, so a few pauses are no failure.
+    // Needing a good share of the keys shown is not yet knowing them.
+    const pauses = Math.max(1, Math.round(result.totalSteps * 0.15));
+    return result.accuracy >= 0.9 - room && result.pausedSteps <= pauses;
+  }
+  // The passes that make a piece count as learned ask for more: hardly a slip, not just most of the notes.
+  const last = task.scope.type === 'whole' && task.tempoPct >= 100 && task.need > 1;
+  return result.accuracy >= (last ? 0.92 : 0.87) - room && result.onTime >= 0.6;
 }
 
 /**
@@ -335,8 +371,19 @@ function withPrevious(detail: NoteOutcome[]): Array<{ note: NoteOutcome; prev: N
   return out;
 }
 
-/** Where the slips were: a measure, a hand, or both, when they gather in one place. */
-function whereItSlipped(result: FlowResult): string | null {
+interface Where {
+  /** The measure most of them were in, counted from zero, or null when they were spread about. */
+  measure: number | null;
+  /** The hand at fault, or null when both were, or only one is playing. */
+  hand: 'left' | 'right' | null;
+  text: string;
+}
+
+/**
+ * Where the trouble was: a measure, a hand, or both, when it gathers in one place.
+ * `noun` is what to call it: slips for wrong and missed notes, pauses for notes that had to be shown.
+ */
+function locate(result: FlowResult, noun: 'slips' | 'pauses' = 'slips'): Where | null {
   const slips = result.detail.filter((d) => d.state !== 'ok');
   // Wrong keys count toward the place they were pressed in.
   const byMeasure = new Map<number, number>();
@@ -354,7 +401,16 @@ function whereItSlipped(result: FlowResult): string | null {
   // One hand, when it slipped at several times the rate of the other. Rates, not counts:
   // the hand with the tune has most of the notes, and so most of the slips, whoever is at fault.
   let hand: 'left' | 'right' | null = null;
-  if (result.hands.length === 2) {
+  // A hand that played next to nothing did not slip. It was left out.
+  let absent = false;
+  if (result.hands.length === 2 && noun === 'slips' && result.mode === 'wait') {
+    // Without a beat, one wrong key marks every note of its step, in both hands.
+    // The wrong keys themselves say which hand slipped.
+    const left = result.wrong.filter((w) => w.hand === 'L').length;
+    const right = result.wrong.filter((w) => w.hand === 'R').length;
+    if (left >= 3 && left >= 3 * right) hand = 'left';
+    else if (right >= 3 && right >= 3 * left) hand = 'right';
+  } else if (result.hands.length === 2 && noun === 'slips') {
     const of = (h: Hand) => {
       const notes = result.detail.filter((d) => d.hand === h);
       const missed = notes.filter((d) => d.state !== 'ok').length;
@@ -365,18 +421,24 @@ function whereItSlipped(result: FlowResult): string | null {
     if (left.notes >= 3 && right.notes >= 3) {
       if (left.missed >= 3 && left.rate >= 0.3 && left.rate >= 3 * right.rate) hand = 'left';
       else if (right.missed >= 3 && right.rate >= 0.3 && right.rate >= 3 * left.rate) hand = 'right';
+      absent = (hand === 'left' ? left.rate : hand === 'right' ? right.rate : 0) >= 0.8;
     }
   }
-  if (measure !== null && hand) return `Most of the slips were in the ${hand} hand, in measure ${measure + 1}.`;
-  if (measure !== null) return `Most of the slips were in measure ${measure + 1}.`;
-  if (hand) return `It was the ${hand} hand that slipped.`;
+  if (hand && absent) return { measure: null, hand, text: `The ${hand} hand hardly played.` };
+  if (measure !== null && hand) return { measure, hand, text: `Most of the ${noun} were in the ${hand} hand, in measure ${measure + 1}.` };
+  if (measure !== null) return { measure, hand, text: `Most of the ${noun} were in measure ${measure + 1}.` };
+  if (hand) return { measure, hand, text: `It was the ${hand} hand that slipped.` };
   return null;
 }
 
-/** Why the timing was off, when the notes show a clear pattern. */
-function whyOffTheBeat(result: FlowResult): string | null {
+/**
+ * Why the timing was off, when the notes show a clear pattern. For a run that
+ * passed, `strict` asks for a plainer pattern before anything is said.
+ */
+function whyOffTheBeat(result: FlowResult, strict = false): string | null {
   const timed = withPrevious(result.detail).filter((x) => x.note.errMs !== undefined);
   if (timed.length < 4) return null;
+  const k = strict ? 1.4 : 1;
 
   // Coming in early after a long note, while the other notes sit on the beat:
   // the long note was not counted out.
@@ -385,7 +447,7 @@ function whyOffTheBeat(result: FlowResult): string | null {
   const others = timed.filter((x) => !follows(x)).map((x) => x.note.errMs as number);
   if (afterLong.length >= 2 && others.length >= 2) {
     const early = afterLong.filter((e) => e <= -50).length;
-    if (early / afterLong.length >= 0.6 && mean(afterLong) <= -60 && mean(others) - mean(afterLong) >= 45) {
+    if (early / afterLong.length >= 0.6 && mean(afterLong) <= -60 * k && mean(others) - mean(afterLong) >= 45 * k) {
       return 'You came in early after the long notes. Count each one out in full.';
     }
   }
@@ -395,8 +457,8 @@ function whyOffTheBeat(result: FlowResult): string | null {
   const quick = timed.filter(isQuick).map((x) => x.note.errMs as number);
   const rest = timed.filter((x) => !isQuick(x)).map((x) => x.note.errMs as number);
   if (quick.length >= 4 && rest.length >= 2) {
-    if (mean(quick) <= -45 && mean(rest) - mean(quick) >= 30) return 'The quick notes ran ahead of the beat. Say one and two and to keep them even.';
-    if (mean(quick) >= 55 && mean(quick) - mean(rest) >= 30) return 'The quick notes fell behind the beat. Keep them light, with the fingers close to the keys.';
+    if (mean(quick) <= -45 * k && mean(rest) - mean(quick) >= 30 * k) return 'The quick notes ran ahead of the beat. Count "one and two and" under your breath to keep them even.';
+    if (mean(quick) >= 55 * k && mean(quick) - mean(rest) >= 30 * k) return 'The quick notes fell behind the beat. Keep them light, with the fingers close to the keys.';
   }
 
   // Speeding up or slowing down from start to finish.
@@ -411,8 +473,8 @@ function whyOffTheBeat(result: FlowResult): string | null {
     if (sxx > 0 && syy > 0) {
       const change = (sxy / sxx) * (Math.max(...xs) - Math.min(...xs));
       const fit = (sxy * sxy) / (sxx * syy);
-      if (fit >= 0.45 && change <= -110) return 'You sped up as it went on. Let the click hold you back.';
-      if (fit >= 0.45 && change >= 110) return 'You fell further behind as it went on. Keep your eyes a note ahead of your hands.';
+      if (fit >= 0.45 && change <= -110 * k) return 'You sped up as it went on. Let the click hold you back.';
+      if (fit >= 0.45 && change >= 110 * k) return 'You fell further behind as it went on. Keep your eyes a note ahead of your hands.';
     }
   }
   return null;
@@ -428,10 +490,69 @@ export function heldTooShort(result: FlowResult): string | null {
  * what went wrong, or where. Null when the playing shows no clear pattern.
  */
 export function diagnose(result: FlowResult): string | null {
-  if (result.mode === 'wait') return whereItSlipped(result);
+  if (result.mode === 'wait') return locate(result)?.text ?? null;
   // Right notes in the wrong place are a matter of timing. Missing or wrong notes are a matter of where.
   if (result.accuracy >= 0.87) return whyOffTheBeat(result) ?? heldTooShort(result);
-  return whereItSlipped(result) ?? whyOffTheBeat(result);
+  return locate(result)?.text ?? whyOffTheBeat(result);
+}
+
+/**
+ * The measure to take out and fix after a run with the beat: the first of two
+ * neighbouring measures that hold most of the missed and wrong notes. Null
+ * when the slips were spread about, and there is no one spot to fix.
+ */
+function gathered(result: FlowResult): number | null {
+  const by = new Map<number, number>();
+  for (const d of result.detail) if (d.state === 'missed') by.set(d.measure, (by.get(d.measure) ?? 0) + 1);
+  for (const w of result.wrong) by.set(w.measure, (by.get(w.measure) ?? 0) + 1);
+  const total = Array.from(by.values()).reduce((a, n) => a + n, 0);
+  if (total < 2) return null;
+  let best: number | null = null;
+  let most = 0;
+  for (const m of Array.from(by.keys()).sort((a, b) => a - b)) {
+    for (const start of [m - 1, m]) {
+      const n = (by.get(start) ?? 0) + (by.get(start + 1) ?? 0);
+      if (n > most) {
+        most = n;
+        best = by.has(start) ? start : m;
+      }
+    }
+  }
+  return most / total > 0.5 ? best : null;
+}
+
+/** A run without a beat in a few words, counted the way the learner would count it. */
+export function waitSummary(result: FlowResult): string {
+  if (result.clean) return 'Every note right the first time';
+  const parts = [result.wrongNotes === 0 ? 'No wrong keys' : result.wrongNotes === 1 ? 'One wrong key' : `${result.wrongNotes} wrong keys`];
+  if (result.hintedSteps > 0) parts.push(result.hintedSteps === 1 ? 'one key shown' : `${result.hintedSteps} keys shown`);
+  return parts.join(', ');
+}
+
+/**
+ * On a piece for two hands, did the learner play one hand's part and leave the
+ * other out? That is someone who knows the tune, not someone lost. Returns the
+ * hand that played.
+ */
+function oneHandPlayed(info: PieceInfo, result: FlowResult): Hand | null {
+  if (result.hands.length !== 2 || !result.take || result.take.notes.length < 3) return null;
+  const keys = result.take.notes.map((n) => n[0] - result.octaveShift);
+  const [from, to] = info.sections[0];
+  const opening = result.detail.filter((d) => d.measure >= from && d.measure <= to);
+  for (const hand of ['R', 'L'] as Hand[]) {
+    const other = opening.filter((d) => d.hand !== hand);
+    if (other.length === 0 || other.some((d) => d.state !== 'missed')) continue;
+    // Every key pressed lies on this hand's side of the other hand's notes.
+    const edge = hand === 'R' ? Math.max(...other.map((d) => d.midi)) : Math.min(...other.map((d) => d.midi));
+    if (keys.every((key) => (hand === 'R' ? key > edge : key < edge))) return hand;
+  }
+  return null;
+}
+
+/** Which phrase a measure belongs to. */
+function phraseOf(info: PieceInfo, measure: number): number {
+  const i = info.sections.findIndex(([from, to]) => measure >= from && measure <= to);
+  return i < 0 ? 0 : i;
 }
 
 // ------------------------------------------------------------ the first play through
@@ -492,11 +613,21 @@ function placeFromTrial(info: PieceInfo, state: PieceState, result: FlowResult):
   } else {
     passed = false;
     plain = true;
-    message = many
-      ? 'That is all that was needed. This one is new to you, so we will build it a phrase at a time.'
-      : 'That is all that was needed. This one is new to you, so we will build it step by step.';
+    const one = oneHandPlayed(info, result);
+    message = one
+      ? `That is the ${one === 'R' ? 'right' : 'left'} hand's part. The ${one === 'R' ? 'left' : 'right'} hand has notes too, so we will build it a phrase at a time, one hand and then both.`
+      : many
+        ? 'That is all that was needed. This one is new to you, so we will build it a phrase at a time.'
+        : 'That is all that was needed. This one is new to you, so we will build it step by step.';
   }
-  return { state: next, verdict: { passed, message, learned: false, plain } };
+  // Played in another octave, it is known all the same. Better said now than found out when the beat is added.
+  let aside: string | undefined;
+  if (result.octaveShift !== 0 && passed) {
+    const octaves = Math.abs(result.octaveShift) / 12;
+    const far = octaves === 1 ? 'an octave' : octaves === 2 ? 'two octaves' : 'some octaves';
+    aside = `You played it ${far} ${result.octaveShift > 0 ? 'higher' : 'lower'} than it is written. The keys on the screen show where it sits.`;
+  }
+  return { state: next, verdict: { passed, message, learned: false, plain, aside } };
 }
 
 /** Record an attempt and return the new state with the coach's reply. */
@@ -528,10 +659,11 @@ export function applyResult(
   if (task.scope.type === 'trial') return placeFromTrial(info, next, result);
 
   const ok = passes(task, result);
-  // A clean pass is not asked for twice.
-  const clean = ok && cleanPass(task, result);
-  // Something worth a word even when the attempt counted.
-  const aside = (ok && task.mode === 'tempo' ? heldTooShort(result) : null) ?? undefined;
+  // Something worth a word even when the attempt counted: long notes let go, a
+  // plain pattern in the timing, or the one place the misses were.
+  const aside = (ok && task.mode === 'tempo' ? (heldTooShort(result) ?? whyOffTheBeat(result, true) ?? locate(result)?.text ?? null) : null) ?? undefined;
+  // A clean pass is not asked for twice. A pass that leaves something to say is not clean.
+  const clean = ok && !aside && cleanPass(task, result);
   next.bestAccuracy = Math.max(next.bestAccuracy, result.accuracy);
   let message = '';
   let learned = false;
@@ -558,7 +690,9 @@ export function applyResult(
       next.focus.left -= 1;
       if (next.focus.left <= 0) {
         next.focus = null;
-        message = 'That spot is fixed. Back to the phrase.';
+        // The spot was taken out of a phrase, or out of the whole piece. Say which it goes back into.
+        const back = nextTask(info, next)?.scope.type;
+        message = back === 'whole' ? 'That spot is fixed. Back to the whole piece.' : back === 'join' ? 'That spot is fixed. Back to joining the phrases.' : 'That spot is fixed. Back to the phrase.';
       } else {
         message = 'Good. Once more the same way, to make it stick.';
       }
@@ -570,18 +704,21 @@ export function applyResult(
   }
 
   if (task.scope.type === 'section') {
-    const s = next.sections[task.scope.index];
+    const index = task.scope.index;
+    const s = next.sections[index];
+    s.rung = settle(info, index, s.rung);
     const rung = rungs[s.rung];
     if (ok) {
       // A clean first pass stands for both.
       const once = clean && s.streak === 0 && rung.need > 1;
+      const stumbled = s.fails > 0;
       s.streak = clean ? rung.need : s.streak + 1;
       s.fails = 0;
       if (s.streak >= rung.need) {
-        s.rung += 1;
+        s.rung = settle(info, index, s.rung + 1);
         s.streak = 0;
-        // The same words at every step would wear thin, so two take turns.
-        const lead = once ? (s.rung % 2 === 0 ? 'Right first time, so no need to repeat it.' : 'Clean, so once is enough.') : null;
+        // The same words at every step would wear thin, so two take turns. Neither claims a first try that was not one.
+        const lead = once ? (stumbled ? 'Clean this time, so once is enough.' : s.rung % 2 === 0 ? 'Right first time, so no need to repeat it.' : 'Clean, so once is enough.') : null;
         if (s.rung >= rungs.length) {
           message = lead ? `${lead} This phrase is secure.` : 'This phrase is secure. Well done.';
         } else {
@@ -604,11 +741,22 @@ export function applyResult(
           const m = spots[0].measure;
           next.focus = { from: m, to: m, left: 2, hands: task.hands };
           s.fails = 0;
-          message = `Measure ${m + 1} keeps tripping you. Let us fix it on its own.`;
+          message =
+            result.wrongNotes === 0
+              ? `Measure ${m + 1} makes you stop each time. Let us take it on its own.`
+              : `Measure ${m + 1} keeps tripping you. Let us fix it on its own.`;
         } else {
-          message = found
-            ? `${found} Take that part slowly, and look at each note before you play it.`
-            : 'Slow down, and pause before any note you are unsure of. Stopping to get it right is good practice.';
+          if (result.wrongNotes === 0) {
+            // No wrong keys at all: the learner stopped to think and the keys were shown. That is not a slip.
+            const paused = locate(result, 'pauses');
+            message = paused
+              ? `${paused.text} Once more, and see if those notes come sooner.`
+              : 'The keys had to be shown several times. Once more, and see if the notes come sooner.';
+          } else {
+            message = found
+              ? `${found} Take that part slowly, and look at each note before you play it.`
+              : 'Slow down, and pause before any note you are unsure of. Stopping to get it right is good practice.';
+          }
         }
       } else if (s.fails >= 2 && s.rung > 0 && rungs[s.rung - 1].mode !== 'listen') {
         s.rung -= 1;
@@ -619,9 +767,11 @@ export function applyResult(
       } else {
         message =
           result.onTime < 0.6 && result.accuracy >= 0.87
-            ? result.biasMs > 0
+            ? result.biasMs > 40
               ? 'The notes were right but a little behind the beat. Listen to the click and play into it.'
-              : 'The notes were right but ahead of the beat. Let the click lead.'
+              : result.biasMs < -40
+                ? 'The notes were right but ahead of the beat. Let the click lead.'
+                : 'The notes were right, but some came early and some late. Feel each click and fit the notes to it.'
             : 'Close. Try again, and keep the pulse going through any slip.';
       }
     }
@@ -639,7 +789,7 @@ export function applyResult(
   }
 
   // Whole piece.
-  if (state.learned && state.wholeRung >= WHOLE_TEMPI.length) {
+  if (isKept(state)) {
     message = ok ? 'Still in your fingers.' : 'A little rusty. It will come back quickly.';
     if (!ok) {
       next.wholeRung = WHOLE_TEMPI.length - 1;
@@ -650,7 +800,8 @@ export function applyResult(
   if (ok) {
     // Below full tempo a clean pass moves straight on. Full tempo always takes two, so the piece is known to be stable.
     const last = next.wholeRung >= WHOLE_TEMPI.length - 1;
-    const once = clean && !last && next.wholeStreak === 0;
+    // A piece learned before that went rusty needs only one good pass at each step to come back.
+    const once = state.learned || (clean && !last && next.wholeStreak === 0);
     next.wholeStreak = once ? 2 : next.wholeStreak + 1;
     next.wholeFails = 0;
     if (next.wholeStreak >= 2) {
@@ -658,9 +809,14 @@ export function applyResult(
       next.wholeStreak = 0;
       if (next.wholeRung >= WHOLE_TEMPI.length) {
         next.learned = true;
-        next.learnedOn = today;
-        learned = true;
-        message = 'You have learned this piece. It will come back for a play through now and then, so it stays with you.';
+        // A piece that went rusty and came back keeps the day it was first learned, and is not announced a second time.
+        next.learnedOn = state.learnedOn ?? today;
+        learned = !state.learned;
+        message = state.learned
+          ? 'Back in your fingers.'
+          : 'You have learned this piece. It will come back for a play through now and then, so it stays with you.';
+      } else if (state.learned) {
+        message = 'That holds together. A little faster next.';
       } else {
         message = once ? 'Clean, so once is enough. A little faster next.' : 'That holds together. A little faster next.';
       }
@@ -671,17 +827,45 @@ export function applyResult(
     next.wholeStreak = 0;
     next.wholeFails += 1;
     const spots = troubleSpots(result, 1);
-    if (spots.length > 0 && info.measures > 2) {
-      const m = spots[0].measure;
-      const to = Math.min(info.measures - 1, m + 1);
-      next.focus = { from: m, to, left: 2, hands: info.hands };
-      message = `Most of the slips were around measure ${m + 1}. Let us take that out and fix it.`;
-    } else if (next.wholeFails >= 2 && next.wholeRung > 0) {
+    const where = locate(result);
+    // One place to take out, when most of the slips are there. Slips spread about have no such place.
+    const spot = gathered(result);
+    // The notes were there and the beat was not: nothing to take out and fix slowly.
+    const timing = result.accuracy >= 0.87 && result.onTime < 0.6;
+    const firstTempo = rungs.findIndex((r) => r.mode === 'tempo');
+    if (next.wholeFails >= 2 && next.wholeRung > 0) {
+      // A second miss at this tempo, after the trouble spot has had its turn. Slower is the way.
       next.wholeRung -= 1;
       next.wholeFails = 0;
-      message = 'One step slower, then back up.';
+      message = timing && found ? `${found} One step slower, then back up.` : 'One step slower, then back up.';
+    } else if (next.wholeFails >= 2 && spots.length > 0 && firstTempo >= 0) {
+      // Already at the slowest tempo for the whole piece. The phrase that gives the trouble goes back to its own slow beat.
+      const i = phraseOf(info, spots[0].measure);
+      next.sections[i] = { rung: firstTempo, streak: 0, fails: 0 };
+      next.wholeFails = 0;
+      message =
+        info.sections.length > 1
+          ? `Phrase ${i + 1} needs its slow beat again before the whole piece will hold. Back to that.`
+          : 'This needs its slow beat again before it will hold at this pace. Back to that.';
+    } else if (timing) {
+      message = found
+        ? `The notes were right. ${found}`
+        : result.biasMs > 40
+          ? 'The notes were right but a little behind the beat. Listen to the click and play into it.'
+          : result.biasMs < -40
+            ? 'The notes were right but ahead of the beat. Let the click lead.'
+            : 'The notes were right, but some came early and some late. Feel each click and fit the notes to it.';
+    } else if (where && where.hand && where.measure === null) {
+      // One hand dropped out all the way through. No single measure is the trouble.
+      message = `${where.text} Again, and keep that hand going from start to finish.`;
+    } else if (spot !== null && info.measures > 2) {
+      const to = Math.min(info.measures - 1, spot + 1);
+      next.focus = { from: spot, to, left: 2, hands: info.hands };
+      message = `Most of the slips were around measure ${spot + 1}. Let us take that out and fix it.`;
     } else if (found) {
-      message = result.accuracy >= 0.87 ? `The notes were right. ${found}` : `${found} Again, and keep the pulse steady above all.`;
+      message = `${found} Again, and keep the pulse steady above all.`;
+    } else if (result.missedNotes + result.wrongNotes >= 3) {
+      message = 'The slips were spread through the piece, with no one spot to fix. Again, and keep the pulse steady above all.';
     } else {
       message = 'Nearly. Again, and keep the pulse steady above all.';
     }
@@ -730,13 +914,18 @@ export function planOutline(info: PieceInfo, state: PieceState): PlanRow[] {
   info.sections.forEach(([from, to], i) => {
     const s = state.sections[i];
     const here = scope?.type === 'section' && scope.index === i;
+    const at = settle(info, i, s.rung);
     rows.push({
       title: many ? `Phrase ${i + 1}` : 'The notes and the beat',
       detail: many ? (from === to ? `Measure ${from + 1}` : `Measures ${from + 1} to ${to + 1}`) : undefined,
-      steps: rungs.map((rung, r) => ({
-        label: rungLabel(rung, twoHands),
-        state: state.learned || r < s.rung ? 'done' : here && r === s.rung ? 'now' : 'todo',
-      })),
+      steps: rungs
+        .map((rung, r) => ({ rung, r }))
+        // Steps for one hand alone are left out of a phrase where only one hand plays.
+        .filter(({ rung }) => applies(info, i, rung))
+        .map(({ rung, r }): PlanStep => ({
+          label: rungLabel(rung, twoHands && playing(info, i).length > 1),
+          state: state.learned || r < at ? 'done' : here && r === at ? 'now' : 'todo',
+        })),
     });
   });
 
@@ -751,12 +940,14 @@ export function planOutline(info: PieceInfo, state: PieceState): PlanRow[] {
     });
   }
 
-  const whole = scope?.type === 'whole' && !state.learned;
+  // A learned piece that went rusty shows the step it is being won back at.
+  const kept = isKept(state);
+  const whole = scope?.type === 'whole' && !kept;
   rows.push({
     title: 'The whole piece',
     steps: WHOLE_TEMPI.map((pct, r) => ({
       label: pct === 100 ? 'Full tempo' : `${pct} percent`,
-      state: state.learned || r < state.wholeRung ? 'done' : whole && r === Math.min(state.wholeRung, WHOLE_TEMPI.length - 1) ? 'now' : 'todo',
+      state: kept || r < state.wholeRung ? 'done' : whole && r === Math.min(state.wholeRung, WHOLE_TEMPI.length - 1) ? 'now' : 'todo',
     })),
   });
   return rows;

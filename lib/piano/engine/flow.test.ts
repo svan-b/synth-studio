@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FlowSession, troubleSpots, type FlowEvent, type FlowResult } from './flow';
+import { FlowSession, notAttempted, troubleSpots, type FlowEvent, type FlowResult } from './flow';
 import { emitNoteOff, emitNoteOn, recentNotes } from '../input/bus';
 import { parseScore, sliceScore } from '../music/score';
 import { piano } from '../audio/engine';
@@ -206,9 +206,161 @@ describe('flow, wait mode', () => {
     const r = result()!;
     expect(r.detail.map((d) => d.state)).toEqual(['ok', 'off', 'ok', 'ok', 'ok', 'ok']);
     expect(r.detail[1]).toMatchObject({ measure: 0, midi: 62, hand: 'R' });
-    expect(r.wrong).toEqual([{ measure: 0, midi: 65, expected: [62] }]);
+    expect(r.wrong).toEqual([{ measure: 0, midi: 65, expected: [62], hand: 'R' }]);
     expect(r.perMeasure.map((m) => m.played)).toEqual([3, 3]);
     expect(r.cutShort).toBe(false);
+  });
+
+  it('takes a pause to think for what it is, and not for a wrong note', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h | E4q D4q C4h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: 3000 });
+    const { events, result } = run(s);
+    press(64);
+    vi.advanceTimersByTime(400);
+    press(62);
+    // A long look at the next note. The key is shown, and then the right one is played.
+    vi.advanceTimersByTime(3500);
+    expect(events.filter((e) => e.type === 'hint')).toHaveLength(1);
+    press(60);
+    [64, 62, 60].forEach((m) => {
+      vi.advanceTimersByTime(400);
+      press(m);
+    });
+    const r = result()!;
+    // Every key was right, so nothing is counted as wrong. The pause is counted as a pause.
+    expect(r.accuracy).toBe(1);
+    expect(r.correctNotes).toBe(6);
+    expect(r.wrongNotes).toBe(0);
+    expect(r.hintedSteps).toBe(1);
+    expect(r.pausedSteps).toBe(1);
+    // It is still not a spotless run, and the note that was shown is marked as such.
+    expect(r.clean).toBe(false);
+    expect(r.detail[2].state).toBe('off');
+  });
+
+  it('counts a key shown after wrong tries as shown, and not as a pause', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: 3000 });
+    const { result } = run(s);
+    press(64);
+    press(70);
+    press(71); // two wrong tries, and the key is shown
+    press(62);
+    press(60);
+    const r = result()!;
+    expect(r.hintedSteps).toBe(1);
+    expect(r.pausedSteps).toBe(0);
+    expect(r.accuracy).toBeCloseTo(2 / 3, 5);
+  });
+
+  it('counts a chord as one step, so one wrong key on it is one slip', () => {
+    const score = parseScore({ rh: 'C4+E4+G4h F4+A4+C5h | G4+B4+D5h C4+E4+G4h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity });
+    const { result } = run(s);
+    [60, 64, 67].forEach((m) => press(m));
+    press(66); // one wrong key on the way to the second chord
+    [65, 69, 72, 67, 71, 74, 60, 64, 67].forEach((m) => press(m));
+    const r = result()!;
+    expect(r.wrongNotes).toBe(1);
+    expect(r.accuracy).toBe(0.75);
+    expect(r.correctNotes).toBe(9);
+  });
+
+  it('says which hand a wrong key belongs to', () => {
+    const score = parseScore({ rh: 'E4q F4q G4h', lh: 'C3h G2h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R', 'L'], hintDelayMs: Infinity });
+    const { result } = run(s);
+    press(65); // near the right hand's E
+    press(64);
+    press(48);
+    press(65);
+    press(41); // near the left hand's G, where the right hand has already played
+    press(67);
+    press(43);
+    expect(result()!.wrong.map((w) => w.hand)).toEqual(['R', 'L']);
+  });
+
+  it('shows the key at once for the right note in the wrong octave', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity });
+    const { events, result } = run(s);
+    press(64);
+    press(74); // D, an octave too high
+    const wrong = events.filter((e) => e.type === 'wrong');
+    expect(wrong).toEqual([{ type: 'wrong', midi: 74, octave: 'high' }]);
+    expect(events.filter((e) => e.type === 'hint')).toHaveLength(1);
+    press(62);
+    press(48); // C, an octave too low
+    expect(events.filter((e) => e.type === 'wrong')[1]).toEqual({ type: 'wrong', midi: 48, octave: 'low' });
+    press(60);
+    expect(result()!.wrongNotes).toBe(2);
+  });
+
+  it('follows a first play through that begins in another octave', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h | E4q D4q C4h' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: 3000, stopAfter: { hints: 2, wrong: 4 }, followOctave: true });
+    const { events, result } = run(s);
+    [76, 74, 72, 76, 74, 72].forEach((m) => {
+      vi.advanceTimersByTime(400);
+      press(m);
+    });
+    const r = result()!;
+    expect(r.cutShort).toBe(false);
+    expect(r.wrongNotes).toBe(0);
+    expect(r.accuracy).toBe(1);
+    expect(r.octaveShift).toBe(12);
+    // The keys that light are the ones under the learner's hand.
+    expect(events.filter((e) => e.type === 'note').map((e) => (e as { midi: number }).midi)).toEqual([76, 74, 72, 76, 74, 72]);
+  });
+
+  it('does not follow into another octave unless asked, or when the first key is simply wrong', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h' });
+    const plain = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity });
+    const first = run(plain);
+    press(76);
+    expect(first.events.filter((e) => e.type === 'wrong')).toHaveLength(1);
+    plain.stop();
+    const asked = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity, followOctave: true });
+    const second = run(asked);
+    press(65); // not an E at all
+    [64, 62, 60].forEach((m) => press(m));
+    expect(second.result()!.octaveShift).toBe(0);
+    expect(second.result()!.wrongNotes).toBe(1);
+  });
+
+  it('does not end a first play through for a pause, or for slips spread through a long piece', () => {
+    const bar = 'E4q D4q C4q D4q';
+    const score = parseScore({ rh: Array.from({ length: 10 }, () => bar).join(' | ') });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: 3000, stopAfter: { hints: 2, wrong: 4 } });
+    const { result } = run(s);
+    const keys = [64, 62, 60, 62];
+    for (let i = 0; i < 40; i++) {
+      // Two long pauses, far apart, each ending in the right key.
+      vi.advanceTimersByTime(i === 9 || i === 30 ? 3500 : 300);
+      // Five wrong keys, one in every other measure.
+      if (i % 8 === 5) press(70);
+      press(keys[i % 4]);
+    }
+    const r = result()!;
+    expect(r.cutShort).toBe(false);
+    expect(r.wrongNotes).toBe(5);
+    expect(r.pausedSteps).toBe(2);
+    expect(r.accuracy).toBeCloseTo(35 / 40, 5);
+  });
+
+  it('counts a shown first key where the first step is the question', () => {
+    const score = parseScore({ rh: 'C4+E4+G4w' });
+    const usual = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: 2000 });
+    const a = run(usual);
+    vi.advanceTimersByTime(2500);
+    [60, 64, 67].forEach((m) => press(m));
+    expect(a.result()!.hintedSteps).toBe(0);
+    const asked = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: 2000, countFirstHint: true });
+    const b = run(asked);
+    vi.advanceTimersByTime(2500);
+    [60, 64, 67].forEach((m) => press(m));
+    expect(b.result()!.hintedSteps).toBe(1);
+    expect(b.result()!.clean).toBe(false);
   });
 
   it('ends a first play through early once the learner is plainly stuck', () => {
@@ -358,6 +510,39 @@ describe('flow, tempo mode', () => {
     expect(pulses[0].accent).toBe(true);
   });
 
+  it('stops a run that the learner begins to play during the count in', () => {
+    const score = parseScore({ rh: 'C4q D4q E4q F4q | G4w', tempo: 60 });
+    const s = new FlowSession(score, { mode: 'tempo', hands: ['R'], bpm: 60 });
+    const { events, result } = run(s);
+    expect(s.phase).toBe('countin');
+    // One key in the count in is a stray, as when a hand is being put in place.
+    vi.advanceTimersByTime(900);
+    press(60);
+    expect(s.phase).toBe('countin');
+    // Three are someone playing the piece before the music has begun.
+    vi.advanceTimersByTime(700);
+    press(62);
+    vi.advanceTimersByTime(700);
+    press(64);
+    expect(events.some((e) => e.type === 'false-start')).toBe(true);
+    expect(s.phase).toBe('stopped');
+    vi.advanceTimersByTime(12000);
+    expect(result()).toBeNull();
+  });
+
+  it('lets a rhythm be tapped along with the count in', () => {
+    const score = parseScore({ rh: 'C4q C4q C4q C4q', tempo: 60 });
+    const s = new FlowSession(score, { mode: 'tempo', hands: ['R'], bpm: 60, anyPitch: true });
+    const { events } = run(s);
+    [900, 1000, 1000].forEach((ms) => {
+      vi.advanceTimersByTime(ms);
+      press(60);
+    });
+    expect(events.some((e) => e.type === 'false-start')).toBe(false);
+    expect(s.phase).toBe('countin');
+    s.stop();
+  });
+
   it('marks missed, late and extra notes', () => {
     const score = parseScore({ rh: 'C4q D4q E4q F4q', tempo: 60 });
     const s = new FlowSession(score, { mode: 'tempo', hands: ['R'], bpm: 60 });
@@ -425,6 +610,23 @@ describe('flow, tempo mode', () => {
     const r = result()!;
     expect(r.detail[2].held).toBeGreaterThanOrEqual(1);
     expect(r.held).toBe(1);
+  });
+
+  it('does not take a run with nothing in it, or next to nothing, for an attempt', () => {
+    const score = parseScore({ rh: 'C4q D4q E4q F4q | G4q F4q E4q D4q | C4q D4q E4q F4q | G4q F4q E4q D4q', tempo: 120 });
+    const play = (count: number) => {
+      const s = new FlowSession(score, { mode: 'tempo', hands: ['R'], bpm: 120 });
+      const t0 = performance.now() / 1000;
+      const { result } = run(s);
+      [60, 62, 64, 65, 67, 65, 64, 62].slice(0, count).forEach((m, i) => playAt(s, t0, 120, 4, i, m));
+      vi.advanceTimersByTime(12000);
+      return result()!;
+    };
+    expect(notAttempted(play(0))).toBe('nothing');
+    // Two notes of sixteen, then nothing: the learner began and stopped.
+    expect(notAttempted(play(2))).toBe('barely');
+    // Half of it is an attempt, whatever its faults.
+    expect(notAttempted(play(8))).toBeNull();
   });
 
   it('counts in correctly before a pickup', () => {

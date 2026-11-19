@@ -4,14 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { instrument } from '@/lib/piano/audio/instrument';
 import { getLesson, getPiece, resolveMusic } from '@/lib/piano/content/catalog';
 import type { Lesson, Step } from '@/lib/piano/content/types';
-import type { FlowResult } from '@/lib/piano/engine/flow';
+import { notAttempted, type FlowResult } from '@/lib/piano/engine/flow';
 import { noteBus } from '@/lib/piano/input/bus';
-import { diagnose } from '@/lib/piano/learn/coach';
+import { diagnose, waitSummary } from '@/lib/piano/learn/coach';
 import { isRemoteKey } from '@/lib/piano/input/hub';
 import { usePiano } from '@/lib/piano/learn/store';
 import { pitchClass } from '@/lib/piano/music/theory';
 import FigureView from './Figures';
-import { useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
+import { readingMs, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
 import { Keyboard, flashKey } from './Keyboard';
 import PlaySurface from './PlaySurface';
 import { Button, Icon, IconButton, Pill, ProgressBar, Prose } from './ui';
@@ -125,8 +125,8 @@ function ListenStep({ step, onNext }: { step: StepOf<'listen'>; onNext: () => vo
           display={step.display ?? 'staff'}
           runId={run}
           onDone={() => setDone(true)}
-          // The first time, leave a moment to read what to listen for. A longer line gets a little longer.
-          leadIn={run === 0 ? Math.min(3200, Math.max(1200, 500 + step.text.length * 26)) : 350}
+          // The first time, leave time to read what to listen for. A longer line gets longer.
+          leadIn={run === 0 ? readingMs(step.text) : 350}
         />
       </div>
     </div>
@@ -137,7 +137,7 @@ function describe(result: FlowResult): string {
   if (result.mode === 'wait') {
     if (result.clean) return result.totalNotes === 1 ? 'That is the one.' : 'Every note right the first time.';
     if (result.totalNotes === 1) return 'You found it on a later try.';
-    return `${result.correctNotes} of ${result.totalNotes} right the first time.`;
+    return `${waitSummary(result)}.`;
   }
   const pct = Math.round(result.accuracy * 100);
   const timing = result.onTime >= 0.8 ? 'well in time' : result.biasMs > 25 ? 'a little behind the beat' : result.biasMs < -25 ? 'a little ahead of the beat' : 'a bit uneven';
@@ -171,11 +171,12 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
     (result: FlowResult | null) => {
       if (!result) return;
       // A timed run in which no key was touched is not an attempt. It waits at the gate again.
-      if (result.mode === 'tempo' && result.correctNotes === 0 && result.wrongNotes === 0) {
+      if (notAttempted(result)) {
         again();
         return;
       }
-      let ok = mode === 'wait' ? result.accuracy >= 0.6 : result.accuracy >= 0.7;
+      // Without a beat, most of it has to come with no wrong key, and no more than half with the key shown.
+      let ok = mode === 'wait' ? result.accuracy >= 0.6 && result.hintedSteps <= Math.max(1, result.totalSteps * 0.5) : result.accuracy >= 0.7;
       let text = describe(result);
       if (ok && step.touch && result.velocity !== null) {
         if (step.touch === 'soft' && result.velocity > 0.45) {
@@ -187,7 +188,7 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
         }
       }
       // Where the step is about holding long notes, letting them go early is the thing to put right.
-      if (ok && step.hold && result.held !== null && result.held < 0.5) {
+      if (ok && step.hold && result.held !== null && result.held < 0.75) {
         ok = false;
         text = 'The rhythm was right, but the long notes were let go early. Keep each key down for all of its beats.';
         setHave(0);
@@ -272,6 +273,7 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
           fingering={step.fingering ?? true}
           names={step.names ?? false}
           anyKey={step.anyKey}
+          sustain={step.hold}
           contourLabel={step.anyKey ? 'none' : 'finger'}
           runId={run}
           onDone={onDone}

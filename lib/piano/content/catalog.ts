@@ -50,7 +50,10 @@ export function pieceInfo(id: string): PieceInfo {
   const sections: Array<[number, number]> = p.sections
     ? p.sections.map(([a, b]) => [a - 1, b - 1])
     : defaultSections(score.measureCount, score.pickup > 0);
-  return { id, title: p.title, hands: score.hands, sections, measures: score.measureCount };
+  // A hand that only rests through a phrase has nothing to practise there on its own.
+  const sectionHands = sections.map(([from, to]) => score.hands.filter((h) => score.notes.some((n) => n.hand === h && !n.tied && n.measure >= from && n.measure <= to)));
+  const uneven = sectionHands.some((h) => h.length < score.hands.length);
+  return { id, title: p.title, hands: score.hands, sections, measures: score.measureCount, ...(uneven ? { sectionHands } : {}) };
 }
 
 function isRef(m: Music): m is MusicRef {

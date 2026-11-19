@@ -51,19 +51,34 @@ export interface FlowOptions {
    */
   catchUp?: number;
   /**
-   * Wait mode: end the run early once this many steps have needed a hint, or
-   * this many wrong keys have been pressed. For a first play through, which
-   * only has to show how much is already known.
+   * Wait mode: end the run early once the learner is plainly stuck. That is
+   * when this many steps in a row have needed the key shown, or this many
+   * wrong keys have come within a stretch of eight steps. For a first play
+   * through, which only has to show how much is already known. Slips spread
+   * through a long piece do not end it, and nor does a pause to think.
    */
   stopAfter?: { hints: number; wrong: number } | null;
+  /**
+   * Wait mode: if the learner begins one or more octaves away from where the
+   * music is written, follow them there. For a first play through, where a
+   * hand on the wrong C still shows that the piece is known.
+   */
+  followOctave?: boolean;
+  /**
+   * Wait mode: count a key that had to be shown on the very first step. By
+   * default it is taken as a guide to where to begin. Where the first step is
+   * itself the question, as in the chords exercise, it counts.
+   */
+  countFirstHint?: boolean;
 }
 
 export type FlowEvent =
   | { type: 'phase'; phase: FlowPhase }
   | { type: 'step'; index: number }
   | { type: 'note'; id: string; state: NoteState; midi: number }
-  | { type: 'wrong'; midi: number }
-  | { type: 'hint'; index: number; notes: NoteEvent[] }
+  | { type: 'wrong'; midi: number; octave?: 'high' | 'low' }
+  | { type: 'false-start' }
+  | { type: 'hint'; index: number; notes: NoteEvent[]; shift: number }
   | { type: 'pulse'; beat: number; accent: boolean; countIn: boolean; number: number }
   | { type: 'done'; result: FlowResult };
 
@@ -109,6 +124,8 @@ export interface WrongPress {
   midi: number;
   /** The keys the music wanted at that moment. */
   expected: number[];
+  /** The hand it most likely belongs to: the one whose wanted key was nearest. */
+  hand?: Hand;
 }
 
 /**
@@ -137,9 +154,12 @@ export interface FlowResult {
   /** Keys pressed that the score did not ask for. */
   wrongNotes: number;
   missedNotes: number;
+  /** Wait mode: steps on which the key had to be shown, after a wait or after wrong tries. */
   hintedSteps: number;
+  /** Wait mode: those of them where no wrong key was pressed. The learner stopped to think, and the key was shown. */
+  pausedSteps: number;
   totalSteps: number;
-  /** 0 to 1. */
+  /** 0 to 1. With a beat, the share of notes played. Without one, the share of steps played with no wrong key. */
   accuracy: number;
   /** Tempo mode: share of matched notes that landed close to the beat. */
   onTime: number;
@@ -161,12 +181,16 @@ export interface FlowResult {
   detail: NoteOutcome[];
   /** Keys pressed that the music did not ask for. */
   wrong: WrongPress[];
-  /** Tempo mode: share of the long notes that were held for most of their length, or null when it cannot be told. */
+  /** Tempo mode: share of the long notes, weighed by their length, that were held for most of it. Null when it cannot be told. */
   held: number | null;
   /** Wait mode: how fast it was played, as a share of the written tempo, or null for a very short passage. */
   pace: number | null;
   /** The run was ended early, see `stopAfter`. */
   cutShort: boolean;
+  /** Wait mode: semitones above the written place at which the run was played, see `followOctave`. 0 when played as written. */
+  octaveShift: number;
+  /** Tempo mode: keys played during the count in, before the music began. */
+  earlyKeys: number;
   /** What was played, for hearing it back. Null when it came through the microphone. */
   take: Take | null;
 }
@@ -217,6 +241,19 @@ export class FlowSession {
   private stallTimer: ReturnType<typeof setTimeout> | null = null;
   private stepTimes: number[] = [];
   private lastStepAt = 0;
+  /** Steps played with no wrong key, and the notes in them. */
+  private rightSteps = 0;
+  private rightNotes = 0;
+  private paused = 0;
+  /** How many steps in a row have needed the key shown, and the last of them. */
+  private shownInARow = 0;
+  private lastShownStep = -2;
+  /** The step each wrong key was pressed on. */
+  private wrongAt: number[] = [];
+  /** Semitones the learner is playing above the written place, once that is known. */
+  private shift = 0;
+  private shiftSettled = false;
+  private early = 0;
 
   // tempo mode
   private matched = new Map<string, number>();
@@ -225,7 +262,6 @@ export class FlowSession {
   private lastOn = new Map<number, number>();
 
   // totals
-  private firstTry = 0;
   private wrong = 0;
   private hinted = 0;
   private measureErrors = new Map<number, number>();
@@ -251,6 +287,8 @@ export class FlowSession {
       anyOctave: opts.anyOctave ?? false,
       catchUp: opts.catchUp ?? 0,
       stopAfter: opts.stopAfter ?? null,
+      followOctave: opts.followOctave ?? false,
+      countFirstHint: opts.countFirstHint ?? false,
       latency: { ...DEFAULT_LATENCY, ...(opts.latency ?? {}) },
     };
     this.steps = stepsFor(score, this.options.hands);
@@ -264,7 +302,7 @@ export class FlowSession {
 
   /** Does a key that was pressed count as this note of the music? */
   private fits(note: NoteEvent, key: number): boolean {
-    if (this.options.anyPitch || note.midi === key) return true;
+    if (this.options.anyPitch || note.midi === key - this.shift) return true;
     return this.options.anyOctave && (note.midi - key) % 12 === 0;
   }
 
@@ -335,6 +373,7 @@ export class FlowSession {
   }
 
   private onInput(ev: NoteInput): void {
+    if (this.phase === 'countin' && ev.type === 'on') this.earlyKey(ev);
     if (this.phase !== 'playing') return;
     if (ev.type === 'off') {
       this.keyUp(ev);
@@ -421,7 +460,7 @@ export class FlowSession {
     this.stepHinted = false;
     this.stepGuided = false;
     this.lastStepAt = piano.now();
-    input.expect(step.notes.map((n) => n.midi));
+    input.expect(step.notes.map((n) => n.midi + this.shift));
     this.events.emit({ type: 'step', index: this.stepIndex });
     if (this.hintTimer) clearTimeout(this.hintTimer);
     this.hintTimer = null;
@@ -439,13 +478,15 @@ export class FlowSession {
     // A hint shown from the start is a guide, not a rescue, so it is not counted.
     // Nor is one on the very first note when nothing wrong was played: time
     // spent finding the place to begin is not a hesitation.
-    this.stepGuided = this.stepIndex === 0 && this.stepWrong === 0;
+    this.stepGuided = this.stepIndex === 0 && this.stepWrong === 0 && !this.options.countFirstHint;
     if (this.options.hintDelayMs > 0 && !this.stepGuided) {
       this.hinted++;
       const m = step.measure + this.score.measureOffset;
       this.measureHints.set(m, (this.measureHints.get(m) ?? 0) + 1);
+      this.shownInARow = this.lastShownStep === this.stepIndex - 1 ? this.shownInARow + 1 : 1;
+      this.lastShownStep = this.stepIndex;
     }
-    this.events.emit({ type: 'hint', index: this.stepIndex, notes: step.notes.filter((n) => this.pending.has(n.id)) });
+    this.events.emit({ type: 'hint', index: this.stepIndex, notes: step.notes.filter((n) => this.pending.has(n.id)), shift: this.shift });
     this.stopIfEnough();
     // On a first play through, a key that was shown and still not played says the learner has stopped.
     if (this.options.stopAfter && !this.stepGuided && this.phase === 'playing') {
@@ -462,13 +503,30 @@ export class FlowSession {
   private stopIfEnough(): void {
     const limit = this.options.stopAfter;
     if (!limit || this.phase !== 'playing') return;
-    if (this.hinted >= limit.hints || this.wrong >= limit.wrong) {
+    // Wrong keys close together say stuck. The same number spread through a long piece do not.
+    const lately = this.wrongAt.filter((i) => i > this.stepIndex - 8).length;
+    if (this.shownInARow >= limit.hints || lately >= limit.wrong) {
       this.cutShort = true;
       this.finish();
     }
   }
 
+  /**
+   * The first key of a run, where the learner may have begun in another
+   * octave. If it is the first note of the music one or more octaves away,
+   * the rest of the run is followed there.
+   */
+  private settleOctave(key: number): void {
+    if (this.shiftSettled || !this.options.followOctave || this.stepIndex !== 0) return;
+    this.shiftSettled = true;
+    const first = this.steps[0].notes;
+    if (first.some((n) => n.midi === key)) return;
+    const away = first.map((n) => key - n.midi).find((d) => d !== 0 && d % 12 === 0 && Math.abs(d) <= 36);
+    if (away !== undefined) this.shift = away;
+  }
+
   private waitInput(ev: NoteInput): void {
+    this.settleOctave(ev.midi);
     const step = this.steps[this.stepIndex];
     const match = step.notes.find((n) => this.pending.has(n.id) && this.fits(n, ev.midi));
     if (match) {
@@ -476,10 +534,9 @@ export class FlowSession {
       this.noteVelocity(ev);
       this.keyDown(ev, match.id);
       const rescued = this.stepWrong > 0 || (this.stepHinted && !this.stepGuided && this.options.hintDelayMs > 0);
-      if (!rescued) this.firstTry++;
       this.outcome.set(match.id, rescued ? 'off' : 'ok');
-      // Where any octave will do, the key to light is the one that was pressed.
-      this.events.emit({ type: 'note', id: match.id, state: rescued ? 'warn' : 'ok', midi: this.options.anyOctave ? ev.midi : match.midi });
+      // Where any octave will do, or the run is followed in another one, the key to light is the one that was pressed.
+      this.events.emit({ type: 'note', id: match.id, state: rescued ? 'warn' : 'ok', midi: this.options.anyOctave || this.shift !== 0 ? ev.midi : match.midi });
       if (this.pending.size === 0) this.completeStep();
       return;
     }
@@ -496,15 +553,28 @@ export class FlowSession {
     this.keyDown(ev, null);
     this.stepWrong++;
     this.wrong++;
+    this.wrongAt.push(this.stepIndex);
     this.addMeasureError(step.measure);
-    this.wrongPresses.push({ measure: step.measure + this.score.measureOffset, midi: ev.midi, expected: step.notes.map((n) => n.midi) });
-    this.events.emit({ type: 'wrong', midi: ev.midi });
-    if (this.stepWrong >= this.options.hintAfterWrong) this.revealHint();
+    // The wanted key nearest to the one pressed says which hand slipped.
+    const wanted = step.notes.filter((n) => this.pending.has(n.id));
+    const nearest = (wanted.length > 0 ? wanted : step.notes).reduce((a, n) => (Math.abs(n.midi + this.shift - ev.midi) < Math.abs(a.midi + this.shift - ev.midi) ? n : a));
+    this.wrongPresses.push({ measure: step.measure + this.score.measureOffset, midi: ev.midi, expected: step.notes.map((n) => n.midi), hand: nearest.hand });
+    // The right note in the wrong octave is its own kind of slip: the learner knows the note and has the wrong place.
+    const away = wanted.map((n) => ev.midi - (n.midi + this.shift)).find((d) => d !== 0 && d % 12 === 0);
+    this.events.emit(away === undefined ? { type: 'wrong', midi: ev.midi } : { type: 'wrong', midi: ev.midi, octave: away > 0 ? 'high' : 'low' });
+    // So the key is shown at once, and not only after a second try.
+    if (away !== undefined || this.stepWrong >= this.options.hintAfterWrong) this.revealHint();
     this.stopIfEnough();
   }
 
   private completeStep(): void {
     this.stepTimes.push(piano.now());
+    if (this.stepWrong === 0) {
+      this.rightSteps++;
+      this.rightNotes += this.steps[this.stepIndex].notes.length;
+      // Shown after a wait, and then played with no wrong key: a pause to think, not a slip.
+      if (this.stepHinted && !this.stepGuided && this.options.hintDelayMs > 0) this.paused++;
+    }
     this.stepIndex++;
     if (this.stepIndex >= this.steps.length) {
       this.finish();
@@ -594,6 +664,24 @@ export class FlowSession {
       onDone: () => this.finish(),
     });
     this.ticker = setInterval(() => this.sweepMissed(), 60);
+  }
+
+  /**
+   * A key played during the count in. One is a stray. Several mean the learner
+   * has started to play before the music has, so the run is stopped and they
+   * are told to wait for the count.
+   */
+  private earlyKey(ev: NoteInput): void {
+    // A microphone can take a sound in the room for a note, so it is not trusted for this.
+    if (this.options.mode !== 'tempo' || this.options.anyPitch || ev.source === 'mic') return;
+    if (ev.source === 'midi' && input.remoteKeys && isRemoteKey(ev.midi) && !this.pitches.has(ev.midi)) return;
+    // The key that opened the gate may still be sounding. It is not part of this.
+    if (piano.now() - this.startedAt < 0.5) return;
+    this.early++;
+    if (this.early >= 3) {
+      this.events.emit({ type: 'false-start' });
+      this.stop();
+    }
   }
 
   /** Run a callback when the audio clock reaches a time. */
@@ -751,28 +839,34 @@ export class FlowSession {
         played: playedIn.get(measure) ?? 0,
       }));
 
-    // Long notes, and whether they were kept down for most of their length.
+    // Long notes, and whether they were kept down for most of their length. Each counts
+    // for its own length, so a whole note let go early weighs more than a half note.
     const long = detail.filter((d) => d.dur >= 2 - 1e-6 && d.held !== undefined);
-    const held = long.length >= 2 ? long.filter((d) => (d.held ?? 0) >= 0.6).length / long.length : null;
+    const longBeats = long.reduce((a, d) => a + d.dur, 0);
+    const held = long.length >= 2 ? long.filter((d) => (d.held ?? 0) >= 0.6).reduce((a, d) => a + d.dur, 0) / longBeats : null;
     const shared = {
       detail,
       wrong: this.wrongPresses,
       cutShort: this.cutShort,
+      octaveShift: this.shift,
+      earlyKeys: this.early,
       take: this.buildTake(piano.now() - this.takeStart),
     };
 
     if (this.options.mode === 'wait') {
-      const accuracy = total === 0 ? 1 : this.firstTry / total;
       const steps = Math.max(1, this.steps.length);
+      // A step counts when it was played with no wrong key. A chord is one step, so one slip on it is one slip.
+      const accuracy = this.steps.length === 0 ? 1 : this.rightSteps / steps;
       return {
         mode: 'wait',
         hands: this.options.hands,
         bpm: this.options.bpm,
         totalNotes: total,
-        correctNotes: this.firstTry,
+        correctNotes: this.rightNotes,
         wrongNotes: this.wrong,
         missedNotes: 0,
         hintedSteps: this.hinted,
+        pausedSteps: this.paused,
         totalSteps: this.steps.length,
         accuracy,
         onTime: 1,
@@ -806,6 +900,7 @@ export class FlowSession {
       wrongNotes: this.wrong,
       missedNotes: this.missed.size,
       hintedSteps: 0,
+      pausedSteps: 0,
       totalSteps: this.steps.length,
       accuracy,
       onTime: matched === 0 ? 0 : onTimeCount / matched,
@@ -826,6 +921,18 @@ export class FlowSession {
 
 function round3(x: number): number {
   return Math.round(x * 1000) / 1000;
+}
+
+/**
+ * A timed run in which nothing was played, or next to nothing, is not an
+ * attempt. The learner was away, or began and stopped at once. Such a run is
+ * never judged.
+ */
+export function notAttempted(result: FlowResult): 'nothing' | 'barely' | null {
+  if (result.mode !== 'tempo') return null;
+  const played = result.correctNotes + result.wrongNotes;
+  if (played === 0) return 'nothing';
+  return result.totalNotes >= 8 && played <= result.totalNotes * 0.15 ? 'barely' : null;
 }
 
 /** Measures that gave the most trouble, worst first. */

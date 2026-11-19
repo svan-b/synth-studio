@@ -238,6 +238,13 @@ html:has(.mc-root[data-theme='dark']) body {
 .mc-key-badge.badge-ink {
   background: rgb(30 28 25);
 }
+/* On a black key every badge is a white disc with a dark figure, whatever its kind, so it can always be read. */
+.mc-key-b .mc-key-badge.badge-accent,
+.mc-key-b .mc-key-badge.badge-ok,
+.mc-key-b .mc-key-badge.badge-ink {
+  background: white;
+  color: rgb(30 28 25);
+}
 
 /* ---------------------------------------------------------------- Motion */
 

@@ -61,6 +61,12 @@ export interface PlaySurfaceProps {
   hiddenPrompt?: string;
   /** End a waiting run early once the learner is plainly stuck, as on a first play through. */
   stopAfter?: { hints: number; wrong: number } | null;
+  /** Follow a learner who begins in another octave, as on a first play through. */
+  followOctave?: boolean;
+  /** Count a key that had to be shown on the first step, where that step is itself the question. */
+  countFirstHint?: boolean;
+  /** The rhythm on any key asks for notes to be held, so the wording says play, not tap. */
+  sustain?: boolean;
   /** Milliseconds before a demonstration begins, to leave time to read what to listen for. */
   leadIn?: number;
   /**
@@ -96,6 +102,9 @@ export default function PlaySurface({
   click = false,
   hiddenPrompt = 'Your turn',
   stopAfter = null,
+  followOctave = false,
+  countFirstHint = false,
+  sustain = false,
   leadIn = 350,
   replay = null,
   onReplayDone,
@@ -112,6 +121,18 @@ export default function PlaySurface({
   const replayDone = useRef(onReplayDone);
   replayDone.current = onReplayDone;
   const [replaying, setReplaying] = useState(false);
+  // A sheet over the stand holds the run. `held` is read when a run would start,
+  // and a change to it stops or restarts only a run that has not finished: a
+  // finished run stays as it is, with its marks, for as long as its reply is up.
+  const heldRef = useRef(held);
+  heldRef.current = held;
+  const finished = useRef(false);
+  const parked = useRef(false);
+  const halt = useRef<(() => void) | null>(null);
+  const [resume, setResume] = useState(0);
+  // A word to the learner about what just happened, such as a start before the count was over.
+  const [notice, setNotice] = useState<string | null>(null);
+  const falseStart = useRef(false);
 
   const [phase, setPhase] = useState<Phase>('ready');
   const [count, setCount] = useState<number | null>(null);
@@ -140,7 +161,18 @@ export default function PlaySurface({
     setBeat(null);
     setPhase('ready');
     gateRef.current = null;
-    if (held) return;
+    finished.current = false;
+    halt.current = null;
+    // After a false start the run goes back to its gate, and the reason stays up until the learner starts again.
+    const afterFalseStart = falseStart.current;
+    if (!afterFalseStart) setNotice(null);
+    falseStart.current = false;
+    if (heldRef.current) {
+      // It starts when the sheet is put away.
+      parked.current = true;
+      return;
+    }
+    parked.current = false;
     const timers: Array<ReturnType<typeof setTimeout>> = [];
     let offGate: (() => void) | null = null;
     let begin: (() => void) | null = null;
@@ -188,6 +220,7 @@ export default function PlaySurface({
           lead: 0.15,
           onDone: () => {
             if (cancelled) return;
+            finished.current = true;
             viewRef.current?.setCursor(null);
             setPhase('done');
             doneRef.current(null);
@@ -200,7 +233,8 @@ export default function PlaySurface({
         mode,
         hands: active,
         bpm,
-        hintDelayMs: hints === 'always' ? 0 : hints === 'delay' ? (hintMs ?? 3500) : Infinity,
+        // Time to think before the key is shown. The music is said to wait, so it does.
+        hintDelayMs: hints === 'always' ? 0 : hints === 'delay' ? (hintMs ?? 4500) : Infinity,
         hintAfterWrong: hints === 'never' ? 4 : 2,
         metronome: click || settings.metronome,
         // Fill in the other hand when the app can play without being overheard.
@@ -210,6 +244,8 @@ export default function PlaySurface({
         // The run is armed a moment after it appears. A note struck in that moment still counts.
         catchUp: catchUp ?? 0.4,
         stopAfter,
+        followOctave,
+        countFirstHint,
         latency: { midi: 0.008 + extra, touch: 0.045 + extra, mic: 0.07 + extra, keys: 0.02 + extra },
       });
       const s = session;
@@ -217,11 +253,20 @@ export default function PlaySurface({
         if (cancelled) return;
         if (ev.type === 'step') {
           viewRef.current?.setCursor(ev.index);
-          if (mode === 'wait') setMarks({});
+          if (mode === 'wait') {
+            setMarks({});
+            setNotice(null);
+          }
         } else if (ev.type === 'hint') {
           const next: Record<number, KeyMark> = {};
-          for (const n of ev.notes) next[n.midi] = { kind: 'target', label: n.finger ? String(n.finger) : undefined };
+          // Where the run is being followed in another octave, the key to show is the one under the learner's hand.
+          for (const n of ev.notes) next[n.midi + ev.shift] = { kind: 'target', label: n.finger ? String(n.finger) : undefined };
           setMarks(next);
+        } else if (ev.type === 'false-start') {
+          // The learner began to play during the count. Back to the gate, with the reason.
+          falseStart.current = true;
+          setNotice('Let the count finish, then come in.');
+          setResume((n) => n + 1);
         } else if (ev.type === 'note') {
           viewRef.current?.mark(ev.id, ev.state);
           if (ev.state !== 'bad') flashKey(kbRef.current, ev.midi, 'ok');
@@ -233,6 +278,8 @@ export default function PlaySurface({
           });
         } else if (ev.type === 'wrong') {
           flashKey(kbRef.current, ev.midi, 'bad');
+          // The right note in the wrong place is worth saying, since the ear will not catch it.
+          if (ev.octave) setNotice(ev.octave === 'high' ? 'The right note, an octave too high. Play the lit key.' : 'The right note, an octave too low. Play the lit key.');
         } else if (ev.type === 'phase') {
           if (ev.phase === 'countin' || ev.phase === 'playing' || ev.phase === 'done') setPhase(ev.phase);
           if (ev.phase === 'playing') setCount(null);
@@ -240,12 +287,13 @@ export default function PlaySurface({
           setBeat({ n: ev.number, accent: ev.accent });
           setCount(ev.countIn ? ev.number : null);
         } else if (ev.type === 'done') {
+          finished.current = true;
           viewRef.current?.setCursor(null);
           setMarks({});
           doneRef.current(ev.result);
         }
       });
-      if (mode === 'tempo' && !autoStart) {
+      if (mode === 'tempo' && (!autoStart || afterFalseStart)) {
         // The run waits at a gate. Any key on the piano opens it, or a tap.
         let begun = false;
         let armed = false;
@@ -256,6 +304,7 @@ export default function PlaySurface({
           offGate = null;
           if (waitingGate.current === open) waitingGate.current = null;
           gateRef.current = null;
+          setNotice(null);
           setPhase('ready');
           // A breath between the key that said go and the first click.
           later(450, () => s.start());
@@ -264,12 +313,32 @@ export default function PlaySurface({
         gateRef.current = open;
         waitingGate.current = open;
         setPhase('gate');
-        // The key that brought the learner here must not also start the run.
-        later(300, () => {
-          armed = true;
-        });
+        // The key that brought the learner here must not also start the run. After a
+        // false start they may still be playing, so the gate waits for the keys to go quiet.
+        let quiet: ReturnType<typeof setTimeout> | null = null;
+        const arm = (ms: number) => {
+          if (quiet) clearTimeout(quiet);
+          quiet = setTimeout(() => {
+            if (!cancelled) armed = true;
+          }, ms);
+          timers.push(quiet);
+        };
+        arm(afterFalseStart ? 1500 : 300);
+        let down = 0;
         offGate = noteBus.subscribe((ev) => {
-          if (ev.type !== 'on' || !armed) return;
+          if (!armed) {
+            if (!afterFalseStart) return;
+            // Still playing. A long note held is not quiet either, so the wait runs from when the keys come up.
+            if (ev.type === 'on') {
+              down++;
+              arm(2500);
+            } else {
+              down = Math.max(0, down - 1);
+              if (down === 0) arm(1500);
+            }
+            return;
+          }
+          if (ev.type !== 'on') return;
           // The bottom key asks to hear it, so it is left to do that.
           if (ev.source === 'midi' && input.remoteKeys && ev.midi === REMOTE_SECONDARY) return;
           open();
@@ -279,7 +348,7 @@ export default function PlaySurface({
       }
     }
 
-    return () => {
+    const stop = () => {
       cancelled = true;
       offGate?.();
       if (begin && waitingGate.current === begin) waitingGate.current = null;
@@ -289,9 +358,24 @@ export default function PlaySurface({
       transport.stop();
       instrument.stop();
     };
+    halt.current = stop;
+    return stop;
     // Settings and input mode are read when a run starts. Changing them mid run would restart it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runId, score, mode, bpm, active, hints, anyKey, display, held, autoStart]);
+  }, [runId, score, mode, bpm, active, hints, anyKey, display, autoStart, resume]);
+
+  useEffect(() => {
+    if (held) {
+      // Stop what is under way. A run that had already finished is left alone.
+      if (!finished.current && halt.current) {
+        halt.current();
+        parked.current = true;
+      }
+    } else if (parked.current) {
+      parked.current = false;
+      setResume((n) => n + 1);
+    }
+  }, [held]);
 
   // The learner's own take, played back over the music that was just played.
   const replayKey = replay?.key ?? null;
@@ -339,7 +423,7 @@ export default function PlaySurface({
   if (replaying) status = 'Your own playing';
   else if (mode === 'listen') status = phase === 'done' ? 'That was it' : 'Listen';
   else if (phase === 'done' || held) status = '';
-  else if (phase === 'gate') status = 'It starts when you do';
+  else if (phase === 'gate') status = 'The count starts when you are ready';
   else if (phase === 'countin') status = 'Get ready';
   else if (mode === 'wait') status = anyKey ? 'Play each note, any key' : 'The music waits for you';
   else if (phase === 'ready') status = 'Get ready';
@@ -369,15 +453,23 @@ export default function PlaySurface({
             </div>
           </div>
         )}
-        {phase === 'gate' && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
-            <button
-              onClick={() => gateRef.current?.()}
-              className="mc-fade-up pointer-events-auto flex h-12 items-center gap-2.5 rounded-full bg-mc-ink px-6 text-[1.05rem] font-semibold text-mc-bg shadow-lg active:scale-[0.97]"
-            >
-              <Icon.Play size={18} />
-              {touch ? 'Tap here when you are ready' : anyKey ? 'Tap any key when you are ready' : 'Play any key when you are ready'}
-            </button>
+        {(phase === 'gate' || notice) && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex flex-col items-center gap-2">
+            {notice && (
+              <div role="status" className="mc-fade-up rounded-full bg-mc-surface px-5 py-2 text-[1rem] font-medium text-mc-hint-ink shadow-lg ring-1 ring-mc-line">
+                {notice}
+              </div>
+            )}
+            {phase === 'gate' && (
+              <button
+                onClick={() => gateRef.current?.()}
+                className="mc-fade-up pointer-events-auto flex h-12 items-center gap-2.5 rounded-full bg-mc-ink px-6 text-[1.05rem] font-semibold text-mc-bg shadow-lg active:scale-[0.97]"
+              >
+                <Icon.Play size={18} />
+                {/* A key starts the count, not the music, and the words say so. */}
+                {touch ? 'Tap here to start the count' : anyKey && !sustain ? 'Tap any key to start the count' : 'Play any key to start the count'}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -403,7 +495,9 @@ export default function PlaySurface({
       {anyKey && touch ? (
         <TapPad />
       ) : anyKey ? (
-        <div className="flex h-16 shrink-0 items-center justify-center text-sm text-mc-muted">Tap the rhythm on any key of your piano</div>
+        <div className="flex h-16 shrink-0 items-center justify-center text-sm text-mc-muted">
+          {sustain ? 'Play the rhythm on any key of your piano, and hold each note for its full length' : 'Tap the rhythm on any key of your piano'}
+        </div>
       ) : (
         <div ref={kbRef} className="shrink-0">
           <Keyboard

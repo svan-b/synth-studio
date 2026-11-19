@@ -131,6 +131,15 @@ export function useApplySettings(): void {
   }, [settings]);
 }
 
+/**
+ * How long to leave a line of instruction on screen before the music it
+ * introduces begins, in milliseconds. Paced for an unhurried reader, and
+ * never so long that a short line leaves the learner waiting.
+ */
+export function readingMs(text: string): number {
+  return Math.min(6000, Math.max(1500, 400 + text.length * 52));
+}
+
 /** Seconds spent with an activity open, reported when it closes. */
 export function usePracticeTimer(onDone: (seconds: number) => void): void {
   const ref = useRef(onDone);

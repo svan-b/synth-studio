@@ -27,6 +27,8 @@ const ChordChart = forwardRef<ScoreViewHandle, ChordChartProps>(function ChordCh
         measure,
         symbols: score.chords.filter((c) => c.measure === measure).map((c) => c.symbol),
         notes: score.notes.filter((n) => n.measure === measure && !n.tied).map((n) => n.id),
+        // Played one note at a time, as against all together.
+        broken: new Set(score.notes.filter((n) => n.measure === measure && !n.tied).map((n) => n.start)).size > 1,
       })),
     [score],
   );
@@ -72,6 +74,14 @@ const ChordChart = forwardRef<ScoreViewHandle, ChordChartProps>(function ChordCh
               <span className={`font-mc-serif text-[4rem] leading-none ${done ? (slipped ? 'text-mc-hint-ink' : 'text-mc-ok') : current ? 'text-mc-ink' : 'text-mc-muted'}`}>
                 {cell.symbols.join(' ') || ' '}
               </span>
+              {/* A chord played one note at a time shows how far through it the learner is. */}
+              {cell.broken && (
+                <span className="mt-3 flex gap-2" aria-hidden="true">
+                  {cell.notes.map((id) => (
+                    <span key={id} className={`h-2.5 w-2.5 rounded-full ${marks[id] === 'ok' ? 'bg-mc-ok' : marks[id] ? 'bg-mc-hint' : 'bg-mc-line'}`} />
+                  ))}
+                </span>
+              )}
               {done && !slipped && (
                 <span className="absolute right-3 top-3 text-mc-ok">
                   <Icon.Check size={22} />

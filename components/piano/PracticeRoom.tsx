@@ -4,14 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { instrument } from '@/lib/piano/audio/instrument';
 import { TakePlayer } from '@/lib/piano/audio/replay';
 import { getPiece, pieceInfo, pieceScore } from '@/lib/piano/content/catalog';
-import type { FlowResult, Take } from '@/lib/piano/engine/flow';
+import { notAttempted, type FlowResult, type Take } from '@/lib/piano/engine/flow';
 import {
   applyResult,
+  isKept,
   newPieceState,
   nextTask,
   pieceProgress,
   planOutline,
   skipTrial,
+  waitSummary,
   type PieceState,
   type Task,
   type Verdict,
@@ -21,7 +23,7 @@ import { outcomeFromAccuracy } from '@/lib/piano/learn/srs';
 import { usePiano } from '@/lib/piano/learn/store';
 import { sliceScore } from '@/lib/piano/music/score';
 import type { Hand } from '@/lib/piano/music/theory';
-import { useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
+import { readingMs, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
 import PlaySurface from './PlaySurface';
 import { Button, Icon, IconButton, Pill, ProgressBar, Segmented, Sheet } from './ui';
 
@@ -35,9 +37,7 @@ interface Free {
 type Stage = 'play' | 'reflect' | 'verdict' | 'learned' | 'timeup';
 
 function statsLine(result: FlowResult): string {
-  if (result.mode === 'wait') {
-    return result.clean ? 'Every note right the first time' : `${result.correctNotes} of ${result.totalNotes} notes right the first time`;
-  }
+  if (result.mode === 'wait') return waitSummary(result);
   const pct = Math.round(result.accuracy * 100);
   const timing = `${Math.round(result.onTime * 100)} percent on the beat`;
   return `${pct} percent of the notes, ${timing}`;
@@ -66,6 +66,8 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   const [state, setState] = useState<PieceState>(() => stored ?? newPieceState(info));
   const [run, setRun] = useState(0);
   const [stage, setStage] = useState<Stage>('play');
+  const stageRef = useRef<Stage>('play');
+  stageRef.current = stage;
   const [verdict, setVerdict] = useState<{ v: Verdict; stats: string } | null>(null);
   const [free, setFree] = useState<Free | null>(null);
   const [options, setOptions] = useState(false);
@@ -81,6 +83,9 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   // A learned piece has been played through and is still there. Once is enough.
   const kept1 = useRef(false);
   const [ending, setEnding] = useState<'time' | 'kept'>('time');
+  // A timed run that has ended and is waiting out the pause before its reply.
+  const pending = useRef<FlowResult | null>(null);
+  const judgeNow = useRef<(result: FlowResult) => boolean>(() => false);
   const startedAt = useRef(performance.now());
   const notesPlayed = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,7 +109,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
     if (free) {
       const [from, to] = free.section < 0 ? [0, info.measures - 1] : info.sections[free.section];
       const hands: Hand[] = free.hands === 'both' ? info.hands : [free.hands];
-      return { from, to, hands, mode: free.mode, tempoPct: free.tempoPct, stopAfter: null };
+      return { from, to, hands, mode: free.mode, tempoPct: free.tempoPct, stopAfter: null, followOctave: false };
     }
     if (!task) return null;
     return {
@@ -114,6 +119,8 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
       mode: modelOnce ? ('listen' as const) : task.mode,
       tempoPct: task.mode === 'wait' ? 85 : task.tempoPct,
       stopAfter: modelOnce ? null : (task.stopAfter ?? null),
+      // A first play through begun on the wrong C still shows the piece is known.
+      followOctave: !modelOnce && task.scope.type === 'trial',
     };
   }, [free, info, modelOnce, task]);
 
@@ -153,6 +160,13 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
 
   const hearModel = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
+    // Asked for in the pause after a run, it must not throw the run away. The reply comes first.
+    if (pending.current) {
+      const result = pending.current;
+      pending.current = null;
+      judgeNow.current(result);
+      return;
+    }
     setVerdict(null);
     setAside(null);
     setTake(null);
@@ -169,8 +183,8 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   }, [take]);
 
   const judge = useCallback(
-    (result: FlowResult) => {
-      if (!task) return;
+    (result: FlowResult): boolean => {
+      if (!task) return false;
       const out = applyResult(info, state, task, result);
       setState(out.state);
       setPiece(pieceId, out.state);
@@ -184,42 +198,71 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
         if (result.take) keepRecording(pieceId, result.take);
         instrument.chime();
         setStage('learned');
-        return;
+        return true;
       }
       // Each later play through of a learned piece replaces the last, so then and now can be compared.
       if (state.learned && out.verdict.passed && result.take) keepRecording(pieceId, result.take);
-      if (state.learned && out.verdict.passed && task.need === 1) kept1.current = true;
+      // A learned piece played through and found in good order, or won back after going rusty. Once is enough.
+      if (state.learned && out.verdict.passed && isKept(out.state)) kept1.current = true;
       if (out.verdict.passed && !out.verdict.plain) instrument.chime();
       setStage('verdict');
       timer.current = setTimeout(proceed, readTime(`${out.verdict.message} ${out.verdict.aside ?? ''}`, out.verdict.passed));
+      return false;
     },
     [addCards, info, keepRecording, pieceId, proceed, reviewCard, setPiece, state, task],
   );
+  judgeNow.current = judge;
+
+  /** Open the plan. Nothing moves on underneath it. */
+  const openOptions = useCallback(() => {
+    // A run that has just ended gets its reply before anything covers the stand.
+    if (pending.current) {
+      const result = pending.current;
+      pending.current = null;
+      if (timer.current) clearTimeout(timer.current);
+      // If that run finished the piece, the screen that says so is what to show.
+      if (judgeNow.current(result)) return;
+    }
+    // A reply that is up stays up until the learner moves on, and their own playing stops sounding.
+    if (timer.current) clearTimeout(timer.current);
+    setReplay(null);
+    setOptions(true);
+  }, []);
 
   const onDone = useCallback(
     (result: FlowResult | null) => {
+      // A result can only belong to the run on the stand. Once a reply is up there is no such run,
+      // and nothing that arrives then may be judged against the step that comes after it.
+      if (stageRef.current !== 'play') return;
       if (modelOnce) {
         setModelOnce(false);
         setRun((r) => r + 1);
         return;
       }
-      // A timed run in which no key was touched is not an attempt. Nothing is
-      // counted, and it waits at the gate until the learner is back.
-      const untouched = result !== null && result.mode === 'tempo' && result.correctNotes === 0 && result.wrongNotes === 0;
-      if (untouched) {
-        setAside('Nothing was played, so nothing was counted. It will wait for you.');
+      // A timed run in which no key was touched, or only a note or two, is not an
+      // attempt. Nothing is counted, and it waits at the gate until the learner is back.
+      const idle = result ? notAttempted(result) : null;
+      if (idle) {
+        setAside(
+          idle === 'nothing'
+            ? 'Nothing was played, so nothing was counted. It will wait for you.'
+            : 'Only a note or two was played, so nothing was counted. It will wait for you.',
+        );
         setRun((r) => r + 1);
         return;
       }
       // A few stray notes are not worth hearing back.
       setTake(result?.take && result.take.notes.length >= 3 && !result.cutShort ? result.take : null);
       if (free) {
-        if (result) {
+        if (result && result.totalNotes === 0) {
+          // A part where the chosen hand only rests.
+          setVerdict({ v: { passed: true, plain: true, message: 'That hand has nothing to play in this part.', learned: false }, stats: 'Choose another part or both hands in Plan and options.' });
+        } else if (result) {
           notesPlayed.current += result.totalNotes;
           setVerdict({ v: { passed: result.accuracy >= 0.87, message: 'Your own practice. Nothing is recorded.', learned: false }, stats: statsLine(result) });
         } else {
           // Heard once. It does not go round again by itself.
-          setVerdict({ v: { passed: true, message: 'That is how it goes.', learned: false }, stats: 'Continue to hear it again, or choose what to play in Options.' });
+          setVerdict({ v: { passed: true, message: 'That is how it goes.', learned: false }, stats: 'Continue to hear it again, or choose what to play in Plan and options.' });
         }
         setStage('verdict');
         return;
@@ -237,7 +280,11 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
       if (task.mode === 'tempo') {
         // A moment to judge it yourself before the verdict appears.
         setStage('reflect');
-        timer.current = setTimeout(() => judge(result), 1500);
+        pending.current = result;
+        timer.current = setTimeout(() => {
+          pending.current = null;
+          judge(result);
+        }, 1500);
       } else {
         judge(result);
       }
@@ -296,12 +343,17 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
           </div>
           <ProgressBar value={progress} tone="ok" className="mt-1 max-w-xs" />
         </div>
-        <Button variant="soft" size="sm" onClick={hearModel} icon={<Icon.Ear size={16} />} hint={inputMode === 'midi' ? 'bottom key' : undefined}>
-          Hear it
-        </Button>
-        <Button variant={free ? 'primary' : 'soft'} size="sm" onClick={() => setOptions(true)}>
-          {free ? 'Own practice' : 'Plan and options'}
-        </Button>
+        {/* The screens that close a piece have their own buttons, and nothing on the stand to hear or plan. */}
+        {stage !== 'learned' && stage !== 'timeup' && (
+          <>
+            <Button variant="soft" size="sm" onClick={hearModel} icon={<Icon.Ear size={16} />} hint={inputMode === 'midi' ? 'bottom key' : undefined}>
+              Hear it
+            </Button>
+            <Button variant={free ? 'primary' : 'soft'} size="sm" onClick={openOptions}>
+              {free ? 'Own practice' : 'Plan and options'}
+            </Button>
+          </>
+        )}
       </header>
 
       {stage === 'learned' ? (
@@ -331,7 +383,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
           <h2 className="mc-fade-up font-mc-serif text-4xl">{ending === 'kept' ? 'Still yours' : 'A good place to stop'}</h2>
           <p className="mc-fade-up max-w-xl text-[1.1rem] leading-relaxed text-mc-muted">
             {ending === 'kept'
-              ? 'This piece is safe in your fingers. It will come back after a longer gap, so that it stays there.'
+              ? 'This piece is safe in your fingers. It will come back now and then, so that it stays there.'
               : 'That is the time set aside for this piece today. What you practised keeps settling after you stop, and a night of sleep helps it along. It will be easier tomorrow.'}
           </p>
           <div className="flex gap-3">
@@ -399,13 +451,16 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
                 tempoPct={shown.tempoPct}
                 display={display}
                 hints="delay"
+                // Time to think. The music is said to wait, and a pause is not a mistake.
+                hintMs={6000}
                 runId={`${run}-${free ? 'free' : 'coach'}`}
                 onDone={onDone}
                 held={options}
                 veil={stage === 'reflect'}
                 stopAfter={shown.stopAfter}
-                // The coach's own demonstration leaves a moment to read what to listen for.
-                leadIn={shown.mode === 'listen' && !modelOnce && !free ? 1300 : 350}
+                followOctave={shown.followOctave}
+                // The coach's own demonstration leaves time to read what to listen for.
+                leadIn={shown.mode === 'listen' && !modelOnce && !free ? readingMs(prompt) : 350}
                 replay={stage === 'verdict' ? replay : null}
                 onReplayDone={() => setReplay(null)}
               />
@@ -415,35 +470,40 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
       )}
 
       <Sheet open={options} onClose={() => setOptions(false)} title="Plan and options" wide>
-        <div className="text-xs font-semibold uppercase tracking-widest text-mc-faint">The plan for this piece</div>
-        <div className="mt-3 space-y-2.5">
-          {plan.map((row) => (
-            <div key={row.title} className="flex items-center gap-4">
-              <div className="w-44 shrink-0">
-                <div className="font-medium leading-tight">{row.title}</div>
-                {row.detail && <div className="text-xs text-mc-muted">{row.detail}</div>}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {row.steps.map((step) => (
-                  <span
-                    key={step.label}
-                    className={`inline-flex h-7 items-center gap-1 rounded-full px-3 text-[13px] font-semibold ${
-                      step.state === 'done' ? 'bg-mc-ok/15 text-mc-ok' : step.state === 'now' ? 'bg-mc-ink text-mc-bg' : 'bg-mc-raised text-mc-muted'
-                    }`}
-                  >
-                    {step.state === 'done' && <Icon.Check size={13} />}
-                    {step.label}
-                  </span>
-                ))}
-              </div>
+        {/* While the learner decides, the coach's plan steps aside, so their own controls are all in view. */}
+        {!free && (
+          <>
+            <div className="text-xs font-semibold uppercase tracking-widest text-mc-faint">The plan for this piece</div>
+            <div className="mt-3 space-y-2.5">
+              {plan.map((row) => (
+                <div key={row.title} className="flex items-center gap-4">
+                  <div className="w-44 shrink-0">
+                    <div className="font-medium leading-tight">{row.title}</div>
+                    {row.detail && <div className="text-xs text-mc-muted">{row.detail}</div>}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {row.steps.map((step) => (
+                      <span
+                        key={step.label}
+                        className={`inline-flex h-7 items-center gap-1 rounded-full px-3 text-[13px] font-semibold ${
+                          step.state === 'done' ? 'bg-mc-ok/15 text-mc-ok' : step.state === 'now' ? 'bg-mc-ink text-mc-bg' : 'bg-mc-raised text-mc-muted'
+                        }`}
+                      >
+                        {step.state === 'done' && <Icon.Check size={13} />}
+                        {step.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <p className="mt-4 text-[15px] leading-relaxed text-mc-muted">
-          The coach moves you along this as each step holds. A clean pass moves on at once, and anything you already know is skipped.
-        </p>
+            <p className="mt-4 text-[15px] leading-relaxed text-mc-muted">
+              The coach moves you along this as each step holds. A clean pass moves on at once, and anything you already know is skipped.
+            </p>
+          </>
+        )}
 
-        <div className="mt-6 border-t border-mc-line pt-5">
+        <div className={free ? '' : 'mt-6 border-t border-mc-line pt-5'}>
           <p className="mb-5 text-mc-muted">If you would rather work on something specific, set it here. Your own practice is not recorded.</p>
           <div className="space-y-5">
             <div className="flex items-center justify-between gap-4">
@@ -500,18 +560,21 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
                     ]}
                   />
                 </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium">Speed, {free.tempoPct} percent</span>
-                  <input
-                    type="range"
-                    className="mc-range w-64"
-                    min={40}
-                    max={110}
-                    step={5}
-                    value={free.tempoPct}
-                    onChange={(e) => setFree({ ...free, tempoPct: Number(e.target.value) })}
-                  />
-                </div>
+                {/* Without a beat the music goes at the learner's own speed, so there is nothing to set. */}
+                {free.mode !== 'wait' && (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-medium">Speed, {free.tempoPct} percent</span>
+                    <input
+                      type="range"
+                      className="mc-range w-64"
+                      min={40}
+                      max={110}
+                      step={5}
+                      value={free.tempoPct}
+                      onChange={(e) => setFree({ ...free, tempoPct: Number(e.target.value) })}
+                    />
+                  </div>
+                )}
                 <Button
                   className="w-full"
                   onClick={() => {

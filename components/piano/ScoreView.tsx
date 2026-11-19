@@ -61,6 +61,8 @@ interface NotePos {
 interface SystemBox {
   top: number;
   bottom: number;
+  /** Top of the room kept for this line, with its chord symbols and finger numbers. */
+  page: number;
 }
 
 interface SystemPlan {
@@ -179,6 +181,14 @@ function planLayout(score: Score, width: number, opts: { fingering: boolean; nam
       else middleExtra = Math.max(middleExtra, d - topLine(clef) - 3);
     }
   }
+  // A stem that points up carries its finger number above its tip, which stands
+  // higher than the note itself. Notes below the middle line have such stems.
+  for (const ev of score.staff[topHand]) {
+    if (ev.kind !== 'note' || ev.sym === 'w') continue;
+    const ds = ev.pitches.map(diatonicIndex);
+    const top = topLine(score.clefs[topHand]);
+    if ((Math.min(...ds) + Math.max(...ds)) / 2 < top - 4) above = Math.max(above, Math.max(...ds) + 7 - top);
+  }
   const labelRoom = (opts.fingering ? 16 : 0) + (opts.names ? 14 : 0);
   // A chord carries one finger number for each of its notes, stacked. Each one past the first needs its own line.
   const stack = (hand: Hand) => (opts.fingering ? Math.max(0, ...score.staff[hand].map((e) => e.fingers?.length ?? 0)) : 0);
@@ -287,11 +297,14 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     // never in the middle of one.
     const viewTop = wrap.scrollTop;
     const viewBottom = viewTop + wrap.clientHeight;
-    const sysTop = box.top * z - 16;
+    // The top of the line is the top of everything that belongs to it: chord
+    // symbols, finger numbers and notes above the staff, not only the staff.
+    const lift = innerRef.current ? parseFloat(innerRef.current.style.marginTop || '0') : 0;
+    const sysTop = box.page * z + lift;
     const next = systemBoxes.current[system + 1];
-    const wantBottom = (next ? next.bottom : box.bottom) * z + 16;
+    const wantBottom = (next ? next.bottom : box.bottom) * z + lift + 16;
     if (sysTop < viewTop || wantBottom > viewBottom) {
-      wrap.scrollTo({ top: Math.max(0, sysTop - 8), behavior: smooth ? 'smooth' : 'auto' });
+      wrap.scrollTo({ top: Math.max(0, sysTop - 4), behavior: smooth ? 'smooth' : 'auto' });
     }
   };
 
@@ -501,7 +514,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
       }
       const topStave = lastStaves[0];
       const bottomStave = lastStaves[lastStaves.length - 1];
-      systemBoxes.current.push({ top: topStave.getYForLine(0) - 16, bottom: bottomStave.getYForLine(4) + 16 });
+      systemBoxes.current.push({ top: topStave.getYForLine(0) - 16, bottom: bottomStave.getYForLine(4) + 16, page: sysY });
     });
 
     // Ties, including ties that cross from one system to the next.
@@ -547,8 +560,9 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
         const note = ev ? eventNotes.get(ev) : undefined;
         if (!ev || !note) continue;
         const si = noteSystem.get(ev) ?? 0;
-        // Above the finger numbers, however many are stacked.
-        const y = systemBoxes.current[si].top - (planOpts.fingering ? 14 + plan.fingerRise : 2);
+        // At the top of the room kept for this line: above the finger numbers, however many are
+        // stacked, and above the highest note. One height for every line, so they read as a row.
+        const y = systemBoxes.current[si].page + 20;
         ctx.fillText(mark.symbol.replace(/b/g, '♭').replace(/#/g, '♯'), note.getAbsoluteX(), y);
       }
       ctx.restore();

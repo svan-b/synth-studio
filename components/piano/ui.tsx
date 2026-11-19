@@ -206,7 +206,7 @@ export function Button({ variant = 'primary', size = 'md', hint, icon, className
       {icon}
       <span className="flex flex-col items-center leading-tight">
         <span>{children}</span>
-        {hint && <span className="text-[11px] font-medium uppercase tracking-wider opacity-70">{hint}</span>}
+        {hint && <span className="text-[12px] font-semibold uppercase tracking-wider opacity-80">{hint}</span>}
       </span>
     </button>
   );

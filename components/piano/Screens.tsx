@@ -13,8 +13,8 @@ import {
   dueReadingCards,
   introducedPieces,
   openDrills,
+  planDay,
   planMinutes,
-  planSession,
   skippedPieces,
   type Block,
   type DrillKind,
@@ -71,19 +71,29 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   const drills = usePiano((s) => s.drills);
   const today = dayKey();
   const doneToday = sessionDoneOn === today;
-  const plan = useMemo(
-    () => planSession({ minutes: profile.minutes, lessons, pieces, cards, days, drills, again: doneToday }),
+  const day = useMemo(
+    () => planDay({ minutes: profile.minutes, lessons, pieces, cards, days, drills, again: doneToday }),
     [profile.minutes, lessons, pieces, cards, days, drills, doneToday],
   );
+  const plan = day.blocks;
   const minutesToday = Math.round((days[today]?.seconds ?? 0) / 60);
   const run = streak(days);
   const date = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const tip = TIPS[Math.floor(new Date(today + 'T12:00:00').getTime() / 86400000) % TIPS.length];
   const firstTime = Object.keys(lessons).length === 0 && Object.keys(days).length === 0;
   const isDone = (id: string) => lessons[id]?.done === true;
-  // The next lesson, for a learner who wants more than the day's plan holds.
-  const upNext = lessonOrder().find((id) => !isDone(id) && lessonUnlocked(id, isDone));
-  const offerLesson = upNext !== undefined && !plan.some((b) => b.kind === 'lesson') && !firstTime;
+  // The next lesson, for a learner who wants more than the day's plan holds, with the reason it is not in the plan.
+  const upNext = day.upNext;
+  const offerLesson = upNext !== undefined && day.held !== null && !firstTime;
+  const count = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][day.waiting.length] ?? String(day.waiting.length);
+  const whyHeld =
+    day.held === 'pieces'
+      ? `You have ${count} pieces still to learn, so today is for them. A new lesson comes when one of them is learned, so that what you are taught gets played.`
+      : day.held === 'turn'
+        ? `With ${profile.minutes} minutes a day, lessons and pieces take the days in turn, and today is the piece's.`
+        : 'The course moves at one new lesson a day at most, because that is what holds best.';
+  // The first day keeps both of its lessons at every session length, so it can run over.
+  const runsLong = firstTime && planMinutes(plan) > profile.minutes + 2;
 
   return (
     <Page title="Today" subtitle={date} right={<ConnectionChip onClick={() => onGo('settings')} />}>
@@ -98,7 +108,9 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
                     ? 'Rest is part of learning. Come back tomorrow. If you want more today, this is extra practice with nothing new in it.'
                     : 'Rest is part of learning. Come back tomorrow.'
                   : firstTime && plan.length > 1
-                    ? `About ${planMinutes(plan)} minutes. By the end of it you will have played your first tune.`
+                    ? `About ${planMinutes(plan)} minutes. By the end of it you will have played your first tune.${
+                        runsLong ? ` That is longer than your usual ${profile.minutes}, and only today. You can stop after the first part.` : ''
+                      }`
                     : `About ${planMinutes(plan)} minutes, in ${plan.length} ${plan.length === 1 ? 'part' : 'parts'}.`}
               </p>
             </div>
@@ -109,25 +121,28 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
             )}
           </div>
           <ol className="mt-5 space-y-2">
-            {plan.map((b, i) => (
-              <li key={`${b.kind}-${b.id}`}>
-                <button
-                  // A lesson that waits on the one before it opens in its turn, when the session reaches it.
-                  disabled={b.kind === 'lesson' && !lessonUnlocked(b.id, isDone)}
-                  onClick={() => onStart(b.kind === 'lesson' ? { kind: 'lesson', id: b.id } : b.kind === 'piece' ? { kind: 'piece', id: b.id, minutes: b.minutes } : { kind: 'drill', id: b.id })}
-                  className="flex w-full items-center gap-4 rounded-2xl bg-mc-bg px-4 py-3 text-left active:bg-mc-raised"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mc-surface text-mc-muted">{BLOCK_ICON[b.kind]}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">
-                      {i + 1}. {b.title}
+            {plan.map((b, i) => {
+              // A lesson that waits on the one before it opens in its turn, when the session reaches it.
+              const waits = b.kind === 'lesson' && !lessonUnlocked(b.id, isDone);
+              return (
+                <li key={`${b.kind}-${b.id}`}>
+                  <button
+                    disabled={waits}
+                    onClick={() => onStart(b.kind === 'lesson' ? { kind: 'lesson', id: b.id } : b.kind === 'piece' ? { kind: 'piece', id: b.id, minutes: b.minutes } : { kind: 'drill', id: b.id })}
+                    className="flex w-full items-center gap-4 rounded-2xl bg-mc-bg px-4 py-3 text-left active:bg-mc-raised"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mc-surface text-mc-muted">{waits ? <Icon.Lock size={18} /> : BLOCK_ICON[b.kind]}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">
+                        {i + 1}. {b.title}
+                      </span>
+                      <span className="block truncate text-sm text-mc-muted">{waits ? 'Follows on from the lesson before it' : b.detail}</span>
                     </span>
-                    <span className="block truncate text-sm text-mc-muted">{b.detail}</span>
-                  </span>
-                  <span className="shrink-0 text-sm tabular-nums text-mc-muted">{b.minutes} min</span>
-                </button>
-              </li>
-            ))}
+                    <span className="shrink-0 text-sm tabular-nums text-mc-muted">{b.minutes} min</span>
+                  </button>
+                </li>
+              );
+            })}
           </ol>
           {plan.length > 0 && (
             <Button size="lg" className="mt-6 w-full" onClick={() => onStart({ kind: 'session', blocks: plan })} icon={<Icon.Play size={20} />}>
@@ -139,8 +154,7 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
               <div className="min-w-0">
                 <div className="font-semibold">Want something new?</div>
                 <div className="text-sm leading-snug text-mc-muted">
-                  The course moves at one new lesson a day, because that is what holds best. The next is <span className="text-mc-ink">{getLesson(upNext).title}</span>, and
-                  taking it early is your call.
+                  {whyHeld} The next is <span className="text-mc-ink">{getLesson(upNext).title}</span>, and taking it now is your call.
                 </div>
               </div>
               <Button variant="soft" size="sm" className="shrink-0" onClick={() => onStart({ kind: 'lesson', id: upNext })}>

@@ -9,7 +9,7 @@ import { input } from '@/lib/piano/input/hub';
 import { midi } from '@/lib/piano/input/midi';
 import { getLesson, pieceInfo } from '@/lib/piano/content/catalog';
 import { pieceProgress } from '@/lib/piano/learn/coach';
-import { currentPiece, planSession, type Block } from '@/lib/piano/learn/planner';
+import { currentPiece, planDay, planSession, type Block } from '@/lib/piano/learn/planner';
 import { streak, usePiano } from '@/lib/piano/learn/store';
 import { dayKey } from '@/lib/piano/util/emitter';
 import Drill from './Drills';
@@ -52,8 +52,12 @@ function recap(before: ReturnType<typeof usePiano.getState>, parts: Block[]): Ar
     const was = before.pieces[b.id];
     const is = now.pieces[b.id];
     if (!is) continue;
+    // Only what was played in this session is spoken for. A piece that was opened and left alone says nothing.
+    const today = dayKey();
+    const played = is.lastOn === today && (was?.lastOn !== today || is.tasksToday > (was?.tasksToday ?? 0));
+    if (!played) continue;
     if (is.learned && !was?.learned) rows.push([info.title, 'Learned']);
-    else if (is.learned) rows.push([info.title, 'Still in your fingers']);
+    else if (is.learned) rows.push([info.title, is.wholeRung >= 3 ? 'Still in your fingers' : 'A little rusty, and coming back']);
     else {
       const from = Math.round(pieceProgress(info, was) * 100);
       const to = Math.round(pieceProgress(info, is) * 100);
@@ -68,10 +72,14 @@ function recap(before: ReturnType<typeof usePiano.getState>, parts: Block[]): Ar
 /** What tomorrow's session opens with, to give the next visit something to come back to. */
 function tomorrow(): string | null {
   const s = usePiano.getState();
-  const plan = planSession({ minutes: s.profile.minutes, lessons: s.lessons, pieces: s.pieces, cards: s.cards, days: s.days, drills: s.drills, now: new Date(Date.now() + 86400000) });
+  const day = planDay({ minutes: s.profile.minutes, lessons: s.lessons, pieces: s.pieces, cards: s.cards, days: s.days, drills: s.drills, now: new Date(Date.now() + 86400000) });
+  const plan = day.blocks;
   const first = plan.find((b) => b.kind === 'lesson') ?? plan.find((b) => b.kind === 'piece') ?? plan[0];
   if (!first) return null;
-  return first.kind === 'lesson' ? `Tomorrow brings a new lesson, ${first.title}.` : first.kind === 'piece' ? `Tomorrow carries on with ${first.title}.` : null;
+  if (first.kind === 'lesson') return `Tomorrow brings a new lesson, ${first.title}.`;
+  if (first.kind !== 'piece') return null;
+  // Where the next lesson is waiting on the pieces, say so, so that a day without one is no surprise.
+  return day.held === 'pieces' ? `Tomorrow carries on with ${first.title}. The next lesson comes when one of your pieces is learned.` : `Tomorrow carries on with ${first.title}.`;
 }
 
 /** Runs the parts of a daily session one after another. */
@@ -170,7 +178,7 @@ function SessionRunner({ blocks: planned, onClose }: { blocks: Block[]; onClose:
             ))}
           </div>
           <div className="flex gap-3">
-            <Button variant="ghost" size="lg" onClick={onClose}>
+            <Button variant="ghost" size="lg" onClick={onClose} hint={mode === 'midi' ? 'or the bottom key' : undefined}>
               Stop for today
             </Button>
             <Button size="lg" onClick={start} className="min-w-[220px]" hint={mode === 'midi' ? 'or the top key' : undefined}>

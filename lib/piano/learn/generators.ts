@@ -165,6 +165,8 @@ export interface ChordExercise {
   /** The chart shows scale steps, such as I, V, vi, IV, in place of letter names. */
   byNumber: boolean;
   key: string;
+  /** Which chords these are, so that the same four are not set twice running. */
+  id: string;
 }
 
 /** Progressions on the three main chords of a key, as scale steps. */
@@ -177,16 +179,18 @@ const PLAIN: number[][] = [
   [1, 5, 1, 4],
 ];
 
-/** Progressions that bring in the minor chords of the key. */
-const WITH_MINOR: number[][] = [
+/**
+ * Progressions that bring in the minor chord on the sixth step, which the
+ * lesson on minor chords teaches as A minor. The other minor chords of a key
+ * are left out: no lesson has shown how they are built.
+ */
+const WITH_SIX: number[][] = [
   [1, 5, 6, 4],
   [1, 6, 4, 5],
   [6, 4, 1, 5],
   [1, 4, 6, 5],
-  [2, 5, 1, 1],
-  [1, 6, 2, 5],
   [4, 1, 5, 6],
-  [1, 4, 2, 5],
+  [1, 6, 5, 4],
 ];
 
 interface ChordSpec {
@@ -197,18 +201,20 @@ interface ChordSpec {
 }
 
 /**
- * The ladder: whole chords, then the same chords broken into single notes,
- * in C, then with minor chords, then in other keys, and last from numbers alone.
+ * The ladder keeps to what the lessons have taught. The three main chords of
+ * C, whole and then broken. The same with A minor. Then, once the lesson on
+ * progressions has named chords by number and moved them to G: C by number,
+ * G by letter, G by number, and both keys by number, broken.
  */
 const CHORD_LADDER: ChordSpec[] = [
   { keys: ['C'], pool: PLAIN, style: 'block', byNumber: false },
   { keys: ['C'], pool: PLAIN, style: 'broken', byNumber: false },
-  { keys: ['C'], pool: WITH_MINOR, style: 'block', byNumber: false },
-  { keys: ['C'], pool: WITH_MINOR, style: 'broken', byNumber: false },
-  { keys: ['G', 'F'], pool: [...PLAIN, ...WITH_MINOR], style: 'block', byNumber: false },
-  { keys: ['G', 'F', 'D'], pool: [...PLAIN, ...WITH_MINOR], style: 'broken', byNumber: false },
-  { keys: ['C', 'G', 'F', 'D'], pool: WITH_MINOR, style: 'block', byNumber: true },
-  { keys: ['C', 'G', 'F', 'D'], pool: WITH_MINOR, style: 'broken', byNumber: true },
+  { keys: ['C'], pool: WITH_SIX, style: 'block', byNumber: false },
+  { keys: ['C'], pool: WITH_SIX, style: 'broken', byNumber: false },
+  { keys: ['C'], pool: [...PLAIN, ...WITH_SIX], style: 'block', byNumber: true },
+  { keys: ['G'], pool: [...PLAIN, ...WITH_SIX], style: 'block', byNumber: false },
+  { keys: ['G'], pool: [...PLAIN, ...WITH_SIX], style: 'block', byNumber: true },
+  { keys: ['C', 'G'], pool: WITH_SIX, style: 'broken', byNumber: true },
 ];
 
 export const CHORD_LEVELS = CHORD_LADDER.length;
@@ -216,17 +222,18 @@ export const CHORD_LEVELS = CHORD_LADDER.length;
 /** How far up the ladder the lessons taken so far reach. */
 export function chordLevelCap(done: (lessonId: string) => boolean): number {
   if (done('progressions')) return 8;
-  if (done('keys')) return 6;
   if (done('minor-chords')) return 4;
   return 2;
 }
 
-/** Four chords of a key, to be played from their symbols. */
-export function chordExercise(level: number, seed: number): ChordExercise {
+/** Four chords of a key, to be played from their symbols. `not` is the one just set, which is not set again. */
+export function chordExercise(level: number, seed: number, not?: string): ChordExercise {
   const spec = CHORD_LADDER[Math.max(0, Math.min(CHORD_LADDER.length - 1, level - 1))];
   const rnd = mulberry32(seed * 49979687 + level * 53);
   const key = pick(spec.keys, rnd);
-  const degrees = pick(spec.pool, rnd);
+  let degrees = pick(spec.pool, rnd);
+  const idOf = (d: number[]) => `${key}:${d.join('-')}:${spec.style}`;
+  if (not !== undefined && idOf(degrees) === not) degrees = spec.pool[(spec.pool.indexOf(degrees) + 1) % spec.pool.length];
   const triads = diatonicTriads(key, 4);
   const measures: string[] = [];
   const symbols: string[] = [];
@@ -243,6 +250,7 @@ export function chordExercise(level: number, seed: number): ChordExercise {
     style: spec.style,
     byNumber: spec.byNumber,
     key,
+    id: idOf(degrees),
   };
 }
 

@@ -188,13 +188,13 @@ export const STAGE5: Lesson[] = [
     id: 'broken-chords',
     stage: 5,
     title: 'Chords in motion',
-    summary: 'Arpeggios and the rocking left hand of classical music.',
+    summary: 'Broken chords and the rocking left hand of classical music.',
     minutes: 10,
     steps: [
       {
         kind: 'say',
         title: 'One note at a time',
-        text: 'A chord played one note after another is an **arpeggio**. It gives harmony and movement at once.\n\nA very common left hand shape plays the notes of a chord in the order **bottom, top, middle, top**. It keeps a gentle rocking motion going under a tune.',
+        text: 'You have played a **broken chord** from chord symbols: the notes of a chord one after another, in place of all together. It gives harmony and movement at once.\n\nA very common left hand shape breaks the chord in the order **bottom, top, middle, top**. It keeps a gentle rocking motion going under a tune.',
       },
       {
         kind: 'play',
@@ -224,22 +224,16 @@ export const STAGE5: Lesson[] = [
         hints: 'delay',
       },
       {
-        kind: 'play',
-        text: 'A right hand arpeggio, reaching across an octave. Fingers 1, 2, 3 and 5.',
-        music: { rh: 'C4q:1 E4q:2 G4q:3 C5q:5 | G4q:3 E4q:2 C4h:1', tempo: 80 },
-        hints: 'always',
-      },
-      {
         kind: 'quiz',
-        question: 'What is an arpeggio?',
-        choices: ['A chord played one note at a time', 'A very fast scale', 'Two notes a step apart'],
+        question: 'In the rocking left hand, in what order do the notes of the chord come?',
+        choices: ['Bottom, top, middle, top', 'Bottom, middle, top, middle', 'Top, middle, bottom, middle'],
         answer: 0,
-        explain: 'The notes of a chord, spread out in time.',
+        explain: 'Bottom, top, middle, top. The top note comes back between the other two, and that is what makes it rock.',
       },
       {
         kind: 'say',
-        title: 'Next, the arpeggio travels',
-        text: 'The rocking left hand keeps a chord moving while staying in one place. In the next lesson the arpeggio leaves home and runs up and down the keyboard, in one hand and then in both.',
+        title: 'Next, the chord travels',
+        text: 'The rocking left hand keeps a chord moving while the hand stays in one place. In the next lesson the chord leaves home. Played as an **arpeggio**, it runs up and down the keyboard, in one hand and then in both.',
       },
     ],
   },
@@ -259,7 +253,7 @@ export const STAGE5: Lesson[] = [
       },
       {
         kind: 'play',
-        text: 'Up and back down. Every note the same length, the same loudness.',
+        text: 'Up and back down. Keep it even, each note as loud as the one before.',
         music: { rh: 'C4q:1 E4q:2 G4q:3 C5q:5 | G4q:3 E4q:2 C4h:1', tempo: 80 },
         hints: 'delay',
         passes: 2,
@@ -295,7 +289,7 @@ export const STAGE5: Lesson[] = [
       {
         kind: 'say',
         title: 'From one hand to the other',
-        text: 'Here is the arpeggio that makes a piano sound grand. The left hand plays the three notes of the chord, and the right hand carries straight on with the next four, as if one very large hand were playing.\n\nPut the right pedal down first, so that every note rings on. Aim for a join between the hands that nobody could hear.',
+        text: 'Here is the arpeggio that makes a piano sound grand. The left hand plays the three notes of the chord, and the right hand carries straight on with the next four, as if one very large hand were playing.\n\nPut the right pedal down first, so that every note rings on. Aim for a join between the hands that nobody could hear.\n\nTwo rests on the page may be new. A rest lasts as long as the note it is named after. The **eighth rest** lasts half a beat, and the **dotted quarter rest** a beat and a half. Each hand simply waits while the other plays.',
       },
       {
         kind: 'play',

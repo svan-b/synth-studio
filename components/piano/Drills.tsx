@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { piano } from '@/lib/piano/audio/engine';
 import { instrument } from '@/lib/piano/audio/instrument';
-import type { FlowResult } from '@/lib/piano/engine/flow';
+import { notAttempted, type FlowResult } from '@/lib/piano/engine/flow';
 import { noteBus } from '@/lib/piano/input/bus';
 import { input, isRemoteKey } from '@/lib/piano/input/hub';
 import {
@@ -207,6 +207,12 @@ type Generated = 'rhythm' | 'ear' | 'sight' | 'chords' | 'technique';
 
 const CHORD_KEYS = { low: 48, high: 84 };
 
+/** How long a reply stays up before the next item comes, in milliseconds. Long enough to read, and longer after a miss. */
+function staysFor(text: string, ok: boolean): number {
+  const reading = 900 + text.length * 45;
+  return Math.min(6500, Math.max(ok ? 1800 : 3200, reading));
+}
+
 interface Round {
   kind: Generated;
   title: string;
@@ -251,9 +257,12 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => voi
     [],
   );
 
+  // The chords set for each item so far, so that the same four do not come twice running.
+  const chordIds = useRef<Record<number, string>>({});
   const { score, chord, named } = useMemo(() => {
     const seed = seedBase.current + index * 13;
-    const made: ChordExercise | null = kind === 'chords' ? chordExercise(level, seed) : null;
+    const made: ChordExercise | null = kind === 'chords' ? chordExercise(level, seed, chordIds.current[index - 1]) : null;
+    if (made) chordIds.current[index] = made.id;
     const run = kind === 'technique' ? techniqueExercise(level, seed) : null;
     const music = made
       ? made.music
@@ -342,66 +351,80 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => voi
       if (kind === 'chords') {
         const ok = result.clean;
         adapt(ok);
-        setNote({
-          ok,
-          text: ok
-            ? 'Yes. Every chord found first time.'
-            : result.hintedSteps > 0
+        const shown = result.hintedSteps;
+        const wrong = result.wrongNotes;
+        const text = ok
+          ? 'Yes. Every chord found first time.'
+          : shown > 0
+            ? shown === 1
               ? 'One of them had to be shown. It will come round again.'
-              : 'A wrong key or two on the way. Picture the shape before you press.',
-        });
-        timer.current = setTimeout(advance, ok ? 1500 : 3000);
+              : `${shown} of them had to be shown. They will come round again.`
+            : `${wrong === 1 ? 'One wrong key' : `${wrong} wrong keys`} on the way. Picture the shape before you press.`;
+        setNote({ ok, text });
+        timer.current = setTimeout(advance, staysFor(text, ok));
         return;
       }
       // A run in which nothing was played is not an attempt, and changes nothing.
-      if (result.correctNotes === 0 && result.wrongNotes === 0) {
+      if (notAttempted(result)) {
         setNote(null);
         if (kind === 'sight') setPhase('look');
         setRun((r) => r + 1);
         return;
       }
       if (kind === 'technique') {
-        const ok = result.accuracy >= 0.9 && result.onTime >= 0.7;
+        // A scale with a note missing, or a wrong key in it, is not yet the scale. Heard by ear, one slip may be the microphone's.
+        const missed = result.missedNotes;
+        const wrong = result.wrongNotes;
+        const whole = missed + wrong <= (result.byEar ? 1 : 0);
+        const ok = whole && result.onTime >= 0.7;
         adapt(ok);
         // How even the run was, from how far its notes strayed from one another around the beat.
-        const spread = evenness(result.detail.filter((d) => d.errMs !== undefined).map((d) => d.errMs as number));
-        setNote({
-          ok,
-          text: ok
-            ? spread !== null && spread <= 28
-              ? 'Even and steady, every note the same length. That is the sound to aim for.'
-              : 'Right notes, in time. Now listen for an even run, every note the same length.'
-            : result.accuracy < 0.9
-              ? 'Some notes went astray. Take it slower in your head and follow the finger numbers.'
-              : result.biasMs > 25
-                ? 'The notes were right but behind the beat. Land with the click.'
-                : result.biasMs < -25
-                  ? 'The notes were right but ahead of the beat. Let the click lead you.'
-                  : 'The notes were right but uneven. Feel each click and fit the notes to it.',
-        });
-        timer.current = setTimeout(advance, ok ? 2200 : 3400);
+        const timed = result.detail.filter((d) => d.errMs !== undefined);
+        const spread = evenness(timed.map((d) => d.errMs as number));
+        // How long the keys stayed down, as a share of each note. A run should join up, not peck.
+        const holds = result.detail.filter((d) => d.held !== undefined).map((d) => d.held as number);
+        const joined = holds.length >= 4 ? holds.reduce((a, h) => a + h, 0) / holds.length : null;
+        const text = ok
+          ? joined !== null && joined < 0.45
+            ? 'Right notes, in time, but short and detached. Hold each key until the next one goes down.'
+            : result.biasMs > 70
+              ? 'Even, and a little behind the beat throughout. Land with the click, not after it.'
+              : result.biasMs < -70
+                ? 'Even, and a little ahead of the beat throughout. Let the click lead you.'
+                : spread !== null && spread <= 28
+                  ? 'Even and steady, each note flowing into the next. That is the sound to aim for.'
+                  : 'Right notes, in time. Now make the run even, so that no note comes early or late.'
+          : !whole
+            ? missed > 0
+              ? `${missed === 1 ? 'One note was' : `${missed} notes were`} left out. Every note of the run counts, so follow the finger numbers through.`
+              : `${wrong === 1 ? 'One wrong key' : `${wrong} wrong keys`} on the way. Picture where the hand goes next, and follow the finger numbers.`
+            : result.biasMs > 25
+              ? 'The notes were right but behind the beat. Land with the click.'
+              : result.biasMs < -25
+                ? 'The notes were right but ahead of the beat. Let the click lead you.'
+                : 'The notes were right but uneven. Feel each click and fit the notes to it.';
+        setNote({ ok, text });
+        timer.current = setTimeout(advance, staysFor(text, ok));
         return;
       }
       const ok = kind === 'rhythm' ? result.accuracy >= 0.85 && result.onTime >= 0.65 : result.accuracy >= 0.85;
       adapt(ok);
       const pct = Math.round(result.accuracy * 100);
-      setNote({
-        ok,
-        text: ok
-          ? kind === 'rhythm'
-            ? `Steady. ${Math.round(result.onTime * 100)} percent on the beat.`
-            : `${pct} percent, and you kept going.`
-          : kind === 'rhythm'
-            ? result.onTime >= 0.65
-              ? 'The beat was steady, but some notes were missing or extra. Count each beat and hold the long notes for their full length.'
-              : result.biasMs > 25
-                ? 'A little behind the beat. Listen for the click and land with it.'
-                : result.biasMs < -25
-                  ? 'A little ahead of the beat. Let the click lead you.'
-                  : 'Uneven against the beat. Count along with the click.'
-            : `${pct} percent. Reading at sight is about keeping going, so never stop to fix a note.`,
-      });
-      timer.current = setTimeout(advance, ok ? 2000 : 3200);
+      const text = ok
+        ? kind === 'rhythm'
+          ? `Steady. ${Math.round(result.onTime * 100)} percent on the beat.`
+          : `${pct} percent, and you kept going.`
+        : kind === 'rhythm'
+          ? result.onTime >= 0.65
+            ? 'The beat was steady, but some notes were missing or extra. Count each beat and hold the long notes for their full length.'
+            : result.biasMs > 25
+              ? 'A little behind the beat. Listen for the click and land with it.'
+              : result.biasMs < -25
+                ? 'A little ahead of the beat. Let the click lead you.'
+                : 'Uneven against the beat. Count along with the click.'
+          : `${pct} percent. Reading at sight is about keeping going, so never stop to fix a note.`;
+      setNote({ ok, text });
+      timer.current = setTimeout(advance, staysFor(text, ok));
     },
     [adapt, advance, hear, kind, phase, tries],
   );
@@ -427,11 +450,11 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => voi
     kind === 'chords'
       ? `${chord?.byNumber ? `In the key of **${chord.key}**. ` : ''}${
           chord?.style === 'broken'
-            ? 'Play each chord one note at a time, from the note it is named after: bottom, middle, top, middle.'
-            : 'Play each chord, all three notes together. Any position on the keyboard will do.'
+            ? '**One note at a time.** Play each chord from the note it is named after: bottom, middle, top, middle.'
+            : '**All three notes together.** Any position on the keyboard will do.'
         }`
       : kind === 'technique'
-        ? `${named ?? 'A scale'}. Play it with the beat, every note the same length.`
+        ? `${named ?? 'A scale'}. Play it with the beat, smooth and even.`
         : kind === 'rhythm'
           ? 'Tap this rhythm in time with the clicks, on any key.'
           : kind === 'ear'
@@ -474,7 +497,9 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => voi
               display={kind === 'ear' ? 'hidden' : kind === 'chords' ? 'chart' : 'staff'}
               // A chord not found in a while is shown, so nobody is left stuck. It then counts as shown.
               hints={kind === 'chords' ? 'delay' : 'never'}
-              hintMs={kind === 'chords' ? 7000 : undefined}
+              // Working a chord out from its symbol takes a while. The first one counts like the rest.
+              hintMs={kind === 'chords' ? 12000 : undefined}
+              countFirstHint={kind === 'chords'}
               anyOctave={kind === 'chords'}
               // Chords may be played anywhere, so three octaves of keys are shown to mirror them.
               keys={kind === 'chords' ? CHORD_KEYS : undefined}

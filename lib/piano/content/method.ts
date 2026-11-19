@@ -73,14 +73,15 @@ export const PRINCIPLES: Principle[] = [
   },
   {
     title: 'One new thing at a time',
-    what: 'A session brings one new lesson, and then goes back to pieces you are already learning. The first day is the one exception, because the first lesson has no music in it. You can take the next lesson early if you want to, and the app says plainly that it is your call.',
-    evidence: 'In one study, learning a second melody straight after the first wiped out the overnight gain on the first, unless the first was played again before stopping.',
+    what: 'A session brings one new lesson at most, and then goes back to pieces you are already learning. The next lesson waits while two pieces are still being learned, so that what a lesson teaches is played before more is added, and with little time lessons and pieces take the days in turn. The first day is the one exception, because the first lesson has no music in it. You can take the next lesson early if you want to, and the app says plainly that it is your call.',
+    evidence:
+      'In one study, learning a second melody straight after the first wiped out the overnight gain on the first, unless the first was played again before stopping. Moving on only once the last thing is secure raised results in a review of 108 controlled studies, though those were school and college courses, not music.',
     strength: 'limited',
-    sources: ['Allen, 2013, Psychology of Music'],
+    sources: ['Allen, 2013, Psychology of Music', 'Kulik, Kulik and Bangert-Drowns, 1990, Review of Educational Research'],
   },
   {
     title: 'Help that fades',
-    what: 'The key to press lights up only after a pause or two wrong tries. Fingering and note names appear early and are withdrawn later.',
+    what: 'The key to press lights up only after a long pause or two wrong tries, and a pause to think is not counted as a mistake. Fingering and note names appear early and are withdrawn later.',
     evidence:
       'The old claim that constant guidance harms learning is weaker than textbooks say, and guidance helps beginners with complex tasks. What does look useful is guidance that fades as skill grows. A recent piano study found it beat fixed guidance when the help was taken away.',
     strength: 'limited',
