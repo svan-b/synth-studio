@@ -375,6 +375,17 @@ describe('practice coach', () => {
     expect(again.state.wholeRung).toBe(1);
   });
 
+  it('says how many notes were missing when they were missing here and there', () => {
+    const state = begun();
+    state.sections[0].rung = 4;
+    // Every fourth note left out, in both hands, so no one place and no one hand stands out.
+    const right = timed(new Array(16).fill(0)).map((d, i) => (i % 4 === 3 ? { ...d, state: 'missed' as const, errMs: undefined } : d));
+    const left = timed(new Array(8).fill(0), { hand: 'L', step: 2, dur: 2 }).map((d, i) => (i % 4 === 3 ? { ...d, state: 'missed' as const, errMs: undefined } : d));
+    const out = applyResult(info, state, nextTask(info, state)!, result({ mode: 'tempo', hands: ['R', 'L'], accuracy: 0.75, onTime: 1, clean: false, missedNotes: 6, detail: [...right, ...left] }));
+    expect(out.verdict.passed).toBe(false);
+    expect(out.verdict.message).toBe('6 notes were left out, here and there. Try again, and keep the pulse going through any slip.');
+  });
+
   it('does not claim a first try after a stumble', () => {
     const state = begun();
     state.sections[0] = { rung: 3, streak: 0, fails: 1 };

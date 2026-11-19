@@ -772,7 +772,11 @@ export function applyResult(
               : result.biasMs < -40
                 ? 'The notes were right but ahead of the beat. Let the click lead.'
                 : 'The notes were right, but some came early and some late. Feel each click and fit the notes to it.'
-            : 'Close. Try again, and keep the pulse going through any slip.';
+            : result.missedNotes >= 3 && result.missedNotes >= result.wrongNotes
+              ? `${result.missedNotes} notes were left out, here and there. Try again, and keep the pulse going through any slip.`
+              : result.wrongNotes >= 3
+                ? `${result.wrongNotes} wrong keys, here and there. Try again, and keep the pulse going through any slip.`
+                : 'Close. Try again, and keep the pulse going through any slip.';
       }
     }
     return { state: next, verdict: { passed: ok, message, learned, aside } };

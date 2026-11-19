@@ -82,12 +82,19 @@ class PianoEngine {
     return this.master;
   }
 
+  /**
+   * Seconds between the app scheduling a sound and the learner hearing it. A
+   * browser can report nothing until sound has flowed for a moment, so the
+   * last figure it gave is kept and used while it reports none.
+   */
   outputLatency(): number {
     if (!this.ctx) return 0;
     const c = this.ctx as AudioContext & { outputLatency?: number };
     const lat = (c.outputLatency ?? 0) + (c.baseLatency ?? 0);
-    return Number.isFinite(lat) ? clamp(lat, 0, 0.25) : 0;
+    if (Number.isFinite(lat) && lat > 0) this.knownLatency = clamp(lat, 0, 0.25);
+    return this.knownLatency;
   }
+  private knownLatency = 0;
 
   /**
    * Must be called from a user gesture (a tap). Creates and resumes the audio

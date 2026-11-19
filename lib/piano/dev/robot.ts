@@ -76,7 +76,7 @@ export async function playCurrent(opts: RobotOptions = {}): Promise<string> {
   } else {
     await waitFor(() => session.phase !== 'ready', 4000);
     const notes = session.steps.flatMap((s) => s.notes);
-    const delay = piano.outputLatency() + session.latencyFor('midi') + (opts.offsetMs ?? 0) / 1000;
+    const delay = session.outputDelay + session.latencyFor('midi') + (opts.offsetMs ?? 0) / 1000;
     notes.forEach((n, i) => {
       if (opts.missEvery && (i + 1) % opts.missEvery === 0) return;
       const at = session.targetTime(n) + delay;

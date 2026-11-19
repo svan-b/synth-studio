@@ -313,6 +313,30 @@ describe('flow, wait mode', () => {
     expect(events.filter((e) => e.type === 'note').map((e) => (e as { midi: number }).midi)).toEqual([76, 74, 72, 76, 74, 72]);
   });
 
+  it('reads no octaves into what a microphone reports', () => {
+    const score = parseScore({ rh: 'E4q D4q C4h' });
+    // A microphone can hear a note an octave out by itself. That is a wrong note to it, with nothing said about octaves.
+    const plain = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity });
+    const first = run(plain);
+    press(64, 'mic');
+    vi.advanceTimersByTime(600);
+    press(74, 'mic');
+    expect(first.events.filter((e) => e.type === 'wrong')).toEqual([{ type: 'wrong', midi: 74 }]);
+    expect(first.events.some((e) => e.type === 'hint')).toBe(false);
+    plain.stop();
+    // And a first play through is not followed to another octave on its word.
+    const trial = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity, followOctave: true });
+    const second = run(trial);
+    press(76, 'mic');
+    vi.advanceTimersByTime(600);
+    [64, 62, 60].forEach((m) => {
+      press(m, 'mic');
+      vi.advanceTimersByTime(600);
+    });
+    expect(second.result()!.octaveShift).toBe(0);
+    expect(second.result()!.wrongNotes).toBe(1);
+  });
+
   it('does not follow into another octave unless asked, or when the first key is simply wrong', () => {
     const score = parseScore({ rh: 'E4q D4q C4h' });
     const plain = new FlowSession(score, { mode: 'wait', hands: ['R'], hintDelayMs: Infinity });
@@ -508,6 +532,28 @@ describe('flow, tempo mode', () => {
     const pulses = events.filter((e) => e.type === 'pulse') as Array<{ countIn: boolean; number: number; accent: boolean }>;
     expect(pulses.filter((p) => p.countIn).map((p) => p.number)).toEqual([1, 2, 3, 4]);
     expect(pulses[0].accent).toBe(true);
+  });
+
+  it('judges a whole run against one figure for the delay of its own sound', () => {
+    const score = parseScore({ rh: 'C4q D4q E4q F4q | G4w', tempo: 120 });
+    // The browser says its sound takes 20 ms to be heard when the run starts.
+    const delay = vi.spyOn(piano, 'outputLatency').mockReturnValue(0.02);
+    const s = new FlowSession(score, { mode: 'tempo', hands: ['R'], bpm: 120 });
+    const t0 = performance.now() / 1000;
+    const { result } = run(s);
+    expect(s.outputDelay).toBe(0.02);
+    [60, 62].forEach((m, i) => playAt(s, t0, 120, 4, i, m, 0.02));
+    // Part way through it changes its mind. The playing has not changed, and must not seem to.
+    delay.mockReturnValue(0.062);
+    [64, 65].forEach((m, i) => playAt(s, t0, 120, 4, i + 2, m, 0.02));
+    playAt(s, t0, 120, 4, 4, 67, 0.02);
+    vi.advanceTimersByTime(4000);
+    const r = result()!;
+    expect(r.correctNotes).toBe(5);
+    const errs = r.detail.map((d) => d.errMs as number);
+    expect(Math.max(...errs) - Math.min(...errs)).toBeLessThan(8);
+    expect(Math.abs(r.biasMs)).toBeLessThan(8);
+    delay.mockRestore();
   });
 
   it('stops a run that the learner begins to play during the count in', () => {

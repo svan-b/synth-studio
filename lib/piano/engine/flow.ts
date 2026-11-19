@@ -217,6 +217,12 @@ export class FlowSession {
 
   private byEar = false;
   private cutShort = false;
+  /**
+   * The delay of the app's own sound, read once when the run starts. A browser
+   * can change the figure it reports while sound is playing, and a run judged
+   * against two different figures would seem to rush or drag part way through.
+   */
+  private soundDelay = 0;
   private offPedal: (() => void) | null = null;
 
   // what was played, for hearing it back
@@ -317,6 +323,7 @@ export class FlowSession {
       this.takePedal.push([round3(ev.time - this.takeStart), state]);
     });
     this.startedAt = piano.now();
+    this.soundDelay = piano.outputLatency();
     activeFlow.current = this;
     if (this.steps.length === 0) {
       this.finish();
@@ -338,9 +345,14 @@ export class FlowSession {
     return this.transport.timeOfBeat(note.start);
   }
 
-  /** Seconds of delay assumed for an input source. */
+  /** Seconds of delay assumed for an input source, with the delay of the app's own sound as this run reads it. */
   latencyFor(source: NoteSource): number {
     return this.options.latency[source];
+  }
+
+  /** The delay of the app's own sound that this run is judged against. */
+  get outputDelay(): number {
+    return this.soundDelay;
   }
 
   private cleanup(): void {
@@ -389,7 +401,7 @@ export class FlowSession {
   /** When a key press is taken to have happened, on the clock the take is kept in. */
   private heardAt(ev: NoteInput): number {
     // With a beat, the delay of the input is taken off, as it is for judging.
-    return this.options.mode === 'tempo' ? ev.time - piano.outputLatency() - this.options.latency[ev.source] : ev.time;
+    return this.options.mode === 'tempo' ? ev.time - this.soundDelay - this.options.latency[ev.source] : ev.time;
   }
 
   private keyDown(ev: NoteInput, noteId: string | null): void {
@@ -516,9 +528,11 @@ export class FlowSession {
    * octave. If it is the first note of the music one or more octaves away,
    * the rest of the run is followed there.
    */
-  private settleOctave(key: number): void {
+  private settleOctave(key: number, source: NoteSource): void {
     if (this.shiftSettled || !this.options.followOctave || this.stepIndex !== 0) return;
     this.shiftSettled = true;
+    // A microphone can mishear a note by an octave, so it is not followed anywhere on its word.
+    if (source === 'mic') return;
     const first = this.steps[0].notes;
     if (first.some((n) => n.midi === key)) return;
     const away = first.map((n) => key - n.midi).find((d) => d !== 0 && d % 12 === 0 && Math.abs(d) <= 36);
@@ -526,7 +540,7 @@ export class FlowSession {
   }
 
   private waitInput(ev: NoteInput): void {
-    this.settleOctave(ev.midi);
+    this.settleOctave(ev.midi, ev.source);
     const step = this.steps[this.stepIndex];
     const match = step.notes.find((n) => this.pending.has(n.id) && this.fits(n, ev.midi));
     if (match) {
@@ -560,7 +574,8 @@ export class FlowSession {
     const nearest = (wanted.length > 0 ? wanted : step.notes).reduce((a, n) => (Math.abs(n.midi + this.shift - ev.midi) < Math.abs(a.midi + this.shift - ev.midi) ? n : a));
     this.wrongPresses.push({ measure: step.measure + this.score.measureOffset, midi: ev.midi, expected: step.notes.map((n) => n.midi), hand: nearest.hand });
     // The right note in the wrong octave is its own kind of slip: the learner knows the note and has the wrong place.
-    const away = wanted.map((n) => ev.midi - (n.midi + this.shift)).find((d) => d !== 0 && d % 12 === 0);
+    // Not on a microphone's word, which can be an octave out by itself.
+    const away = ev.source === 'mic' ? undefined : wanted.map((n) => ev.midi - (n.midi + this.shift)).find((d) => d !== 0 && d % 12 === 0);
     this.events.emit(away === undefined ? { type: 'wrong', midi: ev.midi } : { type: 'wrong', midi: ev.midi, octave: away > 0 ? 'high' : 'low' });
     // So the key is shown at once, and not only after a second try.
     if (away !== undefined || this.stepWrong >= this.options.hintAfterWrong) this.revealHint();
@@ -694,7 +709,7 @@ export class FlowSession {
   }
 
   private tempoInput(ev: NoteInput): void {
-    const t = ev.time - piano.outputLatency() - this.options.latency[ev.source];
+    const t = ev.time - this.soundDelay - this.options.latency[ev.source];
     // A microphone may report one strike twice in quick succession.
     const last = this.lastOn.get(ev.midi);
     if (ev.source === 'mic' && last !== undefined && ev.time - last < 0.09) return;
@@ -728,7 +743,7 @@ export class FlowSession {
 
   private sweepMissed(): void {
     if (this.phase !== 'playing') return;
-    const now = piano.now() - piano.outputLatency();
+    const now = piano.now() - this.soundDelay;
     for (const n of this.notes) {
       if (this.matched.has(n.id) || this.missed.has(n.id)) continue;
       if (this.transport.timeOfBeat(n.start) + this.matchWindow + 0.3 < now) {
