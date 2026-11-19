@@ -209,7 +209,8 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      {/* During setup, once the piano is connected there is nothing left to choose. The other ways stay in Settings. */}
+      <div className={`grid gap-3 sm:grid-cols-2 ${compact && mode === 'midi' ? 'hidden' : ''}`}>
         {native && (
           <button onClick={() => pairBluetooth()} className="rounded-2xl border border-mc-line bg-mc-surface p-5 text-left active:bg-mc-raised">
             <div className="flex items-center gap-2 font-semibold">
