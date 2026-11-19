@@ -23,7 +23,7 @@ final class AppFiles: NSObject, WKURLSchemeHandler {
             respond(task, url: url, status: 404, type: "text/plain; charset=utf-8", data: Data("Not found".utf8))
             return
         }
-        respond(task, url: url, status: 200, type: Self.type(of: file), data: data)
+        respond(task, url: url, status: 200, type: Self.kind(of: file), data: data)
     }
 
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {
@@ -63,7 +63,8 @@ final class AppFiles: NSObject, WKURLSchemeHandler {
         return nil
     }
 
-    private static func type(of file: URL) -> String {
+    /// The content type a browser expects for a file, from its extension.
+    private static func kind(of file: URL) -> String {
         switch file.pathExtension.lowercased() {
         case "html": return "text/html; charset=utf-8"
         case "js", "mjs": return "text/javascript; charset=utf-8"

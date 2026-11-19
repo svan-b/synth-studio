@@ -78,6 +78,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     @objc private func broughtBack() {
         UIApplication.shared.isIdleTimerDisabled = true
         piano.rescan()
+        // Sound stops when the app is put away. Start it again without waiting for a tap.
+        webView?.evaluateJavaScript("window.__middleC && __middleC.wake && __middleC.wake();", completionHandler: nil)
     }
 
     // MARK: - Opening the web app

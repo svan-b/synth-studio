@@ -30,7 +30,7 @@ final class PianoLink {
 
     init() {
         var base = mach_timebase_info_data_t()
-        mach_timebase_info(&base)
+        _ = mach_timebase_info(&base)
         nanosPerTick = base.denom == 0 ? 1 : Double(base.numer) / Double(base.denom)
     }
 
@@ -45,7 +45,7 @@ final class PianoLink {
         let listen = MIDIInputPortCreateWithProtocol(client, "Middle C in" as CFString, ._1_0, &inPort) { [weak self] events, source in
             self?.receive(events, source)
         }
-        MIDIOutputPortCreate(client, "Middle C out" as CFString, &outPort)
+        _ = MIDIOutputPortCreate(client, "Middle C out" as CFString, &outPort)
         rescan()
         return listen == noErr
     }
@@ -67,7 +67,7 @@ final class PianoLink {
             found.append(Port(id: "in:\(source)", name: name(of: source), kind: "input"))
         }
         for gone in listening.subtracting(live) {
-            MIDIPortDisconnectSource(inPort, gone)
+            _ = MIDIPortDisconnectSource(inPort, gone)
             listening.remove(gone)
         }
         destinations.removeAll()
@@ -94,7 +94,7 @@ final class PianoLink {
             when = mach_absolute_time() + UInt64(delayMs * 1_000_000 / nanosPerTick)
         }
         _ = MIDIPacketListAdd(&list, MemoryLayout<MIDIPacketList>.size, first, when, bytes.count, bytes)
-        MIDISend(outPort, destination, &list)
+        _ = MIDISend(outPort, destination, &list)
     }
 
     // MARK: - Incoming
@@ -166,7 +166,7 @@ final class PianoLink {
 
     private func usable(_ endpoint: MIDIEndpointRef) -> Bool {
         var offline: Int32 = 0
-        MIDIObjectGetIntegerProperty(endpoint, kMIDIPropertyOffline, &offline)
+        _ = MIDIObjectGetIntegerProperty(endpoint, kMIDIPropertyOffline, &offline)
         if offline != 0 { return false }
         // The iPad always lists its network session, which is not a piano.
         let label = name(of: endpoint).lowercased()
@@ -202,7 +202,7 @@ final class PianoLink {
         var list = MIDIEventList()
         let first = MIDIEventListInit(&list, ._1_0)
         _ = MIDIEventListAdd(&list, MemoryLayout<MIDIEventList>.size, first, 0, 1, [word])
-        MIDIReceivedEventList(testSource, &list)
+        _ = MIDIReceivedEventList(testSource, &list)
     }
 
     /// Pass bytes on as though an instrument had sent them. Used where a pretend piano cannot be made.

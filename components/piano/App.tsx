@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { piano } from '@/lib/piano/audio/engine';
-import { isNative } from '@/lib/piano/native/bridge';
+import { isNative, onWake } from '@/lib/piano/native/bridge';
 import { instrument } from '@/lib/piano/audio/instrument';
 import { noteBus } from '@/lib/piano/input/bus';
 import { input } from '@/lib/piano/input/hub';
@@ -133,8 +133,17 @@ export default function App() {
 
   // The iPad app has MIDI built in and needs no permission, so it looks for
   // the piano as soon as it opens and keeps looking.
+  // It may also start its sound without a tap, so sound is ready before the
+  // first key is played, and again each time the app comes back to the front.
   useEffect(() => {
-    if (isNative()) void midi.connect();
+    if (!isNative()) return;
+    void midi.connect();
+    void piano.unlock();
+    onWake(() => void piano.unlock());
+    // Hands may never touch the screen. A key played on the piano wakes the sound too.
+    return noteBus.subscribe((ev) => {
+      if (ev.type === 'on' && ev.source === 'midi') void piano.unlock();
+    });
   }, []);
 
   // Once a piano has been connected by hand, later visits reconnect to it by

@@ -44,12 +44,14 @@ final class SelfTest {
     func heard(_ body: [String: Any]) {
         guard let stage = body["stage"] as? String else { return }
         if stage == "page" {
-            report["page"] = body["result"] ?? [:]
-            say("PAGE \(Self.text(body["result"] ?? [:]))")
+            let result: Any = body["result"] ?? [String: Any]()
+            report["page"] = result
+            say("PAGE \(Self.text(result))")
             playPiano()
         } else if stage == "midi" {
-            report["midi"] = body["result"] ?? [:]
-            say("MIDI \(Self.text(body["result"] ?? [:]))")
+            let result: Any = body["result"] ?? [String: Any]()
+            report["midi"] = result
+            say("MIDI \(Self.text(result))")
             finish(note: nil)
         }
     }

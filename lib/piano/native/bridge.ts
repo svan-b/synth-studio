@@ -17,6 +17,8 @@ interface NativeApp {
   /** Progress as last written to the app's own file, by storage key, with when it was written. */
   saved?: Record<string, { value: string; at: number }>;
   post?: (message: Record<string, unknown>) => void;
+  /** Called by the app when it is brought back to the front. */
+  wake?: () => void;
 }
 
 function shell(): NativeApp | null {
@@ -56,6 +58,12 @@ export function saveCopy(key: string, value: string, at: number): void {
   if (!app.saved) app.saved = {};
   app.saved[key] = { value, at };
   post({ type: 'store.save', key, value, at });
+}
+
+/** Have the app call this each time it comes back to the front. */
+export function onWake(fn: () => void): void {
+  const app = shell();
+  if (app) app.wake = fn;
 }
 
 /** Hand a backup to the iPad's share sheet: Files, AirDrop, Mail. */

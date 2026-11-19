@@ -12,9 +12,15 @@ A piano teacher that runs on an iPad on the music stand. It lives at `/piano` in
 - **Hands on the keys.** The top key of the piano means continue and the bottom key means again. With a three pedal unit the middle and left pedals do the same.
 - **The method page** in the app sets out each teaching choice and how strong the evidence for it is.
 
-## Connecting a digital piano
+## The iPad app
 
-Safari on iPad has no MIDI support, and neither does any iPad browser built on it. There are three ways to connect.
+`ios/` holds a native iPad app that carries the piano teacher inside it. It needs no connection, reads the piano over the iPad's own MIDI by USB cable or Bluetooth, keeps progress in a file of its own with a dated copy in the Files app, and holds the whole screen awake on the music stand. This is the way to use Middle C on an iPad. `ios/README.md` has the steps for putting it on an iPad from a Mac.
+
+The web app does not know or care which of the two it is running in, with one exception: `lib/piano/native/bridge.ts` asks the shell for the few things only the shell can do.
+
+## Connecting a digital piano in a browser
+
+Safari on iPad has no MIDI support, and neither does any iPad browser built on it. Outside the iPad app there are three ways to connect.
 
 | Route | What you need | Result |
 | --- | --- | --- |
@@ -50,6 +56,8 @@ lib/piano/dsp/             note detection from audio
 lib/piano/engine/          the score follower (wait and tempo modes)
 lib/piano/learn/           progress store, spaced review, coach, planner, generators
 lib/piano/content/         lessons, pieces, the method
+lib/piano/native/          the few calls into the iPad app
+ios/                       the iPad app: web view shell, MIDI, progress file
 public/piano/              piano samples, icons, manifest, audio worklet
 public/piano-sw.js         offline cache
 ```
