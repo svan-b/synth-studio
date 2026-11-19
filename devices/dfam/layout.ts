@@ -68,9 +68,13 @@ const signs = (x: number, y: number): PanelElement[] => [
 const ring = (x: number, y: number): PanelElement => ({
   kind: 'section', x: x - 11.5, y: y - 11.5, w: 23, h: 23, radius: 11.5, border: '1px solid #8d8d8d',
 });
-/** A mixer or sequencer stalk; mixer stalks carry their legend above */
+/**
+ * A mixer or sequencer stalk; mixer stalks carry their legend above. The small knobs turn 270
+ * degrees, from 7:30 to 4:30, where the large ones turn 300 (measured on the manual's patch
+ * sheets, REFERENCE.md), so a patch sheet's pointer and the twin's point the same way.
+ */
 const stalk = (control: string, x: number, y: number, extra: KnobOpts = {}): PanelElement =>
-  knob(control, x, y, STALK_D, { variant: STALK, ...extra });
+  knob(control, x, y, STALK_D, { variant: STALK, travel: 270, ...extra });
 
 /** A toggle as printed (p.7): its title, one position above the lever and the other below (SEQ PITCH MOD's OFF beside) */
 const sw = (control: string, x: number, y: number, scale = 1.6, labelText?: string, legendText?: string[]): PanelElement => ({

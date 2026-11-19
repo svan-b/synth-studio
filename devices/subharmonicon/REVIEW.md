@@ -91,3 +91,11 @@ the folios printed on the pages, as in REFERENCE.md.
   columns cannot hold them at 9 px; the DFAM review accepted the same.
 - **The 12-JI table.** Still "likely". It is TE's test fixture for the stock table; the manual
   prints only the 8-JI ratios.
+
+## Signal path
+
+`spec.ts` `signalFlow`: the blocks and connections of the manual's SIGNAL FLOW chart (p.55),
+drawn in our own style, left to right. TEMPO and the four rhythm generators step the two sequencers; each sequencer tunes one VCO
+and its two subharmonics; the six levels meet in the mixer, then VCF, VCA and VOLUME; the VCF EG
+and the VCA EG underneath, fired on every step while EG is on. Every control and jack belongs to
+a block.

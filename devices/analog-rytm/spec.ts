@@ -14,7 +14,7 @@
 
 import type { ControlSpec, DeviceSpec, KnobSpec } from '@/types';
 import {
-  EUC_PAGE, FX_PAGES, FX_TRACK, FX_TRACK_LEVEL, MACHINES, PAGES, PARAM_INDEX, RETRIG_MENU, TRACKS, TRACK_EXTRA, TRACK_OPTIONS, TRACK_PAGES, TRIG_COND, TRIG_PAGE,
+  EUC_PAGE, FX_PAGES, FX_TRACK, FX_TRACK_LEVEL, MACHINES, PAGE, PAGES, PARAM_INDEX, RETRIG_MENU, TRACKS, TRACK_EXTRA, TRACK_OPTIONS, TRACK_PAGES, TRIG_COND, TRIG_PAGE,
   formatMachineParam, formatPage, machineParamDefault, trackParamKeys, type PageParam,
 } from './model';
 import { KIT_PRESETS } from './presets';
@@ -105,6 +105,9 @@ function buildControls(): Record<string, ControlSpec> {
   return c;
 }
 
+/** The twelve track prefixes as a regular expression alternation (the signal path's `match`) */
+const TRACK_IDS = TRACKS.map(t => t.id).join('|');
+
 export const ANALOG_RYTM: DeviceSpec = {
   id: 'analog-rytm',
   name: 'Analog Rytm MKII',
@@ -115,12 +118,48 @@ export const ANALOG_RYTM: DeviceSpec = {
   // Elektron spec: W385 x D225 x H82 mm including knobs and feet
   dimensions: { width: 385, height: 225, depth: 82 },
   display: { width: 1240, height: 680, scale: 3.2 },
+  // The signal path, drawn in our own style from the facts of the manual's chart (ANALOG RYTM MKII
+  // SOUND ARCHITECTURE, p.13): a drum voice (machine and sample into overdrive, filter and amp) and the FX track it feeds
+  // (delay and reverb sends, then distortion and compressor on the whole mix). `controls` name the
+  // block's parameter on all twelve tracks; `match` finds the rest. Choosing a block opens its page.
   signalFlow: [
-    { id: 'voices', name: 'Machines (SRC)', description: '8 analog voices on 12 tracks: RS/CP, MT/HT, CH/OH and CY/CB share a voice', order: 1, controls: TRACKS.map(t => `${t.id}_machine`) },
-    { id: 'sample', name: 'Sample layer (SMPL)', description: 'A one-shot layered with the machine before the filter', order: 2, controls: TRACKS.map(t => `${t.id}_smp_slot`) },
-    { id: 'track', name: 'Overdrive > filter > amp', description: 'Per voice: analog overdrive, multimode filter with ADSR, amp envelope, pan, volume, sends', order: 3, controls: TRACKS.flatMap(t => [`${t.id}_flt_frq`, `${t.id}_amp_vol`]) },
-    { id: 'fx', name: 'FX track', description: 'Digital delay and reverb sends; analog distortion and compressor on the mix', order: 4, controls: Object.values(FX_PAGES).flatMap(p => p.filter(Boolean).map(x => `fx_${x!.key}`)) },
-    { id: 'seq', name: 'Sequencer', description: '64-step patterns with locks, conditions, micro timing and retrigs; chains and songs', order: 5, controls: ['bpm', 'play'] },
+    { id: 'seq', name: 'Pads and sequencer', label: 'Pads\nSequencer', role: 'control', order: 1, at: [0, 1],
+      description: 'A pad or a trig on a step fires the track: it starts the machine, the sample and the envelopes. The TRIG page sets the note, velocity and length of new trigs.',
+      controls: ['bpm', 'play', 'quantize', 'fix_vel', ...TRACKS.map(t => `${t.id}_trig_note`)], match: `^((${TRACK_IDS})_(trig|rtrg|euc)|fx_trig)_`,
+      mods: [{ to: 'machine', what: 'trig, note, velocity' }, { to: 'sample', what: 'trig' }] },
+    { id: 'machine', name: 'Machine: the analog drum voice', label: 'Machine', order: 2, at: [1, 0], to: ['overdrive'],
+      description: 'The analog sound generator of the track. A machine is a drum model with its own parameters on the SRC page: tune, decay, sweep, noise. Each voice offers several.',
+      controls: TRACKS.map(t => `${t.id}_machine`), match: `^(${TRACK_IDS})_(?!trig_|rtrg_|euc_|smp_|flt_|amp_|lfo_)` },
+    { id: 'sample', name: 'Sample', label: 'Sample', order: 3, at: [1, 2], to: ['overdrive'],
+      description: 'A digital sample layered with the machine before the overdrive: a clap over the analog snare, a click on the kick. SMP picks it, LEV is its level.',
+      controls: TRACKS.map(t => `${t.id}_smp_slot`), match: `^(${TRACK_IDS})_smp_` },
+    { id: 'overdrive', name: 'Overdrive', label: 'Overdrive', order: 4, at: [2, 1], to: ['filter'],
+      description: 'An analog overdrive on every voice, before the filter. It is OVR on the AMP page: a little thickens a drum, a lot crushes it.',
+      controls: TRACKS.map(t => `${t.id}_amp_ovr`) },
+    { id: 'filter', name: 'Multimode filter and its envelope', label: 'Multimode\nfilter', order: 5, at: [3, 1], to: ['amp'],
+      description: 'A 2-pole analog filter with seven types. FRQ and RES set it, and its own envelope (ATK, DEC, SUS, REL) moves the cutoff by ENV.',
+      controls: TRACKS.map(t => `${t.id}_flt_frq`), match: `^(${TRACK_IDS})_flt_` },
+    { id: 'amp', name: 'Amp', label: 'Amp', order: 6, at: [4, 1], to: ['delay', 'distortion', 'reverb'],
+      description: 'The amplifier and its envelope (ATK, HLD, DEC), then pan and volume into the mix. DEL and REV send copies of the drum to the delay and the reverb.',
+      controls: TRACKS.map(t => `${t.id}_amp_vol`), match: `^(${TRACK_IDS})_amp_(?!ovr)` },
+    { id: 'lfo', name: 'LFO', label: 'LFO', role: 'control', order: 7, at: [3, 0],
+      description: 'One LFO per track, with a fade. It moves the one parameter of its track that DST names: filter cutoff for a wobble, sample start, pan.',
+      controls: TRACKS.map(t => `${t.id}_lfo_dep`), match: `^((${TRACK_IDS})|fx)_lfo_`,
+      mods: [{ to: '*', what: 'the parameter of its track you choose (DST)' }] },
+    { id: 'delay', name: 'Delay', label: 'Delay', order: 8, at: [5, 0], to: ['distortion'],
+      description: 'A stereo delay fed by every track\'s DEL send. It returns before the distortion and compressor, or after them: DEL on the DISTORTION page decides. REV sends its echoes on to the reverb.',
+      controls: [...FX_PAGES[PAGE.SRC].filter(Boolean).map(x => `fx_${x!.key}`), 'fx_trk_lev'] },
+    { id: 'distortion', name: 'Distortion', label: 'Distortion', order: 9, at: [5, 1], to: ['compressor'],
+      description: 'An analog distortion on the whole mix. AMT drives it and SYM chooses which half of the wave clips.',
+      controls: FX_PAGES[PAGE.FLTR].filter(Boolean).map(x => `fx_${x!.key}`) },
+    { id: 'reverb', name: 'Reverb', label: 'Reverb', order: 10, at: [5, 2], to: ['distortion'],
+      description: 'A reverb fed by every track\'s REV send. It returns before the distortion and compressor, or after them: REV on the DISTORTION page decides.',
+      controls: [...FX_PAGES[PAGE.SMPL].filter(Boolean).map(x => `fx_${x!.key}`), 'fx_trk_lev'] },
+    { id: 'compressor', name: 'Compressor', label: 'Compressor', order: 11, at: [6, 1], to: ['>Out'],
+      description: 'An analog compressor, the last stage before the main outputs. It glues the kit together, and SEQ makes it pump by ducking to the bass drum.',
+      controls: FX_PAGES[PAGE.AMP].filter(Boolean).map(x => `fx_${x!.key}`) },
+    // Not part of the path: the main volume, the quick performance knob and the demo kit marker
+    { id: 'other', name: 'Outside the path', order: 12, controls: ['main_volume', 'qper', 'kit_demo'] },
   ],
   controls: buildControls(),
   presets: Object.fromEntries(KIT_PRESETS.map((k, i) => [k.key, {

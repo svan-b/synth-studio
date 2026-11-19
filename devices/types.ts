@@ -73,6 +73,15 @@ export interface DeviceModule {
   /** Values to *display* (e.g. the held step's locked values). Defaults to the stored values. */
   displayValues?: (api: DeviceUiApi) => Values;
 
+  /**
+   * The signal path diagram (spec.signalFlow blocks, components/panel/SignalPath.tsx).
+   * `open`: show a block on the instrument when the learner chooses it - an Elektron opens
+   * the block's parameter page on its screen, where a Moog has the knobs on its panel.
+   */
+  signalPath?: {
+    open?: (block: string, api: DeviceUiApi) => void;
+  };
+
   /** Short demo phrase for lessons and ear-training. Return a stop function. */
   audition?: (api: AuditionApi) => (() => void) | void;
 

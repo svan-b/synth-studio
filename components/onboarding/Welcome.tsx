@@ -106,6 +106,7 @@ export default function Welcome({ open, onClose, onChoose }: { open: boolean; on
           <ul className="mt-5 text-[12px] text-gray-500 space-y-1 list-disc pl-5">
             <li>Use headphones or decent speakers - a lot of synthesis lives in the low end.</li>
             <li>On iPad, turn the ringer/silent switch or Silent Mode off if you hear nothing, and use landscape.</li>
+            <li>New to an instrument? Signal path, above its panel, draws how its sound travels. Choose a block and its knobs light up.</li>
             <li>Your work saves automatically in this browser. Use Project → Save to keep a file, and REC to bounce a WAV.</li>
             <li>Got your own synth? Add “Your synth (MIDI)” or “Audio input” with the Instruments button next to the tabs.</li>
           </ul>

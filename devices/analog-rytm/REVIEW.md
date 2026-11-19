@@ -275,3 +275,15 @@ names included; only the empty margin under them is below the fold.
 
 **Gate:** tsc, lint, validate, build; Rytm lessons; core e2e.
 
+
+## Signal path and the LFO's words
+
+**Signal path** (`spec.ts` `signalFlow`): the blocks and connections of the manual's SOUND
+ARCHITECTURE (p.13), drawn in our own style, a drum voice and the FX track on one line: machine and sample into the overdrive, the multimode filter and the amp;
+the sends to delay and reverb, which return into the distortion and compressor chain (before it or
+after it, by DEL and REV on the DISTORTION page; drawn before); the LFO with a destination of the
+player's choice. A voice block opens its page on the active drum track, an FX block selects the FX
+track first.
+
+**LFO trig modes** read FREE, TRIG, HOLD, ONE and HALF, as the manual lists them (the twin had
+TRG, HLD and HLF).

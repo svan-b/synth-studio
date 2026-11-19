@@ -27,6 +27,7 @@ Register it in `devices/index.ts` (code-split `load: () => import('./<id>')`).
 - `patchBay.inputs/outputs`: every jack, with `jackType` and `signalType`.
 - `presets`: `settings` (control → value) and, for semi-modulars, `patchConnections`.
 - Put `manualReference` ("p.12 – VCF") on controls and use the manual's names.
+- `signalFlow`: the instrument's signal path diagram. See "Signal path" below.
 
 ## layout.ts
 - Units are **mm** from the faceplate's top-left; `pxPerMm` sets render size
@@ -97,6 +98,37 @@ noteOn(note, vel) / noteOff(note)      // keyboards (DeviceModule.keyboard enabl
   `instance`), `transport: 'play'` and `instance`. `node scripts/lesson-runner.cjs` performs
   presses through the real panel buttons, and solves solution-less steps by trying single
   learner moves (a cable, the transport, a switch); it reports those as `auto`.
+
+## Signal path (spec.signalFlow)
+
+The toolbar's **Signal path** button draws the instrument's own flow chart above its panel
+(`components/panel/SignalPath.tsx`, laid out by `lib/signalPath.ts`). Choosing a block lights
+its controls and patch points on the panel with the lesson spotlight; touching a control marks
+its block; a lesson step marks the block it is about. Take the facts from the manual's own signal flow
+chart (the blocks, their order, what feeds and what moves what, the names) and draw them here, in
+our own style: the chart itself is never copied (`docs/research/COPYRIGHT-RULES.md`).
+
+A section of `signalFlow` with `at` is a block:
+
+| Field | What it is |
+|---|---|
+| `at: [column, row]` | its grid cell; halves are allowed (a block between two rows). `size: [columns, rows]` for a tall mixer |
+| `label` | the words in the block, `\n` for a second line (13 characters a line, 3 lines at most). `name` is the full name in the note |
+| `description` | what the learner reads on choosing it: what the block does and which controls matter, in our own words, 215 characters at most |
+| `role` | `'audio'` (default): sound passes through it. `'control'`: an envelope, LFO or sequencer, drawn dashed |
+| `to` | audio: the blocks its sound goes to. `'>Out'` ends the path with an arrow and that word |
+| `mods` | control: `{ to, what }` for each block it acts on and what it moves there ("cutoff"). `to: '*'` when the player chooses the destination (an Elektron LFO). `both` for an arrow at each end, `quiet` to name a link without drawing it, `via` for a line that must go round (`'over'`, `'under'`, or `'around-over'` / `'around-under'` for the outside of the chart, as the Mother-32 manual draws them) |
+| `controls`, `jacks`, `panel` | what lights up: control ids, patch points, and other panel ids (`'keyboard'`) |
+| `match` | a regular expression over control ids, for the same block on other tracks (the Analog Four lists track 1 in `controls`) |
+
+Sections without `at` are not drawn: they name controls that are knowingly outside the path.
+On a paged instrument add `DeviceModule.signalPath.open(block, api)` to open the block's
+parameter page (see the Analog Four and the Analog Rytm). It is not called during a lesson.
+
+`npm run validate` checks every id, that no two blocks share a cell, that no audio wire runs
+through a block, that the diagram is at most 780 px wide (an iPad held upright), and that every
+control and jack on the panel belongs to a block. `node scripts/e2e/signal-path.cjs <url> [device]`
+checks it in the browser by touch (it is part of the core e2e); add the new instrument to its `CASES`.
 
 ## Verify
 ```

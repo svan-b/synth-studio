@@ -213,3 +213,11 @@ On the final build (`next start` on port 3145):
 
 The audio-QA spreads move by 0.3 LU between runs of the same build on the shared machine; the
 before / after table above compares runs taken minutes apart.
+
+## Signal path
+
+`spec.ts` `signalFlow`: one channel's way through the mixer, after the BLOCK DIAGRAM (p.34): input
+and gain, EQ, fader, the filter it is assigned to, master and booth. Cue leaves after the EQ, the
+sends after the fader (before it with PRE), and the returns come back into the master. The
+crossfader is drawn as control: in the block diagram it drives the channel VCAs and carries no
+audio. The decks and the FX unit are marked as the twin's own.

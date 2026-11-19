@@ -281,12 +281,18 @@ function Faceplate(p: FaceplateProps) {
     layout.elements.forEach((el, i) => {
       if (el.kind === 'label') on[i] = geo[i].owner >= 0 && on[geo[i].owner];
     });
-    // A section title stays lit when something lit sits inside the section
+    // A section title stays lit when something lit sits inside the section. So does a printed
+    // frame or scale ring (a border with no fill): it belongs to the controls it surrounds.
+    const CONTROLS = ['knob', 'slider', 'switch', 'button', 'jack', 'stepgrid'];
     layout.elements.forEach((el, i) => {
-      if (el.kind !== 'section' || !el.title) return;
+      if (el.kind !== 'section') return;
+      const frame = !!el.border && !el.background;
+      if (!el.title && !frame) return;
       const x0 = px(el.x), y0 = px(el.y), x1 = px(el.x + el.w), y1 = px(el.y + el.h);
-      on[i] = geo.some((g, j) => j !== i && on[j] && ['knob', 'slider', 'switch', 'button', 'jack', 'stepgrid'].includes(g.kind)
-        && g.cx >= x0 && g.cx <= x1 && g.cy >= y0 && g.cy <= y1);
+      const inside = geo.map((g, j) => j).filter(j => j !== i && CONTROLS.includes(geo[j].kind)
+        && geo[j].cx >= x0 && geo[j].cx <= x1 && geo[j].cy >= y0 && geo[j].cy <= y1);
+      // an untitled frame round nothing is decoration: it stays as it is
+      on[i] = inside.length || el.title ? inside.some(j => on[j]) : true;
     });
     return on;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -340,7 +346,7 @@ function Faceplate(p: FaceplateProps) {
             labelFit={fits.label[i]}
             valueFit={fits.value[i]}
             hitSize={hitFor(i, d)}
-            travel={layout.knobTravel}
+            travel={el.travel ?? layout.knobTravel}
           />
         );
       }
@@ -574,13 +580,16 @@ function Anchor({ x, y, children, dim }: { x: number; y: number; children: React
 
 const SectionEl = memo(function SectionEl({ el, px, theme, fit, dim }: { el: SectionElement; px: (mm: number) => number; theme: PanelTheme; fit?: TextFit; dim: boolean }) {
   const size = fit?.size ?? 8;
+  // A printed frame or scale ring dims as a whole with its controls; a filled section only dims its title
+  const frame = !!el.border && !el.background;
   return (
     <div
-      className="absolute pointer-events-none"
+      className={`absolute pointer-events-none ${frame ? styles.dimmable : ''}`}
       style={{
         left: px(el.x), top: px(el.y), width: px(el.w), height: px(el.h),
         border: el.border ?? 'none', background: el.background ?? 'transparent',
         borderRadius: el.radius !== undefined ? px(el.radius) : 4,
+        ...(frame ? dimStyle(dim) : null),
       }}
     >
       {el.title && (
@@ -591,7 +600,7 @@ const SectionEl = memo(function SectionEl({ el, px, theme, fit, dim }: { el: Sec
             top: -Math.round(size * 0.75), fontSize: size, lineHeight: 1.15,
             transform: fitTransform(fit, 'translateX(-50%)'),
             color: fit?.color ?? el.titleColor ?? theme.muted ?? theme.text, background: el.background ?? 'transparent', letterSpacing: '0.6px',
-            ...dimStyle(dim),
+            ...(frame ? null : dimStyle(dim)),
           }}
         >
           {fit?.text ?? el.title}

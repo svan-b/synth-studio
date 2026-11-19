@@ -42,7 +42,7 @@ import {
 import { KEYS, PX_PER_MM, TRIGS, TRIG_LEGENDS, KEYBOARD, KB_KEY, KB_KEYS, MODE_LEDS, OCT_LEDS, PAGE_LEDS, LOGO } from './geometry';
 import { SOUNDS, SOUND_CATEGORIES, type SoundDef } from './sounds';
 import {
-  KITS, KIT_FORMAT, KIT_PROJECT_IDS, SOUND_DEMO_BASE, freeKitSlot, kitFull, kitSnapshot, kitValues, projectFor, projectKits, soundTrackValues, type A4Project,
+  KITS, KIT_FORMAT, KIT_PROJECT_IDS, SOUND_DEMO_BASE, freeKitSlot, kitFull, kitSnapshot, kitValues, projectFor, projectKits, soundPresetValues, soundTrackValues, type A4Project,
 } from './kits';
 import { isTransposable, setTransposable } from './arp';
 import { DialIcon, GRAPHIC_H, OLED_DIM, OLED_ON, UnusedIcon, paramGraphic, screenLabel, screenWord, wideGraphics } from './screenGraphics';
@@ -119,6 +119,8 @@ const UIK = {
   pageUndo: 'a4pageUndo',       // the last page / trig paste or clear, for the undo by repeating it (p.54)
   trigClip: 'a4trigClip',       // copied trigs (relative steps) and their track
   soundClip: 'a4soundClip',     // a copied track Sound ([TRACK] + [RECORD], p.54)
+  paramDown: 'a4paramDown',     // a [PARAMETER] key held: [YES] randomizes its page, [NO] reloads it (p.17)
+  ctlAll: 'a4ctlAll',           // CONTROL ALL: the values from before, by control id, while [T1-4] is held (p.18; index.ts writes it)
 } as const;
 
 /** STEP RECORDING: STANDARD (advance one step) or JUMP (advance by the NOTE page's LEN), and the active step */
@@ -309,14 +311,62 @@ const pageKey = (name: string, label: string, rows: [string, string]): KeyDef =>
   },
   press: e => {
     if (e.func) { setView(e.ctx, V.SOUND); spendFunc(e.ctx); return; }
+    // [YES] or [NO] held, then a [PARAMETER] key: randomize its page, or reload it (manual p.17, p.21)
+    const yn = liveUi(e.ctx)[UIK.yesNo];
+    if (yn === 'yes' || yn === 'no') { pageRandomOrReload(e, name, yn === 'yes'); return; }
+    e.ctx.setUi({ [UIK.paramDown]: { key: name, at: Date.now() } });
     if (!pageFor(e.track, V[name as keyof typeof V])) {
       say(e.ctx, `${TRACK_NAMES[e.track]} has no ${label} page`);
       return;
     }
     setView(e.ctx, viewAfterPress(name, e.track, e.view));
   },
+  release: e => { if (heldParamKey(e.ctx) === name) e.ctx.setUi({ [UIK.paramDown]: null }); },
   target: (c, v) => c === 'page' && typeof v === 'number' && keyOfView(v)?.key === name,
 });
+
+/** The [PARAMETER] key being held, if any (a hold older than ten seconds is a release that never arrived) */
+function heldParamKey(ctx: CustomRenderContext): string | null {
+  const h = liveUi(ctx)[UIK.paramDown] as { key?: string; at?: number } | null | undefined;
+  return h && typeof h.key === 'string' && Date.now() - (h.at ?? 0) < 10_000 ? h.key : null;
+}
+
+/** The kit as it was last saved: the project's own kit slot, else the demo kit or sound as it came, else the init kit */
+function savedKitValues(ctx: CustomRenderContext): Record<string, ControlValue> {
+  const { kits, active } = projectKits(project(ctx));
+  if (active && kits[active]) return kitFull(kits[active].saved);
+  const loaded = Math.round(num(ctx.values.kit_project_loaded));
+  const demo = KITS[loaded - 2];
+  if (demo) return { ...kitFull(undefined), ...kitValues(demo) };
+  const sound = loaded >= SOUND_DEMO_BASE ? SOUNDS[loaded - SOUND_DEMO_BASE] : undefined;
+  return sound ? { ...kitFull(undefined), ...soundPresetValues(sound) } : kitFull(undefined);
+}
+
+/**
+ * [PARAMETER] + [YES]: every parameter of that page to a random value, a new roll each time.
+ * [PARAMETER] + [NO]: the page back to its last saved state (manual p.17, p.21). Either key may be
+ * the one held. The page is the key's open page (NOISE under [OSC1]), else its first.
+ */
+function pageRandomOrReload(e: KeyEnv, key: string, random: boolean) {
+  const ctx = e.ctx;
+  const views = PAGE_KEYS[key];
+  if (!views) return;
+  const view = keyOfView(e.view)?.key === key ? e.view : V[views[0]];
+  const page = pageFor(e.track, view);
+  if (!page) { say(ctx, `${TRACK_NAMES[e.track]} has no ${key} page`); return; }
+  const params = pageSlots(page).filter((x): x is ParamDef => !!x && !x.key.startsWith('trig_'));
+  if (!params.length) return;
+  const vals: Record<string, ControlValue> = {};
+  if (random) params.forEach(x => { vals[controlFor(e.track, x)] = Math.round(x.min + Math.random() * (x.max - x.min)); });
+  else {
+    const saved = savedKitValues(ctx);
+    params.forEach(x => { const id = controlFor(e.track, x); if (id in saved) vals[id] = saved[id]; });
+  }
+  if (view !== e.view) setView(ctx, view);
+  ctx.setUi({ [UI.heldSteps]: [], [UI.trigEditor]: null });
+  useStudioStore.getState().setControlValues(ctx.instance, vals);
+  say(ctx, `${TRACK_NAMES[e.track]} ${PAGE_TITLE[page]} ${random ? 'RANDOMIZED' : 'RELOADED'}`, 1400);
+}
 
 const viewKey = (name: 'ARP' | 'NOTE' | 'PERF' | 'MIX' | 'TEMPO', label: string, sub: string, funcFn?: (e: KeyEnv) => void): KeyDef => ({
   label,
@@ -409,7 +459,8 @@ const trackKey = (t: number): KeyDef => ({
   release: e => {
     const down = liveUi(e.ctx)[UIK.trackDown];
     const rest = Array.isArray(down) ? (down as number[]).filter(x => x !== t) : [];
-    e.ctx.setUi({ [UIK.trackDown]: rest });
+    // CONTROL ALL ends with the last track key: its changes stay (manual p.18)
+    e.ctx.setUi(rest.length ? { [UIK.trackDown]: rest } : { [UIK.trackDown]: rest, [UIK.ctlAll]: null });
     const er = liveUi(e.ctx)[UIK.erase] as EraseMode | null | undefined;
     if (er?.kind === 'trigs') e.ctx.setUi({ [UIK.erase]: rest.length ? { ...er, tracks: rest } : null });
   },
@@ -594,7 +645,14 @@ const KEYDEFS: Record<string, KeyDef> = {
   // Held, [YES] / [NO] + [PTN] or [TRK] quick-saves / quick-reloads (manual p.54)
   YES: {
     label: 'YES', sub: 'Save', subPlain: true, aria: 'Yes',
-    press: e => { if (e.func) spendFunc(e.ctx); closeMenus(e.ctx); e.ctx.setUi({ [UIK.yesNo]: 'yes' }); },
+    press: e => {
+      // a [PARAMETER] key held + [YES]: randomize that page (manual p.17)
+      const param = heldParamKey(e.ctx);
+      if (param && !e.func) { pageRandomOrReload(e, param, true); return; }
+      if (e.func) spendFunc(e.ctx);
+      closeMenus(e.ctx);
+      e.ctx.setUi({ [UIK.yesNo]: 'yes' });
+    },
     release: e => e.ctx.setUi({ [UIK.yesNo]: null }),
   },
   NO: {
@@ -602,6 +660,17 @@ const KEYDEFS: Record<string, KeyDef> = {
     press: e => {
       const live = !!e.ctx.values.live_rec;
       const down = liveUi(e.ctx)[UIK.trackDown];
+      // a [PARAMETER] key held + [NO]: that page back to its saved state (manual p.17, p.21)
+      const param = heldParamKey(e.ctx);
+      if (param && !e.func) { pageRandomOrReload(e, param, false); return; }
+      // CONTROL ALL: [NO] before [T1-4] is released takes the changes back (manual p.18)
+      const before = liveUi(e.ctx)[UIK.ctlAll] as Record<string, ControlValue> | null | undefined;
+      if (!live && !e.func && before && Object.keys(before).length && Array.isArray(down) && down.length) {
+        useStudioStore.getState().setControlValues(e.ctx.instance, before);
+        e.ctx.setUi({ [UIK.ctlAll]: null });
+        say(e.ctx, 'CONTROL ALL: CHANGES REVERTED', 1400);
+        return;
+      }
       if (e.func) spendFunc(e.ctx);
       closeMenus(e.ctx);
       e.ctx.setUi({ [UIK.yesNo]: 'no' });

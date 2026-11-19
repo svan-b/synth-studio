@@ -8,7 +8,9 @@
 // value bubble, double-tap reset, no page scroll, a momentary lesson step, the
 // spectrum scope), the Producer path on iPad (a whole-studio lesson; First
 // beat by touch on the Analog Rytm and Groove's pattern SWING), and the demo
-// recordings (a hook's level and stop, a loudness-matched demo A/B, the cards' Listen).
+// recordings (a hook's level and stop, a loudness-matched demo A/B, the cards' Listen),
+// the signal path diagram on every instrument (scripts/e2e/signal-path.cjs) and the
+// Analog Four's two-key moves (scripts/e2e/a4-combos.cjs).
 // --full: also scripts/smoke.cjs and scripts/lesson-runner.cjs for every
 // instrument in devices/index.ts.
 // Exits non-zero if anything fails, so it can gate merges.
@@ -116,6 +118,16 @@ check('touch: spectrum scope draws the output while it plays', sp.playing?.mode 
 const lf = run(path.join(__dirname, 'lesson-flow.cjs'), [base]);
 check('lessons: answers are shuffled and still count, "Next lesson" follows the open path, a small turn is not done for you, a question fits the iPad coach by touch', !lf.__error && lf.ok && (lf.errs ?? []).length === 0,
   lf.__error ?? { shownFirst: lf.options?.shownFirst, sides: lf.options?.sides, bothLast: lf.options?.bothLast, next: lf.next?.then, waits: lf.waits?.before, ipad: lf.ipad && { fits: lf.ipad.fits, nextAfterAnswer: lf.ipad.nextAfterAnswer, right: lf.ipad.right, moved: lf.ipad.moved } });
+
+// ---- The signal path diagram on every instrument, by touch -------------------------
+const spd = run(path.join(__dirname, 'signal-path.cjs'), [base], 420_000);
+check('signal path: on all seven instruments a block lights its controls (an Elektron opens its page), a touched control marks its block, a lesson step keeps the panel',
+  !spd.__error && spd.ok && (spd.errs ?? []).length === 0 && Object.keys(spd.report ?? {}).length === 7, spd.__error ?? { failed: spd.failed, errs: spd.errs, instruments: Object.keys(spd.report ?? {}).length });
+
+// ---- Analog Four two-key moves, with two fingers ------------------------------------
+const ac = run(path.join(__dirname, 'a4-combos.cjs'), [base]);
+check('analog four: [PARAMETER] + [YES] / [NO] rolls and reloads a page, a held track key is CONTROL ALL and [NO] reverts it',
+  !ac.__error && ac.ok && (ac.errs ?? []).length === 0, ac.__error ?? { failed: ac.failed, errs: ac.errs });
 
 // ---- Separate outputs (DeviceModule.studio.outputs) ---------------------------
 const so = run(path.join(__dirname, 'outputs.cjs'), [base, path.join(outDir, 'outputs')]);

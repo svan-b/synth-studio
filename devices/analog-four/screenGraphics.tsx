@@ -111,10 +111,8 @@ export function screenLabel(p: ParamDef): string {
   return p.key === 'noise_snh' ? 'SNH' : p.short;
 }
 
-const LFO_MODE_WORDS: Record<string, string> = { FRE: 'FREE', TRG: 'TRIG', HLD: 'HOLD', ONE: 'ONE', HLF: 'HALF' };
-/** A list value as the screen writes it: the LFO modes in full, the multipliers with their own signs */
+/** A list value as the screen writes it: the multipliers with their own signs */
 export function screenWord(p: ParamDef, text: string): string {
-  if (/lfo[12]_mod$/.test(p.key)) return LFO_MODE_WORDS[text] ?? text;
   if (/lfo[12]_mul$/.test(p.key)) return text.replace(/^x/, '×').replace(/^\./, '•');
   return text;
 }

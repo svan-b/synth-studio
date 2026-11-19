@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import type { ControlValue, DeviceSpec, Lesson, LessonPatternPatch, LessonStep, MultipleChoice } from '@/types';
 import { useStudioStore, stepKind, buildCheckState, getSpec, type StepSession } from '@/store/studio';
-import { describeValue, pressTargetOf, pressesNeeded } from '@/lib/controls/mapping';
+import { describeValue, knobClock, pressTargetOf, pressesNeeded } from '@/lib/controls/mapping';
 import { hub } from '@/lib/studio/hub';
 import { getLessonLive, onLessonLive } from '@/lib/studio/lessonLive';
 import { captureInto, goTo, isStudioListen, setPatternSettings, studioAB } from '@/lib/studio/lessonRuntime';
@@ -372,6 +372,8 @@ function StepCard({ lesson, stepIndex, step, spec, satisfied, session, instance,
   // Live value of the step's control, for "now → target"
   const storedValue = useStudioStore(s => (step.control ? s.devices[instance]?.controlValues[step.control] : undefined));
   const liveValue = storedValue ?? (control && 'default' in control ? (control.default as ControlValue) : undefined);
+  // Where the target is on the knob, as a clock position (Moog panels; '' elsewhere)
+  const targetClock = step.control ? knobClock(hub.getModule(store.deviceOf(instance))?.layout, control, step.control, step.targetValue) : '';
 
   const jackLabel = (id?: string) => {
     if (!id || !spec?.patchBay) return id ?? '';
@@ -437,6 +439,8 @@ function StepCard({ lesson, stepIndex, step, spec, satisfied, session, instance,
           ) : step.control && step.targetValue !== undefined ? (
             <span className="text-[11px] font-mono text-teaching-target">
               {control?.label ?? step.control}: {liveValue !== undefined && !satisfied ? <span className="text-gray-400">{describeValue(control, liveValue as ControlValue)} → </span> : null}{describeValue(control, step.targetValue)}
+              {/* on a Moog, also where the knob will point: the way its manual gives a setting */}
+              {targetClock && <span className="text-gray-400" data-target-clock> · {targetClock}</span>}
             </span>
           ) : <span />}
           {satisfied && <span className="text-[11px] text-teaching-current font-bold">✓ Got it</span>}

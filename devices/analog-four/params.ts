@@ -138,7 +138,9 @@ export const LFO_MULTS = [
   'x1', 'x2', 'x4', 'x8', 'x16', 'x32', 'x64', 'x128', 'x256', 'x512', 'x1K', 'x2K',
   '.1', '.2', '.4', '.8', '.16', '.32', '.64', '.128', '.256', '.512', '.1K', '.2K',
 ];
-export const LFO_MODES = ['FRE', 'TRG', 'HLD', 'ONE', 'HLF'];
+// The screen's own words (the LFO page figure, manual p.92, reads FREE; the Rytm manual lists
+// all five in full). The A4 manual's text shortens them to FRE, TRG, HLD, ONE, HLF.
+export const LFO_MODES = ['FREE', 'TRIG', 'HOLD', 'ONE', 'HALF'];
 export const LFO_WAVES = ['TRI', 'SIN', 'SQR', 'SAW', 'EXP', 'RMP', 'RND'];
 /** PLY (the last) arpeggiates a whole chord and needs POLY (manual p.43) */
 export const ARP_MODES = ['OFF', 'THR', 'UP', 'DWN', 'CYC', 'SHF', 'RND', 'PLY'];

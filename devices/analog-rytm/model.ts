@@ -479,7 +479,7 @@ export const IX = {
 
 export const FILTER_TYPES = ['LP2', 'LP1', 'BP', 'HP1', 'HP2', 'BS', 'PK'] as const;
 export const LFO_WAVES = ['TRI', 'SIN', 'SQR', 'SAW', 'EXP', 'RMP', 'RND'] as const;
-export const LFO_MODES = ['FREE', 'TRG', 'HLD', 'ONE', 'HLF'] as const;
+export const LFO_MODES = ['FREE', 'TRIG', 'HOLD', 'ONE', 'HALF'] as const; // as the manual lists them (LFO page, MOD)
 /** x1 .. x2k synced to the tempo, then .1 .. .2k fixed to 120 BPM */
 export const LFO_MULTS: readonly string[] = [
   'x1', 'x2', 'x4', 'x8', 'x16', 'x32', 'x64', 'x128', 'x256', 'x512', 'x1k', 'x2k',
@@ -515,7 +515,7 @@ export const TRIG_PAGE: PageParam[] = [
   PP('trig_syn', 'SYN', 'Synth Trig', 0, 1, 1, 'Trigs start the analog machine.', { options: ['OFF', 'ON'], idx: IX.TRIG_SYN }),
   PP('trig_smp', 'SMP', 'Sample Trig', 0, 1, 1, 'Trigs start the sample layer.', { options: ['OFF', 'ON'], idx: IX.TRIG_SMP }),
   PP('trig_env', 'ENV', 'Filter Env Trig', 0, 1, 1, 'Trigs restart the filter envelope.', { options: ['OFF', 'ON'], idx: IX.TRIG_ENV }),
-  PP('trig_lfo', 'LFO', 'LFO Trig', 0, 1, 0, 'Trigs restart the LFO (in TRG, HLD, ONE and HLF modes).', { options: ['OFF', 'ON'], idx: IX.TRIG_LFO }),
+  PP('trig_lfo', 'LFO', 'LFO Trig', 0, 1, 0, 'Trigs restart the LFO (in TRIG, HOLD, ONE and HALF modes).', { options: ['OFF', 'ON'], idx: IX.TRIG_LFO }),
 ];
 
 /**
@@ -583,7 +583,7 @@ export const LFO_PAGE: PageParam[] = [
   PP('lfo_dst', 'DST', 'Destination', 0, LFO_DESTS.length - 1, 0, 'What the LFO modulates.', { options: LFO_DESTS.map(d => d.name), idx: IX.LFO_DST }),
   PP('lfo_wav', 'WAV', 'Waveform', 0, 6, 0, 'LFO waveform.', { options: LFO_WAVES, idx: IX.LFO_WAV }),
   PP('lfo_sph', 'SPH', 'Start Phase', 0, 127, 0, 'Where the wave starts when it is trigged (0 = start, 64 = middle). With WAV RND it adds slew instead.', { idx: IX.LFO_SPH }),
-  PP('lfo_mod', 'MOD', 'Trig Mode', 0, 4, 0, 'FREE runs on, TRG restarts at each trig, HLD holds the value at the trig, ONE plays one cycle, HLF half a cycle.', { options: LFO_MODES, idx: IX.LFO_MOD }),
+  PP('lfo_mod', 'MOD', 'Trig Mode', 0, 4, 0, 'FREE runs on, TRIG restarts at each trig, HOLD holds the value at the trig, ONE plays one cycle, HALF half a cycle.', { options: LFO_MODES, idx: IX.LFO_MOD }),
   PP('lfo_dep', 'DEP', 'Depth', -128, 127, 0, 'Depth and polarity of the modulation: positive starts towards the crest of the wave, negative towards the trough.', { bipolar: true, idx: IX.LFO_DEP }),
 ];
 

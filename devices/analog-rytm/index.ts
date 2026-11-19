@@ -12,7 +12,7 @@ import { ANALOG_RYTM_LAYOUT } from './layout';
 import { ANALOG_RYTM_LESSONS } from './lessons';
 import { AnalogRytmEngine } from './engine';
 import { LOCKS } from './locks';
-import { EUC_IDS, SEQ_TRACKS, TRACK_OUTS, parseId } from './model';
+import { EUC_IDS, FX_TRACK, PAGE, SEQ_TRACKS, TRACK_OUTS, parseId } from './model';
 import { PROJECT_RV, defaultProject, type RytmProject } from './presets';
 import { editMacro } from './ui';
 
@@ -200,6 +200,24 @@ const analogRytm: DeviceModule = {
   // the TRIG page 2 (Euclidean) encoders edit the pattern through interceptChange: their own values are never stored
   uiControls: ['track', 'page', 'pad_mode', 'rec', 'fix', 'auto_trk', ...EUC_IDS],
   data: { initial: defaultProject, migrate },
+  // Signal path: a block of the voice opens its page on the active drum track, a block of the FX
+  // track selects that track first, where the same five keys open DELAY, REVERB, DISTORTION and COMPRESSOR
+  signalPath: {
+    open: (block, api) => {
+      const voice: Record<string, number> = { seq: PAGE.TRIG, machine: PAGE.SRC, sample: PAGE.SMPL, overdrive: PAGE.AMP, filter: PAGE.FLTR, amp: PAGE.AMP, lfo: PAGE.LFO };
+      const fx: Record<string, number> = { delay: PAGE.SRC, reverb: PAGE.SMPL, distortion: PAGE.FLTR, compressor: PAGE.AMP };
+      const track = Math.round(Number(api.values.track) || 0);
+      if (block in fx) {
+        if (track !== FX_TRACK) api.setValue('track', FX_TRACK);
+        api.setValue('page', fx[block]);
+      } else if (block in voice) {
+        // the LFO page exists on both; every other voice block needs a drum track
+        if (track === FX_TRACK && block !== 'lfo') api.setValue('track', 0);
+        api.setValue('page', voice[block]);
+      } else return;
+      api.setUi({ rytmMenu: null, trigPage2: false });
+    },
+  },
   // the learner's own samples live in IndexedDB: project files carry the ones the project uses
   assets: {
     has: data => Object.keys((data as Partial<RytmProject> | null)?.samples ?? {}).length > 0,

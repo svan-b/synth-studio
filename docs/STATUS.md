@@ -1,4 +1,4 @@
-# Synth Studio: status and next actions (updated 2026-11-12, everything merged)
+# Synth Studio: status and next actions (updated 2026-11-19, everything merged)
 
 Working branch: `claude/dfam-documentation-review-iYhxN` (PR #54). Everything below
 marked **merged** is on this branch, built and verified. Everything marked **in progress** is on
@@ -23,6 +23,7 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
 | Bring your own gear | Web MIDI, Practice synth (works on iPad without hardware), audio input, Web Audio plugins, 16 lessons, Safari guidance. See `docs/EXTERNAL_GEAR.md` |
 | Audio QA tool | `scripts/audio-qa.cjs`, see `docs/AUDIO_QA.md`: LUFS, true peak, DC, clicks, stuck tails per preset. Baseline regenerated at aa0a41a: 271 presets on 7 instruments, medians −18.0 to −19.1 LUFS, 2 intermittent click flags (each clean in 4 of 4 re-runs) |
 | E2E regression suite | `npm run test:e2e` (scripts/e2e/run.cjs): the core checks, both iPad Producer walkthroughs and the demo recordings. `--demos` adds the three demo tracks in real time; `--full` adds those plus smoke and lessons for every instrument: **138/138** at the final run |
+| Signal path | Each instrument's own flow chart above its panel, from its manual: a block lights its controls (an Elektron opens its page), a touched control marks its block. Validated and in the core e2e |
 | iPad | Home-screen install, floating lesson coach, 44 px touch targets, fine-adjust gestures, value bubble. Fit may shrink a panel up to 20 % so it ends above the bottom of the screen (the whole Xone:96 at 87 %, the A4 at 90 %), and the control readout shares the toolbar row. First-load JS 198 kB (MIDI, studio view and coach load on demand) |
 | Research notes | `docs/research/<device>/` (sources, signal-flow, presets, lessons) from the official manuals, in our own words. See `docs/research/COPYRIGHT-RULES.md` |
 
@@ -156,6 +157,16 @@ its own `wip/*` branch on GitHub, committed but **not yet merged**.
   - Upgrades at store 13 / project 10: the A4's delay WID (and the kits saved in A4 projects, converted by the device), the DFAM's old defaults.
   - Audio QA rules can now be per device and per preset, with their own click count (`docs/AUDIO_QA.md`): three DFAM patch sheets need one each, with the reason in `config.cjs`.
   - Each instrument's `REVIEW.md` has the details under "Cross-check".
+- **Signal path, clock positions and a few things the manuals have that the twins lacked** (learning and use; no sound changed).
+  - **Signal path.** Every manual opens with a flow chart and then leaves the learner to map it on to the panel alone. Each instrument's toolbar now has **Signal path**: its signal path above its panel, our own drawing of the facts in the manual's chart (DFAM p.7, Mother-32 p.10, Subharmonicon p.55, Sub 37 p.11, Analog Four p.15 and p.110, Analog Rytm p.13, Xone:96 p.34), solid lines for sound and dashed for control. Choosing a block lights its controls and jacks on the panel with the lesson spotlight and says what it does, what feeds it and what moves it. On the Elektrons a block opens its parameter page (the effects select the FX track). Touching a control marks its block, and in a lesson the diagram marks the block the step is about while the panel keeps the lesson's own spotlight. It is a preference, kept between visits, and closed until asked for.
+  - The data is `spec.signalFlow`, which every instrument already had and nothing showed; it now holds each manual's blocks and connections, placed on a grid (`lib/signalPath.ts` lays it out, `components/panel/SignalPath.tsx` draws it, loaded on first use). `npm run validate` checks every id, that no blocks share a cell, that no audio wire runs through a block, that the chart fits an iPad held upright (780 px) and that every control and jack on a panel belongs to a block. `scripts/e2e/signal-path.cjs` checks all seven by touch at 1180 x 820 and is in the core e2e. `docs/ADDING_A_DEVICE.md` has the how-to.
+  - The printed scale rings round a knob (DFAM, Mother-32) now dim with it in focus mode, in lessons too.
+  - **Clock positions.** The Moog manuals and patch sheets give settings by the clock. The readout above a Moog panel shows where the touched knob points, to the nearest half hour, and the lesson coach shows it for a step's target. The DFAM's small knobs are drawn with the 270 degree sweep measured on its patch sheets (the large ones keep 300), so the default panel reads as the manual draws it.
+  - **A DFAM lesson that follows the manual's own tour** (`dfam-sd0-manual-tour`, "The manual's first patch", after the foundations): from the Default settings through pp.8-12, each setting by the clock. The DFAM now has 21 lessons.
+  - **Analog Four:** page randomise and reload ([PARAMETER] + [YES] / [NO], p.17) and control all ([T1-4] held + a knob, [NO] reverts, p.18), by two-key holds as on the hardware (two fingers on a touch screen; `scripts/e2e/a4-combos.cjs` checks them and is in the core e2e). The LFO trig modes read FREE, TRIG, HOLD, ONE, HALF everywhere, as on the screen; the Rytm's too, as its manual lists them.
+  - **Mother-32:** the sawtooth printed under VCO WAVE was mirrored; it now falls from left to right as on the panel.
+  - First-load JS 205 kB (204 before): the diagram's code loads when it is first opened.
+  - Gate: tsc, lint, validate (0 errors; lesson audit 0 findings), build; core e2e 52/52 (the 51 from before and the signal path check; the Analog Four two-key check, added to the suite after that run, passes 8/8 on its own); lesson runner 0 failed, 0 manual and 0 auto on all seven instruments (142 lessons). No DSP, preset or default changed, so audio QA was not rerun and no saved-settings upgrade is needed.
 - **Project files carry user samples.** An instrument can declare `assets` (`has`, `collect`, `restore`); project files embed them as mono 16-bit PCM, base64.
   - Opening a project restores them before the studio loads.
   - The Rytm's user samples now travel to another browser or the iPad Home Screen app, which keeps its own storage.

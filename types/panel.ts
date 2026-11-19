@@ -63,6 +63,8 @@ export interface KnobElement extends Positioned {
   label?: LabelPosition;   // default 'above'
   labelText?: string;      // overrides spec label
   value?: ValueDisplay;    // default 'always'
+  /** Degrees from minimum to maximum when this knob turns less (or more) than the panel's `knobTravel` */
+  travel?: number;
 }
 
 export interface SliderElement extends Positioned {

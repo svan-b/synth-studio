@@ -80,6 +80,37 @@ export function formatValue(spec: { units?: Units; bipolar?: boolean; format?: (
   }
 }
 
+/**
+ * Where a knob points, as the hour on a clock face, to the nearest half hour: "9 o'clock",
+ * "12 o'clock", "1:30". The Moog manuals and their patch sheets give settings this way.
+ * `norm` is the knob's travel from 0 to 1 and `travel` the degrees it turns end to end
+ * (300 puts the ends at 7 and 5 o'clock).
+ */
+export function clockPosition(norm: number, travel: number): string {
+  const angle = -travel / 2 + clamp(norm, 0, 1) * travel; // degrees clockwise from 12
+  let halves = Math.round((angle / 30) * 2);               // half hours from 12
+  halves = ((halves % 24) + 24) % 24;
+  const hour = Math.floor(halves / 2) || 12;
+  return halves % 2 ? `${hour}:30` : `${hour} o'clock`;
+}
+
+/**
+ * The clock position of a value on a panel knob, or '' when it has none: only knobs with a
+ * pointer and end stops, on a panel that declares its `knobTravel` (the Moogs), are read this
+ * way. `layout` is the instrument's panel; a knob may turn less than the panel's travel
+ * (`KnobElement.travel`, the DFAM's small knobs).
+ */
+export function knobClock(
+  layout: { knobTravel?: number; elements: readonly { kind: string; control?: unknown; travel?: number }[] } | null | undefined,
+  spec: ControlSpec | undefined,
+  id: string,
+  value: ControlValue | undefined,
+): string {
+  if (!layout?.knobTravel || !spec || spec.type !== 'knob' || spec.endless || typeof value !== 'number') return '';
+  const el = layout.elements.find(e => e.kind === 'knob' && e.control === id);
+  return el ? clockPosition(valueToNorm(spec, value), el.travel ?? layout.knobTravel) : '';
+}
+
 /** Human readable target for lesson UI ("800 Hz", "LP", "ON", pattern) */
 export function describeValue(spec: ControlSpec | undefined, value: ControlValue | undefined): string {
   if (value === undefined) return '';

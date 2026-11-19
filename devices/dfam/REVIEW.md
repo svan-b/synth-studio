@@ -175,3 +175,24 @@ touched where the old defaults had them.
 
 **Gate:** tsc, lint, validate, build; DFAM lessons 20, 0 failed; audio QA 40 presets, 0 flagged.
 
+
+## Signal path, clock positions and the manual's tour
+
+**Signal path** (`spec.ts` `signalFlow`, drawn by `components/panel/SignalPath.tsx`): the blocks
+and connections of the manual's DFAM SIGNAL FLOW (p.7), drawn in our own style. VCO 1, VCO 2 and noise (or EXT AUDIO) into the mixer, then
+VCF, VCA and VOLUME; the VCO EG to both oscillators, the VCF EG and the VCA EG under what they
+move, VCO 1 to VCO 2 for FM and hard sync, and the sequencer to the oscillators' pitch and to all
+three envelopes (trigger and velocity, p.23). NOISE / VCF MOD is named in the notes of the noise
+and filter blocks and not drawn. Every control and jack belongs to a block.
+
+**Clock positions.** The manual gives settings by the clock ("3 O'clock"). The readout above the
+panel now shows where the touched knob points, to the nearest half hour. The mixer and sequencer
+knobs are drawn with the 270 degree sweep measured on the patch sheets (7:30 to 4:30; the large
+knobs keep 300, 7 to 5), so the default panel reads as the manual draws it: VCO 1 LEVEL at
+3 o'clock, the VELOCITY knobs at 4:30, 12 and 3. Values and sound are unchanged.
+
+**Lesson** `dfam-sd0-manual-tour` ("The manual's first patch", after the foundations) follows the
+tour of pp.8-12 from the Default settings, each setting given by the clock as the manual gives it:
+VCO 1 FREQUENCY to 10:30, EG AMOUNT to 3, VCO DECAY to 9, SEQ PITCH MOD, CUTOFF to 11, VCF EG
+AMOUNT to 3, VCF DECAY to 10, noise to 1, the two VCA DECAY lengths, then VCO 2 and the velocity
+rests as the learner's own. Lesson audit 0 findings; lesson runner 0 failed, 0 manual, 0 auto.

@@ -104,6 +104,39 @@ export interface SignalFlowSection {
     width: number;
     height: number;
   };
+
+  // ---- The signal path diagram (components/panel/SignalPath.tsx) ----------
+  // A section with `at` is a block of the diagram: our own drawing of the facts in the
+  // maker's signal flow chart. Sections without it only group controls.
+
+  /** The words in the block, as the panel or the manual prints them (default: `name`) */
+  label?: string;
+  /** 'audio': the sound passes through it. 'control': it moves other blocks (envelope, LFO, sequencer). Default 'audio'. */
+  role?: 'audio' | 'control';
+  /** Grid cell [column, row]; halves are allowed (a block between two rows) */
+  at?: [number, number];
+  /** Size in cells [columns, rows]; default [1, 1] */
+  size?: [number, number];
+  /** Audio: the blocks this one's sound goes to. '>Out' ends the path with an arrow and that word. */
+  to?: string[];
+  /**
+   * Control: the blocks this one acts on, and what it moves there ("cutoff", "pitch").
+   * `to: '*'`: the player chooses the destinations (an Elektron LFO); `what` then says so.
+   * `quiet`: named in the block's notes but not drawn (a wire that would only add clutter).
+   * `both`: the two blocks act on each other (an arrowhead at each end).
+   * `via`: the way round when the direct line is taken: an arc 'over' or 'under' the blocks
+   * between, or right round the outside of the chart as the manuals draw a long control line.
+   */
+  mods?: { to: string; what: string; quiet?: boolean; both?: boolean; via?: 'over' | 'under' | 'around-over' | 'around-under' }[];
+  /** Patch points that belong to this block: they light up with its controls */
+  jacks?: string[];
+  /** Other panel ids lit with the block: 'keyboard', or the event of a key the device draws itself */
+  panel?: string[];
+  /**
+   * The same block on other tracks or channels: a regular expression over control ids, so a
+   * touch on any of them finds this block (the Analog Four lists track 1 in `controls`)
+   */
+  match?: string;
 }
 
 // ----------------------------------------------------------------------------

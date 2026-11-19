@@ -189,3 +189,14 @@ panel now prints the symbols; the readout and the lessons keep the words. HI PAS
 (Open, 2): the manual's own note, that any RESONANCE brings the bass back, describes the input
 minus the low-pass, which is what the twin does and what gives the gentle slope.
 
+
+## Signal path and the saw symbol
+
+**Signal path** (`spec.ts` `signalFlow`): the blocks and connections of the manual's ANALOG
+SIGNAL PATH (p.10), drawn in our own style: noise (or EXT. AUDIO) and the VCO into the mixer, VCF,
+VCA, VOLUME; the LFO to the filter and, round the outside, to the VCO; the EG to the filter, the
+VCA and, round the outside, to the VCO; KB / SEQ to the VCO's pitch and the EG's gate.
+VC MIX, MULT and ASSIGN are a block of their own, outside the path until they are cabled.
+
+**VCO WAVE.** The sawtooth printed under the lever falls from left to right, its upright edge on
+the left (p.11). The twin printed it mirrored; it now uses the left-edged glyph.

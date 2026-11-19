@@ -288,8 +288,23 @@ oscillators, AM, sync, the filters' types and the twelve envelope shapes against
 (p.72-75), the FX order (p.94-96).
 
 **Still not modelled** (REFERENCE.md lists them): the CV track's ENV and LFO pages and the CV
-pages that change with the CV type (p.98-100; the twin has no CV outputs), the tuning-fork LFO
-multipliers (p.92), control-all (p.18), page randomise and reset (p.87).
+pages that change with the CV type (p.98-100; the twin has no CV outputs) and the tuning-fork LFO
+multipliers (p.92).
+
+**Added after the cross-check:** control all (p.18) and page randomise and reload (p.17, p.21),
+both by two-key holds as on the hardware (`pageRandomOrReload` in `ui.tsx`, the control-all branch
+of `interceptChange` in `index.ts`). Checked with two touch points (`scripts/e2e/a4-combos.cjs`, in the core e2e): [FLTR] + [YES] rolls the
+FILTERS page anew on each press and [FLTR] + [NO] returns it to the kit's values; [YES] + [AMP]
+and [NO] + [AMP] do the same from the other key; a tap on each in turn changes nothing; [T2] held
+and FRQ turned moves FRQ on all four tracks by the same amount, [NO] takes it back, and without
+the track key only T2 moves. The LFO trig modes now read FREE, TRIG, HOLD, ONE and HALF in the
+readout and the lessons too, as on the screen (the manual's text shortens them, its LFO page
+figure and the Rytm manual spell them out).
+
+**Signal path** (`spec.ts` `signalFlow`): one synth track, drawn in our own style from the facts
+of p.15 and Appendix E (p.110): OSC 1 and OSC 2 with their subs and NOISE into the ladder filter, OVERDRIVE, the
+multimode filter, AMP and out, the sends down to the FX track, ENV F to both filters, ENV 2 and
+the LFOs free. A block opens its page on the active synth track; the FX block selects the FX track.
 
 **Upgrade** (`lib/studio/upgrades.ts`, store 13 / project 10): a saved A4 whose delay did not
 ping-pong keeps its echo in the middle (WID 0), one that did keeps the full swing (WID 63). The

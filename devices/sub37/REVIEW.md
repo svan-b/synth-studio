@@ -283,3 +283,12 @@ No control id, jack id, range or default changed, so saved settings and cables n
 (four side-panel jacks only moved on the panel). Saved patches will sound slightly different: cleaner
 at mixer levels up to 6, and with MULTIDRIVE at 4-6 up to about 3.5 dB quieter than before (the old
 drive was mostly level); the default panel is 0.4 dB louder.
+
+## Signal path
+
+`spec.ts` `signalFlow`: the blocks and connections of the manual's chart (p.11), drawn in our own style. OSC 1 with its sub oscillator, OSC 2, and
+noise with FDBK / EXT IN into the five-channel mixer, then the ladder filter, MULTIDRIVE, the VCA
+and the outputs; the Filter EG and the Amp EG under what they move; MOD 1 and MOD 2 above the
+filter, with their pitch route over the top to the oscillators; the keys, glide and arpeggiator
+to both oscillators and, as gates, to both envelopes. The feedback loop (mixer output back into
+the mixer, with nothing in EXT IN) is said in the noise block's note and not drawn.

@@ -143,7 +143,7 @@ NOISE (digital)┘                                                     │      
 | ENV F | Always drives both cutoffs (DEP knobs), plus two free destinations | (A4 MKII manual, p.89, p.91) |
 | Noise | S&H, COL (-64 red, -32 pink, 0 white, positive high-passed), FAD (0 constant, + out, - in), LEV | (A4 MKII manual, p.87) |
 | Envelope shapes | 12: six shapes, each with and without restart from zero | (A4 MKII manual, p.74-75) |
-| LFO modes | FRE, TRG, HLD, ONE, HLF; SPD bipolar (negative plays backwards); 16, 32 or 64 give straight beats | (A4 MKII manual, p.92) |
+| LFO modes | FREE, TRIG, HOLD, ONE, HALF (the screen's words; the manual's text shortens them to FRE, TRG, HLD, HLF); SPD bipolar (negative plays backwards); 16, 32 or 64 give straight beats | (A4 MKII manual, p.92) |
 | LFO SPH | The phase a trig restarts the wave at. With WAV on RND it adds slew to the steps instead (the twin: the share of each step spent gliding to the new value; a trig starts a new step). The same on the FX LFOs | (A4 MKII manual, p.92, p.97) |
 
 ## Pages and encoder slots
@@ -238,13 +238,15 @@ The shared Elektron sequencer (`lib/sequencer/elektron`, see
 | LIVE RECORDING erase | While held, every step the playhead reaches loses: its locks ([FUNC] + [NO]; NOT / VEL / LEN stay), its trig ([TRACK] + [NO], several tracks at once), or one parameter's lock ([NO] + turning that knob: the twin's knobs have no push switch) | (A4 MKII manual, p.41, p.47, p.50) |
 | STEP RECORDING | [RECORD] + [STOP] enters it (the RECORD key flashes); [STOP] again with [RECORD] held switches STANDARD / JUMP; [RECORD] leaves it. A trig key picks the active step (green, flashing; held, it takes locks); LEFT / RIGHT move it. Each key writes a note trig there (its locks stay) and moves on: one step, or in JUMP the NOTE page's LEN (which is also locked on the trig). A key pressed while another is down joins its chord (POLY). [NO] removes the active step's trig (a rest) and moves on. With [YES] held the trig's LEN is how long the key was held | (A4 MKII manual, p.41-42) |
 | Chains and songs | Quick chains: hold the first pattern's trig and press more; songs play row by row with repeats, song mutes and transpose, then stop | (A4 MKII manual, p.55-57) |
+| Page randomise and reload | A [PARAMETER] key held + [YES] rolls random values for every parameter of its page (a new roll each press); + [NO] puts the page back as it was last saved: the project's kit slot, else the demo kit as it came. [YES] or [NO] held + a [PARAMETER] key does the same. The page is the key's open page (NOISE under [OSC1]), else its first. Two fingers on a touch screen | (A4 MKII manual, p.17, p.21) |
+| Control all | With a [T1-4] key held, a DATA ENTRY knob moves its parameter on all four synth tracks by the same amount, each from where it stands (clamped at the ends). [NO] before the track key is released takes the changes back. Not while a trig is held (that writes locks) or in LIVE RECORDING. **Twin**: the manual does not say whether the change is the same amount or the same value; the twin moves every track by the knob's amount, which keeps the tracks' differences | (A4 MKII manual, p.18) |
 | Demo song | Night Drive loops back to row 2 so it keeps playing while you explore (SONG EDIT > END makes it stop like the hardware's) | twin choice |
 
 ## What the twin simplifies or leaves out
 
 - **Kits per project** are slots in the project (`a4kits`, up to 128) rather than +Drive files; kit names are "KIT nn" (no NAMING menu), and the six preset kits stay in the KIT menu as they were.
 - **No CV or audio-input jacks.** The CV track is sequenced and shown; IN L / IN R and the EXT IN page are present but silent.
-- **No sound locks** (A4 MKII manual, p.50), no Euclidean NOTE page (p.46-47), no ARP SETUP step offsets (p.44), no KEY SCALE / KEY NOTE (p.47), no control-all (p.18), no page randomise / revert (p.17), and no page playback ([PAGE] + [TRIG 1-4], p.39). LIVE RECORDING does not record note lengths from the keys (they take the NOTE page's LEN), and the CLICK TRACK PREROLL is the studio's count-in (p.48).
+- **No sound locks** (A4 MKII manual, p.50), no Euclidean NOTE page (p.46-47), no ARP SETUP step offsets (p.44), no KEY SCALE / KEY NOTE (p.47), and no page playback ([PAGE] + [TRIG 1-4], p.39). LIVE RECORDING does not record note lengths from the keys (they take the NOTE page's LEN), and the CLICK TRACK PREROLL is the studio's count-in (p.48).
 - **Performance macros are fixed** (LP sweep, HP sweep, resonance ...): there is no PERFORMANCE SETUP (p.26-27); QPER picks one macro, not several (p.28).
 - **LFO multiplier**: the × and · groups (24 values); the tuning-fork group that syncs to an oscillator is left out (A4 MKII manual, p.92).
 - **Modulation destinations**: continuous parameters only (55 synth, 22 FX); discrete targets such as waveforms are left out.

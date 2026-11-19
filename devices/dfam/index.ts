@@ -22,6 +22,7 @@ const dfam: DeviceModule = {
     return () => api.event('audition:stop');
   },
   tips: [
+    'Reset gives the Default settings the manual starts from (p.8). Touch a knob and the line above the panel shows its value and where it points, as on a clock face: the manual and its patch sheets write every setting that way. The large knobs run from 7 to 5 o\'clock, the small ones from 7:30 to 4:30.',
     'TRIGGER plays the current step. RUN / STOP (or the Space bar) plays the 8-step sequence; ADVANCE moves one step without playing it.',
     'Silent TRIGGER? The current step\'s VELOCITY is probably at 0 - TRIGGER plays at that step\'s velocity, just like the hardware.',
     'Patch: tap an output jack (white label), then an input - or drag between them. Tap a cable to unplug it.',

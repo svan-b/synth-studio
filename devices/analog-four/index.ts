@@ -12,7 +12,7 @@ import { ANALOG_FOUR } from './spec';
 import { ANALOG_FOUR_LAYOUT } from './layout';
 import { ANALOG_FOUR_LESSONS } from './lessons';
 import { AnalogFourEngine } from './engine';
-import { CV_BY_KEY, FX_BY_KEY, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS, TRACK_OUTS } from './params';
+import { CV_BY_KEY, FX_BY_KEY, FX_TRACK, SEQ_TRACKS, SYNTH_BY_KEY, SYNTH_TRACKS, TRACK_OUTS, V } from './params';
 import { ARP_KEYS, isArpKey, patternArp, setPatternArp, type ArpSettings } from './arp';
 import { KIT_BY_ID, migrateKits } from './kits';
 
@@ -50,6 +50,12 @@ export const LOCKS: LockOptions = {
 
 const base = projectData({ tracks: SEQ_TRACKS, defaults: { note: 60, vel: 100 } });
 
+/** The page each block of the signal path opens (spec.ts signalFlow ids) */
+const PATH_VIEWS: Record<string, number> = {
+  sequencer: V.NOTE, osc1: V.OSC1, noise: V.OSC1_2, osc2: V.OSC2, ladder: V.FLTR, overdrive: V.FLTR, multimode: V.FLTR,
+  amp: V.AMP, envf: V.ENV, env2: V.ENV_2, lfo1: V.LFO, lfo2: V.LFO_2, fx: V.FLTR,
+};
+
 const analogFour: DeviceModule = {
   spec: ANALOG_FOUR,
   layout: ANALOG_FOUR_LAYOUT,
@@ -65,6 +71,21 @@ const analogFour: DeviceModule = {
     // the sequencer's own repairs, then the project's kits to the current kit format
     migrate: saved => migrateKits(base.migrate(saved)),
   },
+  // Signal path: a block of the voice opens its page on a synth track; the effects are the FX track,
+  // where the FLTR key opens CHORUS (AMP is DELAY and ENV is REVERB, as printed under the keys)
+  signalPath: {
+    open: (block, api) => {
+      const view = PATH_VIEWS[block];
+      if (view === undefined) return;
+      const track = Math.round(Number(api.values.track) || 0);
+      if (block === 'fx') {
+        if (track !== FX_TRACK) api.setValue('track', FX_TRACK);
+      } else if (track >= SYNTH_TRACKS) api.setValue('track', 0);
+      api.setValue('page', view);
+      // an open menu would cover the page (ui.tsx UIK.menu, the sequencer's UI.menu and trig editor)
+      api.setUi({ a4menu: null, seqMenu: null, trigEditor: null });
+    },
+  },
   interceptChange: (id: string, value: ControlValue, api) => {
     // [FUNC] + TRACK LEVEL opens the SOUND BROWSER (manual p.12, p.21); while it is open TRACK LEVEL
     // scrolls its list on the hardware, so it leaves the track level alone here too
@@ -79,6 +100,27 @@ const analogFour: DeviceModule = {
     if (id === 'swing' && typeof value === 'number') {
       api.updateData(d => { const p = asProject(d, SEQ_TRACKS); return updatePatternSettings(p, p.active, { swing: value }); });
       return true;
+    }
+    // CONTROL ALL (manual p.18): with a [T1-4] key held, a knob moves its parameter on all four synth
+    // tracks by the same amount, each from where it stands. The values from before are kept while the
+    // key is down, so [NO] can take the change back (ui.tsx: UIK.trackDown, UIK.ctlAll).
+    const all = /^t([1-4])_(.+)$/.exec(id);
+    const tracksDown = api.ui.a4trackDown;
+    if (all && typeof value === 'number' && Array.isArray(tracksDown) && tracksDown.some(t => typeof t === 'number' && t < SYNTH_TRACKS)
+      && !heldSteps(api.ui).length && api.values.live_rec !== true) {
+      const p = SYNTH_BY_KEY[all[2]];
+      if (p && !all[2].startsWith('trig_') && !isArpKey(all[2]) && all[2] !== 'level') {
+        const delta = value - (typeof api.values[id] === 'number' ? (api.values[id] as number) : p.def);
+        const before = { ...((api.ui.a4ctlAll as Record<string, ControlValue> | null | undefined) ?? {}) };
+        for (let t = 1; t <= SYNTH_TRACKS; t++) {
+          const cid = `t${t}_${all[2]}`;
+          const cur = typeof api.values[cid] === 'number' ? (api.values[cid] as number) : p.def;
+          if (!(cid in before)) before[cid] = cur;
+          api.setValue(cid, cid === id ? value : Math.max(p.min, Math.min(p.max, cur + delta)));
+        }
+        api.setUi({ a4ctlAll: before, a4msg: { text: `CONTROL ALL: ${p.name.toUpperCase()} ON T1-T4 ([NO] REVERTS)`, until: Date.now() + 1400 } });
+        return true;
+      }
     }
     // micro timing and conditions belong to a held trig: without one there is nothing to set
     if (/^t\d_trig_(micro|cond|envf|env2|lfo1|lfo2)$/.test(id) && !heldSteps(api.ui).length) return true;
@@ -156,6 +198,7 @@ const analogFour: DeviceModule = {
     'Space = PLAY/STOP; synced to the studio it is the studio transport. On its own clock [PLAY] while playing pauses and [PLAY] resumes; [STOP] cuts the sound while the delay rings on, and [STOP][STOP] fades the send effects. Keys A-K play the active track, Z/X shift the octave. [SND] or the TRACK LEVEL push opens the sound browser; [KIT] loads whole kits.',
     'Chords: [FUNC] + [MIX] opens POLY CONFIG. Tick voices (or TRIG 1-4) to share them between their tracks, then hold a trig and press several keys together to store a chord. ALLOCATION picks how notes find a voice; UNISON stacks them all on one note.',
     'Recording: [RECORD] + [PLAY] records live - played notes, and knob turns as locks on the steps that pass ([PLAY][PLAY] quantizes). [RECORD] + [STOP] is STEP RECORDING: each key writes the active step and moves on. [PAGE] or held trigs + [RECORD] / [STOP] / [PLAY] copy, paste and clear.',
+    'Two-key moves, with two fingers on a touch screen: hold a page key (OSC 1, FILTER, AMP...) and press [YES] to roll random values for that page, [NO] to bring the page back as it was saved. Hold a track key and turn a knob for CONTROL ALL: the parameter moves on all four synth tracks, and [NO] before you let go takes it back.',
     'Simplified: one kit per project, no CV or audio-input jacks (the CV track is sequenced and shown), no sound locks and no Euclidean NOTE page. Value-to-Hz and -seconds curves are fits to the documented ranges.',
   ],
 };

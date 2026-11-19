@@ -15,6 +15,7 @@ import { isProject } from '../lib/sequencer/elektron/project';
 import { MAX_STEPS } from '../lib/sequencer/elektron/types';
 import { patternPatchProblem } from '../lib/studio/elektronEdits';
 import { DEMO_RECORDINGS, FULL, refsOf, resolveClip } from '../lib/studio/demos/recordings';
+import { blockOverlaps, blockTargets, layoutSignalPath, pathSections, wireCrossings } from '../lib/signalPath';
 
 type Issue = { level: 'error' | 'warn'; msg: string };
 
@@ -188,6 +189,69 @@ function radius(el: PanelElement): number | null {
   }
 }
 
+/** Widest diagram that fits an iPad held upright without scrolling sideways (820 px less the page margins) */
+const PATH_MAX_WIDTH = 780;
+/** Longest line of a block's label that fits its 84 px (11 px condensed capitals) */
+const PATH_LABEL_CHARS = 13;
+/** Longest description the note beside the diagram shows in three lines */
+const PATH_DESCRIPTION_CHARS = 215;
+
+/**
+ * The signal path: every id it names exists, the drawing has no two blocks in one cell and no
+ * audio wire through a block, it fits an iPad, and every control on the panel belongs to a block
+ * (so touching it lights one up).
+ */
+function validateSignalPath(mod: DeviceModule, jacks: Map<string, string>, onPanel: Set<string>, out: Issue[]) {
+  const err = (m: string) => out.push({ level: 'error', msg: `signal path: ${m}` });
+  const warn = (m: string) => out.push({ level: 'warn', msg: `signal path: ${m}` });
+  const flow = mod.spec.signalFlow;
+  const controls = mod.spec.controls;
+  const seen = new Set<string>();
+  flow.forEach(s => {
+    if (seen.has(s.id)) err(`two sections called "${s.id}"`);
+    seen.add(s.id);
+    s.controls.forEach(c => { if (!controls[c]) err(`${s.id} lists the control "${c}", which the spec does not have`); });
+    s.jacks?.forEach(j => { if (!jacks.has(j)) err(`${s.id} lists the jack "${j}", which the patch bay does not have`); });
+  });
+  const blocks = pathSections(flow);
+  if (!blocks.length) return;
+  const ids = new Set(blocks.map(b => b.id));
+  const all = Object.keys(controls);
+  blocks.forEach(b => {
+    const w = `block ${b.id}`;
+    if (!b.description) err(`${w} has no description: it is what the learner reads on choosing it`);
+    else if (b.description.length > PATH_DESCRIPTION_CHARS) warn(`${w}: the description is ${b.description.length} characters, more than the ${PATH_DESCRIPTION_CHARS} the note has room for`);
+    const lines = (b.label ?? b.name).split('\n');
+    if (lines.length > 3) err(`${w}: the label has ${lines.length} lines, a block has room for 3`);
+    lines.forEach(l => { if (l.trim().length > PATH_LABEL_CHARS) warn(`${w}: the label line "${l.trim()}" is over ${PATH_LABEL_CHARS} characters and may not fit the block`); });
+    b.to?.forEach(t => { if (!t.startsWith('>') && !ids.has(t)) err(`${w} sends its sound to "${t}", which is not a block`); });
+    b.mods?.forEach(m => {
+      if (m.to !== '*' && !ids.has(m.to)) err(`${w} moves "${m.to}", which is not a block`);
+      if (!m.what) err(`${w} > ${m.to}: say what it moves there`);
+    });
+    if (b.role === 'control' && b.to?.length) err(`${w} is a control block: it moves other blocks (mods), sound does not pass through it (to)`);
+    if (b.match) {
+      let re: RegExp | null = null;
+      try { re = new RegExp(b.match); } catch { err(`${w}: match is not a regular expression`); }
+      if (re && !all.some(c => re!.test(c))) warn(`${w}: match fits no control`);
+    }
+    if (!blockTargets(b, all).length && !(mod.signalPath?.open)) warn(`${w} lights nothing on the panel`);
+  });
+  const layout = layoutSignalPath(flow);
+  blockOverlaps(layout).forEach(m => err(m));
+  wireCrossings(layout).forEach(m => err(m));
+  if (layout.width > PATH_MAX_WIDTH) warn(`the diagram is ${layout.width} px wide: over ${PATH_MAX_WIDTH} px it scrolls sideways on an iPad held upright`);
+  // Every control someone can touch finds a block
+  const ui = new Set(mod.uiControls ?? []);
+  const covered = new Set(blocks.flatMap(b => blockTargets(b, all)));
+  // (a section without a place in the diagram names controls that are knowingly outside the path)
+  const outside = new Set(flow.filter(s => !s.at).flatMap(s => blockTargets(s, all)));
+  const loose = [...onPanel].filter(c => !covered.has(c) && !ui.has(c) && !outside.has(c));
+  if (loose.length) warn(`${loose.length} control(s) on the panel belong to no block: ${loose.slice(0, 12).join(', ')}${loose.length > 12 ? '…' : ''}`);
+  const looseJacks = [...jacks.keys()].filter(j => !blocks.some(b => b.jacks?.includes(j)));
+  if (looseJacks.length) warn(`${looseJacks.length} jack(s) belong to no block: ${looseJacks.join(', ')}`);
+}
+
 function validate(id: string, mod: DeviceModule): Issue[] {
   const out: Issue[] = [];
   const err = (m: string) => out.push({ level: 'error', msg: m });
@@ -305,6 +369,9 @@ function validate(id: string, mod: DeviceModule): Issue[] {
       }
     }
   }
+
+  // Signal path diagram (spec.signalFlow blocks, components/panel/SignalPath.tsx)
+  validateSignalPath(mod, jacks, onPanel, out);
 
   // Presets
   Object.entries(spec.presets ?? {}).forEach(([pid, p]) => {

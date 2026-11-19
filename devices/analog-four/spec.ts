@@ -172,6 +172,9 @@ SOUNDS.forEach(s => {
   };
 });
 
+/** Track 1's control ids for the parameters of these pages (the signal path lists one track) */
+const T1 = (pages: string[]): string[] => SYNTH_PARAMS.filter(p => pages.includes(p.page)).map(p => tid(0, p.key));
+
 export const ANALOG_FOUR: DeviceSpec = {
   id: 'analog-four',
   name: 'Analog Four MKII',
@@ -182,13 +185,60 @@ export const ANALOG_FOUR: DeviceSpec = {
   dimensions: { width: 385, height: 225, depth: 82 },
   display: { width: 1194, height: 698, scale: 3.1 },
 
+  // The signal path of one synth track, drawn in our own style from the facts of the manual's
+  // charts (ANALOG FOUR MKII SIGNAL PATH, p.15, and Appendix E, p.110): two oscillators and noise into the ladder filter,
+  // overdrive, the multimode filter, the amp, and the sends to the FX track. `controls` are track
+  // 1's; `match` finds the same block on tracks 2 to 4. Choosing a block opens its page (index.ts).
   signalFlow: [
-    { id: 'sequencer', name: 'Sequencer', order: 1, description: 'Patterns of up to 64 steps per track, p-locks, conditions, chains and songs', controls: ['play', 'tempo', 'swing'] },
-    { id: 'oscillators', name: 'Oscillators', order: 2, description: 'OSC 1 / OSC 2 with sub oscillators, sync and AM; NOISE', controls: SYNTH_PARAMS.filter(p => ['osc1', 'osc2', 'osc12', 'noise'].includes(p.page)).map(p => tid(0, p.key)) },
-    { id: 'filters', name: 'Filters', order: 3, description: '4-pole ladder low-pass, overdrive, 2-pole multimode', controls: SYNTH_PARAMS.filter(p => p.page === 'filters').map(p => tid(0, p.key)) },
-    { id: 'amp', name: 'Amp', order: 4, description: 'Amp envelope, FX sends, pan, volume', controls: SYNTH_PARAMS.filter(p => p.page === 'amp').map(p => tid(0, p.key)) },
-    { id: 'modulation', name: 'Envelopes and LFOs', order: 5, description: 'ENV F, ENV 2, LFO 1, LFO 2, velocity modulation', controls: SYNTH_PARAMS.filter(p => ['envf', 'env2', 'lfo1', 'lfo2', 'vmod'].includes(p.page)).map(p => tid(0, p.key)) },
-    { id: 'fx', name: 'FX track', order: 6, description: 'Chorus, delay, reverb, FX LFOs', controls: FX_PARAMS.filter(p => !p.key.startsWith('trig_')).map(p => fxid(p.key)) },
+    { id: 'sequencer', name: 'Sequencer', label: 'Sequencer', role: 'control', order: 1, at: [0, 0.5],
+      description: 'Each track has its own pattern of up to 64 steps. A note trig sends a pitch to the oscillators and starts the envelopes. The NOTE and ARP pages set what a new trig plays.',
+      controls: ['play', 'tempo', 'swing', 'rec', 'live_rec', 'trns', 'trig_mode', ...T1(['note', 'arp'])], match: '^t[1-6]_(trig|arp)_',
+      mods: [{ to: 'osc1', what: 'pitch' }, { to: 'osc2', what: 'pitch' }] },
+    { id: 'osc1', name: 'Oscillator 1 and its sub oscillator', label: 'Osc 1\n+ Sub', order: 2, at: [1.25, 0], to: ['ladder'],
+      description: 'An analog oscillator: sawtooth, transistor pulse, pulse or triangle, with pulse width and its own PWM. SUB adds a square one or two octaves down.',
+      controls: T1(['osc1']), match: '^t[1-4]_osc1_',
+      mods: [{ to: 'osc2', what: 'sync and AM, either way (OSC 1&2 page)', both: true }] },
+    { id: 'osc2', name: 'Oscillator 2 and its sub oscillator', label: 'Osc 2\n+ Sub', order: 3, at: [1.25, 1], to: ['ladder'],
+      description: 'The second oscillator, the same as the first. Its key opens a second page, OSC 1&2: sync, amplitude modulation, vibrato, slide and pitch bend for both.',
+      controls: T1(['osc2', 'osc12']), match: '^t[1-4]_osc(2)?_' },
+    { id: 'noise', name: 'Noise', label: 'Noise', order: 4, at: [1.25, 2], to: ['ladder'],
+      description: 'A noise generator with a colour filter and sample and hold. It has its own fade envelope, for a burst at the start of a note or a slow swell.',
+      controls: T1(['noise']), match: '^t[1-4]_noise_' },
+    { id: 'ladder', name: 'Filter 1: ladder low-pass', label: 'Ladder\nfilter', order: 5, at: [2.25, 0], size: [1, 3], to: ['overdrive'],
+      description: 'The first filter, a 4-pole low-pass. FRQ sets the cutoff and RES a peak there that can ring on its own. DEP is how far the filter envelope moves it.',
+      controls: ['t1_flt1_frq', 't1_flt1_res', 't1_flt1_trk', 't1_flt1_dep'], match: '^t[1-4]_flt1_(frq|res|trk|dep)$' },
+    { id: 'overdrive', name: 'Overdrive', label: 'Overdrive', order: 6, at: [3.25, 1], to: ['multimode'],
+      description: 'An analog overdrive between the two filters. OVR to the right adds grit. To the left it cleans the signal by lowering the level into the second filter.',
+      controls: ['t1_flt1_ovr'], match: '^t[1-4]_flt1_ovr$' },
+    { id: 'multimode', name: 'Filter 2: multimode', label: 'Multimode\nfilter', order: 7, at: [4.25, 1], to: ['amp'],
+      description: 'The second filter, 2-pole, after the overdrive. TYP picks one of seven shapes: low-pass, high-pass, band-pass, band-stop and peak.',
+      controls: T1(['filters']).filter(id => id.startsWith('t1_flt2_')), match: '^t[1-4]_flt2_' },
+    { id: 'amp', name: 'Amp', label: 'Amp', order: 8, at: [5.25, 1], to: ['fx', '>Out'],
+      description: 'The amplifier and its own envelope (ATK, DEC, SUS, REL), then pan and volume. CHO, DEL and REV send copies of the sound to the three effects.',
+      controls: [...T1(['amp']), 't1_level'], match: '^t[1-4]_(amp_|level$)' },
+    { id: 'fx', name: 'FX track: chorus, delay, reverb', label: 'Chorus\nDelay\nReverb', order: 9, at: [5.25, 2], to: ['>Out'],
+      description: 'Three send effects shared by all four tracks. They are the FX track: select it and the FLTR, AMP and ENV keys open CHORUS, DELAY and REVERB. Their sound joins the main outputs.',
+      controls: FX_PARAMS.filter(p => !p.key.startsWith('trig_')).map(p => fxid(p.key)), match: '^fx_' },
+    { id: 'envf', name: 'Filter envelope (ENV F)', label: 'Env F', role: 'control', order: 10, at: [3.25, 2],
+      description: 'The envelope wired to both filters: each filter takes as much of it as its DEP says. It also has two free destinations, DST A and DST B.',
+      controls: T1(['envf']), match: '^t[1-4]_envf_',
+      mods: [{ to: 'ladder', what: 'cutoff, by its DEP' }, { to: 'multimode', what: 'cutoff, by its DEP' }] },
+    { id: 'env2', name: 'Envelope 2', label: 'Env 2', role: 'control', order: 11, at: [3.25, 0],
+      description: 'A free envelope. It does nothing until DST A or DST B names a parameter: pitch for a kick, pulse width, an effect send.',
+      controls: T1(['env2']), match: '^t[1-4]_env2_',
+      mods: [{ to: '*', what: 'any two parameters you choose (DST A, DST B)' }] },
+    { id: 'lfo1', name: 'LFO 1', label: 'LFO 1', role: 'control', order: 12, at: [4.25, 0],
+      description: 'A low frequency oscillator with seven waves, tempo multipliers and a fade. It moves the two parameters you name in DST A and DST B.',
+      controls: T1(['lfo1']), match: '^t[1-4]_lfo1_',
+      mods: [{ to: '*', what: 'any two parameters you choose (DST A, DST B)' }] },
+    { id: 'lfo2', name: 'LFO 2', label: 'LFO 2', role: 'control', order: 13, at: [5.25, 0],
+      description: 'The second LFO, the same as the first. It can also move LFO 1, for movement that itself moves.',
+      controls: T1(['lfo2']), match: '^t[1-4]_lfo2_',
+      mods: [{ to: '*', what: 'any two parameters you choose (DST A, DST B)' }] },
+    // Not part of one voice's path: the velocity and sound settings pages, the CV track, the
+    // performance macros, polyphony and the main volume
+    { id: 'other', name: 'Outside one voice', order: 14, controls: ['main_volume', 'perf_mute', 'kit_project', 'kit_project_loaded'],
+      match: '^(t[1-4]_(vmod|snd)_|cv_|perf_[a-j]$|poly_)' },
   ],
 
   controls,

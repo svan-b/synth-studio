@@ -130,6 +130,8 @@ interface LessonSessionState {
   lessonSnapshot?: { instance: string; state: InstanceState };
   /** Spotlight: dim everything except what the step is about */
   focusMode: boolean;
+  /** The signal path diagram above an instrument's panel is open (a preference, kept between visits) */
+  signalPath: boolean;
   /** "Show me" demonstration in progress (auto-advance waits until it ends) */
   lessonDemo: LessonDemo | null;
   /**
@@ -213,6 +215,7 @@ interface StudioStore extends StudioStoreState {
   revealStep: () => void;
   showHint: () => void;
   setFocusMode: (on: boolean) => void;
+  setSignalPath: (on: boolean) => void;
   reevaluate: () => void;
   /** A press on the panel (momentary button, pad, trig key, transport key): control ids and/or event names */
   lessonPress: (instance: string, ids: string[]) => void;
@@ -709,6 +712,7 @@ export const useStudioStore = create<StudioStore>()(
         session: {},
         lessonSnapshot: undefined,
         focusMode: true,
+        signalPath: false,
         lessonDemo: null,
         lessonStudio: undefined,
         lessonBackups: [],
@@ -1203,6 +1207,7 @@ export const useStudioStore = create<StudioStore>()(
         },
 
         setFocusMode: on => set({ focusMode: on }),
+        setSignalPath: on => set({ signalPath: on }),
 
         reevaluate: () => evaluate(),
 
@@ -1306,6 +1311,7 @@ export const useStudioStore = create<StudioStore>()(
         completedLessons: s.completedLessons,
         review: s.review,
         focusMode: s.focusMode,
+        signalPath: s.signalPath,
         // A lesson that replaced the studio must never cost the learner their track, even after a reload
         lessonBackups: s.lessonBackups,
       }),
@@ -1340,6 +1346,7 @@ export const useStudioStore = create<StudioStore>()(
           completedLessons: upgradeCompletedLessons((old.completedLessons as string[]) ?? [], version),
           review: (old.review as Record<string, ReviewItem>) ?? {},
           focusMode: (old.focusMode as boolean) ?? true,
+          signalPath: (old.signalPath as boolean) ?? false,
           // Studios saved before lessons get the same upgrades, so bringing one back sounds as it did
           lessonBackups,
         } as unknown as StudioStore;

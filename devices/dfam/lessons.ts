@@ -726,6 +726,143 @@ const f7: Lesson = {
 // SOUND DESIGN
 // ============================================================================
 
+/**
+ * The tour the manual opens with (EXPLORING THE DFAM, pp.8-12), from its Default settings, which
+ * are what Reset gives. The manual writes every setting as a clock position; the readout above
+ * the panel shows one for the knob last touched. Targets are those positions as values: a large
+ * knob turns 300 degrees, from 7 to 5 o'clock, a small one 270, from 7:30 to 4:30.
+ */
+const tour: Lesson = {
+  id: 'dfam-sd0-manual-tour', device: 'dfam', path: 'sound-design', order: O(7.5), difficulty: 'beginner',
+  name: 'The manual\'s first patch',
+  description: 'Follow the tour the DFAM manual opens with, from its Default settings to a punchy loop, reading every knob by the clock.',
+  objective: 'Build a patch from clock positions, the way a manual or a patch sheet writes its settings.',
+  source: 'Synth Studio · DFAM manual, Exploring the DFAM (pp.8-12)', estimatedMinutes: 9,
+  prerequisites: ['dfam-f6-sequencer'],
+  concepts: ['modulation-depth', 'envelope-decay', 'filter-cutoff', 'sequencer-pattern'],
+  start: { reset: true, values: { run_stop: false } },
+  steps: [
+    run('Start a patch from a known panel, so each move you make is the only thing that changed.'),
+    {
+      kind: 'do', control: 'vco1_frequency', targetValue: -1.5, concept: 'oscillator-pitch',
+      instruction: 'Turn VCO 1 FREQUENCY left to 10:30, between 10 and 11 o\'clock. The readout above the panel shows the clock position.',
+      principle: 'A knob\'s pointer works like a clock hand: 12 o\'clock is straight up, the middle of its range.',
+      explanation: 'A knob has no numbers on it, so manuals and patch sheets say where its pointer points. The large DFAM knobs travel from 7 o\'clock to 5 o\'clock. At 10:30 VCO 1 plays a deep bass note, about 46 Hz.',
+      manualReference: 'Manual p.8: Set the pitch',
+    },
+    {
+      kind: 'predict', control: 'vco1_eg_amount', targetValue: 60, concept: 'modulation-depth',
+      instruction: 'Turn VCO 1 EG AMOUNT up to 3 o\'clock.',
+      predict: {
+        question: 'The VCO envelope will now bend the pitch of every hit, very briefly. What will you hear?',
+        options: ['Each hit starts with a click of punch', 'Each hit rings twice as long as before', 'The loop plays one octave higher'], answer: 0,
+        explain: 'VCO DECAY is at its shortest, so the pitch jumps up and falls back in a hundredth of a second. That is too fast to hear as a note: the ear hears it as punch. The length of a hit belongs to the VCA, and the pitch it settles on has not moved.',
+      },
+      principle: 'A very fast drop in pitch at the start of a note is heard as punch, not as melody.',
+      manualReference: 'Manual p.8: Adding punch',
+    },
+    {
+      kind: 'do', control: 'vco_decay', targetValue: 40, concept: 'envelope-decay',
+      instruction: 'Turn VCO DECAY slowly up to 9 o\'clock and listen to the pitch start to fall.',
+      principle: 'The longer a pitch envelope lasts, the more of its fall the ear can follow.',
+      explanation: 'At 9 o\'clock the fall takes about 40 ms: the thump of a kick drum. Turn it further and the hit becomes a falling tone, a tom or a laser. The manual\'s tip here (p.9): how far EG AMOUNT is turned decides whether you get a toy sound or a hard kick.',
+      manualReference: 'Manual p.9: Get the pitch jumping',
+    },
+    {
+      kind: 'listen', concept: 'modulation-depth', focus: ['vco1_eg_amount', 'vco_decay'],
+      instruction: 'Compare the bass note with and without the pitch envelope.',
+      listen: {
+        a: { vco1_eg_amount: 0 }, b: { vco1_eg_amount: 60 }, labels: ['EG AMOUNT at 12', 'EG AMOUNT at 3'],
+        question: {
+          question: 'Which one sounds like a kick drum?',
+          options: ['B, with EG AMOUNT at 3 o\'clock', 'A, with EG AMOUNT at 12 o\'clock', 'Neither'], answer: 0,
+          explain: 'At 12 o\'clock a bipolar knob does nothing: A is a plain low beep. At 3 o\'clock the pitch drops into the note on every hit, and that drop is the thump.',
+        },
+      },
+    },
+    {
+      kind: 'do', control: 'seq_pitch_mod', targetValue: 0, concept: 'sequencer-pattern',
+      instruction: 'Flip SEQ PITCH MOD up to VCO 1&2. The eight PITCH knobs now tune each step.',
+      principle: 'A sequencer row does nothing until it is routed somewhere.',
+      explanation: 'The PITCH knobs sit at 12 o\'clock, so the steps still play one note. Nudge one or two of them a little: their range is very wide, ten octaves from end to end.',
+      manualReference: 'Manual p.9: Sequencing pitch',
+    },
+    {
+      kind: 'do', control: 'vcf_cutoff', targetValue: 317, concept: 'filter-cutoff', scope: 'spectrum',
+      instruction: 'Turn CUTOFF down to 11 o\'clock. The sound turns dark and flat.',
+      principle: 'A low-pass filter removes what lies above its cutoff, so closing it darkens the sound.',
+      manualReference: 'Manual p.11: Filtering sound',
+    },
+    {
+      kind: 'do', control: 'vcf_eg_amount', targetValue: 60, concept: 'modulation-depth', scope: 'spectrum',
+      instruction: 'Turn VCF EG AMOUNT slowly up to 3 o\'clock.',
+      principle: 'An envelope on the cutoff opens the filter at each hit, so every note starts bright.',
+      explanation: 'It is the same idea as the pitch envelope, pointed at the filter instead. With VCF DECAY at its shortest you hear only a click of brightness.',
+      manualReference: 'Manual p.11: Filter modulation',
+    },
+    {
+      kind: 'do', control: 'vcf_decay', targetValue: 79, concept: 'envelope-decay', scope: 'spectrum',
+      instruction: 'Turn VCF DECAY slowly up to 10 o\'clock. Each step now closes like a plucked string.',
+      principle: 'A filter envelope\'s decay sets how long the brightness lasts after each hit.',
+      manualReference: 'Manual p.11: Filter articulation',
+    },
+    {
+      kind: 'quiz', instruction: 'Quick check.', concept: 'modulation-depth',
+      quiz: {
+        question: 'A large DFAM knob travels from 7 o\'clock to 5 o\'clock. A patch sheet shows one at 9 o\'clock. How far up is it?',
+        options: ['About a fifth of the way', 'About half of the way', 'Nearly all of the way'], answer: 0,
+        explain: 'From 7 to 9 is two hours out of the ten the knob can travel, so a fifth. Half of the way is 12 o\'clock, straight up, and nearly all of the way would be 4 o\'clock.',
+      },
+    },
+    {
+      kind: 'do', control: 'noise_level', targetValue: 61, concept: 'noise',
+      instruction: 'Turn NOISE / EXT LEVEL up to 1 o\'clock. It is a small knob: it travels from 7:30 to 4:30.',
+      principle: 'A little noise mixed into a drum gives it a natural attack.',
+      manualReference: 'Manual p.11: Noise as a sound source',
+    },
+    {
+      kind: 'listen', concept: 'envelope-decay', focus: ['vca_decay'],
+      instruction: 'Compare two lengths: VCA DECAY at 10 o\'clock and at 1 o\'clock.',
+      listen: {
+        a: { vca_decay: 79 }, b: { vca_decay: 631 }, labels: ['10 o\'clock', '1 o\'clock'],
+        question: {
+          question: 'Which one lets the tail of each hit ring out?',
+          options: ['B, at 1 o\'clock', 'A, at 10 o\'clock', 'Neither'], answer: 0,
+          explain: 'The VCA is a volume control that an envelope moves. A short decay chops the tail off and tightens the loop. A long one lets the filter and pitch sweeps finish before the hit fades.',
+        },
+      },
+    },
+    {
+      kind: 'challenge', concept: 'velocity-dynamics',
+      instruction: 'Finish the tour your way: add VCO 2 in tune with VCO 1, and rest two steps with their VELOCITY knobs.',
+      checklist: [
+        { text: 'VCO 2 LEVEL at 1 o\'clock or more', check: s => num(s, 'vco2_level') >= 58 },
+        { text: 'VCO 2 FREQUENCY at the pitch of VCO 1, or octaves above it', check: s => { const d = num(s, 'vco2_frequency') - num(s, 'vco1_frequency'); return d > -0.1 && Math.abs(d - Math.round(d)) < 0.1; } },
+        { text: 'Two or more VELOCITY knobs all the way down', check: s => [1, 2, 3, 4, 5, 6, 7, 8].filter(i => num(s, `velocity_${i}`) <= 6).length >= 2 },
+      ],
+      hints: [
+        'The readouts help: VCO 1 FREQUENCY shows its Hz, and so does VCO 2.',
+        'Tune VCO 2 FREQUENCY until it reads the same Hz as VCO 1, or double. A step at zero velocity is a rest.',
+        'VCO 2 LEVEL to 3 o\'clock, VCO 2 FREQUENCY to 10:30, then VELOCITY 4 and 6 all the way left.',
+      ],
+      solution: { values: { vco2_level: 84, vco2_frequency: -1.5, velocity_4: 0, velocity_6: 0 } },
+    },
+    {
+      kind: 'reflect', instruction: 'Explain it in your own words.',
+      reflect: {
+        prompt: 'In a sentence or two: why do manuals give knob settings as clock positions, and where is 12 o\'clock?',
+        model: 'A knob has no numbers, but its pointer works like a clock hand, so a position can be written down and found again. 12 o\'clock is straight up, the middle of the knob\'s range.',
+      },
+    },
+  ],
+  review: [
+    { question: 'On a patch sheet, a knob drawn at 12 o\'clock is…', options: ['At the middle of its range', 'At the bottom of its range', 'At the top of its range'], answer: 0, explain: 'Straight up is halfway. On a bipolar knob such as EG AMOUNT that is zero.' },
+    { question: 'The large DFAM knobs stop at…', options: ['7 o\'clock and 5 o\'clock', '9 o\'clock and 3 o\'clock', '6 o\'clock and 6 o\'clock'], answer: 0, explain: 'They turn 300 degrees, from 7 round to 5.' },
+    { question: 'VCO 1 EG AMOUNT at 3 o\'clock with a short VCO DECAY gives each hit…', options: ['A quick drop in pitch, heard as punch', 'A slow rise in level, heard as a swell', 'A long ring after it, heard as a tail'], answer: 0, explain: 'A pitch sweep too fast to follow reads as punch.' },
+    { question: 'With SEQ PITCH MOD on OFF, the eight PITCH knobs…', options: ['Do not reach either VCO', 'Tune VCO 1 and leave VCO 2', 'Set the length of each step'], answer: 0, explain: 'OFF sends them nowhere inside the DFAM. The PITCH jack still carries them.' },
+  ],
+};
+
 const sd1: Lesson = {
   id: 'dfam-sd1-kick', device: 'dfam', path: 'sound-design', order: O(8), difficulty: 'beginner',
   name: 'Design a kick drum',
@@ -1768,4 +1905,4 @@ const st2: Lesson = {
   ],
 };
 
-export const DFAM_LESSONS: Lesson[] = [f1, f2, f3, f4, f5, f6, f7, sd1, sd2, sd3, sd4, e1, e2, e3, e4, sq1, sq2, p1, st1, st2];
+export const DFAM_LESSONS: Lesson[] = [f1, f2, f3, f4, f5, f6, f7, tour, sd1, sd2, sd3, sd4, e1, e2, e3, e4, sq1, sq2, p1, st1, st2];

@@ -121,7 +121,7 @@ The twin follows all three.
 | SMPL | TUN FIN BR SMP / STA END LOP LEV | END below STA plays backwards. LOP loops for the trig's length. The twin ships synthesized one-shots in place of samples, and the second SMPL page (a waveform view) is not drawn | (Rytm MKII manual, pp.77-78) |
 | FLTR | ATK DEC SUS REL / FRQ RES TYP ENV | Seven types (LP2 LP1 BP HP1 HP2 BS PK). The twin builds them all from one resonant 2-pole filter; the 1-pole types have a gentler slope | (Rytm MKII manual, p.78) |
 | AMP | ATK HLD DEC OVR / DEL REV PAN VOL | HLD AUTO (0) holds while the pad is pressed; 1-127 are fixed holds. OVR drives the sound before the filter. **Twin**: on the sequencer HLD AUTO holds for the trig's length, and DEC 127 never decays | (Rytm MKII manual, p.79) |
-| LFO | SPD MUL FAD DST / WAV SPH MOD DEP | Seven waves (TRI SIN SQR SAW EXP RMP RND) and five trig modes (FREE TRG HLD ONE HLF). MUL "x" values follow the tempo; "." values run at 120 BPM whatever the tempo. **Twin**: SPH adds slew on RND | (Rytm MKII manual, pp.79-80) |
+| LFO | SPD MUL FAD DST / WAV SPH MOD DEP | Seven waves (TRI SIN SQR SAW EXP RMP RND) and five trig modes (FREE TRIG HOLD ONE HALF). MUL "x" values follow the tempo; "." values run at 120 BPM whatever the tempo. **Twin**: SPH adds slew on RND | (Rytm MKII manual, pp.79-80) |
 
 Each control has its own id:
 - `<track>_<key>` for the drum tracks (`bd_dec`, `cp_flt_typ`, `oh_amp_dec`).

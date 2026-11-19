@@ -155,7 +155,7 @@ const elements: PanelElement[] = [
   hole(36.5, ROW1), hole(65.9, ROW1), hole(95.6, ROW1), hole(95.6, ROW2), hole(95.6, ROW3),
   ringLegend('FREQUENCY', 21.7, ROW1), knob('frequency', 21.7, ROW1),
   // the WAVE switches print the waves: a pulse above the lever and a sawtooth below (VCO), a square and a triangle (LFO)
-  ...toggle('vco_wave', 'VCO WAVE', 51.3, ROW1, ['\u2293', '\u25FF']),
+  ...toggle('vco_wave', 'VCO WAVE', 51.3, ROW1, ['\u2293', '\u25FA']),
   ringLegend('PULSE WIDTH', 80.8, ROW1), knob('pulse_width', 80.8, ROW1),
   legend('MIX', 110.3, ROW1), knob('mix', 110.3, ROW1),
   { kind: 'label', text: 'VCO', x: 102.4, y: ROW1 + 12.4, size: 5.6, color: '#bdbdbd' },

@@ -1,18 +1,26 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import type { ControlValue, DeviceSpec, PatchConnection, PresetSpec } from '@/types';
-import type { EngineState, Values } from '@/types/panel';
+import type { EngineState, PanelLayout, Values } from '@/types/panel';
 import type { DeviceModule, DeviceUiApi } from '@/devices/types';
 import { useStudioStore, specDefaults, stepKind, registerLessons, setLessonEngineReader } from '@/store/studio';
 import { useUiStore, selectUi } from '@/store/ui';
 import { hub } from '@/lib/studio/hub';
 import { useDeviceModule } from '@/lib/studio/useHub';
-import { describeValue } from '@/lib/controls/mapping';
+import { describeValue, knobClock } from '@/lib/controls/mapping';
 import SynthPanel, { type EngineSource, type PatchController } from '@/components/panel/SynthPanel';
+import { blockOfControl, blockTargets, pathSections } from '@/lib/signalPathBlocks';
 import ResponsiveDeviceContainer from '@/components/ui/ResponsiveDeviceContainer';
 import { prefetchTeaching } from '@/components/teaching/onDemand';
 import { midiLearnTouch, useMidiFocus } from '@/lib/midi/lite'; // external gear: MIDI learn + MIDI input (stack loads after first paint)
+
+// The signal path diagram loads when it is first opened (its layout code is not on every page load)
+const SignalPath = dynamic(() => import('@/components/panel/SignalPath'), {
+  ssr: false,
+  loading: () => <div className="h-[190px] mb-2" aria-hidden="true" />,
+});
 
 const NO_ENGINE: EngineState = {};
 
@@ -82,6 +90,11 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
     subscribe: cb => hub.subscribeState(instance, () => cb()),
   }), [instance]);
   const [touched, setTouched] = useState<{ kind: 'control' | 'jack'; id: string } | null>(null);
+  // The signal path diagram: open or not is a preference, the chosen block belongs to this visit
+  const hasPath = !compact && pathSections(spec.signalFlow).length > 0;
+  const showPath = useStudioStore(s => s.signalPath) && hasPath;
+  const setShowPath = useStudioStore(s => s.setSignalPath);
+  const [pathBlock, setPathBlock] = useState<string | null>(null);
   const [zoom, setZoom] = useState<'fit' | number>('fit');
   const [scaleInfo, setScaleInfo] = useState({ scale: 1, fit: 1 });
   const [held, setHeld] = useState<Set<number>>(new Set());
@@ -208,7 +221,7 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
   }, [isTeaching, lesson, stepIndex, lessonInstance, instance]);
 
   // Spotlight (focus mode): dim everything the step isn't about
-  const focus = useMemo(() => {
+  const lessonFocus = useMemo(() => {
     if (!step || !focusMode) return null;
     const ids = new Set<string>(step.focus ?? []);
     if (step.control) ids.add(step.control);
@@ -219,6 +232,37 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
     if (stepKind(step) === 'match' && step.match) step.match.controls.forEach(c => ids.add(c));
     return ids.size ? ids : null;
   }, [step, focusMode]);
+
+  // Signal path: the chosen block lights its controls and patch points the same way. A lesson
+  // step's own spotlight comes first, so the coach and the panel never disagree.
+  const pathFocus = useMemo(() => {
+    if (!showPath || !pathBlock) return null;
+    const section = spec.signalFlow.find(x => x.id === pathBlock);
+    const ids = section ? blockTargets(section, Object.keys(spec.controls)) : [];
+    return ids.length ? new Set<string>(ids) : null;
+  }, [showPath, pathBlock, spec]);
+  const focus = lessonFocus ?? pathFocus;
+
+  // "You are here": the block of the lesson step's control, else of the control last touched
+  const pathHere = useMemo(() => {
+    if (!showPath) return null;
+    const flow = spec.signalFlow;
+    if (step) {
+      const ids = [step.control, step.patchTo, step.patchFrom, ...(step.focus ?? [])];
+      for (const id of ids) {
+        const b = blockOfControl(flow, id);
+        if (b) return b;
+      }
+    }
+    return touched ? blockOfControl(flow, touched.id.replace(/__lock$/, '')) : null;
+  }, [showPath, spec, step, touched]);
+
+  // In a lesson the diagram is a map only: it must not turn a page the step asks the learner to turn
+  const inLesson = !!step;
+  const choosePathBlock = useCallback((id: string | null) => {
+    setPathBlock(id);
+    if (id && apiRef.current && !inLesson) mod.signalPath?.open?.(id, apiRef.current);
+  }, [mod, inLesson]);
 
   // Checks that read the engine (the current step LED, a playing sequencer) re-run as it changes
   const engineChecks = !!step && (!!step.check || !!step.checklist?.length);
@@ -296,6 +340,15 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
             Clear cables{patches.length ? ` (${patches.length})` : ''}
           </ToolButton>
         )}
+        {hasPath && (
+          <ToolButton
+            onClick={() => { setShowPath(!showPath); setPathBlock(null); }}
+            title="Show how the sound travels through this instrument. Choose a block to light its controls on the panel."
+            pressed={showPath}
+          >
+            Signal path
+          </ToolButton>
+        )}
         {!compact && canSync && (
           <ToolButton
             onClick={() => setSync(instance, !synced)}
@@ -320,10 +373,21 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
         )}
         {!compact && mod.transportControl && keyboardActive && <span className="text-[11px] text-gray-500 hidden md:inline coarse-lg:hidden">Space = play/stop</span>}
         {/* On an iPad the status shares the toolbar row, so the panel gets its line */}
-        {!compact && <ControlStatus spec={spec} values={displayValues} touched={touched} inline />}
+        {!compact && <ControlStatus spec={spec} layout={layout} values={displayValues} touched={touched} inline />}
       </div>
 
-      {!compact && <ControlStatus spec={spec} values={displayValues} touched={touched} />}
+      {!compact && <ControlStatus spec={spec} layout={layout} values={displayValues} touched={touched} />}
+
+      {showPath && (
+        <SignalPath
+          flow={spec.signalFlow}
+          deviceName={spec.name}
+          selected={pathBlock}
+          here={pathHere}
+          onSelect={choosePathBlock}
+          inLesson={inLesson}
+        />
+      )}
 
       <ResponsiveDeviceContainer zoom={zoomOverride ?? zoom} fitHeight={!compact} onScaleChange={onScaleChange}>
         <SynthPanel
@@ -360,6 +424,7 @@ function LoadedDevice({ instance, device, mod, compact, keyboardActive = true, p
         <details className="mt-2 max-w-3xl mx-auto text-[12px] text-gray-500">
           <summary className="cursor-pointer text-gray-400 hover:text-white select-none">How to play this {spec.name}</summary>
           <ul className="list-disc pl-6 space-y-0.5 mt-1">
+            {hasPath && <li>Signal path, in the toolbar, draws how the sound travels through the {spec.name}. Choose a block and its controls light up on the panel.</li>}
             {mod.tips.map(t => <li key={t}>{t}</li>)}
           </ul>
         </details>
@@ -380,9 +445,10 @@ function firstSentence(text: string | undefined): string {
  * does. Touch screens have no hover tooltips, and naming the thing you just moved
  * (with its unit) is half of learning a new instrument.
  */
-function ControlStatus({ spec, values, touched, inline = false }: { spec: DeviceSpec; values: Values; touched: { kind: 'control' | 'jack'; id: string } | null; inline?: boolean }) {
+function ControlStatus({ spec, layout, values, touched, inline = false }: { spec: DeviceSpec; layout: PanelLayout; values: Values; touched: { kind: 'control' | 'jack'; id: string } | null; inline?: boolean }) {
   let name = '';
   let value = '';
+  let clock = '';
   let about = '';
   if (touched?.kind === 'control') {
     // Elektron lock encoders draw `<id>__lock`
@@ -393,6 +459,9 @@ function ControlStatus({ spec, values, touched, inline = false }: { spec: Device
       const v = values[id] ?? ('default' in c ? (c.default as ControlValue) : undefined);
       // A momentary button (TRIGGER, TAP) has no lasting state worth showing
       value = c.type === 'jack' || c.type === 'pattern' || (c.type === 'button' && c.momentary) ? '' : describeValue(c, v);
+      // A knob with a pointer and end stops (the Moogs): where it points, the way their manuals
+      // and patch sheets give a setting
+      clock = knobClock(layout, c, id, v);
       about = firstSentence(c.description);
     }
   } else if (touched?.kind === 'jack') {
@@ -416,6 +485,7 @@ function ControlStatus({ spec, values, touched, inline = false }: { spec: Device
         <>
           <span className="font-bold text-white shrink-0">{name}</span>
           {value && <span className="font-mono text-green-300 shrink-0 tabular-nums">{value}</span>}
+          {clock && <span className="text-gray-300 shrink-0 tabular-nums" data-control-clock title="Where the knob points, as on a clock face">{clock}</span>}
           {about && <span className="text-gray-400 truncate min-w-0">{about}</span>}
         </>
       ) : (
