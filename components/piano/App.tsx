@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { piano } from '@/lib/piano/audio/engine';
+import { isNative } from '@/lib/piano/native/bridge';
 import { instrument } from '@/lib/piano/audio/instrument';
 import { noteBus } from '@/lib/piano/input/bus';
 import { input } from '@/lib/piano/input/hub';
@@ -130,6 +131,12 @@ export default function App() {
     return () => events.forEach((e) => window.removeEventListener(e, wake, true));
   }, [autoMidi, onboarded]);
 
+  // The iPad app has MIDI built in and needs no permission, so it looks for
+  // the piano as soon as it opens and keeps looking.
+  useEffect(() => {
+    if (isNative()) void midi.connect();
+  }, []);
+
   // Once a piano has been connected by hand, later visits reconnect to it by
   // themselves. Until then the browser is not asked for MIDI unprompted.
   useEffect(
@@ -154,15 +161,24 @@ export default function App() {
 
   // Keep the app and its piano samples on the device, so it opens without a connection.
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
+    // The iPad app carries its files inside it, so it has no need of this.
+    if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator) || isNative()) return;
     navigator.serviceWorker.register('/piano-sw.js', { scope: '/piano' }).catch(() => undefined);
   }, []);
 
   const close = useCallback(() => setActivity(null), []);
 
+  const behind = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // While the welcome screens are up, what lies behind them cannot be reached.
+    behind.current?.toggleAttribute('inert', !onboarded);
+    if (onboarded) behind.current?.removeAttribute('aria-hidden');
+    else behind.current?.setAttribute('aria-hidden', 'true');
+  }, [onboarded]);
+
   return (
     <div className="mc-root" data-theme={theme}>
-      <div className="flex h-full landscape:flex-row portrait:flex-col-reverse">
+      <div ref={behind} className="flex h-full landscape:flex-row portrait:flex-col-reverse">
         <nav
           className="flex shrink-0 border-mc-line bg-mc-surface/70 landscape:w-[88px] landscape:flex-col landscape:border-r landscape:py-5 portrait:h-[72px] portrait:border-t portrait:px-2 mc-safe-bottom"
           aria-label="Main"

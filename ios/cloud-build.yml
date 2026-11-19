@@ -1,0 +1,96 @@
+# To switch this on, copy this file to .github/workflows/ios.yml in the
+# repository (the GitHub website can do it: Add file, Create new file).
+# It is kept here because the tool that wrote it is not allowed to add
+# workflows itself.
+
+name: iPad app
+
+# Builds the iPad app on a Mac in the cloud and has it test itself in the
+# iPad simulator: the web app opens from inside the app, the piano sound
+# loads, progress is saved to the app's own file, and notes from a pretend
+# MIDI piano reach the web app. Also packs the Xcode project, with the web
+# app already inside, as a download.
+
+on:
+  push:
+    branches: ['claude/**', 'main']
+    paths: ['ios/**', '.github/workflows/ios.yml', 'components/piano/**', 'lib/piano/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Put the web app inside
+        run: ./ios/build-web.sh
+
+      - name: Build for the iPad simulator
+        run: |
+          xcodebuild -version
+          set -o pipefail
+          xcodebuild -project ios/MiddleC.xcodeproj -scheme MiddleC -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build > build.log 2>&1 || {
+              echo "BUILD FAILED"
+              grep -nE "error|fatal" build.log | head -80
+              echo "----- end of log -----"
+              tail -40 build.log
+              exit 1
+            }
+          grep -E "warning:" build.log | sort -u | head -40 || true
+          echo "BUILD SUCCEEDED"
+
+      - name: Self test in the simulator
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          devices = json.load(sys.stdin)['devices']
+          pads = [d for runtime, found in sorted(devices.items(), reverse=True) if 'iOS' in runtime for d in found if 'iPad' in d['name']]
+          print(pads[0]['udid'])
+          ")
+          xcrun simctl list devices available | grep "$UDID" || true
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" ios/build/Build/Products/Debug-iphonesimulator/MiddleC.app
+          (for t in 5 9 13; do sleep 4; xcrun simctl io "$UDID" screenshot "shot-$t.png" >/dev/null 2>&1 || true; done) &
+          xcrun simctl launch --console "$UDID" app.middlec.piano -MCSelfTest YES > selftest.log 2>&1 || true
+          wait
+          grep "SELFTEST" selftest.log || { echo "no self test output"; tail -30 selftest.log; }
+          # A plain launch as a learner would see it, for the picture.
+          xcrun simctl launch "$UDID" app.middlec.piano || true
+          sleep 8
+          xcrun simctl io "$UDID" screenshot shot-launch.png || true
+          for f in shot-*.png; do sips -Z 900 -s format jpeg -s formatOptions 60 "$f" --out "${f%.png}.jpg" >/dev/null 2>&1 || true; done
+          grep -q "SELFTEST RESULT PASS" selftest.log
+
+      - name: Pack the Xcode project
+        if: always()
+        run: |
+          rm -rf ios/build
+          mkdir -p pack/MiddleC-iPad
+          cp -R ios/MiddleC ios/MiddleC.xcodeproj ios/README.md pack/MiddleC-iPad/ 2>/dev/null || true
+          ls pack/MiddleC-iPad
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: MiddleC-iPad
+          path: pack/MiddleC-iPad
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            build.log
+            selftest.log
+            shot-*.png
+            shot-*.jpg

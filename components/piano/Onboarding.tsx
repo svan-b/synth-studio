@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { piano } from '@/lib/piano/audio/engine';
 import { usePiano, type Experience } from '@/lib/piano/learn/store';
+import { isNative } from '@/lib/piano/native/bridge';
 import ConnectionPanel from './Connection';
-import { useInputMode, useMidiStatus } from './hooks';
+import { useInputMode } from './hooks';
 import { Button, Icon } from './ui';
 
 const LEVELS: Array<{ value: Experience; title: string; text: string }> = [
@@ -43,7 +44,6 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   const setProfile = usePiano((s) => s.setProfile);
   const [step, setStep] = useState(0);
   const mode = useInputMode();
-  const midi = useMidiStatus();
 
   const next = () => {
     void piano.unlock();
@@ -96,8 +96,9 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
             <>
               <h2 className="font-mc-serif text-4xl">Connect your piano</h2>
               <p className="mb-6 mt-2 text-[1.1rem] text-mc-muted">
-                The app works best when it can see exactly which keys you press. Choose how it should follow your playing. You can change this later
-                in Settings.
+                {isNative()
+                  ? 'Through a cable the app sees exactly which keys you press, how firmly, and the pedals. Plug in now, or carry on and do it later.'
+                  : 'The app works best when it can see exactly which keys you press. Choose how it should follow your playing. You can change this later in Settings.'}
               </p>
               <ConnectionPanel compact />
             </>
@@ -136,7 +137,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
           )}
           {step < 4 ? (
             <Button size="lg" onClick={next} className="min-w-[180px]">
-              {step === 0 ? 'Begin' : step === 3 ? (mode === 'touch' && midi.state !== 'connected' ? 'Not now' : 'Continue') : 'Continue'}
+              {step === 0 ? 'Begin' : step === 3 && mode === 'touch' ? 'Not now' : 'Continue'}
             </Button>
           ) : (
             <Button size="lg" onClick={finish} className="min-w-[180px]">

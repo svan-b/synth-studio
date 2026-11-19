@@ -8,6 +8,7 @@ import { pieceProgress } from '@/lib/piano/learn/coach';
 import { EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS } from '@/lib/piano/learn/generators';
 import { dueReadingCards, introducedPieces, planMinutes, planSession, readsStaff, type Block, type DrillKind } from '@/lib/piano/learn/planner';
 import { exportData, streak, totalMinutes, usePiano } from '@/lib/piano/learn/store';
+import { isNative, shareFile } from '@/lib/piano/native/bridge';
 import { parseScore } from '@/lib/piano/music/score';
 import { dayKey } from '@/lib/piano/util/emitter';
 import ConnectionPanel, { ConnectionChip } from './Connection';
@@ -468,6 +469,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
   const importData = usePiano((s) => s.importData);
   const resetAll = usePiano((s) => s.resetAll);
   const mode = useInputMode();
+  const native = isNative();
   const [timing, setTiming] = useState(false);
   const [timingNote, setTimingNote] = useState<string | null>(null);
   const [backup, setBackup] = useState(false);
@@ -486,7 +488,19 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
     }
   };
 
+  const restoreFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      setPaste(await file.text());
+      setBackupNote(null);
+    } catch {
+      setBackupNote('That file could not be read.');
+    }
+  };
+
   const download = () => {
+    // The iPad app hands the file to the share sheet: Files, AirDrop, Mail.
+    if (shareFile(`middle-c-${dayKey()}.json`, exportData())) return;
     const blob = new Blob([exportData()], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -582,7 +596,9 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
       <section className="mt-9">
         <h2 className="font-mc-serif text-2xl">Your data</h2>
         <p className="text-mc-muted">
-          Progress is kept in this browser on this device. Save a backup now and then, and use it to move to another browser or device.
+          {native
+            ? 'Progress is kept on this iPad, and a dated copy is put in the Files app under Middle C each day you practise. Save a backup to carry it to another device.'
+            : 'Progress is kept in this browser on this device. Save a backup now and then, and use it to move to another browser or device.'}
         </p>
         <div className="mt-3 flex flex-wrap gap-3">
           <Button
@@ -640,8 +656,8 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
 
       <Sheet open={saving} onClose={() => setSaving(false)} title="Save a backup">
         <p className="mb-4 text-mc-muted">
-          Save your progress as a file, or copy it and paste it somewhere safe such as a note. Either can be restored later, here or in another
-          browser.
+          Save your progress as a file, or copy it and paste it somewhere safe such as a note. Either can be restored later, here or on another
+          device.
         </p>
         <div className="flex flex-wrap gap-3">
           <Button onClick={download}>Save as a file</Button>
@@ -660,7 +676,11 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
       </Sheet>
 
       <Sheet open={backup} onClose={() => setBackup(false)} title="Restore from a backup">
-        <p className="mb-3 text-mc-muted">Open your backup file, copy everything in it, and paste it here. This replaces the progress in this browser.</p>
+        <p className="mb-3 text-mc-muted">Choose your backup file, or paste its contents below. This replaces the progress {native ? 'on this iPad' : 'in this browser'}.</p>
+        <label className="mb-3 inline-flex h-11 cursor-pointer items-center rounded-full bg-mc-raised px-5 font-semibold active:scale-[0.97]">
+          Choose a file
+          <input type="file" accept=".json,application/json,text/plain" className="sr-only" onChange={(e) => void restoreFile(e.target.files?.[0])} />
+        </label>
         <textarea
           className="mc-selectable h-40 w-full rounded-2xl border border-mc-line bg-mc-bg p-3 font-mono text-xs text-mc-ink"
           value={paste}
@@ -689,7 +709,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
       </Sheet>
 
       <Sheet open={confirmReset} onClose={() => setConfirmReset(false)} title="Start over?">
-        <p className="text-[1.05rem] leading-relaxed text-mc-muted">This erases all lessons, pieces and review history in this browser. Your settings are kept. It cannot be undone, so save a backup first if you might want it back.</p>
+        <p className="text-[1.05rem] leading-relaxed text-mc-muted">This erases all lessons, pieces and review history {native ? 'on this iPad' : 'in this browser'}. Your settings are kept. It cannot be undone, so save a backup first if you might want it back.</p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="soft" onClick={() => setConfirmReset(false)}>
             Cancel

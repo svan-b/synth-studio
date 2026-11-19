@@ -1,7 +1,8 @@
 'use client';
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
+import { saveCopy, savedCopy } from '../native/bridge';
 import { dayKey, daysBetween } from '../util/emitter';
 import { newCard, review, type Outcome, type StoredCard } from './srs';
 import type { PieceState } from './coach';
@@ -95,6 +96,52 @@ const defaultSettings: Settings = {
   autoMidi: false,
 };
 
+/**
+ * Where progress is kept. In a browser that is the browser's own storage.
+ * Inside the iPad app it is also written to a file the app owns, so progress
+ * survives the web view's storage being cleared. Each copy carries the time
+ * it was written, and the newer one is read back.
+ */
+const progressStorage: StateStorage = {
+  getItem: (name) => {
+    let local: string | null = null;
+    let localAt = 0;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        local = localStorage.getItem(name);
+        localAt = Number(localStorage.getItem(`${name}:at`) ?? 0) || 0;
+      }
+    } catch {
+      local = null;
+    }
+    const saved = savedCopy(name);
+    if (saved && (local === null || saved.at >= localAt)) return saved.value;
+    return local;
+  },
+  setItem: (name, value) => {
+    const at = Date.now();
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(name, value);
+        localStorage.setItem(`${name}:at`, String(at));
+      }
+    } catch {
+      /* storage full or switched off: the app's own file still has it */
+    }
+    saveCopy(name, value, at);
+  },
+  removeItem: (name) => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(name);
+        localStorage.removeItem(`${name}:at`);
+      }
+    } catch {
+      /* nothing to remove */
+    }
+  },
+};
+
 export const usePiano = create<State>()(
   persist(
     (set, get) => ({
@@ -149,7 +196,9 @@ export const usePiano = create<State>()(
       finishSession: () => set({ sessionDoneOn: dayKey() }),
       importData: (json) => {
         try {
-          const data = JSON.parse(json) as Partial<State>;
+          const parsed = JSON.parse(json) as Partial<State> & { state?: Partial<State> };
+          // The daily copies the iPad app keeps hold the same things one level down.
+          const data: Partial<State> = parsed?.state?.profile ? parsed.state : parsed;
           if (!data || typeof data !== 'object' || !data.profile) return false;
           set({
             profile: { ...defaultProfile, ...data.profile },
@@ -181,6 +230,7 @@ export const usePiano = create<State>()(
     {
       name: 'middle-c-v1',
       version: 1,
+      storage: createJSONStorage(() => progressStorage),
       partialize: (s) => ({
         profile: s.profile,
         settings: s.settings,

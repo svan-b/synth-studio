@@ -32,3 +32,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 backup/
+
+# iPad app: the exported web app and Xcode leftovers
+/out-app/
+/ios/MiddleC/web/
+/ios/build/
+xcuserdata/
+*.xcuserstate
+DerivedData/

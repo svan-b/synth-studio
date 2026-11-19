@@ -5,6 +5,7 @@ import { piano } from '@/lib/piano/audio/engine';
 import { noteBus } from '@/lib/piano/input/bus';
 import { listener } from '@/lib/piano/input/listen';
 import { midi, type MonitorLine } from '@/lib/piano/input/midi';
+import { isNative, pairBluetooth } from '@/lib/piano/native/bridge';
 import { usePiano } from '@/lib/piano/learn/store';
 import { midiLabel } from '@/lib/piano/music/theory';
 import { useInputMode, useListenStatus, useMidiStatus } from './hooks';
@@ -88,6 +89,8 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
   const setSettings = usePiano((s) => s.setSettings);
   const [tested, setTested] = useState(false);
   const noMidiAtAll = !m.webMidi && !m.bluetooth;
+  // The iPad app has MIDI built in. It looks for the piano by itself, so there is nothing to switch on.
+  const native = isNative();
 
   const connectMidi = async () => {
     await piano.unlock();
@@ -123,7 +126,19 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
           </p>
         </div>
       )}
-      {m.state === 'connected' && m.inputs.length === 0 && (
+      {native && m.inputs.length === 0 && mode !== 'listen' && (
+        <div className="rounded-2xl border border-mc-line bg-mc-surface px-5 py-4">
+          <div className="flex items-center gap-2.5 font-semibold">
+            <span className="mc-pulse inline-block h-2.5 w-2.5 rounded-full bg-mc-accent" />
+            Looking for your piano
+          </div>
+          <p className="mt-1 text-[15px] text-mc-muted">
+            Switch the piano on and run a USB cable from its socket marked USB TO HOST to the iPad. The piano appears here by itself, usually
+            within a few seconds.
+          </p>
+        </div>
+      )}
+      {!native && m.state === 'connected' && m.inputs.length === 0 && (
         <div className="rounded-2xl border border-mc-hint/40 bg-mc-hint/10 px-5 py-4 text-[15px] text-mc-muted">
           <strong className="text-mc-ink">MIDI is on, but no piano was found.</strong> Check that the piano is switched on and the cable is in the
           socket marked USB TO HOST. For Bluetooth, pair the piano with the iPad first. It will appear here as soon as it is seen.
@@ -179,7 +194,16 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {m.webMidi && (
+        {native && (
+          <button onClick={() => pairBluetooth()} className="rounded-2xl border border-mc-line bg-mc-surface p-5 text-left active:bg-mc-raised">
+            <div className="flex items-center gap-2 font-semibold">
+              <Icon.Bluetooth size={20} />
+              Pair a Bluetooth piano
+            </div>
+            <p className="mt-1 text-[15px] text-mc-muted">For a piano with Bluetooth MIDI. Choose it in the list that opens, then come back here.</p>
+          </button>
+        )}
+        {!native && m.webMidi && (
           <button onClick={() => void connectMidi()} className="rounded-2xl border border-mc-line bg-mc-surface p-5 text-left active:bg-mc-raised">
             <div className="flex items-center gap-2 font-semibold">
               <Icon.Cable size={20} />
@@ -207,7 +231,7 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
           </div>
           <p className="mt-1 text-[15px] text-mc-muted">No cable needed. Stand the iPad on the piano and it hears what you play.</p>
         </button>
-        {mode !== 'touch' && (
+        {mode !== 'touch' && !native && (
           <button
             onClick={() => {
               midi.disconnect();
@@ -233,7 +257,11 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
       )}
       {(l.state === 'denied' || l.state === 'error') && (
         <p className="rounded-2xl bg-mc-bad/10 px-4 py-3 text-[15px] text-mc-bad">
-          {l.state === 'denied' ? 'The microphone is blocked for this page. Allow it in the browser settings, then try again.' : (l.error ?? 'The microphone could not be started.')}
+          {l.state === 'denied'
+            ? native
+              ? 'The microphone is switched off for Middle C. Allow it in the iPad Settings app, under Middle C, then try again.'
+              : 'The microphone is blocked for this page. Allow it in the browser settings, then try again.'
+            : (l.error ?? 'The microphone could not be started.')}
         </p>
       )}
 
