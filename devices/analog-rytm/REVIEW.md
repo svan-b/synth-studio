@@ -287,3 +287,10 @@ track first.
 
 **LFO trig modes** read FREE, TRIG, HOLD, ONE and HALF, as the manual lists them (the twin had
 TRG, HLD and HLF).
+
+**Holding a key with a mouse.** A right-click (or Alt-click) on a key that does something while
+held keeps it down until it is clicked again, or for 15 seconds (`Key` in `ui.tsx`, as on the
+Analog Four). [YES] or [NO] with a PARAMETER key (roll or reload a page), [REC] with [PLAY] and
+the other two-key moves no longer need a touch screen. `scripts/e2e/rytm-hold.cjs` (in the core
+e2e) checks it with the mouse and with two touch points: [YES] held and [FLTR] rolls the FILTER
+page, [NO] held and [FLTR] returns it to the kit, a plain click changes nothing.

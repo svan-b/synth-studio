@@ -297,7 +297,10 @@ of `interceptChange` in `index.ts`). Checked with two touch points (`scripts/e2e
 FILTERS page anew on each press and [FLTR] + [NO] returns it to the kit's values; [YES] + [AMP]
 and [NO] + [AMP] do the same from the other key; a tap on each in turn changes nothing; [T2] held
 and FRQ turned moves FRQ on all four tracks by the same amount, [NO] takes it back, and without
-the track key only T2 moves. The LFO trig modes now read FREE, TRIG, HOLD, ONE and HALF in the
+the track key only T2 moves. With a mouse, a right-click or Alt-click holds a key down until it
+is clicked again (`PanelKey`), so these and the older two-key moves ([NO] + [KIT], [YES] + [PTN],
+a track key + [NO] in LIVE RECORDING) can be done without a second finger; the same check covers
+it. The LFO trig modes now read FREE, TRIG, HOLD, ONE and HALF in the
 readout and the lessons too, as on the screen (the manual's text shortens them, its LFO page
 figure and the Rytm manual spell them out).
 

@@ -11,6 +11,9 @@
 //   control all     [T2] held + the FRQ knob moves filter 1 on all four synth tracks by
 //                   the same amount; [NO] before [T2] is released takes it back (p.18)
 //   one track       without a track key the knob moves its own track only
+//   with a mouse    a right-click (or Alt-click) holds a key down and a click lets it go, so
+//                   the same moves work without a second finger: [FLTR] held + [YES] / [NO],
+//                   and nothing once the key is let go
 // Fingers go through the DevTools protocol, the path a real finger takes.
 // Prints one JSON object; scripts/e2e/run.cjs checks `ok`.
 // ============================================================================
@@ -113,6 +116,47 @@ const { chromium } = require('playwright');
     await dragKnob('t2_flt1_frq', 24);
     const alone = await vals(C);
     check('without a track key the knob moves its own track only', alone[1] !== before[1] && alone[0] === before[0] && alone[2] === before[2] && alone[3] === before[3], { before, alone });
+    // ---- with a mouse: a latched key -----------------------------------------------------------
+    const mctx = await b.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+    const m = await mctx.newPage();
+    m.on('pageerror', e => errs.push(String(e)));
+    await m.addInitScript(() => {
+      if (sessionStorage.getItem('seeded')) return;
+      sessionStorage.setItem('seeded', '1');
+      localStorage.setItem('synth-studio-welcomed', '1');
+      localStorage.setItem('synth-studio-storage', JSON.stringify({ state: { currentDevice: 'analog-four', devices: {}, completedLessons: [] }, version: 3 }));
+    });
+    await m.goto(base, { waitUntil: 'networkidle' });
+    await m.waitForFunction(() => !!window.__synthStudio, null, { timeout: 30000 });
+    await m.waitForSelector('[data-control="key:FLTR"]', { timeout: 30000 });
+    await m.waitForTimeout(1500);
+    const mvals = keys => m.evaluate(ks => {
+      const v = window.__synthStudio.store.getState().devices['analog-four']?.controlValues ?? {};
+      return ks.map(k => v[k]);
+    }, keys);
+    const mkey = name => m.locator(`[data-control="key:${name}"]`);
+    const held = name => mkey(name).getAttribute('data-held');
+    const mkit = await mvals(F);
+    await mkey('FLTR').click({ button: 'right' });
+    await m.waitForTimeout(150);
+    const isHeld = (await held('FLTR')) !== null;
+    await mkey('YES').click(); await m.waitForTimeout(220);
+    const mroll = await mvals(F);
+    await mkey('NO').click(); await m.waitForTimeout(220);
+    const mback = await mvals(F);
+    await mkey('FLTR').click(); await m.waitForTimeout(150); // lets go
+    const letGo = (await held('FLTR')) === null;
+    await mkey('YES').click(); await m.waitForTimeout(220);
+    const mafter = await mvals(F);
+    check('mouse: a right-click holds [FLTR], [YES] rolls its page and [NO] reloads it', isHeld && !same(mkit, mroll) && same(mkit, mback), { isHeld, mkit, mroll, mback });
+    check('mouse: a click lets the key go, and [YES] alone then changes nothing', letGo && same(mkit, mafter), { letGo, mafter });
+    await mkey('AMP').click({ modifiers: ['Alt'] });
+    await m.waitForTimeout(150);
+    const altHeld = (await held('AMP')) !== null;
+    await mkey('AMP').click({ modifiers: ['Alt'] });
+    await m.waitForTimeout(150);
+    check('mouse: Alt-click holds a key too, and lets it go', altHeld && (await held('AMP')) === null, { altHeld });
+    await mctx.close();
   } catch (e) {
     check('ran to the end', false, String(e).split('\n')[0]);
   }

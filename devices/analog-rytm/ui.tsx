@@ -128,6 +128,9 @@ function spotlight(ctx: CustomRenderContext, ids: string[], focusMode: boolean):
 // Key
 // ----------------------------------------------------------------------------
 
+/** How long a key latched with the mouse stays down by itself */
+const HOLD_MS = 15_000;
+
 export interface KeyProps {
   ctx: CustomRenderContext;
   id: string;
@@ -165,6 +168,25 @@ export function Key(p: KeyProps) {
   const dim = sp.dim && !radioTarget && !(ctx.teaching && step?.control && p.control === step.control);
   const lit = typeof p.lit === 'boolean' ? (p.lit ? 1 : 0) : p.lit ?? 0;
   const pressed = useRef(false);
+  // A mouse cannot hold one key and press another, so it can latch one: right-click or Alt-click
+  // holds a key down, any click on it lets go (as does HOLD_MS, or leaving the instrument)
+  const [latched, setLatched] = useState(false);
+  const hold = useRef<{ on: boolean; timer: ReturnType<typeof setTimeout> | null; release: () => void }>({ on: false, timer: null, release: () => undefined });
+  hold.current.release = () => p.onUp?.();
+  useEffect(() => {
+    const h = hold.current;
+    return () => { if (h.timer) clearTimeout(h.timer); if (h.on) { h.on = false; h.release(); } };
+  }, []);
+  const letGo = () => {
+    const h = hold.current;
+    if (h.timer) clearTimeout(h.timer);
+    h.timer = null;
+    if (!h.on) return;
+    h.on = false;
+    pressed.current = false;
+    setLatched(false);
+    h.release();
+  };
   const color = p.ledColor ?? RY.led;
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: dim ? 0.3 : 1, transition: 'opacity 200ms' }}>
@@ -172,18 +194,27 @@ export function Key(p: KeyProps) {
         type="button"
         data-control={p.id}
         aria-label={typeof p.label === 'string' ? p.label : p.title ?? p.id}
-        aria-pressed={lit > 0}
+        aria-pressed={lit > 0 || latched}
+        data-held={latched ? '' : undefined}
         title={p.title}
         onPointerDown={e => {
-          if (e.button !== 0 && e.pointerType === 'mouse') return;
+          // (only keys that do something while held: a key without onUp has nothing to hold)
+          const latch = e.pointerType === 'mouse' && !!p.onUp && (e.button === 2 || (e.button === 0 && e.altKey));
+          if (e.button !== 0 && e.pointerType === 'mouse' && !latch) return;
           e.preventDefault();
           e.stopPropagation();
+          if (hold.current.on) { letGo(); return; } // a held key: this click lets it go
           try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* */ }
           pressed.current = true;
           p.onDown?.(e);
+          if (latch) {
+            hold.current.on = true;
+            hold.current.timer = setTimeout(letGo, HOLD_MS);
+            setLatched(true);
+          }
         }}
-        onPointerUp={() => { if (pressed.current) { pressed.current = false; p.onUp?.(); } }}
-        onPointerCancel={() => { if (pressed.current) { pressed.current = false; p.onUp?.(); } }}
+        onPointerUp={() => { if (pressed.current && !hold.current.on) { pressed.current = false; p.onUp?.(); } }}
+        onPointerCancel={() => { if (pressed.current && !hold.current.on) { pressed.current = false; p.onUp?.(); } }}
         onContextMenu={e => e.preventDefault()}
         className={`${p.dblink ? 'rytm-dblink' : p.blink ? 'rytm-blink' : ''} ${hl && !correct ? 'rytm-target' : ''}`}
         style={{
@@ -194,6 +225,7 @@ export function Key(p: KeyProps) {
             '0 2px 0 #000, inset 0 1px 0 rgba(255,255,255,0.08)',
             lit > 0 ? `0 0 ${4 + 8 * lit}px ${color}` : '',
             correct ? '0 0 0 2px #22c55e' : '',
+            latched ? '0 0 0 2px #7dd3fc' : '',
           ].filter(Boolean).join(', '),
           color: lit > 0.5 ? '#fff' : RY.legend, fontFamily: FONT, fontWeight: 700, fontSize: 'var(--rytm-key-font, 10px)', letterSpacing: 0.3,
           cursor: 'pointer', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'transparent',

@@ -39,7 +39,7 @@ Then run only the checks that apply:
 - **Lesson audit:** `npm run audit:lessons [device ...]` (part of `npm run validate`). Every lesson against `docs/PEDAGOGY.md`; it must report 0 findings. `scripts/e2e/lesson-flow.cjs` checks the same flow in the browser, by touch on an iPad-sized screen too (it runs in the core e2e).
 - **Audio QA for one device:** `node scripts/audio-qa.cjs http://localhost:3100 <device> --target -18`. It must exit 0. See `docs/AUDIO_QA.md`.
 - **Signal path:** `node scripts/e2e/signal-path.cjs http://localhost:3100 [device ...]`. Every instrument's diagram by touch on an iPad-sized screen: a block lights its controls, a touched control marks its block (it runs in the core e2e). `npm run validate` checks the drawing itself. See "Signal path" in `docs/ADDING_A_DEVICE.md`.
-- **A4 two-key moves:** `node scripts/e2e/a4-combos.cjs http://localhost:3100`. Page randomise and reload, and control all, with two touch points (it runs in the core e2e).
+- **Elektron two-key moves:** `node scripts/e2e/a4-combos.cjs http://localhost:3100` (page randomise and reload, control all) and `node scripts/e2e/rytm-hold.cjs http://localhost:3100`. Each checks two touch points and a key held with the mouse (right-click or Alt-click). Both run in the core e2e.
 - **Separate outputs:**
   - `node scripts/e2e/outputs.cjs http://localhost:3100` (the studio side)
   - `node scripts/e2e/outputs-device.cjs http://localhost:3100 [device] [outputId] [pattern]` (a real instrument's output; the default is the Rytm's BD. For the A4 use `analog-four t3 A02`: the pattern holds the groove, since the demo song's sections change level, and TRACK 3, the bass, is a large enough part of it to measure)

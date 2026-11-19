@@ -10,7 +10,7 @@
 // beat by touch on the Analog Rytm and Groove's pattern SWING), and the demo
 // recordings (a hook's level and stop, a loudness-matched demo A/B, the cards' Listen),
 // the signal path diagram on every instrument (scripts/e2e/signal-path.cjs) and the
-// Analog Four's two-key moves (scripts/e2e/a4-combos.cjs).
+// Elektrons' two-key moves by touch and with a mouse (a4-combos.cjs, rytm-hold.cjs).
 // --full: also scripts/smoke.cjs and scripts/lesson-runner.cjs for every
 // instrument in devices/index.ts.
 // Exits non-zero if anything fails, so it can gate merges.
@@ -128,6 +128,11 @@ check('signal path: on all seven instruments a block lights its controls (an Ele
 const ac = run(path.join(__dirname, 'a4-combos.cjs'), [base]);
 check('analog four: [PARAMETER] + [YES] / [NO] rolls and reloads a page, a held track key is CONTROL ALL and [NO] reverts it',
   !ac.__error && ac.ok && (ac.errs ?? []).length === 0, ac.__error ?? { failed: ac.failed, errs: ac.errs });
+
+// ---- Analog Rytm: a key held with the mouse, and with a finger ----------------------
+const rh = run(path.join(__dirname, 'rytm-hold.cjs'), [base]);
+check('analog rytm: a right-click or Alt-click holds a key for the two-key moves, and two fingers do them by touch',
+  !rh.__error && rh.ok && (rh.errs ?? []).length === 0, rh.__error ?? { failed: rh.failed, errs: rh.errs });
 
 // ---- Separate outputs (DeviceModule.studio.outputs) ---------------------------
 const so = run(path.join(__dirname, 'outputs.cjs'), [base, path.join(outDir, 'outputs')]);

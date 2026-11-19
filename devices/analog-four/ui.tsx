@@ -325,10 +325,10 @@ const pageKey = (name: string, label: string, rows: [string, string]): KeyDef =>
   target: (c, v) => c === 'page' && typeof v === 'number' && keyOfView(v)?.key === name,
 });
 
-/** The [PARAMETER] key being held, if any (a hold older than ten seconds is a release that never arrived) */
+/** The [PARAMETER] key being held, if any (a hold older than HOLD_MS is a release that never arrived) */
 function heldParamKey(ctx: CustomRenderContext): string | null {
   const h = liveUi(ctx)[UIK.paramDown] as { key?: string; at?: number } | null | undefined;
-  return h && typeof h.key === 'string' && Date.now() - (h.at ?? 0) < 10_000 ? h.key : null;
+  return h && typeof h.key === 'string' && Date.now() - (h.at ?? 0) < HOLD_MS + 500 ? h.key : null;
 }
 
 /** The kit as it was last saved: the project's own kit slot, else the demo kit or sound as it came, else the init kit */
@@ -1197,6 +1197,9 @@ function mix(a: string, b: string, t: number): string {
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
+/** How long a key latched with the mouse stays down by itself (and how long a hold with no release is believed) */
+const HOLD_MS = 15_000;
+
 /** One panel key. The custom element's box is the key itself; legends hang below it. */
 export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string }) {
   const def = KEYDEFS[name];
@@ -1204,6 +1207,14 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
   const focusMode = useFocusMode();
   const [down, setDown] = useState(false);
   const pointer = useRef<number | null>(null);
+  // A mouse cannot hold one key and press another, so it can latch one: right-click or Alt-click
+  // holds a key down, any click on it lets go (as does HOLD_MS, or leaving the instrument)
+  const [latched, setLatched] = useState(false);
+  const hold = useRef<{ on: boolean; timer: ReturnType<typeof setTimeout> | null; release: () => void }>({ on: false, timer: null, release: () => undefined });
+  useEffect(() => {
+    const h = hold.current;
+    return () => { if (h.timer) clearTimeout(h.timer); if (h.on) { h.on = false; h.release(); } };
+  }, []);
   if (!def || !box) return null;
   const funcState = ctx.ui[UIK.func];
   const env: KeyEnv = {
@@ -1219,10 +1230,25 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
   const funcOn = isFunc && (funcState === 'held' || funcState === 'latched');
   const big = name === 'RECORD' || name === 'PLAY' || name === 'STOP' || name === 'FUNC';
 
+  // what letting go of this key does, with the state of the moment it happens
+  hold.current.release = () => def.release?.({ ...env, func: funcActive(ctx) });
+  const letGo = () => {
+    const h = hold.current;
+    if (h.timer) clearTimeout(h.timer);
+    h.timer = null;
+    if (!h.on) return;
+    h.on = false;
+    setLatched(false);
+    setDown(false);
+    h.release();
+  };
   const onDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    // (only keys that do something while held: a key without a release has nothing to hold)
+    const latch = e.pointerType === 'mouse' && !isFunc && !!def.release && (e.button === 2 || (e.button === 0 && e.altKey));
+    if (e.button !== 0 && e.pointerType === 'mouse' && !latch) return;
     e.preventDefault();
     e.stopPropagation();
+    if (hold.current.on) { letGo(); return; } // a held key: this click lets it go
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     pointer.current = e.pointerId;
     setDown(true);
@@ -1234,10 +1260,16 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
     }
     const live: KeyEnv = { ...env, func: funcActive(ctx) };
     def.press(live);
+    if (latch) {
+      hold.current.on = true;
+      hold.current.timer = setTimeout(letGo, HOLD_MS);
+      setLatched(true);
+    }
   };
   const onUp = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (pointer.current !== e.pointerId) return;
     pointer.current = null;
+    if (hold.current.on) return; // held by a latch: it stays down
     setDown(false);
     if (isFunc) {
       const u = liveUi(ctx);
@@ -1270,7 +1302,8 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
         type="button"
         data-control={`key:${name}`}
         aria-label={def.aria}
-        aria-pressed={lit ? true : funcOn ? true : undefined}
+        aria-pressed={lit || latched ? true : funcOn ? true : undefined}
+        data-held={latched ? '' : undefined}
         onPointerDown={onDown}
         onPointerUp={onUp}
         onPointerCancel={onUp}
@@ -1288,6 +1321,7 @@ export function PanelKey({ ctx, name }: { ctx: CustomRenderContext; name: string
             isFunc ? 'inset 0 1px 0 rgba(255,255,255,0.35)' : 'inset 0 1px 0 rgba(255,255,255,0.09)',
             ledCol ? `0 0 ${3 + 3 * amt}px ${ledCol}${amt > 0.6 ? '30' : '18'}` : '',
             funcOn ? '0 0 0 2px #e8eaee' : '',
+            latched ? '0 0 0 2px #7dd3fc' : '',
           ].filter(Boolean).join(', '),
           transform: down ? 'translateY(1px)' : undefined,
           opacity: dim ? 0.3 : 1, transition: 'opacity 200ms',

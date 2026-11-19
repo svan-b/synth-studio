@@ -274,6 +274,7 @@ const analogRytm: DeviceModule = {
     'Keys A-K (and MIDI notes 12-59) play the active track chromatically; Z/X change the octave, and the lowest octave (MIDI 0-11) plays tracks 1-12. Press [TRIG] twice for TRIG page 2, the Euclidean sequencer.',
     'Sound pool: [YES] + [MUTE] stores the active track\'s Sound; hold a trig and turn TRACK LEVEL to sound lock it to a pool Sound.',
     'FUNC: hold it with one finger and press a key with another, or tap it once (it lights) and then press the key. The secondary functions are printed under the keys.',
+    'Other two-key moves ([YES] or [NO] with a PARAMETER key rolls or reloads a page, [REC] with [PLAY]...) need a key held. On a touch screen use two fingers. With a mouse, right-click a key (or Alt-click it) to hold it down, and click it again to let go.',
     'Twelve tracks share eight voices: RS/CP, MT/HT, CH/OH and CY/CB (marked ||) cut each other off, just like the hardware. Sampling, the GLOBAL menu and MIDI CCs are not modelled; the sample layer plays synthesized one-shots.',
   ],
 };
