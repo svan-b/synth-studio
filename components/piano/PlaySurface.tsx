@@ -303,7 +303,8 @@ export default function PlaySurface({
     setReplaying(true);
     player.play(replay.take, {
       score,
-      click: tempo,
+      // The beat it was played to, unless the learner has the click switched off.
+      click: tempo && (click || settings.metronome),
       onKey: (midiNote, down) =>
         setMarks((m) => {
           const next = { ...m };

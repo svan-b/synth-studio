@@ -191,7 +191,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
       if (state.learned && out.verdict.passed && task.need === 1) kept1.current = true;
       if (out.verdict.passed && !out.verdict.plain) instrument.chime();
       setStage('verdict');
-      timer.current = setTimeout(proceed, readTime(out.verdict.message, out.verdict.passed));
+      timer.current = setTimeout(proceed, readTime(`${out.verdict.message} ${out.verdict.aside ?? ''}`, out.verdict.passed));
     },
     [addCards, info, keepRecording, pieceId, proceed, reviewCard, setPiece, state, task],
   );
@@ -354,6 +354,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
                   <div className={`text-[1.15rem] font-medium leading-snug ${verdict.v.plain ? 'text-mc-ink' : verdict.v.passed ? 'text-mc-ok' : 'text-mc-hint-ink'}`}>
                     {verdict.v.message}
                   </div>
+                  {verdict.v.aside && <div className="text-[1rem] leading-snug text-mc-ink">{verdict.v.aside}</div>}
                   {verdict.stats && <div className="text-sm text-mc-muted">{verdict.stats}</div>}
                 </div>
               ) : (

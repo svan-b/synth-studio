@@ -281,6 +281,8 @@ export interface Verdict {
   learned: boolean;
   /** Neither a pass nor a miss, as after the first play through of a piece that is new. */
   plain?: boolean;
+  /** One more thing worth a word after an attempt that counted, such as long notes let go early. */
+  aside?: string;
 }
 
 /**
@@ -349,11 +351,21 @@ function whereItSlipped(result: FlowResult): string | null {
     // More than half of them, so that "most" is true.
     if (count >= 2 && count / total > 0.5) measure = worst;
   }
+  // One hand, when it slipped at several times the rate of the other. Rates, not counts:
+  // the hand with the tune has most of the notes, and so most of the slips, whoever is at fault.
   let hand: 'left' | 'right' | null = null;
-  if (result.hands.length === 2 && slips.length >= 3) {
-    const left = slips.filter((d) => d.hand === 'L').length / slips.length;
-    if (left >= 0.75) hand = 'left';
-    else if (left <= 0.25) hand = 'right';
+  if (result.hands.length === 2) {
+    const of = (h: Hand) => {
+      const notes = result.detail.filter((d) => d.hand === h);
+      const missed = notes.filter((d) => d.state !== 'ok').length;
+      return { notes: notes.length, missed, rate: notes.length > 0 ? missed / notes.length : 0 };
+    };
+    const left = of('L');
+    const right = of('R');
+    if (left.notes >= 3 && right.notes >= 3) {
+      if (left.missed >= 3 && left.rate >= 0.3 && left.rate >= 3 * right.rate) hand = 'left';
+      else if (right.missed >= 3 && right.rate >= 0.3 && right.rate >= 3 * left.rate) hand = 'right';
+    }
   }
   if (measure !== null && hand) return `Most of the slips were in the ${hand} hand, in measure ${measure + 1}.`;
   if (measure !== null) return `Most of the slips were in measure ${measure + 1}.`;
@@ -518,8 +530,7 @@ export function applyResult(
   // A clean pass is not asked for twice.
   const clean = ok && cleanPass(task, result);
   // Something worth a word even when the attempt counted.
-  const aside = ok && task.mode === 'tempo' ? heldTooShort(result) : null;
-  const say = (text: string) => (aside ? `${text} ${aside}` : text);
+  const aside = (ok && task.mode === 'tempo' ? heldTooShort(result) : null) ?? undefined;
   next.bestAccuracy = Math.max(next.bestAccuracy, result.accuracy);
   let message = '';
   let learned = false;
@@ -568,7 +579,8 @@ export function applyResult(
       if (s.streak >= rung.need) {
         s.rung += 1;
         s.streak = 0;
-        const lead = once ? 'Clean, so once is enough.' : null;
+        // The same words at every step would wear thin, so two take turns.
+        const lead = once ? (s.rung % 2 === 0 ? 'Right first time, so no need to repeat it.' : 'Clean, so once is enough.') : null;
         if (s.rung >= rungs.length) {
           message = lead ? `${lead} This phrase is secure.` : 'This phrase is secure. Well done.';
         } else {
@@ -581,7 +593,6 @@ export function applyResult(
       } else {
         message = task.mode === 'wait' ? 'Right. Once more, just as calmly.' : 'Good. One more like that and we move on.';
       }
-      message = say(message);
     } else {
       s.streak = 0;
       s.fails += 1;
@@ -613,17 +624,17 @@ export function applyResult(
             : 'Close. Try again, and keep the pulse going through any slip.';
       }
     }
-    return { state: next, verdict: { passed: ok, message, learned } };
+    return { state: next, verdict: { passed: ok, message, learned, aside } };
   }
 
   if (task.scope.type === 'join') {
     if (ok) {
       next.joined = Math.max(next.joined, task.scope.upTo);
-      message = say('Joined. The seam is gone.');
+      message = 'Joined. The seam is gone.';
     } else {
       message = 'The join is where it wobbles. Once more, and think ahead to the first note of the second phrase.';
     }
-    return { state: next, verdict: { passed: ok, message, learned } };
+    return { state: next, verdict: { passed: ok, message, learned, aside } };
   }
 
   // Whole piece.
@@ -650,10 +661,10 @@ export function applyResult(
         learned = true;
         message = 'You have learned this piece. It will come back for a play through now and then, so it stays with you.';
       } else {
-        message = say(once ? 'Clean, so once is enough. A little faster next.' : 'That holds together. A little faster next.');
+        message = once ? 'Clean, so once is enough. A little faster next.' : 'That holds together. A little faster next.';
       }
     } else {
-      message = say(last ? 'Good. Once more at full tempo, to show it was no accident.' : 'Good. Once more at this tempo.');
+      message = last ? 'Good. Once more at full tempo, to show it was no accident.' : 'Good. Once more at this tempo.';
     }
   } else {
     next.wholeStreak = 0;
@@ -674,7 +685,8 @@ export function applyResult(
       message = 'Nearly. Again, and keep the pulse steady above all.';
     }
   }
-  return { state: next, verdict: { passed: ok, message, learned } };
+  // A piece just learned is a moment to enjoy. The word about long notes can wait for its next play through.
+  return { state: next, verdict: { passed: ok, message, learned, aside: learned ? undefined : aside } };
 }
 
 // ------------------------------------------------------------------ the plan

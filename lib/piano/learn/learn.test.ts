@@ -119,7 +119,7 @@ describe('practice coach', () => {
       state = out.state;
     }
     expect(seen).toEqual(['listen:RL:85', 'wait:R:0', 'wait:L:0', 'wait:RL:0', 'tempo:RL:60', 'tempo:RL:80']);
-    expect(said).toMatch(/once is enough/);
+    expect(said).toMatch(/once is enough|no need to repeat/);
 
     // The whole piece: 70 and 85 once each when clean, full tempo twice whatever happens.
     state.sections.forEach((s) => (s.rung = 6));
@@ -349,6 +349,14 @@ describe('practice coach', () => {
       ...timed([5, -140, -120, -150, -130], { step: 2, dur: 2 }).map((d, i) => ({ ...d, id: `h${i}`, start: 4 + i * 2 })),
     ];
 
+    it('does not blame a hand only because it has more of the notes', () => {
+      // The tune has sixteen notes and the bass four. A quarter of each went wrong.
+      const right = timed(new Array(16).fill(0)).map((d, i) => (i % 4 === 1 ? { ...d, state: 'missed' as const, errMs: undefined } : d));
+      const left = timed([0, 0, 0, 0], { hand: 'L', step: 4, dur: 4 }).map((d, i) => (i === 2 ? { ...d, state: 'missed' as const, errMs: undefined } : d));
+      const said = diagnose(result({ mode: 'tempo', hands: ['R', 'L'], accuracy: 0.75, detail: [...right, ...left] }));
+      expect(said ?? '').not.toMatch(/hand/);
+    });
+
     it('spots coming in early after long notes', () => {
       expect(diagnose(result({ mode: 'tempo', accuracy: 1, onTime: 0.5, detail: cutShort() }))).toMatch(/early after the long notes/);
       // When every note is early by the same amount there is nothing to tell the long notes by.
@@ -384,7 +392,8 @@ describe('practice coach', () => {
       state.sections[0].rung = 4;
       const out = applyResult(info, state, nextTask(info, state)!, result({ mode: 'tempo', ...good, held: 0.2 }));
       expect(out.verdict.passed).toBe(true);
-      expect(out.verdict.message).toMatch(/let go early/);
+      expect(out.verdict.message).toMatch(/One more like that/);
+      expect(out.verdict.aside).toMatch(/let go early/);
     });
 
     it('uses what it found in the coach\'s reply', () => {

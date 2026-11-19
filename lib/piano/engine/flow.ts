@@ -328,6 +328,8 @@ export class FlowSession {
     if (phase === 'playing') {
       // The take begins here. In tempo mode that is a moment before the first beat.
       this.takeStart = piano.now();
+      // A pedal put down during the count in is already down when the take begins.
+      if (midi.isPedalDown('sustain')) this.takePedal.push([0, 1]);
     }
     this.events.emit({ type: 'phase', phase });
   }
