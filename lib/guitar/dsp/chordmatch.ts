@@ -36,6 +36,10 @@ export interface ChordFit {
 const PRESENT = 0.05;
 /** Share of the sound a right chord is expected to hold, at the least. */
 const SHARE = 0.45;
+/** How much better a likely mistake must fit than the chord asked for, to be named. */
+const MARGIN = 0.04;
+/** The same, for a chord a fifth above, which the right chord's own harmonics favour. */
+const SHADOW_MARGIN = 0.15;
 
 export function chordFit(chroma: number[], pcs: number[]): ChordFit {
   if (chroma.length !== 12) return { share: 0, coverage: 0, missing: pcs.slice() };
@@ -68,6 +72,7 @@ export function judgeChord(chroma: number[], pcs: number[], confusers: Array<{ s
   let heard: string | null = null;
   let best = fit.share;
   const own = new Set(pcs.map(pitchClass));
+  const fifths = new Set(Array.from(own).map((pc) => pitchClass(pc + 7)));
   for (const c of confusers) {
     // A chord with the very same notes is no mistake.
     const theirs = new Set(c.pcs.map(pitchClass));
@@ -81,8 +86,14 @@ export function judgeChord(chroma: number[], pcs: number[], confusers: Array<{ s
     const added = Array.from(theirs).filter((pc) => !own.has(pc));
     const contains = Array.from(own).every((pc) => theirs.has(pc));
     if (contains && added.length <= 1) continue;
+    // The third harmonic of every string sounds a fifth above it, so the
+    // harmonics of a chord fall on the notes of the chord a fifth above:
+    // those of G on D, of C on G, of A on E. A chord whose own notes all lie
+    // there gets a share of the sound from the right chord's harmonics alone,
+    // so it must win more clearly to count as the mistake.
+    const shadow = added.length > 0 && added.every((pc) => fifths.has(pc));
     const s = chordFit(chroma, c.pcs).share;
-    if (s > best + 0.04) {
+    if (s > best + (shadow ? SHADOW_MARGIN : MARGIN)) {
       best = s;
       heard = c.symbol;
     }

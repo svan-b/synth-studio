@@ -36,7 +36,7 @@ That matters for loudness. An iPad's speaker gives little below about 150 Hz, wh
 
 - **Tuner**: YIN pitch detection on a decimated copy of the input, with an octave check and smoothing (`lib/guitar/dsp/pitch.ts`).
 - **Strikes and notes**: onsets from spectral flux, then each new sound is compared with what was ringing just before it, and notes are scored by how well their harmonics explain the new peaks (`lib/guitar/dsp/tracker.ts`). Notes the music expects next get a gentler test, so a right note is confirmed quickly.
-- **Chords**: the app always knows which chord it asked for. A strum's pitch content, read from a longer window once all six strings have sounded, is compared with that chord and with the chord before it, which is the likeliest slip (`lib/guitar/dsp/chordmatch.ts`). The check is lenient by design: a chord that is nearly right passes, a chord that only adds one note to the one asked for (A7 for A) is not counted as a mistake, a retry costs nothing, and Move on is always there.
+- **Chords**: the app always knows which chord it asked for. A strum's pitch content, read from a longer window once all six strings have sounded, is compared with that chord and with the chord before it, which is the likeliest slip (`lib/guitar/dsp/chordmatch.ts`). The check is lenient by design: a chord that is nearly right passes, a chord that only adds one note to the one asked for (A7 for A) is not counted as a mistake, and a chord a fifth above the one asked for (D for G) must win clearly, since the right chord's own harmonics fall on its notes. A retry costs nothing, and Move on is always there.
 - **The click** is pitched between frets, so the detector can tell it from a string, and the app's own demonstrations are ignored while they play.
 
 ## Evaluation on real guitars
@@ -56,8 +56,8 @@ Results on the evaluation set, as last run:
 | Notes in melodies, with the music to follow, as in the app | 76 percent heard, and 71 percent of what was named was right |
 | Notes in melodies, without the music to follow | 65 percent heard, 67 percent right, octave slips 4 percent |
 | Strums heard | 73 percent |
-| The right chord passes the chord check | 74 percent |
-| A wrong chord passes the chord check | 2.6 percent, against four wrong chords for each strum |
+| The right chord passes the chord check | 75 percent |
+| A wrong chord passes the chord check | 3.1 percent, against four wrong chords for each strum |
 | A plain chord taken for its seventh, such as A for A7 | never, in 176 plain chords |
 
 The chord check is set to let very few wrong chords through, at the cost of sometimes asking for a right chord again.
