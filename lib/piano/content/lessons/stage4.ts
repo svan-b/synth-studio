@@ -107,11 +107,11 @@ export const STAGE4: Lesson[] = [
         text: 'From now on, letters appear above the staff in pieces that have them. They are **chord symbols**, and they tell you the harmony at a glance. They are not the names of the notes below them.\n\nOnce you can play chords from symbols, you can accompany almost any song from a simple chart.',
       },
       {
-        kind: 'quiz',
-        question: 'Which notes make the chord of C major?',
-        choices: ['C, D and E', 'C, E and G', 'C, F and G'],
-        answer: 1,
-        explain: 'Start on C and take every other note: C, skip D, E, skip F, G.',
+        kind: 'play',
+        text: 'From memory now, with nothing on the stand. Play the chord of **C major**, all three notes together.',
+        music: { rh: 'C4+E4+G4w:135' },
+        display: 'hidden',
+        hints: 'delay',
       },
       {
         kind: 'quiz',
@@ -173,7 +173,7 @@ export const STAGE4: Lesson[] = [
       {
         kind: 'quiz',
         question: 'You play the notes C, F and A together. What chord is that?',
-        choices: ['F major, rearranged', 'C major', 'A new chord called C6'],
+        choices: ['F major', 'C major', 'A minor'],
         answer: 0,
         explain: 'F, A and C are the notes of F major. Putting C at the bottom changes the order, not the chord.',
       },
@@ -206,7 +206,7 @@ export const STAGE4: Lesson[] = [
           caption: 'F then F sharp, A then B flat. In the second measure a natural turns F sharp back into F.',
         },
       },
-      { kind: 'play', text: 'Read and play. Finger 2 goes up onto **F sharp**.', music: { rh: 'E4q:1 F#4q:2 G4q:3 F#4q:2 | E4w:1', tempo: 80 }, hints: 'always' },
+      { kind: 'play', text: 'Read and play. Finger 2 goes up onto **F sharp**.', music: { rh: 'E4q:1 F#4q:2 G4h:3 | F#4h:2 E4h:1', tempo: 80 }, hints: 'always' },
       { kind: 'play', text: 'Now a flat. Finger 4 plays **B flat**.', music: { rh: 'F4q:1 G4q:2 A4q:3 Bb4q:4 | A4h:3 F4h:1', tempo: 80 }, hints: 'delay' },
       {
         kind: 'play',
@@ -225,7 +225,7 @@ export const STAGE4: Lesson[] = [
         kind: 'quiz',
         question: 'The first F here has a sharp. What is the last note of the measure?',
         figure: { kind: 'staff', music: { rh: 'F#4q G4q F#4h' } },
-        choices: ['F sharp again', 'Plain F', 'G'],
+        choices: ['F sharp', 'F', 'G'],
         answer: 0,
         explain: 'A sharp lasts to the end of its measure, so the second F is sharp as well. Only a natural sign would cancel it.',
       },

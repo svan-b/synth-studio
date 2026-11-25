@@ -23,7 +23,7 @@ import { outcomeFromAccuracy } from '@/lib/piano/learn/srs';
 import { usePiano } from '@/lib/piano/learn/store';
 import { sliceScore } from '@/lib/piano/music/score';
 import type { Hand } from '@/lib/piano/music/theory';
-import { readingMs, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
+import { readingMs, useHints, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
 import PlaySurface from './PlaySurface';
 import { useOnward } from './session';
 import { Button, Icon, IconButton, Pill, ProgressBar, Segmented, Sheet } from './ui';
@@ -319,9 +319,12 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   // Inside the day's session, the way out of a finished piece is the way on to the next part.
   const { label: onward, session } = useOnward('Done');
   const finish = useCallback(() => onClose(true), [onClose]);
+  const hints = useHints();
+  // The first play through of a piece can be declined from the piano: the top key says it is new.
+  const declines = trial && stage === 'play' && !modelOnce;
   useRemote({
     // At time up the main choice is to stop, so the top key does that.
-    primary: stage === 'verdict' ? proceed : stage === 'timeup' || stage === 'learned' ? finish : undefined,
+    primary: stage === 'verdict' ? proceed : stage === 'timeup' || stage === 'learned' ? finish : declines ? teachFromStart : undefined,
     secondary: stage === 'timeup' ? proceed : stage === 'learned' ? undefined : hearModel,
   });
 
@@ -337,20 +340,21 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
       <header className="flex h-14 shrink-0 items-center gap-3 px-4">
-        <IconButton label="Close" onClick={() => onClose(stage === 'learned' || stage === 'timeup')}>
+        {/* On the closing screen of a part of the day's session, closing means stopping for today. Going on has its own button. */}
+        <IconButton label="Close" onClick={() => ((stage === 'learned' || stage === 'timeup') && session ? session.stop() : onClose(stage === 'learned' || stage === 'timeup'))}>
           <Icon.Close />
         </IconButton>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-3">
             <span className="truncate font-mc-serif text-xl">{piece.title}</span>
-            {piece.composer && <span className="truncate text-[1.05rem] text-mc-muted">{piece.composer}</span>}
+            {piece.composer && <span className="truncate text-[1.05rem] text-mc-muted portrait:hidden">{piece.composer}</span>}
           </div>
           <ProgressBar value={progress} tone="ok" className="mt-1 max-w-xs" />
         </div>
         {/* The screens that close a piece have their own buttons, and nothing on the stand to hear or plan. */}
         {stage !== 'learned' && stage !== 'timeup' && (
           <>
-            <Button variant="soft" size="sm" onClick={hearModel} icon={<Icon.Ear size={16} />} hint={inputMode === 'midi' ? 'bottom key' : undefined}>
+            <Button variant="soft" size="sm" onClick={hearModel} icon={<Icon.Ear size={16} />} hint={hints.bottom}>
               Hear it
             </Button>
             <Button variant={free ? 'primary' : 'soft'} size="sm" onClick={openOptions}>
@@ -371,7 +375,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
           </div>
           <p className="mc-fade-up max-w-2xl text-[1.3rem] leading-relaxed text-mc-muted">{verdict?.v.message}</p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {session && (
+            {session?.next && (
               <Button variant="ghost" size="lg" onClick={session.stop}>
                 Stop for today
               </Button>
@@ -381,7 +385,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
                 {encore ? 'Stop' : 'Hear how you played it'}
               </Button>
             )}
-            <Button size="lg" onClick={finish} className="min-w-[240px]" hint={inputMode === 'midi' ? 'top key' : undefined}>
+            <Button size="lg" onClick={finish} className="min-w-[240px]" hint={hints.top}>
               {onward}
             </Button>
           </div>
@@ -396,15 +400,15 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
               : 'That is the time set aside for this piece today. What you practised keeps settling after you stop, and a night of sleep helps it along. It will be easier tomorrow.'}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {session && (
+            {session?.next && (
               <Button variant="ghost" size="lg" onClick={session.stop}>
                 Stop for today
               </Button>
             )}
-            <Button variant="soft" size="lg" onClick={proceed} hint={inputMode === 'midi' ? 'bottom key' : undefined}>
+            <Button variant="soft" size="lg" onClick={proceed} hint={hints.bottom}>
               {ending === 'kept' ? 'Play it again' : 'Keep going'}
             </Button>
-            <Button size="lg" onClick={finish} className="min-w-[240px]" hint={inputMode === 'midi' ? 'top key' : undefined}>
+            <Button size="lg" onClick={finish} className="min-w-[240px]" hint={hints.top}>
               {session ? onward : 'Finish'}
             </Button>
           </div>
@@ -438,7 +442,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
               </div>
             )}
             {trial && stage === 'play' && !modelOnce && (
-              <Button variant="ghost" onClick={teachFromStart}>
+              <Button variant="ghost" onClick={teachFromStart} hint={hints.top}>
                 It is new to me
               </Button>
             )}
@@ -448,7 +452,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
               </Button>
             )}
             {stage === 'verdict' && (
-              <Button onClick={proceed} hint={inputMode === 'midi' ? 'top key' : undefined}>
+              <Button onClick={proceed} hint={hints.top}>
                 Continue
               </Button>
             )}

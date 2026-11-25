@@ -7,7 +7,7 @@ import { markKnownThrough } from '@/lib/piano/learn/placement';
 import { usePiano, type Experience } from '@/lib/piano/learn/store';
 import { isNative } from '@/lib/piano/native/bridge';
 import ConnectionPanel from './Connection';
-import { useInputMode } from './hooks';
+import { useHints, useInputMode, useRemote } from './hooks';
 import { Button, Icon } from './ui';
 
 const LEVELS: Array<{ value: Experience; title: string; text: string }> = [
@@ -64,6 +64,9 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     setProfile({ onboarded: true });
     onDone();
   };
+  // Once the piano is connected its keys turn these pages too, and nothing behind them can be reached.
+  const hints = useHints();
+  useRemote({ primary: last ? finish : next, secondary: index > 0 ? () => setIndex((s) => s - 1) : undefined });
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
@@ -170,16 +173,16 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
         </div>
         <div className="flex gap-3">
           {index > 0 && (
-            <Button variant="ghost" size="lg" onClick={() => setIndex((s) => s - 1)}>
+            <Button variant="ghost" size="lg" onClick={() => setIndex((s) => s - 1)} hint={hints.bottom}>
               Back
             </Button>
           )}
           {!last ? (
-            <Button size="lg" onClick={next} className="min-w-[180px]">
+            <Button size="lg" onClick={next} className="min-w-[180px]" hint={hints.top}>
               {step === 'welcome' ? 'Begin' : step === 'connect' && mode === 'touch' ? 'Not now' : 'Continue'}
             </Button>
           ) : (
-            <Button size="lg" onClick={finish} className="min-w-[180px]">
+            <Button size="lg" onClick={finish} className="min-w-[180px]" hint={hints.top}>
               Open the app
             </Button>
           )}

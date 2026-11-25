@@ -78,6 +78,23 @@ export interface DrillState {
 }
 
 /** A part of a session, as the planner lays it out. Kept as plain data. */
+/**
+ * The version of the course that progress is kept against. It goes up when
+ * lessons are split or moved, so that progress from before can be carried over.
+ */
+export const COURSE = 2;
+
+/**
+ * Bring lesson progress from an earlier course up to this one. The lesson on
+ * arpeggios became two, one hand and then both. Whoever finished it as it was
+ * has had both.
+ */
+export function carryOver(lessons: Record<string, LessonProgress>): Record<string, LessonProgress> {
+  const out = { ...lessons };
+  if (out['arpeggios']?.done && !out['arpeggios-two-hands']) out['arpeggios-two-hands'] = { ...out['arpeggios'] };
+  return out;
+}
+
 export interface SessionPart {
   kind: 'lesson' | 'piece' | 'drill';
   id: string;
@@ -92,6 +109,15 @@ export interface SavedSession {
   blocks: SessionPart[];
   /** The part that comes next. */
   index: number;
+  /** Parts that were passed over, by their place in the list. They are behind, and they are not done. */
+  skipped?: number[];
+  /** How the session's lessons and pieces stood when it began, so its closing account covers all of it. */
+  base?: SessionBase;
+}
+
+export interface SessionBase {
+  lessons: Record<string, boolean>;
+  pieces: Record<string, PieceState | null>;
 }
 
 interface State {
@@ -125,6 +151,8 @@ interface State {
   /** Keep a take of a learned piece. The first is kept for good, later ones replace each other. */
   keepRecording: (id: string, take: Take) => void;
   addCards: (ids: string[]) => void;
+  /** Take review cards out again, where they have never been reviewed. */
+  dropCards: (ids: string[]) => void;
   reviewCard: (id: string, outcome: Outcome) => void;
   logPractice: (seconds: number, notes: number, activities?: number) => void;
   recordDrill: (id: string, correct: boolean, level?: number) => void;
@@ -242,6 +270,18 @@ export const usePiano = create<State>()(
           }
           return changed ? { cards } : {};
         }),
+      dropCards: (ids) =>
+        set((s) => {
+          const cards = { ...s.cards };
+          let changed = false;
+          for (const id of ids) {
+            if (cards[id] && cards[id].reps === 0) {
+              delete cards[id];
+              changed = true;
+            }
+          }
+          return changed ? { cards } : {};
+        }),
       reviewCard: (id, outcome) => set((s) => ({ cards: { ...s.cards, [id]: review(s.cards[id], outcome) } })),
       logPractice: (seconds, notes, activities = 0) =>
         set((s) => {
@@ -277,6 +317,9 @@ export const usePiano = create<State>()(
           // The daily copies the iPad app keeps hold the same things one level down.
           const data: Partial<State> = parsed?.state?.profile ? parsed.state : parsed;
           if (!data || typeof data !== 'object' || !data.profile) return false;
+          // A copy made before the course changed is brought up to the course as it is now.
+          const made = (parsed as { course?: number; version?: number }).course ?? (parsed as { version?: number }).version ?? 0;
+          if (made < COURSE) data.lessons = carryOver(data.lessons ?? {});
           set({
             profile: { ...defaultProfile, ...data.profile },
             settings: { ...defaultSettings, ...(data.settings ?? {}) },
@@ -311,7 +354,15 @@ export const usePiano = create<State>()(
     }),
     {
       name: 'middle-c-v1',
-      version: 1,
+      version: COURSE,
+      // Without this, progress kept by an earlier version would be thrown away.
+      migrate: (kept, version) => {
+        const state = (kept ?? {}) as Partial<State>;
+        if (version < COURSE && state.lessons) state.lessons = carryOver(state.lessons);
+        // A session saved against the old list of lessons is not picked up.
+        if (version < COURSE) state.session = null;
+        return state as State;
+      },
       storage: createJSONStorage(() => progressStorage),
       partialize: (s) => ({
         profile: s.profile,
@@ -335,6 +386,7 @@ export function exportData(): string {
   return JSON.stringify(
     {
       app: 'middle-c',
+      course: COURSE,
       exportedAt: new Date().toISOString(),
       profile: s.profile,
       settings: s.settings,

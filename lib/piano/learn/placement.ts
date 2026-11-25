@@ -24,13 +24,22 @@ export function markKnownThrough(stageId: number): void {
     }
   }
   seedLevels(stageId);
+  // The day's plan is different now, so one begun before is not picked up.
+  usePiano.getState().keepSession(null);
 }
 
 /** Take back the mark on one stage: its lessons that were marked as known, and not taken, are to do again. */
 export function undoKnown(stageId: number): void {
   const s = usePiano.getState();
   const stage = allStages().find((x) => x.id === stageId);
-  for (const id of stage?.lessons ?? []) s.unskipLesson(id);
+  for (const id of stage?.lessons ?? []) {
+    if (!s.lessons[id]?.skipped) continue;
+    s.unskipLesson(id);
+    // The notes the mark added to the reading review go too, unless they have been reviewed since.
+    const cards = getLesson(id).cards;
+    if (cards) s.dropCards(cards);
+  }
+  s.keepSession(null);
 }
 
 /** The level an untried exercise starts at for someone who knows this many stages. It finds its own level from there. */

@@ -486,14 +486,14 @@ export default function PlaySurface({
         {(phase === 'gate' || notice) && (
           <div className="pointer-events-none absolute inset-x-0 bottom-3 flex flex-col items-center gap-2">
             {notice && (
-              <div role="status" className="mc-fade-up rounded-full bg-mc-surface px-5 py-2 text-[1rem] font-medium text-mc-hint-ink shadow-lg ring-1 ring-mc-line">
+              <div role="status" className="mc-fade-up rounded-full bg-mc-surface px-6 py-2.5 text-[1.2rem] font-medium text-mc-hint-ink shadow-lg ring-1 ring-mc-line">
                 {notice}
               </div>
             )}
             {phase === 'gate' && (
               <button
                 onClick={() => gateRef.current?.()}
-                className="mc-fade-up pointer-events-auto flex h-12 items-center gap-2.5 rounded-full bg-mc-ink px-6 text-[1.05rem] font-semibold text-mc-bg shadow-lg active:scale-[0.97]"
+                className="mc-fade-up pointer-events-auto flex h-14 items-center gap-2.5 rounded-full bg-mc-ink px-7 text-[1.3rem] font-semibold text-mc-bg shadow-lg active:scale-[0.97]"
               >
                 <Icon.Play size={18} />
                 {/* A key starts the count, not the music, and the words say so. */}
@@ -504,7 +504,7 @@ export default function PlaySurface({
         )}
       </div>
 
-      <div className="relative flex h-11 shrink-0 items-center justify-between px-6 text-[1.05rem] text-mc-muted">
+      <div className="relative flex h-11 shrink-0 items-center justify-between px-6 text-[1.2rem] text-mc-ink/75">
         {lead !== null && (
           <span className="absolute inset-x-6 top-0 h-0.5 overflow-hidden rounded-full bg-mc-line" aria-hidden="true">
             <span key={String(runId)} className="mc-lead block h-full rounded-full bg-mc-accent" style={{ animationDuration: `${lead}ms` }} />

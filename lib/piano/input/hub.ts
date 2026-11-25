@@ -25,6 +25,10 @@ export type RemoteAction = 'primary' | 'secondary' | 'pedal';
 /** How long the keys must have been still before the right pedal counts as a button. */
 const QUIET_MS = 1200;
 
+/** How far down a pedal must go to count as pressed, and how far up to count as let go, from 0 to 1. */
+const PEDAL_DOWN = 80 / 127;
+const PEDAL_UP = 40 / 127;
+
 export function isRemoteKey(note: number): boolean {
   return note === REMOTE_PRIMARY || note === REMOTE_SECONDARY;
 }
@@ -38,6 +42,7 @@ class InputHub {
   /** Keys held down now, and when one last went down: the right pedal is a button only away from playing. */
   private held = new Set<number>();
   private lastKey = -Infinity;
+  private pedalDown: Record<string, boolean> = {};
 
   constructor() {
     noteBus.subscribe((ev) => {
@@ -52,7 +57,13 @@ class InputHub {
       else if (ev.midi === REMOTE_SECONDARY) this.fire('secondary');
     });
     midi.pedals.subscribe((ev) => {
-      if (!this.remotePedals || !ev.down) return;
+      // A pedal that reports how far down it is sends a stream of values on the way down and
+      // on the way up. One press is one press: it counts when the pedal passes well down, and
+      // not again until it has come well up. A foot resting half way does nothing.
+      const was = this.pedalDown[ev.pedal] === true;
+      const now = was ? ev.value > PEDAL_UP : ev.value >= PEDAL_DOWN;
+      this.pedalDown[ev.pedal] = now;
+      if (!this.remotePedals || was || !now) return;
       // Middle pedal continues, left pedal repeats.
       if (ev.pedal === 'sostenuto') this.fire('primary');
       else if (ev.pedal === 'soft') this.fire('secondary');

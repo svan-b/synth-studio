@@ -29,7 +29,7 @@ import { usePiano } from '@/lib/piano/learn/store';
 import { parseScore } from '@/lib/piano/music/score';
 import { midiLabel, midiName } from '@/lib/piano/music/theory';
 import { shuffle } from '@/lib/piano/util/emitter';
-import { useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
+import { useHints, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
 import { Keyboard, flashKey, keyboardRange, type KeyMark } from './Keyboard';
 import PlaySurface from './PlaySurface';
 import ScoreView from './ScoreView';
@@ -37,10 +37,13 @@ import { useOnward } from './session';
 import { Button, Icon, IconButton, Pill, ProgressBar } from './ui';
 
 function Shell({ title, progress, onClose, children }: { title: string; progress: number; onClose: () => void; children: ReactNode }) {
+  const { session } = useOnward();
+  // On the closing screen of a part of the day's session, closing means stopping for today. Going on has its own button.
+  const close = () => (progress >= 1 && session ? session.stop() : onClose());
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
       <header className="flex h-14 shrink-0 items-center gap-3 px-4">
-        <IconButton label="Close" onClick={() => onClose()}>
+        <IconButton label="Close" onClick={close}>
           <Icon.Close />
         </IconButton>
         <div className="min-w-0 flex-1">
@@ -54,7 +57,7 @@ function Shell({ title, progress, onClose, children }: { title: string; progress
 }
 
 function Summary({ title, lines, onDone }: { title: string; lines: string[]; onDone: () => void }) {
-  const mode = useInputMode();
+  const hints = useHints();
   // Inside the day's session, the way out of a finished exercise is the way on to the next part.
   const { label, session } = useOnward();
   useRemote({ primary: onDone, pedal: true });
@@ -73,12 +76,12 @@ function Summary({ title, lines, onDone }: { title: string; lines: string[]; onD
         ))}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        {session && (
+        {session?.next && (
           <Button variant="ghost" size="lg" onClick={session.stop}>
             Stop for today
           </Button>
         )}
-        <Button size="lg" onClick={onDone} className="min-w-[260px]" hint={mode === 'midi' ? 'top key or right pedal' : undefined}>
+        <Button size="lg" onClick={onDone} className="min-w-[260px]" hint={hints.onward}>
           {label}
         </Button>
       </div>
@@ -291,7 +294,12 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
 
   const finished = index >= round.count;
 
-  const advance = useCallback(() => {
+  const quiet = useRef(0);
+  const advance = useCallback((auto?: boolean) => {
+    // A press that was already on its way when the exercise moved on by itself is not a wish to skip the next one.
+    const now = performance.now();
+    if (auto === true) quiet.current = now + 750;
+    else if (now < quiet.current) return;
     if (timer.current) clearTimeout(timer.current);
     setNote(null);
     setTries(0);
@@ -347,7 +355,7 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
         if (result.clean) {
           adapt(true);
           setNote({ ok: true, text: 'Yes, that is it.', stand: 'That is it' });
-          timer.current = setTimeout(advance, 1100);
+          timer.current = setTimeout(() => advance(true), 1100);
         } else if (tries < 1) {
           setTries(1);
           setNote({ ok: false, text: 'Not quite. Listen once more.', stand: 'Listen again' });
@@ -355,7 +363,7 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
         } else {
           adapt(false);
           setNote({ ok: false, text: 'You got there. On to the next.', stand: 'On to the next' });
-          timer.current = setTimeout(advance, 1500);
+          timer.current = setTimeout(() => advance(true), 1500);
         }
         return;
       }
@@ -372,7 +380,7 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
               : `${shown} of them had to be shown. They will come round again.`
             : `${wrong === 1 ? 'One wrong key' : `${wrong} wrong keys`} on the way. Picture the shape before you press.`;
         setNote({ ok, text });
-        timer.current = setTimeout(advance, staysFor(text, ok));
+        timer.current = setTimeout(() => advance(true), staysFor(text, ok));
         return;
       }
       // A run in which nothing was played is not an attempt, and changes nothing.
@@ -415,7 +423,7 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
                 ? 'The notes were right but ahead of the beat. Let the click lead you.'
                 : 'The notes were right but uneven. Feel each click and fit the notes to it.';
         setNote({ ok, text });
-        timer.current = setTimeout(advance, staysFor(text, ok));
+        timer.current = setTimeout(() => advance(true), staysFor(text, ok));
         return;
       }
       const ok = kind === 'rhythm' ? result.accuracy >= 0.85 && result.onTime >= 0.65 : result.accuracy >= 0.85;
@@ -435,17 +443,17 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
                 : 'Uneven against the beat. Count along with the click.'
           : `${pct} percent. Reading at sight is about keeping going, so never stop to fix a note.`;
       setNote({ ok, text });
-      timer.current = setTimeout(advance, staysFor(text, ok));
+      timer.current = setTimeout(() => advance(true), staysFor(text, ok));
     },
     [adapt, advance, hear, kind, phase, tries],
   );
 
   // As in a lesson: the top key always goes on, and the bottom key hears it again where there is something to hear.
   useRemote({
-    primary: phase === 'look' ? () => setPhase('play') : advance,
+    primary: phase === 'look' ? () => setPhase('play') : () => advance(),
     secondary: hear,
   });
-  const keys = useInputMode() === 'midi';
+  const hints = useHints();
 
   if (finished) {
     return (
@@ -485,16 +493,16 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
           </div>
           <Pill>Level {level}</Pill>
           {kind === 'ear' && (
-            <Button variant="soft" onClick={hear} icon={<Icon.Ear size={18} />} hint={keys ? 'bottom key' : undefined}>
+            <Button variant="soft" onClick={hear} icon={<Icon.Ear size={18} />} hint={hints.bottom}>
               Hear it
             </Button>
           )}
           {phase === 'look' ? (
-            <Button onClick={() => setPhase('play')} className="mc-pulse" hint={keys ? 'top key' : undefined}>
+            <Button onClick={() => setPhase('play')} className="mc-pulse" hint={hints.top}>
               I am ready
             </Button>
           ) : (
-            <Button variant="ghost" onClick={advance} hint={keys ? 'top key' : undefined}>
+            <Button variant="ghost" onClick={() => advance()} hint={hints.top}>
               {note ? 'Go on' : 'Skip'}
             </Button>
           )}

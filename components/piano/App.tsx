@@ -10,10 +10,10 @@ import { midi } from '@/lib/piano/input/midi';
 import { getLesson, pieceInfo } from '@/lib/piano/content/catalog';
 import { pieceProgress } from '@/lib/piano/learn/coach';
 import { currentPiece, planDay, planSession, type Block } from '@/lib/piano/learn/planner';
-import { streak, usePiano } from '@/lib/piano/learn/store';
+import { streak, usePiano, type SessionBase } from '@/lib/piano/learn/store';
 import { dayKey } from '@/lib/piano/util/emitter';
 import Drill from './Drills';
-import { useApplySettings, useInputMode, useRemote, useTheme } from './hooks';
+import { useApplySettings, useHints, useRemote, useTheme } from './hooks';
 import LessonPlayer from './LessonPlayer';
 import Onboarding from './Onboarding';
 import PracticeRoom from './PracticeRoom';
@@ -37,20 +37,20 @@ function BlockActivity({ block, onClose }: { block: Block; onClose: (finished: b
 }
 
 /** What a session changed, as a short list for the screen that closes it. */
-function recap(before: ReturnType<typeof usePiano.getState>, parts: Block[]): Array<[string, string]> {
+function recap(before: SessionBase, parts: Block[]): Array<[string, string]> {
   const now = usePiano.getState();
   const rows: Array<[string, string]> = [];
   const minutes = Math.round((now.days[dayKey()]?.seconds ?? 0) / 60);
   if (minutes > 0) rows.push(['At the piano today', minutes === 1 ? '1 minute' : `${minutes} minutes`]);
   for (const b of parts) {
-    if (b.kind === 'lesson' && now.lessons[b.id]?.done && !before.lessons[b.id]?.done) rows.push(['New lesson', getLesson(b.id).title]);
+    if (b.kind === 'lesson' && now.lessons[b.id]?.done && !before.lessons[b.id]) rows.push(['New lesson', getLesson(b.id).title]);
   }
   const seen = new Set<string>();
   for (const b of parts) {
     if (b.kind !== 'piece' || seen.has(b.id)) continue;
     seen.add(b.id);
     const info = pieceInfo(b.id);
-    const was = before.pieces[b.id];
+    const was = before.pieces[b.id] ?? undefined;
     const is = now.pieces[b.id];
     if (!is) continue;
     // Only what was played in this session is spoken for. A piece that was opened and left alone says nothing.
@@ -83,84 +83,120 @@ function tomorrow(): string | null {
   return day.held === 'pieces' ? `Tomorrow carries on with ${first.title}. The next lesson waits until your pieces are further along.` : `Tomorrow carries on with ${first.title}.`;
 }
 
+/** How the lessons and pieces of these parts stand now, to measure the session against when it ends. */
+function baseOf(parts: Block[]): SessionBase {
+  const state = usePiano.getState();
+  const base: SessionBase = { lessons: {}, pieces: {} };
+  for (const b of parts) {
+    if (b.kind === 'lesson') base.lessons[b.id] = state.lessons[b.id]?.done === true;
+    else if (b.kind === 'piece') base.pieces[b.id] = state.pieces[b.id] ?? null;
+  }
+  return base;
+}
+
 /** Runs the parts of a daily session one after another. */
-function SessionRunner({ blocks: planned, from = 0, onClose }: { blocks: Block[]; from?: number; onClose: () => void }) {
+function SessionRunner({
+  blocks: planned,
+  from = 0,
+  skipped: passed,
+  base: began,
+  onClose,
+}: {
+  blocks: Block[];
+  from?: number;
+  skipped?: number[];
+  base?: SessionBase;
+  onClose: () => void;
+}) {
   // The parts can grow: when a piece is learned with time to spare, the next piece takes the rest of it.
   const [blocks, setBlocks] = useState(planned);
   const [index, setIndex] = useState(() => Math.max(0, Math.min(from, planned.length)));
+  // Parts that were passed over. They are behind, and they are not done.
+  const [skipped, setSkipped] = useState<number[]>(() => passed ?? []);
   // A session goes straight into its first part, and from each finished part straight into the
   // next: the screen that closes a part says what follows. This screen in between is shown only
-  // when a part was left part way, where there is something to decide.
-  const [between, setBetween] = useState(false);
+  // where there is something to decide: a part was left part way, or passed over.
+  const [between, setBetween] = useState<null | 'left' | 'next'>(null);
   const finishSession = usePiano((s) => s.finishSession);
   const keepSession = usePiano((s) => s.keepSession);
   const lessons = usePiano((s) => s.lessons);
-  const mode = useInputMode();
+  const hints = useHints();
   const done = index >= blocks.length;
   const marked = useRef(false);
-  const before = useRef(usePiano.getState());
+  const base = useRef<SessionBase>(began ?? baseOf(planned));
   const blockStarted = useRef(performance.now());
   const [summary, setSummary] = useState<{ rows: Array<[string, string]>; next: string | null } | null>(null);
+  // A session in which nothing was finished has not been done. It is put back as it was.
+  const nothingDone = done && skipped.length >= blocks.length;
 
   // Where the session stands is kept as it goes, so that stopping, or the app closing, loses nothing.
   useEffect(() => {
-    if (!done) keepSession({ on: dayKey(), blocks, index });
-  }, [blocks, done, index, keepSession]);
+    if (!done) keepSession({ on: dayKey(), blocks, index, skipped, base: base.current });
+  }, [blocks, done, index, keepSession, skipped]);
 
   useEffect(() => {
-    if (done && !marked.current) {
-      marked.current = true;
-      finishSession();
-      instrument.chime();
-      setSummary({ rows: recap(before.current, blocks), next: tomorrow() });
+    if (!done || marked.current) return;
+    marked.current = true;
+    if (nothingDone) {
+      keepSession(null);
+      onClose();
+      return;
     }
-  }, [blocks, done, finishSession]);
+    finishSession();
+    instrument.chime();
+    setSummary({ rows: recap(base.current, blocks), next: tomorrow() });
+  }, [blocks, done, finishSession, keepSession, nothingDone, onClose]);
 
   const start = useCallback(() => {
     blockStarted.current = performance.now();
-    setBetween(false);
+    setBetween(null);
   }, []);
   const afterBlock = useCallback(
     (finished: boolean) => {
       const block = blocks[index];
       const state = usePiano.getState();
-      // A lesson that was closed part way is not finished. The session stays on it,
+      // A part closed before its end is not finished, whatever it is. The session stays on it,
       // to be picked up again, passed over, or left for today.
-      if (block?.kind === 'lesson' && state.lessons[block.id]?.done !== true) {
-        setBetween(true);
+      const lessonDone = block?.kind === 'lesson' && state.lessons[block.id]?.done === true;
+      if (block?.kind === 'lesson' ? !lessonDone : !finished) {
+        setBetween('left');
         return;
       }
       // A piece learned well inside its time leaves room to begin the next one.
       const used = (performance.now() - blockStarted.current) / 60000;
       const left = block?.kind === 'piece' ? Math.floor(block.minutes - used) : 0;
-      const justLearned = block?.kind === 'piece' && state.pieces[block.id]?.learned === true && before.current.pieces[block.id]?.learned !== true;
+      const justLearned = block?.kind === 'piece' && state.pieces[block.id]?.learned === true && base.current.pieces[block.id]?.learned !== true;
       const nextPiece = justLearned && left >= 3 ? currentPiece(state.lessons, state.pieces) : null;
       const extra = nextPiece !== null && !blocks.some((b) => b.kind === 'piece' && b.id === nextPiece);
       if (extra && nextPiece) {
         const info = pieceInfo(nextPiece);
         const added: Block = { kind: 'piece', id: nextPiece, minutes: left, title: info.title, detail: 'There is time left, so on to the next piece' };
+        base.current.pieces[nextPiece] = state.pieces[nextPiece] ?? null;
         setBlocks((list) => [...list.slice(0, index + 1), added, ...list.slice(index + 1)]);
+        // The parts after it have moved along by one.
+        setSkipped((list) => list.map((i) => (i > index ? i + 1 : i)));
       }
       setIndex((i) => i + 1);
       blockStarted.current = performance.now();
       // Straight on, when the part ended on its own closing screen, which named what comes next.
-      // A part closed early, or a part nobody was told about, gets a screen to say so first.
-      setBetween(!finished || extra);
+      // A part nobody was told about gets a screen to say so first.
+      setBetween(extra ? 'next' : null);
     },
     [blocks, index],
   );
   const skip = useCallback(() => {
+    setSkipped((list) => (list.includes(index) ? list : [...list, index]));
     setIndex((i) => i + 1);
-    setBetween(true);
-  }, []);
+    setBetween('next');
+  }, [index]);
   /** Stop from the closing screen of a part: that part is done, so the session is kept from the next one. */
   const stopAfter = useCallback(() => {
     if (index + 1 >= blocks.length) finishSession();
-    else keepSession({ on: dayKey(), blocks, index: index + 1 });
+    else keepSession({ on: dayKey(), blocks, index: index + 1, skipped, base: base.current });
     onClose();
-  }, [blocks, finishSession, index, keepSession, onClose]);
+  }, [blocks, finishSession, index, keepSession, onClose, skipped]);
   // The bottom key means again everywhere else, so here it does nothing. Stopping is a deliberate tap.
-  useRemote({ primary: done ? onClose : between ? start : undefined, pedal: true }, between || done);
+  useRemote({ primary: done ? onClose : between ? start : undefined, pedal: true }, between !== null || done);
 
   const link = useMemo<SessionLink>(() => ({ next: blocks[index + 1]?.title ?? null, stop: stopAfter }), [blocks, index, stopAfter]);
 
@@ -171,11 +207,14 @@ function SessionRunner({ blocks: planned, from = 0, onClose }: { blocks: Block[]
       </SessionContext.Provider>
     );
   }
+  // Nothing was finished: the effect above is putting the day back as it was.
+  if (nothingDone) return null;
 
   const block = blocks[index];
   // A lesson left part way says how far it had got.
   const at = block?.kind === 'lesson' && lessons[block.id]?.done !== true ? (lessons[block.id]?.step ?? 0) : 0;
   const steps = block?.kind === 'lesson' ? getLesson(block.id).steps.length : 0;
+  const left = between === 'left';
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-7 bg-mc-bg px-8 text-center mc-safe-top mc-safe-bottom">
@@ -200,7 +239,7 @@ function SessionRunner({ blocks: planned, from = 0, onClose }: { blocks: Block[]
               What you worked on keeps settling after you stop, and it will feel easier next time. {summary?.next ?? 'Come back tomorrow.'}
             </p>
           </div>
-          <Button size="lg" onClick={onClose} className="min-w-[240px]" hint={mode === 'midi' ? 'or the top key' : undefined}>
+          <Button size="lg" onClick={onClose} className="min-w-[240px]" hint={hints.onward}>
             Finish
           </Button>
         </>
@@ -208,16 +247,25 @@ function SessionRunner({ blocks: planned, from = 0, onClose }: { blocks: Block[]
         <>
           <div className="mc-fade-up">
             <div className="text-[1.1rem] font-semibold uppercase tracking-widest text-mc-muted">
-              {at > 0 ? 'Left part way' : 'Next'}, part {index + 1} of {blocks.length}
+              {left ? 'Left part way' : 'Next'}, part {index + 1} of {blocks.length}
             </div>
             <h2 className="mt-2 font-mc-serif text-5xl">{block.title}</h2>
             <p className="mt-3 text-[1.35rem] text-mc-muted">
-              {at > 0 ? `You were at step ${at + 1} of ${steps}. It opens there.` : `${block.detail.replace(/[.\s]+$/, '')}. About ${block.minutes} minutes.`}
+              {left
+                ? block.kind === 'lesson'
+                  ? at > 0
+                    ? `You were at step ${at + 1} of ${steps}. It opens there.`
+                    : 'You closed it at its first step.'
+                  : 'You closed it before its end.'
+                : `${block.detail.replace(/[.\s]+$/, '')}. About ${block.minutes} minutes.`}
             </p>
           </div>
           <div className="flex items-center gap-2" aria-hidden="true">
             {blocks.map((_, i) => (
-              <span key={i} className={`h-2.5 rounded-full ${i < index ? 'w-2.5 bg-mc-ok' : i === index ? 'w-8 bg-mc-ink' : 'w-2.5 bg-mc-line'}`} />
+              <span
+                key={i}
+                className={`h-2.5 rounded-full ${i === index ? 'w-8 bg-mc-ink' : i < index && !skipped.includes(i) ? 'w-2.5 bg-mc-ok' : 'w-2.5 bg-mc-line'}`}
+              />
             ))}
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -227,8 +275,8 @@ function SessionRunner({ blocks: planned, from = 0, onClose }: { blocks: Block[]
             <Button variant="soft" size="lg" onClick={skip}>
               Skip this part
             </Button>
-            <Button size="lg" onClick={start} className="min-w-[240px]" hint={mode === 'midi' ? 'or the top key' : undefined}>
-              {at > 0 ? 'Carry on' : 'Continue'}
+            <Button size="lg" onClick={start} className="min-w-[240px]" hint={hints.onward}>
+              {left ? 'Carry on' : 'Continue'}
             </Button>
           </div>
         </>
@@ -348,7 +396,7 @@ export default function App() {
           })}
         </nav>
         <main className="min-h-0 min-w-0 flex-1 mc-safe-top">
-          {view === 'today' && <TodayScreen onStart={setActivity} onGo={setView} />}
+          {view === 'today' && <TodayScreen onStart={setActivity} onGo={setView} front={!activity && onboarded} />}
           {view === 'learn' && <LearnScreen onStart={setActivity} />}
           {view === 'pieces' && <PiecesScreen onStart={setActivity} />}
           {view === 'train' && <TrainScreen onStart={setActivity} />}
@@ -362,7 +410,7 @@ export default function App() {
       {activity?.kind === 'lesson' && <LessonPlayer key={activity.id} lessonId={activity.id} onClose={(_, then) => setActivity(then ?? null)} />}
       {activity?.kind === 'piece' && <PracticeRoom pieceId={activity.id} minutes={activity.minutes} onClose={close} />}
       {activity?.kind === 'drill' && <Drill kind={activity.id} onClose={close} />}
-      {activity?.kind === 'session' && <SessionRunner blocks={activity.blocks} from={activity.from} onClose={close} />}
+      {activity?.kind === 'session' && <SessionRunner blocks={activity.blocks} from={activity.from} skipped={activity.skipped} base={activity.base} onClose={close} />}
       {!onboarded && <Onboarding onDone={() => setView('today')} />}
     </div>
   );

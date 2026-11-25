@@ -6,12 +6,14 @@ import { getLesson, getPiece, lessonOrder, resolveMusic } from '@/lib/piano/cont
 import type { Lesson, Step } from '@/lib/piano/content/types';
 import { notAttempted, type FlowResult } from '@/lib/piano/engine/flow';
 import { noteBus } from '@/lib/piano/input/bus';
+import { ANSWER_KEYS, answerKeys } from '@/lib/piano/learn/answers';
 import { diagnose, waitSummary } from '@/lib/piano/learn/coach';
 import { REMOTE_PRIMARY, REMOTE_SECONDARY, isRemoteKey } from '@/lib/piano/input/hub';
+import { midi } from '@/lib/piano/input/midi';
 import { usePiano } from '@/lib/piano/learn/store';
 import { pitchClass } from '@/lib/piano/music/theory';
 import FigureView from './Figures';
-import { readingMs, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
+import { readingMs, useHints, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
 import { Keyboard, flashKey } from './Keyboard';
 import PlaySurface from './PlaySurface';
 import type { Activity } from './Screens';
@@ -55,7 +57,6 @@ function TextStep({
   /** Whether the right pedal turns the page. Not on a page that asks for the pedal to be tried. */
   pedal?: boolean;
 }) {
-  const mode = useInputMode();
   const back = useContext(BackContext);
   // Nothing is being played on a page of words, so the bottom key is free to turn back a page.
   useRemote({ primary: onNext, secondary: back ?? undefined, pedal });
@@ -71,24 +72,25 @@ function TextStep({
           {aside && <div className="mt-6 landscape:mt-0">{aside}</div>}
         </div>
       </div>
-      <StepFoot onNext={onNext} nextLabel={nextLabel} hint={mode === 'midi'} pedal={pedal} />
+      <StepFoot onNext={onNext} nextLabel={nextLabel} pedal={pedal} />
     </div>
   );
 }
 
 /** The foot of a step that is read, not played: back on the left, on in the middle, both within reach of the keys. */
-function StepFoot({ onNext, nextLabel = 'Continue', hint, disabled, pedal }: { onNext: () => void; nextLabel?: string; hint: boolean; disabled?: boolean; pedal?: boolean }) {
+function StepFoot({ onNext, nextLabel = 'Continue', disabled, pedal }: { onNext: () => void; nextLabel?: string; disabled?: boolean; pedal?: boolean }) {
   const back = useContext(BackContext);
+  const hints = useHints();
   return (
     <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 px-8 pb-6 pt-3">
       <div>
         {back && (
-          <Button variant="ghost" size="lg" onClick={back} hint={hint ? 'or the bottom key' : undefined} icon={<Icon.Left size={20} />}>
+          <Button variant="ghost" size="lg" onClick={back} hint={hints.bottom} icon={<Icon.Left size={20} />}>
             Back
           </Button>
         )}
       </div>
-      <Button size="lg" disabled={disabled} onClick={onNext} hint={hint && !disabled ? (pedal ? 'top key or right pedal' : 'or the top key') : undefined} className="min-w-[260px]">
+      <Button size="lg" disabled={disabled} onClick={onNext} hint={disabled ? undefined : pedal ? hints.onward : hints.top} className="min-w-[260px]">
         {nextLabel}
       </Button>
       <div />
@@ -106,8 +108,10 @@ function SayStep({ step, onNext }: { step: StepOf<'say'>; onNext: () => void }) 
 }
 
 function CheckStep({ step, onNext }: { step: StepOf<'check'>; onNext: () => void }) {
+  // On a page that asks the learner to try things at the piano, the pedal is a pedal.
+  const pedal = !step.playing && !/pedal/i.test(`${step.text ?? ''} ${step.items.join(' ')}`);
   return (
-    <TextStep title={step.title} onNext={onNext} nextLabel="I am set">
+    <TextStep title={step.title} onNext={onNext} nextLabel={step.button ?? 'Continue'} pedal={pedal}>
       {step.text && <Prose text={step.text} className="mb-5 text-[1.6rem] leading-normal text-mc-ink/85" />}
       <ul className="space-y-3">
         {step.items.map((item, i) => (
@@ -138,11 +142,11 @@ function Brief({ text, children, tone }: { text: string; children?: ReactNode; t
 /** How long a finished demonstration stays up before the lesson goes on by itself. */
 const FLOW_MS = 2600;
 
-function ListenStep({ step, onNext }: { step: StepOf<'listen'>; onNext: () => void }) {
+function ListenStep({ step, onNext, onAuto }: { step: StepOf<'listen'>; onNext: () => void; onAuto: () => void }) {
   const score = useMemo(() => resolveMusic(step.music), [step.music]);
   const [run, setRun] = useState(0);
   const [done, setDone] = useState(false);
-  const mode = useInputMode();
+  const hints = useHints();
   const again = useCallback(() => {
     setDone(false);
     setRun((r) => r + 1);
@@ -151,17 +155,17 @@ function ListenStep({ step, onNext }: { step: StepOf<'listen'>; onNext: () => vo
   // Asking to hear it again within that moment keeps it here.
   useEffect(() => {
     if (!done) return;
-    const t = setTimeout(onNext, FLOW_MS);
+    const t = setTimeout(onAuto, FLOW_MS);
     return () => clearTimeout(t);
-  }, [done, onNext]);
+  }, [done, onAuto]);
   useRemote({ primary: onNext, secondary: again });
   return (
     <div className="flex h-full min-h-0 flex-col">
       <Brief text={step.text}>
-        <Button variant="soft" onClick={again} icon={<Icon.Repeat size={18} />} hint={mode === 'midi' ? 'bottom key' : undefined}>
+        <Button variant="soft" onClick={again} icon={<Icon.Repeat size={18} />} hint={hints.bottom}>
           Again
         </Button>
-        <Button variant={done ? 'primary' : 'ghost'} onClick={onNext} className="relative overflow-hidden" hint={mode === 'midi' ? 'top key' : undefined}>
+        <Button variant={done ? 'primary' : 'ghost'} onClick={onNext} className="relative overflow-hidden" hint={hints.top}>
           {done ? 'Go on' : 'Skip'}
           {done && <span className="mc-lead absolute bottom-0 left-0 h-1 bg-mc-bg/60" style={{ animationDuration: `${FLOW_MS}ms` }} aria-hidden="true" />}
         </Button>
@@ -193,7 +197,7 @@ function describe(result: FlowResult): string {
   return `${pct} percent of the notes, ${timing}.`;
 }
 
-function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }) {
+function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () => void; onAuto: () => void }) {
   const score = useMemo(() => resolveMusic(step.music), [step.music]);
   const mode = step.mode ?? 'wait';
   const need = step.passes ?? 1;
@@ -210,8 +214,22 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
     [],
   );
 
+  // How many times the right pedal went down in this run, for the steps that are about it.
+  const pedalPresses = useRef(0);
+  useEffect(() => {
+    if (!step.pedal) return;
+    let down = false;
+    return midi.pedals.subscribe((ev) => {
+      if (ev.pedal !== 'sustain') return;
+      const now = down ? ev.value > 0.3 : ev.value >= 0.6;
+      if (now && !down) pedalPresses.current++;
+      down = now;
+    });
+  }, [step.pedal]);
+
   const again = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
+    pedalPresses.current = 0;
     setVerdict(null);
     setRun((r) => r + 1);
   }, []);
@@ -236,6 +254,22 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
           text = 'Right notes, but not yet full. Let the weight of your arm fall into the keys.';
         }
       }
+      // Where the step is about the pedal, the notes alone are not the point. Only a piano over MIDI reports its pedal.
+      if (ok && step.pedal && inputMode === 'midi') {
+        const presses = pedalPresses.current;
+        if (presses === 0) {
+          ok = false;
+          text = 'Right notes, but the pedal stayed up. Press the right pedal after the first chord, and change it after each new one.';
+        } else if (presses === 1 && result.totalSteps >= 3) {
+          ok = false;
+          text = 'The pedal went down and stayed down, so the chords ran into each other. Let it up and straight back down just after each new chord.';
+        }
+        if (!ok) {
+          setHave(0);
+          setVerdict({ ok: false, text });
+          return;
+        }
+      }
       // Where the step is about holding long notes, letting them go early is the thing to put right.
       if (ok && step.hold && result.held !== null && result.held < 0.75) {
         ok = false;
@@ -250,7 +284,7 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
         if (total >= need) {
           setVerdict({ ok: true, text });
           instrument.chime();
-          timer.current = setTimeout(onNext, 1700);
+          timer.current = setTimeout(onAuto, 1700);
         } else {
           setVerdict({ ok: true, text: `${text} Once more to make it stick.` });
           timer.current = setTimeout(again, 1700);
@@ -270,12 +304,12 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
         });
       }
     },
-    [again, have, mode, need, onNext, step.hold, step.touch],
+    [again, have, inputMode, mode, need, onAuto, step.hold, step.pedal, step.touch],
   );
 
   // The same two keys mean the same two things all the way through: the top key goes on, the bottom key plays it again.
   useRemote({ primary: onNext, secondary: again });
-  const keys = inputMode === 'midi';
+  const hints = useHints();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -287,19 +321,19 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
         )}
         {verdict && !verdict.ok ? (
           <>
-            <Button onClick={again} hint={keys ? 'bottom key' : undefined} icon={<Icon.Repeat size={18} />}>
+            <Button onClick={again} hint={hints.bottom} icon={<Icon.Repeat size={18} />}>
               Try again
             </Button>
-            <Button variant="soft" onClick={onNext} hint={keys ? 'top key' : undefined}>
+            <Button variant="soft" onClick={onNext} hint={hints.top}>
               Move on
             </Button>
           </>
         ) : (
           <>
-            <Button variant="ghost" onClick={again} hint={keys ? 'bottom key' : undefined} icon={<Icon.Repeat size={18} />}>
+            <Button variant="ghost" onClick={again} hint={hints.bottom} icon={<Icon.Repeat size={18} />}>
               Again
             </Button>
-            <Button variant="ghost" onClick={onNext} hint={keys ? 'top key' : undefined}>
+            <Button variant="ghost" onClick={onNext} hint={hints.top}>
               {verdict ? 'Go on' : 'Skip'}
             </Button>
           </>
@@ -334,7 +368,7 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
   );
 }
 
-function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }) {
+function EchoStep({ step, onNext, onAuto }: { step: StepOf<'echo'>; onNext: () => void; onAuto: () => void }) {
   const scores = useMemo(
     () => step.motifs.map((m) => resolveMusic(step.hand === 'L' ? { lh: m, key: step.key, tempo: 88 } : { rh: m, key: step.key, tempo: 88 })),
     [step],
@@ -346,7 +380,7 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
   // The reply above the stand, with the few words shown on the stand itself to match it.
   const [note, setNote] = useState<{ ok: boolean; text: string; stand: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mode = useInputMode();
+  const hints = useHints();
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -361,10 +395,11 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
     setRun((r) => r + 1);
   }, []);
 
-  const advance = useCallback(() => {
+  const advance = useCallback((auto?: boolean) => {
     if (timer.current) clearTimeout(timer.current);
     if (index + 1 >= scores.length) {
-      onNext();
+      if (auto === true) onAuto();
+      else onNext();
       return;
     }
     setIndex((i) => i + 1);
@@ -372,7 +407,7 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
     setNote(null);
     setPhase('listen');
     setRun((r) => r + 1);
-  }, [index, onNext, scores.length]);
+  }, [index, onAuto, onNext, scores.length]);
 
   const onDone = useCallback(
     (result: FlowResult | null) => {
@@ -386,20 +421,20 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
       if (!result) return;
       if (result.clean) {
         setNote({ ok: true, text: 'Yes, that is it.', stand: 'That is it' });
-        timer.current = setTimeout(advance, 1100);
+        timer.current = setTimeout(() => advance(true), 1100);
       } else if (tries < 1) {
         setTries((t) => t + 1);
         setNote({ ok: false, text: 'Not quite. Listen once more.', stand: 'Listen again' });
         timer.current = setTimeout(hear, 1300);
       } else {
         setNote({ ok: false, text: 'You found it in the end. On to the next.', stand: 'On to the next' });
-        timer.current = setTimeout(advance, 1500);
+        timer.current = setTimeout(() => advance(true), 1500);
       }
     },
     [advance, hear, phase, tries],
   );
 
-  useRemote({ primary: advance, secondary: hear });
+  useRemote({ primary: () => advance(), secondary: hear });
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -407,10 +442,10 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
         <Pill>
           {index + 1} of {scores.length}
         </Pill>
-        <Button variant="soft" onClick={hear} icon={<Icon.Ear size={18} />} hint={mode === 'midi' ? 'bottom key' : undefined}>
+        <Button variant="soft" onClick={hear} icon={<Icon.Ear size={18} />} hint={hints.bottom}>
           Hear it
         </Button>
-        <Button variant="ghost" onClick={advance} hint={mode === 'midi' ? 'top key' : undefined}>
+        <Button variant="ghost" onClick={() => advance()} hint={hints.top}>
           Skip
         </Button>
       </Brief>
@@ -439,8 +474,7 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
   );
 }
 
-function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }) {
-  const mode = useInputMode();
+function FindStep({ step, onNext, onAuto }: { step: StepOf<'find'>; onNext: () => void; onAuto: () => void }) {
   const kbRef = useRef<HTMLDivElement>(null);
   const found = useRef(new Set<number>());
   const [count, setCount] = useState(0);
@@ -452,6 +486,8 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
   const wanted = useCallback((midi: number) => step.pitchClasses.includes(pitchClass(midi)), [step.pitchClasses]);
   const topSkips = !wanted(REMOTE_PRIMARY);
   useRemote({ primary: topSkips ? onNext : undefined, secondary: wanted(REMOTE_SECONDARY) ? undefined : (back ?? undefined) });
+  const mode = useInputMode();
+  const hints = useHints();
 
   useEffect(() => {
     found.current = new Set();
@@ -469,7 +505,7 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
           if (found.current.size >= step.count) {
             finished = true;
             instrument.chime();
-            timer = setTimeout(onNext, 1000);
+            timer = setTimeout(onAuto, 1000);
           }
         }
       } else {
@@ -480,7 +516,8 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
       unsub();
       if (timer) clearTimeout(timer);
     };
-  }, [step, onNext]);
+  }, [step, onAuto]);
+  const backByKey = !wanted(REMOTE_SECONDARY);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -491,9 +528,18 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
             <span key={i} className={`h-3 w-3 rounded-full transition-colors ${i < count ? 'bg-mc-ok' : 'bg-mc-line'}`} />
           ))}
         </div>
-        <Button variant="ghost" onClick={onNext} hint={mode === 'midi' && topSkips ? 'top key' : undefined}>
-          Skip
-        </Button>
+        <div className="flex items-center gap-3">
+          {back && (
+            <Button variant="ghost" onClick={back} hint={backByKey ? hints.bottom : undefined} icon={<Icon.Left size={18} />}>
+              Back
+            </Button>
+          )}
+          <Button variant="ghost" onClick={onNext} hint={topSkips ? hints.top : undefined}>
+            Skip
+          </Button>
+        </div>
+        {/* Where an end key is one of the notes asked for, it is an answer, so it is said. */}
+        {hints.top && !topSkips && <p className="text-[1.05rem] text-mc-muted">The top key of the piano is one of them too.</p>}
       </div>
       <div ref={kbRef} className="shrink-0">
         <Keyboard low={low} high={high} height={mode === 'touch' ? 200 : 130} labels={step.labels ?? 'none'} interactive={mode === 'touch'} sound={mode === 'touch'} />
@@ -502,37 +548,48 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
   );
 }
 
-/** The white keys that answer a question from the piano: C for the first choice, D for the second, and so on. */
-const ANSWER_KEYS: Array<{ pc: number; name: string }> = [
-  { pc: 0, name: 'C' },
-  { pc: 2, name: 'D' },
-  { pc: 4, name: 'E' },
-  { pc: 5, name: 'F' },
-];
+/** How long a question is up before the piano can answer it, so a note still sounding from the music before is not taken as one. */
+const ARM_MS = 900;
 
 function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }) {
   const [picked, setPicked] = useState<number | null>(null);
   const mode = useInputMode();
   const back = useContext(BackContext);
   const answered = picked !== null;
-  const byKey = mode === 'midi' && step.choices.length <= ANSWER_KEYS.length;
-  useRemote({ primary: answered ? onNext : undefined, secondary: back ?? undefined, pedal: true });
+  const keys = useMemo(() => (mode === 'midi' ? answerKeys(step.choices) : null), [mode, step.choices]);
+  // A question about the pedal may have the learner try it, so there the pedal stays a pedal.
+  const pedal = !/pedal/i.test(`${step.question} ${step.choices.join(' ')}`);
+  useRemote({ primary: answered ? onNext : undefined, secondary: back ?? undefined, pedal });
   // Answered from the piano, so the hands stay where they are.
   useEffect(() => {
-    if (!byKey || answered) return;
+    if (!keys || answered) return;
+    const from = performance.now() + ARM_MS;
+    const down = new Set<number>();
+    // Keys still held from the step before have to come up first.
+    let clear = false;
     return noteBus.subscribe((ev) => {
-      if (ev.type !== 'on' || ev.source !== 'midi' || isRemoteKey(ev.midi)) return;
-      const i = ANSWER_KEYS.findIndex((k) => k.pc === pitchClass(ev.midi));
-      if (i >= 0 && i < step.choices.length) setPicked(i);
+      if (ev.source !== 'midi' || isRemoteKey(ev.midi)) return;
+      if (ev.type === 'off') {
+        down.delete(ev.midi);
+        return;
+      }
+      const ready = performance.now() >= from && (clear || down.size === 0);
+      down.add(ev.midi);
+      if (!ready) return;
+      clear = true;
+      const i = keys.pcs.indexOf(pitchClass(ev.midi));
+      if (i >= 0) setPicked(i);
     });
-  }, [answered, byKey, step.choices.length]);
+  }, [answered, keys]);
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="mc-scroll min-h-0 flex-1">
         <div className="mc-fade-up mx-auto w-full max-w-3xl px-8 py-6">
           <h2 className="font-mc-serif text-[2.4rem] leading-tight">{step.question}</h2>
-          {byKey && !answered && (
-            <p className="mt-2 text-[1.1rem] text-mc-muted">Answer on the piano with the key shown beside each one, any octave, or tap it.</p>
+          {keys && !answered && (
+            <p className="mt-2 text-[1.25rem] text-mc-ink/75">
+              {keys.byNote ? 'Answer by playing that note on the piano, in any octave, or tap it.' : 'Answer on the piano with the key shown beside each one, in any octave, or tap it.'}
+            </p>
           )}
           {step.figure && (
             <div className="mt-5">
@@ -558,7 +615,8 @@ function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }
                           : 'border-mc-line bg-mc-surface opacity-50'
                   }`}
                 >
-                  {byKey && (
+                  {/* A key to press is shown only where the choice does not name its own. */}
+                  {keys && !keys.byNote && (
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-mc-line bg-mc-bg font-mc-serif text-[1.3rem] text-mc-ink" aria-hidden="true">
                       {ANSWER_KEYS[i].name}
                     </span>
@@ -578,13 +636,13 @@ function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }
           )}
         </div>
       </div>
-      <StepFoot onNext={onNext} hint={mode === 'midi'} disabled={!answered} pedal />
+      <StepFoot onNext={onNext} disabled={!answered} pedal={pedal} />
     </div>
   );
 }
 
 function Complete({ lesson, onDone }: { lesson: Lesson; onDone: (then?: Activity) => void }) {
-  const mode = useInputMode();
+  const hints = useHints();
   const { label, session } = useOnward();
   const lessons = usePiano((s) => s.lessons);
   const pieces = usePiano((s) => s.pieces);
@@ -623,9 +681,12 @@ function Complete({ lesson, onDone }: { lesson: Lesson; onDone: (then?: Activity
       )}
       <div className="flex flex-wrap items-center justify-center gap-3">
         {session ? (
-          <Button variant="ghost" size="lg" onClick={session.stop}>
-            Stop for today
-          </Button>
+          // After the last part there is nothing left to stop before.
+          session.next && (
+            <Button variant="ghost" size="lg" onClick={session.stop}>
+              Stop for today
+            </Button>
+          )
         ) : (
           follow && (
             <Button variant="ghost" size="lg" onClick={() => onDone()}>
@@ -633,13 +694,16 @@ function Complete({ lesson, onDone }: { lesson: Lesson; onDone: (then?: Activity
             </Button>
           )
         )}
-        <Button size="lg" onClick={onward} className="min-w-[260px]" hint={mode === 'midi' ? 'top key or right pedal' : undefined}>
+        <Button size="lg" onClick={onward} className="min-w-[260px]" hint={hints.onward}>
           {follow ? follow.label : label}
         </Button>
       </div>
     </div>
   );
 }
+
+/** After the lesson moves on by itself, how long a press is taken to be one that was already on its way. */
+const QUIET_AFTER_AUTO = 750;
 
 export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; onClose: (completed: boolean, then?: Activity) => void }) {
   const lesson = useMemo(() => getLesson(lessonId), [lessonId]);
@@ -657,10 +721,17 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
   indexRef.current = index;
 
   const lastNext = useRef(0);
-  const next = useCallback(() => {
-    // Two quick taps on Continue are one wish to go on, not two.
+  const quiet = useRef(0);
+  const next = useCallback((auto?: boolean) => {
     const now = performance.now();
-    if (now - lastNext.current < 400) return;
+    if (auto === true) {
+      // The lesson has moved on by itself. A press that was already on its way is not a wish to skip what comes next.
+      quiet.current = now + QUIET_AFTER_AUTO;
+    } else {
+      if (now < quiet.current) return;
+      // Two quick taps on Continue are one wish to go on, not two.
+      if (now - lastNext.current < 400) return;
+    }
     lastNext.current = now;
     const n = indexRef.current + 1;
     if (n >= lesson.steps.length) {
@@ -674,16 +745,22 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
     setIndex(n);
   }, [addCards, completeLesson, lesson, lessonId, setLessonStep]);
 
-  /** Go straight to any step, back or ahead. Nothing in a lesson is locked. */
+  /**
+   * Go straight to any step, back or ahead. Nothing in a lesson is locked.
+   * Looking ahead does not move the place the lesson is kept at: only going
+   * on from a step does.
+   */
   const jump = useCallback(
     (to: number) => {
       const n = Math.max(0, Math.min(lesson.steps.length - 1, to));
       indexRef.current = n;
-      setLessonStep(lessonId, n);
       setIndex(n);
     },
-    [lesson.steps.length, lessonId, setLessonStep],
+    [lesson.steps.length],
   );
+  const onward = useCallback(() => next(), [next]);
+  const moveOn = useCallback(() => next(true), [next]);
+  const { session } = useOnward();
   const back = useCallback(() => jump(indexRef.current - 1), [jump]);
   const step = lesson.steps[index];
   // How far the lesson has got. Turning back to look at something does not lose the place.
@@ -692,7 +769,8 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
       <header className="flex h-16 shrink-0 items-center gap-2 px-3">
-        <IconButton label="Close lesson" onClick={() => onClose(finished)}>
+        {/* On the closing screen of a part of the day's session, closing means stopping for today. Going on has its own button. */}
+        <IconButton label="Close lesson" onClick={() => (finished && session ? session.stop() : onClose(finished))}>
           <Icon.Close />
         </IconButton>
         <div className="max-w-[15rem] shrink-0 truncate text-[1.05rem] font-semibold text-mc-ink">{lesson.title}</div>
@@ -719,13 +797,13 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
         </nav>
         {!finished && (
           <>
-            <span className="shrink-0 text-[0.95rem] tabular-nums text-mc-muted">
+            <span className="shrink-0 text-[1.1rem] tabular-nums text-mc-ink/75">
               {index + 1} of {lesson.steps.length}
             </span>
             <IconButton label="Previous step" onClick={back} disabled={index === 0} className="disabled:opacity-30">
               <Icon.Left size={22} />
             </IconButton>
-            <IconButton label="Next step" onClick={next}>
+            <IconButton label="Next step" onClick={onward}>
               <Icon.Right size={22} />
             </IconButton>
           </>
@@ -736,7 +814,7 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
           <Complete lesson={lesson} onDone={(then) => onClose(true, then)} />
         ) : (
           <BackContext.Provider value={index > 0 ? back : null}>
-            <StepView key={`${lessonId}-${index}`} step={step} onNext={next} />
+            <StepView key={`${lessonId}-${index}`} step={step} onNext={onward} onAuto={moveOn} />
           </BackContext.Provider>
         )}
       </div>
@@ -744,20 +822,20 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
   );
 }
 
-export function StepView({ step, onNext }: { step: Step; onNext: () => void }) {
+export function StepView({ step, onNext, onAuto }: { step: Step; onNext: () => void; /** The step has finished and moves on by itself. */ onAuto: () => void }) {
   switch (step.kind) {
     case 'say':
       return <SayStep step={step} onNext={onNext} />;
     case 'check':
       return <CheckStep step={step} onNext={onNext} />;
     case 'listen':
-      return <ListenStep step={step} onNext={onNext} />;
+      return <ListenStep step={step} onNext={onNext} onAuto={onAuto} />;
     case 'play':
-      return <PlayStep step={step} onNext={onNext} />;
+      return <PlayStep step={step} onNext={onNext} onAuto={onAuto} />;
     case 'echo':
-      return <EchoStep step={step} onNext={onNext} />;
+      return <EchoStep step={step} onNext={onNext} onAuto={onAuto} />;
     case 'find':
-      return <FindStep step={step} onNext={onNext} />;
+      return <FindStep step={step} onNext={onNext} onAuto={onAuto} />;
     case 'quiz':
       return <QuizStep step={step} onNext={onNext} />;
   }

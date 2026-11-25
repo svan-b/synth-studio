@@ -21,12 +21,12 @@ import {
   type Block,
   type DrillKind,
 } from '@/lib/piano/learn/planner';
-import { exportData, streak, totalMinutes, usePiano, type Recording } from '@/lib/piano/learn/store';
+import { exportData, streak, totalMinutes, usePiano, type Recording, type SessionBase } from '@/lib/piano/learn/store';
 import { isNative, shareFile } from '@/lib/piano/native/bridge';
 import { parseScore } from '@/lib/piano/music/score';
 import { dayKey } from '@/lib/piano/util/emitter';
 import ConnectionPanel, { ConnectionChip, ConnectionReport } from './Connection';
-import { useInputMode, useRemote, useSound } from './hooks';
+import { useHints, useInputMode, useRemote, useSound } from './hooks';
 import PlaySurface from './PlaySurface';
 import { Button, Card, Icon, Pill, ProgressBar, Ring, Segmented, Sheet, Toggle } from './ui';
 
@@ -36,7 +36,16 @@ export type Activity =
   | { kind: 'lesson'; id: string }
   | { kind: 'piece'; id: string; minutes?: number }
   | { kind: 'drill'; id: DrillKind }
-  | { kind: 'session'; blocks: Block[]; /** The part to begin at, when a session is picked up again. */ from?: number };
+  | {
+      kind: 'session';
+      blocks: Block[];
+      /** The part to begin at, when a session is picked up again. */
+      from?: number;
+      /** Parts that were passed over before it was stopped. */
+      skipped?: number[];
+      /** How things stood when it began, kept so the closing account covers the whole of it. */
+      base?: SessionBase;
+    };
 
 function Page({ title, subtitle, right, children }: { title: string; subtitle?: string; right?: ReactNode; children: ReactNode }) {
   return (
@@ -63,7 +72,16 @@ const BLOCK_ICON = {
 
 // ------------------------------------------------------------------ today
 
-export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void; onGo: (v: View) => void }) {
+export function TodayScreen({
+  onStart,
+  onGo,
+  front = true,
+}: {
+  onStart: (a: Activity) => void;
+  onGo: (v: View) => void;
+  /** Nothing is open in front of this page. Only then do the piano's keys act on it. */
+  front?: boolean;
+}) {
   const profile = usePiano((s) => s.profile);
   const lessons = usePiano((s) => s.lessons);
   const pieces = usePiano((s) => s.pieces);
@@ -73,7 +91,7 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   const saved = usePiano((s) => s.session);
   const drills = usePiano((s) => s.drills);
   const sound = useSound();
-  const mode = useInputMode();
+  const hints = useHints();
   const today = dayKey();
   const doneToday = sessionDoneOn === today;
   const day = useMemo(
@@ -89,6 +107,7 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   // The next lesson, for a learner who wants more than the day's plan holds, with the reason it is not in the plan.
   const upNext = day.upNext;
   const offerLesson = upNext !== undefined && day.held !== null && !firstTime;
+  const lessonToday = Object.values(lessons).some((l) => l.done && !l.skipped && l.doneOn === today);
   const word = (n: number) => ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][n] ?? String(n);
   const count = word(day.waiting.length);
   // How many of them have to be learned before the next lesson comes of itself.
@@ -100,7 +119,9 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
         } learned${day.comesIn === null ? '' : day.comesIn === 1 ? ', or after one more day of practice at the latest' : `, or after ${word(day.comesIn)} more days of practice at the latest`}.`
       : day.held === 'turn'
         ? `With ${profile.minutes} minutes a day, lessons and pieces take the days in turn, and today is the piece's.`
-        : 'The course moves at one new lesson a day at most, because that is what holds best.';
+        : lessonToday
+          ? 'The course moves at one new lesson a day at most, because that is what holds best.'
+          : 'The session for today is done, and extra practice has nothing new in it.';
   // A session begun today is picked up where it stopped, with the parts it had then.
   const resume = useMemo(() => {
     if (!saved || saved.on !== today || doneToday) return null;
@@ -108,7 +129,7 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
     let at = saved.index;
     // A lesson finished some other way since then is behind us.
     while (at < blocks.length && blocks[at].kind === 'lesson' && lessons[blocks[at].id]?.done) at++;
-    return at < blocks.length ? { blocks, at } : null;
+    return at < blocks.length ? { blocks, at, skipped: saved.skipped ?? [], base: saved.base } : null;
   }, [doneToday, lessons, saved, today]);
   const parts = resume?.blocks ?? plan;
   const at = resume?.at ?? 0;
@@ -120,9 +141,13 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
     return step > 0 ? `Left at step ${step + 1} of ${getLesson(b.id).steps.length}. It opens there` : b.detail;
   };
   const begin = useCallback(() => {
-    if (parts.length > 0) onStart({ kind: 'session', blocks: parts, from: at });
-  }, [at, onStart, parts]);
-  useRemote({ primary: parts.length > 0 ? begin : undefined });
+    if (parts.length > 0) onStart({ kind: 'session', blocks: parts, from: at, skipped: resume?.skipped, base: resume?.base });
+  }, [at, onStart, parts, resume]);
+  // The top key starts the day from the piano. It does so only while this page is in front, and
+  // not once the day is done: extra practice is asked for with a tap.
+  useRemote({ primary: begin }, front && parts.length > 0 && !doneToday);
+  // A session that was begun, or whose first part is a lesson left part way, is carried on, not started.
+  const begun = at > 0 || (next?.kind === 'lesson' && stepOf(next.id) > 0);
   // The first day keeps both of its lessons at every session length, so it can run over.
   const runsLong = firstTime && planMinutes(plan) > profile.minutes + 2;
   const left = planMinutes(parts.slice(at));
@@ -180,14 +205,17 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
               onClick={begin}
               icon={<Icon.Play size={22} />}
               // The session starts from the piano: sit down, press the top key, play.
-              hint={mode === 'midi' ? 'or the top key' : undefined}
+              hint={doneToday ? undefined : hints.top}
             >
-              {doneToday ? 'Practise some more' : at > 0 ? 'Carry on' : firstTime ? 'Begin' : 'Start session'}
+              {doneToday ? 'Practise some more' : begun ? 'Carry on' : firstTime ? 'Begin' : 'Start session'}
             </Button>
           )}
           <ol className="mt-6 space-y-2">
             {parts.map((b, i) => {
-              const finished = !doneToday && i < at;
+              const behind = !doneToday && i < at;
+              // A part that was passed over is behind, and it is not done.
+              const passed = behind && (resume?.skipped ?? []).includes(i);
+              const finished = behind && !passed;
               const isNext = !doneToday && i === at;
               return (
                 <li key={`${b.kind}-${b.id}-${i}`}>
@@ -203,12 +231,12 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
                       {finished ? <Icon.Check size={22} /> : BLOCK_ICON[b.kind]}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className={`block truncate font-semibold ${finished ? 'text-mc-muted' : ''}`}>
+                      <span className={`block truncate font-semibold ${behind ? 'text-mc-muted' : ''}`}>
                         {i + 1}. {b.title}
                       </span>
-                      <span className="block truncate text-[1.05rem] text-mc-muted">{finished ? 'Done' : partDetail(b)}</span>
+                      <span className="block truncate text-[1.05rem] text-mc-muted">{finished ? 'Done' : passed ? 'Passed over. Tap to do it after all' : partDetail(b)}</span>
                     </span>
-                    {!finished && <span className="shrink-0 text-[1.05rem] tabular-nums text-mc-muted">{b.minutes} min</span>}
+                    {!behind && <span className="shrink-0 text-[1.05rem] tabular-nums text-mc-muted">{b.minutes} min</span>}
                   </button>
                 </li>
               );
@@ -356,7 +384,7 @@ export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
                         {done && !skipped ? <Icon.Check size={22} /> : order.indexOf(id) + 1}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold">{lesson.title}</span>
+                        <span className="line-clamp-2 font-semibold leading-snug">{lesson.title}</span>
                         <span className="line-clamp-2 text-[1.05rem] text-mc-muted">{lesson.summary}</span>
                       </span>
                       {/* A lesson left part way through says so. */}
@@ -797,11 +825,14 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
         <h2 className="font-mc-serif text-2xl">Hands on the keys</h2>
         <p className="text-mc-muted">Run the app from the piano, so you do not have to reach for the screen.</p>
         <Card className="mt-3 divide-y divide-mc-line px-5">
-          <Row title="Top and bottom keys as buttons" text="The highest key means continue. The lowest key means again, or hear it.">
+          <Row title="Top and bottom keys as buttons" text="The top key of the piano means go on. The bottom key means again, or back on a page of words.">
             <Toggle value={settings.remoteKeys} onChange={(v) => setSettings({ remoteKeys: v })} label="Top and bottom keys as buttons" />
           </Row>
-          <Row title="Left and middle pedals as buttons" text="The middle pedal means continue and the left pedal means again. The right pedal stays a pedal.">
-            <Toggle value={settings.remotePedals} onChange={(v) => setSettings({ remotePedals: v })} label="Left and middle pedals as buttons" />
+          <Row
+            title="Pedals as buttons"
+            text="The middle pedal means go on and the left pedal means again. On a page with no music, the right pedal means go on too. While music is on the stand it stays a pedal."
+          >
+            <Toggle value={settings.remotePedals} onChange={(v) => setSettings({ remotePedals: v })} label="Pedals as buttons" />
           </Row>
         </Card>
       </section>

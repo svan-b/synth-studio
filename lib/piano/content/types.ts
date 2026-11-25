@@ -52,7 +52,16 @@ export type Figure =
 
 export type Step =
   | { kind: 'say'; title?: string; text: string; figure?: Figure; why?: string }
-  | { kind: 'check'; title: string; text?: string; items: string[] }
+  | {
+      kind: 'check';
+      title: string;
+      text?: string;
+      items: string[];
+      /** The word on the button that leaves the page. */
+      button?: string;
+      /** The learner plays on this page, so the pedal is left to be a pedal. */
+      playing?: boolean;
+    }
   | { kind: 'listen'; text: string; music: Music; display?: Display; hands?: Hand[] }
   | {
       kind: 'play';
@@ -74,6 +83,8 @@ export type Step =
       touch?: 'soft' | 'loud';
       /** Ask for long notes to be held for their length, checked when the input reports keys coming up. */
       hold?: boolean;
+      /** Ask for the right pedal to be used and changed, checked when the piano reports its pedal. */
+      pedal?: boolean;
       why?: string;
     }
   | { kind: 'echo'; text: string; motifs: string[]; key?: string; hand?: Hand; why?: string }

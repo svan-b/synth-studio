@@ -87,6 +87,24 @@ export function useRemote(
   }, [enabled]);
 }
 
+/**
+ * The words under a button that name the key or pedal doing the same thing.
+ * They follow Settings: with the end keys or the pedals switched off as
+ * buttons, nothing is promised that will not happen.
+ */
+export function useHints(): { top?: string; bottom?: string; onward?: string } {
+  const mode = useInputMode();
+  const keys = usePiano((s) => s.settings.remoteKeys);
+  const pedals = usePiano((s) => s.settings.remotePedals);
+  if (mode !== 'midi') return {};
+  return {
+    top: keys ? 'top key' : undefined,
+    bottom: keys ? 'bottom key' : undefined,
+    // On a page with no music the right pedal goes on as well.
+    onward: keys && pedals ? 'top key or right pedal' : keys ? 'top key' : pedals ? 'right pedal' : undefined,
+  };
+}
+
 /** Keep the screen awake while practising. */
 export function useWakeLock(active: boolean): void {
   useEffect(() => {

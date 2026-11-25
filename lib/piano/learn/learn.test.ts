@@ -766,6 +766,48 @@ describe('the path so far', () => {
   });
 });
 
+describe('answering a question from the piano', () => {
+  it('reads the key a choice names', () => {
+    expect(namedKey('Middle C')).toBe(0);
+    expect(namedKey('G')).toBe(7);
+    expect(namedKey('F sharp')).toBe(6);
+    expect(namedKey('B flat')).toBe(10);
+    expect(namedKey('E minor')).toBe(4);
+    expect(namedKey('A step')).toBeNull();
+    expect(namedKey('A new chord called C6')).toBeNull();
+    expect(namedKey('C, E and G')).toBeNull();
+  });
+
+  it('answers a question about notes with the note itself', () => {
+    // The note shown is E and the choices are D, E and F. Playing E has to mean E.
+    expect(answerKeys(['D', 'E', 'F'])).toEqual({ byNote: true, pcs: [2, 4, 5] });
+    expect(answerKeys(['Middle C', 'G', 'E'])).toEqual({ byNote: true, pcs: [0, 7, 4] });
+    expect(answerKeys(['F sharp', 'F', 'G'])).toEqual({ byNote: true, pcs: [6, 5, 7] });
+  });
+
+  it('answers anything else by position, with C, D, E and F', () => {
+    expect(answerKeys(['A step', 'A skip'])).toEqual({ byNote: false, pcs: [0, 2] });
+    expect(answerKeys(['Two', 'Three', 'Four'])).toEqual({ byNote: false, pcs: [0, 2, 4] });
+    expect(answerKeys(['a', 'b', 'c', 'd', 'e'])).toBeNull();
+  });
+
+  it('never leaves a question in the course where a choice names a key that would answer for another', async () => {
+    const { allLessons } = await import('../content/catalog');
+    for (const lesson of allLessons()) {
+      lesson.steps.forEach((step, i) => {
+        if (step.kind !== 'quiz') return;
+        const keys = answerKeys(step.choices);
+        expect(keys, `${lesson.id} step ${i + 1}`).not.toBeNull();
+        if (keys?.byNote) return;
+        // Answered by position. No choice may itself read as the name of a note or chord.
+        for (const choice of step.choices) {
+          expect(/^(Middle )?[A-G]\b(?! (step|skip|leap|third|fourth|fifth))/.test(choice), `${lesson.id} step ${i + 1}: "${choice}"`).toBe(false);
+        }
+      });
+    }
+  });
+});
+
 describe('streak', () => {
   it('counts days in a row, allowing today to be still to come', () => {
     const d = (seconds: number) => ({ seconds, notes: 0, activities: 0 });
@@ -794,6 +836,8 @@ import {
 } from './generators';
 import { currentPiece, introducedPieces, openDrills, pieceToEndOn, planDay, planSession, readsStaff, skippedPieces } from './planner';
 import { startingLevel } from './placement';
+import { answerKeys, namedKey } from './answers';
+import { carryOver } from './store';
 import { parseScore, scoreRange } from '../music/score';
 import { lessonOrder, pieceInfo } from '../content/catalog';
 
@@ -1188,6 +1232,24 @@ describe('daily plan', () => {
     expect(startingLevel(5, 6)).toBe(4);
     // Never past what the exercise has, or past what the lessons taken reach.
     expect(startingLevel(5, 2)).toBe(2);
+  });
+
+  it('keeps a piece in practice that an earlier course brought sooner, once it has been begun', () => {
+    // Lightly Row used to join practice from lesson 6. It now comes with lesson 9.
+    const lessons = doneUpTo(7);
+    expect(introducedPieces(lessons, {})).not.toContain('lightly-row');
+    const pieces = { 'lightly-row': newPieceState(pieceInfo('lightly-row'), '2026-03-01') };
+    expect(introducedPieces(lessons, pieces)).toContain('lightly-row');
+    // A new learner who opens it early, before the lesson that used to bring it, does not get it that way.
+    expect(introducedPieces(doneUpTo(3), pieces)).not.toContain('lightly-row');
+  });
+
+  it('counts the old lesson on arpeggios for both of the lessons it became', () => {
+    const before = { arpeggios: { done: true, doneOn: '2026-02-01', step: 0 } };
+    const after = carryOver(before);
+    expect(after['arpeggios-two-hands']).toMatchObject({ done: true, doneOn: '2026-02-01' });
+    // Nothing is made up for a learner who has not reached it.
+    expect(carryOver({})['arpeggios-two-hands']).toBeUndefined();
   });
 
   it('offers exactly one new lesson, then work on a piece already met', () => {

@@ -138,6 +138,25 @@ describe('MIDI messages from a piano', () => {
     expect(remote).toEqual(['pedal']);
   });
 
+  it('counts one press of a pedal that reports how far down it is as one press', async () => {
+    send(0xb0, 64, 0);
+    await new Promise((r) => setTimeout(r, 1300));
+    // On the way down, held, and on the way up: a stream of values, and one press.
+    for (const v of [40, 90, 127]) send(0xb0, 64, v);
+    await new Promise((r) => setTimeout(r, 400));
+    for (const v of [115, 96, 70, 64, 50]) send(0xb0, 64, v);
+    expect(remote).toEqual(['pedal']);
+    // A foot hovering around the middle does nothing more.
+    for (const v of [60, 70, 62, 75, 58]) send(0xb0, 64, v);
+    expect(remote).toEqual(['pedal']);
+    // Let go, and the next press counts again.
+    for (const v of [30, 0]) send(0xb0, 64, v);
+    await new Promise((r) => setTimeout(r, 400));
+    for (const v of [70, 110]) send(0xb0, 64, v);
+    expect(remote).toEqual(['pedal', 'pedal']);
+    send(0xb0, 64, 0);
+  });
+
   it('releases held keys when the piano says all notes off', () => {
     send(0x90, 60, 90);
     send(0x90, 67, 90);

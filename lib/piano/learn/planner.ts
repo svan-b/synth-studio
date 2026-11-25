@@ -41,14 +41,28 @@ const done = (lessons: Record<string, LessonProgress>) => (id: string) => lesson
 export function introducedPieces(lessons: Record<string, LessonProgress>, pieces: Record<string, PieceState> = {}): string[] {
   const out: string[] = [];
   for (const id of lessonOrder()) {
-    if (!lessons[id]?.done) continue;
     for (const p of getLesson(id).pieces ?? []) {
-      if (lessons[id].skipped && !pieces[p]) continue;
-      if (!out.includes(p)) out.push(p);
+      if (out.includes(p)) continue;
+      if (lessons[id]?.done) {
+        if (lessons[id].skipped && !pieces[p]) continue;
+        out.push(p);
+      } else if (pieces[p] && lessons[CAME_FROM[p] ?? '']?.done && !lessons[CAME_FROM[p]]?.skipped) {
+        // Begun under the earlier course, when another lesson brought it. It stays in practice.
+        out.push(p);
+      }
     }
   }
   return out;
 }
+
+/**
+ * Pieces that a different lesson used to bring, before the course was
+ * reordered. A learner who met one that way and began it keeps it in practice,
+ * even though the lesson that brings it now is still ahead of them.
+ */
+const CAME_FROM: Record<string, string> = {
+  'lightly-row': 'hands-together',
+};
 
 /** Pieces from lessons that were marked as known, which the learner has not opened. */
 export function skippedPieces(lessons: Record<string, LessonProgress>, pieces: Record<string, PieceState>): string[] {
