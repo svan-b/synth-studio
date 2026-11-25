@@ -131,7 +131,14 @@ type WebMidiInput = {
   state?: string;
   onmidimessage: ((e: { data: Uint8Array | null; timeStamp: number }) => void) | null;
 };
-type WebMidiOutput = { id: string; name?: string | null; state?: string; send: (data: number[] | Uint8Array, timestamp?: number) => void };
+type WebMidiOutput = {
+  id: string;
+  name?: string | null;
+  state?: string;
+  send: (data: number[] | Uint8Array, timestamp?: number) => void;
+  /** Withdraw messages sent with a time that has not come yet. Not every system offers it. */
+  clear?: () => void;
+};
 type WebMidiAccess = {
   inputs: { forEach: (fn: (port: WebMidiInput) => void) => void };
   outputs: { forEach: (fn: (port: WebMidiOutput) => void) => void };
@@ -166,6 +173,13 @@ class MidiManager {
   private pedalDown: Record<PedalName, boolean> = { sustain: false, sostenuto: false, soft: false };
   private timers = new Set<ReturnType<typeof setTimeout>>();
   private sounding = new Set<number>();
+  /** Notes handed to the system with a time in the future, and not yet sounded. */
+  private queued = new Map<ReturnType<typeof setTimeout>, { midi: number; at: number }>();
+  /** How firmly the learner tends to strike, 0 to 1, as a running average of their own playing. */
+  private touch: number | null = null;
+  private touchCount = 0;
+  /** Milliseconds each of the last keys took to reach the app. */
+  private lateness: number[] = [];
 
   constructor() {
     if (typeof navigator !== 'undefined') {
@@ -189,6 +203,26 @@ class MidiManager {
 
   isPedalDown(pedal: PedalName): boolean {
     return this.pedalDown[pedal];
+  }
+
+  /** How firmly the learner tends to play, 0 to 1. Null until enough keys have been heard to say. */
+  get typicalTouch(): number | null {
+    return this.touchCount >= 12 ? this.touch : null;
+  }
+
+  /** How long keys have been taking to reach the app, in milliseconds: the usual figure and the worst, or null with too few to say. */
+  get keyDelay(): { usual: number; worst: number; keys: number } | null {
+    if (this.lateness.length < 5) return null;
+    const sorted = this.lateness.slice().sort((a, b) => a - b);
+    return { usual: Math.round(sorted[Math.floor(sorted.length / 2)]), worst: Math.round(sorted[sorted.length - 1]), keys: sorted.length };
+  }
+
+  /** Start from what was learned on an earlier day. */
+  rememberTouch(level: number | null | undefined): void {
+    if (this.touch === null && typeof level === 'number' && level > 0) {
+      this.touch = level;
+      this.touchCount = 12;
+    }
   }
 
   private set(patch: Partial<MidiStatus>): void {
@@ -383,11 +417,23 @@ class MidiManager {
     const type = status & 0xf0;
     const time = toAudioTime(timeStamp);
     if (type === 0x90 && d2 > 0) {
+      // How long the key took to reach the app, for the connection report.
+      const late = performance.now() - timeStamp;
+      if (Number.isFinite(late) && late >= 0 && late < 2000) {
+        this.lateness.push(late);
+        if (this.lateness.length > 60) this.lateness.shift();
+      }
       this.count(`Key down  ${d1}  velocity ${d2}`, port);
       // A layered voice sends the same key on two channels. Count it once.
       if (this.held.has(d1)) return;
       this.held.add(d1);
-      emitNoteOn(d1, velocityCurve(d2), time, 'midi');
+      const strength = velocityCurve(d2);
+      // The top and bottom keys are buttons for the app, so they say nothing about how the learner plays.
+      if (d1 !== 21 && d1 !== 108) {
+        this.touch = this.touch === null ? strength : this.touch + (strength - this.touch) * 0.04;
+        this.touchCount++;
+      }
+      emitNoteOn(d1, strength, time, 'midi');
     } else if (type === 0x80 || (type === 0x90 && d2 === 0)) {
       this.count(`Key up    ${d1}`, port);
       if (!this.held.has(d1)) return;
@@ -452,13 +498,36 @@ class MidiManager {
     this.timers.add(t);
   }
 
-  /** Have the piano itself play a note, at an audio clock time. */
+  /**
+   * Have the piano itself play a note, at an audio clock time. The strength
+   * is sent as it is, on the same scale the piano uses for the learner's own
+   * keys, so a note sent at 0.7 is as loud as a key struck at 0.7.
+   */
   playNote(midi: number, seconds: number, velocity = 0.7, when?: number): void {
-    const vel = Math.max(1, Math.min(127, Math.round(velocity * 110 + 8)));
-    this.at(when, () => {
-      this.sounding.add(midi);
-      this.send([0x90, midi, vel]);
-    });
+    const vel = Math.max(1, Math.min(127, Math.round(velocity * 127)));
+    const delay = when === undefined ? 0 : (when - piano.now()) * 1000;
+    if (delay > 1 && delay < 2000 && this.outputs.length > 0 && !this.bleCharacteristic) {
+      // Stamped with its time and handed over now. The system's MIDI clock then
+      // sounds it, which a timer in a busy page cannot do as evenly.
+      const at = performance.now() + delay;
+      for (const out of this.outputs) {
+        try {
+          out.send([0x90, midi, vel], at);
+        } catch {
+          /* a port that went away */
+        }
+      }
+      const t = setTimeout(() => {
+        this.queued.delete(t);
+        this.sounding.add(midi);
+      }, delay);
+      this.queued.set(t, { midi, at });
+    } else {
+      this.at(when, () => {
+        this.sounding.add(midi);
+        this.send([0x90, midi, vel]);
+      });
+    }
     this.at((when ?? piano.now()) + Math.max(0.05, seconds), () => {
       this.sounding.delete(midi);
       this.send([0x80, midi, 0]);
@@ -469,6 +538,26 @@ class MidiManager {
   silence(): void {
     this.timers.forEach((t) => clearTimeout(t));
     this.timers.clear();
+    // Notes already handed over for a moment from now are withdrawn where the system allows it.
+    // Where it does not, each gets a key up just after it sounds, so nothing is left ringing.
+    for (const out of this.outputs) {
+      try {
+        out.clear?.();
+      } catch {
+        /* not offered */
+      }
+    }
+    this.queued.forEach(({ midi, at }, t) => {
+      clearTimeout(t);
+      for (const out of this.outputs) {
+        try {
+          out.send([0x80, midi, 0], at + 40);
+        } catch {
+          /* a port that went away */
+        }
+      }
+    });
+    this.queued.clear();
     this.sounding.forEach((midi) => this.send([0x80, midi, 0]));
     this.sounding.clear();
   }

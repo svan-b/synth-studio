@@ -248,6 +248,21 @@ html:has(.mc-root[data-theme='dark']) body {
 
 /* ---------------------------------------------------------------- Motion */
 
+/* The time left to read before a demonstration begins, running out from full to nothing. */
+@keyframes mc-lead {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+.mc-lead {
+  animation-name: mc-lead;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
 @keyframes mc-fade-up {
   from {
     opacity: 0;

@@ -1,3 +1,4 @@
+import AVFoundation
 import CoreAudioKit
 import UIKit
 import WebKit
@@ -49,6 +50,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
         NotificationCenter.default.addObserver(self, selector: #selector(putAway), name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(broughtBack), name: UIApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(soundMoved), name: AVAudioSession.routeChangeNotification, object: nil)
 
         if SelfTest.wanted {
             selfTest = SelfTest(webView: webView, piano: piano, progress: progress)
@@ -66,9 +68,15 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         progress.backUpNow()
     }
 
+    /// The iPad's sound has gone somewhere else: headphones, a Bluetooth speaker, back to its own speaker.
+    @objc private func soundMoved() {
+        DispatchQueue.main.async { [weak self] in self?.tellSound() }
+    }
+
     @objc private func broughtBack() {
         UIApplication.shared.isIdleTimerDisabled = true
         piano.rescan()
+        tellSound()
         // Sound stops when the app is put away. Start it again without waiting for a tap.
         webView?.evaluateJavaScript("window.__middleC && __middleC.wake && __middleC.wake();", completionHandler: nil)
     }
@@ -128,6 +136,11 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         case "share":
             guard let name = body["name"] as? String, let text = body["text"] as? String else { return }
             share(name: name, text: text)
+        case "midi.flush":
+            guard let id = body["id"] as? String else { return }
+            piano.flush(id: id)
+        case "sound.ask":
+            tellSound()
         case "bluetooth":
             showBluetoothPianos()
         case "selftest":
@@ -151,6 +164,27 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         webView.evaluateJavaScript("window.__middleC && __middleC.midi && __middleC.midi.rx('\(id)',[\(numbers)],\(stamp));", completionHandler: nil)
     }
 
+    /// Tell the page where the iPad's sound is going and how long it takes to be heard.
+    /// Sound sent over Bluetooth arrives late, and the page has no other way to know.
+    private func tellSound() {
+        let session = AVAudioSession.sharedInstance()
+        let output = session.currentRoute.outputs.first
+        var route = "other"
+        if let kind = output?.portType {
+            if kind == .bluetoothA2DP || kind == .bluetoothLE || kind == .bluetoothHFP {
+                route = "bluetooth"
+            } else if kind == .builtInSpeaker {
+                route = "speaker"
+            } else if kind == .headphones {
+                route = "headphones"
+            }
+        }
+        let delay = (session.outputLatency + session.ioBufferDuration) * 1000
+        let info: [String: Any] = ["route": route, "name": output?.portName ?? "", "delayMs": delay.isFinite ? delay : 0]
+        guard let data = try? JSONSerialization.data(withJSONObject: info), let json = String(data: data, encoding: .utf8) else { return }
+        webView?.evaluateJavaScript("window.__middleC && __middleC.sound && __middleC.sound(\(json));", completionHandler: nil)
+    }
+
     // MARK: - Sheets
 
     /// Hand a backup file to the share sheet: Files, AirDrop, Mail.
@@ -169,6 +203,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     /// The iPad's own list of Bluetooth MIDI instruments nearby.
     private func showBluetoothPianos() {
+        // The sheet can be swiped away without Done, so the search for the piano starts as it opens.
+        lookForPiano()
         let list = CABTMIDICentralViewController()
         list.navigationItem.title = "Bluetooth pianos"
         list.navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(closeSheet))
@@ -178,7 +214,15 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     }
 
     @objc private func closeSheet() {
-        dismiss(animated: true) { [weak self] in self?.piano.rescan() }
+        dismiss(animated: true) { [weak self] in self?.lookForPiano() }
+    }
+
+    /// A piano joined over Bluetooth can take a moment to appear, so look now and a few times more.
+    private func lookForPiano() {
+        piano.rescan()
+        for wait in [1.0, 3.0, 6.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in self?.piano.rescan() }
+        }
     }
 
     private func anchor(_ sheet: UIViewController) {
@@ -217,6 +261,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        tellSound()
         selfTest?.pageLoaded()
     }
 

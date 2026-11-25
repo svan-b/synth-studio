@@ -7,6 +7,7 @@ import { input, type InputMode, type RemoteAction } from '@/lib/piano/input/hub'
 import { listener, type ListenStatus } from '@/lib/piano/input/listen';
 import { midi, type MidiStatus } from '@/lib/piano/input/midi';
 import { usePiano } from '@/lib/piano/learn/store';
+import { onSound, type SoundInfo } from '@/lib/piano/native/bridge';
 import type { Emitter } from '@/lib/piano/util/emitter';
 
 /** Follow a status emitter as React state. */
@@ -30,6 +31,13 @@ export function useMidiStatus(): MidiStatus {
 
 export function useListenStatus(): ListenStatus {
   return useEmitted(listener.status, () => listener.getStatus());
+}
+
+/** Where the iPad's own sound is going, inside the iPad app. Null in a browser. */
+export function useSound(): SoundInfo | null {
+  const [info, setInfo] = useState<SoundInfo | null>(null);
+  useEffect(() => onSound(setInfo), []);
+  return info;
 }
 
 /** How the learner is playing right now. */
@@ -125,10 +133,25 @@ export function useApplySettings(): void {
   useEffect(() => {
     piano.setPianoVolume(settings.pianoVolume);
     piano.setClickVolume(settings.clickVolume);
-    instrument.preferPiano = settings.demoOnPiano;
+    instrument.where = settings.demoChosen ? (settings.demoOnPiano ? 'piano' : 'ipad') : 'auto';
+    midi.rememberTouch(settings.touchLevel);
     input.remoteKeys = settings.remoteKeys;
     input.remotePedals = settings.remotePedals;
   }, [settings]);
+
+  // How firmly the learner plays is kept from day to day, so the app's own playing matches from the first note.
+  const setSettings = usePiano((s) => s.setSettings);
+  useEffect(() => {
+    const t = setInterval(() => {
+      const now = midi.typicalTouch;
+      const kept = usePiano.getState().settings.touchLevel ?? 0;
+      if (now !== null && Math.abs(now - kept) > 0.03) setSettings({ touchLevel: Math.round(now * 100) / 100 });
+    }, 20000);
+    return () => clearInterval(t);
+  }, [setSettings]);
+
+  // Inside the iPad app, the iPad says where its sound is going and how long it takes to get there.
+  useEffect(() => onSound((info) => piano.setDeviceDelay(info ? info.delayMs / 1000 : null)), []);
 }
 
 /**

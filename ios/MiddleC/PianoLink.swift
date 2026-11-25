@@ -99,6 +99,12 @@ final class PianoLink {
         _ = MIDISendEventList(outPort, destination, &list)
     }
 
+    /// Withdraw anything sent to an instrument with a time that has not come yet.
+    func flush(id: String) {
+        guard let destination = destinations[id] else { return }
+        _ = MIDIFlushOutput(destination)
+    }
+
     /// Plain MIDI bytes as the 32 bit words the system now sends. Only key,
     /// pedal and other channel messages are passed on.
     static func words(from bytes: [UInt8]) -> [UInt32] {

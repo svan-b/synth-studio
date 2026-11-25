@@ -21,8 +21,12 @@ export interface Profile {
 
 export interface Settings {
   theme: ThemeChoice;
-  /** Play demonstrations on the connected piano instead of the iPad. */
+  /** Play demonstrations on the connected piano instead of the iPad. Read only once the learner has chosen. */
   demoOnPiano: boolean;
+  /** The learner has said where demonstrations should sound. Until then they go to the piano when it can play them. */
+  demoChosen?: boolean;
+  /** How firmly the learner tends to play, 0 to 1, so that the app can play as loudly on their piano. */
+  touchLevel?: number;
   remoteKeys: boolean;
   remotePedals: boolean;
   metronome: boolean;

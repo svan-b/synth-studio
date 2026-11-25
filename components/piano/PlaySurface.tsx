@@ -8,7 +8,7 @@ import { Transport, scoreEvents, type TimedEvent } from '@/lib/piano/audio/trans
 import type { Display, Hints } from '@/lib/piano/content/types';
 import { FlowSession, waitingGate, type FlowResult, type Take } from '@/lib/piano/engine/flow';
 import { emitNoteOff, emitNoteOn, noteBus } from '@/lib/piano/input/bus';
-import { REMOTE_SECONDARY, input } from '@/lib/piano/input/hub';
+import { REMOTE_SECONDARY, input, isRemoteKey } from '@/lib/piano/input/hub';
 import { usePiano } from '@/lib/piano/learn/store';
 import { scoreRange, stepsFor, type Score } from '@/lib/piano/music/score';
 import { pulsesPerMeasure, type Hand } from '@/lib/piano/music/theory';
@@ -132,6 +132,9 @@ export default function PlaySurface({
   const [resume, setResume] = useState(0);
   // A word to the learner about what just happened, such as a start before the count was over.
   const [notice, setNotice] = useState<string | null>(null);
+  // The time left to read before a demonstration begins, in milliseconds, and a way to cut it short.
+  const [lead, setLead] = useState<number | null>(null);
+  const skipRef = useRef<(() => void) | null>(null);
   const falseStart = useRef(false);
 
   const [phase, setPhase] = useState<Phase>('ready');
@@ -160,6 +163,8 @@ export default function PlaySurface({
     setCount(null);
     setBeat(null);
     setPhase('ready');
+    setLead(null);
+    skipRef.current = null;
     gateRef.current = null;
     finished.current = false;
     halt.current = null;
@@ -212,7 +217,16 @@ export default function PlaySurface({
       steps.forEach((step, index) => {
         events.push({ beat: step.start, run: (when) => atAudio(when, () => viewRef.current?.setCursor(index)) });
       });
-      later(leadIn, () => {
+      // The wait before a demonstration is time to read, not a hang: it is shown
+      // running out, and a key or a tap on the music starts the demonstration at once.
+      let begunListening = false;
+      const go = () => {
+        if (cancelled || begunListening) return;
+        begunListening = true;
+        offGate?.();
+        offGate = null;
+        skipRef.current = null;
+        setLead(null);
         setPhase('playing');
         transport.start(events, score.totalBeats + 0.5, {
           bpm,
@@ -226,7 +240,19 @@ export default function PlaySurface({
             doneRef.current(null);
           },
         });
-      });
+      };
+      if (leadIn > 900) {
+        setLead(leadIn);
+        skipRef.current = go;
+        let armed = false;
+        later(350, () => {
+          armed = true;
+        });
+        offGate = noteBus.subscribe((ev) => {
+          if (ev.type === 'on' && armed && !(ev.source === 'midi' && input.remoteKeys && isRemoteKey(ev.midi))) go();
+        });
+      }
+      later(leadIn, go);
     } else {
       const extra = settings.latencyMs / 1000;
       session = new FlowSession(score, {
@@ -353,6 +379,7 @@ export default function PlaySurface({
       offGate?.();
       if (begin && waitingGate.current === begin) waitingGate.current = null;
       gateRef.current = null;
+      skipRef.current = null;
       timers.forEach((t) => clearTimeout(t));
       session?.stop();
       transport.stop();
@@ -421,7 +448,7 @@ export default function PlaySurface({
 
   let status = '';
   if (replaying) status = 'Your own playing';
-  else if (mode === 'listen') status = phase === 'done' ? 'That was it' : 'Listen';
+  else if (mode === 'listen') status = phase === 'done' ? 'That was it' : lead !== null ? 'It begins in a moment. Play a key to hear it now' : 'Listen';
   else if (phase === 'done' || held) status = '';
   else if (phase === 'gate') status = 'The count starts when you are ready';
   else if (phase === 'countin') status = 'Get ready';
@@ -431,7 +458,7 @@ export default function PlaySurface({
 
   return (
     <div className={`flex h-full min-h-0 flex-col ${veil ? 'mc-veil' : ''}`}>
-      <div className="relative min-h-0 flex-1 px-5">
+      <div className="relative min-h-0 flex-1 px-5" onClick={() => skipRef.current?.()}>
         {showStaff && (
           <ScoreView ref={viewRef} score={score} steps={steps} showFingering={fingering} showNames={names} focusHand={focusHand} showChords={chordsTaught} />
         )}
@@ -474,7 +501,12 @@ export default function PlaySurface({
         )}
       </div>
 
-      <div className="flex h-11 shrink-0 items-center justify-between px-6 text-sm text-mc-muted">
+      <div className="relative flex h-11 shrink-0 items-center justify-between px-6 text-sm text-mc-muted">
+        {lead !== null && (
+          <span className="absolute inset-x-6 top-0 h-0.5 overflow-hidden rounded-full bg-mc-line" aria-hidden="true">
+            <span key={String(runId)} className="mc-lead block h-full rounded-full bg-mc-accent" style={{ animationDuration: `${lead}ms` }} />
+          </span>
+        )}
         <span className="font-medium">{status}</span>
         {mode === 'tempo' && (
           <div className="flex items-center gap-4">

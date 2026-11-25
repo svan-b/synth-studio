@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { piano } from '@/lib/piano/audio/engine';
+import { instrument } from '@/lib/piano/audio/instrument';
 import { noteBus } from '@/lib/piano/input/bus';
 import { listener } from '@/lib/piano/input/listen';
 import { midi, type MonitorLine } from '@/lib/piano/input/midi';
-import { isNative, pairBluetooth } from '@/lib/piano/native/bridge';
+import { isNative, pairBluetooth, shareFile } from '@/lib/piano/native/bridge';
 import { usePiano } from '@/lib/piano/learn/store';
 import { midiLabel } from '@/lib/piano/music/theory';
-import { useInputMode, useListenStatus, useMidiStatus } from './hooks';
+import { useInputMode, useListenStatus, useMidiStatus, useSound } from './hooks';
 import { Button, Icon, Pill } from './ui';
 
 /** A small light that blinks when a note arrives from any source. */
@@ -88,8 +89,9 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
   const settings = usePiano((s) => s.settings);
   const setSettings = usePiano((s) => s.setSettings);
   const [tested, setTested] = useState(false);
-  // Neither answer is shown as chosen until the learner has given one.
-  const [answered, setAnswered] = useState(false);
+  const sound = useSound();
+  // Left alone, demonstrations go to the piano whenever it can play them.
+  const onPiano = settings.demoChosen ? settings.demoOnPiano : true;
   const noMidiAtAll = !m.webMidi && !m.bluetooth;
   // The iPad app has MIDI built in. It looks for the piano by itself, so there is nothing to switch on.
   const native = isNative();
@@ -111,7 +113,7 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
   const testOutput = async () => {
     await piano.unlock();
     const now = piano.now();
-    [60, 64, 67].forEach((n, i) => midi.playNote(n, 0.5, 0.6, now + 0.1 + i * 0.3));
+    [60, 64, 67].forEach((n, i) => midi.playNote(n, 0.5, instrument.level, now + 0.1 + i * 0.3));
     setTested(true);
   };
 
@@ -170,42 +172,45 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
       {(mode === 'midi' || mode === 'listen') && <LastNote />}
       {mode === 'midi' && !compact && <Monitor />}
 
+      {sound?.route === 'bluetooth' && (
+        <div className="rounded-2xl border border-mc-hint/40 bg-mc-hint/10 px-5 py-4">
+          <div className="font-semibold text-mc-hint-ink">The iPad&apos;s sound is going over Bluetooth{sound.name ? ` to ${sound.name}` : ''}</div>
+          <p className="mt-1 text-[15px] text-mc-muted">
+            Sound sent over Bluetooth arrives late, so the click and anything the iPad plays will lag behind your hands. That link carries sound only.
+            It is not how the app hears your keys. For playing in time, switch it off under Bluetooth in the iPad&apos;s own Settings and let the piano
+            play demonstrations itself.
+          </p>
+        </div>
+      )}
+
       {mode === 'midi' && midi.hasOutput && (
         <div className="rounded-2xl border border-mc-line bg-mc-surface px-5 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="font-semibold">Play demonstrations on the piano</div>
-              <div className="text-[15px] text-mc-muted">When the app shows you how something goes, your piano plays it with its own sound.</div>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold">Where demonstrations sound</div>
+              <div className="text-[15px] text-mc-muted">
+                {onPiano
+                  ? 'Your piano plays them itself, as loudly as you play, since it is the same instrument.'
+                  : 'The iPad plays them through its own speaker, which is much quieter than a piano.'}
+              </div>
             </div>
-            <Button variant="soft" size="sm" onClick={() => void testOutput()}>
-              Test
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button size="sm" variant={onPiano ? 'primary' : 'soft'} onClick={() => setSettings({ demoChosen: true, demoOnPiano: true })}>
+                The piano
+              </Button>
+              <Button size="sm" variant={!onPiano ? 'primary' : 'soft'} onClick={() => setSettings({ demoChosen: true, demoOnPiano: false })}>
+                The iPad
+              </Button>
+            </div>
           </div>
-          {tested && (
-            <div className="mt-3 flex items-center gap-3">
-              <span className="text-[15px] text-mc-muted">Did the piano play three notes?</span>
-              <Button
-                size="sm"
-                variant={answered && settings.demoOnPiano ? 'primary' : 'soft'}
-                onClick={() => {
-                  setAnswered(true);
-                  setSettings({ demoOnPiano: true });
-                }}
-              >
-                Yes, use the piano
-              </Button>
-              <Button
-                size="sm"
-                variant={answered && !settings.demoOnPiano ? 'primary' : 'soft'}
-                onClick={() => {
-                  setAnswered(true);
-                  setSettings({ demoOnPiano: false });
-                }}
-              >
-                No, use the iPad
-              </Button>
-            </div>
-          )}
+          <div className="mt-3 flex items-center gap-3 border-t border-mc-line pt-3">
+            <Button variant="soft" size="sm" onClick={() => void testOutput()}>
+              Test the piano
+            </Button>
+            <span className="text-[15px] text-mc-muted">
+              {tested ? 'Three notes were sent. If the piano stayed silent, choose the iPad.' : 'Sends three notes for the piano to play.'}
+            </span>
+          </div>
         </div>
       )}
 
@@ -217,7 +222,10 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
               <Icon.Bluetooth size={20} />
               Pair a Bluetooth piano
             </div>
-            <p className="mt-1 text-[15px] text-mc-muted">For a piano with Bluetooth MIDI. Choose it in the list that opens, then come back here.</p>
+            <p className="mt-1 text-[15px] text-mc-muted">
+              Switch Bluetooth on at the piano, then choose the entry that ends in MIDI in the list that opens, such as P-525 MIDI. It will not be found
+              in the iPad&apos;s own Settings. What shows there is the piano&apos;s speaker, not its keys.
+            </p>
           </button>
         )}
         {!native && m.webMidi && (
@@ -289,6 +297,100 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
           Store. On a computer, Chrome and Edge work directly. Until then, listening through the microphone works here.
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * What the app can measure about the connection, in plain words, with a way
+ * to send it on. For finding out where a delay comes from: the keys reaching
+ * the app, the iPad's sound reaching the ear, or the screen.
+ */
+export function ConnectionReport() {
+  const m = useMidiStatus();
+  const sound = useSound();
+  const settings = usePiano((s) => s.settings);
+  const [frames, setFrames] = useState<number | null>(null);
+  const [tick, setTick] = useState(0);
+  const [sent, setSent] = useState(false);
+
+  // How smoothly the screen is drawing, counted over one second.
+  useEffect(() => {
+    let n = 0;
+    let raf = 0;
+    const start = performance.now();
+    const step = () => {
+      n++;
+      if (performance.now() - start >= 1000) setFrames(n);
+      else raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [tick]);
+  // The figures move as the learner plays, so the panel looks again every two seconds.
+  useEffect(() => {
+    const t = setInterval(() => setTick((x) => x + 1), 2000);
+    return () => clearInterval(t);
+  }, []);
+
+  const keys = midi.keyDelay;
+  const total = Math.round(piano.outputLatency() * 1000);
+  const onPiano = instrument.onPiano;
+  const rows: Array<[string, string]> = [
+    ['Piano', m.inputs.length > 0 ? `${m.inputs.map((p) => p.name).join(', ')}${m.outputs.length > 0 ? ', and it can be played by the app' : ', keys only'}` : 'Not connected'],
+    ['Keys reach the app in', keys ? `${keys.usual} ms as a rule, ${keys.worst} ms at worst, over the last ${keys.keys} keys` : 'Play a few keys to measure'],
+    [
+      'The iPad\'s sound',
+      sound
+        ? `${sound.route === 'bluetooth' ? 'Over Bluetooth' : sound.route === 'speaker' ? 'Its own speaker' : sound.route === 'headphones' ? 'Headphones' : 'Another output'}${
+            sound.name ? ` (${sound.name})` : ''
+          }, heard about ${total} ms after it is sent`
+        : `Heard about ${total} ms after it is sent, as far as the browser says`,
+    ],
+    ['Demonstrations', onPiano ? `Played by the piano, at strength ${Math.round(instrument.level * 127)} of 127` : 'Played by the iPad'],
+    ['Timing check', settings.latencyMs === 0 ? 'Not run' : `${settings.latencyMs > 0 ? '+' : ''}${settings.latencyMs} ms`],
+    ['Screen', frames === null ? 'Measuring' : `${frames} frames a second`],
+  ];
+  const text = () =>
+    [
+      'Middle C connection report',
+      new Date().toISOString(),
+      isNative() ? 'iPad app' : 'Browser',
+      ...rows.map(([k, v]) => `${k}: ${v}`),
+      `Window: ${window.innerWidth} by ${window.innerHeight}`,
+      navigator.userAgent,
+    ].join('\n');
+  const send = async () => {
+    const body = text();
+    if (!shareFile('middle-c-connection.txt', body)) {
+      try {
+        await navigator.clipboard.writeText(body);
+      } catch {
+        return;
+      }
+    }
+    setSent(true);
+  };
+
+  return (
+    <div className="rounded-2xl border border-mc-line bg-mc-surface px-5 py-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <div className="font-semibold">Connection report</div>
+          <div className="text-[15px] text-mc-muted">If something lags, this shows where the time goes.</div>
+        </div>
+        <Button variant="soft" size="sm" onClick={() => void send()}>
+          {sent ? 'Sent' : isNative() ? 'Share it' : 'Copy it'}
+        </Button>
+      </div>
+      <dl className="mt-3 space-y-1.5 border-t border-mc-line pt-3 text-[15px]">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex gap-3">
+            <dt className="w-44 shrink-0 text-mc-muted">{k}</dt>
+            <dd className="min-w-0 text-mc-ink">{v}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

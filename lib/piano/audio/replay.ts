@@ -86,7 +86,8 @@ export class TakePlayer {
     const events: TimedEvent[] = take.notes.map((n, i) => ({
       beat: times[i],
       run: (when: number) => {
-        instrument.play(n[0], Math.max(0.05, n[2]), n[3], when);
+        // The learner's own strength, as it was played.
+        instrument.play(n[0], Math.max(0.05, n[2]), n[3], when, true);
         if (opts.onKey) {
           this.at(when, () => opts.onKey?.(n[0], true));
           this.at(when + Math.max(0.08, n[2]) - 0.02, () => opts.onKey?.(n[0], false));

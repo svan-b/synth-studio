@@ -11,9 +11,12 @@
  *                    store.save key value       write progress to the app's file
  *                    share      name text       hand a file to the share sheet
  *                    bluetooth                  show the Bluetooth MIDI list
+ *                    midi.flush id              withdraw notes sent with a time still to come
+ *                    sound.ask                  say again where the iPad's sound is going
  *
  *   app to page    __middleC.midi.ports([{ id, name, kind }])
  *                  __middleC.midi.rx(id, [bytes], epochMs)
+ *                  __middleC.sound({ route, name, delayMs })
  */
 (function () {
   'use strict';
@@ -59,7 +62,9 @@
   Port.prototype.close = function () {
     return Promise.resolve(this);
   };
-  Port.prototype.clear = function () {};
+  Port.prototype.clear = function () {
+    app.post({ type: 'midi.flush', id: this.id });
+  };
   Port.prototype.send = function (data, timestamp) {
     var delay = 0;
     if (typeof timestamp === 'number' && timestamp > 0) delay = Math.max(0, timestamp - performance.now());
@@ -106,6 +111,12 @@
     waiting = [];
     for (var i = 0; i < list.length; i++) list[i](access);
   }
+
+  /** Where the iPad's sound is going and how long it takes. Kept, so a page that asks later still gets it. */
+  app.sound = function (info) {
+    app.soundInfo = info;
+    if (typeof app.onSound === 'function') app.onSound(info);
+  };
 
   app.midi = {
     /** The instruments the iPad can see now. Called at the start and whenever one comes or goes. */

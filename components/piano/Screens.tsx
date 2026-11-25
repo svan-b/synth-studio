@@ -24,8 +24,8 @@ import { exportData, streak, totalMinutes, usePiano, type Recording } from '@/li
 import { isNative, shareFile } from '@/lib/piano/native/bridge';
 import { parseScore } from '@/lib/piano/music/score';
 import { dayKey } from '@/lib/piano/util/emitter';
-import ConnectionPanel, { ConnectionChip } from './Connection';
-import { useInputMode } from './hooks';
+import ConnectionPanel, { ConnectionChip, ConnectionReport } from './Connection';
+import { useInputMode, useSound } from './hooks';
 import PlaySurface from './PlaySurface';
 import { Button, Card, Icon, Pill, ProgressBar, Ring, Segmented, Sheet, Toggle } from './ui';
 
@@ -70,6 +70,7 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   const days = usePiano((s) => s.days);
   const sessionDoneOn = usePiano((s) => s.sessionDoneOn);
   const drills = usePiano((s) => s.drills);
+  const sound = useSound();
   const today = dayKey();
   const doneToday = sessionDoneOn === today;
   const day = useMemo(
@@ -103,6 +104,12 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
 
   return (
     <Page title="Today" subtitle={date} right={<ConnectionChip onClick={() => onGo('settings')} />}>
+      {sound?.route === 'bluetooth' && (
+        <button onClick={() => onGo('settings')} className="mb-5 block w-full rounded-2xl border border-mc-hint/40 bg-mc-hint/10 px-5 py-3.5 text-left">
+          <span className="font-semibold text-mc-hint-ink">The iPad&apos;s sound is going over Bluetooth{sound.name ? ` to ${sound.name}` : ''}, which makes it late.</span>{' '}
+          <span className="text-mc-muted">The click will lag behind your hands. Settings says what to do.</span>
+        </button>
+      )}
       <div className="grid gap-6 landscape:grid-cols-[1fr_300px]">
         <Card className="p-7">
           <div className="flex items-start justify-between gap-4">
@@ -695,6 +702,9 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
       <section>
         <h2 className="mb-3 font-mc-serif text-2xl">Your piano</h2>
         <ConnectionPanel />
+        <div className="mt-4">
+          <ConnectionReport />
+        </div>
       </section>
 
       <section className="mt-9">

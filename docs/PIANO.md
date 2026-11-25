@@ -11,6 +11,7 @@ A piano teacher that runs on an iPad on the music stand. It lives at `/piano` in
 - **Hear yourself.** After a run, Hear yours plays your own take back, key for key, with the cursor following. The play through that finishes a piece is kept, with the latest one since, on the Progress page.
 - **Exercises** for note reading (spaced review), rhythm, playing by ear, sight reading, scales and arpeggios (judged for evenness), and chords from symbols in any position, with fresh material every time. Each opens once the lesson that prepares it is done, and climbs only as far as the lessons have gone.
 - **A daily session** sized to the time you have. The first day ends with a tune, every session ends with a short account of what changed, and when there is time it closes on a piece you already play well. New lessons wait while two pieces are still being learned, so the course moves as fast as the playing does, and the next lesson can always be taken early.
+- **Demonstrations on your own piano.** When the piano can receive notes, the app plays on the piano itself and as firmly as you tend to play, so a demonstration is as loud as your own playing.
 - **Hands on the keys.** The top key of the piano means continue and the bottom key means again. With a three pedal unit the middle and left pedals do the same.
 - **The method page** in the app sets out each teaching choice and how strong the evidence for it is.
 

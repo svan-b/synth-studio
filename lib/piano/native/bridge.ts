@@ -11,8 +11,21 @@
  * In an ordinary browser none of this exists and every call here does nothing.
  */
 
+/** Where the iPad's own sound is going, as the app reports it. */
+export interface SoundInfo {
+  /** The iPad's speaker, wired headphones, something over Bluetooth, or anything else. */
+  route: 'speaker' | 'headphones' | 'bluetooth' | 'other';
+  /** The name of the output, such as "P-525 AUDIO". */
+  name: string;
+  /** How long sound takes to be heard after it is sent, in milliseconds. */
+  delayMs: number;
+}
+
 interface NativeApp {
   native?: boolean;
+  /** The last word from the app about its sound output, and who to tell when it changes. */
+  soundInfo?: SoundInfo;
+  onSound?: (info: SoundInfo) => void;
   version?: string;
   /** Progress as last written to the app's own file, by storage key, with when it was written. */
   saved?: Record<string, { value: string; at: number }>;
@@ -74,4 +87,27 @@ export function shareFile(name: string, text: string): boolean {
 /** Open the iPad's own list of Bluetooth MIDI instruments. */
 export function pairBluetooth(): boolean {
   return post({ type: 'bluetooth' });
+}
+
+const soundListeners = new Set<(info: SoundInfo | null) => void>();
+
+/** What the app last said about where the iPad's sound is going, or null outside the app. */
+export function soundInfo(): SoundInfo | null {
+  const info = shell()?.soundInfo;
+  return info && typeof info.delayMs === 'number' ? info : null;
+}
+
+/** Be told where the iPad's sound is going, now and whenever it changes. Returns a way to stop. */
+export function onSound(fn: (info: SoundInfo | null) => void): () => void {
+  const app = shell();
+  soundListeners.add(fn);
+  if (app) {
+    app.onSound = (info) => soundListeners.forEach((f) => f(info));
+    fn(soundInfo());
+    // Ask, in case the app spoke before the page was ready to listen.
+    post({ type: 'sound.ask' });
+  }
+  return () => {
+    soundListeners.delete(fn);
+  };
 }

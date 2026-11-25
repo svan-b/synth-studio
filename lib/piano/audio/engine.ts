@@ -42,6 +42,12 @@ export interface AudioStatus {
 
 type AnyAudioContext = AudioContext;
 
+/**
+ * How hard the sampled piano is driven into the limiter. An iPad's speakers
+ * are small next to a piano's, so it is given all the level they can carry.
+ */
+const PIANO_GAIN = 2.2;
+
 function getContextCtor(): typeof AudioContext | undefined {
   if (typeof window === 'undefined') return undefined;
   return window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -90,11 +96,20 @@ class PianoEngine {
   outputLatency(): number {
     if (!this.ctx) return 0;
     const c = this.ctx as AudioContext & { outputLatency?: number };
-    const lat = (c.outputLatency ?? 0) + (c.baseLatency ?? 0);
-    if (Number.isFinite(lat) && lat > 0) this.knownLatency = clamp(lat, 0, 0.25);
+    // Inside the iPad app the iPad itself says how long its sound takes to be heard, and its
+    // figure covers a Bluetooth speaker too. The browser engine there does not say at all.
+    const out = this.deviceDelay ?? (c.outputLatency && c.outputLatency > 0 ? c.outputLatency : 0);
+    const lat = out + (c.baseLatency ?? 0);
+    if (Number.isFinite(lat) && lat > 0) this.knownLatency = clamp(lat, 0, 0.5);
     return this.knownLatency;
   }
   private knownLatency = 0;
+  private deviceDelay: number | null = null;
+
+  /** The delay of the device's sound output in seconds, as the iPad app reports it. */
+  setDeviceDelay(seconds: number | null): void {
+    this.deviceDelay = seconds !== null && Number.isFinite(seconds) && seconds >= 0 ? Math.min(seconds, 0.5) : null;
+  }
 
   /**
    * Must be called from a user gesture (a tap). Creates and resumes the audio
@@ -174,7 +189,7 @@ class PianoEngine {
     this.master = ctx.createGain();
     this.master.gain.value = 1;
     this.pianoBus = ctx.createGain();
-    this.pianoBus.gain.value = this.pianoVolume * 1.5;
+    this.pianoBus.gain.value = this.pianoVolume * PIANO_GAIN;
     this.clickBus = ctx.createGain();
     this.clickBus.gain.value = this.clickVolume;
     this.pianoBus.connect(comp);
@@ -185,7 +200,7 @@ class PianoEngine {
 
   setPianoVolume(v: number): void {
     this.pianoVolume = clamp(v, 0, 1);
-    if (this.pianoBus && this.ctx) this.pianoBus.gain.setTargetAtTime(this.pianoVolume * 1.5, this.ctx.currentTime, 0.02);
+    if (this.pianoBus && this.ctx) this.pianoBus.gain.setTargetAtTime(this.pianoVolume * PIANO_GAIN, this.ctx.currentTime, 0.02);
   }
 
   setClickVolume(v: number): void {

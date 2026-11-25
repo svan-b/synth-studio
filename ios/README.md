@@ -24,7 +24,22 @@ On a Mac with an Apple chip you can also choose **My Mac (Designed for iPad)** a
 
 ## Using it
 
-Plug the piano's USB TO HOST socket into the iPad and open the app. It finds the piano by itself. For a piano with Bluetooth MIDI, use **Pair a Bluetooth piano** in Settings inside the app.
+Plug the piano's USB TO HOST socket into the iPad and open the app. It finds the piano by itself. A cable is the surest link and has the least delay.
+
+### Bluetooth
+
+A piano such as the Yamaha P-525 has two separate Bluetooth links, and they are easy to mix up.
+
+- **Bluetooth MIDI** carries the keys. This is the one the app needs. It is joined inside the app: Settings, **Pair a Bluetooth piano**, then choose the entry that ends in MIDI, such as P-525 MIDI. Bluetooth has to be switched on at the piano first. This link never appears in the iPad's own Settings.
+- **Bluetooth audio** carries sound from the iPad to the piano's speakers. This is what the iPad's own Settings shows, as P-525 AUDIO. The app does not need it, and it makes the iPad's sound arrive late, so the click lags behind your hands. If the app says the iPad's sound is going over Bluetooth, switch that link off in the iPad's Settings.
+
+### Demonstrations
+
+When the piano can receive notes, the app plays its demonstrations on the piano itself, as firmly as you tend to play, so they are as loud as your own playing. Settings has the choice between the piano and the iPad's speaker.
+
+### If something lags
+
+Settings has a **Connection report**. It shows how long keys take to reach the app, where the iPad's sound is going and how late it is, and how smoothly the screen is drawing. **Share it** sends the figures on.
 
 ## How it is put together
 

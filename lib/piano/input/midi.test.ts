@@ -160,3 +160,30 @@ describe('MIDI packets that carry more than one message', () => {
     expect(heard.filter((e) => e.type === 'on').map((e) => e.midi)).toEqual([62, 65]);
   });
 });
+
+describe('how firmly the learner plays', () => {
+  it('is learned from their own keys, and leaves the keys that work as buttons out of it', () => {
+    const before = midi.typicalTouch;
+    // Too few keys to say anything yet, unless an earlier test has played some.
+    for (let i = 0; i < 40; i++) {
+      midi.handleBytes(new Uint8Array([0x90, 60 + (i % 5), 100]), performance.now(), 'test');
+      midi.handleBytes(new Uint8Array([0x80, 60 + (i % 5), 0]), performance.now(), 'test');
+    }
+    const firm = midi.typicalTouch!;
+    expect(firm).not.toBeNull();
+    if (before !== null) expect(firm).toBeGreaterThan(Math.min(before, 0.5));
+    // A run of the top key, pressed hard as a button, changes nothing.
+    for (let i = 0; i < 20; i++) {
+      midi.handleBytes(new Uint8Array([0x90, 108, 127]), performance.now(), 'test');
+      midi.handleBytes(new Uint8Array([0x80, 108, 0]), performance.now(), 'test');
+    }
+    expect(midi.typicalTouch).toBe(firm);
+    // Softer playing brings it down, gradually.
+    for (let i = 0; i < 60; i++) {
+      midi.handleBytes(new Uint8Array([0x90, 62, 50]), performance.now(), 'test');
+      midi.handleBytes(new Uint8Array([0x80, 62, 0]), performance.now(), 'test');
+    }
+    expect(midi.typicalTouch!).toBeLessThan(firm);
+    expect(midi.typicalTouch!).toBeGreaterThan(50 / 127);
+  });
+});
