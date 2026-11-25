@@ -64,6 +64,10 @@ The chord check is set to let very few wrong chords through, at the cost of some
 
 These recordings are harder than a beginner's playing: fast jazz, rock and singer songwriter lines, and comping with quick changes. The test material in the course is slow and plain by comparison.
 
+## Checked end to end
+
+The development robot (`?osdebug=1`) plays the app as a learner would, as sound into the listening input, with its strings damped when played again as on a real guitar. With it, all 24 lessons play through, nine songs of every kind (strummed, waltz, six eight, melody, fingerpicked, the blues) go from the first play through to learned at full speed, the four exercises run, and a simulated learner goes through a week of daily sessions, a break, and the welcome back. These runs found real faults that unit tests had not: bass notes in waltz patterns that could never be matched, plain chords taken for their seventh, every known chord compared with every strum, and fingerpicking judged too harshly. The same web app also runs with a stand in for the iPad app's bridge, which checks that listening starts without a tap, progress and reminders reach the app, and the iPad app's self test passes its page half.
+
 ## Code map
 
 ```
