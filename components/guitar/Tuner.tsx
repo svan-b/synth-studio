@@ -93,6 +93,23 @@ export default function Tuner({ onDone, compact = false }: { onDone?: () => void
   const doneRef = useRef(done);
   doneRef.current = done;
   const finished = useRef(false);
+  // The tuner hands on once, whether by itself after the last string or by a tap, never twice.
+  const handedOn = useRef(false);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handOn = useCallback(() => {
+    if (handedOn.current) return;
+    handedOn.current = true;
+    if (autoTimer.current) clearTimeout(autoTimer.current);
+    onDoneRef.current?.();
+  }, []);
+  useEffect(
+    () => () => {
+      if (autoTimer.current) clearTimeout(autoTimer.current);
+    },
+    [],
+  );
 
   const advance = useCallback(
     (s: StringNo) => {
@@ -109,12 +126,12 @@ export default function Tuner({ onDone, compact = false }: { onDone?: () => void
           finished.current = true;
           markTuned();
           instrument.chime();
-          setTimeout(() => onDone?.(), 900);
+          autoTimer.current = setTimeout(handOn, 900);
         }
         return next;
       });
     },
-    [markTuned, onDone],
+    [handOn, markTuned],
   );
 
   useEffect(() => {
@@ -246,7 +263,7 @@ export default function Tuner({ onDone, compact = false }: { onDone?: () => void
           {target === 'any' ? 'Go string by string' : 'Any string'}
         </Button>
         {onDone && (
-          <Button variant="ghost" onClick={onDone}>
+          <Button variant="ghost" onClick={handOn}>
             {done.size === 6 ? 'Continue' : 'It is in tune already'}
           </Button>
         )}

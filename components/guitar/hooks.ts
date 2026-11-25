@@ -6,7 +6,7 @@ import { chordsKnown } from '@/lib/guitar/content/catalog';
 import { listener, type ListenStatus } from '@/lib/guitar/input/listen';
 import { useGuitar } from '@/lib/guitar/learn/store';
 import { audioListening, isNative, onVolume } from '@/lib/guitar/native/bridge';
-import type { Emitter } from '@/lib/guitar/util/emitter';
+import { dayKey, type Emitter } from '@/lib/guitar/util/emitter';
 
 /** Follow a status emitter as React state. */
 export function useEmitted<T>(emitter: Emitter<T>, initial: () => T): T {
@@ -157,4 +157,19 @@ export function useDeviceVolume(): number | null {
   const [volume, setVolume] = useState<number | null>(null);
   useEffect(() => onVolume(setVolume), []);
   return volume;
+}
+
+/** Today's date, kept current: it moves on at midnight and when the app comes back to the front. */
+export function useToday(): string {
+  const [today, setToday] = useState(dayKey);
+  useEffect(() => {
+    const check = () => setToday((d) => (d === dayKey() ? d : dayKey()));
+    const timer = setInterval(check, 30000);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, []);
+  return today;
 }

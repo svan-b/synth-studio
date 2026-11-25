@@ -13,24 +13,41 @@ final class Reminders {
     private static let prefix = "open-string-practice-"
     /// Days ahead, counting today as 0. After the first week, two last ones.
     private static let days = [0, 1, 2, 3, 4, 5, 6, 9, 13]
+    /// All the work happens here, one request at a time.
+    private let queue = DispatchQueue(label: "app.openstring.reminders")
+    /// Each request is numbered. One overtaken by a newer request stops where it is,
+    /// so turning reminders off just after turning them on leaves them off.
+    private var generation = 0
 
     func update(on: Bool, hour: Int, minute: Int, playedToday: Bool, message: String) {
-        center.getPendingNotificationRequests { [weak self] pending in
-            guard let self = self else { return }
-            let ours = pending.map { $0.identifier }.filter { $0.hasPrefix(Self.prefix) }
-            self.center.removePendingNotificationRequests(withIdentifiers: ours)
-            guard on else { return }
-            self.center.getNotificationSettings { settings in
-                switch settings.authorizationStatus {
-                case .authorized, .provisional, .ephemeral:
-                    self.schedule(hour: hour, minute: minute, playedToday: playedToday, message: message)
-                case .notDetermined:
-                    // The first time, the iPad asks the learner whether reminders may be shown.
-                    self.center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
-                        if granted { self.schedule(hour: hour, minute: minute, playedToday: playedToday, message: message) }
+        queue.async {
+            self.generation += 1
+            let mine = self.generation
+            self.center.getPendingNotificationRequests { pending in
+                self.queue.async {
+                    guard mine == self.generation else { return }
+                    let ours = pending.map { $0.identifier }.filter { $0.hasPrefix(Self.prefix) }
+                    self.center.removePendingNotificationRequests(withIdentifiers: ours)
+                    guard on else { return }
+                    self.center.getNotificationSettings { settings in
+                        self.queue.async {
+                            guard mine == self.generation else { return }
+                            switch settings.authorizationStatus {
+                            case .authorized, .provisional, .ephemeral:
+                                self.schedule(hour: hour, minute: minute, playedToday: playedToday, message: message)
+                            case .notDetermined:
+                                // The first time, the iPad asks the learner whether reminders may be shown.
+                                self.center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                                    self.queue.async {
+                                        guard granted, mine == self.generation else { return }
+                                        self.schedule(hour: hour, minute: minute, playedToday: playedToday, message: message)
+                                    }
+                                }
+                            default:
+                                break
+                            }
+                        }
                     }
-                default:
-                    break
                 }
             }
         }

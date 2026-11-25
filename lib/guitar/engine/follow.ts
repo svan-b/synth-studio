@@ -183,6 +183,8 @@ export class Follower {
 
   // tempo mode
   private matched = new Map<number, number>();
+  /** Bass notes in strummed music matched by their name, with when they were heard. */
+  private namedAt = new Map<number, number>();
   private missed = new Set<number>();
   private chordJudged = new Map<number, ChordVerdict>();
   private ticker: ReturnType<typeof setInterval> | null = null;
@@ -594,6 +596,8 @@ export class Follower {
     // waltz, the bass note on the first beat. In picked music the notes are
     // matched as they come, and strikes only count the dead ones.
     if (this.score.kind !== 'strum' && !this.options.anyStrike) return;
+    // A bass note already matched by its name: this strike is the same sound.
+    if (Array.from(this.namedAt.values()).some((at) => Math.abs(at - t) < 0.15)) return;
     const hit = this.nearestStep(t, () => true);
     if (!hit) {
       this.extra++;
@@ -622,8 +626,20 @@ export class Follower {
   }
 
   private tempoNote(ev: NoteInput): void {
-    if (this.score.kind === 'strum' || this.options.anyStrike) return;
+    if (this.options.anyStrike) return;
     const t = this.heardAt(ev.time);
+    if (this.score.kind === 'strum') {
+      // Strums are judged from strikes. A bass note in the pattern may be
+      // named without a strike of its own, as when a ringing string is
+      // played again, and then its name counts for its step. Other names
+      // in strummed music are the notes of the strums, and say nothing.
+      const hit = this.nearestStep(t, (i) => this.steps[i].strum === null && this.steps[i].notes.some((n) => n.midi === ev.midi));
+      if (!hit) return;
+      this.matched.set(hit.index, hit.err);
+      this.namedAt.set(hit.index, t);
+      this.events.emit({ type: 'mark', index: hit.index, state: Math.abs(hit.err) <= this.onTimeWindow ? 'ok' : 'warn' });
+      return;
+    }
     const hit = this.nearestStep(t, (i) => this.steps[i].notes.some((n) => n.midi === ev.midi));
     if (!hit) {
       // The note before, still ringing and named again, is no slip.

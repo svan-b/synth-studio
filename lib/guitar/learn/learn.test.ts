@@ -4,6 +4,7 @@ import type { FollowResult } from '../engine/follow';
 import { applyResult, isKept, newSongState, nextTask, planOutline, songProgress, type SongState } from './coach';
 import { milestones } from './milestones';
 import { DRILL_LESSON, openDrills, planDay } from './planner';
+import { isDue, newCard } from './srs';
 import { daysAway, daysThisWeek } from './store';
 
 function result(over: Partial<FollowResult> = {}): FollowResult {
@@ -155,5 +156,14 @@ describe('days played', () => {
     expect(titles).toContain('Played a first chord');
     expect(titles).toContain('20 clean changes in a minute, A and E7');
     expect(titles).toContain('30 clean changes in a minute, A and E7');
+  });
+});
+
+describe('spaced review', () => {
+  it('counts a card due on its day, whatever the time it was last reviewed', () => {
+    // Reviewed in the evening, with its next review two days on at the same hour.
+    const card = { ...newCard(), due: new Date(2026, 11, 3, 20, 10).toISOString() };
+    expect(isDue(card, new Date(2026, 11, 3, 9, 0))).toBe(true);
+    expect(isDue(card, new Date(2026, 11, 2, 23, 0))).toBe(false);
   });
 });

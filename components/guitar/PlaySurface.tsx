@@ -90,6 +90,8 @@ export default function PlaySurface(props: SurfaceProps) {
   onTakeRef.current = props.onTake;
   const followRef = useRef<Follower | null>(null);
   const startedRef = useRef(false);
+  const [restart, setRestart] = useState(0);
+  const carryNote = useRef<Note | null>(null);
 
   const bpm = Math.max(30, Math.round((score.tempo * (mode === 'tempo' ? tempoPct : mode === 'listen' ? tempoPct : 100)) / 100));
   // When the music waits on a strummed score, it waits for each new chord: those are the steps shown.
@@ -124,12 +126,16 @@ export default function PlaySurface(props: SurfaceProps) {
     reset();
     setPhase('listening');
     let stop: (() => void) | null = null;
+    let cancelled = false;
     const t = setTimeout(() => {
       void guitar.unlock().then(() => {
+        // Sound may take a moment to wake. If this run was left meanwhile, it does not play.
+        if (cancelled) return;
         stop = playSong(score, props.melody ?? null, { bpm, onStep: (i) => setCurrent(i), onDone: () => onDoneRef.current(null) });
       });
     }, props.leadIn ?? 350);
     return () => {
+      cancelled = true;
       clearTimeout(t);
       stop?.();
     };
@@ -149,6 +155,10 @@ export default function PlaySurface(props: SurfaceProps) {
   useEffect(() => {
     if (mode === 'listen' || held || !listening) return;
     reset();
+    if (carryNote.current) {
+      setNote(carryNote.current);
+      carryNote.current = null;
+    }
     startedRef.current = false;
     const f = new Follower(score, {
       mode,
@@ -215,9 +225,9 @@ export default function PlaySurface(props: SurfaceProps) {
           break;
         }
         case 'false-start':
-          setNote({ tone: 'hint', text: 'You started before the count in finished. Wait for the clicks, then come in.' });
-          setPhase('gate');
-          startedRef.current = false;
+          // This run has stopped itself. A fresh one waits for the learner, with the reason shown.
+          carryNote.current = { tone: 'hint', text: 'You started before the count in finished. Wait for the clicks, then come in.' };
+          setRestart((r) => r + 1);
           break;
         case 'done':
           setPhase('done');
@@ -255,7 +265,7 @@ export default function PlaySurface(props: SurfaceProps) {
       if (followRef.current === f) followRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runId, mode, held, listening, score]);
+  }, [runId, mode, held, listening, score, restart]);
 
   useEffect(
     () => () => {
@@ -361,7 +371,7 @@ export default function PlaySurface(props: SurfaceProps) {
             {display === 'chart' && (
               <div className="os-scroll min-h-0 flex-1">
                 {props.words && props.lyrics ? (
-                  <WordsView lyrics={props.lyrics} measure={current !== null && stepNow ? stepNow.measure : null} />
+                  <WordsView lyrics={props.lyrics} measure={current !== null && stepNow ? stepNow.measure + score.measureOffset : null} />
                 ) : (
                   <ChartView score={score} current={chartCurrent} marks={changesOnly ? remap(marks, steps, score) : marks} />
                 )}

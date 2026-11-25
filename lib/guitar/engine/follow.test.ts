@@ -185,6 +185,28 @@ describe('the follower, with a beat', () => {
     expect(r.accuracy).toBe(1);
   });
 
+  it('takes a waltz bass note that was only named, and does not count its strike twice', () => {
+    const score = parseScore({ chart: 'A | D', strum: 'B.D.D.', time: [3, 4], tempo: 84 });
+    const f = new Follower(score, { mode: 'tempo', inputDelay: 0, metronome: false });
+    const { result } = run(f);
+    for (let i = 0; i < f.steps.length; i++) {
+      const step = f.steps[i];
+      const due = f.timeOfStep(i);
+      vi.advanceTimersByTime(Math.max(0, (due - guitar.now()) * 1000));
+      if (step.strum) strike(of(step.strum.chord), due);
+      else if (i === 0) note(step.notes[0].midi, due); // named, with no strike
+      else {
+        note(step.notes[0].midi, due); // named first, then the same sound as a strike
+        strike(chroma([step.notes[0].midi % 12]), due);
+      }
+    }
+    vi.advanceTimersByTime(3000);
+    const r = result()!;
+    expect(r.missedSteps).toBe(0);
+    expect(r.extraStrikes).toBe(0);
+    expect(r.accuracy).toBe(1);
+  });
+
   it('counts missed and extra strums, and lateness', () => {
     const score = parseScore({ chart: 'Em | Em', strum: 'D.D.D.D.', tempo: 70 });
     const f = new Follower(score, { mode: 'tempo', inputDelay: 0, metronome: false });

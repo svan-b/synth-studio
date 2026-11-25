@@ -11,7 +11,7 @@ import { daysThisWeek, useGuitar } from '@/lib/guitar/learn/store';
 import { isNative, onWake, setReminder } from '@/lib/guitar/native/bridge';
 import { dayKey } from '@/lib/guitar/util/emitter';
 import Drill from './Drills';
-import { useApplySettings, usePracticeTimer, useTheme, useWakeLock } from './hooks';
+import { useApplySettings, usePracticeTimer, useTheme, useToday, useWakeLock } from './hooks';
 import LessonPlayer from './LessonPlayer';
 import Onboarding from './Onboarding';
 import { LessonsScreen, MethodScreen, PracticeScreen, ProgressScreen, SettingsScreen, SongsScreen, TodayScreen, type Activity, type View } from './Screens';
@@ -125,6 +125,8 @@ function SessionRunner({ blocks: planned, onClose }: { blocks: Block[]; onClose:
   const marked = useRef(false);
   const before = useRef(useGuitar.getState());
   const blockStarted = useRef(performance.now());
+  // Each part is closed once. A second call for the same part, from a timer and a tap together, is ignored.
+  const closed = useRef(false);
   const [summary, setSummary] = useState<{ rows: Array<[string, string]>; next: string | null } | null>(null);
 
   useEffect(() => {
@@ -138,10 +140,13 @@ function SessionRunner({ blocks: planned, onClose }: { blocks: Block[]; onClose:
 
   const start = useCallback(() => {
     blockStarted.current = performance.now();
+    closed.current = false;
     setBetween(false);
   }, []);
 
   const afterBlock = useCallback(() => {
+    if (closed.current) return;
+    closed.current = true;
     // A lesson closed part way is not finished. The session stays on it, so it can be picked up again or the session stopped.
     const block = blocks[index];
     const state = useGuitar.getState();
@@ -225,7 +230,8 @@ export default function App() {
   const bigText = useGuitar((s) => s.settings.bigText);
   const reminder = useGuitar((s) => s.settings.reminder);
   const playAt = useGuitar((s) => s.profile.playAt);
-  const playedToday = useGuitar((s) => (s.days[dayKey()]?.seconds ?? 0) >= 60);
+  const today = useToday();
+  const playedToday = useGuitar((s) => (s.days[today]?.seconds ?? 0) >= 60);
   const [view, setView] = useState<View>('today');
   const [activity, setActivity] = useState<Activity | null>(null);
   useApplySettings();
@@ -263,7 +269,12 @@ export default function App() {
   // The reminder at the time to play is set again whenever it could have
   // changed, so it never comes on a day that has been played already.
   useEffect(() => {
-    if (!isNative() || !onboarded || !playAt) return;
+    if (!isNative() || !onboarded) return;
+    // With no time to play there is nothing to remind at, so any reminders set before are taken off.
+    if (!playAt) {
+      setReminder(false, 0, 0, playedToday, REMINDER);
+      return;
+    }
     const [h, m] = playAt.split(':').map(Number);
     setReminder(reminder, h, m, playedToday, REMINDER);
   }, [onboarded, playAt, playedToday, reminder]);

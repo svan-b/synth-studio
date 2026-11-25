@@ -15,7 +15,7 @@ import { exportTake, loadTake, playTake } from '@/lib/guitar/learn/takes';
 import { isNative, onVolume, setReminder, shareFile } from '@/lib/guitar/native/bridge';
 import { parseScore } from '@/lib/guitar/music/score';
 import { dayKey } from '@/lib/guitar/util/emitter';
-import { useListening } from './hooks';
+import { useListening, useToday } from './hooks';
 import Tuner from './Tuner';
 import { Button, Card, Icon, Pill, ProgressBar, Ring, Segmented, Toggle } from './ui';
 
@@ -70,6 +70,7 @@ function timeWords(hhmm: string | null): string | null {
 // ---------------------------------------------------------------------- today
 
 export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void; onGo: (v: View) => void }) {
+  const today = useToday();
   const profile = useGuitar((s) => s.profile);
   const lessons = useGuitar((s) => s.lessons);
   const songs = useGuitar((s) => s.songs);
@@ -77,9 +78,12 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   const days = useGuitar((s) => s.days);
   const drills = useGuitar((s) => s.drills);
   const sessionDoneOn = useGuitar((s) => s.sessionDoneOn);
-  const today = dayKey();
   const doneToday = sessionDoneOn === today;
-  const day = useMemo(() => planDay({ minutes: profile.minutes, lessons, songs, cards, days, drills, again: doneToday }), [profile.minutes, lessons, songs, cards, days, drills, doneToday]);
+  // The plan is made again when the day changes, as when the iPad has sat overnight with the app open.
+  const day = useMemo(
+    () => planDay({ minutes: profile.minutes, lessons, songs, cards, days, drills, again: doneToday, now: new Date(today + 'T12:00:00') }),
+    [profile.minutes, lessons, songs, cards, days, drills, doneToday, today],
+  );
   const plan = day.blocks;
   const minutesToday = Math.round((days[today]?.seconds ?? 0) / 60);
   const week = daysThisWeek(days);
@@ -637,18 +641,34 @@ export function SoundCheck() {
 }
 
 /** Strum along with clicks, and find how far behind the microphone hears it. */
-function TimingCheck({ onDone }: { onDone: (biasMs: number | null) => void }) {
+type TimingOutcome = { biasMs: number } | { problem: 'too-few' | 'early' };
+
+/**
+ * Strum along with clicks, and find how far behind the microphone hears it.
+ * The run hears with no allowance at all, so what it finds is the whole delay.
+ */
+function TimingCheck({ onDone }: { onDone: (outcome: TimingOutcome) => void }) {
   const { status, start } = useListening(true);
   const [state, setState] = useState<'idle' | 'running'>('idle');
+  const follower = useRef<Follower | null>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  useEffect(() => () => follower.current?.stop(), []);
   const go = () => {
     void guitar.unlock();
+    follower.current?.stop();
     setState('running');
     const score = parseScore({ chart: 'Em | Em | Em', strum: 'D.D.D.D.', tempo: 80 });
     const f = new Follower(score, { mode: 'tempo', anyStrike: true, inputDelay: 0, metronome: true });
+    follower.current = f;
     f.events.subscribe((ev) => {
-      if (ev.type === 'done') {
+      if (ev.type === 'false-start') {
+        // Strummed during the four clicks that count in. The run has stopped itself.
         setState('idle');
-        onDone(ev.result.totalSteps - ev.result.missedSteps >= 6 ? ev.result.biasMs : null);
+        onDoneRef.current({ problem: 'early' });
+      } else if (ev.type === 'done') {
+        setState('idle');
+        onDoneRef.current(ev.result.totalSteps - ev.result.missedSteps >= 6 ? { biasMs: ev.result.biasMs } : { problem: 'too-few' });
       }
     });
     f.start();
@@ -661,7 +681,7 @@ function TimingCheck({ onDone }: { onDone: (biasMs: number | null) => void }) {
     );
   return (
     <Button size="sm" variant="soft" disabled={state === 'running'} onClick={go}>
-      {state === 'running' ? 'Strum with each click' : 'Run the timing check'}
+      {state === 'running' ? 'Four clicks, then strum' : 'Run the timing check'}
     </Button>
   );
 }
@@ -720,7 +740,11 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
             onChange={(e) => {
               const v = e.target.value || null;
               setProfile({ playAt: v });
-              if (settings.reminder) applyReminder(true, v);
+              // With no time to play there is nothing to remind at, so the reminders set already are taken off.
+              if (settings.reminder) {
+                if (v) applyReminder(true, v);
+                else setReminder(false, 0, 0, false, '');
+              }
             }}
             className="h-12 rounded-2xl border border-os-line bg-os-bg px-3 text-[1.1rem]"
           />
@@ -751,16 +775,21 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
         <Row title="Sound check" text="The app plays, then you strum, and it tells you whether the iPad is loud enough beside your guitar.">
           <SoundCheck />
         </Row>
-        <Row title="Timing check" text={timing ?? 'Strum along with the clicks, and the app allows for any delay in hearing you.'}>
+        <Row title="Timing check" text={timing ?? 'Four clicks count in, then strum once on each click. The app allows for any delay in hearing you.'}>
           <TimingCheck
-            onDone={(bias) => {
-              if (bias === null) {
-                setTiming('Not enough strums were heard. Try again, strumming once on each click.');
+            onDone={(outcome) => {
+              if ('problem' in outcome) {
+                setTiming(
+                  outcome.problem === 'early'
+                    ? 'That began during the four clicks that count in. Try again, and start strumming on the fifth click.'
+                    : 'Not enough strums were heard. Try again, strumming once on each click.',
+                );
                 return;
               }
-              const latency = Math.round(Math.max(-150, Math.min(250, settings.latencyMs + bias)));
+              // The run heard with no allowance, so it found the whole delay. Every run hears with 60 milliseconds already allowed, so the setting is what is left.
+              const latency = Math.round(Math.max(-150, Math.min(250, outcome.biasMs - 60)));
               setSettings({ latencyMs: latency });
-              setTiming(`Done. The app now allows ${latency} milliseconds for hearing you.`);
+              setTiming(`Done. The app now allows for a delay of ${latency + 60} milliseconds in hearing you.`);
             }}
           />
         </Row>

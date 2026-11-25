@@ -5,6 +5,7 @@
  */
 
 import { Rating, createEmptyCard, fsrs, generatorParameters, type Card, type Grade } from 'ts-fsrs';
+import { dayKey } from '../util/emitter';
 
 export interface StoredCard {
   due: string;
@@ -68,9 +69,14 @@ export function review(card: StoredCard | undefined, outcome: Outcome, now: Date
   return store(scheduler.next(current, now, RATING[outcome]).card);
 }
 
+/**
+ * Due on its day, whatever the time. Intervals are whole days from the time
+ * of the last review, so a card reviewed in the evening would otherwise not
+ * come back until that evening, and slip a day when the next session is earlier.
+ */
 export function isDue(card: StoredCard | undefined, now: Date = new Date()): boolean {
   if (!card) return false;
-  return new Date(card.due).getTime() <= now.getTime();
+  return dayKey(new Date(card.due)) <= dayKey(now);
 }
 
 /** Days until the card is due, negative when overdue. */

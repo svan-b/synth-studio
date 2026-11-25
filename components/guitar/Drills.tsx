@@ -276,6 +276,8 @@ function RecallDrill({ onClose }: { onClose: () => void }) {
   const [done, setDone] = useState(false);
   const { status, start } = useListening(true);
   const t0 = useRef(performance.now());
+  // Looking at the picture before playing is help, and the chord comes back sooner for it.
+  const peeked = useRef(false);
   useWakeLock(true);
   const chord = queue[i];
   const score = useMemo(() => (chord ? parseScore({ line: `[${chord}]w`, tempo: 60 }) : null), [chord]);
@@ -284,6 +286,7 @@ function RecallDrill({ onClose }: { onClose: () => void }) {
     setShown(false);
     setNote(null);
     t0.current = performance.now();
+    peeked.current = false;
     let wrong = 0;
     const f = new Follower(score, { mode: 'wait', hintDelayMs: 7000, hintAfterWrong: 2, confusers: known });
     const off = f.events.subscribe((ev) => {
@@ -298,8 +301,9 @@ function RecallDrill({ onClose }: { onClose: () => void }) {
       }
       if (ev.type === 'done') {
         const seconds = (performance.now() - t0.current) / 1000;
-        const clean = wrong === 0 && !ev.result.hintedSteps;
-        reviewCard(`chord:${chord}`, ev.result.hintedSteps > 0 ? 'again' : outcomeFromAnswer(clean, seconds, 4, 10));
+        const helped = ev.result.hintedSteps > 0 || peeked.current;
+        const clean = wrong === 0 && !helped;
+        reviewCard(`chord:${chord}`, helped ? 'again' : outcomeFromAnswer(clean, seconds, 4, 10));
         recordDrill('recall', clean);
         instrument.chime();
         setNote(clean ? (seconds < 4 ? 'Quick and clean.' : 'Right.') : 'Got it.');
@@ -339,7 +343,13 @@ function RecallDrill({ onClose }: { onClose: () => void }) {
           {shown ? (
             <ChordDiagram chord={chord} width={200} name={false} />
           ) : (
-            <Button variant="ghost" onClick={() => setShown(true)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                peeked.current = true;
+                setShown(true);
+              }}
+            >
               Show me
             </Button>
           )}

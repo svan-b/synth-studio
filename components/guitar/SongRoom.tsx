@@ -82,6 +82,9 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warned = useRef(false);
   const latestTake = useRef<Blob | null>(null);
+  // The run each recording belongs to, so a take from an earlier run is never heard or kept for a later one.
+  const takeRun = useRef(-1);
+  const runRef = useRef(0);
 
   useWakeLock(true);
   usePracticeTimer((seconds) => logPractice(seconds, played.current, 1));
@@ -92,6 +95,8 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
     },
     [],
   );
+
+  runRef.current = run;
 
   const task: Task | null = useMemo(() => nextTask(info, state), [info, state]);
   const trial = !free && task?.scope.type === 'trial';
@@ -207,7 +212,7 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
       if (state.learned) reviewCard(`song:${songId}`, outcomeFromAccuracy(result.accuracy, result.clean));
       const stats = task.scope.type === 'trial' && result.cutShort ? '' : statsLine(result);
       setVerdict({ v: out.verdict, stats });
-      const blob = latestTake.current;
+      const blob = takeRun.current === runRef.current ? latestTake.current : null;
       if (out.verdict.learned) {
         addCards([`song:${songId}`]);
         reviewCard(`song:${songId}`, 'good');
@@ -253,7 +258,8 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
         setRun((r) => r + 1);
         return;
       }
-      setTake(result?.mode === 'tempo' ? latestTake.current : null);
+      // This run's recording arrives a moment after the run ends, through onTake.
+      setTake(result?.mode === 'tempo' && takeRun.current === runRef.current ? latestTake.current : null);
       if (free) {
         if (result) {
           played.current += result.totalSteps;
@@ -291,7 +297,8 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
 
   const onTake = useCallback((blob: Blob) => {
     latestTake.current = blob;
-    if (stageRef.current === 'verdict') setTake(blob);
+    takeRun.current = runRef.current;
+    if (stageRef.current === 'verdict' || stageRef.current === 'reflect') setTake(blob);
   }, []);
 
   const teachFromStart = useCallback(() => {
