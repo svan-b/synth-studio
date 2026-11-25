@@ -103,9 +103,10 @@ export function onSound(fn: (info: SoundInfo | null) => void): () => void {
   soundListeners.add(fn);
   if (app) {
     app.onSound = (info) => soundListeners.forEach((f) => f(info));
-    fn(soundInfo());
-    // Ask, in case the app spoke before the page was ready to listen.
-    post({ type: 'sound.ask' });
+    const known = soundInfo();
+    fn(known);
+    // Ask once, in case the app spoke before the page was ready to listen.
+    if (!known) post({ type: 'sound.ask' });
   }
   return () => {
     soundListeners.delete(fn);

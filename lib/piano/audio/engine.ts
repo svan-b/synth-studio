@@ -48,6 +48,15 @@ type AnyAudioContext = AudioContext;
  */
 const PIANO_GAIN = 2.2;
 
+/**
+ * The level of the click for a volume setting, 0 to 1. The click has to be
+ * heard over a piano from an iPad's speaker, so it is given most of what the
+ * speaker can carry from the middle of the slider up, and never enough to clip.
+ */
+function clickGain(volume: number): number {
+  return Math.sqrt(clamp(volume, 0, 1)) * 1.3;
+}
+
 function getContextCtor(): typeof AudioContext | undefined {
   if (typeof window === 'undefined') return undefined;
   return window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -191,7 +200,7 @@ class PianoEngine {
     this.pianoBus = ctx.createGain();
     this.pianoBus.gain.value = this.pianoVolume * PIANO_GAIN;
     this.clickBus = ctx.createGain();
-    this.clickBus.gain.value = this.clickVolume;
+    this.clickBus.gain.value = clickGain(this.clickVolume);
     this.pianoBus.connect(comp);
     comp.connect(this.master);
     this.clickBus.connect(this.master);
@@ -205,7 +214,7 @@ class PianoEngine {
 
   setClickVolume(v: number): void {
     this.clickVolume = clamp(v, 0, 1);
-    if (this.clickBus && this.ctx) this.clickBus.gain.setTargetAtTime(this.clickVolume, this.ctx.currentTime, 0.02);
+    if (this.clickBus && this.ctx) this.clickBus.gain.setTargetAtTime(clickGain(this.clickVolume), this.ctx.currentTime, 0.02);
   }
 
   load(): Promise<void> {
