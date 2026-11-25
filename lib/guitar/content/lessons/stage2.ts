@@ -46,7 +46,7 @@ export const STAGE2: Lesson[] = [
       },
       {
         kind: 'play',
-        text: 'Now down and up: two strums for every click. Keep the up strums light, just the thinner strings.',
+        text: 'Now down and up, two strums for every click. Keep the up strums light, just the thinner strings.',
         music: { line: '[Em]e [Em]eu [Em]e [Em]eu [Em]e [Em]eu [Em]e [Em]eu | [Em]e [Em]eu [Em]e [Em]eu [Em]e [Em]eu [Em]e [Em]eu', tempo: 60 },
         display: 'chart',
         mode: 'tempo',
@@ -54,7 +54,7 @@ export const STAGE2: Lesson[] = [
       },
       {
         kind: 'play',
-        text: 'Now with changes: a bar of A, a bar of D, four down strums each. Change on the first beat, and keep the hand going through it.',
+        text: 'Now with changes. A bar of A, a bar of D, four down strums each. Change on the first beat, and keep the hand going through it.',
         music: { chart: 'A | D | A | D', strum: 'D.D.D.D.', tempo: 70 },
         display: 'chart',
         mode: 'tempo',
@@ -90,7 +90,7 @@ export const STAGE2: Lesson[] = [
       },
       {
         kind: 'play',
-        text: 'Your turn, on E minor. Say it out loud if it helps: down, down up, up down up.',
+        text: 'Your turn, on E minor. Say it out loud if it helps. Down, down up, up down up.',
         music: { chart: 'Em | Em | Em | Em', strum: 'D.DU.UDU', tempo: 66 },
         display: 'chart',
         mode: 'tempo',
@@ -124,7 +124,7 @@ export const STAGE2: Lesson[] = [
     id: 'waltz-time',
     stage: 2,
     title: 'Waltz time',
-    summary: 'Boom chick chick: a bass note and two strums.',
+    summary: 'Boom chick chick, a bass note and two strums.',
     minutes: 10,
     songs: ['amazing-grace'],
     steps: [
@@ -137,7 +137,7 @@ export const STAGE2: Lesson[] = [
       {
         kind: 'say',
         title: 'Which string is the boom',
-        text: 'The boom is the chord\'s own note in the bass: the **A string** for A, the **D string** for D, the **low E string** for E7 and E minor.',
+        text: 'The boom is the chord\'s own note in the bass. That is the **A string** for A, the **D string** for D, and the **low E string** for E7 and E minor.',
         figure: { kind: 'chords', chords: ['A', 'D', 'E7'] },
       },
       {
@@ -148,7 +148,7 @@ export const STAGE2: Lesson[] = [
       },
       {
         kind: 'play',
-        text: 'Your turn: boom chick chick, A for two bars, D for one, A again.',
+        text: 'Your turn. Boom chick chick, A for two bars, D for one, then A again.',
         music: { chart: 'A | A | D | A', strum: 'B.D.D.', time: [3, 4], tempo: 84 },
         display: 'chart',
         mode: 'tempo',

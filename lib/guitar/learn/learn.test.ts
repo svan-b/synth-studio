@@ -116,10 +116,14 @@ describe('the coach', () => {
 describe('the daily plan', () => {
   const day = (d: string) => new Date(`${d}T10:00:00`);
 
-  it('tunes first, and gives the first day two lessons so it ends with a chord', () => {
+  it('gives the first day two lessons so it ends with a chord, and tunes first every day after', () => {
     const plan = planDay({ minutes: 15, lessons: {}, songs: {}, cards: {}, now: day('2026-12-01') });
-    expect(plan.blocks[0].kind).toBe('tune');
+    // The first lesson teaches tuning, so the first day has no separate tune up.
+    expect(plan.blocks.some((b) => b.kind === 'tune')).toBe(false);
     expect(plan.blocks.filter((b) => b.kind === 'lesson').map((b) => b.id)).toEqual(lessonOrder().slice(0, 2));
+    const first = lessonOrder()[0];
+    const next = planDay({ minutes: 15, lessons: { [first]: { done: true, doneOn: '2026-12-01', step: 0 } }, songs: {}, cards: {}, days: { '2026-12-01': {} }, now: day('2026-12-02') });
+    expect(next.blocks[0].kind).toBe('tune');
   });
 
   it('holds the next lesson while two songs are still being learned', () => {

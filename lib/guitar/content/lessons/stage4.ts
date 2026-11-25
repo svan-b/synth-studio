@@ -156,7 +156,7 @@ export const STAGE4: Lesson[] = [
       },
       {
         kind: 'play',
-        text: 'Warm up: these notes from the tune.',
+        text: 'Warm up with these notes from the tune.',
         music: { line: 'E3q:2 F#3q:4 A3q:2 B3q | C#4h:2 B3h', time: [4, 4] },
         display: 'tab',
         hints: 'always',

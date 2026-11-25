@@ -35,7 +35,7 @@ export const PRINCIPLES: Principle[] = [
   },
   {
     title: 'Practise the change, not just the chord',
-    what: 'Most beginners can hold a chord. What stops a song is getting from one chord to the next in time. So the change itself is practised: back and forth, and a minute at a time, counting the clean ones. When a song keeps catching on one change, the coach takes that change out, drills it, and puts it back. Pairs of chords are mixed, not drilled one pair for a long time.',
+    what: 'Most beginners can hold a chord. What stops a song is getting from one chord to the next in time. So the change itself is practised, back and forth and a minute at a time, counting the clean ones. When a song keeps catching on one change, the coach takes that change out, drills it, and puts it back. Pairs of chords are mixed, not drilled one pair for a long time.',
     evidence:
       'Studies of practice order in music found that mixing what is practised felt worse at the time but was better later. Beginning clarinettists who practised in mixed order played faster at a retention test, and pianists who mixed melodies were faster two days later while believing the opposite. These are small studies on other instruments. No study has tested guitar chord changes, so the minute of changes is a teaching tradition built on that idea.',
     strength: 'limited',
@@ -49,13 +49,13 @@ export const PRINCIPLES: Principle[] = [
     title: 'Practise what you cannot yet play',
     what: 'The first time you open a song you play it through once. Lines you already have are not drilled again, and a clean run moves you on without a repeat.',
     evidence:
-      'Accounts of how experts practise put the work on what cannot yet be done, and in the pianist study above neither time nor repetitions predicted the result. Across many studies, hours of this kind of practice explain about a fifth of the differences between musicians: a great deal, but not everything.',
+      'Accounts of how experts practise put the work on what cannot yet be done, and in the pianist study above neither time nor repetitions predicted the result. Across many studies, hours of this kind of practice explain about a fifth of the differences between musicians. That is a great deal, but not everything.',
     strength: 'limited',
     sources: ['Ericsson, Krampe and Tesch-Römer, 1993, Psychological Review', 'Macnamara, Hambrick and Oswald, 2014, Psychological Science', 'Duke, Simmons and Cash, 2009'],
   },
   {
     title: 'Take trouble spots out and fix them',
-    what: 'After a run the coach says where it went wrong and, when the playing shows it, why: a late change, strums rushing ahead, a string that did not ring. The trouble spot is practised on its own, then put back.',
+    what: 'After a run the coach says where it went wrong and, when the playing shows it, why, such as a late change, strums rushing ahead, or a string that did not ring. The trouble spot is practised on its own, then put back.',
     evidence: 'The best practisers in the pianist study stopped at errors, found exactly where they came from, and repeated the spot until it was right. Beginners left alone mostly play pieces straight through.',
     strength: 'moderate',
     sources: ['Duke, Simmons and Cash, 2009', 'McPherson and Renwick, 2001, Music Education Research'],
@@ -84,7 +84,7 @@ export const PRINCIPLES: Principle[] = [
     title: 'A time and a place to play',
     what: 'When you start, you choose a time of day to play, and the iPad app can remind you then. Keeping the guitar out on a stand, where you see it, makes picking it up the easy thing to do.',
     evidence:
-      'A plan of the form "when it is this time, I will do this" helps people follow through. A review of 642 tests found the effect real but small, smaller once bias in the published studies is allowed for. Habits form with repetition in the same setting: in one study they took 66 days on average to become automatic, from 18 days to 254.',
+      'A plan of the form "when it is this time, I will do this" helps people follow through. A review of 642 tests found the effect real but small, smaller once bias in the published studies is allowed for. Habits form with repetition in the same setting. In one study they took 66 days on average to become automatic, from 18 days to 254.',
     strength: 'moderate',
     sources: [
       'Gollwitzer, 1999, American Psychologist',
@@ -110,7 +110,7 @@ export const PRINCIPLES: Principle[] = [
   },
   {
     title: 'See your progress',
-    what: 'The Progress page keeps what you have done: songs learned, your best minute of changes for each pair of chords, the days you played, and recordings of you playing.',
+    what: 'The Progress page keeps what you have done, with songs learned, your best minute of changes for each pair of chords, the days you played, and recordings of you playing.',
     evidence: 'A review of 138 experiments found that keeping track of progress helps people reach their goals, more so when the progress is recorded rather than just noticed.',
     strength: 'strong',
     sources: ['Harkin and colleagues, 2016, Psychological Bulletin'],
@@ -160,7 +160,7 @@ export const PRINCIPLES: Principle[] = [
   },
   {
     title: 'Never too late',
-    what: 'The course is paced for a grown up beginner: plain words, short sessions, and no hurry.',
+    what: 'The course is paced for a grown up beginner, with plain words, short sessions, and no hurry.',
     evidence:
       'Adults starting an instrument in later life make real progress. In one trial, people of 60 to 85 with no training improved after six months of piano lessons. In two recent studies, beginners in their sixties and seventies made measurable gains within a year, and kept them. None of these studies were of guitar.',
     strength: 'moderate',

@@ -35,7 +35,7 @@ export const STAGE1: Lesson[] = [
       {
         kind: 'say',
         title: 'Six strings, two ways to name them',
-        text: 'Strings are **numbered from 1 to 6**. String 1 is the thinnest, nearest the floor. String 6 is the thickest, nearest your face.\n\nThey are also called by the note each one plays: from the thickest, **E A D G B E**. An old way to remember it: **E**ddie **A**te **D**ynamite, **G**ood **B**ye **E**ddie.',
+        text: 'Strings are **numbered from 1 to 6**. String 1 is the thinnest, nearest the floor. String 6 is the thickest, nearest your face.\n\nThey are also called by the note each one plays. From the thickest they are **E A D G B E**. An old way to remember it is **E**ddie **A**te **D**ynamite, **G**ood **B**ye **E**ddie.',
         figure: { kind: 'strings' },
       },
       {
@@ -110,7 +110,7 @@ export const STAGE1: Lesson[] = [
       },
       {
         kind: 'listen',
-        text: 'Here is your first piece, **First Light**. The app plays the tune. The strumming will be yours: one down strum of E minor on each beat.',
+        text: 'Here is your first piece, **First Light**. The app plays the tune. The strumming will be yours, one down strum of E minor on each beat.',
         music: { song: 'first-light' },
         display: 'chart',
       },
@@ -141,7 +141,7 @@ export const STAGE1: Lesson[] = [
       {
         kind: 'say',
         title: 'One finger makes it major',
-        text: 'Hold E minor. Now add your **first finger** on the G string at the first fret. That is **E**.\n\nOne finger turns a minor chord into a major one. Listen to the difference: minor sounds thoughtful, major sounds bright.',
+        text: 'Hold E minor. Now add your **first finger** on the G string at the first fret. That is **E**.\n\nOne finger turns a minor chord into a major one. Listen to the difference. Minor sounds thoughtful, and major sounds bright.',
         figure: { kind: 'chords', chords: ['Em', 'E'] },
       },
       {
@@ -186,7 +186,7 @@ export const STAGE1: Lesson[] = [
         choices: ['E minor', 'E'],
         answer: 1,
         hear: { line: '[E]w', tempo: 60 },
-        explain: 'Bright and open: E, the major chord.',
+        explain: 'Bright and open. That was E, the major chord.',
       },
       {
         kind: 'quiz',
@@ -194,7 +194,7 @@ export const STAGE1: Lesson[] = [
         choices: ['E minor', 'E'],
         answer: 0,
         hear: { line: '[Em]w', tempo: 60 },
-        explain: 'Darker and more thoughtful: E minor.',
+        explain: 'Darker and more thoughtful. That was E minor.',
       },
     ],
   },
@@ -210,7 +210,7 @@ export const STAGE1: Lesson[] = [
       {
         kind: 'say',
         title: 'The A chord',
-        text: 'Three fingers side by side on the **second fret**: the first finger on the D string, the second on the G string, the third on the B string. The thin E string rings open under them.\n\nLeave out the thick low E string: start your strum on the A string.\n\nIt feels crowded at first. Tuck the fingers close behind the fret and angle them a little.',
+        text: 'Three fingers side by side on the **second fret**. The first finger goes on the D string, the second on the G string, the third on the B string. The thin E string rings open under them.\n\nLeave out the thick low E string, and start your strum on the A string.\n\nIt feels crowded at first. Tuck the fingers close behind the fret and angle them a little.',
         figure: { kind: 'chord', chord: 'A' },
       },
       {
@@ -252,7 +252,7 @@ export const STAGE1: Lesson[] = [
       },
       {
         kind: 'play',
-        text: 'Now with a slow beat: one strum on each click. Keep strumming even if a change is not quite ready.',
+        text: 'Now with a slow beat, one strum on each click. Keep strumming even if a change is not quite ready.',
         music: { song: 'skip-to-my-lou', from: 1, to: 8 },
         display: 'chart',
         mode: 'tempo',
@@ -277,12 +277,12 @@ export const STAGE1: Lesson[] = [
       {
         kind: 'say',
         title: 'The D chord',
-        text: 'A small triangle on the three thinnest strings: the **first finger** on the G string at the second fret, the **third finger** on the B string at the third fret, the **second finger** on the high E string at the second fret.\n\nStrum only from the **D string** down. The two thickest strings stay quiet.',
+        text: 'A small triangle on the three thinnest strings. The **first finger** goes on the G string at the second fret, the **third finger** on the B string at the third fret, the **second finger** on the high E string at the second fret.\n\nStrum only from the **D string** down. The two thickest strings stay quiet.',
         figure: { kind: 'chord', chord: 'D' },
       },
       {
         kind: 'strings',
-        text: 'Pick the four strings of D on their own, from the D string down. The thin E string is the one most often muted: arch your fingers to keep it clear.',
+        text: 'Pick the four strings of D on their own, from the D string down. The thin E string is the one most often muted, so arch your fingers to keep it clear.',
         chord: 'D',
       },
       {

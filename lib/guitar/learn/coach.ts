@@ -221,10 +221,10 @@ export function nextTask(info: SongInfo, state: SongState): Task | null {
         prompt = strum ? 'Listen first, and follow the chords with your eyes. Sing along if you like.' : 'Listen first, and follow the notes with your eyes. Hum along if you like.';
       } else if (rung.mode === 'wait') {
         title = strum ? `${label}, the chord changes` : `${label}, the notes`;
-        prompt = strum ? 'Strum each new chord once. Take all the time you need to find the shape: the music waits.' : 'In your own time. The music waits for you.';
+        prompt = strum ? 'Strum each new chord once. Take all the time you need to find the shape. The music waits.' : 'In your own time. The music waits for you.';
       } else if (rung.simple) {
         title = `${label}, one strum a beat`;
-        prompt = 'With a slow beat now: one down strum on each click. Keep strumming even if a chord is not quite there yet.';
+        prompt = 'With a slow beat now, one down strum on each click. Keep strumming even if a chord is not quite there yet.';
       } else {
         title = `${label}, with the beat`;
         prompt = strum ? 'Now the song\'s own strum, at an easy pace. Keep your hand moving through the changes.' : 'With the beat now, at an easy pace. Keep going even if a note slips.';

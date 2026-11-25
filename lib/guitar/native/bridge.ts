@@ -64,18 +64,22 @@ export function onWake(fn: () => void): void {
   if (app) app.wake = fn;
 }
 
-/** Follow the iPad's output volume, when the app can tell. */
+const volumeListeners = new Set<(v: number) => void>();
+
+/** Follow the iPad's output volume, when the app can tell. Returns a function that stops following it. */
 export function onVolume(fn: (v: number) => void): () => void {
   const app = shell();
   if (!app) return () => undefined;
+  volumeListeners.add(fn);
   app.volume = (v: number) => {
     app.lastVolume = v;
-    fn(v);
+    volumeListeners.forEach((listener) => listener(v));
   };
   if (typeof app.lastVolume === 'number') fn(app.lastVolume);
+  // Each request also brings a fresh reading.
   post({ type: 'volume.watch' });
   return () => {
-    if (app.volume) app.volume = undefined;
+    volumeListeners.delete(fn);
   };
 }
 

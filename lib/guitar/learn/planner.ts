@@ -198,8 +198,9 @@ export function planDay(input: PlanInput): { blocks: Block[]; upNext: string | u
     song2 = { kind: 'song', id: otherId, minutes: 5, title: getSong(otherId).title, detail: p === 0 ? 'Start learning this song' : `Carry on, ${Math.round(p * 100)} percent learned` };
   }
 
-  const blocks: Block[] = [tune];
-  let total = tune.minutes;
+  // The very first lesson teaches tuning itself, so the first day starts with it instead.
+  const blocks: Block[] = isDone(order[0]) ? [tune] : [];
+  let total = blocks.length > 0 ? tune.minutes : 0;
   const add = (b: Block | null) => {
     if (!b) return;
     if (total + b.minutes > budget + OVER) return;

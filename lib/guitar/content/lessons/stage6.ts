@@ -17,7 +17,7 @@ export const STAGE6: Lesson[] = [
       {
         kind: 'say',
         title: 'A small barre',
-        text: 'For F, the **first finger lies flat** across the B and high E strings at the first fret. The second finger goes on the G string at the second fret, the third on the D string at the third fret. Strum the top four strings.\n\nRoll the first finger slightly onto its side: the bony edge presses better than the soft middle.',
+        text: 'For F, the **first finger lies flat** across the B and high E strings at the first fret. The second finger goes on the G string at the second fret, the third on the D string at the third fret. Strum the top four strings.\n\nRoll the first finger slightly onto its side, since the bony edge presses better than the soft middle.',
         figure: { kind: 'chord', chord: 'F', variant: 'small' },
       },
       {
@@ -99,7 +99,7 @@ export const STAGE6: Lesson[] = [
     id: 'by-ear',
     stage: 6,
     title: 'Chords by ear',
-    summary: 'One, four and five: finding the chords of a song yourself.',
+    summary: 'One, four and five, and finding the chords of a song yourself.',
     minutes: 10,
     steps: [
       {
@@ -161,7 +161,7 @@ export const STAGE6: Lesson[] = [
       {
         kind: 'say',
         title: 'Keep going',
-        text: 'You have come all the way through the course. From here, the best teacher is the music you love: keep your songs in your fingers, add new ones, and play for the people around you.',
+        text: 'You have come all the way through the course. From here, the best teacher is the music you love. Keep your songs in your fingers, add new ones, and play for the people around you.',
       },
     ],
   },

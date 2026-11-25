@@ -5,7 +5,7 @@
  *
  * The recordings are not stored in the repository. To run this file, unpack
  * audio_mono-mic.zip into <dir>/audio, convert the annotations with
- * convert_guitarset.py (see docs/GUITAR.md) to <dir>/notes.json, then:
+ * scripts/convert_guitarset.py (see docs/GUITAR.md) to <dir>/notes.json, then:
  *
  *   GUITARSET_DIR=/path/to/guitarset npx vitest run lib/guitar/dsp/tracker.eval.test.ts
  *
@@ -241,6 +241,8 @@ run('the guitar tracker on GuitarSet recordings', () => {
       const truth: number[] = [];
       let passed = 0;
       let wrongPassed = 0;
+      // A chord and the same chord with a seventh added, such as A and A7.
+      const seventh = { plain: 0, plainHeardAsSeventh: 0, sevenths: 0, seventhCaught: 0 };
       const alts: number[][] = [[], [], [], []];
       const covT: number[] = [];
       for (const f of loaded) {
@@ -261,6 +263,21 @@ run('the guitar tracker on GuitarSet recordings', () => {
             const rest = [{ symbol: 'right', pcs }, ...others.filter((_, j) => j !== i)];
             if (judgeChord(hit.chroma, o.pcs, rest).ok) wrongPassed++;
           });
+          // Major and minor triads, and the same with a minor seventh: is a plain chord heard as its seventh, and is a real seventh caught?
+          const root = pitchClass(Math.min(...g.map((n) => n[1])));
+          const has = (iv: number) => pcs.includes(pitchClass(root + iv));
+          const third = has(4) ? 4 : has(3) ? 3 : 0;
+          if (third && has(7)) {
+            const triad = [root, pitchClass(root + third), pitchClass(root + 7)];
+            const withSeventh = [...triad, pitchClass(root + 10)];
+            if (pcs.length === 3) {
+              seventh.plain++;
+              if (judgeChord(hit.chroma, triad, [{ symbol: '7', pcs: withSeventh }]).heard === '7') seventh.plainHeardAsSeventh++;
+            } else if (pcs.length === 4 && has(10)) {
+              seventh.sevenths++;
+              if (judgeChord(hit.chroma, triad, [{ symbol: '7', pcs: withSeventh }]).heard === '7') seventh.seventhCaught++;
+            }
+          }
         }
       }
       const rate = (xs: number[], th: number) => xs.filter((x) => x >= th).length / Math.max(1, xs.length);
@@ -268,6 +285,9 @@ run('the guitar tracker on GuitarSet recordings', () => {
       const versus = truth.filter((t, i) => alts.every((a) => t > a[i])).length / Math.max(1, truth.length);
       console.log(`RULE ${label}: right chord passes ${(passed / Math.max(1, truth.length)).toFixed(3)}, wrong chord passes ${(wrongPassed / Math.max(1, 4 * truth.length)).toFixed(3)}`);
       console.log(`CHORDS ${label} (n=${truth.length}) right beats every wrong ${versus.toFixed(3)} | ${rows.join(' | ')} | coverage full ${(covT.filter((c) => c >= 0.99).length / Math.max(1, covT.length)).toFixed(2)}`);
+      console.log(
+        `SEVENTHS ${label}: plain chords heard as their seventh ${seventh.plainHeardAsSeventh} of ${seventh.plain}, sevenths caught when the plain chord was asked for ${seventh.seventhCaught} of ${seventh.sevenths}`,
+      );
     }
   }, 900000);
 

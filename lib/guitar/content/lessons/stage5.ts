@@ -67,7 +67,7 @@ export const STAGE5: Lesson[] = [
       {
         kind: 'say',
         title: 'An easy F',
-        text: '**Fmaj7** stands in for F until F itself comes later: the third finger on the D string at the third fret, the second finger on the G string at the second fret, the first finger on the B string at the first fret. The high E rings open.',
+        text: '**Fmaj7** stands in for F until F itself comes later. The third finger goes on the D string at the third fret, the second finger on the G string at the second fret, the first finger on the B string at the first fret. The high E rings open.',
         figure: { kind: 'chord', chord: 'Fmaj7' },
       },
       {

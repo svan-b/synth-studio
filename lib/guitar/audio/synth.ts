@@ -28,6 +28,17 @@ export interface PluckOptions {
   seed?: number;
   /** Tuning offset in cents. */
   detune?: number;
+  /** How much of the pluck is the snap of the pick letting go, 0 to 1. Defaults to what the string's register shows in recordings. */
+  snap?: number;
+}
+
+/**
+ * How bright a pick sounds on each string. Measured on GuitarSet, the low
+ * strings of an acoustic guitar show their second and third harmonics about
+ * as strong as the fundamental, and the plain top strings far less so.
+ */
+export function snapFor(midi: number): number {
+  return Math.max(0.15, Math.min(0.55, 0.55 - 0.025 * (midi - 40)));
 }
 
 /** How long a note rings on an acoustic guitar, from long on the bass strings to short at the top. */
@@ -66,15 +77,33 @@ export function pluck(midi: number, sampleRate: number, opts: PluckOptions = {})
   // The pluck. A string pulled aside at one point and let go starts as a
   // triangle, with its corner where the pick was. That shape gives the
   // harmonics a natural fall in strength, and leaves out those with a node at
-  // the pick. A softer touch rounds the corner, which darkens the tone. A
-  // little noise gives each pluck its own small character.
+  // the pick. A pick also lets go with a snap, which adds a step at the same
+  // point, whose harmonics fall away more slowly. The wound bass strings
+  // show it most. A softer touch rounds the corner, which darkens the tone.
+  // A little noise gives each pluck its own small character.
   const pos = Math.max(0.05, Math.min(0.5, opts.position ?? 0.2));
   const apex = Math.max(1, Math.round(pos * usedL));
+  const snap = Math.max(0, Math.min(1, opts.snap ?? snapFor(midi)));
   const rnd = mulberry32(opts.seed ?? midi * 7919 + 17);
+  // The step's edges are eased over a few hundredths of the string, twice
+  // over, which keeps its low harmonics and lets the high ones fall away as
+  // they do on a real guitar.
+  const step = new Float32Array(usedL);
+  for (let i = 0; i < usedL; i++) step[i] = i < apex ? 2 : 0;
+  const ease = Math.max(1, Math.round(0.06 * usedL));
+  for (let pass = 0; pass < 2; pass++) {
+    const src = step.slice();
+    let run = 0;
+    for (let j = 0; j < ease; j++) run += src[(usedL - j) % usedL];
+    for (let i = 0; i < usedL; i++) {
+      run += src[i] - src[(i - ease + usedL) % usedL];
+      step[i] = run / ease;
+    }
+  }
   const shaped = new Float32Array(usedL);
   for (let i = 0; i < usedL; i++) {
     const tri = i <= apex ? i / apex : (usedL - i) / (usedL - apex);
-    shaped[i] = tri + 0.12 * (rnd() * 2 - 1);
+    shaped[i] = (1 - snap) * tri + snap * step[i] + 0.12 * (rnd() * 2 - 1);
   }
   // Rounding the corner: a gentle low pass, run forwards and back so the shape does not shift.
   const soft = 0.25 + 0.7 * velocity;
@@ -195,12 +224,13 @@ export class Biquad {
 }
 
 /**
- * The body of an acoustic guitar, as a handful of resonances: the air in
+ * The body of an acoustic guitar, as a handful of resonances: little below
+ * the lowest string, which a body this size hardly radiates, the air in
  * the box near 100 Hz, the top plate near 200 Hz and a broad one near 400
  * Hz, and a softer top end. The app applies the same filters live.
  */
 export const BODY: Array<{ type: 'peaking'; freq: number; q: number; gain: number } | { type: 'highshelf'; freq: number; gain: number } | { type: 'highpass'; freq: number; q: number }> = [
-  { type: 'highpass', freq: 55, q: 0.7 },
+  { type: 'highpass', freq: 75, q: 0.9 },
   { type: 'peaking', freq: 102, q: 2.2, gain: 6 },
   { type: 'peaking', freq: 205, q: 2.5, gain: 4 },
   { type: 'peaking', freq: 410, q: 1.4, gain: 2.5 },

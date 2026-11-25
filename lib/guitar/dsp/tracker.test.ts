@@ -92,6 +92,26 @@ describe('the listening chain on synthesised guitar', () => {
     expect(wrongPassed / n).toBeLessThanOrEqual(0.1);
   });
 
+  it('does not hear a chord as its seventh', () => {
+    const pairs: Array<[string, string]> = [
+      ['A', 'A7'],
+      ['E', 'E7'],
+      ['D', 'D7'],
+      ['G', 'G7'],
+      ['C', 'C7'],
+    ];
+    const order = pairs.flatMap(([plain, seventh]) => [plain, seventh]);
+    const sounds = order.map((c, i) => ({ at: 0.5 + i * 1.2, midis: shapeMidis(shapeFor(c)) }));
+    const { strikes } = listen(render(sounds, 0.5 + order.length * 1.2 + 1.5));
+    expect(strikes.length).toBe(order.length);
+    pairs.forEach(([plain, seventh], k) => {
+      // The plain chord, asked for, with its seventh as the likely mistake, passes.
+      expect(judgeChord(strikes[2 * k].chroma, chordPitchClasses(plain), [{ symbol: seventh, pcs: chordPitchClasses(seventh) }]).ok).toBe(true);
+      // And the seventh, asked for after the plain chord, passes too.
+      expect(judgeChord(strikes[2 * k + 1].chroma, chordPitchClasses(seventh), [{ symbol: plain, pcs: chordPitchClasses(plain) }]).ok).toBe(true);
+    });
+  });
+
   it('hears a melody note by note when it knows what comes next', () => {
     const tune = [64, 62, 60, 62, 64, 64, 64, 62, 62, 62, 64, 67, 67];
     const sounds = tune.map((m, i) => ({ at: 0.4 + i * 0.5, midis: [m] }));

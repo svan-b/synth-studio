@@ -1,0 +1,317 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		BB0000000000000000000001 /* OpenStringApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000001 /* OpenStringApp.swift */; };
+		BB0000000000000000000002 /* WebScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000002 /* WebScreen.swift */; };
+		BB0000000000000000000003 /* AppFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000003 /* AppFiles.swift */; };
+		BB0000000000000000000004 /* Recordings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000004 /* Recordings.swift */; };
+		BB0000000000000000000005 /* ProgressFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000005 /* ProgressFile.swift */; };
+		BB0000000000000000000006 /* SelfTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000006 /* SelfTest.swift */; };
+		BB0000000000000000000007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000007 /* Assets.xcassets */; };
+		BB0000000000000000000008 /* Bridge.js in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000008 /* Bridge.js */; };
+		BB0000000000000000000009 /* web in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000009 /* web */; };
+		BB000000000000000000000C /* Reminders.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000C /* Reminders.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AA0000000000000000000001 /* OpenStringApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenStringApp.swift; sourceTree = "<group>"; };
+		AA0000000000000000000002 /* WebScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebScreen.swift; sourceTree = "<group>"; };
+		AA0000000000000000000003 /* AppFiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFiles.swift; sourceTree = "<group>"; };
+		AA0000000000000000000004 /* Recordings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recordings.swift; sourceTree = "<group>"; };
+		AA0000000000000000000005 /* ProgressFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressFile.swift; sourceTree = "<group>"; };
+		AA0000000000000000000006 /* SelfTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTest.swift; sourceTree = "<group>"; };
+		AA0000000000000000000007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AA0000000000000000000008 /* Bridge.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Bridge.js; sourceTree = "<group>"; };
+		AA0000000000000000000009 /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; path = web; sourceTree = "<group>"; };
+		AA000000000000000000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AA000000000000000000000B /* OpenString.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenString.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA000000000000000000000C /* Reminders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reminders.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FF0000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		CC0000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				CC0000000000000000000002 /* OpenString */,
+				CC0000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		CC0000000000000000000002 /* OpenString */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000001 /* OpenStringApp.swift */,
+				AA0000000000000000000002 /* WebScreen.swift */,
+				AA0000000000000000000003 /* AppFiles.swift */,
+				AA0000000000000000000004 /* Recordings.swift */,
+				AA000000000000000000000C /* Reminders.swift */,
+				AA0000000000000000000005 /* ProgressFile.swift */,
+				AA0000000000000000000006 /* SelfTest.swift */,
+				AA0000000000000000000008 /* Bridge.js */,
+				AA0000000000000000000009 /* web */,
+				AA0000000000000000000007 /* Assets.xcassets */,
+				AA000000000000000000000A /* Info.plist */,
+			);
+			path = OpenString;
+			sourceTree = "<group>";
+		};
+		CC0000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000000B /* OpenString.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		DD0000000000000000000001 /* OpenString */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 110000000000000000000002 /* Build configuration list for PBXNativeTarget "OpenString" */;
+			buildPhases = (
+				FF0000000000000000000004 /* Check the web app is inside */,
+				FF0000000000000000000001 /* Sources */,
+				FF0000000000000000000002 /* Frameworks */,
+				FF0000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OpenString;
+			productName = OpenString;
+			productReference = AA000000000000000000000B /* OpenString.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		EE0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					DD0000000000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = 110000000000000000000001 /* Build configuration list for PBXProject "OpenString" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = CC0000000000000000000001;
+			productRefGroup = CC0000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DD0000000000000000000001 /* OpenString */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		FF0000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB0000000000000000000007 /* Assets.xcassets in Resources */,
+				BB0000000000000000000008 /* Bridge.js in Resources */,
+				BB0000000000000000000009 /* web in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		FF0000000000000000000004 /* Check the web app is inside */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Check the web app is inside";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ ! -f \"${SRCROOT}/OpenString/web/guitar.html\" ]; then\n  echo \"error: The guitar teacher is not in ios-guitar/OpenString/web yet. Run ios-guitar/build-web.sh in Terminal, then build again.\"\n  exit 1\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		FF0000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB0000000000000000000001 /* OpenStringApp.swift in Sources */,
+				BB0000000000000000000002 /* WebScreen.swift in Sources */,
+				BB0000000000000000000003 /* AppFiles.swift in Sources */,
+				BB0000000000000000000004 /* Recordings.swift in Sources */,
+				BB000000000000000000000C /* Reminders.swift in Sources */,
+				BB0000000000000000000005 /* ProgressFile.swift in Sources */,
+				BB0000000000000000000006 /* SelfTest.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		220000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		220000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		220000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OpenString/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.openstring.guitar;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		220000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = OpenString/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.openstring.guitar;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		110000000000000000000001 /* Build configuration list for PBXProject "OpenString" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				220000000000000000000001 /* Debug */,
+				220000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		110000000000000000000002 /* Build configuration list for PBXNativeTarget "OpenString" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				220000000000000000000003 /* Debug */,
+				220000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = EE0000000000000000000001 /* Project object */;
+}

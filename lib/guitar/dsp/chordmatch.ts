@@ -72,6 +72,15 @@ export function judgeChord(chroma: number[], pcs: number[], confusers: Array<{ s
     // A chord with the very same notes is no mistake.
     const theirs = new Set(c.pcs.map(pitchClass));
     if (theirs.size === own.size && Array.from(theirs).every((pc) => own.has(pc))) continue;
+    // A chord that only adds one note to the one asked for, such as A7 for A,
+    // is not counted as a mistake. It always holds at least as much of the
+    // sound, and on real guitars the added note is often there anyway: the
+    // seventh harmonic of a low string falls close to it, and other strings
+    // ring on. Measured on GuitarSet, plain chords would be taken for their
+    // seventh far too often. The two sound close, so letting it pass costs little.
+    const added = Array.from(theirs).filter((pc) => !own.has(pc));
+    const contains = Array.from(own).every((pc) => theirs.has(pc));
+    if (contains && added.length <= 1) continue;
     const s = chordFit(chroma, c.pcs).share;
     if (s > best + 0.04) {
       best = s;

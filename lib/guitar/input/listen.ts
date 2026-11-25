@@ -60,6 +60,8 @@ class Listener {
   private recorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
   private starting: Promise<boolean> | null = null;
+  /** Listening was asked for and not stopped on purpose, so it comes back after an interruption. */
+  private wanted = false;
 
   getStatus(): ListenStatus {
     return this.current;
@@ -81,6 +83,7 @@ class Listener {
 
   /** Start listening. In a browser, call it from a tap. */
   start(): Promise<boolean> {
+    this.wanted = true;
     if (this.active) return Promise.resolve(true);
     if (!this.starting) this.starting = this.open().finally(() => (this.starting = null));
     return this.starting;
@@ -132,7 +135,10 @@ class Listener {
       if (ctx.audioWorklet && typeof AudioWorkletNode !== 'undefined') {
         await ctx.audioWorklet.addModule('/guitar/capture-worklet.js');
         const worklet = new AudioWorkletNode(ctx, 'os-capture', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
-        worklet.port.onmessage = (e: MessageEvent<{ samples: Float32Array; time: number }>) => onBlock(e.data.samples, e.data.time);
+        // Blocks from a capture node this listener no longer uses, after a restart, are ignored.
+        worklet.port.onmessage = (e: MessageEvent<{ samples: Float32Array; time: number }>) => {
+          if (this.node === worklet) onBlock(e.data.samples, e.data.time);
+        };
         node = worklet;
       }
     } catch {
@@ -141,6 +147,7 @@ class Listener {
     if (!node) {
       const legacy = ctx.createScriptProcessor(1024, 1, 1);
       legacy.onaudioprocess = (e) => {
+        if (this.node !== legacy) return;
         const data = e.inputBuffer.getChannelData(0);
         onBlock(new Float32Array(data), ctx.currentTime - data.length / ctx.sampleRate);
       };
@@ -149,12 +156,33 @@ class Listener {
     this.source.connect(node);
     node.connect(this.sink);
     this.node = node;
-    this.set({ state: 'listening', heard: 0, source: this.stream.getAudioTracks()[0]?.label ?? '' });
+    const track = this.stream.getAudioTracks()[0];
+    // A phone call, another app or the iPad going to sleep can take the microphone away.
+    if (track) track.onended = () => this.close();
+    this.set({ state: 'listening', heard: 0, source: track?.label ?? '' });
     return true;
   }
 
+  /** Stop listening, on purpose. */
   stop(): void {
-    this.stopRecording();
+    this.wanted = false;
+    this.close();
+  }
+
+  /**
+   * After the app comes back to the front. If the microphone was taken away
+   * meanwhile and listening was still wanted, open it again.
+   */
+  revive(): void {
+    if (!this.wanted || this.starting) return;
+    const track = this.stream?.getAudioTracks()[0];
+    if (this.active && track && track.readyState === 'live' && !track.muted) return;
+    this.close();
+    void this.start();
+  }
+
+  private close(): void {
+    void this.stopRecording();
     try {
       this.source?.disconnect();
       this.node?.disconnect();

@@ -8,7 +8,7 @@ import type { Score, Step } from '../music/score';
 import type { StringNo } from '../music/theory';
 import { listener } from '../input/listen';
 import { guitar } from './engine';
-import { Transport, playStep, scoreEvents } from './transport';
+import { Transport, playStep, scoreEvents, type TimedEvent } from './transport';
 
 /** How long after the app plays something the microphone keeps ignoring new sounds. The note rings on, but a ringing note starts nothing new. */
 const QUIET = 0.3;
@@ -78,3 +78,41 @@ export function playScore(score: Score, opts: { bpm?: number; onStep?: (index: n
     guitar.stopAll();
   };
 }
+
+/**
+ * Play a song's chords with its tune over them, on one clock. The tune may
+ * start before the chords, on its pickup. `onStep` follows the chords, which
+ * is what the chart shows.
+ */
+export function playSong(chords: Score, melody: Score | null, opts: { bpm?: number; onStep?: (index: number) => void; onDone?: () => void; lead?: number } = {}): () => void {
+  if (!melody) return playScore(chords, opts);
+  const bpm = opts.bpm ?? chords.tempo;
+  const spb = 60 / bpm;
+  const offset = melody.pickup;
+  const transport = new Transport();
+  const timers: Array<ReturnType<typeof setTimeout>> = [];
+  const events: TimedEvent[] = [
+    // The chords a little under the tune, so the tune can be heard.
+    ...scoreEvents(chords, spb, {
+      velocity: 0.62,
+      onStep: (index, when) => {
+        listener.suppress(when + 0.08 + QUIET);
+        if (opts.onStep) timers.push(setTimeout(() => opts.onStep?.(index), Math.max(0, (when - guitar.now()) * 1000)));
+      },
+    }).map((e) => ({ ...e, beat: e.beat + offset })),
+    ...melody.steps.map((st) => ({
+      beat: st.start,
+      run: (when: number) => {
+        for (const n of st.notes) guitar.pluck(n.midi, when, { velocity: 0.9, string: null, seconds: Math.max(0.25, n.dur * spb * 1.1) });
+        listener.suppress(when + QUIET);
+      },
+    })),
+  ];
+  transport.start(events, Math.max(chords.totalBeats + offset, melody.totalBeats) + 0.5, { bpm, fromBeat: 0, lead: opts.lead ?? 0.15, onDone: () => opts.onDone?.() });
+  return () => {
+    transport.stop();
+    timers.forEach((t) => clearTimeout(t));
+    guitar.stopAll();
+  };
+}
+

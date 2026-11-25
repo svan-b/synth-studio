@@ -17,7 +17,7 @@ export const STAGE3: Lesson[] = [
       {
         kind: 'say',
         title: 'The G chord',
-        text: 'Three fingers spread wide: the **second finger** on the low E string at the third fret, the **first finger** on the A string at the second fret, and the **third finger** on the high E string at the third fret.\n\nAll six strings ring. It is a stretch at first, and it gets easier within days.',
+        text: 'Three fingers spread wide. The **second finger** goes on the low E string at the third fret, the **first finger** on the A string at the second fret, and the **third finger** on the high E string at the third fret.\n\nAll six strings ring. It is a stretch at first, and it gets easier within days.',
         figure: { kind: 'chord', chord: 'G' },
       },
       {
@@ -65,7 +65,7 @@ export const STAGE3: Lesson[] = [
       {
         kind: 'say',
         title: 'The C chord',
-        text: 'Three fingers stepping down: the **third finger** on the A string at the third fret, the **second finger** on the D string at the second fret, the **first finger** on the B string at the first fret.\n\nArch your fingers so the open G string and high E string can ring. Leave out the low E.',
+        text: 'Three fingers stepping down. The **third finger** goes on the A string at the third fret, the **second finger** on the D string at the second fret, the **first finger** on the B string at the first fret.\n\nArch your fingers so the open G string and high E string can ring. Leave out the low E.',
         figure: { kind: 'chord', chord: 'C' },
       },
       {
@@ -140,7 +140,7 @@ export const STAGE3: Lesson[] = [
       {
         kind: 'say',
         title: 'G7',
-        text: 'G7 is like G turned round: the **third finger** on the low E string at the third fret, the **second finger** on the A string at the second fret, and the **first finger** on the high E string at the first fret.',
+        text: 'G7 is like G turned round. The **third finger** goes on the low E string at the third fret, the **second finger** on the A string at the second fret, and the **first finger** on the high E string at the first fret.',
         figure: { kind: 'chord', chord: 'G7' },
       },
       {
@@ -234,7 +234,7 @@ export const STAGE3: Lesson[] = [
     id: 'capo',
     stage: 3,
     title: 'The capo',
-    summary: 'The same shapes, higher up: songs in a key that suits your voice.',
+    summary: 'The same shapes, higher up, for songs in a key that suits your voice.',
     minutes: 8,
     steps: [
       {

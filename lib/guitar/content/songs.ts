@@ -71,7 +71,7 @@ export const SONGS: Song[] = [
       [2, 'happy birthday, dear [D]friend,'],
       [2, 'happy [A]birthday [E7]to [A]you.'],
     ],
-    note: 'Three beats to a bar: count one, two, three. The song starts on "happy", just before the first chord.',
+    note: 'Three beats to a bar, counted one, two, three. The song starts on "happy", just before the first chord.',
   },
   {
     id: 'clementine',
@@ -139,7 +139,7 @@ export const SONGS: Song[] = [
       [4, 'once was lost, but [D]now am [A]found, was'],
       [3, 'blind, but [E7]now I [A]see.'],
     ],
-    note: 'A waltz: the bass note of the chord on one, then strums on two and three.',
+    note: 'A waltz, with the bass note of the chord on one, then strums on two and three.',
   },
   {
     id: 'lantern-waltz',
@@ -357,7 +357,7 @@ export const SONGS: Song[] = [
     time: [4, 4],
     tempo: 96,
     line: 'G3q G3q D4q:3 D4q:3 | E4q E4q D4h:3 | C4q:1 C4q:1 B3q B3q | A3q:2 A3q:2 G3h | D4q:3 D4q:3 C4q:1 C4q:1 | B3q B3q A3h:2 | D4q:3 D4q:3 C4q:1 C4q:1 | B3q B3q A3h:2 | G3q G3q D4q:3 D4q:3 | E4q E4q D4h:3 | C4q:1 C4q:1 B3q B3q | A3q:2 A3q:2 G3h',
-    note: 'Three strings: G, B and high E. The tune climbs up, then walks back down a step at a time.',
+    note: 'Just three strings, G, B and high E. The tune climbs up, then walks back down a step at a time.',
   },
   {
     id: 'michael-row-tune',
