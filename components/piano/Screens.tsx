@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TakePlayer } from '@/lib/piano/audio/replay';
 import { allPieces, allStages, getLesson, getPiece, lessonOrder, lessonUnlocked, pieceInfo } from '@/lib/piano/content/catalog';
 import { NOT_USED, PRINCIPLES, TIPS, type Strength } from '@/lib/piano/content/method';
@@ -25,7 +25,7 @@ import { isNative, shareFile } from '@/lib/piano/native/bridge';
 import { parseScore } from '@/lib/piano/music/score';
 import { dayKey } from '@/lib/piano/util/emitter';
 import ConnectionPanel, { ConnectionChip, ConnectionReport } from './Connection';
-import { useInputMode, useSound } from './hooks';
+import { useInputMode, useRemote, useSound } from './hooks';
 import PlaySurface from './PlaySurface';
 import { Button, Card, Icon, Pill, ProgressBar, Ring, Segmented, Sheet, Toggle } from './ui';
 
@@ -71,6 +71,7 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   const sessionDoneOn = usePiano((s) => s.sessionDoneOn);
   const drills = usePiano((s) => s.drills);
   const sound = useSound();
+  const mode = useInputMode();
   const today = dayKey();
   const doneToday = sessionDoneOn === today;
   const day = useMemo(
@@ -99,6 +100,10 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
       : day.held === 'turn'
         ? `With ${profile.minutes} minutes a day, lessons and pieces take the days in turn, and today is the piece's.`
         : 'The course moves at one new lesson a day at most, because that is what holds best.';
+  const begin = useCallback(() => {
+    if (plan.length > 0) onStart({ kind: 'session', blocks: plan });
+  }, [onStart, plan]);
+  useRemote({ primary: plan.length > 0 ? begin : undefined });
   // The first day keeps both of its lessons at every session length, so it can run over.
   const runsLong = firstTime && planMinutes(plan) > profile.minutes + 2;
 
@@ -158,7 +163,14 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
             })}
           </ol>
           {plan.length > 0 && (
-            <Button size="lg" className="mt-6 w-full" onClick={() => onStart({ kind: 'session', blocks: plan })} icon={<Icon.Play size={20} />}>
+            <Button
+              size="lg"
+              className="mt-6 w-full"
+              onClick={begin}
+              icon={<Icon.Play size={20} />}
+              // The session starts from the piano: sit down, press the top key, play.
+              hint={mode === 'midi' ? 'or the top key' : undefined}
+            >
               {doneToday ? 'Practise some more' : firstTime ? 'Begin' : 'Start session'}
             </Button>
           )}
@@ -265,23 +277,22 @@ export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
                 {stage.lessons.map((id) => {
                   const lesson = getLesson(id);
                   const done = isDone(id);
-                  const open = lessonUnlocked(id, isDone);
                   const isNext = id === nextId;
+                  // Nothing is locked. The course has an order, and the next lesson in it is marked, but any lesson opens.
                   return (
                     <button
                       key={id}
-                      disabled={!open}
                       onClick={() => onStart({ kind: 'lesson', id })}
                       className={`flex items-center gap-4 rounded-2xl border p-4 text-left transition-transform active:scale-[0.99] ${
                         isNext ? 'border-mc-ink bg-mc-surface' : 'border-mc-line bg-mc-surface'
-                      } ${open ? '' : 'opacity-50'}`}
+                      }`}
                     >
                       <span
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                           done ? 'bg-mc-ok text-white' : isNext ? 'bg-mc-ink text-mc-bg' : 'bg-mc-raised text-mc-muted'
                         }`}
                       >
-                        {done ? <Icon.Check size={20} /> : open ? <Icon.Play size={16} /> : <Icon.Lock size={18} />}
+                        {done ? <Icon.Check size={20} /> : <Icon.Play size={16} />}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold">{lesson.title}</span>
