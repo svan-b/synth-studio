@@ -27,6 +27,10 @@ mkdir -p "$dest/piano"
 cp out-app/piano.html "$dest/"
 [ -f out-app/piano.txt ] && cp out-app/piano.txt "$dest/"
 cp -R out-app/_next "$dest/_next"
+# The build also writes the code of this site's other pages. The piano teacher never loads it,
+# so it does not go into the app: nothing ships that is not the app's own.
+rm -f "$dest"/_next/static/chunks/app/page-*.js
+rm -rf "$dest"/_next/static/chunks/app/_not-found
 cp -R out-app/piano/samples out-app/piano/icons "$dest/piano/"
 cp out-app/piano/capture-worklet.js out-app/piano/manifest.webmanifest "$dest/piano/"
 rm -rf out-app
