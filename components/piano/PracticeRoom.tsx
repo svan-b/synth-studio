@@ -385,7 +385,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
               {onward}
             </Button>
           </div>
-          {kept && <p className="mc-fade-up max-w-md text-[1.05rem] text-mc-faint">That last play through is kept on the Progress page, so you can hear it again later.</p>}
+          {kept && <p className="mc-fade-up max-w-xl text-[1.1rem] text-mc-muted">That last play through is kept on the Progress page, so you can hear it again later.</p>}
         </div>
       ) : stage === 'timeup' ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
@@ -487,7 +487,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
         {/* While the learner decides, the coach's plan steps aside, so their own controls are all in view. */}
         {!free && (
           <>
-            <div className="text-[0.85rem] font-semibold uppercase tracking-widest text-mc-faint">The plan for this piece</div>
+            <div className="text-[0.9rem] font-semibold uppercase tracking-widest text-mc-muted">The plan for this piece</div>
             <div className="mt-3 space-y-2.5">
               {plan.map((row) => (
                 <div key={row.title} className="flex items-center gap-4">

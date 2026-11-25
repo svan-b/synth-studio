@@ -366,7 +366,7 @@ export function Pill({ children, tone = 'muted' }: { children: ReactNode; tone?:
     hint: 'bg-mc-hint/15 text-mc-hint-ink',
     bad: 'bg-mc-bad/10 text-mc-bad',
   };
-  return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.85rem] font-semibold ${tones[tone]}`}>{children}</span>;
+  return <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[0.9rem] font-semibold ${tones[tone]}`}>{children}</span>;
 }
 
 /** Text with **bold** spans and blank lines as paragraph breaks. */

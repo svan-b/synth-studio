@@ -123,6 +123,21 @@ describe('MIDI messages from a piano', () => {
     expect(remote).toEqual(['primary', 'secondary', 'primary', 'secondary']);
   });
 
+  it('takes the right pedal as a button only when nothing is being played', async () => {
+    // With a key held, or one just played, it is a pedal.
+    send(0x90, 60, 80);
+    send(0xb0, 64, 127);
+    send(0xb0, 64, 0);
+    send(0x80, 60, 0);
+    send(0xb0, 64, 127);
+    send(0xb0, 64, 0);
+    expect(remote).toEqual([]);
+    // Once the keys have been still for a moment, pressing it means continue.
+    await new Promise((r) => setTimeout(r, 1300));
+    send(0xb0, 64, 127);
+    expect(remote).toEqual(['pedal']);
+  });
+
   it('releases held keys when the piano says all notes off', () => {
     send(0x90, 60, 90);
     send(0x90, 67, 90);

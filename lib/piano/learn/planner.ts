@@ -216,7 +216,12 @@ export function planDay(input: PlanInput): { blocks: Block[]; upNext: string | u
   const second: Block | null = lesson && upNext === order[0] && order.length > 1 ? lessonBlock(order[1]) : null;
 
   // Work on a piece with the coach.
-  const pieceId = currentPiece(input.lessons, input.pieces);
+  // A learner who skipped ahead has met no piece in a lesson yet. Until they have one, the last
+  // piece of what they marked as known goes in: the session has music in it from the first day,
+  // and playing it shows them whether the skip was right.
+  const fromLessons = currentPiece(input.lessons, input.pieces);
+  const trial = !fromLessons && Object.keys(input.pieces).length === 0 ? skippedPieces(input.lessons, input.pieces).pop() : undefined;
+  const pieceId = fromLessons ?? trial ?? null;
   let piece: Block | null = null;
   if (pieceId) {
     const info = pieceInfo(pieceId);
@@ -226,7 +231,11 @@ export function planDay(input: PlanInput): { blocks: Block[]; upNext: string | u
       id: pieceId,
       minutes: budget >= 20 ? 7 : 5,
       title: info.title,
-      detail: progress === 0 ? 'Start learning this piece' : `Carry on, ${Math.round(progress * 100)} percent learned`,
+      detail: trial
+        ? 'A piece from the part you marked as known'
+        : progress === 0
+          ? 'Start learning this piece'
+          : `Carry on, ${Math.round(progress * 100)} percent learned`,
     };
   }
 

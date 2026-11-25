@@ -793,6 +793,7 @@ import {
   TECH_LEVELS,
 } from './generators';
 import { currentPiece, introducedPieces, openDrills, pieceToEndOn, planDay, planSession, readsStaff, skippedPieces } from './planner';
+import { startingLevel } from './placement';
 import { parseScore, scoreRange } from '../music/score';
 import { lessonOrder, pieceInfo } from '../content/catalog';
 
@@ -1157,6 +1158,34 @@ describe('daily plan', () => {
     // One the learner opens anyway is theirs to practise.
     const pieces = { 'hot-cross-buns': newPieceState(pieceInfo('hot-cross-buns'), '2026-03-01') };
     expect(introducedPieces(lessons, pieces)).toEqual(['hot-cross-buns']);
+  });
+
+  it('gives a learner who skipped ahead a piece from what they skipped, so the first session has music in it', () => {
+    const lessons = Object.fromEntries(order.slice(0, 12).map((id) => [id, { done: true, skipped: true, step: 0 }]));
+    const now = new Date('2026-03-02T09:00:00');
+    const plan = planSession({ minutes: 20, lessons, pieces: {}, cards: {}, now });
+    const last = skippedPieces(lessons, {}).pop();
+    // The last piece of the part marked as known: the best test of whether the skip was right.
+    expect(plan.find((b) => b.kind === 'piece')).toMatchObject({ id: last });
+    expect(plan.find((b) => b.kind === 'piece')?.detail).toMatch(/marked as known/);
+    // And still the next lesson of the course.
+    expect(plan.find((b) => b.kind === 'lesson')).toMatchObject({ id: order[12] });
+    // Only until they have a piece of their own. After that the lessons bring the pieces.
+    const pieces = { [last as string]: { ...newPieceState(pieceInfo(last as string), '2026-03-02'), learned: true } };
+    const later = planSession({ minutes: 20, lessons, pieces, cards: {}, now: new Date('2026-03-03T09:00:00') });
+    expect(later.some((b) => b.kind === 'piece' && /marked as known/.test(b.detail))).toBe(false);
+    // A learner who skipped nothing is not given one.
+    expect(planSession({ minutes: 20, lessons: {}, pieces: {}, cards: {}, now }).some((b) => b.kind === 'piece')).toBe(false);
+  });
+
+  it('starts untried exercises further up for a learner who skipped ahead', () => {
+    expect(startingLevel(0, 6)).toBe(1);
+    expect(startingLevel(1, 6)).toBe(2);
+    expect(startingLevel(2, 6)).toBe(2);
+    expect(startingLevel(3, 6)).toBe(3);
+    expect(startingLevel(5, 6)).toBe(4);
+    // Never past what the exercise has, or past what the lessons taken reach.
+    expect(startingLevel(5, 2)).toBe(2);
   });
 
   it('offers exactly one new lesson, then work on a piece already met', () => {

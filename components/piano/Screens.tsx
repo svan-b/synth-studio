@@ -8,6 +8,7 @@ import type { FlowResult } from '@/lib/piano/engine/flow';
 import { pieceProgress } from '@/lib/piano/learn/coach';
 import { CHORD_LEVELS, EAR_LEVELS, RHYTHM_LEVELS, SIGHT_LEVELS, TECH_LEVELS } from '@/lib/piano/learn/generators';
 import { milestones } from '@/lib/piano/learn/milestones';
+import { markKnownThrough, undoKnown } from '@/lib/piano/learn/placement';
 import {
   DRILL_LESSON,
   dueReadingCards,
@@ -276,52 +277,51 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
 
 export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
   const lessons = usePiano((s) => s.lessons);
-  const skipLesson = usePiano((s) => s.skipLesson);
-  const addCards = usePiano((s) => s.addCards);
   const [confirm, setConfirm] = useState<number | null>(null);
   const isDone = (id: string) => lessons[id]?.done === true;
-  const nextId = lessonOrder().find((id) => !isDone(id));
+  const isKnown = (id: string) => lessons[id]?.skipped === true;
+  const order = lessonOrder();
+  const nextId = order.find((id) => !isDone(id));
+  const first = allStages()[0];
 
-  // Open at the stage the learner has reached, not at the top of the course.
+  // Open at the stage the learner has reached. A new learner is already there, at the top of the page.
   const here = useRef<HTMLElement>(null);
   useEffect(() => {
-    here.current?.scrollIntoView({ block: 'start' });
+    if (nextId && !first.lessons.includes(nextId)) here.current?.scrollIntoView({ block: 'start' });
+    // Only when the page opens. It does not jump about while a stage is marked or unmarked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const skipStage = (stageId: number) => {
-    // Everything up to and including this stage is marked as known.
-    for (const stage of allStages()) {
-      if (stage.id > stageId) break;
-      for (const id of stage.lessons) {
-        skipLesson(id);
-        const cards = getLesson(id).cards;
-        if (cards) addCards(cards);
-      }
-    }
-    setConfirm(null);
-  };
-
   return (
-    <Page title="Learn" subtitle="The course, one short lesson at a time.">
+    <Page title="Learn" subtitle="The course, one short lesson at a time. Any lesson opens, and the next in order is marked.">
       <div className="space-y-8">
         {allStages().map((stage) => {
-          const doneCount = stage.lessons.filter(isDone).length;
+          const known = stage.lessons.filter(isKnown).length;
+          const taken = stage.lessons.filter(isDone).length - known;
+          const all = taken + known === stage.lessons.length;
           return (
             <section key={stage.id} ref={stage.lessons.includes(nextId ?? '') ? here : undefined} className="scroll-mt-4">
               <div className="mb-3 flex items-end justify-between gap-4">
                 <div>
-                  <div className="text-[0.85rem] font-semibold uppercase tracking-widest text-mc-faint">Stage {stage.id}</div>
+                  <div className="text-[0.9rem] font-semibold uppercase tracking-widest text-mc-muted">Stage {stage.id}</div>
                   <h2 className="font-mc-serif text-2xl">{stage.title}</h2>
                   <p className="text-mc-muted">{stage.goal}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  {doneCount < stage.lessons.length && (
-                    <Button variant="ghost" size="sm" onClick={() => setConfirm(stage.id)}>
-                      I know this already
+                  {/* Marking a stage as known is a guess about oneself, so it can be taken back. */}
+                  {known > 0 ? (
+                    <Button variant="ghost" size="sm" onClick={() => undoKnown(stage.id)}>
+                      Undo marked as known
                     </Button>
+                  ) : (
+                    !all && (
+                      <Button variant="ghost" size="sm" onClick={() => setConfirm(stage.id)}>
+                        I know this already
+                      </Button>
+                    )
                   )}
-                  <Pill tone={doneCount === stage.lessons.length ? 'ok' : 'muted'}>
-                    {doneCount} of {stage.lessons.length}
+                  <Pill tone={all && known === 0 ? 'ok' : 'muted'}>
+                    {known === stage.lessons.length ? 'Marked as known' : known > 0 ? `${taken} done, ${known} known` : `${taken} of ${stage.lessons.length}`}
                   </Pill>
                 </div>
               </div>
@@ -329,22 +329,31 @@ export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
                 {stage.lessons.map((id) => {
                   const lesson = getLesson(id);
                   const done = isDone(id);
+                  const skipped = isKnown(id);
                   const isNext = id === nextId;
                   // Nothing is locked. The course has an order, and the next lesson in it is marked, but any lesson opens.
                   return (
                     <button
                       key={id}
                       onClick={() => onStart({ kind: 'lesson', id })}
+                      aria-current={isNext ? 'step' : undefined}
                       className={`flex items-center gap-4 rounded-2xl border p-4 text-left transition-transform active:scale-[0.99] ${
-                        isNext ? 'border-mc-ink bg-mc-surface' : 'border-mc-line bg-mc-surface'
+                        isNext ? 'border-mc-ink bg-mc-surface ring-1 ring-mc-ink' : 'border-mc-line bg-mc-surface'
                       }`}
                     >
+                      {/* A lesson taken is filled in. One only marked as known is outlined: it was passed over, not done. */}
                       <span
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                          done ? 'bg-mc-ok text-white' : isNext ? 'bg-mc-ink text-mc-bg' : 'bg-mc-raised text-mc-muted'
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-semibold tabular-nums ${
+                          skipped
+                            ? 'border-2 border-mc-line text-mc-muted'
+                            : done
+                              ? 'bg-mc-ok text-white'
+                              : isNext
+                                ? 'bg-mc-ink text-mc-bg'
+                                : 'bg-mc-raised text-mc-muted'
                         }`}
                       >
-                        {done ? <Icon.Check size={20} /> : <Icon.Play size={16} />}
+                        {done && !skipped ? <Icon.Check size={22} /> : order.indexOf(id) + 1}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold">{lesson.title}</span>
@@ -353,6 +362,10 @@ export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
                       {/* A lesson left part way through says so. */}
                       {!done && (lessons[id]?.step ?? 0) > 0 ? (
                         <Pill tone="accent">Started</Pill>
+                      ) : skipped ? (
+                        <Pill>Known</Pill>
+                      ) : isNext ? (
+                        <Pill tone="accent">Next</Pill>
                       ) : (
                         <span className="shrink-0 text-[1.05rem] tabular-nums text-mc-muted">{lesson.minutes} min</span>
                       )}
@@ -365,15 +378,22 @@ export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
         })}
       </div>
       <Sheet open={confirm !== null} onClose={() => setConfirm(null)} title="Skip ahead?">
-        <p className="text-[1.05rem] leading-relaxed text-mc-muted">
-          This marks every lesson up to the end of stage {confirm} as done, and adds its notes to your reading review. You can still open any of those
-          lessons later, and their pieces stay on the Pieces page for when you want them.
+        <p className="text-[1.15rem] leading-relaxed text-mc-muted">
+          This marks every lesson up to the end of stage {confirm} as known, and adds its notes to your reading review. The lessons stay open, their
+          pieces stay on the Pieces page, and the mark can be undone here whenever you like.
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="soft" onClick={() => setConfirm(null)}>
             Cancel
           </Button>
-          <Button onClick={() => confirm !== null && skipStage(confirm)}>Mark as known</Button>
+          <Button
+            onClick={() => {
+              if (confirm !== null) markKnownThrough(confirm);
+              setConfirm(null);
+            }}
+          >
+            Mark as known
+          </Button>
         </div>
       </Sheet>
     </Page>
@@ -425,7 +445,7 @@ export function PiecesScreen({ onStart }: { onStart: (a: Activity) => void }) {
                         <ProgressBar value={progress} tone="ok" />
                         <span className="w-10 shrink-0 text-right text-[0.85rem] tabular-nums text-mc-muted">{Math.round(progress * 100)}%</span>
                       </div>
-                      <div className="mt-2 text-[0.85rem] text-mc-faint">
+                      <div className="mt-2 text-[1rem] text-mc-muted">
                         {info.hands.length === 2 ? 'Both hands' : info.hands[0] === 'R' ? 'Right hand' : 'Left hand'}, {info.measures} measures
                       </div>
                     </button>
@@ -507,7 +527,7 @@ export function TrainScreen({ onStart }: { onStart: (a: Activity) => void }) {
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-mc-raised text-mc-ink">{it.icon}</span>
             <div className="mt-4 font-mc-serif text-2xl">{it.title}</div>
             <p className="mt-1 text-mc-muted">{it.text}</p>
-            <div className="mt-auto pt-4 text-[1.05rem] font-semibold text-mc-faint">{it.meta}</div>
+            <div className="mt-auto pt-4 text-[1.05rem] font-semibold text-mc-muted">{it.meta}</div>
           </button>
         ))}
       </div>
@@ -549,7 +569,8 @@ export function ProgressScreen() {
   };
   const kept = allPieces().filter((p) => recordings[p.id]);
   const total = lessonOrder().length;
-  const done = lessonOrder().filter((id) => lessons[id]?.done).length;
+  const known = lessonOrder().filter((id) => lessons[id]?.skipped).length;
+  const done = lessonOrder().filter((id) => lessons[id]?.done).length - known;
   const learned = Object.values(pieces).filter((p) => p.learned).length;
   const notes = Object.keys(cards).filter((id) => id.startsWith('read:')).length;
   const last14 = useMemo(() => {
@@ -565,7 +586,7 @@ export function ProgressScreen() {
   const stats: Array<[string, string]> = [
     [`${streak(days)}`, 'days in a row'],
     [`${totalMinutes(days)}`, 'minutes in all'],
-    [`${done} of ${total}`, 'lessons done'],
+    [`${done} of ${total}`, known > 0 ? `lessons done, and ${known} marked as known` : 'lessons done'],
     [`${learned}`, learned === 1 ? 'piece learned' : 'pieces learned'],
     [`${notes}`, 'notes you can read'],
   ];
@@ -592,7 +613,7 @@ export function ProgressScreen() {
                 style={{ height: `${Math.max(3, (d.minutes / peak) * 100)}%` }}
                 title={`${d.minutes} minutes`}
               />
-              <span className="text-[0.85rem] text-mc-faint">{d.label}</span>
+              <span className="text-[0.9rem] text-mc-muted">{d.label}</span>
             </div>
           ))}
         </div>
@@ -660,16 +681,18 @@ export function ProgressScreen() {
       </div>
       <div className="mt-6 space-y-4">
         {allStages().map((stage) => {
-          const n = stage.lessons.filter((id) => lessons[id]?.done).length;
+          const skipped = stage.lessons.filter((id) => lessons[id]?.skipped).length;
+          const n = stage.lessons.filter((id) => lessons[id]?.done).length - skipped;
           return (
             <div key={stage.id} className="flex items-center gap-4">
               <div className="w-48 shrink-0">
-                <div className="text-[0.85rem] font-semibold uppercase tracking-widest text-mc-faint">Stage {stage.id}</div>
+                <div className="text-[0.9rem] font-semibold uppercase tracking-widest text-mc-muted">Stage {stage.id}</div>
                 <div className="font-semibold">{stage.title}</div>
               </div>
+              {/* A stage marked as known is not shown as done: the bar is for lessons taken. */}
               <ProgressBar value={n / stage.lessons.length} tone="ok" />
-              <span className="w-14 shrink-0 text-right text-[1.05rem] tabular-nums text-mc-muted">
-                {n} of {stage.lessons.length}
+              <span className="w-40 shrink-0 text-right text-[1.05rem] tabular-nums text-mc-muted">
+                {skipped === stage.lessons.length ? 'Marked as known' : skipped > 0 ? `${n} done, ${skipped} known` : `${n} of ${stage.lessons.length}`}
               </span>
             </div>
           );
@@ -1015,7 +1038,7 @@ export function MethodScreen({ onGo }: { onGo: (v: View) => void }) {
             </div>
             <p className="mt-2 text-[1.05rem] leading-relaxed text-mc-ink">{p.what}</p>
             <p className="mt-2 text-[1.1rem] leading-relaxed text-mc-muted">{p.evidence}</p>
-            <p className="mc-selectable mt-3 text-[0.85rem] leading-relaxed text-mc-faint">{p.sources.join('. ')}.</p>
+            <p className="mc-selectable mt-3 text-[0.9rem] leading-relaxed text-mc-muted">{p.sources.join('. ')}.</p>
           </Card>
         ))}
       </div>

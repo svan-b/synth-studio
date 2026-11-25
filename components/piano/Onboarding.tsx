@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { piano } from '@/lib/piano/audio/engine';
+import { allStages } from '@/lib/piano/content/catalog';
+import { markKnownThrough } from '@/lib/piano/learn/placement';
 import { usePiano, type Experience } from '@/lib/piano/learn/store';
 import { isNative } from '@/lib/piano/native/bridge';
 import ConnectionPanel from './Connection';
@@ -42,14 +44,23 @@ function Choice({ selected, title, text, onClick }: { selected: boolean; title: 
 export default function Onboarding({ onDone }: { onDone: () => void }) {
   const profile = usePiano((s) => s.profile);
   const setProfile = usePiano((s) => s.setProfile);
-  const [step, setStep] = useState(0);
+  const [index, setIndex] = useState(0);
+  // Where the course begins, for a learner who has played before. Nothing is marked until setup ends, so it can be changed freely.
+  const [startStage, setStartStage] = useState(1);
   const mode = useInputMode();
+  const experienced = profile.experience !== 'new';
+  // Someone who has played before is asked where to begin. A beginner is not shown the question.
+  const pages = ['welcome', 'level', ...(experienced ? ['place'] : []), 'minutes', 'connect', 'set'];
+  const step = pages[Math.min(index, pages.length - 1)];
+  const last = index >= pages.length - 1;
+  const from = experienced ? startStage : 1;
 
   const next = () => {
     void piano.unlock();
-    setStep((s) => s + 1);
+    setIndex((s) => s + 1);
   };
   const finish = () => {
+    if (from > 1) markKnownThrough(from - 1);
     setProfile({ onboarded: true });
     onDone();
   };
@@ -57,8 +68,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
       <div className="mc-scroll min-h-0 flex-1">
-        <div key={step} className="mc-fade-up mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-8 py-10">
-          {step === 0 && (
+        <div key={step} className={`mc-fade-up mx-auto flex min-h-full w-full flex-col justify-center px-8 py-10 ${step === 'place' ? 'max-w-4xl' : 'max-w-2xl'}`}>
+          {step === 'welcome' && (
             <div className="text-center">
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-mc-ink text-mc-bg">
                 <Icon.Piano size={40} />
@@ -70,10 +81,10 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               </p>
             </div>
           )}
-          {step === 1 && (
+          {step === 'level' && (
             <>
               <h2 className="font-mc-serif text-4xl">Where are you starting from?</h2>
-              <p className="mb-6 mt-2 text-[1.1rem] text-mc-muted">The course is the same for everyone. If you have played before, you can skip what you already know.</p>
+              <p className="mb-6 mt-2 text-[1.1rem] text-mc-muted">The course is the same for everyone. If you have played before, the next page lets you begin further in.</p>
               <div className="space-y-3">
                 {LEVELS.map((l) => (
                   <Choice key={l.value} selected={profile.experience === l.value} title={l.title} text={l.text} onClick={() => setProfile({ experience: l.value })} />
@@ -81,7 +92,27 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               </div>
             </>
           )}
-          {step === 2 && (
+          {step === 'place' && (
+            <>
+              <h2 className="font-mc-serif text-4xl">Where should the course begin?</h2>
+              <p className="mb-6 mt-2 text-[1.1rem] text-mc-muted">
+                Pick the first stage that holds something new to you. What comes before it is marked as known, and the Learn page can undo that. If
+                you are unsure, begin a stage early. Easy lessons go by quickly.
+              </p>
+              <div className="grid gap-3 landscape:grid-cols-2">
+                {allStages().map((stage) => (
+                  <Choice
+                    key={stage.id}
+                    selected={startStage === stage.id}
+                    title={stage.id === 1 ? `From the beginning: ${stage.title}` : `Stage ${stage.id}: ${stage.title}`}
+                    text={stage.goal}
+                    onClick={() => setStartStage(stage.id)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          {step === 'minutes' && (
             <>
               <h2 className="font-mc-serif text-4xl">How long on a normal day?</h2>
               <p className="mb-6 mt-2 text-[1.1rem] text-mc-muted">Short and regular beats long and rare. Pick what you will really do.</p>
@@ -92,7 +123,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               </div>
             </>
           )}
-          {step === 3 && (
+          {step === 'connect' && (
             <>
               <h2 className="font-mc-serif text-4xl">Connect your piano</h2>
               <p className="mb-6 mt-2 text-[1.1rem] text-mc-muted">
@@ -103,7 +134,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               <ConnectionPanel compact />
             </>
           )}
-          {step === 4 && (
+          {step === 'set' && (
             <div className="text-center">
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-mc-ok text-white">
                 <Icon.Check size={44} />
@@ -114,10 +145,18 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                 {mode === 'midi' && (
                   <p>
                     <strong className="text-mc-ink">Your hands can stay on the piano.</strong> The very top key means continue. The very bottom key
-                    means again. With a three pedal unit, the middle and left pedals do the same.
+                    means again, or back. On a page with no music, the right pedal means continue too.
                   </p>
                 )}
-                {profile.experience !== 'new' && <p>Since you have played before, look at the Learn page and use I know this already to skip what you know.</p>}
+                {experienced &&
+                  (from > 1 ? (
+                    <p>
+                      The course begins at stage {from}. The stages before it are marked as known, and the Learn page can undo that if it turns out to
+                      be too far.
+                    </p>
+                  ) : (
+                    <p>If the first lessons turn out too easy, each stage on the Learn page has a button to mark it as known.</p>
+                  ))}
               </div>
             </div>
           )}
@@ -125,19 +164,19 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
       </div>
       <div className="flex shrink-0 items-center justify-between px-8 pb-7 pt-3">
         <div className="flex gap-2">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <span key={i} className={`h-2 rounded-full transition-all ${i === step ? 'w-6 bg-mc-ink' : 'w-2 bg-mc-line'}`} />
+          {pages.map((name, i) => (
+            <span key={name} className={`h-2 rounded-full transition-all ${i === index ? 'w-6 bg-mc-ink' : 'w-2 bg-mc-line'}`} />
           ))}
         </div>
         <div className="flex gap-3">
-          {step > 0 && (
-            <Button variant="ghost" onClick={() => setStep((s) => s - 1)}>
+          {index > 0 && (
+            <Button variant="ghost" size="lg" onClick={() => setIndex((s) => s - 1)}>
               Back
             </Button>
           )}
-          {step < 4 ? (
+          {!last ? (
             <Button size="lg" onClick={next} className="min-w-[180px]">
-              {step === 0 ? 'Begin' : step === 3 && mode === 'touch' ? 'Not now' : 'Continue'}
+              {step === 'welcome' ? 'Begin' : step === 'connect' && mode === 'touch' ? 'Not now' : 'Continue'}
             </Button>
           ) : (
             <Button size="lg" onClick={finish} className="min-w-[180px]">
