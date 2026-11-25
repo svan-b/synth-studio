@@ -159,6 +159,8 @@ export default function PlaySurface({
   useEffect(() => {
     viewRef.current?.clearMarks();
     viewRef.current?.setCursor(null);
+    // A run begins at the top of the page, so the first measures are there to be read while it waits.
+    viewRef.current?.rewind?.();
     setMarks({});
     setCount(null);
     setBeat(null);

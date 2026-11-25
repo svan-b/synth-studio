@@ -26,6 +26,8 @@ export interface ScoreViewHandle {
   setCursor(stepIndex: number | null): void;
   mark(noteId: string, state: NoteMark | null): void;
   clearMarks(): void;
+  /** Turn back to the top of the music, for a run that is about to begin. Views that never scroll have no need of it. */
+  rewind?(): void;
 }
 
 export interface ScoreViewProps {
@@ -261,6 +263,9 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     return () => mo.disconnect();
   }, []);
 
+  /** The music last drawn, so that new music can be told from the same music drawn again at a new size. */
+  const drawn = useRef<Score | null>(null);
+
   const applyCursor = (index: number | null, smooth = true) => {
     const cur = cursorRef.current;
     const wrap = wrapRef.current;
@@ -308,6 +313,22 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     }
   };
 
+  /**
+   * Back to the top of the music. The page otherwise stays wherever the last
+   * run left it, and the cursor's old place keeps it there even when the music
+   * has changed to something shorter: the stand would then be showing nothing.
+   */
+  const rewind = () => {
+    const cur = cursorRef.current;
+    if (cur) {
+      cur.style.opacity = '0';
+      cur.style.height = '0px';
+      cur.style.transform = 'translate(0px, 0px)';
+    }
+    cursorStep.current = null;
+    if (wrapRef.current) wrapRef.current.scrollTop = 0;
+  };
+
   const applyMark = (id: string, state: NoteMark | null) => {
     const p = positions.current.get(id);
     const el = p?.head ?? p?.group;
@@ -330,6 +351,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
       marks.current.forEach((_, id) => applyMark(id, null));
       marks.current.clear();
     },
+    rewind,
   }));
 
   useLayoutEffect(() => {
@@ -598,6 +620,10 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     if (innerRef.current) innerRef.current.style.marginTop = `${Math.max(0, Math.round((size.h - plan.height * z) * 0.3))}px`;
 
     marks.current.forEach((state, id) => applyMark(id, state));
+    if (drawn.current !== score) {
+      drawn.current = score;
+      rewind();
+    }
     applyCursor(cursorStep.current, false);
     onHeight?.(Math.ceil(plan.height * z));
     // eslint-disable-next-line react-hooks/exhaustive-deps
