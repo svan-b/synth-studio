@@ -590,10 +590,11 @@ export class Follower {
 
   private tempoStrike(ev: StrikeInput): void {
     const t = this.heardAt(ev.time);
-    const isStrum = (i: number) => this.steps[i].strum !== null;
-    // In strummed music every strike is a strum. In picked music the notes are matched as they come, and strikes only count the dead ones.
+    // In strummed music every strike is a strum, or in a pattern such as a
+    // waltz, the bass note on the first beat. In picked music the notes are
+    // matched as they come, and strikes only count the dead ones.
     if (this.score.kind !== 'strum' && !this.options.anyStrike) return;
-    const hit = this.nearestStep(t, (i) => this.options.anyStrike || isStrum(i));
+    const hit = this.nearestStep(t, () => true);
     if (!hit) {
       this.extra++;
       const beat = this.transport.beatAt(t);

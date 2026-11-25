@@ -169,6 +169,22 @@ describe('the follower, with a beat', () => {
     expect(hardestChange(r)).toEqual({ from: 'G', to: 'C', times: 2 });
   });
 
+  it('takes the bass note of a waltz pattern as a strike on its beat, not an extra strum', () => {
+    const score = parseScore({ chart: 'A | D', strum: 'B.D.D.', time: [3, 4], tempo: 84 });
+    const f = new Follower(score, { mode: 'tempo', inputDelay: 0, metronome: false });
+    const { result } = run(f);
+    expect(f.steps.some((s) => s.strum === null)).toBe(true);
+    playAll(f, (i) => {
+      const step = f.steps[i];
+      // A plucked bass note is heard as its own note of the scale.
+      return step.strum ? of(step.strum.chord) : chroma([step.notes[0].midi % 12]);
+    });
+    const r = result()!;
+    expect(r.extraStrikes).toBe(0);
+    expect(r.missedSteps).toBe(0);
+    expect(r.accuracy).toBe(1);
+  });
+
   it('counts missed and extra strums, and lateness', () => {
     const score = parseScore({ chart: 'Em | Em', strum: 'D.D.D.D.', tempo: 70 });
     const f = new Follower(score, { mode: 'tempo', inputDelay: 0, metronome: false });
