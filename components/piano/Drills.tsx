@@ -183,7 +183,7 @@ function ReadingDrill({ onClose }: { onClose: (finished?: boolean) => void }) {
   return (
     <Shell title="Note reading" progress={index / deck.length} onClose={() => onClose(false)}>
       <div className="flex h-full min-h-0 flex-col">
-        <div className="px-7 text-[1.15rem] text-mc-muted">
+        <div className="px-7 text-[1.35rem] text-mc-ink/85">
           {reveal ? (
             <span className={reveal.ok ? 'text-mc-ok' : 'text-mc-hint-ink'}>
               {reveal.ok ? 'Yes.' : 'Not that one.'} This note is <strong>{midiLabel(reveal.midi)}</strong>.
@@ -440,10 +440,12 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
     [adapt, advance, hear, kind, phase, tries],
   );
 
+  // As in a lesson: the top key always goes on, and the bottom key hears it again where there is something to hear.
   useRemote({
-    primary: phase === 'look' ? () => setPhase('play') : note ? advance : undefined,
+    primary: phase === 'look' ? () => setPhase('play') : advance,
     secondary: hear,
   });
+  const keys = useInputMode() === 'midi';
 
   if (finished) {
     return (
@@ -478,23 +480,24 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
     <Shell title={round.title} progress={index / round.count} onClose={() => onClose(false)}>
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-center gap-4 px-7 pb-2 pt-1">
-          <div className={`min-w-0 flex-1 text-[1.15rem] leading-snug ${note ? (note.ok ? 'text-mc-ok' : 'text-mc-hint-ink') : 'text-mc-muted'}`}>
+          <div className={`min-w-0 flex-1 text-[1.35rem] leading-snug ${note ? (note.ok ? 'text-mc-ok' : 'text-mc-hint-ink') : 'text-mc-ink/85'}`}>
             {note ? note.text : brief.split('**').map((part, i) => (i % 2 ? <strong key={i} className="text-mc-ink">{part}</strong> : <span key={i}>{part}</span>))}
           </div>
           <Pill>Level {level}</Pill>
           {kind === 'ear' && (
-            <Button variant="soft" size="sm" onClick={hear} icon={<Icon.Ear size={16} />}>
+            <Button variant="soft" onClick={hear} icon={<Icon.Ear size={18} />} hint={keys ? 'bottom key' : undefined}>
               Hear it
             </Button>
           )}
-          {phase === 'look' && (
-            <Button size="sm" onClick={() => setPhase('play')} className="mc-pulse">
+          {phase === 'look' ? (
+            <Button onClick={() => setPhase('play')} className="mc-pulse" hint={keys ? 'top key' : undefined}>
               I am ready
             </Button>
+          ) : (
+            <Button variant="ghost" onClick={advance} hint={keys ? 'top key' : undefined}>
+              {note ? 'Go on' : 'Skip'}
+            </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={advance}>
-            Skip
-          </Button>
         </div>
         <div className="min-h-0 flex-1">
           {phase === 'look' ? (
