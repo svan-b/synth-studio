@@ -18,6 +18,22 @@ A guitar teacher for an acoustic guitar and an iPad on a stand. It lives at `/gu
 - **A sound check.** The app strums, you strum, and it tells you whether the iPad is loud enough beside your guitar, with the iPad's own volume shown.
 - **The method page** in the app sets out each teaching choice, the studies behind it, and how strong the evidence is.
 
+## Made for hands on the guitar
+
+The learner sits with a guitar on the lap and the iPad on a stand about an arm's length away. Both hands are busy, and the eyes move between the fretting hand and the screen. Every playing screen is built around that.
+
+- **One line at the top** says what to do, or how the last try went. It is set large enough to read from the chair. Text size is a choice made at the first start and in Settings (standard, large, largest), and large is where it begins.
+- **One bar along the bottom** holds every control, in the same places on every screen. Back, again and hearing it sit on one side. The next thing to do sits on the other side and is the largest button on the screen. For a left handed player the sides swap.
+- **The app moves on by itself.** After a step that went well, the next one begins in a few seconds, shown as a count on the button. A touch anywhere else holds it there for as long as the learner wants to read.
+- **A strum starts things.** Where the app waits to begin a run, one strum begins it. Between the parts of a session a strum carries on to the next part.
+- **A foot pedal works.** Bluetooth page turning pedals are small keyboards, so the keys they send are answered: right arrow, down arrow, page down, return and space go forward, and left arrow, up arrow and page up go back or play it again. A keyboard works the same way.
+- **Nobody gets stuck.** Every step can be skipped. A step that is not heard right after three tries is let go and the lesson carries on, and after two failed runs the main button becomes Move on. In a song, the plan opens to show every step, and a tap on any of them goes there.
+- **Eyes on the music.** While a run with the click is under way, the words at the top step back and only the chord, the next chord, the strum and the bar stay. The chord to play is the largest thing on the screen, the next chord sits beside it and lights up in the beat before the change, and the count in fills the middle of the screen.
+- **The tuner follows the string that is plucked**, so there is nothing to tap between strings, and it says Tighten or Loosen in large words.
+- **Read aloud**, a setting that is off until asked for, speaks each instruction and result in the iPad's own voice. The app does not take its own voice for the guitar, and it does not move on while it is still speaking.
+
+These choices follow what the best known music apps do well, and what their users complain about. Sheet music readers take page turns from a pedal. Song trainers show the next chord beside the current one, with the strum under it. Tuners find the string by ear. The most common complaint about listening apps is being held on a step the app did not hear right, which is why skipping is always one press away here.
+
 ## The iPad app
 
 `ios-guitar/` holds a native iPad app that carries the guitar teacher inside it. It needs no connection, keeps progress in a file of its own with a dated copy in the Files app, saves recordings to the Files app, sets the reminder at your time to play, reports the iPad's volume for the sound check, and holds the screen awake on its stand. `ios-guitar/README.md` has the steps for putting it on an iPad from a Mac.

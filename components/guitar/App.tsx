@@ -7,15 +7,16 @@ import { getLesson, songInfo } from '@/lib/guitar/content/catalog';
 import { listener } from '@/lib/guitar/input/listen';
 import { songProgress } from '@/lib/guitar/learn/coach';
 import { currentSong, planDay, type Block } from '@/lib/guitar/learn/planner';
-import { daysThisWeek, useGuitar } from '@/lib/guitar/learn/store';
+import { daysThisWeek, textSizeOf, useGuitar } from '@/lib/guitar/learn/store';
 import { isNative, onWake, setReminder } from '@/lib/guitar/native/bridge';
 import { dayKey } from '@/lib/guitar/util/emitter';
 import Drill from './Drills';
-import { useApplySettings, usePracticeTimer, useTheme, useToday, useWakeLock } from './hooks';
+import { useApplySettings, useListening, usePracticeTimer, useTheme, useToday, useWakeLock } from './hooks';
 import LessonPlayer from './LessonPlayer';
 import Onboarding from './Onboarding';
 import { LessonsScreen, MethodScreen, PracticeScreen, ProgressScreen, SettingsScreen, SongsScreen, TodayScreen, type Activity, type View } from './Screens';
 import SongRoom from './SongRoom';
+import { ActionBar } from './Stage';
 import Tuner from './Tuner';
 import { Button, Icon, IconButton } from './ui';
 
@@ -37,18 +38,18 @@ function TuneActivity({ onClose }: { onClose: () => void }) {
   usePracticeTimer((seconds) => logPractice(seconds, 0, 1));
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-os-bg os-safe-top os-safe-bottom">
-      <header className="flex h-16 shrink-0 items-center gap-3 px-4">
-        <IconButton label="Close" onClick={onClose}>
-          <Icon.Close />
+      <header className="flex h-16 shrink-0 items-center gap-2 px-3">
+        <IconButton label="Close" onClick={onClose} className="h-14 w-14">
+          <Icon.Close size={26} />
         </IconButton>
-        <div className="min-w-0 flex-1 truncate font-os-serif text-[1.4rem]">Tune up</div>
+        <div className="min-w-0 flex-1 truncate font-os-serif text-[1.5rem]">Tune up</div>
       </header>
       <div className="os-scroll min-h-0 flex-1">
-        <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-center px-7 py-6">
-          <p className="mb-6 text-center text-[1.1rem] text-os-muted">String by string, from the thickest. The app moves on by itself when each one is in tune.</p>
-          <Tuner onDone={onClose} />
+        <div className="mx-auto flex min-h-full max-w-6xl flex-col justify-center px-7 py-3">
+          <Tuner onDone={onClose} bar />
         </div>
       </div>
+      <ActionBar primary={{ label: 'It is in tune', onClick: onClose, quiet: true }} />
     </div>
   );
 }
@@ -143,6 +144,10 @@ function SessionRunner({ blocks: planned, onClose }: { blocks: Block[]; onClose:
     closed.current = false;
     setBetween(false);
   }, []);
+  /** Leave a part out and look at the next. */
+  const skipPart = useCallback(() => setIndex((i) => i + 1), []);
+  // Inside the iPad app the microphone is already open here, so a strum can carry the session on.
+  const { status: hearing } = useListening(true);
 
   const afterBlock = useCallback(() => {
     if (closed.current) return;
@@ -168,56 +173,56 @@ function SessionRunner({ blocks: planned, onClose }: { blocks: Block[]; onClose:
   if (!done && !between) return <BlockActivity key={index} block={blocks[index]} onClose={afterBlock} />;
 
   return (
-    <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-7 bg-os-bg px-8 text-center os-safe-top os-safe-bottom">
+    <div className="absolute inset-0 z-40 flex flex-col bg-os-bg os-safe-top os-safe-bottom">
       {done ? (
         <>
-          <div className="os-pop flex h-20 w-20 items-center justify-center rounded-full bg-os-ok text-white">
-            <Icon.Check size={44} />
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-7 px-8 text-center">
+            <div className="os-pop flex h-24 w-24 items-center justify-center rounded-full bg-os-ok text-white">
+              <Icon.Check size={54} />
+            </div>
+            <div className="os-fade-up">
+              <h2 className="font-os-serif text-[3.4rem] leading-tight">Session complete</h2>
+              {summary && summary.rows.length > 0 && (
+                <dl className="mx-auto mt-6 w-full max-w-xl divide-y divide-os-line rounded-2xl bg-os-surface px-6 text-left text-[1.3rem]">
+                  {summary.rows.map(([label, value]) => (
+                    <div key={`${label}-${value}`} className="flex items-baseline justify-between gap-6 py-3">
+                      <dt className="text-os-muted">{label}</dt>
+                      <dd className="text-right font-semibold text-os-ink">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              <p className="mx-auto mt-5 max-w-2xl text-[1.3rem] leading-relaxed text-os-muted">
+                What you worked on keeps settling after you stop, and it will feel easier next time. {summary?.next ?? 'Come back tomorrow.'}
+              </p>
+            </div>
           </div>
-          <div className="os-fade-up">
-            <h2 className="font-os-serif text-5xl">Session complete</h2>
-            {summary && summary.rows.length > 0 && (
-              <dl className="mx-auto mt-6 w-full max-w-md divide-y divide-os-line rounded-2xl bg-os-surface px-5 text-left">
-                {summary.rows.map(([label, value]) => (
-                  <div key={`${label}-${value}`} className="flex items-baseline justify-between gap-6 py-2.5">
-                    <dt className="text-os-muted">{label}</dt>
-                    <dd className="text-right font-semibold text-os-ink">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-            <p className="mx-auto mt-4 max-w-xl text-[1.05rem] leading-relaxed text-os-muted">
-              What you worked on keeps settling after you stop, and it will feel easier next time. {summary?.next ?? 'Come back tomorrow.'}
-            </p>
-          </div>
-          <Button size="lg" onClick={onClose} className="min-w-[220px]">
-            Finish
-          </Button>
+          <ActionBar primary={{ label: 'Finish', onClick: onClose }} />
         </>
       ) : (
         <>
-          <div className="os-fade-up">
-            <div className="text-sm font-semibold uppercase tracking-widest text-os-muted">
-              {index === 0 ? 'First' : 'Next'}, part {index + 1} of {blocks.length}
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 px-8 text-center">
+            <div className="os-fade-up">
+              <div className="text-[1.15rem] font-semibold uppercase tracking-widest text-os-muted">
+                {index === 0 ? 'First' : 'Next'}, part {index + 1} of {blocks.length}
+              </div>
+              <h2 className="mt-3 font-os-serif text-[4rem] leading-tight">{blocks[index].title}</h2>
+              <p className="os-say mt-3">
+                {blocks[index].detail.replace(/[.\s]+$/, '')}. About {blocks[index].minutes} {blocks[index].minutes === 1 ? 'minute' : 'minutes'}.
+              </p>
             </div>
-            <h2 className="mt-2 font-os-serif text-5xl">{blocks[index].title}</h2>
-            <p className="mt-3 text-[1.15rem] text-os-muted">
-              {blocks[index].detail.replace(/[.\s]+$/, '')}. About {blocks[index].minutes} {blocks[index].minutes === 1 ? 'minute' : 'minutes'}.
-            </p>
+            <div className="flex items-center gap-3" aria-hidden>
+              {blocks.map((_, i) => (
+                <span key={i} className={`h-4 rounded-full ${i < index ? 'w-4 bg-os-ok' : i === index ? 'w-12 bg-os-ink' : 'w-4 bg-os-line'}`} />
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-2" aria-hidden>
-            {blocks.map((_, i) => (
-              <span key={i} className={`h-2.5 rounded-full ${i < index ? 'w-2.5 bg-os-ok' : i === index ? 'w-8 bg-os-ink' : 'w-2.5 bg-os-line'}`} />
-            ))}
-          </div>
-          <div className="flex gap-3">
-            <Button variant="ghost" size="lg" onClick={onClose}>
-              Stop for today
-            </Button>
-            <Button size="lg" onClick={start} className="min-w-[220px]">
-              {index === 0 ? 'Start' : 'Continue'}
-            </Button>
-          </div>
+          {/* The place to rest between parts. A strum carries on, so the hands can stay where they are. */}
+          <ActionBar
+            extras={[{ label: 'Stop for today', onClick: onClose }]}
+            skip={index + 1 < blocks.length ? { label: 'Skip this part', onClick: skipPart } : null}
+            primary={{ label: index === 0 ? 'Start' : 'Continue', onClick: start, strum: hearing.state === 'listening' }}
+          />
         </>
       )}
     </div>
@@ -227,7 +232,7 @@ function SessionRunner({ blocks: planned, onClose }: { blocks: Block[]; onClose:
 export default function App() {
   const theme = useTheme();
   const onboarded = useGuitar((s) => s.profile.onboarded);
-  const bigText = useGuitar((s) => s.settings.bigText);
+  const textSize = useGuitar((s) => textSizeOf(s.settings));
   const reminder = useGuitar((s) => s.settings.reminder);
   const playAt = useGuitar((s) => s.profile.playAt);
   const today = useToday();
@@ -308,7 +313,7 @@ export default function App() {
   }, [onboarded]);
 
   return (
-    <div className="os-root" data-theme={theme} data-size={bigText ? 'big' : 'normal'}>
+    <div className="os-root" data-theme={theme} data-size={textSize}>
       <div ref={behind} className="flex h-full landscape:flex-row portrait:flex-col-reverse">
         <nav
           className="flex shrink-0 border-os-line bg-os-surface/70 landscape:w-[92px] landscape:flex-col landscape:border-r landscape:py-5 portrait:h-[76px] portrait:border-t portrait:px-2 os-safe-bottom"

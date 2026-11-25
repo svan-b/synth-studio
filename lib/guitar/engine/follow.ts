@@ -48,6 +48,12 @@ export interface FollowOptions {
   stopAfter?: { hints: number; wrong: number } | null;
   /** Seconds the microphone adds before a sound is heard, from the timing check. */
   inputDelay?: number;
+  /**
+   * Wait mode: after this many tries at one step that were wrong or unclear,
+   * the step is let go as not quite right and the music moves on. A learner
+   * is never left stranded on a chord the microphone keeps mishearing. 0 for never.
+   */
+  giveAfter?: number;
 }
 
 export interface MeasureStat {
@@ -140,6 +146,7 @@ export type FollowEvent =
   | { type: 'unclear'; index: number; missing?: number[] }
   | { type: 'false-start' }
   | { type: 'hint'; index: number }
+  | { type: 'given'; index: number }
   | { type: 'pulse'; beat: number; accent: boolean; countIn: boolean; number: number }
   | { type: 'done'; result: FollowResult };
 
@@ -222,6 +229,7 @@ export class Follower {
       confusers: opts.confusers ?? [],
       stopAfter: opts.stopAfter ?? null,
       inputDelay: opts.inputDelay ?? 0.06,
+      giveAfter: opts.giveAfter ?? 0,
     };
     this.steps = this.options.mode === 'wait' && this.options.changesOnly && score.kind === 'strum' ? changeSteps(score) : score.steps;
   }
@@ -427,6 +435,11 @@ export class Follower {
     this.addError(step.measure);
     if (this.stepWrong + this.stepUnclear >= this.options.hintAfterWrong) this.showHint();
     this.stopIfStuck();
+    const give = this.options.giveAfter;
+    if (give > 0 && this.phase === 'playing' && this.stepWrong + this.stepUnclear >= give) {
+      this.events.emit({ type: 'given', index: this.index });
+      this.complete();
+    }
   }
 
   private waitNote(ev: NoteInput): void {

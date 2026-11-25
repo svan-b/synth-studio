@@ -39,8 +39,12 @@ export interface Settings {
   latencyMs: number;
   /** Chord pictures drawn for a guitar held the other way round. */
   leftHanded: boolean;
-  /** Everything a size larger. */
+  /** Everything a size larger. Kept for progress saved before there were three sizes. */
   bigText: boolean;
+  /** Text size, chosen from where the learner sits: 0 standard, 1 large, 2 largest. */
+  textSize?: 0 | 1 | 2;
+  /** Read the coach's words aloud. */
+  speak?: boolean;
   /** A reminder at the time to play, inside the iPad app. */
   reminder: boolean;
 }
@@ -128,8 +132,16 @@ const defaultSettings: Settings = {
   latencyMs: 0,
   leftHanded: false,
   bigText: false,
+  // Read from a chair with a guitar on the lap, so it starts a size up. The welcome screens ask.
+  textSize: 1,
+  speak: false,
   reminder: false,
 };
+
+/** The text size in use: the chosen one, or what the older setting meant. */
+export function textSizeOf(settings: Settings): 0 | 1 | 2 {
+  return settings.textSize ?? (settings.bigText ? 1 : 0);
+}
 
 /** The key a pair of chords is kept under, the same whichever way round. */
 export function pairKey(a: string, b: string): string {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { guitar } from '@/lib/guitar/audio/engine';
+import { whenQuiet } from '@/lib/guitar/audio/speech';
 import { instrument, playSong } from '@/lib/guitar/audio/instrument';
 import { Follower, type FollowEvent, type FollowResult } from '@/lib/guitar/engine/follow';
 import { strikeBus } from '@/lib/guitar/input/bus';
@@ -15,6 +16,7 @@ import { ChordDiagram } from './ChordDiagram';
 import { Neck, PatternView } from './Figures';
 import { useDeviceVolume, useListening } from './hooks';
 import { TabView, type StepMark } from './TabView';
+import { setFocus, useRemoteKey } from './Stage';
 import { Button, Icon } from './ui';
 
 export type SurfaceMode = 'listen' | 'wait' | 'tempo';
@@ -55,6 +57,10 @@ export interface SurfaceProps {
   extra?: ReactNode;
   /** A tune the app plays over the chords when listening. */
   melody?: Score | null;
+  /** Told the way to start a timed run while it waits to be started, and null otherwise, so the screen's own bar can offer it. */
+  onGate?: (start: (() => void) | null) => void;
+  /** When the music waits: tries at one step before it is let go. 0 for never. */
+  giveAfter?: number;
 }
 
 interface Note {
@@ -84,6 +90,14 @@ export default function PlaySurface(props: SurfaceProps) {
   const [count, setCount] = useState<number | null>(null);
   const [pulse, setPulse] = useState<{ n: number; accent: boolean } | null>(null);
   const [heard, setHeard] = useState(0);
+  // What the last strum was judged to be, shown on the chord itself.
+  const [flash, setFlash] = useState<{ key: number; tone: StepMark } | null>(null);
+  const [heardAs, setHeardAs] = useState<string | null>(null);
+  // Where in the strum pattern the music is.
+  const [slot, setSlot] = useState<number | null>(null);
+  const flashKey = useRef(0);
+  const onGateRef = useRef(props.onGate);
+  onGateRef.current = props.onGate;
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
   const onTakeRef = useRef(props.onTake);
@@ -98,14 +112,16 @@ export default function PlaySurface(props: SurfaceProps) {
   const changesOnly = props.changesOnly ?? (mode === 'wait' && score.kind === 'strum');
   const steps = useMemo(() => (changesOnly && score.kind === 'strum' ? changeSteps(score) : score.steps), [changesOnly, score]);
   const stepNow = current !== null ? steps[current] : steps[0];
-  const nextChord = useMemo(() => {
+  const nextUp = useMemo(() => {
     if (!stepNow?.strum) return null;
     for (let i = (current ?? 0) + 1; i < steps.length; i++) {
       const c = steps[i].strum?.chord;
-      if (c && c !== stepNow.strum.chord) return c;
+      // Within a beat of the change, the next chord is the thing to look at.
+      if (c && c !== stepNow.strum.chord) return { chord: c, soon: steps[i].start - stepNow.start <= 1 };
     }
     return null;
   }, [current, stepNow, steps]);
+  const nextChord = nextUp?.chord ?? null;
 
   // A strike heard anywhere, to show the app is listening.
   useEffect(() => strikeBus.subscribe(() => setHeard((h) => h + 1)), []);
@@ -117,6 +133,9 @@ export default function PlaySurface(props: SurfaceProps) {
     setNote(null);
     setCount(null);
     setPulse(null);
+    setFlash(null);
+    setHeardAs(null);
+    setSlot(null);
   }, []);
 
   // ------------------------------------------------------------- listening
@@ -128,11 +147,19 @@ export default function PlaySurface(props: SurfaceProps) {
     let stop: (() => void) | null = null;
     let cancelled = false;
     const t = setTimeout(() => {
-      void guitar.unlock().then(() => {
-        // Sound may take a moment to wake. If this run was left meanwhile, it does not play.
-        if (cancelled) return;
-        stop = playSong(score, props.melody ?? null, { bpm, onStep: (i) => setCurrent(i), onDone: () => onDoneRef.current(null) });
-      });
+      void guitar
+        .unlock()
+        // Where the instruction is being read aloud, the example waits for the voice to finish.
+        .then(() => whenQuiet())
+        .then(() => {
+          // Sound may take a moment to wake. If this run was left meanwhile, it does not play.
+          if (cancelled) return;
+          stop = playSong(score, props.melody ?? null, {
+            bpm,
+            onStep: (i) => setCurrent(i),
+            onDone: () => onDoneRef.current(null),
+          });
+        });
     }, props.leadIn ?? 350);
     return () => {
       cancelled = true;
@@ -170,6 +197,8 @@ export default function PlaySurface(props: SurfaceProps) {
       confusers: props.confusers,
       stopAfter: props.stopAfter ?? null,
       inputDelay: 0.06 + latencyMs / 1000,
+      // A chord the microphone keeps mishearing is let go after three tries, so nobody is left stranded.
+      giveAfter: mode === 'wait' ? (props.giveAfter ?? 3) : 0,
     });
     followRef.current = f;
     let recording = false;
@@ -192,11 +221,23 @@ export default function PlaySurface(props: SurfaceProps) {
           setPulse({ n: ev.number, accent: ev.accent });
           if (ev.countIn) setCount(ev.number);
           break;
-        case 'step':
+        case 'step': {
           setCurrent(ev.index);
           if (mode === 'wait') setHint(null);
+          const st = f.steps[ev.index];
+          if (mode === 'tempo' && st) setSlot(Math.round((st.start - (score.measureStarts[st.measure] ?? 0)) * 2));
+          break;
+        }
+        case 'given':
+          setNote({
+            tone: 'hint',
+            text: 'Near enough for now. On to the next one.',
+          });
           break;
         case 'mark':
+          flashKey.current += 1;
+          setFlash({ key: flashKey.current, tone: ev.state });
+          if (ev.state !== 'bad') setHeardAs(null);
           setMarks((m) => new Map(m).set(ev.index, ev.state));
           if (mode === 'wait' && ev.state !== 'bad') setNote(null);
           break;
@@ -206,13 +247,26 @@ export default function PlaySurface(props: SurfaceProps) {
         case 'wrong': {
           if (mode !== 'wait') break;
           const want = steps[ev.index];
-          if (ev.heard && want?.strum) setNote({ tone: 'hint', text: `That sounded more like ${sayChord(ev.heard)}. Check the picture for ${sayChord(want.strum.chord)}.` });
-          else if (ev.midi !== undefined) setNote({ tone: 'hint', text: `That was ${sayLetter(noteLetter(ev.midi))}. ${placeWords(want)}` });
+          flashKey.current += 1;
+          setFlash({ key: flashKey.current, tone: 'warn' });
+          if (ev.heard && want?.strum) {
+            setHeardAs(ev.heard);
+            setNote({
+              tone: 'hint',
+              text: `That sounded more like ${sayChord(ev.heard)}. Check the picture for ${sayChord(want.strum.chord)}.`,
+            });
+          } else if (ev.midi !== undefined)
+            setNote({
+              tone: 'hint',
+              text: `That was ${sayLetter(noteLetter(ev.midi))}. ${placeWords(want)}`,
+            });
           break;
         }
         case 'unclear': {
           if (mode !== 'wait') break;
           const want = steps[ev.index];
+          flashKey.current += 1;
+          setFlash({ key: flashKey.current, tone: 'warn' });
           if (want?.strum) {
             setNote({
               tone: 'hint',
@@ -221,12 +275,19 @@ export default function PlaySurface(props: SurfaceProps) {
                   ? `Not every string rang. ${ev.missing.map((pc) => sayLetter(noteLetter(pc))).join(' and ')} ${ev.missing.length === 1 ? 'was' : 'were'} hard to hear. Arch your fingers and press just behind the frets.`
                   : 'That strum sounded muted. Press a little firmer, just behind the frets.',
             });
-          } else setNote({ tone: 'hint', text: 'That note did not ring clearly. Press with the fingertip, just behind the fret.' });
+          } else
+            setNote({
+              tone: 'hint',
+              text: 'That note did not ring clearly. Press with the fingertip, just behind the fret.',
+            });
           break;
         }
         case 'false-start':
           // This run has stopped itself. A fresh one waits for the learner, with the reason shown.
-          carryNote.current = { tone: 'hint', text: 'You started before the count in finished. Wait for the clicks, then come in.' };
+          carryNote.current = {
+            tone: 'hint',
+            text: 'You started before the count in finished. Wait for the clicks, then come in.',
+          };
           setRestart((r) => r + 1);
           break;
         case 'done':
@@ -301,80 +362,117 @@ export default function PlaySurface(props: SurfaceProps) {
       </div>
     ) : null;
 
+  // The screen's own bar offers Start while a timed run waits to begin. The pedal starts it too.
+  const gateOpen = mode === 'tempo' && phase === 'gate' && listening && !held;
+  useEffect(() => {
+    onGateRef.current?.(gateOpen ? begin : null);
+    return () => onGateRef.current?.(null);
+  }, [begin, gateOpen, runId, restart]);
+  useRemoteKey('forward', gateOpen ? begin : null, 5);
+
+  // While a run with the beat is under way, everything but the music steps back.
+  const underWay = mode === 'tempo' && (phase === 'countin' || phase === 'playing');
+  useEffect(() => {
+    setFocus(underWay);
+    return () => setFocus(false);
+  }, [underWay]);
+
+  const strumNow = (display === 'chord' || display === 'chart') && stepNow?.strum ? stepNow.strum : null;
+  const big = display === 'chord';
+  const flashClass = flash ? (flash.tone === 'ok' ? 'os-flash-ok' : 'os-flash-warn') : '';
+  const wrongNow = heardAs !== null && mode === 'wait';
+  const beatNow = current !== null && steps[current] ? steps[current].start : null;
+  const changeSoon = Boolean(nextUp?.soon) && mode === 'tempo' && phase === 'playing' && current !== null;
+
   return (
-    <div className={`flex h-full min-h-0 flex-col ${props.veil ? 'os-veil' : ''}`}>
-      {/* What is happening now: the beat, the count, and what was heard. */}
-      <div className="flex min-h-[3.5rem] shrink-0 items-center gap-4 px-7">
+    <div className={`relative flex h-full min-h-0 flex-col ${props.veil ? 'os-veil' : ''}`}>
+      {/* What is happening now: the beat, and what was heard. */}
+      <div className="flex min-h-[3.25rem] shrink-0 items-center gap-4 px-7">
         {mode === 'tempo' && phase !== 'gate' && (
-          <div className="flex items-center gap-2" aria-hidden>
+          <div className="flex items-center gap-3" aria-hidden>
             {Array.from({ length: pulses }, (_, i) => (
               <span key={i} className={`os-beat-dot ${pulse && pulse.n === i + 1 ? 'is-on' : ''} ${i === 0 ? 'is-accent' : ''}`} />
             ))}
           </div>
         )}
-        {count !== null && phase === 'countin' && (
-          <span key={count} className="os-count font-os-serif text-4xl font-semibold">
-            {count}
-          </span>
-        )}
         <div className="min-w-0 flex-1">
-          {note && <div className={`os-fade-up text-[1.1rem] leading-snug ${note.tone === 'ok' ? 'text-os-ok' : note.tone === 'bad' ? 'text-os-bad' : 'text-os-hint-ink'}`}>{note.text}</div>}
+          {/* Waiting to begin: one plain line, large, and a strum is all it takes. */}
+          {gateOpen && !note && (
+            <div className="os-fade-up inline-flex items-center gap-3 rounded-full bg-os-accent py-2 pl-2 pr-6 text-white">
+              <span className="os-pulse flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
+                <Icon.Guitar size={24} />
+              </span>
+              <span className="text-[1.55rem] font-semibold leading-tight">Strum once to begin</span>
+            </div>
+          )}
+          {note && <div className={`os-fade-up text-[1.35rem] font-medium leading-snug ${note.tone === 'ok' ? 'text-os-ok-ink' : note.tone === 'bad' ? 'text-os-bad' : 'text-os-hint-ink'}`}>{note.text}</div>}
           {!note && mode === 'listen' && deviceVolume !== null && deviceVolume < 0.4 && (
-            <div className="text-[1.05rem] leading-snug text-os-hint-ink">The iPad is turned down low. Turn it up with the buttons on its side to hear this clearly.</div>
+            <div className="text-[1.25rem] leading-snug text-os-hint-ink">The iPad is turned down low. Turn it up with the buttons on its side to hear this clearly.</div>
           )}
-          {!note && mode === 'tempo' && phase === 'gate' && listening && (
-            <div className="text-[1.15rem] font-medium text-os-ink">Strum once when you are ready, and the count in begins.</div>
-          )}
-          {!note && mode === 'wait' && notesHint && <div className="text-[1.1rem] text-os-muted">{placeWords(stepNow)}</div>}
+          {!note && mode === 'wait' && notesHint && <div className="text-[1.35rem] text-os-ink">{placeWords(stepNow)}</div>}
         </div>
         {mode !== 'listen' && listening && (
-          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-os-raised text-os-muted" title="Listening">
-            <Icon.Mic size={18} />
-            <span key={heard} className={heard > 0 ? 'os-heard absolute inset-0 rounded-full border-2 border-os-accent' : ''} />
+          <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-os-raised text-os-muted" title="Listening">
+            <Icon.Mic size={22} />
+            <span key={heard} className={heard > 0 ? 'os-heard absolute inset-0 rounded-full border-[3px] border-os-accent' : ''} />
           </span>
-        )}
-        {mode === 'tempo' && phase === 'gate' && listening && (
-          <Button size="sm" onClick={begin} icon={<Icon.Play size={16} />}>
-            Start
-          </Button>
         )}
         {props.extra}
       </div>
 
-      <div className="min-h-0 flex-1 px-7 pb-6">
+      <div className="min-h-0 flex-1 px-7 pb-3">
         {micBlock ?? (
           <div className="flex h-full min-h-0 flex-col gap-4">
-            {(display === 'chord' || display === 'chart') && stepNow?.strum && (
-              <div className="flex shrink-0 items-end justify-center gap-8">
-                <div className="flex flex-col items-center">
-                  <ChordDiagram chord={stepNow.strum.chord} shape={stepNow.strum.shape} width={display === 'chord' ? 230 : 170} />
+            {strumNow && (
+              <div className={`grid min-h-0 flex-1 gap-x-8 gap-y-4 ${big ? '' : 'landscape:grid-cols-[auto_minmax(0,1fr)] portrait:grid-rows-[auto_minmax(0,1fr)]'}`}>
+                {/* The chord to play now, the largest thing in view, with the next one beside it. */}
+                <div className={`flex items-end justify-center gap-7 ${big ? 'h-full items-center' : 'landscape:items-start'}`}>
+                  <div key={flash?.key ?? 'still'} className={`flex flex-col items-center rounded-[2rem] px-4 pb-2 pt-1 ${flashClass} ${wrongNow ? 'ring-[6px] ring-os-hint' : ''}`}>
+                    <div className={`font-os-serif font-semibold leading-none ${big ? 'text-[6.5rem]' : 'text-[5.25rem]'}`}>{strumNow.chord}</div>
+                    {wrongNow && <div className="os-fade-up mt-1 text-[1.6rem] font-semibold text-os-hint-ink">Heard {heardAs}</div>}
+                    <ChordDiagram chord={strumNow.chord} shape={strumNow.shape} width={big ? 310 : 270} name={false} />
+                  </div>
+                  {nextChord && (
+                    <div className={`flex flex-col items-center rounded-[1.5rem] px-3 pb-2 pt-1 transition-colors duration-150 ${changeSoon ? 'bg-os-accent/20 ring-4 ring-os-accent' : ''}`}>
+                      <span className={`text-[1.15rem] font-semibold uppercase tracking-widest ${changeSoon ? 'text-os-ink' : 'text-os-muted'}`}>Next</span>
+                      <span className="font-os-serif text-[3rem] font-semibold leading-tight">{nextChord}</span>
+                      <ChordDiagram chord={nextChord} width={big ? 190 : 160} name={false} />
+                    </div>
+                  )}
                 </div>
-                {nextChord && (
-                  <div className="flex flex-col items-center opacity-70">
-                    <span className="mb-1 text-xs font-semibold uppercase tracking-widest text-os-faint">Next</span>
-                    <ChordDiagram chord={nextChord} width={display === 'chord' ? 150 : 120} />
+                {!big && (
+                  <div className="flex min-h-0 flex-col gap-4">
+                    {props.pattern && mode !== 'wait' && (
+                      <div className="flex shrink-0 justify-center landscape:justify-start">
+                        <PatternView pattern={props.pattern} time={score.time} now={mode === 'tempo' && phase === 'playing' ? slot : null} large />
+                      </div>
+                    )}
+                    <div className="os-scroll min-h-0 flex-1">
+                      {props.words && props.lyrics ? (
+                        <WordsView lyrics={props.lyrics} measure={current !== null && stepNow ? stepNow.measure + score.measureOffset : null} score={score} beat={beatNow} />
+                      ) : (
+                        <ChartView score={score} current={chartCurrent} marks={changesOnly ? remap(marks, steps, score) : marks} />
+                      )}
+                    </div>
                   </div>
                 )}
-                {display === 'chart' && props.pattern && mode !== 'wait' && (
-                  <div className="hidden flex-col items-center gap-2 landscape:flex">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-os-faint">Strum</span>
-                    <PatternView pattern={props.pattern} time={score.time} />
-                  </div>
-                )}
+              </div>
+            )}
+            {display === 'chart' && !strumNow && (
+              <div className="os-scroll min-h-0 flex-1">
+                <ChartView score={score} current={chartCurrent} marks={changesOnly ? remap(marks, steps, score) : marks} />
               </div>
             )}
             {display === 'chord' && stepNow && !stepNow.strum && (
               <div className="flex justify-center">
-                <Neck marks={stepNow.notes.map((n) => ({ string: n.place.string, fret: n.place.fret, label: noteLetter(n.midi) }))} frets={5} />
-              </div>
-            )}
-            {display === 'chart' && (
-              <div className="os-scroll min-h-0 flex-1">
-                {props.words && props.lyrics ? (
-                  <WordsView lyrics={props.lyrics} measure={current !== null && stepNow ? stepNow.measure + score.measureOffset : null} />
-                ) : (
-                  <ChartView score={score} current={chartCurrent} marks={changesOnly ? remap(marks, steps, score) : marks} />
-                )}
+                <Neck
+                  marks={stepNow.notes.map((n) => ({
+                    string: n.place.string,
+                    fret: n.place.fret,
+                    label: noteLetter(n.midi),
+                  }))}
+                  frets={5}
+                />
               </div>
             )}
             {display === 'tab' && (
@@ -385,7 +483,20 @@ export default function PlaySurface(props: SurfaceProps) {
                 {notesHint && (
                   <div className="flex shrink-0 justify-center">
                     <div className="w-full max-w-[420px]">
-                      <Neck marks={[{ string: notesHint.place.string, fret: notesHint.place.fret, label: notesHint.finger ? String(notesHint.finger) : noteLetter(notesHint.midi) }]} frets={5} highlight={{ string: notesHint.place.string, fret: notesHint.place.fret }} />
+                      <Neck
+                        marks={[
+                          {
+                            string: notesHint.place.string,
+                            fret: notesHint.place.fret,
+                            label: notesHint.finger ? String(notesHint.finger) : noteLetter(notesHint.midi),
+                          },
+                        ]}
+                        frets={5}
+                        highlight={{
+                          string: notesHint.place.string,
+                          fret: notesHint.place.fret,
+                        }}
+                      />
                     </div>
                   </div>
                 )}
@@ -395,6 +506,15 @@ export default function PlaySurface(props: SurfaceProps) {
           </div>
         )}
       </div>
+
+      {/* The count in, in the middle of everything, where the eyes already are. */}
+      {phase === 'countin' && count !== null && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
+          <span key={count} className="os-count-big flex h-[15rem] w-[15rem] items-center justify-center rounded-full bg-os-ink/90 font-os-serif text-[10rem] font-semibold leading-none text-os-bg shadow-2xl">
+            {count}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

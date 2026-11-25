@@ -14,6 +14,7 @@
   --os-hint: 204 140 30;
   /* The same amber, dark enough to read as text. */
   --os-hint-ink: 140 86 4;
+  --os-ok-ink: 24 110 66;
   --os-wood: 176 112 58;
   --os-string: 120 112 100;
   --os-shadow: 28 29 27;
@@ -33,6 +34,7 @@
   --os-bad: 238 127 109;
   --os-hint: 232 182 85;
   --os-hint-ink: 240 196 110;
+  --os-ok-ink: 120 210 160;
   --os-wood: 204 146 92;
   --os-string: 176 168 154;
   --os-shadow: 0 0 0;
@@ -51,8 +53,12 @@ html:has(.os-root[data-theme='dark']) body {
 }
 
 /* Larger text, for reading from the music stand or with tired eyes. Everything sized in rem grows with it. */
-html:has(.os-root[data-size='big']) {
+/* Text is read from a chair with a guitar on the lap, an arm's length or more from the iPad. */
+html:has(.os-root[data-size='1']) {
   font-size: 18px;
+}
+html:has(.os-root[data-size='2']) {
+  font-size: 20px;
 }
 
 .os-root {
@@ -226,17 +232,18 @@ html:has(.os-root[data-size='big']) {
     border-color 120ms;
 }
 .os-measure.is-now {
-  background: rgb(var(--os-accent) / 0.12);
-  border-color: rgb(var(--os-accent) / 0.6);
+  background: rgb(var(--os-accent) / 0.25);
+  border-color: rgb(var(--os-ink));
+  border-width: 4px;
 }
 .os-measure.is-ok {
-  background: rgb(var(--os-ok) / 0.12);
+  background: rgb(var(--os-ok) / 0.3);
 }
 .os-measure.is-warn {
-  background: rgb(var(--os-hint) / 0.16);
+  background: rgb(var(--os-hint) / 0.32);
 }
 .os-measure.is-bad {
-  background: rgb(var(--os-bad) / 0.12);
+  background: rgb(var(--os-bad) / 0.28);
 }
 /* While the learner judges a run for themselves, the marks are kept back. */
 .os-veil .os-measure.is-ok,
@@ -246,4 +253,96 @@ html:has(.os-root[data-size='big']) {
 }
 .os-veil .os-mark {
   opacity: 0;
+}
+
+/* ------------------------------------------------------- Playing screens */
+
+/*
+ * Fluent reading needs letters whose x-height fills about a fifth of a degree
+ * of the eye's view (Legge and Bigelow, 2011). At 70 cm from an iPad that is
+ * a font of about 25 px, so the words read while holding a guitar start there.
+ */
+.os-say {
+  font-size: 1.6rem;
+  line-height: 1.5;
+  color: rgb(var(--os-ink) / 0.82);
+}
+.os-say strong {
+  color: rgb(var(--os-ink));
+}
+.os-brief {
+  font-size: 1.6rem;
+  line-height: 1.3;
+  font-weight: 500;
+}
+
+/* The next thing to do fills itself in as it counts down, then goes by itself. */
+@keyframes os-auto-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.os-auto-fill {
+  transform-origin: left;
+  animation: os-auto-fill linear forwards;
+}
+
+/* The count in, large enough to read without looking for it. */
+@keyframes os-count-big {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+}
+.os-count-big {
+  animation: os-count-big 0.5s ease-out both;
+}
+
+/* A strum heard and judged: the chord in view flashes its colour. */
+@keyframes os-flash-ok {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--os-ok) / 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 22px rgb(var(--os-ok) / 0);
+  }
+}
+@keyframes os-flash-warn {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--os-hint) / 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 22px rgb(var(--os-hint) / 0);
+  }
+}
+.os-flash-ok {
+  animation: os-flash-ok 0.5s ease-out;
+}
+.os-flash-warn {
+  animation: os-flash-warn 0.5s ease-out;
+}
+
+.os-beat-dot {
+  width: 20px;
+  height: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .os-auto-fill,
+  .os-count-big,
+  .os-flash-ok,
+  .os-flash-warn {
+    animation-duration: 0.01ms;
+  }
 }

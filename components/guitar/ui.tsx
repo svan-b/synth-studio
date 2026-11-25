@@ -228,7 +228,7 @@ export const Icon = {
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'soft' | 'ghost' | 'danger';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   /** Small note under the label. */
   hint?: string;
   icon?: ReactNode;
@@ -238,7 +238,8 @@ export function Button({ variant = 'primary', size = 'md', hint, icon, className
   const base =
     'inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-[transform,opacity,background-color] duration-150 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100 select-none';
   // The smallest is still a full finger tall: the iPad is at arm's length, and hands are busy with a guitar.
-  const sizes = { sm: 'h-12 px-5 text-base', md: 'h-14 px-6 text-[1.05rem]', lg: 'h-16 px-8 text-xl' };
+  // The largest is for the one thing to do next, reached for with a pick still in the hand.
+  const sizes = { sm: 'h-12 px-5 text-base', md: 'h-14 px-6 text-[1.05rem]', lg: 'h-16 px-8 text-xl', xl: 'h-[4.5rem] px-10 text-[1.45rem]' };
   const variants = {
     primary: 'bg-os-ink text-os-bg',
     soft: 'bg-os-raised text-os-ink',
@@ -380,7 +381,7 @@ export function Sheet({ open, onClose, title, children, wide }: { open: boolean;
   }, [open]);
   if (!shown) return null;
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center p-6">
+    <div className="absolute inset-0 z-50 flex items-center justify-center p-6" data-os-sheet>
       <div
         className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${open ? 'opacity-100' : 'opacity-0'}`}
         onClick={onClose}

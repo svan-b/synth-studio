@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { lessonOrder, songInfo } from '../content/catalog';
 import type { FollowResult } from '../engine/follow';
-import { applyResult, isKept, newSongState, nextTask, planOutline, songProgress, type SongState } from './coach';
+import { applyResult, isKept, jumpTo, newSongState, nextTask, planOutline, skipTask, songProgress, type SongState } from './coach';
 import { milestones } from './milestones';
 import { DRILL_LESSON, openDrills, planDay } from './planner';
 import { isDue, newCard } from './srs';
@@ -165,5 +165,43 @@ describe('spaced review', () => {
     const card = { ...newCard(), due: new Date(2026, 11, 3, 20, 10).toISOString() };
     expect(isDue(card, new Date(2026, 11, 3, 9, 0))).toBe(true);
     expect(isDue(card, new Date(2026, 11, 2, 23, 0))).toBe(false);
+  });
+});
+
+describe('going through a song at the learner\'s own pace', () => {
+  const info = songInfo('skip-to-my-lou');
+
+  it('skips a step with no credit, down to the last run of the whole song, which must be played', () => {
+    let state = newSongState(info);
+    const seen: string[] = [];
+    for (let i = 0; i < 60; i++) {
+      const task = nextTask(info, state)!;
+      seen.push(`${task.scope.type}:${task.mode}:${task.tempoPct}`);
+      const next = skipTask(info, state);
+      if (!next) break;
+      state = next;
+    }
+    const last = nextTask(info, state)!;
+    expect(last.scope.type).toBe('whole');
+    expect(last.tempoPct).toBe(100);
+    expect(state.learned).toBe(false);
+    expect(skipTask(info, state)).toBeNull();
+    expect(seen[0].startsWith('trial')).toBe(true);
+  });
+
+  it('goes straight to any place on the plan, taking what comes before as known', () => {
+    const state = newSongState(info);
+    const rows = planOutline(info, { ...state, trial: 'done' });
+    const whole = rows[rows.length - 1].steps[1].place!;
+    const jumped = jumpTo(info, state, whole);
+    const task = nextTask(info, jumped)!;
+    expect(task.scope.type).toBe('whole');
+    expect(task.tempoPct).toBe(85);
+    // And back again, to the first line's chord changes.
+    const first = rows.find((r) => r.steps.some((st) => st.place?.type === 'section'))!.steps[1].place!;
+    const back = jumpTo(info, jumped, first);
+    const again = nextTask(info, back)!;
+    expect(again.scope).toEqual({ type: 'section', index: 0 });
+    expect(again.mode).toBe('wait');
   });
 });

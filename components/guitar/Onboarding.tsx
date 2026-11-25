@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { guitar } from '@/lib/guitar/audio/engine';
 import { strikeBus } from '@/lib/guitar/input/bus';
-import { useGuitar, type Experience } from '@/lib/guitar/learn/store';
+import { canSpeak, speak, stopSpeaking } from '@/lib/guitar/audio/speech';
+import { textSizeOf, useGuitar, type Experience } from '@/lib/guitar/learn/store';
 import { isNative, setReminder } from '@/lib/guitar/native/bridge';
 import { useListening } from './hooks';
 import { SoundCheck } from './Screens';
@@ -20,6 +21,12 @@ const MINUTES: Array<{ value: number; title: string; text: string }> = [
   { value: 15, title: '15 minutes', text: 'Room for a lesson or a song, and a little practice.' },
   { value: 20, title: '20 minutes', text: 'A lesson, a song and one exercise.' },
   { value: 30, title: '30 minutes', text: 'The fullest session, for days with time to spare.' },
+];
+
+const SIZES: Array<{ value: 0 | 1 | 2; title: string; px: number }> = [
+  { value: 0, title: 'Standard', px: 16 },
+  { value: 1, title: 'Large', px: 18 },
+  { value: 2, title: 'Largest', px: 20 },
 ];
 
 const TIMES: Array<{ value: string; title: string }> = [
@@ -104,7 +111,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   const setProfile = useGuitar((s) => s.setProfile);
   const setSettings = useGuitar((s) => s.setSettings);
   const [step, setStep] = useState(0);
-  const last = 5;
+  const last = 6;
+  const size = textSizeOf(settings);
   const native = isNative();
 
   const next = () => {
@@ -200,12 +208,55 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
           )}
           {step === 4 && (
             <>
+              <h2 className="font-os-serif text-4xl">Can you read this from your chair?</h2>
+              <p className="mb-6 mt-2 text-[1.1rem] text-os-muted">Set the iPad where it will stand, on a table or a stand in front of you, and sit back as you will with the guitar. Then choose the size that reads easily from there.</p>
+              <div className="space-y-3">
+                {SIZES.map((o) => (
+                  <button
+                    key={o.value}
+                    onClick={() => setSettings({ textSize: o.value })}
+                    aria-pressed={size === o.value}
+                    className={`flex w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left transition-colors ${size === o.value ? 'border-os-ink bg-os-surface' : 'border-os-line bg-os-surface/60'}`}
+                  >
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${size === o.value ? 'border-os-ink bg-os-ink text-os-bg' : 'border-os-line'}`}>{size === o.value && <Icon.Check size={14} />}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold leading-tight" style={{ fontSize: o.px * 1.6 }}>
+                        Strum once on each beat.
+                      </span>
+                      <span className="block text-os-muted" style={{ fontSize: 16 }}>
+                        {o.title}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {canSpeak() && (
+                <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-os-line bg-os-surface/60 px-5 py-4">
+                  <div>
+                    <div className="text-[1.1rem] font-semibold">Read the instructions aloud</div>
+                    <div className="text-os-muted">The app says what to do and how it went, so your eyes can stay on your hands.</div>
+                  </div>
+                  <Toggle
+                    label="Read the instructions aloud"
+                    value={settings.speak === true}
+                    onChange={(v) => {
+                      setSettings({ speak: v });
+                      if (v) speak('This is how the app sounds when it reads to you.');
+                      else stopSpeaking();
+                    }}
+                  />
+                </div>
+              )}
+            </>
+          )}
+          {step === 5 && (
+            <>
               <h2 className="font-os-serif text-4xl">Let the app hear you</h2>
               <p className="mb-6 mt-2 text-[1.1rem] text-os-muted">Sit with the guitar and set the iPad up on a stand or table in front of you, about an arm&apos;s length away.</p>
               <Hearing />
             </>
           )}
-          {step === 5 && (
+          {step === 6 && (
             <div className="text-center">
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-os-ok text-white">
                 <Icon.Check size={44} />
@@ -213,6 +264,9 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               <h2 className="font-os-serif text-5xl">You are set</h2>
               <div className="mx-auto mt-5 max-w-xl space-y-3 text-left text-[1.1rem] leading-relaxed text-os-muted">
                 <p>Each day the app builds a short session for you. Start it from the Today page and it takes you through, beginning with tuning up.</p>
+                <p>
+                  <strong className="text-os-ink">Your hands can stay on the guitar.</strong> The app moves on by itself when it hears you get something right, and a strum starts each piece of playing. The large button at the bottom right is always the next thing to do.
+                </p>
                 <p>Your fingertips will be tender for the first couple of weeks. That is normal, and it passes. Short sessions on most days get you through it fastest.</p>
                 {profile.experience !== 'new' && <p>Since you have played before, look at the Lessons page and use I know this to skip what you know.</p>}
               </div>

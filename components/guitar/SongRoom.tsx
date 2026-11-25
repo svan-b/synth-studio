@@ -8,9 +8,11 @@ import {
   applyResult,
   fitState,
   isKept,
+  jumpTo,
   newSongState,
   nextTask,
   planOutline,
+  skipTask,
   skipTrial,
   songProgress,
   tempoSummary,
@@ -27,7 +29,8 @@ import { dayKey } from '@/lib/guitar/util/emitter';
 import { readingMs, usePracticeTimer, useWakeLock } from './hooks';
 import { songMelody } from './LessonPlayer';
 import PlaySurface from './PlaySurface';
-import { Button, Icon, IconButton, Pill, ProgressBar, Segmented, Sheet } from './ui';
+import { ActionBar, StageMessage, useFocus } from './Stage';
+import { Button, Icon, IconButton, ProgressBar, Segmented, Sheet } from './ui';
 
 interface Free {
   section: number;
@@ -65,14 +68,17 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
   const [stage, setStage] = useState<Stage>('play');
   const stageRef = useRef<Stage>('play');
   stageRef.current = stage;
-  const [verdict, setVerdict] = useState<{ v: Verdict; stats: string } | null>(null);
+  const [verdict, setVerdict] = useState<{ v: Verdict; stats: string; auto?: number } | null>(null);
+  // The way to start a timed run while it waits to be started, for the bar.
+  const [gate, setGate] = useState<(() => void) | null>(null);
+  const onGate = useCallback((start: (() => void) | null) => setGate(() => start), []);
   const [free, setFree] = useState<Free | null>(null);
   const [options, setOptions] = useState(false);
   const [modelOnce, setModelOnce] = useState(false);
   const [words, setWords] = useState(Boolean(song.lyrics));
   const [aside, setAside] = useState<string | null>(null);
   const [take, setTake] = useState<Blob | null>(null);
-  const [playing, setPlaying] = useState<'mine' | 'kept' | null>(null);
+  const [playing2, setPlaying] = useState<'mine' | 'kept' | null>(null);
   const stopPlay = useRef<(() => void) | null>(null);
   const kept1 = useRef(false);
   const [ending, setEnding] = useState<'time' | 'kept'>('time');
@@ -87,6 +93,7 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
   const takeRun = useRef(-1);
   const runRef = useRef(0);
 
+  const away = useFocus();
   useWakeLock(true);
   usePracticeTimer((seconds) => logPractice(seconds, played.current, 1));
   useEffect(
@@ -180,14 +187,14 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
 
   const hearMine = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
-    if (playing) {
+    if (playing2) {
       stopPlayback();
       return;
     }
     if (!take) return;
     setPlaying('mine');
     stopPlay.current = playTake(take, () => setPlaying(null));
-  }, [playing, take]);
+  }, [playing2, take]);
 
   /** Keep a recording of the learner: the first time through a learned song, and the latest since. */
   const keep = useCallback(
@@ -212,7 +219,7 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
       setSong(songId, out.state);
       if (state.learned) reviewCard(`song:${songId}`, outcomeFromAccuracy(result.accuracy, result.clean));
       const stats = task.scope.type === 'trial' && result.cutShort ? '' : statsLine(result);
-      setVerdict({ v: out.verdict, stats });
+      setVerdict({ v: out.verdict, stats, auto: readTime(`${out.verdict.message} ${out.verdict.aside ?? ''}`, out.verdict.passed) / 1000 });
       const blob = takeRun.current === runRef.current ? latestTake.current : null;
       if (out.verdict.learned) {
         addCards([`song:${songId}`]);
@@ -226,10 +233,9 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
       if (state.learned && out.verdict.passed && isKept(out.state)) kept1.current = true;
       if (out.verdict.passed && !out.verdict.plain) instrument.chime();
       setStage('verdict');
-      timer.current = setTimeout(proceed, readTime(`${out.verdict.message} ${out.verdict.aside ?? ''}`, out.verdict.passed));
       return false;
     },
-    [addCards, info, keep, proceed, reviewCard, setSong, songId, state, task],
+    [addCards, info, keep, reviewCard, setSong, songId, state, task],
   );
   judgeNow.current = judge;
 
@@ -302,6 +308,27 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
     if (stageRef.current === 'verdict' || stageRef.current === 'reflect') setTake(blob);
   }, []);
 
+  const goOn = useCallback(
+    (next: SongState | null) => {
+      if (!next) return;
+      if (timer.current) clearTimeout(timer.current);
+      pending.current = null;
+      stopPlayback();
+      setState(next);
+      setSong(songId, next);
+      setFree(null);
+      setVerdict(null);
+      setAside(null);
+      setTake(null);
+      setModelOnce(false);
+      setOptions(false);
+      setStage('play');
+      setRun((r) => r + 1);
+    },
+    [setSong, songId],
+  );
+  const skippable = useMemo(() => !free && skipTask(info, state) !== null, [free, info, state]);
+
   const teachFromStart = useCallback(() => {
     const next = skipTrial(state);
     setState(next);
@@ -311,7 +338,7 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
   }, [setSong, songId, state]);
 
   const hearKept = useCallback(async () => {
-    if (playing) {
+    if (playing2) {
       stopPlayback();
       return;
     }
@@ -321,7 +348,7 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
     if (!blob) return;
     setPlaying('kept');
     stopPlay.current = playTake(blob, () => setPlaying(null));
-  }, [kept, playing]);
+  }, [kept, playing2]);
 
   const shareKept = useCallback(async () => {
     const rec = kept?.latest ?? kept?.first;
@@ -336,127 +363,81 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
   const prompt = free ? 'You choose what to play. The coach waits until you switch back.' : modelOnce ? 'Hear how it goes, then it is your turn again.' : (task?.prompt ?? '');
   const pattern = shown?.simple ? simpleStrum(song.time) : song.strum;
 
+  const playing = stage === 'play' || stage === 'reflect' || stage === 'verdict';
+  const wordsToggle = song.lyrics && song.kind === 'strum' && !shown?.change ? { label: words ? 'Chords' : 'Words', onClick: () => setWords((w) => !w) } : null;
+  const verdictTone = verdict && !verdict.v.plain ? (verdict.v.passed ? ('ok' as const) : ('hint' as const)) : undefined;
+  const pips =
+    !free && task && task.need > 1 && stage === 'play' && !modelOnce ? (
+      <div className="flex items-center gap-2" aria-label={`${task.have} of ${task.need} good runs`}>
+        {Array.from({ length: task.need }, (_, i) => (
+          <span key={i} className={`h-5 w-5 rounded-full ${i < task.have ? 'bg-os-ok' : 'bg-os-line'}`} />
+        ))}
+      </div>
+    ) : null;
+  const where = shown && !shown.change && shown.to - shown.from + 1 < info.measures && stage === 'play' ? (shown.from === shown.to ? `Measure ${shown.from + 1}` : `Measures ${shown.from + 1} to ${shown.to + 1}`) : null;
+
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-os-bg os-safe-top os-safe-bottom">
-      <header className="flex h-16 shrink-0 items-center gap-3 px-4">
-        <IconButton label="Close" onClick={onClose}>
-          <Icon.Close />
+      <header className="flex h-16 shrink-0 items-center gap-2 px-3">
+        <IconButton label="Close" onClick={onClose} className="h-14 w-14">
+          <Icon.Close size={26} />
         </IconButton>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-3">
-            <span className="truncate font-os-serif text-[1.4rem]">{song.title}</span>
-            <span className="hidden truncate text-sm text-os-muted landscape:inline">{song.origin}</span>
-          </div>
-          <ProgressBar value={progress} tone="ok" className="mt-1 max-w-xs" />
+        <div className={`min-w-0 flex-1 transition-opacity duration-300 ${away ? 'opacity-0' : ''}`}>
+          <div className="truncate font-os-serif text-[1.5rem] leading-tight">{song.title}</div>
+          <ProgressBar value={progress} tone="ok" className="mt-1 max-w-sm" />
         </div>
-        {stage !== 'learned' && stage !== 'timeup' && (
-          <>
-            {song.lyrics && song.kind === 'strum' && !shown?.change && (
-              <Button variant={words ? 'primary' : 'soft'} size="sm" onClick={() => setWords((w) => !w)}>
-                {words ? 'Chords' : 'Words'}
-              </Button>
-            )}
-            <Button variant="soft" size="sm" onClick={hearModel} icon={<Icon.Ear size={16} />}>
-              Hear it
-            </Button>
-            <Button variant={free ? 'primary' : 'soft'} size="sm" onClick={openOptions}>
-              {free ? 'Own practice' : 'Plan'}
-            </Button>
-          </>
-        )}
       </header>
 
       {stage === 'learned' ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
-          <div className="os-pop flex h-20 w-20 items-center justify-center rounded-full bg-os-ok text-white">
-            <Icon.Check size={44} />
+        <>
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
+            <div className="os-pop flex h-24 w-24 items-center justify-center rounded-full bg-os-ok text-white">
+              <Icon.Check size={54} />
+            </div>
+            <div className="os-fade-up">
+              <div className="text-[1.15rem] font-semibold uppercase tracking-widest text-os-muted">Song learned</div>
+              <h2 className="mt-2 font-os-serif text-[3.4rem] leading-tight">{song.title}</h2>
+            </div>
+            <p className="os-say os-fade-up max-w-2xl">{verdict?.v.message} Now play it for someone. A song played for a person, even once, is the best practice there is.</p>
+            {kept && <p className="os-fade-up max-w-xl text-[1.15rem] text-os-muted">Your recording is kept on the Progress page, so you can hear it again later.</p>}
           </div>
-          <div className="os-fade-up">
-            <div className="text-sm font-semibold uppercase tracking-widest text-os-muted">Song learned</div>
-            <h2 className="mt-2 font-os-serif text-5xl">{song.title}</h2>
-          </div>
-          <p className="os-fade-up max-w-xl text-[1.25rem] leading-relaxed text-os-muted">
-            {verdict?.v.message} Now play it for someone. A song played for a person, even once, is the best practice there is.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            {kept && (
-              <>
-                <Button variant="soft" size="lg" onClick={() => void hearKept()} icon={<Icon.Ear size={20} />}>
-                  {playing === 'kept' ? 'Stop' : 'Hear how you played it'}
-                </Button>
-                <Button variant="soft" size="lg" onClick={() => void shareKept()} icon={<Icon.Share size={20} />}>
-                  Share it
-                </Button>
-              </>
-            )}
-            <Button size="lg" onClick={onClose} className="min-w-[220px]">
-              Done
-            </Button>
-          </div>
-          {kept && <p className="os-fade-up max-w-md text-[15px] text-os-faint">Your recording is kept on the Progress page, so you can hear it again later.</p>}
-        </div>
+          <ActionBar
+            extras={kept ? [{ label: playing2 === 'kept' ? 'Stop' : 'Hear yours', onClick: () => void hearKept(), icon: <Icon.Ear size={20} /> }, { label: 'Share it', onClick: () => void shareKept(), icon: <Icon.Share size={20} /> }] : []}
+            primary={{ label: 'Done', onClick: onClose }}
+          />
+        </>
       ) : stage === 'timeup' ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
-          <h2 className="os-fade-up font-os-serif text-5xl">{ending === 'kept' ? 'Still yours' : 'A good place to stop'}</h2>
-          <p className="os-fade-up max-w-xl text-[1.25rem] leading-relaxed text-os-muted">
-            {ending === 'kept'
-              ? 'This song is safe in your fingers. It will come back now and then, so it stays there.'
-              : 'That is the time set aside for this song today. What you practised keeps settling after you stop, and a night of sleep helps it along. It will be easier tomorrow.'}
-          </p>
-          <div className="flex gap-3">
-            <Button variant="soft" size="lg" onClick={proceed}>
-              {ending === 'kept' ? 'Play it again' : 'Keep going'}
-            </Button>
-            <Button size="lg" onClick={onClose}>
-              Finish
-            </Button>
+        <>
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
+            <h2 className="os-fade-up font-os-serif text-[3.4rem] leading-tight">{ending === 'kept' ? 'Still yours' : 'A good place to stop'}</h2>
+            <p className="os-say os-fade-up max-w-2xl">
+              {ending === 'kept'
+                ? 'This song is safe in your fingers. It will come back now and then, so it stays there.'
+                : 'That is the time set aside for this song today. What you practised keeps settling after you stop, and a night of sleep helps it along. It will be easier tomorrow.'}
+            </p>
           </div>
-        </div>
+          <ActionBar again={{ label: ending === 'kept' ? 'Play it again' : 'Keep going', onClick: proceed }} primary={{ label: 'Finish', onClick: onClose }} />
+        </>
       ) : (
         <>
-          <div className="flex min-h-[4.75rem] shrink-0 items-center gap-4 px-7 pb-1">
-            <div className="min-w-0 flex-1">
-              {stage === 'reflect' ? (
-                <div className="os-fade-up text-[1.25rem] text-os-muted">How did that go? Decide for yourself before you look.</div>
-              ) : stage === 'verdict' && verdict ? (
-                <div className="os-fade-up">
-                  <div className={`text-[1.25rem] font-medium leading-snug ${verdict.v.plain ? 'text-os-ink' : verdict.v.passed ? 'text-os-ok' : 'text-os-hint-ink'}`}>{verdict.v.message}</div>
-                  {verdict.v.aside && <div className="text-[1.05rem] leading-snug text-os-ink">{verdict.v.aside}</div>}
-                  {verdict.stats && <div className="text-[15px] text-os-muted">{verdict.stats}</div>}
-                </div>
-              ) : (
-                <>
-                  <div className="text-[1.25rem] font-semibold text-os-ink">{title}</div>
-                  <div className="text-[1.05rem] leading-snug text-os-muted">{aside ?? prompt}</div>
-                </>
-              )}
-            </div>
-            {!free && task && task.need > 1 && stage === 'play' && !modelOnce && (
-              <div className="flex items-center gap-1.5" aria-label={`${task.have} of ${task.need} good runs`}>
-                {Array.from({ length: task.need }, (_, i) => (
-                  <span key={i} className={`h-3.5 w-3.5 rounded-full ${i < task.have ? 'bg-os-ok' : 'bg-os-line'}`} />
-                ))}
-              </div>
-            )}
-            {trial && stage === 'play' && !modelOnce && (
-              <Button variant="ghost" size="sm" onClick={teachFromStart}>
-                It is new to me
-              </Button>
-            )}
-            {stage === 'verdict' && take && (
-              <Button variant="soft" size="sm" onClick={hearMine} icon={<Icon.Ear size={16} />}>
-                {playing === 'mine' ? 'Stop' : 'Hear yours'}
-              </Button>
-            )}
-            {stage === 'verdict' && (
-              <Button size="sm" onClick={proceed}>
-                Continue
-              </Button>
-            )}
-            {shown && !shown.change && shown.to - shown.from + 1 < info.measures && stage === 'play' && (
-              <Pill>{shown.from === shown.to ? `Measure ${shown.from + 1}` : `Measures ${shown.from + 1} to ${shown.to + 1}`}</Pill>
-            )}
-          </div>
+          {stage === 'reflect' ? (
+            <StageMessage text="How did that go? Decide for yourself before you look." />
+          ) : stage === 'verdict' && verdict ? (
+            <StageMessage text={verdict.v.message} sub={[verdict.v.aside, verdict.stats].filter(Boolean).join(' ') || null} tone={verdictTone} />
+          ) : (
+            <StageMessage
+              text={title}
+              sub={aside ?? prompt}
+              right={
+                pips || where ? (
+                  <>
+                    {where && <span className="whitespace-nowrap rounded-full bg-os-raised px-4 py-2 text-[1.1rem] font-semibold text-os-muted">{where}</span>}
+                    {pips}
+                  </>
+                ) : undefined
+              }
+            />
+          )}
           <div className="min-h-0 flex-1">
             {shown && (
               <PlaySurface
@@ -471,6 +452,7 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
                 stopAfter={shown.stopAfter}
                 runId={`${run}-${free ? 'free' : 'coach'}`}
                 onDone={onDone}
+                onGate={onGate}
                 held={options}
                 veil={stage === 'reflect'}
                 lyrics={song.lyrics}
@@ -482,6 +464,33 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
               />
             )}
           </div>
+          {/* Everything to touch is here, in the same places every time. The next thing happens by itself where it can. */}
+          {playing && (
+            <ActionBar
+              extras={[
+                { label: 'Hear it', onClick: hearModel, icon: <Icon.Ear size={20} /> },
+                stage === 'verdict' && take ? { label: playing2 === 'mine' ? 'Stop' : 'Hear yours', onClick: hearMine, icon: <Icon.Record size={20} /> } : null,
+                wordsToggle,
+                { label: free ? 'Own practice' : 'Plan', onClick: openOptions, icon: <Icon.Steps size={20} /> },
+              ]}
+              skip={
+                stage !== 'play' || modelOnce
+                  ? null
+                  : trial
+                    ? { label: 'It is new to me', onClick: teachFromStart }
+                    : skippable
+                      ? { label: 'Next step', onClick: () => goOn(skipTask(info, state)) }
+                      : null
+              }
+              primary={
+                stage === 'verdict'
+                  ? { label: 'Continue', onClick: proceed, auto: free ? undefined : verdict?.auto }
+                  : stage === 'play' && gate
+                    ? { label: 'Start', onClick: gate, icon: <Icon.Play size={22} />, hint: 'or strum once' }
+                    : null
+              }
+            />
+          )}
         </>
       )}
 
@@ -492,27 +501,29 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
             <div className="mt-3 space-y-2.5">
               {plan.map((row) => (
                 <div key={row.title} className="flex items-center gap-4">
-                  <div className="w-40 shrink-0">
-                    <div className="font-medium leading-tight">{row.title}</div>
-                    {row.detail && <div className="text-xs text-os-muted">{row.detail}</div>}
+                  <div className="w-44 shrink-0">
+                    <div className="text-[1.1rem] font-medium leading-tight">{row.title}</div>
+                    {row.detail && <div className="text-sm text-os-muted">{row.detail}</div>}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {row.steps.map((st) => (
-                      <span
+                      <button
                         key={st.label}
-                        className={`inline-flex h-8 items-center gap-1 rounded-full px-3 text-[14px] font-semibold ${
-                          st.state === 'done' ? 'bg-os-ok/15 text-os-ok' : st.state === 'now' ? 'bg-os-ink text-os-bg' : 'bg-os-raised text-os-muted'
+                        disabled={!st.place || state.learned}
+                        onClick={() => st.place && goOn(jumpTo(info, state, st.place))}
+                        className={`inline-flex h-12 items-center gap-1.5 rounded-full px-4 text-[1.05rem] font-semibold ${
+                          st.state === 'done' ? 'bg-os-ok/15 text-os-ok-ink' : st.state === 'now' ? 'bg-os-ink text-os-bg' : 'bg-os-raised text-os-muted'
                         }`}
                       >
-                        {st.state === 'done' && <Icon.Check size={13} />}
+                        {st.state === 'done' && <Icon.Check size={16} />}
                         {st.label}
-                      </span>
+                      </button>
                     ))}
                   </div>
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-[1rem] leading-relaxed text-os-muted">The coach moves you along this as each step holds. A clean run moves on at once, and anything you already know is skipped.</p>
+            <p className="mt-4 text-[1.1rem] leading-relaxed text-os-muted">The coach moves you along this as each step holds. A clean run moves on at once. Tap any step to go straight to it: what comes before it is taken as known.</p>
           </>
         )}
         <div className={free ? '' : 'mt-6 border-t border-os-line pt-5'}>

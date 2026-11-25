@@ -45,6 +45,7 @@ const config: Config = {
           bad: 'rgb(var(--os-bad) / <alpha-value>)',
           hint: 'rgb(var(--os-hint) / <alpha-value>)',
           'hint-ink': 'rgb(var(--os-hint-ink) / <alpha-value>)',
+          'ok-ink': 'rgb(var(--os-ok-ink) / <alpha-value>)',
           wood: 'rgb(var(--os-wood) / <alpha-value>)',
         },
         teaching: {

@@ -49,13 +49,28 @@ export function ChartView({ score, current = null, marks, perRow = 4 }: { score:
           <div
             key={m}
             data-measure={m}
-            className={`os-measure relative flex h-[4.6rem] items-center rounded-2xl border px-3 ${m === nowMeasure ? 'is-now border-2' : 'border-os-line bg-os-surface'} ${mark ? `is-${mark}` : ''}`}
+            className={`os-measure relative flex h-[5.4rem] items-center rounded-2xl border px-3 ${m === nowMeasure ? 'is-now' : 'border-os-line bg-os-surface'} ${mark ? `is-${mark}` : ''}`}
           >
-            <span className="absolute left-2 top-1 text-[11px] font-semibold text-os-faint">{m + 1 + score.measureOffset}</span>
+            <span className="absolute left-2.5 top-1 text-[13px] font-semibold text-os-muted">{m + 1 + score.measureOffset}</span>
+            {mark && m !== nowMeasure && (
+              <span className={`os-mark absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full text-white ${mark === 'ok' ? 'bg-os-ok' : mark === 'warn' ? 'bg-os-hint' : 'bg-os-bad'}`} aria-hidden>
+                {mark === 'ok' ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
+                ) : mark === 'bad' ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.6" strokeLinecap="round">
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                ) : (
+                  <span className="block h-1 w-3 rounded bg-white" />
+                )}
+              </span>
+            )}
             {chords.map((c, i) => (
               <span
                 key={i}
-                className="absolute font-os-serif text-[1.65rem] font-semibold leading-none"
+                className="absolute font-os-serif text-[2.1rem] font-semibold leading-none"
                 style={{ left: `calc(${(c.at / beats) * 88}% + 0.75rem)` }}
               >
                 {c.symbol}
@@ -69,36 +84,76 @@ export function ChartView({ score, current = null, marks, perRow = 4 }: { score:
   );
 }
 
-/** Lyrics with their chords above the syllables they fall on, one line at a time. */
-export function WordsView({ lyrics, measure = null }: { lyrics: Array<[number, string]>; measure?: number | null }) {
+/**
+ * Lyrics with their chords above the syllables they fall on. The line being
+ * sung is large and dark, the chord being played sits on a dark pill, and the
+ * lines to come wait below in a quieter size.
+ */
+export function WordsView({ lyrics, measure = null, score, beat = null }: { lyrics: Array<[number, string]>; measure?: number | null; score?: Score; beat?: number | null }) {
   const lines = useMemo(() => {
     let at = 0;
     return lyrics.map(([bars, text]) => {
       const from = at;
       at += bars;
-      return { from, to: at - 1, parts: parseChordPro(text) };
+      const parts = parseChordPro(text);
+      return { from, to: at - 1, parts, chars: parts.reduce((n, p) => n + p.text.length, 0) };
     });
   }, [lyrics]);
   const box = useRef<HTMLDivElement>(null);
   const nowLine = measure === null ? -1 : lines.findIndex((l) => measure >= l.from && measure <= l.to);
   useEffect(() => {
     if (nowLine < 0) return;
-    box.current?.querySelector(`[data-line="${nowLine}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    box.current?.querySelector(`[data-line="${nowLine}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }, [nowLine]);
+  // Which chord of the line is being played: the chords written in the line are those of its measures, in order.
+  const live = useMemo(() => {
+    if (!score || beat === null || nowLine < 0) return -1;
+    const l = lines[nowLine];
+    const all = score.chords.filter((c) => c.measure + score.measureOffset >= l.from && c.measure + score.measureOffset <= l.to);
+    const written = l.parts.filter((p) => p.chord !== null).length;
+    // The chart names a chord in every measure. The words name it once, where it changes.
+    const changes = all.filter((c, i) => i === 0 || c.symbol !== all[i - 1].symbol);
+    const inLine = all.length === written ? all : changes.length === written ? changes : null;
+    // A line that is only partly inside the passage played, or written more loosely than the chart, shows no single chord as live.
+    if (!inLine) return -1;
+    let k = -1;
+    inLine.forEach((c, i) => {
+      if (c.start <= beat + 1e-6) k = i;
+    });
+    return k;
+  }, [beat, lines, nowLine, score]);
   return (
-    <div ref={box} className="space-y-1">
-      {lines.map((l, i) => (
-        <div key={i} data-line={i} className={`rounded-2xl px-4 py-2 transition-colors ${i === nowLine ? 'bg-os-accent/10' : ''}`}>
-          <div className="flex flex-wrap items-end">
-            {l.parts.map((p, k) => (
-              <span key={k} className="inline-flex flex-col">
-                <span className="h-7 pr-2 font-os-serif text-[1.25rem] font-bold leading-7 text-os-accent">{p.chord ?? ''}</span>
-                <span className={`whitespace-pre text-[1.35rem] leading-8 ${i === nowLine ? 'text-os-ink' : 'text-os-muted'}`}>{p.text || ' '}</span>
-              </span>
-            ))}
+    <div ref={box} className="space-y-1" style={{ containerType: 'inline-size' }}>
+      {lines.map((l, i) => {
+        const now = i === nowLine;
+        let chordIndex = -1;
+        // The line being sung is set as large as fits on one row, and wraps only if it must.
+        const fit = now ? { fontSize: `clamp(1.45rem, calc((100cqw - 2.5rem) / ${Math.max(10, l.chars) * 0.5}), 1.9rem)` } : undefined;
+        return (
+          <div key={i} data-line={i} className={`rounded-2xl px-4 py-2 transition-colors ${now ? 'bg-os-accent/15' : ''}`}>
+            <div className="flex flex-wrap items-end">
+              {l.parts.map((p, k) => {
+                if (p.chord !== null) chordIndex++;
+                const isLive = now && p.chord !== null && chordIndex === live;
+                // Word by word, so a long line wraps and is never cut off. The chord stays over the word it belongs to.
+                const words = (p.text || ' ').match(/\s*\S+\s*|\s+/g) ?? [' '];
+                return words.map((w, j) => (
+                  <span key={`${k}-${j}`} className="inline-flex flex-col">
+                    {j === 0 && p.chord !== null && (
+                      <span className={`font-os-serif font-bold ${now ? 'h-10 text-[1.75rem] leading-10' : 'h-8 text-[1.4rem] leading-8'}`}>
+                        <span className={`mr-2 rounded-lg px-1.5 ${isLive ? 'bg-os-ink text-os-bg' : 'text-os-accent'}`}>{p.chord}</span>
+                      </span>
+                    )}
+                    <span className={`whitespace-pre ${now ? 'text-[1.9rem] leading-[2.6rem] text-os-ink' : 'text-[1.45rem] leading-9 text-os-muted'}`} style={fit}>
+                      {w}
+                    </span>
+                  </span>
+                ));
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

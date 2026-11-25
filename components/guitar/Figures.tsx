@@ -91,33 +91,37 @@ export function StringsFigure({ highlight }: { highlight?: StringNo[] }) {
 }
 
 /** How a strum pattern is counted, with a mark under each count for what the hand does. */
-export function PatternView({ pattern, time = [4, 4], now = null }: { pattern: string; time?: TimeSig; now?: number | null }) {
+export function PatternView({ pattern, time = [4, 4], now = null, large = false }: { pattern: string; time?: TimeSig; now?: number | null; large?: boolean }) {
   const slots = pattern.replace(/\s+/g, '').split('');
   const compound = isCompound(time);
   const counts = slots.map((_, i) => (compound ? String(i + 1) : i % 2 === 0 ? String(i / 2 + 1) : 'and'));
   void measureBeats;
   return (
-    <div className="flex items-end gap-1.5" role="img" aria-label={`Strum pattern ${pattern}`}>
+    <div className="flex max-w-full items-end gap-1.5" role="img" aria-label={`Strum pattern ${pattern}`}>
       {slots.map((c, i) => {
         const lit = now === i;
+        const aw = large ? 40 : 26;
+        const ah = large ? 52 : 34;
         return (
-          <div key={i} className={`flex w-12 flex-col items-center rounded-xl py-1.5 ${lit ? 'bg-os-accent/15' : ''}`}>
-            <span className={`h-9 ${c === '.' ? 'text-os-line' : 'text-os-ink'}`}>
+          <div key={i} className={`flex min-w-0 shrink ${large ? 'w-[4.1rem] py-2' : 'w-12 py-1.5'} flex-col items-center rounded-2xl transition-colors duration-75 ${lit ? 'bg-os-accent/30 ring-2 ring-os-accent' : ''}`}>
+            <span className={`flex items-center justify-center ${large ? 'h-14' : 'h-9'} ${c === '.' ? 'text-os-line' : 'text-os-ink'}`}>
               {c === 'D' && (
-                <svg width="26" height="34" viewBox="0 0 26 34" aria-label="down">
+                <svg width={aw} height={ah} viewBox="0 0 26 34" aria-label="down">
                   <path d="M13 3v26M5 21l8 9 8-9" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
               {c === 'U' && (
-                <svg width="26" height="34" viewBox="0 0 26 34" aria-label="up">
+                <svg width={aw} height={ah} viewBox="0 0 26 34" aria-label="up">
                   <path d="M13 31V5M5 13l8-9 8 9" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" opacity={0.75} />
                 </svg>
               )}
-              {(c === 'B' || c === 'A') && <span className="flex h-9 w-9 items-center justify-center rounded-full bg-os-ink text-sm font-bold text-os-bg">{c === 'B' ? 'bass' : 'alt'}</span>}
+              {(c === 'B' || c === 'A') && (
+                <span className={`flex items-center justify-center rounded-full bg-os-ink font-bold text-os-bg ${large ? 'h-12 w-12 text-base' : 'h-9 w-9 text-sm'}`}>{c === 'B' ? 'bass' : 'alt'}</span>
+              )}
               {c === 'x' && <span className="text-2xl font-bold">x</span>}
-              {c === '.' && <span className="block pt-3 text-2xl leading-none">.</span>}
+              {c === '.' && <span className="block text-2xl leading-none">.</span>}
             </span>
-            <span className={`text-sm font-semibold ${counts[i] === 'and' ? 'text-os-faint' : 'text-os-muted'}`}>{counts[i] === 'and' ? '&' : counts[i]}</span>
+            <span className={`font-semibold ${large ? 'text-[1.35rem]' : 'text-sm'} ${counts[i] === 'and' ? 'text-os-faint' : 'text-os-muted'}`}>{counts[i] === 'and' ? '&' : counts[i]}</span>
           </div>
         );
       })}
@@ -192,18 +196,18 @@ export function HandFigure() {
   );
 }
 
-export default function FigureView({ figure }: { figure: Figure }) {
+export default function FigureView({ figure, large = false }: { figure: Figure; large?: boolean }) {
   const tabScore = useMemo(() => (figure.kind === 'tab' ? resolveMusic(figure.music) : null), [figure]);
   let body: JSX.Element;
   switch (figure.kind) {
     case 'chord':
-      body = <ChordDiagram chord={figure.chord} variant={figure.variant} width={200} strings={figure.strings} />;
+      body = <ChordDiagram chord={figure.chord} variant={figure.variant} width={large ? 300 : 200} strings={figure.strings} />;
       break;
     case 'chords':
       body = (
         <div className="flex flex-wrap justify-center gap-6">
           {figure.chords.map((c) => (
-            <ChordDiagram key={c} chord={c} width={150} />
+            <ChordDiagram key={c} chord={c} width={large ? 210 : 150} />
           ))}
         </div>
       );
@@ -215,7 +219,7 @@ export default function FigureView({ figure }: { figure: Figure }) {
       body = <StringsFigure highlight={figure.highlight} />;
       break;
     case 'pattern':
-      body = <PatternView pattern={figure.pattern} time={figure.time} />;
+      body = <PatternView pattern={figure.pattern} time={figure.time} large={large} />;
       break;
     case 'tab':
       body = <div className="h-[200px] w-full">{tabScore && <TabView score={tabScore} compact />}</div>;
@@ -228,9 +232,9 @@ export default function FigureView({ figure }: { figure: Figure }) {
       break;
   }
   return (
-    <figure className="flex flex-col items-center gap-3 rounded-3xl bg-os-surface px-5 py-6">
+    <figure className={`flex flex-col items-center gap-3 rounded-3xl bg-os-surface px-5 py-6 ${large ? 'w-full' : ''}`}>
       {body}
-      {figure.caption && <figcaption className="text-center text-[15px] text-os-muted">{figure.caption}</figcaption>}
+      {figure.caption && <figcaption className={`text-center text-os-muted ${large ? 'text-[1.2rem]' : 'text-[15px]'}`}>{figure.caption}</figcaption>}
     </figure>
   );
 }

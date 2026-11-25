@@ -607,9 +607,68 @@ export function applyResult(info: SongInfo, state: SongState, task: Task, result
 
 // ------------------------------------------------------------------ the plan
 
+/** A place on the plan that can be gone straight to. */
+export type PlanPlace = { type: 'section'; index: number; rung: number } | { type: 'join'; upTo: number } | { type: 'whole'; rung: number };
+
 export interface PlanStep {
   label: string;
   state: 'done' | 'now' | 'todo';
+  /** Where this step is, for going straight to it. */
+  place?: PlanPlace;
+}
+
+/**
+ * Leave the step the coach has set and go on to the one after, with no
+ * credit for it. The learner decides what they already know. The last run
+ * of the whole song cannot be passed over: that one is the song.
+ */
+export function skipTask(info: SongInfo, state: SongState): SongState | null {
+  const task = nextTask(info, state);
+  if (!task || isKept(state)) return null;
+  const next: SongState = { ...state, sections: state.sections.map((s) => ({ ...s })), focus: state.focus ? { ...state.focus } : null };
+  const scope = task.scope;
+  if (scope.type === 'trial') return skipTrial(next);
+  if (scope.type === 'focus') {
+    next.focus = null;
+    return next;
+  }
+  if (scope.type === 'section') {
+    next.sections[scope.index] = { rung: next.sections[scope.index].rung + 1, streak: 0, fails: 0 };
+    return next;
+  }
+  if (scope.type === 'join') {
+    next.joined = Math.max(next.joined, scope.upTo);
+    return next;
+  }
+  if (next.wholeRung >= WHOLE_TEMPI.length - 1) return null;
+  next.wholeRung += 1;
+  next.wholeStreak = 0;
+  next.wholeFails = 0;
+  return next;
+}
+
+/**
+ * Go straight to a place on the plan. Everything before it is taken as
+ * known, and the step itself, with what follows it, is still to do.
+ */
+export function jumpTo(info: SongInfo, state: SongState, place: PlanPlace): SongState {
+  const rungs = rungsFor(info);
+  const secure = { rung: rungs.length, streak: 0, fails: 0 };
+  const next: SongState = { ...state, sections: state.sections.map((s) => ({ ...s })), focus: null, trial: 'done', wholeStreak: 0, wholeFails: 0 };
+  if (place.type === 'section') {
+    next.sections = next.sections.map((s, i) => (i < place.index ? { ...secure } : i === place.index ? { rung: Math.max(0, Math.min(rungs.length - 1, place.rung)), streak: 0, fails: 0 } : s));
+    next.joined = Math.min(next.joined, Math.max(0, place.index - 1));
+    next.wholeRung = 0;
+  } else if (place.type === 'join') {
+    next.sections = next.sections.map((s, i) => (i <= place.upTo ? { ...secure } : s));
+    next.joined = Math.max(0, place.upTo - 1);
+    next.wholeRung = 0;
+  } else {
+    next.sections = next.sections.map(() => ({ ...secure }));
+    next.joined = Math.max(0, info.sections.length - 1);
+    next.wholeRung = Math.max(0, Math.min(WHOLE_TEMPI.length - 1, place.rung));
+  }
+  return next;
 }
 
 export interface PlanRow {
@@ -640,7 +699,7 @@ export function planOutline(info: SongInfo, state: SongState): PlanRow[] {
     rows.push({
       title: many ? `Line ${i + 1}` : 'The chords and the beat',
       detail: many ? (from === to ? `Measure ${from + 1}` : `Measures ${from + 1} to ${to + 1}`) : undefined,
-      steps: rungs.map((rung, r): PlanStep => ({ label: rungLabel(rung, info.kind), state: state.learned || r < s.rung ? 'done' : here && r === s.rung ? 'now' : 'todo' })),
+      steps: rungs.map((rung, r): PlanStep => ({ label: rungLabel(rung, info.kind), state: state.learned || r < s.rung ? 'done' : here && r === s.rung ? 'now' : 'todo', place: { type: 'section', index: i, rung: r } })),
     });
   });
   if (many) {
@@ -649,7 +708,7 @@ export function planOutline(info: SongInfo, state: SongState): PlanRow[] {
       steps: info.sections.slice(1).map((_, k) => {
         const i = k + 1;
         const here = scope?.type === 'join' && scope.upTo === i;
-        return { label: `${i} and ${i + 1}`, state: state.learned || state.joined >= i ? 'done' : here ? 'now' : 'todo' };
+        return { label: `${i} and ${i + 1}`, state: state.learned || state.joined >= i ? 'done' : here ? 'now' : 'todo', place: { type: 'join', upTo: i } };
       }),
     });
   }
@@ -660,6 +719,7 @@ export function planOutline(info: SongInfo, state: SongState): PlanRow[] {
     steps: WHOLE_TEMPI.map((pct, r) => ({
       label: pct === 100 ? 'Full speed' : `${pct} percent`,
       state: kept || r < state.wholeRung ? 'done' : whole && r === Math.min(state.wholeRung, WHOLE_TEMPI.length - 1) ? 'now' : 'todo',
+      place: { type: 'whole', rung: r },
     })),
   });
   return rows;

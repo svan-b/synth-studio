@@ -10,7 +10,8 @@ import { listener } from '@/lib/guitar/input/listen';
 import { songProgress } from '@/lib/guitar/learn/coach';
 import { milestones } from '@/lib/guitar/learn/milestones';
 import { DRILL_LABEL, DRILL_LESSON, SONGS_IN_HAND, planDay, planMinutes, type Block, type DrillKind } from '@/lib/guitar/learn/planner';
-import { daysAway, daysPlayed, daysThisWeek, exportData, totalMinutes, useGuitar, type ThemeChoice } from '@/lib/guitar/learn/store';
+import { canSpeak, speak, stopSpeaking } from '@/lib/guitar/audio/speech';
+import { daysAway, daysPlayed, daysThisWeek, exportData, textSizeOf, totalMinutes, useGuitar, type ThemeChoice } from '@/lib/guitar/learn/store';
 import { exportTake, loadTake, playTake } from '@/lib/guitar/learn/takes';
 import { isNative, onVolume, setReminder, shareFile } from '@/lib/guitar/native/bridge';
 import { parseScore } from '@/lib/guitar/music/score';
@@ -797,9 +798,30 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
 
       <h2 className="mb-2 mt-8 font-os-serif text-[1.6rem]">Seeing it</h2>
       <Card className="divide-y divide-os-line px-6">
-        <Row title="Larger text" text="Everything a size bigger.">
-          <Toggle label="Larger text" value={settings.bigText} onChange={(v) => setSettings({ bigText: v })} />
+        <Row title="Text size" text="Choose it from where you sit with the guitar.">
+          <Segmented
+            value={textSizeOf(settings)}
+            onChange={(v) => setSettings({ textSize: v })}
+            options={[
+              { value: 0, label: 'Standard' },
+              { value: 1, label: 'Large' },
+              { value: 2, label: 'Largest' },
+            ]}
+          />
         </Row>
+        {canSpeak() && (
+          <Row title="Read aloud" text="The app says what to do and how it went, so your eyes can stay on your hands.">
+            <Toggle
+              label="Read aloud"
+              value={settings.speak === true}
+              onChange={(v) => {
+                setSettings({ speak: v });
+                if (v) speak('This is how the app sounds when it reads to you.');
+                else stopSpeaking();
+              }}
+            />
+          </Row>
+        )}
         <Row title="Left handed" text="Chord pictures drawn for a guitar held the other way round.">
           <Toggle label="Left handed" value={settings.leftHanded} onChange={(v) => setSettings({ leftHanded: v })} />
         </Row>
@@ -814,6 +836,19 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
             ]}
           />
         </Row>
+      </Card>
+
+      <h2 className="mb-2 mt-8 font-os-serif text-[1.6rem]">Hands on the guitar</h2>
+      <Card className="space-y-3 px-6 py-5 text-[1.05rem] leading-relaxed text-os-muted">
+        <p>
+          <strong className="text-os-ink">The app moves on by itself.</strong> When it hears you get something right, the next step comes after a moment, and a miss sets up another try. Touch anywhere to hold it where it is.
+        </p>
+        <p>
+          <strong className="text-os-ink">A strum starts things.</strong> Playing with the beat begins when you strum once, and a strum carries a session on from one part to the next.
+        </p>
+        <p>
+          <strong className="text-os-ink">A foot pedal works too.</strong> A Bluetooth page turning pedal, the kind used for sheet music, does the next thing with its right pedal and goes back or repeats with its left. So do the arrow keys, space and return on a keyboard.
+        </p>
       </Card>
 
       <h2 className="mb-2 mt-8 font-os-serif text-[1.6rem]">Your progress</h2>

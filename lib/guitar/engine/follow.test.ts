@@ -131,6 +131,24 @@ describe('the follower, with the music waiting', () => {
   });
 });
 
+describe('the follower, never leaving a learner stranded', () => {
+  it('lets a chord go after three tries that were not heard as right, and marks it as not quite', () => {
+    const f = new Follower(parseScore({ chart: 'G | C', strum: 'D.......' }), { mode: 'wait', hintDelayMs: Infinity, hintAfterWrong: 99, giveAfter: 3 });
+    const { events, result } = run(f);
+    strike(of('G'));
+    vi.advanceTimersByTime(500);
+    // C, played, but heard as unclear each time.
+    for (let i = 0; i < 3; i++) {
+      strike(chroma([1, 6, 10]));
+      vi.advanceTimersByTime(500);
+    }
+    expect(events.some((e) => e.type === 'given' && e.index === 1)).toBe(true);
+    const r = result()!;
+    expect(r.detail[1].state).toBe('off');
+    expect(r.clean).toBe(false);
+  });
+});
+
 describe('the follower, with a beat', () => {
   function playAll(f: Follower, chords: (i: number) => number[] | null, offset = 0) {
     for (let i = 0; i < f.steps.length; i++) {
