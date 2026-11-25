@@ -36,7 +36,20 @@ function Why({ text }: { text: string }) {
 }
 
 /** A column of text with a button at the foot. */
-function TextStep({ title, children, onNext, nextLabel = 'Continue' }: { title?: string; children: ReactNode; onNext: () => void; nextLabel?: string }) {
+function TextStep({
+  title,
+  children,
+  aside,
+  onNext,
+  nextLabel = 'Continue',
+}: {
+  title?: string;
+  children: ReactNode;
+  /** A picture that goes with the words. On a wide screen it stands beside them, so both are in view without scrolling. */
+  aside?: ReactNode;
+  onNext: () => void;
+  nextLabel?: string;
+}) {
   const mode = useInputMode();
   const back = useContext(BackContext);
   // Nothing is being played on a page of words, so the bottom key is free to turn back a page.
@@ -45,9 +58,12 @@ function TextStep({ title, children, onNext, nextLabel = 'Continue' }: { title?:
     <div className="flex h-full min-h-0 flex-col">
       <div className="mc-scroll min-h-0 flex-1">
         {/* Set large and dark: this is read from the bench, at arm's length. */}
-        <div className="mc-fade-up mx-auto w-full max-w-3xl px-8 py-6">
-          {title && <h2 className="mb-4 font-mc-serif text-[2.5rem] leading-tight">{title}</h2>}
-          {children}
+        <div className={`mc-fade-up mx-auto w-full px-8 py-6 ${aside ? 'max-w-6xl landscape:grid landscape:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] landscape:items-center landscape:gap-10' : 'max-w-3xl'}`}>
+          <div>
+            {title && <h2 className="mb-4 font-mc-serif text-[2.6rem] leading-tight">{title}</h2>}
+            {children}
+          </div>
+          {aside && <div className="mt-6 landscape:mt-0">{aside}</div>}
         </div>
       </div>
       <StepFoot onNext={onNext} nextLabel={nextLabel} hint={mode === 'midi'} />
@@ -77,13 +93,8 @@ function StepFoot({ onNext, nextLabel = 'Continue', hint, disabled }: { onNext: 
 
 function SayStep({ step, onNext }: { step: StepOf<'say'>; onNext: () => void }) {
   return (
-    <TextStep title={step.title} onNext={onNext}>
-      <Prose text={step.text} className="text-[1.4rem] leading-relaxed text-mc-ink/80" />
-      {step.figure && (
-        <div className="mt-6">
-          <FigureView figure={step.figure} />
-        </div>
-      )}
+    <TextStep title={step.title} onNext={onNext} aside={step.figure ? <FigureView figure={step.figure} /> : undefined}>
+      <Prose text={step.text} className="text-[1.6rem] leading-normal text-mc-ink/85" />
       {step.why && <Why text={step.why} />}
     </TextStep>
   );
@@ -92,10 +103,10 @@ function SayStep({ step, onNext }: { step: StepOf<'say'>; onNext: () => void }) 
 function CheckStep({ step, onNext }: { step: StepOf<'check'>; onNext: () => void }) {
   return (
     <TextStep title={step.title} onNext={onNext} nextLabel="I am set">
-      {step.text && <Prose text={step.text} className="mb-5 text-[1.4rem] leading-relaxed text-mc-ink/80" />}
+      {step.text && <Prose text={step.text} className="mb-5 text-[1.6rem] leading-normal text-mc-ink/85" />}
       <ul className="space-y-3">
         {step.items.map((item, i) => (
-          <li key={i} className="flex items-start gap-3 rounded-2xl bg-mc-surface px-5 py-3.5 text-[1.3rem] leading-snug">
+          <li key={i} className="flex items-start gap-3 rounded-2xl bg-mc-surface px-5 py-3.5 text-[1.45rem] leading-snug">
             <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-mc-ink/10 text-mc-ink">
               <Icon.Check size={15} />
             </span>
@@ -111,7 +122,7 @@ function CheckStep({ step, onNext }: { step: StepOf<'check'>; onNext: () => void
 function Brief({ text, children, tone }: { text: string; children?: ReactNode; tone?: 'ok' | 'hint' }) {
   return (
     <div className="flex shrink-0 items-center gap-4 px-7 pb-2 pt-1">
-      <div className={`min-w-0 flex-1 text-[1.3rem] leading-snug ${tone === 'ok' ? 'text-mc-ok' : tone === 'hint' ? 'text-mc-hint-ink' : 'text-mc-ink/80'}`}>
+      <div className={`min-w-0 flex-1 text-[1.45rem] leading-snug ${tone === 'ok' ? 'text-mc-ok' : tone === 'hint' ? 'text-mc-hint-ink' : 'text-mc-ink/85'}`}>
         <Prose text={text} />
       </div>
       <div className="flex shrink-0 items-center gap-2">{children}</div>
@@ -494,7 +505,7 @@ function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }
     <div className="flex h-full min-h-0 flex-col">
       <div className="mc-scroll min-h-0 flex-1">
         <div className="mc-fade-up mx-auto w-full max-w-3xl px-8 py-6">
-          <h2 className="font-mc-serif text-[2.2rem] leading-tight">{step.question}</h2>
+          <h2 className="font-mc-serif text-[2.4rem] leading-tight">{step.question}</h2>
           {byKey && !answered && (
             <p className="mt-2 text-[1.1rem] text-mc-muted">Answer on the piano with the key shown beside each one, any octave, or tap it.</p>
           )}
@@ -512,7 +523,7 @@ function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }
                   key={i}
                   disabled={answered}
                   onClick={() => setPicked(i)}
-                  className={`flex w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left text-[1.35rem] font-medium transition-colors ${
+                  className={`flex w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left text-[1.5rem] font-medium transition-colors ${
                     state === 'idle'
                       ? 'border-mc-line bg-mc-surface active:bg-mc-raised'
                       : state === 'right'
@@ -535,7 +546,7 @@ function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }
             })}
           </div>
           {answered && step.explain && (
-            <p className="mc-fade-up mt-5 text-[1.3rem] leading-relaxed text-mc-ink/80">
+            <p className="mc-fade-up mt-5 text-[1.45rem] leading-normal text-mc-ink/85">
               {picked === step.answer ? 'Right. ' : 'Not quite. '}
               {step.explain}
             </p>

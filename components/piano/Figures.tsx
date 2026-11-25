@@ -111,7 +111,7 @@ export default function FigureView({ figure }: { figure: Figure }) {
       {figure.kind === 'hands' && <HandsFigure />}
       {figure.kind === 'keys' && <KeysFigure fig={figure} />}
       {figure.kind === 'staff' && <StaffFigure fig={figure} />}
-      {figure.caption && <figcaption className="mt-2 text-center text-sm text-mc-muted">{figure.caption}</figcaption>}
+      {figure.caption && <figcaption className="mt-2 text-center text-[1.1rem] text-mc-muted">{figure.caption}</figcaption>}
     </figure>
   );
 }

@@ -39,6 +39,24 @@ class InputHub {
       if (ev.pedal === 'sostenuto') this.fire('primary');
       else if (ev.pedal === 'soft') this.fire('secondary');
     });
+    // A Bluetooth page turning pedal, the kind used with sheet music readers,
+    // is a keyboard to the iPad: it sends arrow or page keys. Forward means
+    // continue and back means again, so such a pedal works with nothing to set up.
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', (e) => {
+        if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName ?? '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+        const forward = e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown';
+        const backward = e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp';
+        // Space and Return also mean continue, unless a button has the focus and will take them itself.
+        const plain = (e.key === ' ' || e.key === 'Enter') && (tag === 'BODY' || tag === 'HTML' || tag === '');
+        if (!forward && !backward && !plain) return;
+        e.preventDefault();
+        this.fire(backward ? 'secondary' : 'primary');
+      });
+    }
   }
 
   private fire(action: RemoteAction): void {
