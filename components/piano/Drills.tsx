@@ -33,13 +33,14 @@ import { useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks'
 import { Keyboard, flashKey, keyboardRange, type KeyMark } from './Keyboard';
 import PlaySurface from './PlaySurface';
 import ScoreView from './ScoreView';
+import { useOnward } from './session';
 import { Button, Icon, IconButton, Pill, ProgressBar } from './ui';
 
 function Shell({ title, progress, onClose, children }: { title: string; progress: number; onClose: () => void; children: ReactNode }) {
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
       <header className="flex h-14 shrink-0 items-center gap-3 px-4">
-        <IconButton label="Close" onClick={onClose}>
+        <IconButton label="Close" onClick={() => onClose()}>
           <Icon.Close />
         </IconButton>
         <div className="min-w-0 flex-1">
@@ -53,7 +54,10 @@ function Shell({ title, progress, onClose, children }: { title: string; progress
 }
 
 function Summary({ title, lines, onDone }: { title: string; lines: string[]; onDone: () => void }) {
-  useRemote({ primary: onDone });
+  const mode = useInputMode();
+  // Inside the day's session, the way out of a finished exercise is the way on to the next part.
+  const { label, session } = useOnward();
+  useRemote({ primary: onDone, pedal: true });
   useEffect(() => {
     instrument.chime();
   }, []);
@@ -62,15 +66,22 @@ function Summary({ title, lines, onDone }: { title: string; lines: string[]; onD
       <div className="mc-pop flex h-20 w-20 items-center justify-center rounded-full bg-mc-ok text-white">
         <Icon.Check size={44} />
       </div>
-      <h2 className="mc-fade-up font-mc-serif text-4xl">{title}</h2>
-      <div className="mc-fade-up max-w-xl space-y-1 text-[1.1rem] text-mc-muted">
+      <h2 className="mc-fade-up font-mc-serif text-5xl">{title}</h2>
+      <div className="mc-fade-up max-w-2xl space-y-1 text-[1.3rem] text-mc-muted">
         {lines.map((l, i) => (
           <p key={i}>{l}</p>
         ))}
       </div>
-      <Button size="lg" onClick={onDone} className="min-w-[220px]">
-        Done
-      </Button>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        {session && (
+          <Button variant="ghost" size="lg" onClick={session.stop}>
+            Stop for today
+          </Button>
+        )}
+        <Button size="lg" onClick={onDone} className="min-w-[260px]" hint={mode === 'midi' ? 'top key or right pedal' : undefined}>
+          {label}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -88,7 +99,7 @@ function parseCard(id: string): ReadCard {
   return { id, clef: clef as 'T' | 'B', midi: Number(m) };
 }
 
-function ReadingDrill({ onClose }: { onClose: () => void }) {
+function ReadingDrill({ onClose }: { onClose: (finished?: boolean) => void }) {
   const cards = usePiano((s) => s.cards);
   const reviewCard = usePiano((s) => s.reviewCard);
   const recordDrill = usePiano((s) => s.recordDrill);
@@ -152,25 +163,25 @@ function ReadingDrill({ onClose }: { onClose: () => void }) {
 
   if (deck.length === 0) {
     return (
-      <Shell title="Note reading" progress={0} onClose={onClose}>
-        <Summary title="Nothing to review yet" lines={['Notes join this review as the lessons on reading teach them.']} onDone={onClose} />
+      <Shell title="Note reading" progress={0} onClose={() => onClose(true)}>
+        <Summary title="Nothing to review yet" lines={['Notes join this review as the lessons on reading teach them.']} onDone={() => onClose(true)} />
       </Shell>
     );
   }
   if (!card || !score) {
     return (
-      <Shell title="Note reading" progress={1} onClose={onClose}>
+      <Shell title="Note reading" progress={1} onClose={() => onClose(true)}>
         <Summary
           title="Reading done"
           lines={[`${right} of ${deck.length} right.`, 'Notes you found quickly will wait longer before they come back.']}
-          onDone={onClose}
+          onDone={() => onClose(true)}
         />
       </Shell>
     );
   }
   const marks: Record<number, KeyMark> = reveal && !reveal.ok ? { [reveal.midi]: { kind: 'target', label: midiLabel(reveal.midi) } } : {};
   return (
-    <Shell title="Note reading" progress={index / deck.length} onClose={onClose}>
+    <Shell title="Note reading" progress={index / deck.length} onClose={() => onClose(false)}>
       <div className="flex h-full min-h-0 flex-col">
         <div className="px-7 text-[1.15rem] text-mc-muted">
           {reveal ? (
@@ -228,7 +239,7 @@ const ROUNDS: Record<Generated, Round> = {
   technique: { kind: 'technique', title: 'Scales and arpeggios', count: 3, maxLevel: TECH_LEVELS },
 };
 
-function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => void }) {
+function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished?: boolean) => void }) {
   const round = ROUNDS[kind];
   const stored = usePiano((s) => s.drills[kind]);
   const lessons = usePiano((s) => s.lessons);
@@ -436,11 +447,11 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => voi
 
   if (finished) {
     return (
-      <Shell title={round.title} progress={1} onClose={onClose}>
+      <Shell title={round.title} progress={1} onClose={() => onClose(true)}>
         <Summary
           title={`${round.title} done`}
           lines={[`${good} of ${round.count} went well.`, levelNote ?? 'The difficulty follows how you do, so it stays just within reach.']}
-          onDone={onClose}
+          onDone={() => onClose(true)}
         />
       </Shell>
     );
@@ -464,7 +475,7 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => voi
               : 'Play it with the beat. Keep going whatever happens.';
 
   return (
-    <Shell title={round.title} progress={index / round.count} onClose={onClose}>
+    <Shell title={round.title} progress={index / round.count} onClose={() => onClose(false)}>
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-center gap-4 px-7 pb-2 pt-1">
           <div className={`min-w-0 flex-1 text-[1.15rem] leading-snug ${note ? (note.ok ? 'text-mc-ok' : 'text-mc-hint-ink') : 'text-mc-muted'}`}>
@@ -519,7 +530,7 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: () => voi
   );
 }
 
-export default function Drill({ kind, onClose }: { kind: DrillKind; onClose: () => void }) {
+export default function Drill({ kind, onClose }: { kind: DrillKind; onClose: (finished?: boolean) => void }) {
   const logPractice = usePiano((s) => s.logPractice);
   useWakeLock(true);
   usePracticeTimer((seconds) => logPractice(seconds, 0, 1));

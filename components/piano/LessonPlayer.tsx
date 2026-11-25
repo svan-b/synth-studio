@@ -2,19 +2,21 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { instrument } from '@/lib/piano/audio/instrument';
-import { getLesson, getPiece, resolveMusic } from '@/lib/piano/content/catalog';
+import { getLesson, getPiece, lessonOrder, resolveMusic } from '@/lib/piano/content/catalog';
 import type { Lesson, Step } from '@/lib/piano/content/types';
 import { notAttempted, type FlowResult } from '@/lib/piano/engine/flow';
 import { noteBus } from '@/lib/piano/input/bus';
 import { diagnose, waitSummary } from '@/lib/piano/learn/coach';
-import { isRemoteKey } from '@/lib/piano/input/hub';
+import { REMOTE_PRIMARY, REMOTE_SECONDARY, isRemoteKey } from '@/lib/piano/input/hub';
 import { usePiano } from '@/lib/piano/learn/store';
 import { pitchClass } from '@/lib/piano/music/theory';
 import FigureView from './Figures';
 import { readingMs, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
 import { Keyboard, flashKey } from './Keyboard';
 import PlaySurface from './PlaySurface';
-import { Button, Icon, IconButton, Pill, ProgressBar, Prose } from './ui';
+import type { Activity } from './Screens';
+import { useOnward } from './session';
+import { Button, Icon, IconButton, Pill, Prose } from './ui';
 
 type StepOf<K extends Step['kind']> = Extract<Step, { kind: K }>;
 
@@ -42,6 +44,7 @@ function TextStep({
   aside,
   onNext,
   nextLabel = 'Continue',
+  pedal = true,
 }: {
   title?: string;
   children: ReactNode;
@@ -49,11 +52,13 @@ function TextStep({
   aside?: ReactNode;
   onNext: () => void;
   nextLabel?: string;
+  /** Whether the right pedal turns the page. Not on a page that asks for the pedal to be tried. */
+  pedal?: boolean;
 }) {
   const mode = useInputMode();
   const back = useContext(BackContext);
   // Nothing is being played on a page of words, so the bottom key is free to turn back a page.
-  useRemote({ primary: onNext, secondary: back ?? undefined });
+  useRemote({ primary: onNext, secondary: back ?? undefined, pedal });
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="mc-scroll min-h-0 flex-1">
@@ -66,13 +71,13 @@ function TextStep({
           {aside && <div className="mt-6 landscape:mt-0">{aside}</div>}
         </div>
       </div>
-      <StepFoot onNext={onNext} nextLabel={nextLabel} hint={mode === 'midi'} />
+      <StepFoot onNext={onNext} nextLabel={nextLabel} hint={mode === 'midi'} pedal={pedal} />
     </div>
   );
 }
 
 /** The foot of a step that is read, not played: back on the left, on in the middle, both within reach of the keys. */
-function StepFoot({ onNext, nextLabel = 'Continue', hint, disabled }: { onNext: () => void; nextLabel?: string; hint: boolean; disabled?: boolean }) {
+function StepFoot({ onNext, nextLabel = 'Continue', hint, disabled, pedal }: { onNext: () => void; nextLabel?: string; hint: boolean; disabled?: boolean; pedal?: boolean }) {
   const back = useContext(BackContext);
   return (
     <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 px-8 pb-6 pt-3">
@@ -83,7 +88,7 @@ function StepFoot({ onNext, nextLabel = 'Continue', hint, disabled }: { onNext: 
           </Button>
         )}
       </div>
-      <Button size="lg" disabled={disabled} onClick={onNext} hint={hint && !disabled ? 'or the top key' : undefined} className="min-w-[240px]">
+      <Button size="lg" disabled={disabled} onClick={onNext} hint={hint && !disabled ? (pedal ? 'top key or right pedal' : 'or the top key') : undefined} className="min-w-[260px]">
         {nextLabel}
       </Button>
       <div />
@@ -93,7 +98,7 @@ function StepFoot({ onNext, nextLabel = 'Continue', hint, disabled }: { onNext: 
 
 function SayStep({ step, onNext }: { step: StepOf<'say'>; onNext: () => void }) {
   return (
-    <TextStep title={step.title} onNext={onNext} aside={step.figure ? <FigureView figure={step.figure} /> : undefined}>
+    <TextStep title={step.title} onNext={onNext} pedal={!/pedal/i.test(step.text)} aside={step.figure ? <FigureView figure={step.figure} /> : undefined}>
       <Prose text={step.text} className="text-[1.6rem] leading-normal text-mc-ink/85" />
       {step.why && <Why text={step.why} />}
     </TextStep>
@@ -130,6 +135,9 @@ function Brief({ text, children, tone }: { text: string; children?: ReactNode; t
   );
 }
 
+/** How long a finished demonstration stays up before the lesson goes on by itself. */
+const FLOW_MS = 2600;
+
 function ListenStep({ step, onNext }: { step: StepOf<'listen'>; onNext: () => void }) {
   const score = useMemo(() => resolveMusic(step.music), [step.music]);
   const [run, setRun] = useState(0);
@@ -139,15 +147,23 @@ function ListenStep({ step, onNext }: { step: StepOf<'listen'>; onNext: () => vo
     setDone(false);
     setRun((r) => r + 1);
   }, []);
+  // Once it has been heard it goes on by itself after a moment, so the hands can stay on the keys.
+  // Asking to hear it again within that moment keeps it here.
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(onNext, FLOW_MS);
+    return () => clearTimeout(t);
+  }, [done, onNext]);
   useRemote({ primary: onNext, secondary: again });
   return (
     <div className="flex h-full min-h-0 flex-col">
       <Brief text={step.text}>
-        <Button variant="soft" size="sm" onClick={again} icon={<Icon.Repeat size={16} />}>
+        <Button variant="soft" onClick={again} icon={<Icon.Repeat size={18} />} hint={mode === 'midi' ? 'bottom key' : undefined}>
           Again
         </Button>
-        <Button variant={done ? 'primary' : 'ghost'} size="sm" onClick={onNext} className={done ? 'mc-pulse' : ''} hint={mode === 'midi' ? 'top key' : undefined}>
-          {done ? 'My turn' : 'Skip'}
+        <Button variant={done ? 'primary' : 'ghost'} onClick={onNext} className="relative overflow-hidden" hint={mode === 'midi' ? 'top key' : undefined}>
+          {done ? 'Go on' : 'Skip'}
+          {done && <span className="mc-lead absolute bottom-0 left-0 h-1 bg-mc-bg/60" style={{ animationDuration: `${FLOW_MS}ms` }} aria-hidden="true" />}
         </Button>
       </Brief>
       <div className="min-h-0 flex-1">
@@ -257,7 +273,9 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
     [again, have, mode, need, onNext, step.hold, step.touch],
   );
 
-  useRemote({ primary: verdict && !verdict.ok ? again : verdict ? onNext : undefined, secondary: again });
+  // The same two keys mean the same two things all the way through: the top key goes on, the bottom key plays it again.
+  useRemote({ primary: onNext, secondary: again });
+  const keys = inputMode === 'midi';
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -269,20 +287,20 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
         )}
         {verdict && !verdict.ok ? (
           <>
-            <Button variant="ghost" size="sm" onClick={onNext}>
-              Move on
-            </Button>
-            <Button size="sm" onClick={again} hint={inputMode === 'midi' ? 'top key' : undefined} icon={<Icon.Repeat size={16} />}>
+            <Button onClick={again} hint={keys ? 'bottom key' : undefined} icon={<Icon.Repeat size={18} />}>
               Try again
+            </Button>
+            <Button variant="soft" onClick={onNext} hint={keys ? 'top key' : undefined}>
+              Move on
             </Button>
           </>
         ) : (
           <>
-            <IconButton label="Start again" onClick={again}>
-              <Icon.Repeat size={20} />
-            </IconButton>
-            <Button variant="ghost" size="sm" onClick={onNext}>
-              Skip
+            <Button variant="ghost" onClick={again} hint={keys ? 'bottom key' : undefined} icon={<Icon.Repeat size={18} />}>
+              Again
+            </Button>
+            <Button variant="ghost" onClick={onNext} hint={keys ? 'top key' : undefined}>
+              {verdict ? 'Go on' : 'Skip'}
             </Button>
           </>
         )}
@@ -290,7 +308,7 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
       {step.why && !verdict && (
         <div className="px-7">
           <details className="text-[1.05rem] text-mc-muted">
-            <summary className="cursor-pointer font-semibold">Why it is taught this way</summary>
+            <summary className="flex min-h-[44px] cursor-pointer items-center font-semibold">Why it is taught this way</summary>
             <p className="mt-1 max-w-3xl leading-relaxed">{step.why}</p>
           </details>
         </div>
@@ -328,6 +346,7 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
   // The reply above the stand, with the few words shown on the stand itself to match it.
   const [note, setNote] = useState<{ ok: boolean; text: string; stand: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mode = useInputMode();
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -388,17 +407,17 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
         <Pill>
           {index + 1} of {scores.length}
         </Pill>
-        <Button variant="soft" size="sm" onClick={hear} icon={<Icon.Ear size={16} />}>
+        <Button variant="soft" onClick={hear} icon={<Icon.Ear size={18} />} hint={mode === 'midi' ? 'bottom key' : undefined}>
           Hear it
         </Button>
-        <Button variant="ghost" size="sm" onClick={advance}>
+        <Button variant="ghost" onClick={advance} hint={mode === 'midi' ? 'top key' : undefined}>
           Skip
         </Button>
       </Brief>
       {step.why && !note && phase === 'listen' && index === 0 && (
         <div className="px-7">
           <details className="text-[1.05rem] text-mc-muted">
-            <summary className="cursor-pointer font-semibold">Why it is taught this way</summary>
+            <summary className="flex min-h-[44px] cursor-pointer items-center font-semibold">Why it is taught this way</summary>
             <p className="mt-1 max-w-3xl leading-relaxed">{step.why}</p>
           </details>
         </div>
@@ -427,6 +446,12 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
   const [count, setCount] = useState(0);
   const low = step.low ?? 48;
   const high = step.high ?? 83;
+  const back = useContext(BackContext);
+  // The top key is a C and the bottom key an A. Where the step asks for that note, the key is
+  // an answer like any other. Where it does not, the key keeps its usual meaning.
+  const wanted = useCallback((midi: number) => step.pitchClasses.includes(pitchClass(midi)), [step.pitchClasses]);
+  const topSkips = !wanted(REMOTE_PRIMARY);
+  useRemote({ primary: topSkips ? onNext : undefined, secondary: wanted(REMOTE_SECONDARY) ? undefined : (back ?? undefined) });
 
   useEffect(() => {
     found.current = new Set();
@@ -435,7 +460,7 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unsub = noteBus.subscribe((ev) => {
       if (ev.type !== 'on' || finished) return;
-      if (ev.source === 'midi' && isRemoteKey(ev.midi)) return;
+      if (ev.source === 'midi' && isRemoteKey(ev.midi) && !step.pitchClasses.includes(pitchClass(ev.midi))) return;
       if (step.pitchClasses.includes(pitchClass(ev.midi))) {
         flashKey(kbRef.current, ev.midi, 'ok', 700);
         if (!found.current.has(ev.midi)) {
@@ -466,7 +491,7 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
             <span key={i} className={`h-3 w-3 rounded-full transition-colors ${i < count ? 'bg-mc-ok' : 'bg-mc-line'}`} />
           ))}
         </div>
-        <Button variant="ghost" size="sm" onClick={onNext}>
+        <Button variant="ghost" onClick={onNext} hint={mode === 'midi' && topSkips ? 'top key' : undefined}>
           Skip
         </Button>
       </div>
@@ -491,7 +516,7 @@ function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }
   const back = useContext(BackContext);
   const answered = picked !== null;
   const byKey = mode === 'midi' && step.choices.length <= ANSWER_KEYS.length;
-  useRemote({ primary: answered ? onNext : undefined, secondary: back ?? undefined });
+  useRemote({ primary: answered ? onNext : undefined, secondary: back ?? undefined, pedal: true });
   // Answered from the piano, so the hands stay where they are.
   useEffect(() => {
     if (!byKey || answered) return;
@@ -553,14 +578,27 @@ function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }
           )}
         </div>
       </div>
-      <StepFoot onNext={onNext} hint={mode === 'midi'} disabled={!answered} />
+      <StepFoot onNext={onNext} hint={mode === 'midi'} disabled={!answered} pedal />
     </div>
   );
 }
 
-function Complete({ lesson, onDone }: { lesson: Lesson; onDone: () => void }) {
+function Complete({ lesson, onDone }: { lesson: Lesson; onDone: (then?: Activity) => void }) {
   const mode = useInputMode();
-  useRemote({ primary: onDone });
+  const { label, session } = useOnward();
+  const lessons = usePiano((s) => s.lessons);
+  const pieces = usePiano((s) => s.pieces);
+  // Opened by itself, a finished lesson still leads somewhere: to the piece it brought, or to the lesson after it.
+  const follow = useMemo<{ label: string; to: Activity } | null>(() => {
+    if (session) return null;
+    const piece = lesson.pieces?.find((id) => !pieces[id]?.learned);
+    if (piece) return { label: `Practise ${getPiece(piece).title}`, to: { kind: 'piece', id: piece } };
+    const order = lessonOrder();
+    const after = order.slice(order.indexOf(lesson.id) + 1).find((id) => !lessons[id]?.done);
+    return after ? { label: `Next lesson: ${getLesson(after).title}`, to: { kind: 'lesson', id: after } } : null;
+  }, [lesson, lessons, pieces, session]);
+  const onward = useCallback(() => onDone(follow?.to), [follow, onDone]);
+  useRemote({ primary: onward, pedal: true });
   useEffect(() => {
     instrument.chime();
   }, []);
@@ -570,11 +608,11 @@ function Complete({ lesson, onDone }: { lesson: Lesson; onDone: () => void }) {
         <Icon.Check size={44} />
       </div>
       <div className="mc-fade-up">
-        <div className="text-[1.05rem] font-semibold uppercase tracking-widest text-mc-muted">Lesson complete</div>
-        <h2 className="mt-2 font-mc-serif text-4xl">{lesson.title}</h2>
+        <div className="text-[1.1rem] font-semibold uppercase tracking-widest text-mc-muted">Lesson complete</div>
+        <h2 className="mt-2 font-mc-serif text-5xl">{lesson.title}</h2>
       </div>
       {(lesson.pieces?.length || lesson.cards?.length) && (
-        <div className="mc-fade-up max-w-xl space-y-2 text-[1.1rem] text-mc-muted">
+        <div className="mc-fade-up max-w-2xl space-y-2 text-[1.3rem] text-mc-muted">
           {lesson.pieces && lesson.pieces.length > 0 && (
             <p>
               Added to your practice: <strong className="text-mc-ink">{lesson.pieces.map((id) => getPiece(id).title).join(', ')}</strong>.
@@ -583,14 +621,27 @@ function Complete({ lesson, onDone }: { lesson: Lesson; onDone: () => void }) {
           {lesson.cards && lesson.cards.length > 0 && <p>{lesson.cards.length === 1 ? 'One new note joins' : `${lesson.cards.length} new notes join`} your daily reading review.</p>}
         </div>
       )}
-      <Button size="lg" onClick={onDone} className="min-w-[240px]" hint={mode === 'midi' ? 'or the top key' : undefined}>
-        Done
-      </Button>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        {session ? (
+          <Button variant="ghost" size="lg" onClick={session.stop}>
+            Stop for today
+          </Button>
+        ) : (
+          follow && (
+            <Button variant="ghost" size="lg" onClick={() => onDone()}>
+              Done
+            </Button>
+          )
+        )}
+        <Button size="lg" onClick={onward} className="min-w-[260px]" hint={mode === 'midi' ? 'top key or right pedal' : undefined}>
+          {follow ? follow.label : label}
+        </Button>
+      </div>
     </div>
   );
 }
 
-export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; onClose: (completed: boolean) => void }) {
+export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; onClose: (completed: boolean, then?: Activity) => void }) {
   const lesson = useMemo(() => getLesson(lessonId), [lessonId]);
   const stored = usePiano((s) => s.lessons[lessonId]);
   const setLessonStep = usePiano((s) => s.setLessonStep);
@@ -635,6 +686,8 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
   );
   const back = useCallback(() => jump(indexRef.current - 1), [jump]);
   const step = lesson.steps[index];
+  // How far the lesson has got. Turning back to look at something does not lose the place.
+  const reached = Math.max(index, stored && !stored.done ? stored.step : 0);
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
@@ -646,7 +699,7 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
         {/* One mark for each step. Where the learner is, what is behind, what is ahead, and a way to any of them. */}
         <nav className="flex min-w-0 flex-1 items-center gap-1 px-2" aria-label="Steps of this lesson">
           {lesson.steps.map((s, i) => {
-            const state = finished || i < index ? 'done' : i === index ? 'now' : 'todo';
+            const state = finished ? 'done' : i === index ? 'now' : i < reached ? 'done' : 'todo';
             return (
               <button
                 key={i}
@@ -680,7 +733,7 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
       </header>
       <div className="min-h-0 flex-1">
         {finished ? (
-          <Complete lesson={lesson} onDone={() => onClose(true)} />
+          <Complete lesson={lesson} onDone={(then) => onClose(true, then)} />
         ) : (
           <BackContext.Provider value={index > 0 ? back : null}>
             <StepView key={`${lessonId}-${index}`} step={step} onNext={next} />

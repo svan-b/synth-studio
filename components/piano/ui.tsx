@@ -194,7 +194,7 @@ export function Button({ variant = 'primary', size = 'md', hint, icon, className
   const base =
     'inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-[transform,opacity,background-color] duration-150 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100 select-none';
   // The smallest is still a full finger tall: the iPad is at arm's length on the stand.
-  const sizes = { sm: 'h-11 px-4 text-[1.1rem]', md: 'h-12 px-6 text-base', lg: 'h-14 px-8 text-lg' };
+  const sizes = { sm: 'h-11 px-4 text-[1.1rem]', md: 'h-[3.25rem] px-6 text-[1.15rem]', lg: 'h-16 px-8 text-[1.3rem]' };
   const variants = {
     primary: 'bg-mc-ink text-mc-bg',
     soft: 'bg-mc-raised text-mc-ink',
@@ -206,7 +206,7 @@ export function Button({ variant = 'primary', size = 'md', hint, icon, className
       {icon}
       <span className="flex flex-col items-center leading-tight">
         <span>{children}</span>
-        {hint && <span className="text-[12px] font-semibold uppercase tracking-wider opacity-80">{hint}</span>}
+        {hint && <span className="whitespace-nowrap text-[0.9rem] font-medium opacity-75">{hint}</span>}
       </span>
     </button>
   );
@@ -221,7 +221,7 @@ export function IconButton({
   return (
     <button
       aria-label={label}
-      className={`flex h-11 w-11 items-center justify-center rounded-full text-mc-muted transition-colors active:bg-mc-raised ${className ?? ''}`}
+      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-mc-muted transition-colors active:bg-mc-raised ${className ?? ''}`}
       {...rest}
     >
       {children}

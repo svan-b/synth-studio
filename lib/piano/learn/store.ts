@@ -45,7 +45,7 @@ export interface LessonProgress {
   doneOn?: string;
   /** Marked as known without being taken. */
   skipped?: boolean;
-  /** Step to resume at. */
+  /** Step to resume at: the furthest one reached. */
   step: number;
 }
 
@@ -77,6 +77,23 @@ export interface DrillState {
   lastOn?: string;
 }
 
+/** A part of a session, as the planner lays it out. Kept as plain data. */
+export interface SessionPart {
+  kind: 'lesson' | 'piece' | 'drill';
+  id: string;
+  minutes: number;
+  title: string;
+  detail: string;
+}
+
+export interface SavedSession {
+  /** The day it was begun. A session from an earlier day is not picked up. */
+  on: string;
+  blocks: SessionPart[];
+  /** The part that comes next. */
+  index: number;
+}
+
 interface State {
   profile: Profile;
   settings: Settings;
@@ -88,6 +105,12 @@ interface State {
   recordings: Record<string, PieceRecordings>;
   /** Day the daily session was last finished. */
   sessionDoneOn: string | null;
+  /**
+   * The day's session while it is under way: its parts and which comes next.
+   * Kept so that a session left part way, or cut off by the app closing, is
+   * picked up where it stopped.
+   */
+  session: SavedSession | null;
 
   setProfile: (patch: Partial<Profile>) => void;
   setSettings: (patch: Partial<Settings>) => void;
@@ -95,6 +118,9 @@ interface State {
   completeLesson: (id: string) => void;
   /** Mark a lesson as known without taking it. */
   skipLesson: (id: string) => void;
+  /** Take back a mark of "known", so the lesson is to be taken after all. */
+  unskipLesson: (id: string) => void;
+  keepSession: (session: SavedSession | null) => void;
   setPiece: (id: string, state: PieceState) => void;
   /** Keep a take of a learned piece. The first is kept for good, later ones replace each other. */
   keepRecording: (id: string, take: Take) => void;
@@ -181,11 +207,18 @@ export const usePiano = create<State>()(
       drills: {},
       recordings: {},
       sessionDoneOn: null,
+      session: null,
 
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
       setLessonStep: (id, step) =>
-        set((s) => ({ lessons: { ...s.lessons, [id]: { done: s.lessons[id]?.done ?? false, doneOn: s.lessons[id]?.doneOn, step } } })),
+        set((s) => {
+          const had = s.lessons[id];
+          // A lesson already done, or marked as known, can be looked through again without changing that.
+          if (had?.done) return {};
+          // The place kept is the furthest step reached, so turning back to look at something does not lose it.
+          return { lessons: { ...s.lessons, [id]: { done: false, step: Math.max(had?.step ?? 0, step) } } };
+        }),
       completeLesson: (id) =>
         set((s) => ({ lessons: { ...s.lessons, [id]: { done: true, doneOn: s.lessons[id]?.doneOn ?? dayKey(), step: 0 } } })),
       skipLesson: (id) =>
@@ -229,7 +262,15 @@ export const usePiano = create<State>()(
         }),
       setDrillLevel: (id, level) =>
         set((s) => ({ drills: { ...s.drills, [id]: { ...(s.drills[id] ?? { recent: [] }), level, recent: [] } } })),
-      finishSession: () => set({ sessionDoneOn: dayKey() }),
+      finishSession: () => set({ sessionDoneOn: dayKey(), session: null }),
+      keepSession: (session) => set({ session }),
+      unskipLesson: (id) =>
+        set((s) => {
+          if (!s.lessons[id]?.skipped) return {};
+          const lessons = { ...s.lessons };
+          delete lessons[id];
+          return { lessons };
+        }),
       importData: (json) => {
         try {
           const parsed = JSON.parse(json) as Partial<State> & { state?: Partial<State> };
@@ -246,6 +287,7 @@ export const usePiano = create<State>()(
             drills: data.drills ?? {},
             recordings: data.recordings ?? {},
             sessionDoneOn: data.sessionDoneOn ?? null,
+            session: null,
           });
           return true;
         } catch {
@@ -264,6 +306,7 @@ export const usePiano = create<State>()(
           drills: {},
           recordings: {},
           sessionDoneOn: null,
+          session: null,
         }),
     }),
     {
@@ -280,6 +323,7 @@ export const usePiano = create<State>()(
         drills: s.drills,
         recordings: s.recordings,
         sessionDoneOn: s.sessionDoneOn,
+        session: s.session,
       }),
     },
   ),

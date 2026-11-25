@@ -59,7 +59,15 @@ export function useInputMode(): InputMode {
 const remoteStack: Array<{ id: number }> = [];
 let remoteSeq = 0;
 
-export function useRemote(handlers: { primary?: () => void; secondary?: () => void }, enabled = true): void {
+export function useRemote(
+  handlers: {
+    primary?: () => void;
+    secondary?: () => void;
+    /** On a screen with no music, the right pedal means continue as well. */
+    pedal?: boolean;
+  },
+  enabled = true,
+): void {
   const ref = useRef(handlers);
   ref.current = handlers;
   useEffect(() => {
@@ -68,8 +76,8 @@ export function useRemote(handlers: { primary?: () => void; secondary?: () => vo
     remoteStack.push(entry);
     const unsub = input.remote.subscribe((action: RemoteAction) => {
       if (remoteStack[remoteStack.length - 1] !== entry) return;
-      if (action === 'primary') ref.current.primary?.();
-      else ref.current.secondary?.();
+      if (action === 'primary' || (action === 'pedal' && ref.current.pedal)) ref.current.primary?.();
+      else if (action === 'secondary') ref.current.secondary?.();
     });
     return () => {
       unsub();

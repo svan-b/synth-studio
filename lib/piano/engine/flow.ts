@@ -545,13 +545,17 @@ export class FlowSession {
     const step = this.steps[this.stepIndex];
     const match = step.notes.find((n) => this.pending.has(n.id) && this.fits(n, ev.midi));
     if (match) {
-      this.pending.delete(match.id);
       this.noteVelocity(ev);
       this.keyDown(ev, match.id);
       const rescued = this.stepWrong > 0 || (this.stepHinted && !this.stepGuided && this.options.hintDelayMs > 0);
-      this.outcome.set(match.id, rescued ? 'off' : 'ok');
-      // Where any octave will do, or the run is followed in another one, the key to light is the one that was pressed.
-      this.events.emit({ type: 'note', id: match.id, state: rescued ? 'warn' : 'ok', midi: this.options.anyOctave || this.shift !== 0 ? ev.midi : match.midi });
+      // Two hands can be written on the same key at the same moment, as when both thumbs
+      // share middle C. There is one key to press, and pressing it plays both notes.
+      for (const n of step.notes.filter((x) => this.pending.has(x.id) && x.midi === match.midi)) {
+        this.pending.delete(n.id);
+        this.outcome.set(n.id, rescued ? 'off' : 'ok');
+        // Where any octave will do, or the run is followed in another one, the key to light is the one that was pressed.
+        this.events.emit({ type: 'note', id: n.id, state: rescued ? 'warn' : 'ok', midi: this.options.anyOctave || this.shift !== 0 ? ev.midi : n.midi });
+      }
       if (this.pending.size === 0) this.completeStep();
       return;
     }
@@ -729,9 +733,14 @@ export class FlowSession {
     this.keyDown(ev, best ? best.id : null);
     if (best) {
       this.noteVelocity(ev);
-      this.matched.set(best.id, bestErr);
       const onTime = Math.abs(bestErr) <= this.onTimeWindow;
-      this.events.emit({ type: 'note', id: best.id, state: onTime ? 'ok' : 'warn', midi: this.options.anyOctave ? ev.midi : best.midi });
+      // Both hands written on one key at one moment are one key press, and it plays them both.
+      const twin = best;
+      for (const n of this.notes) {
+        if (n !== twin && (n.midi !== twin.midi || Math.abs(n.start - twin.start) > 1e-6 || this.matched.has(n.id) || this.missed.has(n.id))) continue;
+        this.matched.set(n.id, bestErr);
+        this.events.emit({ type: 'note', id: n.id, state: onTime ? 'ok' : 'warn', midi: this.options.anyOctave ? ev.midi : n.midi });
+      }
     } else {
       this.wrong++;
       const beat = this.transport.beatAt(t);

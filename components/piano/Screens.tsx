@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TakePlayer } from '@/lib/piano/audio/replay';
-import { allPieces, allStages, getLesson, getPiece, lessonOrder, lessonUnlocked, pieceInfo } from '@/lib/piano/content/catalog';
+import { allPieces, allStages, getLesson, getPiece, lessonOrder, pieceInfo } from '@/lib/piano/content/catalog';
 import { NOT_USED, PRINCIPLES, TIPS, type Strength } from '@/lib/piano/content/method';
 import type { FlowResult } from '@/lib/piano/engine/flow';
 import { pieceProgress } from '@/lib/piano/learn/coach';
@@ -35,7 +35,7 @@ export type Activity =
   | { kind: 'lesson'; id: string }
   | { kind: 'piece'; id: string; minutes?: number }
   | { kind: 'drill'; id: DrillKind }
-  | { kind: 'session'; blocks: Block[] };
+  | { kind: 'session'; blocks: Block[]; /** The part to begin at, when a session is picked up again. */ from?: number };
 
 function Page({ title, subtitle, right, children }: { title: string; subtitle?: string; right?: ReactNode; children: ReactNode }) {
   return (
@@ -69,6 +69,7 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   const cards = usePiano((s) => s.cards);
   const days = usePiano((s) => s.days);
   const sessionDoneOn = usePiano((s) => s.sessionDoneOn);
+  const saved = usePiano((s) => s.session);
   const drills = usePiano((s) => s.drills);
   const sound = useSound();
   const mode = useInputMode();
@@ -84,7 +85,6 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   const date = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   const tip = TIPS[Math.floor(new Date(today + 'T12:00:00').getTime() / 86400000) % TIPS.length];
   const firstTime = Object.keys(lessons).length === 0 && Object.keys(days).length === 0;
-  const isDone = (id: string) => lessons[id]?.done === true;
   // The next lesson, for a learner who wants more than the day's plan holds, with the reason it is not in the plan.
   const upNext = day.upNext;
   const offerLesson = upNext !== undefined && day.held !== null && !firstTime;
@@ -100,12 +100,35 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
       : day.held === 'turn'
         ? `With ${profile.minutes} minutes a day, lessons and pieces take the days in turn, and today is the piece's.`
         : 'The course moves at one new lesson a day at most, because that is what holds best.';
+  // A session begun today is picked up where it stopped, with the parts it had then.
+  const resume = useMemo(() => {
+    if (!saved || saved.on !== today || doneToday) return null;
+    const blocks = saved.blocks as Block[];
+    let at = saved.index;
+    // A lesson finished some other way since then is behind us.
+    while (at < blocks.length && blocks[at].kind === 'lesson' && lessons[blocks[at].id]?.done) at++;
+    return at < blocks.length ? { blocks, at } : null;
+  }, [doneToday, lessons, saved, today]);
+  const parts = resume?.blocks ?? plan;
+  const at = resume?.at ?? 0;
+  const next: Block | undefined = parts[at];
+  /** How far a lesson has got, when it was left part way. */
+  const stepOf = (id: string) => (lessons[id]?.done ? 0 : (lessons[id]?.step ?? 0));
+  const partDetail = (b: Block) => {
+    const step = b.kind === 'lesson' ? stepOf(b.id) : 0;
+    return step > 0 ? `Left at step ${step + 1} of ${getLesson(b.id).steps.length}. It opens there` : b.detail;
+  };
   const begin = useCallback(() => {
-    if (plan.length > 0) onStart({ kind: 'session', blocks: plan });
-  }, [onStart, plan]);
-  useRemote({ primary: plan.length > 0 ? begin : undefined });
+    if (parts.length > 0) onStart({ kind: 'session', blocks: parts, from: at });
+  }, [at, onStart, parts]);
+  useRemote({ primary: parts.length > 0 ? begin : undefined });
   // The first day keeps both of its lessons at every session length, so it can run over.
   const runsLong = firstTime && planMinutes(plan) > profile.minutes + 2;
+  const left = planMinutes(parts.slice(at));
+  // Lessons opened from the course and left part way, which the day's parts would not lead back to.
+  const halfway = lessonOrder().filter((id) => stepOf(id) > 0 && !parts.some((b) => b.kind === 'lesson' && b.id === id));
+  const open = (b: Block) =>
+    onStart(b.kind === 'lesson' ? { kind: 'lesson', id: b.id } : b.kind === 'piece' ? { kind: 'piece', id: b.id, minutes: b.minutes } : { kind: 'drill', id: b.id });
 
   return (
     <Page title="Today" subtitle={date} right={<ConnectionChip onClick={() => onGo('settings')} />}>
@@ -117,72 +140,101 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
       )}
       <div className="grid gap-6 landscape:grid-cols-[1fr_300px]">
         <Card className="p-7">
+          {/* One thing to do, said large enough to read from the bench: what comes next, and the button that starts it. */}
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="font-mc-serif text-2xl">{doneToday ? 'Today is done' : firstTime ? 'Your first session' : 'Your session'}</h2>
-              <p className="mt-1 text-mc-muted">
+            <div className="min-w-0">
+              <div className="text-[0.95rem] font-semibold uppercase tracking-widest text-mc-muted">
                 {doneToday
-                  ? plan.length > 0
+                  ? 'Your session'
+                  : at > 0
+                    ? `Your session, part ${at + 1} of ${parts.length}`
+                    : firstTime
+                      ? `Your first session, about ${planMinutes(parts)} minutes`
+                      : `Your session, about ${planMinutes(parts)} minutes in ${parts.length} ${parts.length === 1 ? 'part' : 'parts'}`}
+              </div>
+              <h2 className="mt-1 font-mc-serif text-[2.5rem] leading-tight">{doneToday || !next ? 'Today is done' : next.title}</h2>
+              <p className="mt-1.5 max-w-2xl text-[1.25rem] leading-snug text-mc-muted">
+                {doneToday || !next
+                  ? parts.length > 0
                     ? 'Rest is part of learning. Come back tomorrow. If you want more today, this is extra practice with nothing new in it.'
                     : 'Rest is part of learning. Come back tomorrow.'
-                  : firstTime && plan.length > 1
-                    ? `About ${planMinutes(plan)} minutes. By the end of it you will have played your first tune.${
-                        runsLong ? ` That is longer than your usual ${profile.minutes}, and only today. You can stop after the first part.` : ''
-                      }`
-                    : `About ${planMinutes(plan)} minutes, in ${plan.length} ${plan.length === 1 ? 'part' : 'parts'}.`}
+                  : at > 0
+                    ? `${partDetail(next).replace(/[.\s]+$/, '')}. About ${left} minutes are left.`
+                    : firstTime && parts.length > 1
+                      ? `By the end of it you will have played your first tune.${runsLong ? ` It is longer than your usual ${profile.minutes} minutes, today only, and you can stop after any part.` : ''}`
+                      : `${partDetail(next).replace(/[.\s]+$/, '')}.`}
               </p>
             </div>
             {doneToday && (
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-mc-ok text-white">
-                <Icon.Check size={24} />
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-mc-ok text-white">
+                <Icon.Check size={26} />
               </span>
             )}
           </div>
-          <ol className="mt-5 space-y-2">
-            {plan.map((b, i) => {
-              // A lesson that waits on the one before it opens in its turn, when the session reaches it.
-              const waits = b.kind === 'lesson' && !lessonUnlocked(b.id, isDone);
+          {parts.length > 0 && (
+            <Button
+              size="lg"
+              variant={doneToday ? 'soft' : 'primary'}
+              className="mt-5 w-full"
+              onClick={begin}
+              icon={<Icon.Play size={22} />}
+              // The session starts from the piano: sit down, press the top key, play.
+              hint={mode === 'midi' ? 'or the top key' : undefined}
+            >
+              {doneToday ? 'Practise some more' : at > 0 ? 'Carry on' : firstTime ? 'Begin' : 'Start session'}
+            </Button>
+          )}
+          <ol className="mt-6 space-y-2">
+            {parts.map((b, i) => {
+              const finished = !doneToday && i < at;
+              const isNext = !doneToday && i === at;
               return (
-                <li key={`${b.kind}-${b.id}`}>
+                <li key={`${b.kind}-${b.id}-${i}`}>
                   <button
-                    disabled={waits}
-                    onClick={() => onStart(b.kind === 'lesson' ? { kind: 'lesson', id: b.id } : b.kind === 'piece' ? { kind: 'piece', id: b.id, minutes: b.minutes } : { kind: 'drill', id: b.id })}
-                    className="flex w-full items-center gap-4 rounded-2xl bg-mc-bg px-4 py-3 text-left active:bg-mc-raised"
+                    onClick={() => open(b)}
+                    aria-current={isNext ? 'step' : undefined}
+                    className={`flex w-full items-center gap-4 rounded-2xl px-4 py-3 text-left active:bg-mc-raised ${isNext ? 'bg-mc-bg ring-2 ring-inset ring-mc-ink/60' : 'bg-mc-bg'}`}
                   >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mc-surface text-mc-muted">{waits ? <Icon.Lock size={18} /> : BLOCK_ICON[b.kind]}</span>
+                    <span
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${finished ? 'bg-mc-ok text-white' : 'bg-mc-surface text-mc-muted'}`}
+                      aria-label={finished ? 'Done' : undefined}
+                    >
+                      {finished ? <Icon.Check size={22} /> : BLOCK_ICON[b.kind]}
+                    </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">
+                      <span className={`block truncate font-semibold ${finished ? 'text-mc-muted' : ''}`}>
                         {i + 1}. {b.title}
                       </span>
-                      <span className="block truncate text-[1.05rem] text-mc-muted">{waits ? 'Follows on from the lesson before it' : b.detail}</span>
+                      <span className="block truncate text-[1.05rem] text-mc-muted">{finished ? 'Done' : partDetail(b)}</span>
                     </span>
-                    <span className="shrink-0 text-[1.05rem] tabular-nums text-mc-muted">{b.minutes} min</span>
+                    {!finished && <span className="shrink-0 text-[1.05rem] tabular-nums text-mc-muted">{b.minutes} min</span>}
                   </button>
                 </li>
               );
             })}
           </ol>
-          {plan.length > 0 && (
-            <Button
-              size="lg"
-              className="mt-6 w-full"
-              onClick={begin}
-              icon={<Icon.Play size={20} />}
-              // The session starts from the piano: sit down, press the top key, play.
-              hint={mode === 'midi' ? 'or the top key' : undefined}
-            >
-              {doneToday ? 'Practise some more' : firstTime ? 'Begin' : 'Start session'}
-            </Button>
-          )}
+          {halfway.slice(0, 2).map((id) => (
+            <div key={id} className="mt-3 flex items-center justify-between gap-4 rounded-2xl border border-mc-line px-4 py-3">
+              <div className="min-w-0">
+                <div className="truncate font-semibold">{getLesson(id).title}</div>
+                <div className="text-[1.05rem] leading-snug text-mc-muted">
+                  A lesson you left at step {stepOf(id) + 1} of {getLesson(id).steps.length}.
+                </div>
+              </div>
+              <Button variant="soft" className="shrink-0" onClick={() => onStart({ kind: 'lesson', id })}>
+                Carry on
+              </Button>
+            </div>
+          ))}
           {offerLesson && upNext && (
-            <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-mc-line px-4 py-3">
+            <div className="mt-3 flex items-center justify-between gap-4 rounded-2xl border border-mc-line px-4 py-3">
               <div className="min-w-0">
                 <div className="font-semibold">Want something new?</div>
                 <div className="text-[1.05rem] leading-snug text-mc-muted">
                   {whyHeld} The next is <span className="text-mc-ink">{getLesson(upNext).title}</span>, and taking it now is your call.
                 </div>
               </div>
-              <Button variant="soft" size="sm" className="shrink-0" onClick={() => onStart({ kind: 'lesson', id: upNext })}>
+              <Button variant="soft" className="shrink-0" onClick={() => onStart({ kind: 'lesson', id: upNext })}>
                 Take it now
               </Button>
             </div>
@@ -211,7 +263,7 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
             </div>
           </Card>
           <Card className="p-5">
-            <div className="text-[0.85rem] font-semibold uppercase tracking-widest text-mc-faint">Practice tip</div>
+            <div className="text-[0.9rem] font-semibold uppercase tracking-widest text-mc-muted">Practice tip</div>
             <p className="mt-2 text-[1.1rem] leading-relaxed text-mc-muted">{tip}</p>
           </Card>
         </div>

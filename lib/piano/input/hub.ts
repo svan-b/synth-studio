@@ -14,7 +14,16 @@ export type InputMode = 'midi' | 'listen' | 'touch';
 export const REMOTE_PRIMARY = 108;
 export const REMOTE_SECONDARY = 21;
 
-export type RemoteAction = 'primary' | 'secondary';
+/**
+ * "primary" means continue, "secondary" means again or back. "pedal" is the
+ * right pedal going down: on a screen with no music it means continue too,
+ * since that pedal is the one every piano has. While music is on the stand it
+ * stays a pedal.
+ */
+export type RemoteAction = 'primary' | 'secondary' | 'pedal';
+
+/** How long the keys must have been still before the right pedal counts as a button. */
+const QUIET_MS = 1200;
 
 export function isRemoteKey(note: number): boolean {
   return note === REMOTE_PRIMARY || note === REMOTE_SECONDARY;
@@ -26,18 +35,29 @@ class InputHub {
   remoteKeys = true;
   remotePedals = true;
   private lastRemote = -Infinity;
+  /** Keys held down now, and when one last went down: the right pedal is a button only away from playing. */
+  private held = new Set<number>();
+  private lastKey = -Infinity;
 
   constructor() {
     noteBus.subscribe((ev) => {
+      if (ev.source === 'midi' && !isRemoteKey(ev.midi)) {
+        if (ev.type === 'on') {
+          this.held.add(ev.midi);
+          this.lastKey = performance.now();
+        } else this.held.delete(ev.midi);
+      }
       if (ev.type !== 'on' || ev.source !== 'midi' || !this.remoteKeys) return;
       if (ev.midi === REMOTE_PRIMARY) this.fire('primary');
       else if (ev.midi === REMOTE_SECONDARY) this.fire('secondary');
     });
     midi.pedals.subscribe((ev) => {
       if (!this.remotePedals || !ev.down) return;
-      // Middle pedal continues, left pedal repeats. The right pedal stays a pedal.
+      // Middle pedal continues, left pedal repeats.
       if (ev.pedal === 'sostenuto') this.fire('primary');
       else if (ev.pedal === 'soft') this.fire('secondary');
+      // Someone trying a few notes with the pedal down is playing, not turning the page.
+      else if (ev.pedal === 'sustain' && this.held.size === 0 && performance.now() - this.lastKey > QUIET_MS) this.fire('pedal');
     });
     // A Bluetooth page turning pedal, the kind used with sheet music readers,
     // is a keyboard to the iPad: it sends arrow or page keys. Forward means

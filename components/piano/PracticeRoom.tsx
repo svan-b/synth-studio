@@ -25,6 +25,7 @@ import { sliceScore } from '@/lib/piano/music/score';
 import type { Hand } from '@/lib/piano/music/theory';
 import { readingMs, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
 import PlaySurface from './PlaySurface';
+import { useOnward } from './session';
 import { Button, Icon, IconButton, Pill, ProgressBar, Segmented, Sheet } from './ui';
 
 interface Free {
@@ -49,7 +50,7 @@ function readTime(message: string, passed: boolean): number {
   return passed ? Math.min(7000, Math.max(2600, reading)) : Math.min(8500, Math.max(5500, reading));
 }
 
-export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: string; minutes?: number; onClose: () => void }) {
+export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: string; minutes?: number; onClose: (finished?: boolean) => void }) {
   const piece = useMemo(() => getPiece(pieceId), [pieceId]);
   const info = useMemo(() => pieceInfo(pieceId), [pieceId]);
   const full = useMemo(() => pieceScore(pieceId), [pieceId]);
@@ -315,9 +316,12 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
     player.play(recording.take, { onDone: () => setEncore(false) });
   }, [encore, kept]);
 
+  // Inside the day's session, the way out of a finished piece is the way on to the next part.
+  const { label: onward, session } = useOnward('Done');
+  const finish = useCallback(() => onClose(true), [onClose]);
   useRemote({
     // At time up the main choice is to stop, so the top key does that.
-    primary: stage === 'verdict' ? proceed : stage === 'timeup' || stage === 'learned' ? onClose : undefined,
+    primary: stage === 'verdict' ? proceed : stage === 'timeup' || stage === 'learned' ? finish : undefined,
     secondary: stage === 'timeup' ? proceed : stage === 'learned' ? undefined : hearModel,
   });
 
@@ -333,7 +337,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
       <header className="flex h-14 shrink-0 items-center gap-3 px-4">
-        <IconButton label="Close" onClick={onClose}>
+        <IconButton label="Close" onClick={() => onClose(stage === 'learned' || stage === 'timeup')}>
           <Icon.Close />
         </IconButton>
         <div className="min-w-0 flex-1">
@@ -362,36 +366,46 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
             <Icon.Check size={44} />
           </div>
           <div className="mc-fade-up">
-            <div className="text-[1.05rem] font-semibold uppercase tracking-widest text-mc-muted">Piece learned</div>
-            <h2 className="mt-2 font-mc-serif text-4xl">{piece.title}</h2>
+            <div className="text-[1.1rem] font-semibold uppercase tracking-widest text-mc-muted">Piece learned</div>
+            <h2 className="mt-2 font-mc-serif text-5xl">{piece.title}</h2>
           </div>
-          <p className="mc-fade-up max-w-xl text-[1.1rem] leading-relaxed text-mc-muted">{verdict?.v.message}</p>
+          <p className="mc-fade-up max-w-2xl text-[1.3rem] leading-relaxed text-mc-muted">{verdict?.v.message}</p>
           <div className="flex flex-wrap items-center justify-center gap-3">
+            {session && (
+              <Button variant="ghost" size="lg" onClick={session.stop}>
+                Stop for today
+              </Button>
+            )}
             {kept && (
               <Button variant="soft" size="lg" onClick={hearEncore} icon={<Icon.Ear size={20} />}>
                 {encore ? 'Stop' : 'Hear how you played it'}
               </Button>
             )}
-            <Button size="lg" onClick={onClose} className="min-w-[220px]" hint={inputMode === 'midi' ? 'top key' : undefined}>
-              Done
+            <Button size="lg" onClick={finish} className="min-w-[240px]" hint={inputMode === 'midi' ? 'top key' : undefined}>
+              {onward}
             </Button>
           </div>
           {kept && <p className="mc-fade-up max-w-md text-[1.05rem] text-mc-faint">That last play through is kept on the Progress page, so you can hear it again later.</p>}
         </div>
       ) : stage === 'timeup' ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
-          <h2 className="mc-fade-up font-mc-serif text-4xl">{ending === 'kept' ? 'Still yours' : 'A good place to stop'}</h2>
-          <p className="mc-fade-up max-w-xl text-[1.1rem] leading-relaxed text-mc-muted">
+          <h2 className="mc-fade-up font-mc-serif text-5xl">{ending === 'kept' ? 'Still yours' : 'A good place to stop'}</h2>
+          <p className="mc-fade-up max-w-2xl text-[1.3rem] leading-relaxed text-mc-muted">
             {ending === 'kept'
               ? 'This piece is safe in your fingers. It will come back now and then, so that it stays there.'
               : 'That is the time set aside for this piece today. What you practised keeps settling after you stop, and a night of sleep helps it along. It will be easier tomorrow.'}
           </p>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {session && (
+              <Button variant="ghost" size="lg" onClick={session.stop}>
+                Stop for today
+              </Button>
+            )}
             <Button variant="soft" size="lg" onClick={proceed} hint={inputMode === 'midi' ? 'bottom key' : undefined}>
               {ending === 'kept' ? 'Play it again' : 'Keep going'}
             </Button>
-            <Button size="lg" onClick={onClose} hint={inputMode === 'midi' ? 'top key' : undefined}>
-              Finish
+            <Button size="lg" onClick={finish} className="min-w-[240px]" hint={inputMode === 'midi' ? 'top key' : undefined}>
+              {session ? onward : 'Finish'}
             </Button>
           </div>
         </div>
@@ -400,19 +414,19 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
           <div className="flex min-h-[4.25rem] shrink-0 items-center gap-4 px-7 pb-2">
             <div className="min-w-0 flex-1">
               {stage === 'reflect' ? (
-                <div className="mc-fade-up text-[1.15rem] text-mc-muted">How did that go? Decide for yourself before you look.</div>
+                <div className="mc-fade-up text-[1.35rem] text-mc-muted">How did that go? Decide for yourself before you look.</div>
               ) : stage === 'verdict' && verdict ? (
                 <div className="mc-fade-up">
-                  <div className={`text-[1.15rem] font-medium leading-snug ${verdict.v.plain ? 'text-mc-ink' : verdict.v.passed ? 'text-mc-ok' : 'text-mc-hint-ink'}`}>
+                  <div className={`text-[1.35rem] font-medium leading-snug ${verdict.v.plain ? 'text-mc-ink' : verdict.v.passed ? 'text-mc-ok' : 'text-mc-hint-ink'}`}>
                     {verdict.v.message}
                   </div>
-                  {verdict.v.aside && <div className="text-[1rem] leading-snug text-mc-ink">{verdict.v.aside}</div>}
-                  {verdict.stats && <div className="text-[1.05rem] text-mc-muted">{verdict.stats}</div>}
+                  {verdict.v.aside && <div className="text-[1.15rem] leading-snug text-mc-ink">{verdict.v.aside}</div>}
+                  {verdict.stats && <div className="text-[1.1rem] text-mc-muted">{verdict.stats}</div>}
                 </div>
               ) : (
                 <>
-                  <div className="text-[1.15rem] font-semibold text-mc-ink">{title}</div>
-                  <div className="text-[1rem] leading-snug text-mc-muted">{aside ?? prompt}</div>
+                  <div className="text-[1.35rem] font-semibold leading-snug text-mc-ink">{title}</div>
+                  <div className="text-[1.2rem] leading-snug text-mc-ink/75">{aside ?? prompt}</div>
                 </>
               )}
             </div>
@@ -424,17 +438,17 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
               </div>
             )}
             {trial && stage === 'play' && !modelOnce && (
-              <Button variant="ghost" size="sm" onClick={teachFromStart}>
+              <Button variant="ghost" onClick={teachFromStart}>
                 It is new to me
               </Button>
             )}
             {stage === 'verdict' && take && (
-              <Button variant="soft" size="sm" onClick={hearMine} icon={<Icon.Ear size={16} />}>
+              <Button variant="soft" onClick={hearMine} icon={<Icon.Ear size={18} />}>
                 {replay ? 'Stop' : 'Hear yours'}
               </Button>
             )}
             {stage === 'verdict' && (
-              <Button size="sm" onClick={proceed} hint={inputMode === 'midi' ? 'top key' : undefined}>
+              <Button onClick={proceed} hint={inputMode === 'midi' ? 'top key' : undefined}>
                 Continue
               </Button>
             )}

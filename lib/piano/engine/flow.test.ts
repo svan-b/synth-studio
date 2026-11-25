@@ -690,3 +690,53 @@ describe('flow, tempo mode', () => {
     expect(firstBar.accent).toBe(true);
   });
 });
+
+describe('two hands written on the same key', () => {
+  beforeEach(() => {
+    recentNotes.length = 0;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance', 'Date'] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('takes one press of the key for both notes when the music waits', () => {
+    // Both thumbs share middle C at the start and at the end.
+    const score = parseScore({ rh: 'C4q D4q E4q C4q', lh: 'C4q B3q A3q C4q' });
+    const s = new FlowSession(score, { mode: 'wait', hands: ['R', 'L'], hintDelayMs: Infinity });
+    const { events, result } = run(s);
+    press(60);
+    expect(events.filter((e) => e.type === 'step')).toHaveLength(2);
+    [62, 59, 64, 57].forEach((m) => press(m));
+    press(60);
+    const r = result()!;
+    expect(r.clean).toBe(true);
+    expect(r.totalNotes).toBe(8);
+    expect(r.detail.every((d) => d.state === 'ok')).toBe(true);
+  });
+
+  it('takes one press for both with the beat, and counts every note', () => {
+    const score = parseScore({ rh: 'C4q D4q E4q C4q', lh: 'C4q B3q A3q C4q', tempo: 60 });
+    const s = new FlowSession(score, { mode: 'tempo', hands: ['R', 'L'], bpm: 60 });
+    const t0 = performance.now() / 1000;
+    const { result } = run(s);
+    const at = (beat: number, midi: number) => {
+      const target = t0 + 0.25 + (beat + 4) + 0.045;
+      const now = performance.now() / 1000;
+      if (target > now) vi.advanceTimersByTime((target - now) * 1000);
+      press(midi);
+    };
+    at(0, 60);
+    at(1, 62);
+    at(1, 59);
+    at(2, 64);
+    at(2, 57);
+    at(3, 60);
+    vi.advanceTimersByTime(4000);
+    const r = result()!;
+    expect(r.correctNotes).toBe(8);
+    expect(r.missedNotes).toBe(0);
+    expect(r.wrongNotes).toBe(0);
+    expect(r.accuracy).toBe(1);
+  });
+});
