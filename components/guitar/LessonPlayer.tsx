@@ -9,7 +9,7 @@ import { Follower, notAttempted, type FollowEvent, type FollowResult } from '@/l
 import { diagnose, tempoSummary, waitSummary } from '@/lib/guitar/learn/coach';
 import { useGuitar } from '@/lib/guitar/learn/store';
 import { playedStrings, sayChord, shapeFor, shapeNoteOn } from '@/lib/guitar/music/chords';
-import { parseScore } from '@/lib/guitar/music/score';
+import { chordsUsed, parseScore } from '@/lib/guitar/music/score';
 import { OPEN_MIDI, STRING_NAME, noteLetter, noteName, sayLetter, type StringNo } from '@/lib/guitar/music/theory';
 import { ChordDiagram, type StringMark } from './ChordDiagram';
 import FigureView, { StringsFigure } from './Figures';
@@ -164,7 +164,6 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
   const song = 'song' in step.music ? getSong(step.music.song) : null;
   const mode = step.mode ?? 'wait';
   const need = step.passes ?? 1;
-  const known = useKnownChords();
   const [run, setRun] = useState(0);
   const [have, setHave] = useState(0);
   const [verdict, setVerdict] = useState<{ ok: boolean; text: string } | null>(null);
@@ -256,7 +255,7 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
           hints={step.hints ?? 'delay'}
           anyStrike={step.anyStrike}
           changesOnly={step.changesOnly}
-          confusers={known}
+          confusers={chordsUsed(score)}
           pattern={song?.strum ?? ('strum' in step.music ? step.music.strum : undefined)}
           runId={run}
           onDone={onDone}
@@ -539,7 +538,8 @@ function ChangesStep({ step, onNext }: { step: StepOf<'changes'>; onNext: () => 
     setCurrent(0);
     setVerdict(null);
     setNote(null);
-    const f = new Follower(score, { mode: 'wait', hintDelayMs: Infinity, hintAfterWrong: 99, confusers: known });
+    // Back and forth between two chords: the chord just left is the slip to listen for, and the follower knows it.
+    const f = new Follower(score, { mode: 'wait', hintDelayMs: Infinity, hintAfterWrong: 99 });
     const off = f.events.subscribe((ev) => {
       if (ev.type === 'step') setCurrent(ev.index);
       else if (ev.type === 'mark') setNote(null);

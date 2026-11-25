@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { instrument } from '@/lib/guitar/audio/instrument';
-import { changeScore, getSong, simpleStrum, songInfo, songScore } from '@/lib/guitar/content/catalog';
+import { changeScore, getSong, simpleStrum, songChords, songInfo, songScore } from '@/lib/guitar/content/catalog';
 import { notAttempted, type FollowResult } from '@/lib/guitar/engine/follow';
 import {
   applyResult,
@@ -24,7 +24,7 @@ import { useGuitar } from '@/lib/guitar/learn/store';
 import { deleteTake, exportTake, loadTake, playTake, saveTake } from '@/lib/guitar/learn/takes';
 import { sliceScore } from '@/lib/guitar/music/score';
 import { dayKey } from '@/lib/guitar/util/emitter';
-import { readingMs, useKnownChords, usePracticeTimer, useWakeLock } from './hooks';
+import { readingMs, usePracticeTimer, useWakeLock } from './hooks';
 import { songMelody } from './LessonPlayer';
 import PlaySurface from './PlaySurface';
 import { Button, Icon, IconButton, Pill, ProgressBar, Segmented, Sheet } from './ui';
@@ -57,7 +57,8 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
   const reviewCard = useGuitar((s) => s.reviewCard);
   const addCards = useGuitar((s) => s.addCards);
   const logPractice = useGuitar((s) => s.logPractice);
-  const known = useKnownChords();
+  // The likely slips in a song are its other chords.
+  const songChordList = useMemo(() => songChords(songId), [songId]);
 
   const [state, setState] = useState<SongState>(() => (stored ? fitState(info, stored) : newSongState(info)));
   const [run, setRun] = useState(0);
@@ -466,7 +467,7 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
                 display={display}
                 hints="delay"
                 hintMs={6500}
-                confusers={known}
+                confusers={songChordList}
                 stopAfter={shown.stopAfter}
                 runId={`${run}-${free ? 'free' : 'coach'}`}
                 onDone={onDone}

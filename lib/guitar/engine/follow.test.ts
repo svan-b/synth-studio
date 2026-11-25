@@ -207,6 +207,27 @@ describe('the follower, with a beat', () => {
     expect(r.accuracy).toBe(1);
   });
 
+  it('names the chord just left on a close call, but asks more of other chords', () => {
+    // E minor, played, but the strum fits E7 a little better: E, G and B against E, G sharp, B and D.
+    const close = new Array(12).fill(0.1 / 7);
+    close[4] = 0.3;
+    close[7] = 0.12;
+    close[11] = 0.3;
+    close[8] = 0.1;
+    close[2] = 0.08;
+    const judgeSecond = (chart: string, confusers: string[]) => {
+      const score = parseScore({ chart, strum: 'D.......', tempo: 80 });
+      const f = new Follower(score, { mode: 'tempo', inputDelay: 0, metronome: false, confusers });
+      const { events } = run(f);
+      playAll(f, (i) => (i === 0 ? of(f.steps[0].strum!.chord) : close));
+      return events.some((e) => e.type === 'wrong' && e.index === 1);
+    };
+    // Coming from E7, the likely slip is to stay on it, and a close call names it.
+    expect(judgeSecond('E7 | Em', [])).toBe(true);
+    // E7 only as one of the chords a learner knows: a close call is not enough.
+    expect(judgeSecond('G | Em', ['E7'])).toBe(false);
+  });
+
   it('counts missed and extra strums, and lateness', () => {
     const score = parseScore({ chart: 'Em | Em', strum: 'D.D.D.D.', tempo: 70 });
     const f = new Follower(score, { mode: 'tempo', inputDelay: 0, metronome: false });

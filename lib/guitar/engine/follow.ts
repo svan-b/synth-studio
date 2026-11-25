@@ -17,7 +17,7 @@
 
 import { guitar } from '../audio/engine';
 import { Transport, clickEvents, measureStartFor, type TimedEvent } from '../audio/transport';
-import { judgeChord, type ChordVerdict } from '../dsp/chordmatch';
+import { MARGIN, OTHER_MARGIN, judgeChord, type ChordVerdict } from '../dsp/chordmatch';
 import { noteBus, strikeBus, type NoteInput, type StrikeInput } from '../input/bus';
 import { listener } from '../input/listen';
 import { chordPitchClasses } from '../music/chords';
@@ -285,19 +285,28 @@ export class Follower {
   }
 
   /** Chords to compare a strum with: the chord before this one, and any the caller named. */
-  private confusersFor(index: number): Array<{ symbol: string; pcs: number[] }> {
+  /**
+   * Chords to compare a strum with. The chord just left is the likeliest
+   * slip, still under the fingers. Others the caller names, such as the rest
+   * of a song's chords, must fit more clearly to be named.
+   */
+  private confusersFor(index: number): Array<{ symbol: string; pcs: number[]; margin: number }> {
     const step = this.steps[index];
     const own = step.strum?.chord;
-    const names = new Set<string>(this.options.confusers);
+    let before: string | null = null;
     for (let i = index - 1; i >= 0; i--) {
       const c = this.steps[i].strum?.chord;
       if (c && c !== own) {
-        names.add(c);
+        before = c;
         break;
       }
     }
+    const names = new Set<string>(this.options.confusers);
     if (own) names.delete(own);
-    return Array.from(names).map((symbol) => ({ symbol, pcs: chordPitchClasses(symbol) }));
+    if (before) names.delete(before);
+    const out = Array.from(names).map((symbol) => ({ symbol, pcs: chordPitchClasses(symbol), margin: OTHER_MARGIN }));
+    if (before) out.unshift({ symbol: before, pcs: chordPitchClasses(before), margin: MARGIN });
+    return out;
   }
 
   private addError(measure: number): void {

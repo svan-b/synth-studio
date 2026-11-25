@@ -68,7 +68,6 @@ function ChangesDrill({ onClose }: { onClose: () => void }) {
   const records = useGuitar((s) => s.changes);
   const recordChanges = useGuitar((s) => s.recordChanges);
   const recordDrill = useGuitar((s) => s.recordDrill);
-  const known = useKnownChords();
   const pairs = useMemo(() => changePairs(lessons, songs), [lessons, songs]);
   // The pair never tried, or the slowest one, comes first.
   const suggested = useMemo(() => pairs.slice().sort((a, b) => (records[pairKey(...a)]?.best ?? -1) - (records[pairKey(...b)]?.best ?? -1))[0] ?? (['Em', 'E'] as [string, string]), [pairs, records]);
@@ -85,7 +84,8 @@ function ChangesDrill({ onClose }: { onClose: () => void }) {
   const begin = useCallback(() => {
     void guitar.unlock();
     const score = changeScore(pair[0], pair[1], 240, 60);
-    const f = new Follower(score, { mode: 'wait', hintDelayMs: Infinity, hintAfterWrong: 99, confusers: known });
+    // Back and forth between two chords: the chord just left is the slip to listen for, and the follower knows it.
+    const f = new Follower(score, { mode: 'wait', hintDelayMs: Infinity, hintAfterWrong: 99 });
     follower.current = f;
     let changes = 0;
     f.events.subscribe((ev) => {
@@ -100,7 +100,7 @@ function ChangesDrill({ onClose }: { onClose: () => void }) {
     setLeft(60);
     setPhase('going');
     f.start();
-  }, [known, pair]);
+  }, [pair]);
 
   useEffect(() => {
     if (phase !== 'going') return;

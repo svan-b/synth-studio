@@ -37,7 +37,14 @@ const PRESENT = 0.05;
 /** Share of the sound a right chord is expected to hold, at the least. */
 const SHARE = 0.45;
 /** How much better a likely mistake must fit than the chord asked for, to be named. */
-const MARGIN = 0.04;
+export const MARGIN = 0.04;
+/**
+ * The same, for a chord that is possible but less likely than the one just
+ * left, such as any other chord the learner knows. The more chords are
+ * compared, the likelier one of them fits a right strum a little better by
+ * chance, so each must win more clearly.
+ */
+export const OTHER_MARGIN = 0.1;
 /** The same, for a chord a fifth above, which the right chord's own harmonics favour. */
 const SHADOW_MARGIN = 0.15;
 
@@ -64,7 +71,7 @@ export interface ChordVerdict {
  * likely to be mistaken for, given as symbol and notes. A three note chord may
  * lose one note to a quiet string. Larger chords may lose a little more.
  */
-export function judgeChord(chroma: number[], pcs: number[], confusers: Array<{ symbol: string; pcs: number[] }> = []): ChordVerdict {
+export function judgeChord(chroma: number[], pcs: number[], confusers: Array<{ symbol: string; pcs: number[]; margin?: number }> = []): ChordVerdict {
   const fit = chordFit(chroma, pcs);
   if (chroma.length !== 12) return { ok: false, fit, heard: null, dead: true };
   const size = new Set(pcs.map(pitchClass)).size;
@@ -93,7 +100,7 @@ export function judgeChord(chroma: number[], pcs: number[], confusers: Array<{ s
     // so it must win more clearly to count as the mistake.
     const shadow = added.length > 0 && added.every((pc) => fifths.has(pc));
     const s = chordFit(chroma, c.pcs).share;
-    if (s > best + (shadow ? SHADOW_MARGIN : MARGIN)) {
+    if (s > best + Math.max(c.margin ?? MARGIN, shadow ? SHADOW_MARGIN : 0)) {
       best = s;
       heard = c.symbol;
     }
