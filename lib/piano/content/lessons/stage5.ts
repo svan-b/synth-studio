@@ -18,6 +18,13 @@ export const STAGE5: Lesson[] = [
         text: 'The **right pedal** lifts the dampers off the strings, so notes keep sounding after you let go of the keys. It joins chords that your fingers cannot join and gives the piano its warmth.\n\nKeep your heel on the floor and press with the ball of your foot.',
       },
       {
+        kind: 'play',
+        text: 'Try it. Put the right pedal down, play this chord, and take your hands away. The sound stays. Let the pedal up and it stops.',
+        music: { rh: 'C4+E4+G4w:135' },
+        pedal: true,
+        hints: 'always',
+      },
+      {
         kind: 'say',
         title: 'Hands first, then foot',
         text: 'The skill is in **when** you change it. If the pedal stays down through a chord change, the two chords smear together.\n\nSo the foot moves just **after** the hands. Play the new chord, then let the pedal up and straight back down.\n\nSay it as you do it: play, change.',
@@ -31,6 +38,7 @@ export const STAGE5: Lesson[] = [
           chords: 'C | F | G | C',
           tempo: 66,
         },
+        pedal: true,
         hints: 'delay',
       },
       {
@@ -42,6 +50,7 @@ export const STAGE5: Lesson[] = [
         kind: 'play',
         text: 'The melody by Dvořák, both hands, with a pedal change at the start of each measure.',
         music: { piece: 'largo', from: 1, to: 4 },
+        pedal: true,
         hints: 'delay',
       },
       {
@@ -65,7 +74,7 @@ export const STAGE5: Lesson[] = [
     summary: 'A minor, its raised seventh, and Greensleeves.',
     minutes: 11,
     pieces: ['greensleeves'],
-    cards: ['read:T:57', 'read:T:59', 'read:T:81'],
+    cards: ['read:T:57'],
     steps: [
       {
         kind: 'say',
@@ -74,8 +83,9 @@ export const STAGE5: Lesson[] = [
       },
       {
         kind: 'play',
-        text: 'A minor, right hand. The fingering is the one you know from C major.',
+        text: 'A minor, right hand, with the fingering you know from C major. It starts on the **A** below middle C, two lines under the staff, so the letters are shown.',
         music: { rh: 'A3q:1 B3q:2 C4q:3 D4q:1 | E4q:2 F4q:3 G4q:4 A4q:5', tempo: 80, key: 'Am' },
+        names: true,
         hints: 'always',
       },
       {
@@ -154,7 +164,6 @@ export const STAGE5: Lesson[] = [
     summary: 'A minuet in which each hand has a line of its own.',
     minutes: 12,
     pieces: ['minuet'],
-    cards: ['read:T:83', 'read:B:43', 'read:B:64'],
     steps: [
       {
         kind: 'say',
@@ -233,7 +242,7 @@ export const STAGE5: Lesson[] = [
       {
         kind: 'say',
         title: 'Next, the chord travels',
-        text: 'The rocking left hand keeps a chord moving while the hand stays in one place. In the next lesson the chord leaves home. Played as an **arpeggio**, it runs up and down the keyboard, in one hand and then in both.',
+        text: 'The rocking left hand keeps a chord moving while the hand stays in one place. In the next two lessons the chord leaves home. Played as an **arpeggio**, it runs up and down the keyboard, first in one hand and then passed between both.',
       },
     ],
   },

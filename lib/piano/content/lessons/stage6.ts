@@ -15,7 +15,7 @@ export const STAGE6: Lesson[] = [
       {
         kind: 'say',
         title: 'Four notes',
-        text: 'Add one more skip to the top of a triad and you get a **seventh chord**, named for the distance from its bottom note to its top.\n\nOn C that is C, E, G, B, called **C major seven**. On G it is **G seven**, and on D it is **D minor seven**.',
+        text: 'Add one more skip to the top of a triad and you get a **seventh chord**, named for the distance from its bottom note to its top.\n\nOn C it is **C major seven**, on D **D minor seven**, on G **G seven**. The names differ because the distances inside each chord differ. For now, take them as names.',
         figure: { kind: 'staff', music: { rh: 'C4+E4+G4+B4h D4+F4+A4+C5h | G3+B3+D4+F4w' }, caption: 'C major seven, D minor seven, G seven' },
       },
       {
@@ -116,7 +116,7 @@ export const STAGE6: Lesson[] = [
         music: { rh: 'C4q:1 D4q:2 E4q:3 G4q:4 | A4q:5 G4q:4 E4q:3 D4q:2 | C4w:1', tempo: 80 },
         hints: 'always',
       },
-      { kind: 'listen', text: 'Here is the sort of thing you can do with them, over a held fifth in the left hand.', music: { rh: 'E4q G4q A4h | G4q E4q D4h | E4e G4e A4q G4q E4q | D4q C4h.', lh: 'C3+G3w | C3+G3w | C3+G3w | C3+G3w', tempo: 84 } },
+      { kind: 'listen', text: 'Here is the sort of thing you can do with them, over a held fifth in the left hand.', music: { rh: 'E4q:3 G4q:4 A4h:5 | E4q:3 G4q:4 D4h:2 | E4q:3 G4q:4 A4q:5 G4q:4 | E4q:3 D4q:2 C4h:1', lh: 'C3+G3w:51 | C3+G3w | C3+G3w | C3+G3w', tempo: 84 } },
       {
         kind: 'play',
         text: 'Play that one yourself. An idea, the same idea with a new ending, then an answer that comes home to C. This is how a line is built.',
@@ -130,6 +130,8 @@ export const STAGE6: Lesson[] = [
       },
       {
         kind: 'check',
+        playing: true,
+        button: 'Go on',
         title: 'Now you',
         text: 'Hold C and G with your left hand, and let your right hand wander over those five notes. Nothing is being checked. Try each of these in turn.',
         items: [
@@ -219,6 +221,7 @@ export const STAGE6: Lesson[] = [
     summary: 'Für Elise and the first Gymnopédie, and where to go from here.',
     minutes: 12,
     pieces: ['fur-elise', 'gymnopedie'],
+    cards: ['read:T:81', 'read:B:40', 'read:B:38'],
     steps: [
       {
         kind: 'say',

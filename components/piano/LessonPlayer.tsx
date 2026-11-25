@@ -259,7 +259,10 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
         const presses = pedalPresses.current;
         if (presses === 0) {
           ok = false;
-          text = 'Right notes, but the pedal stayed up. Press the right pedal after the first chord, and change it after each new one.';
+          text =
+            result.totalSteps >= 3
+              ? 'Right notes, but the pedal stayed up. Press the right pedal after the first chord, and change it after each new one.'
+              : 'Right notes, but the pedal stayed up. Put the right pedal down and play it again.';
         } else if (presses === 1 && result.totalSteps >= 3) {
           ok = false;
           text = 'The pedal went down and stayed down, so the chords ran into each other. Let it up and straight back down just after each new chord.';
@@ -355,6 +358,8 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
           tempoPct={step.tempoPct ?? 100}
           display={step.display ?? 'staff'}
           hints={step.hints ?? 'delay'}
+          // With nothing on the stand the learner is recalling, so the key waits longer before it shows itself.
+          hintMs={step.display === 'hidden' ? 9000 : undefined}
           fingering={step.fingering ?? true}
           names={step.names ?? false}
           anyKey={step.anyKey}

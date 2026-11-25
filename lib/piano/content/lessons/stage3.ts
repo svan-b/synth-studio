@@ -206,7 +206,7 @@ export const STAGE3: Lesson[] = [
     summary: 'The same hand shape in a new place, and new notes to read.',
     minutes: 10,
     pieces: ['open-road'],
-    cards: ['read:T:69', 'read:T:71', 'read:T:72', 'read:T:74', 'read:B:57', 'read:B:59', 'read:B:62'],
+    cards: ['read:T:69', 'read:T:71', 'read:T:72', 'read:T:74', 'read:B:62'],
     steps: [
       {
         kind: 'say',

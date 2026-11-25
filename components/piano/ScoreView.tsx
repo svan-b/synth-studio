@@ -373,11 +373,28 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
       const candidates = [maxZoom, 1.75, 1.6, 1.45, 1.3, 1.18, 1.05, 0.95, minZoom].filter(
         (c, i, all) => c <= maxZoom && c >= minZoom && all.indexOf(c) === i,
       );
+      let whole = false;
       for (const c of candidates) {
         const p = planLayout(score, size.w / c, planOpts);
         z = c;
         plan = p;
-        if (p.height * c <= size.h - 4 || size.h < 60) break;
+        if (p.height * c <= size.h - 4 || size.h < 60) {
+          whole = true;
+          break;
+        }
+      }
+      // Music longer than the page turns pages whatever its size. It is then set as large as still
+      // leaves the line being played and the line after it in view together, not as small as it goes.
+      if (!whole) {
+        for (const c of candidates) {
+          const p = planLayout(score, size.w / c, planOpts);
+          z = c;
+          plan = p;
+          // The space under the lower staff of the second line can run off the page. And a line
+          // has to hold enough of a phrase to read: not one measure to a line, however tall the page.
+          const perLine = score.measureCount / Math.max(1, p.systems.length);
+          if ((2 * p.systemHeight - 14) * c <= size.h && perLine >= 2.5) break;
+        }
       }
     }
     zoomRef.current = z;

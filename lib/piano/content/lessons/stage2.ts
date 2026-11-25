@@ -164,6 +164,7 @@ export const STAGE2: Lesson[] = [
       },
       { kind: 'play', text: 'The first half of **Lightly Row**.', music: { piece: 'lightly-row', from: 1, to: 4 }, hints: 'delay' },
       { kind: 'play', text: 'All of it.', music: { piece: 'lightly-row' }, hints: 'delay' },
+      { kind: 'listen', text: 'Hear how it goes before you play it with the beat. The open notes last twice as long as the filled ones.', music: { piece: 'lightly-row' } },
       { kind: 'play', text: 'With the beat.', music: { piece: 'lightly-row' }, mode: 'tempo', tempoPct: 80 },
     ],
   },
@@ -185,6 +186,7 @@ export const STAGE2: Lesson[] = [
         kind: 'say',
         title: 'Measures',
         text: 'The upright lines divide the music into **measures**. The two numbers at the start are the **time signature**. For now read only the top one, which says how many beats are in each measure.\n\nFour on top means you count one, two, three, four in every measure.',
+        figure: { kind: 'staff', music: { rh: 'G4q G4q G4q G4q | G4h G4h' }, caption: 'Two measures of four beats. The time signature stands at the start.' },
       },
       {
         kind: 'play',
@@ -291,6 +293,7 @@ export const STAGE2: Lesson[] = [
     summary: 'Reading both hands at once on the grand staff.',
     minutes: 12,
     pieces: ['two-voices', 'aura-lee'],
+    cards: ['read:B:57', 'read:B:59'],
     steps: [
       {
         kind: 'say',

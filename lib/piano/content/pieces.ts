@@ -113,7 +113,7 @@ export const PIECES: Piece[] = [
     time: [4, 4],
     tempo: 92,
     rh: 'C4q:1 F4q:4 E4q F4q | G4q:5 D4q:2 G4h | F4q E4q D4q E4q | F4w | C4q F4q E4q F4q | G4q D4q G4h | F4q E4q D4q E4q | F4w',
-    note: 'A song from 1861. The first leap, from C up to F, is a fourth.',
+    note: 'A song from 1861. It opens with a leap, from C up to F.',
   },
   {
     id: 'two-voices',
@@ -191,7 +191,7 @@ export const PIECES: Piece[] = [
     time: [3, 4],
     tempo: 84,
     pickup: 1,
-    rh: 'D4q:1 | G4h:2 B4q:4 | B4h A4q:3 | G4h:2 E4q:1 | D4h D4q | G4h:2 B4q | B4h A4q | D5h.:5~ | D5h B4q:3 | D5h:5 B4q | G4h:2 D4q:1 | E4h:1 G4q:2 | D4h:1 D4q | G4h:2 B4q:4 | B4h A4q | G4h.:2~ | G4h',
+    rh: 'D4q:1 | G4h:3 B4q:5 | B4h:5 A4q:4 | G4h:3 E4q:2 | D4h:1 D4q:1 | G4h:2 B4q:4 | B4h:4 A4q:3 | D5h.:5~ | D5h B4q:3 | D5h:5 B4q:3 | G4h:2 D4q:1 | E4h:2 G4q:3 | D4h:1 D4q:1 | G4h:3 B4q:5 | B4h:5 A4q:4 | G4h.:3~ | G4h',
     lh: 'rq | G3h.:1 | G3h. | C3h.:5 | G3h.:1 | G3h. | G3h. | D3h.:4 | D3h. | G3h.:1 | G3h. | C3h.:5 | G3h.:1 | G3h. | D3h.:4 | G3h.:1 | G3h',
     chords: '. | G | G | C | G | G | G | D | D | G | G | C | G | G | D | G | G',
     sections: [
@@ -211,7 +211,7 @@ export const PIECES: Piece[] = [
     time: [3, 4],
     tempo: 80,
     pickup: 1,
-    rh: 'E4e:1 E4e | G4q.:3 E4e:1 E4q | G4h:3 E4e:1 G4e:3 | C5q:5 B4q.:4 A4e:3 | A4q G4q:2 D4e:1 E4e | F4q:3 D4q:1 D4e E4e | F4h:3 D4e:1 F4e:3 | B4e:5 A4e G4q:3 B4q:5 | C5h C4e:1 C4e | C5h:5 A4e:3 F4e:1 | G4h:2 E4e:1 C4e | F4q:2 G4q:3 A4q:4 | G4h:3 C4e:1 C4e | C5h:5 A4e:3 F4e:1 | G4h:2 E4e:1 C4e | F4q:4 E4q:3 D4q:2 | C4h:1',
+    rh: 'E4e:1 E4e:1 | G4q.:3 E4e:1 E4q:1 | G4h:3 E4e:1 G4e:3 | C5q:5 B4q.:4 A4e:3 | A4q:3 G4q:2 D4e:1 E4e:2 | F4q:3 D4q:1 D4e:1 E4e:2 | F4h:3 D4e:1 F4e:2 | B4e:5 A4e:4 G4q:3 B4q:4 | C5h:5 C4e:1 C4e:1 | C5h:5 A4e:3 F4e:1 | G4h:5 E4e:3 C4e:1 | F4q:2 G4q:3 A4q:4 | G4h:3 C4e:1 C4e:1 | C5h:5 A4e:3 F4e:1 | G4h:5 E4e:3 C4e:1 | F4q:4 E4q:3 D4q:2 | C4h:1',
     lh: 'rq | C3h.:5 | C3h. | G3h.:1 | G3h. | G3h. | G3h. | G3h. | C3h.:5 | F3h.:2 | C3h.:5 | F3h.:2 | C3h.:5 | F3h.:2 | C3h.:5 | G3h.:1 | C3h:5',
     chords: '. | C | C | G | G | G | G | G | C | F | C | F | C | F | C | G | C',
     sections: [
@@ -250,7 +250,7 @@ export const PIECES: Piece[] = [
     tempo: 96,
     rh: 'rq Eb4e:2 E4e:3 G4q:5 G4q | E4q:3 C4h:1 rq | rq Eb4e:2 E4e:3 G4q:5 G4q | E4q:3 C4h:1 rq | rq Ab4e:2 A4e:3 C5q:5 C5q | A4q:3 F4h:1 rq | rq Eb4e:2 E4e:3 G4q:5 G4q | E4q:3 C4h:1 rq | rq Bb4e:2 B4e:3 D5q:5 D5q | C5q:5 A4q:3 F4h:1 | rq Eb4e:2 E4e:3 G4q:5 E4q:3 | C4w:1',
     lh: 'C3q:5 G3q:2 A3q:1 G3q:2 | C3q G3q A3q G3q | C3q G3q A3q G3q | C3q G3q A3q G3q | F3q:5 C4q:2 D4q:1 C4q:2 | F3q C4q D4q C4q | C3q:5 G3q:2 A3q:1 G3q:2 | C3q G3q A3q G3q | G3q:5 D4q:2 E4q:1 D4q:2 | F3q:5 C4q:2 D4q:1 C4q:2 | C3q:5 G3q:2 A3q:1 G3q:2 | C3w:5',
-    chords: 'C7 | C7 | C7 | C7 | F7 | F7 | C7 | C7 | G7 | F7 | C7 | C7',
+    chords: 'C | C | C | C | F | F | C | C | G | F | C | C',
     sections: [
       [1, 4],
       [5, 8],
@@ -269,7 +269,7 @@ export const PIECES: Piece[] = [
     time: [3, 4],
     tempo: 100,
     pickup: 1,
-    rh: 'A4q:1 | C5h:2 D5q:3 | E5q.:4 F5e:5 E5q:4 | D5h:3 B4q:1 | G4q.:1 A4e:2 B4q:3 | C5h:4 A4q:2 | A4q.:2 G#4e:1 A4q:2 | B4h:3 G#4q:1 | E4h:1 A4q:2 | C5h:3 D5q:4 | E5q.:5 F5e E5q | D5h:4 B4q:2 | G4q.:1 A4e:2 B4q:3 | C5q.:4 B4e:3 A4q:2 | G#4q.:2 F#4e:1 G#4q:2 | A4h.:3~ | A4h',
+    rh: 'A4q:1 | C5h:2 D5q:3 | E5q.:4 F5e:5 E5q:4 | D5h:3 B4q:2 | G4q.:1 A4e:2 B4q:3 | C5h:5 A4q:3 | A4q.:3 G#4e:2 A4q:3 | B4h:4 G#4q:2 | E4h:1 A4q:1 | C5h:2 D5q:3 | E5q.:4 F5e:5 E5q:4 | D5h:3 B4q:2 | G4q.:1 A4e:2 B4q:3 | C5q.:5 B4e:4 A4q:3 | G#4q.:2 F#4e:1 G#4q:2 | A4h.:3~ | A4h',
     lh: 'rq | A3h.:1 | A3h. | G3h.:2 | G3h. | A3h.:1 | E3h.:4 | E3h. | E3h. | A3h.:1 | A3h. | G3h.:2 | G3h. | A3h.:1 | E3h.:4 | A3h.:1 | A3h',
     chords: '. | Am | Am | G | G | Am | E | E | E | Am | Am | G | G | Am | E | Am | Am',
     sections: [

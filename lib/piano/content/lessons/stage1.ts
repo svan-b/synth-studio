@@ -15,6 +15,7 @@ export const STAGE1: Lesson[] = [
     steps: [
       {
         kind: 'check',
+        button: 'I am set',
         title: 'First, how you sit',
         text: 'Set yourself up well before you touch a key. Tension is the thing to avoid, now and always.',
         items: [
@@ -142,7 +143,7 @@ export const STAGE1: Lesson[] = [
         text: 'Last time, with nothing to look at. It starts on **E**, finger 3. If you get stuck, the next key will show itself.',
         music: { piece: 'hot-cross-buns' },
         display: 'hidden',
-        hints: 'never',
+        hints: 'delay',
       },
       {
         kind: 'say',
@@ -175,8 +176,8 @@ export const STAGE1: Lesson[] = [
       {
         kind: 'say',
         title: 'Long and short',
-        text: 'Notes last different lengths.\n\nA **quarter note** lasts one beat. A **half note** lasts two. A **whole note** lasts four. In the picture, longer notes are longer bars.\n\nCount the beats in your head, or out loud: one, two, three, four.',
-        figure: { kind: 'staff', music: { rh: 'B4q B4q B4h | B4w' }, caption: 'Two quarter notes, a half note, then a whole note' },
+        text: 'Notes last different lengths.\n\nA **quarter note** lasts one beat. A **half note** lasts two. A **whole note** lasts four. In the pictures you play from, a longer note is a longer bar.\n\nCount the beats in your head, or out loud: one, two, three, four.',
+        figure: { kind: 'staff', music: { rh: 'B4q B4q B4h | B4w' }, caption: 'How they are written, for later: two quarter notes, a half note, then a whole note' },
         why: 'Counting the beat while you play, aloud at first, is one of the few rhythm teaching methods with consistent support in studies.',
       },
       {
@@ -232,7 +233,7 @@ export const STAGE1: Lesson[] = [
       {
         kind: 'say',
         title: 'Steps and skips',
-        text: 'Melodies move in two main ways.\n\nA **step** goes to the very next key, such as C to D. A **skip** jumps over one key, such as C to E.\n\nMost of the tune you are about to learn moves by step.',
+        text: 'Melodies move in two main ways.\n\nA **step** goes to the very next white key, such as C to D. A **skip** jumps over one, such as C to E.\n\nMost of the tune you are about to learn moves by step.',
         figure: { kind: 'keys', low: 60, high: 67, marks: { 60: 'C', 62: 'D', 64: 'E' }, labels: 'none', caption: 'C to D is a step. C to E is a skip.' },
       },
       {
@@ -256,7 +257,7 @@ export const STAGE1: Lesson[] = [
         text: 'From memory. It starts on **E**. If you are stuck for a while, the next key will light.',
         music: { piece: 'ode-first' },
         display: 'hidden',
-        hints: 'never',
+        hints: 'delay',
       },
       {
         kind: 'say',
@@ -314,7 +315,7 @@ export const STAGE1: Lesson[] = [
         text: 'Now both hands, but not yet at the same time. In **Stepping Stones** the right hand asks and the left hand answers.\n\nPut both hands in their C positions and leave them there.',
         figure: { kind: 'keys', low: 48, high: 67, marks: { 48: '5', 55: '1', 60: '1', 67: '5' }, labels: 'c', caption: 'Left hand on the low C, right thumb on middle C' },
       },
-      { kind: 'listen', text: 'Listen. Blue bars are the right hand, gold bars are the left.', music: { piece: 'stepping-stones' }, display: 'contour' },
+      { kind: 'listen', text: 'Listen. Blue bars are the right hand, grey bars are the left.', music: { piece: 'stepping-stones' }, display: 'contour' },
       { kind: 'play', text: 'Play it, each hand in turn.', music: { piece: 'stepping-stones' }, display: 'contour', hints: 'always' },
       { kind: 'play', text: 'Once more, keys dark.', music: { piece: 'stepping-stones' }, display: 'contour', hints: 'delay' },
     ],

@@ -134,7 +134,11 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
 
   const score = useMemo(() => (shown ? sliceScore(full, shown.from, shown.to) : full), [full, shown]);
   // Early pieces are shown as a picture of their shape until reading has been taught.
-  const display = piece.stage === 1 && !readsStaff(lessons) ? 'contour' : 'staff';
+  // A piece from the first stage is shown as its shape until the learner reads what it is written in:
+  // the treble staff for the right hand alone, the bass clef for the left, both staves for both hands.
+  const reads =
+    info.hands.length === 2 ? lessons['grand-staff']?.done === true : info.hands[0] === 'L' ? lessons['bass-clef']?.done === true : readsStaff(lessons);
+  const display = piece.stage === 1 && !reads ? 'contour' : 'staff';
 
   const proceed = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);

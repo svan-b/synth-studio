@@ -128,6 +128,7 @@ export const STAGE4: Lesson[] = [
     title: 'Changing chords smoothly',
     summary: 'The same chords with the notes rearranged, so the hand barely moves.',
     minutes: 10,
+    cards: ['read:T:59', 'read:B:47'],
     steps: [
       {
         kind: 'say',
@@ -142,8 +143,9 @@ export const STAGE4: Lesson[] = [
       },
       {
         kind: 'play',
-        text: 'Right hand. Watch how little the hand has to travel.',
+        text: 'Right hand. Watch how little the hand has to travel. The G chord starts on the **B** just below middle C, which hangs under its line, so the letters are shown.',
         music: { rh: 'C4+E4+G4w:135 | C4+F4+A4w:135 | B3+D4+G4w:125 | C4+E4+G4w:135', tempo: 72, chords: 'C | F | G | C' },
+        names: true,
         hints: 'always',
       },
       { kind: 'play', text: 'Again, keys dark.', music: { rh: 'C4+E4+G4w:135 | C4+F4+A4w:135 | B3+D4+G4w:125 | C4+E4+G4w:135', tempo: 72, chords: 'C | F | G | C' }, hints: 'delay' },
@@ -237,6 +239,7 @@ export const STAGE4: Lesson[] = [
     title: 'Minor chords',
     summary: 'The darker colour, and the four chords behind countless songs.',
     minutes: 10,
+    cards: ['read:B:45', 'read:B:43', 'read:B:41'],
     steps: [
       {
         kind: 'say',
@@ -293,7 +296,7 @@ export const STAGE4: Lesson[] = [
     summary: 'Why some scales need black keys, and what a key signature tells you.',
     minutes: 12,
     pieces: ['canon'],
-    cards: ['read:T:76', 'read:T:77', 'read:T:79', 'read:B:45', 'read:B:47'],
+    cards: ['read:T:76', 'read:T:77', 'read:T:79'],
     steps: [
       {
         kind: 'say',
@@ -324,6 +327,7 @@ export const STAGE4: Lesson[] = [
         kind: 'say',
         title: 'Key signatures',
         text: 'Writing a sharp beside every F would clutter the page. So the sharps or flats are written once, at the start of each line. That is the **key signature**, and it applies to every note of that name.\n\nOne sharp means G major. One flat means F major. Two sharps, F and C, mean D major.',
+        figure: { kind: 'staff', music: { rh: 'G4q A4q B4q C5q | D5q E5q F#5q G5q', key: 'G' }, caption: 'One sharp at the start of the line, on the F line. No sign is needed beside the F in the music.' },
       },
       {
         kind: 'play',
@@ -386,7 +390,8 @@ export const STAGE4: Lesson[] = [
         text: 'One more for your practice, the **Lullaby** by Brahms. It opens with a pickup too, and its left hand plays roots.',
         music: { piece: 'lullaby', from: 1, to: 5 },
       },
-      { kind: 'play', text: 'The first phrase of the Lullaby, both hands. Three beats in a measure.', music: { piece: 'lullaby', from: 1, to: 5 }, hints: 'delay' },
+      { kind: 'play', text: 'Its tune alone first, right hand. Three beats in a measure.', music: { piece: 'lullaby', from: 1, to: 5 }, hands: ['R'], hints: 'delay' },
+      { kind: 'play', text: 'Now both hands. The left hand holds one low note through each measure.', music: { piece: 'lullaby', from: 1, to: 5 }, hints: 'delay' },
       {
         kind: 'say',
         title: 'Yours to arrange',
@@ -523,6 +528,7 @@ export const STAGE4: Lesson[] = [
     summary: 'Twelve measures, three chords and one bent note.',
     minutes: 12,
     pieces: ['blues'],
+    cards: ['read:B:64'],
     steps: [
       {
         kind: 'say',
@@ -537,8 +543,9 @@ export const STAGE4: Lesson[] = [
       { kind: 'play', text: 'The pattern on C. Fingers 5, 2, 1, 2.', music: { lh: 'C3q:5 G3q:2 A3q:1 G3q:2 | C3q G3q A3q G3q', tempo: 88 }, hints: 'always' },
       {
         kind: 'play',
-        text: 'The same shape on F, then on G.',
+        text: 'The same shape on F, then on G. The top notes climb above middle C, higher than the left hand has read so far, so the letters are shown.',
         music: { lh: 'F3q:5 C4q:2 D4q:1 C4q:2 | F3q C4q D4q C4q | G3q:5 D4q:2 E4q:1 D4q:2 | G3q D4q E4q D4q', tempo: 88 },
+        names: true,
         hints: 'delay',
       },
       {
