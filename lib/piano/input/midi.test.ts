@@ -187,3 +187,87 @@ describe('how firmly the learner plays', () => {
     expect(midi.typicalTouch!).toBeGreaterThan(50 / 127);
   });
 });
+
+describe('a piano joined by cable and by Bluetooth at once', () => {
+  type FakeIn = { id: string; name: string; state: string; transport?: string; onmidimessage: ((e: { data: Uint8Array; timeStamp: number }) => void) | null };
+  type FakeOut = { id: string; name: string; state: string; transport?: string; send: (d: number[]) => void; sent: number[][] };
+  const input = (id: string, name: string, transport?: string): FakeIn => ({ id, name, state: 'connected', transport, onmidimessage: null });
+  const output = (id: string, name: string, transport?: string): FakeOut => {
+    const o: FakeOut = { id, name, state: 'connected', transport, sent: [], send: (d) => void o.sent.push(Array.from(d)) };
+    return o;
+  };
+  const plug = async (ins: FakeIn[], outs: FakeOut[]) => {
+    const access = { inputs: { forEach: (fn: (p: FakeIn) => void) => ins.forEach(fn) }, outputs: { forEach: (fn: (p: FakeOut) => void) => outs.forEach(fn) }, onstatechange: null };
+    Object.defineProperty(globalThis.navigator, 'requestMIDIAccess', { configurable: true, writable: true, value: () => Promise.resolve(access) });
+    await midi.connect();
+  };
+  const key = (port: FakeIn, bytes: number[]) => port.onmidimessage?.({ data: new Uint8Array(bytes), timeStamp: performance.now() });
+  let heard: NoteInput[] = [];
+  let off: () => void = () => undefined;
+  beforeEach(() => {
+    heard = [];
+    off = noteBus.subscribe((e) => heard.push(e));
+  });
+  afterEach(() => {
+    off();
+    midi.disconnect();
+  });
+
+  it('uses the cable and leaves the Bluetooth link alone, in and out', async () => {
+    const usb = input('in:1', 'P-525', 'cable');
+    const ble = input('in:2', 'P-525 MIDI', 'bluetooth');
+    const usbOut = output('out:1', 'P-525', 'cable');
+    const bleOut = output('out:2', 'P-525 MIDI', 'bluetooth');
+    await plug([usb, ble], [usbOut, bleOut]);
+    const status = midi.getStatus();
+    expect(status.inputs.map((p) => p.name)).toEqual(['P-525']);
+    expect(status.aside.map((p) => p.name)).toEqual(['P-525 MIDI']);
+    expect(status.outputs.map((p) => p.name)).toEqual(['P-525']);
+    // One key, reported by both links, is heard once.
+    key(usb, [0x90, 60, 90]);
+    key(ble, [0x90, 60, 90]);
+    key(usb, [0x80, 60, 0]);
+    key(ble, [0x80, 60, 0]);
+    expect(heard.map((e) => e.type)).toEqual(['on', 'off']);
+    // A note the app plays goes to the piano once.
+    midi.send([0x90, 64, 80]);
+    expect(usbOut.sent).toEqual([[0x90, 64, 80]]);
+    expect(bleOut.sent).toEqual([]);
+  });
+
+  it('with Bluetooth alone, uses Bluetooth', async () => {
+    const ble = input('in:2', 'P-525 MIDI', 'bluetooth');
+    const bleOut = output('out:2', 'P-525 MIDI', 'bluetooth');
+    await plug([ble], [bleOut]);
+    expect(midi.getStatus().inputs.map((p) => p.name)).toEqual(['P-525 MIDI']);
+    expect(midi.getStatus().aside).toEqual([]);
+    key(ble, [0x90, 60, 90]);
+    expect(heard.map((e) => e.type)).toEqual(['on']);
+    midi.send([0x90, 64, 80]);
+    expect(bleOut.sent).toHaveLength(1);
+  });
+
+  it('finds a second link by its echo where the system does not say which is which', async () => {
+    const a = input('in:1', 'P-525');
+    const b = input('in:2', 'Digital Piano');
+    const outA = output('out:1', 'P-525');
+    const outB = output('out:2', 'Digital Piano');
+    await plug([a, b], [outA, outB]);
+    expect(midi.getStatus().inputs).toHaveLength(2);
+    // Each key arrives on one and then, a moment later, on the other. Even a short note is heard once.
+    for (const note of [60, 62, 64, 65]) {
+      key(a, [0x90, note, 90]);
+      key(a, [0x80, note, 0]);
+      key(b, [0x90, note, 90]);
+      key(b, [0x80, note, 0]);
+    }
+    expect(heard.filter((e) => e.type === 'on').map((e) => e.midi)).toEqual([60, 62, 64, 65]);
+    expect(heard.filter((e) => e.type === 'off')).toHaveLength(4);
+    // After a few, the second link is left alone, and notes go out by the first only.
+    expect(midi.getStatus().inputs.map((p) => p.name)).toEqual(['P-525']);
+    expect(midi.getStatus().aside.map((p) => p.name)).toEqual(['Digital Piano']);
+    midi.send([0x90, 64, 80]);
+    expect(outA.sent).toHaveLength(1);
+    expect(outB.sent).toHaveLength(0);
+  });
+});

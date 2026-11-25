@@ -14,7 +14,7 @@
  *                    midi.flush id              withdraw notes sent with a time still to come
  *                    sound.ask                  say again where the iPad's sound is going
  *
- *   app to page    __middleC.midi.ports([{ id, name, kind }])
+ *   app to page    __middleC.midi.ports([{ id, name, kind, transport }])
  *                  __middleC.midi.rx(id, [bytes], epochMs)
  *                  __middleC.sound({ route, name, delayMs })
  */
@@ -42,6 +42,8 @@
     this.name = info.name;
     this.manufacturer = info.manufacturer || '';
     this.type = info.kind;
+    // "bluetooth" or "cable". A piano joined both ways shows up twice, and the page then uses one.
+    this.transport = info.transport || '';
     this.version = '';
     this.state = 'connected';
     this.connection = 'open';
@@ -77,7 +79,10 @@
       var info = list[i];
       seen[info.id] = true;
       var port = map.get(info.id);
-      if (port) port.name = info.name;
+      if (port) {
+        port.name = info.name;
+        port.transport = info.transport || '';
+      }
       else map.set(info.id, new Port(info));
     }
     map.forEach(function (port, id) {

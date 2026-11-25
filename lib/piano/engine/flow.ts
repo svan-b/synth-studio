@@ -376,8 +376,9 @@ export class FlowSession {
   private setPhase(phase: FlowPhase): void {
     this.phase = phase;
     if (phase === 'playing') {
-      // The take begins here. In tempo mode that is a moment before the first beat.
-      this.takeStart = piano.now();
+      // The take begins here. In tempo mode that is a moment before the first beat, on the
+      // clock the music is sent by, which runs ahead of what is heard by the sound's delay.
+      this.takeStart = piano.now() - (this.options.mode === 'tempo' ? this.soundDelay : 0);
       // A pedal put down during the count in is already down when the take begins.
       if (midi.isPedalDown('sustain')) this.takePedal.push([0, 1]);
     }
@@ -699,9 +700,9 @@ export class FlowSession {
     }
   }
 
-  /** Run a callback when the audio clock reaches a time. */
+  /** Run a callback when the sound sent for an audio clock time is heard, so that the screen moves with what the learner hears. */
   private at(when: number, fn: () => void): void {
-    const delay = Math.max(0, (when - piano.now()) * 1000);
+    const delay = Math.max(0, (when + this.soundDelay - piano.now()) * 1000);
     const t = setTimeout(() => {
       if (this.phase !== 'done' && this.phase !== 'stopped') fn();
     }, delay);

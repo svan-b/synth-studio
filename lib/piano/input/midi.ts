@@ -39,6 +39,11 @@ export interface MidiStatus {
   transport: 'webmidi' | 'bluetooth' | null;
   inputs: MidiPort[];
   outputs: MidiPort[];
+  /**
+   * Links to a piano that is already being heard another way, and so are left
+   * alone: the Bluetooth link of a piano that is also plugged in by cable.
+   */
+  aside: MidiPort[];
   error: string | null;
   /** Count of note and pedal messages received, so the UI can show a live signal. */
   messages: number;
@@ -129,12 +134,15 @@ type WebMidiInput = {
   id: string;
   name?: string | null;
   state?: string;
+  /** "bluetooth" or "cable", where the system says. The iPad app does. */
+  transport?: string;
   onmidimessage: ((e: { data: Uint8Array | null; timeStamp: number }) => void) | null;
 };
 type WebMidiOutput = {
   id: string;
   name?: string | null;
   state?: string;
+  transport?: string;
   send: (data: number[] | Uint8Array, timestamp?: number) => void;
   /** Withdraw messages sent with a time that has not come yet. Not every system offers it. */
   clear?: () => void;
@@ -157,6 +165,7 @@ class MidiManager {
     transport: null,
     inputs: [],
     outputs: [],
+    aside: [],
     error: null,
     messages: 0,
   };
@@ -180,6 +189,14 @@ class MidiManager {
   private touchCount = 0;
   /** Milliseconds each of the last keys took to reach the app. */
   private lateness: number[] = [];
+  /** Ports not listened to: a second link to a piano that is already heard. */
+  private muted = new Set<string>();
+  /** Ports found, from what they send, to repeat what another port has just sent. */
+  private shadow = new Set<string>();
+  private echoes = new Map<string, number>();
+  /** The port each key last went down on and when, and the port holding it now. */
+  private lastOn = new Map<number, { port: string; at: number }>();
+  private owner = new Map<number, string>();
 
   constructor() {
     if (typeof navigator !== 'undefined') {
@@ -261,29 +278,58 @@ class MidiManager {
 
   private refreshPorts(): void {
     if (!this.access) return;
-    const inputs: MidiPort[] = [];
-    const outputs: MidiPort[] = [];
-    const outs: WebMidiOutput[] = [];
+    const ins: WebMidiInput[] = [];
+    const allOuts: WebMidiOutput[] = [];
     this.access.inputs.forEach((port) => {
-      if (port.state === 'disconnected') return;
-      inputs.push({ id: port.id, name: port.name || 'MIDI device' });
-      // Assigning the handler also opens the port.
-      port.onmidimessage = (e) => {
-        if (e.data) this.handleBytes(e.data, e.timeStamp, port.name || 'MIDI');
-      };
+      if (port.state !== 'disconnected') ins.push(port);
     });
     this.access.outputs.forEach((port) => {
-      if (port.state === 'disconnected') return;
-      outputs.push({ id: port.id, name: port.name || 'MIDI device' });
-      outs.push(port);
+      if (port.state !== 'disconnected') allOuts.push(port);
     });
-    this.outputs = outs;
-    const changed =
-      inputs.map((p) => p.id).join() !== this.current.inputs.map((p) => p.id).join() ||
-      outputs.map((p) => p.id).join() !== this.current.outputs.map((p) => p.id).join();
-    if (changed) {
+
+    // A piano plugged in by cable and joined over Bluetooth as well shows up
+    // twice. Heard on both, every key would arrive twice, and every note the
+    // app sends would be played twice. One link is used: the cable, which is
+    // the quicker and steadier of the two. The other is left alone.
+    const wireless = (p: { name?: string | null; transport?: string }) => p.transport === 'bluetooth' || /bluetooth|\bble\b/i.test(p.name ?? '');
+    const both = ins.some(wireless) && ins.some((p) => !wireless(p));
+    const setAside = (p: WebMidiInput) => this.shadow.has(p.id) || (both && wireless(p));
+    const used = ins.filter((p) => !setAside(p));
+    const asideIn = ins.filter(setAside);
+    this.muted = new Set(asideIn.map((p) => p.id));
+    for (const port of ins) {
+      // Assigning the handler also opens the port.
+      port.onmidimessage = (e) => {
+        if (e.data && !this.muted.has(port.id)) this.handleBytes(e.data, e.timeStamp, port.name || 'MIDI', port.id);
+      };
+    }
+    // The same for the way out: a note goes to the piano once, by the link that is listened to.
+    const asideNames = new Set(asideIn.map((p) => p.name ?? ''));
+    const outsBoth = allOuts.some(wireless) && allOuts.some((p) => !wireless(p));
+    const outs = allOuts.filter((p) => !(outsBoth && wireless(p)) && !(this.shadow.size > 0 && asideNames.has(p.name ?? '') && allOuts.length > 1));
+    this.outputs = outs.length > 0 ? outs : allOuts.slice(0, 1);
+
+    const inputs = used.map((p) => ({ id: p.id, name: p.name || 'MIDI device' }));
+    const outputs = this.outputs.map((p) => ({ id: p.id, name: p.name || 'MIDI device' }));
+    const aside = asideIn.map((p) => ({ id: p.id, name: p.name || 'MIDI device' }));
+    const ids = (list: MidiPort[]) => list.map((p) => p.id).join();
+    if (ids(inputs) !== ids(this.current.inputs) || ids(outputs) !== ids(this.current.outputs) || ids(aside) !== ids(this.current.aside)) {
       if (inputs.length === 0) this.releaseAll();
-      this.set({ inputs, outputs });
+      this.set({ inputs, outputs, aside });
+    }
+  }
+
+  /**
+   * A key that arrived a moment ago on one port has arrived again on another.
+   * After a few of these the second port is plainly a second link to the same
+   * piano, and is left alone from then on.
+   */
+  private noteEcho(portId: string): void {
+    const n = (this.echoes.get(portId) ?? 0) + 1;
+    this.echoes.set(portId, n);
+    if (n >= 3 && !this.shadow.has(portId)) {
+      this.shadow.add(portId);
+      this.refreshPorts();
     }
   }
 
@@ -366,7 +412,12 @@ class MidiManager {
     this.bleDevice = null;
     this.bleCharacteristic = null;
     this.releaseAll();
-    this.set({ state: 'idle', transport: null, inputs: [], outputs: [], error: null });
+    this.muted.clear();
+    this.shadow.clear();
+    this.echoes.clear();
+    this.lastOn.clear();
+    this.owner.clear();
+    this.set({ state: 'idle', transport: null, inputs: [], outputs: [], aside: [], error: null });
   }
 
   // ------------------------------------------------------------- incoming
@@ -377,7 +428,7 @@ class MidiManager {
    * packet: several messages at once, as when a chord is struck, sometimes
    * with the status byte left out of all but the first. Every one is read.
    */
-  handleBytes(data: Uint8Array, timeStamp: number, port: string): void {
+  handleBytes(data: Uint8Array, timeStamp: number, port: string, portId?: string): void {
     let status = 0;
     let i = 0;
     while (i < data.length) {
@@ -408,13 +459,33 @@ class MidiManager {
       const need = type === 0xc0 || type === 0xd0 ? 1 : 2;
       if (i + need > data.length) break;
       if (data[i] & 0x80 || (need === 2 && data[i + 1] & 0x80)) continue; // cut short by a new status
-      this.handleMessage(status, data[i], need === 2 ? data[i + 1] : 0, timeStamp, port);
+      this.handleMessage(status, data[i], need === 2 ? data[i + 1] : 0, timeStamp, port, portId);
       i += need;
     }
   }
 
-  private handleMessage(status: number, d1: number, d2: number, timeStamp: number, port: string): void {
+  private handleMessage(status: number, d1: number, d2: number, timeStamp: number, port: string, portId?: string): void {
     const type = status & 0xf0;
+    if (portId !== undefined && this.shadow.has(portId)) return;
+    if (portId !== undefined && (type === 0x90 || type === 0x80)) {
+      const down = type === 0x90 && d2 > 0;
+      if (down) {
+        // The same key, a moment ago, from another port: a second link to the same piano repeating it.
+        const last = this.lastOn.get(d1);
+        const now = performance.now();
+        if (last && last.port !== portId && now - last.at < 150) {
+          this.noteEcho(portId);
+          return;
+        }
+        this.lastOn.set(d1, { port: portId, at: now });
+        this.owner.set(d1, portId);
+      } else {
+        // A key comes up on the port it went down on. The other port's word for it is the echo.
+        const own = this.owner.get(d1);
+        if (own !== undefined && own !== portId) return;
+        this.owner.delete(d1);
+      }
+    }
     const time = toAudioTime(timeStamp);
     if (type === 0x90 && d2 > 0) {
       // How long the key took to reach the app, for the connection report.

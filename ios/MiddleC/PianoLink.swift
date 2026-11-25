@@ -12,6 +12,8 @@ final class PianoLink {
         let name: String
         /// "input" or "output", as the web page names them.
         let kind: String
+        /// "bluetooth" or "cable". A piano joined both ways appears twice, and the page then uses one of them.
+        let transport: String
     }
 
     /// Called on the main thread when an instrument comes or goes.
@@ -64,7 +66,7 @@ final class PianoLink {
                     listening.insert(source)
                 }
             }
-            found.append(Port(id: "in:\(source)", name: name(of: source), kind: "input"))
+            found.append(Port(id: "in:\(source)", name: name(of: source), kind: "input", transport: transport(of: source)))
         }
         for gone in listening.subtracting(live) {
             _ = MIDIPortDisconnectSource(inPort, gone)
@@ -76,7 +78,7 @@ final class PianoLink {
             guard destination != 0, usable(destination) else { continue }
             let id = "out:\(destination)"
             destinations[id] = destination
-            found.append(Port(id: id, name: name(of: destination), kind: "output"))
+            found.append(Port(id: id, name: name(of: destination), kind: "output", transport: transport(of: destination)))
         }
         if found != ports {
             ports = found
@@ -214,6 +216,19 @@ final class PianoLink {
         let label = name(of: endpoint).lowercased()
         if label.contains("network session") || label == "session 1" || label.contains("idam") { return false }
         return true
+    }
+
+    /// Whether an instrument is joined over Bluetooth or by cable, from the driver that runs it.
+    private func transport(of object: MIDIObjectRef) -> String {
+        var value: Unmanaged<CFString>?
+        var driver = ""
+        if MIDIObjectGetStringProperty(object, kMIDIPropertyDriverOwner, &value) == noErr, let text = value?.takeRetainedValue() {
+            driver = (text as String).lowercased()
+        }
+        if driver.contains("bluetooth") || driver.contains("btle") || name(of: object).lowercased().contains("bluetooth") {
+            return "bluetooth"
+        }
+        return "cable"
     }
 
     private func name(of object: MIDIObjectRef) -> String {

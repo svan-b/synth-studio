@@ -34,7 +34,10 @@ export const instrument = {
    */
   play(note: number, seconds: number, velocity = 0.7, when?: number, exact = false): void {
     const t = when ?? piano.now();
-    if (this.onPiano) midi.playNote(note, seconds, exact ? velocity : Math.min(1, Math.max(0.2, velocity * (this.level / WRITTEN))), t);
+    // A note sent to the piano sounds at once, while the iPad's own sound, the click with it, is
+    // heard a little after it is sent, and much after over Bluetooth. The piano's note waits that
+    // long, so that everything the learner hears lines up.
+    if (this.onPiano) midi.playNote(note, seconds, exact ? velocity : Math.min(1, Math.max(0.2, velocity * (this.level / WRITTEN))), t + piano.outputLatency());
     else piano.play(note, seconds, velocity, t);
     // Do not mistake the app's own playing for the learner's.
     listener.suppress(t + seconds + 0.3);

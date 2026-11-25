@@ -128,6 +128,12 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
           <p className="mt-1 text-[15px] text-mc-muted">
             The app sees every key you press, how firmly, and the pedals. The keyboard on screen mirrors your playing.
           </p>
+          {m.aside.length > 0 && (
+            <p className="mt-2 text-[15px] text-mc-muted">
+              The piano is joined a second way as well, as <span className="font-semibold text-mc-ink">{m.aside.map((p) => p.name).join(', ')}</span>.
+              One link is enough, so that one is left alone and each key is heard once.
+            </p>
+          )}
         </div>
       )}
       {native && m.inputs.length === 0 && mode !== 'listen' && (
@@ -338,6 +344,7 @@ export function ConnectionReport() {
   const onPiano = instrument.onPiano;
   const rows: Array<[string, string]> = [
     ['Piano', m.inputs.length > 0 ? `${m.inputs.map((p) => p.name).join(', ')}${m.outputs.length > 0 ? ', and it can be played by the app' : ', keys only'}` : 'Not connected'],
+    ...(m.aside.length > 0 ? ([['Second link, left alone', m.aside.map((p) => p.name).join(', ')]] as Array<[string, string]>) : []),
     ['Keys reach the app in', keys ? `${keys.usual} ms as a rule, ${keys.worst} ms at worst, over the last ${keys.keys} keys` : 'Play a few keys to measure'],
     [
       'The iPad\'s sound',

@@ -192,7 +192,8 @@ export default function PlaySurface({
         }, ms),
       );
     };
-    const atAudio = (when: number, fn: () => void) => later(Math.max(0, (when - piano.now()) * 1000), fn);
+    // When the sound sent for a moment is heard, which is a little after it is sent.
+    const atAudio = (when: number, fn: () => void) => later(Math.max(0, (when + piano.outputLatency() - piano.now()) * 1000), fn);
 
     if (mode === 'listen') {
       const secondsPerBeat = 60 / bpm;

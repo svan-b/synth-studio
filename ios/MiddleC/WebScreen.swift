@@ -153,7 +153,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     // MARK: - App to page
 
     private func tell(ports: [PianoLink.Port]) {
-        let list = ports.map { ["id": $0.id, "name": $0.name, "kind": $0.kind] }
+        let list = ports.map { ["id": $0.id, "name": $0.name, "kind": $0.kind, "transport": $0.transport] }
         guard let data = try? JSONSerialization.data(withJSONObject: list), let json = String(data: data, encoding: .utf8) else { return }
         webView.evaluateJavaScript("window.__middleC && __middleC.midi && __middleC.midi.ports(\(json));", completionHandler: nil)
     }
