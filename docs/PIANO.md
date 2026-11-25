@@ -80,4 +80,10 @@ Adding `?mcdebug=1` to the address loads development tools, including a robot pi
 
 ## Credits
 
-Piano samples: Salamander Grand Piano by Alexander Holm, Creative Commons Attribution 3.0. Notation: VexFlow. Review scheduling: ts-fsrs. All pieces are traditional, in the public domain, or written for the course.
+The piano sound is Salamander Grand Piano V3 by Alexander Holm, under Creative Commons Attribution 3.0, with one loudness layer used and each recording shortened, faded and encoded again as MP3. The music symbols come from Bravura by Steinberg, as converted for VexFlow, under the SIL Open Font License 1.1. Notation is drawn with VexFlow, and reviews are scheduled with ts-fsrs. Every piece is traditional, in the public domain, or written for the course.
+
+The app shows these credits under Settings, About, Acknowledgements, with the full licence texts of every open source package its code includes. Those texts are in `public/piano/licences.txt`, written by `node scripts/piano-notices.mjs` from what the bundler actually pulls in. A test fails if the file falls behind the code.
+
+## Privacy
+
+The app collects nothing. Its privacy policy is in the app under Settings, About, Privacy, and on the web at `/piano/privacy`. Both show the text in `lib/piano/content/about.ts`, which has to stay true of the code. The iPad app's privacy manifest is `ios/MiddleC/PrivacyInfo.xcprivacy`.

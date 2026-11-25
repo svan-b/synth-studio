@@ -25,6 +25,7 @@ import { exportData, streak, totalMinutes, usePiano, type Recording, type Sessio
 import { isNative, shareFile } from '@/lib/piano/native/bridge';
 import { parseScore } from '@/lib/piano/music/score';
 import { dayKey } from '@/lib/piano/util/emitter';
+import { CreditsText, PrivacyText } from './About';
 import ConnectionPanel, { ConnectionChip, ConnectionReport } from './Connection';
 import { useHints, useInputMode, useRemote, useSound } from './hooks';
 import PlaySurface from './PlaySurface';
@@ -769,6 +770,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
   const setProfile = usePiano((s) => s.setProfile);
   const importData = usePiano((s) => s.importData);
   const resetAll = usePiano((s) => s.resetAll);
+  const [about, setAbout] = useState<'privacy' | 'credits' | null>(null);
   const mode = useInputMode();
   const native = isNative();
   const [timing, setTiming] = useState(false);
@@ -936,12 +938,24 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
           <Button variant="soft" size="sm" className="mt-3" onClick={() => onGo('method')}>
             Read the method
           </Button>
-          <p className="mt-4">
-            Piano sound: Salamander Grand Piano by Alexander Holm, used under the Creative Commons Attribution 3.0 licence. Notation drawn with VexFlow.
-            {mode === 'midi' ? ' When connected over MIDI, your own piano plays its own sound.' : ''}
-          </p>
+          <p className="mt-4">Middle C collects nothing about you, and the work of others it contains is credited here.</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Button variant="soft" size="sm" onClick={() => setAbout('privacy')}>
+              Privacy
+            </Button>
+            <Button variant="soft" size="sm" onClick={() => setAbout('credits')}>
+              Acknowledgements
+            </Button>
+          </div>
         </Card>
       </section>
+
+      <Sheet open={about === 'privacy'} onClose={() => setAbout(null)} title="Privacy" wide>
+        <PrivacyText />
+      </Sheet>
+      <Sheet open={about === 'credits'} onClose={() => setAbout(null)} title="Acknowledgements" wide>
+        <CreditsText />
+      </Sheet>
 
       <Sheet open={timing} onClose={() => setTiming(false)} title="Timing check" wide>
         <p className="mb-2 text-mc-muted">Play any key to begin. After the count in, play a key exactly with each click, eight times, as you normally would.</p>

@@ -75,6 +75,12 @@ When the web app changes, run `./ios/build-web.sh` again and press Play in Xcode
 
 For work on the web app itself, a Debug build can load it from a computer instead of from inside the app: run `npm run dev` on the Mac, then in Xcode edit the scheme and add the launch argument `-MCDevURL http://your-mac.local:3000/piano`.
 
+## Putting it on the App Store
+
+`APP_STORE.md`, beside this file, has everything App Store Connect asks for: the listing text, the privacy answers, notes for App Review, and the steps to submit. Read its first section before anything else, about the app's name.
+
+The privacy manifest Apple requires is `MiddleC/PrivacyInfo.xcprivacy`, already in the project.
+
 ## Building in the cloud
 
 `cloud-build.yml` is a GitHub Actions workflow that builds the app on a Mac in the cloud, has it test itself in the iPad simulator, and offers the Xcode project with the web app inside as a download. It is not switched on. To switch it on, copy it to `.github/workflows/ios.yml`.

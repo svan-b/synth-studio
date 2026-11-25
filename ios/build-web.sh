@@ -17,6 +17,10 @@ if [ ! -d node_modules ]; then
   npm ci
 fi
 
+echo "Writing the licence notices..."
+# Every open source package the app's code pulls in is credited, with its licence text.
+node scripts/piano-notices.mjs
+
 echo "Building the web app..."
 rm -rf out-app
 MC_APP=1 npx next build
@@ -32,7 +36,7 @@ cp -R out-app/_next "$dest/_next"
 rm -f "$dest"/_next/static/chunks/app/page-*.js
 rm -rf "$dest"/_next/static/chunks/app/_not-found
 cp -R out-app/piano/samples out-app/piano/icons "$dest/piano/"
-cp out-app/piano/capture-worklet.js out-app/piano/manifest.webmanifest "$dest/piano/"
+cp out-app/piano/capture-worklet.js out-app/piano/manifest.webmanifest out-app/piano/licences.txt "$dest/piano/"
 rm -rf out-app
 
 echo "Done. The web app is in $dest ($(du -sh "$dest" | cut -f1)). Now build the app in Xcode."
