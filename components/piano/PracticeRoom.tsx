@@ -339,7 +339,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-3">
             <span className="truncate font-mc-serif text-xl">{piece.title}</span>
-            {piece.composer && <span className="truncate text-sm text-mc-muted">{piece.composer}</span>}
+            {piece.composer && <span className="truncate text-[1.05rem] text-mc-muted">{piece.composer}</span>}
           </div>
           <ProgressBar value={progress} tone="ok" className="mt-1 max-w-xs" />
         </div>
@@ -362,7 +362,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
             <Icon.Check size={44} />
           </div>
           <div className="mc-fade-up">
-            <div className="text-sm font-semibold uppercase tracking-widest text-mc-muted">Piece learned</div>
+            <div className="text-[1.05rem] font-semibold uppercase tracking-widest text-mc-muted">Piece learned</div>
             <h2 className="mt-2 font-mc-serif text-4xl">{piece.title}</h2>
           </div>
           <p className="mc-fade-up max-w-xl text-[1.1rem] leading-relaxed text-mc-muted">{verdict?.v.message}</p>
@@ -376,7 +376,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
               Done
             </Button>
           </div>
-          {kept && <p className="mc-fade-up max-w-md text-sm text-mc-faint">That last play through is kept on the Progress page, so you can hear it again later.</p>}
+          {kept && <p className="mc-fade-up max-w-md text-[1.05rem] text-mc-faint">That last play through is kept on the Progress page, so you can hear it again later.</p>}
         </div>
       ) : stage === 'timeup' ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
@@ -407,7 +407,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
                     {verdict.v.message}
                   </div>
                   {verdict.v.aside && <div className="text-[1rem] leading-snug text-mc-ink">{verdict.v.aside}</div>}
-                  {verdict.stats && <div className="text-sm text-mc-muted">{verdict.stats}</div>}
+                  {verdict.stats && <div className="text-[1.05rem] text-mc-muted">{verdict.stats}</div>}
                 </div>
               ) : (
                 <>
@@ -473,19 +473,19 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
         {/* While the learner decides, the coach's plan steps aside, so their own controls are all in view. */}
         {!free && (
           <>
-            <div className="text-xs font-semibold uppercase tracking-widest text-mc-faint">The plan for this piece</div>
+            <div className="text-[0.85rem] font-semibold uppercase tracking-widest text-mc-faint">The plan for this piece</div>
             <div className="mt-3 space-y-2.5">
               {plan.map((row) => (
                 <div key={row.title} className="flex items-center gap-4">
                   <div className="w-44 shrink-0">
                     <div className="font-medium leading-tight">{row.title}</div>
-                    {row.detail && <div className="text-xs text-mc-muted">{row.detail}</div>}
+                    {row.detail && <div className="text-[0.85rem] text-mc-muted">{row.detail}</div>}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {row.steps.map((step) => (
                       <span
                         key={step.label}
-                        className={`inline-flex h-7 items-center gap-1 rounded-full px-3 text-[13px] font-semibold ${
+                        className={`inline-flex h-7 items-center gap-1 rounded-full px-3 text-[0.95rem] font-semibold ${
                           step.state === 'done' ? 'bg-mc-ok/15 text-mc-ok' : step.state === 'now' ? 'bg-mc-ink text-mc-bg' : 'bg-mc-raised text-mc-muted'
                         }`}
                       >
@@ -497,7 +497,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-[15px] leading-relaxed text-mc-muted">
+            <p className="mt-4 text-[1.1rem] leading-relaxed text-mc-muted">
               The coach moves you along this as each step holds. A clean pass moves on at once, and anything you already know is skipped.
             </p>
           </>
@@ -592,7 +592,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
             )}
           </div>
         </div>
-        {piece.note && <p className="mt-6 rounded-2xl bg-mc-raised px-4 py-3 text-[15px] leading-relaxed text-mc-muted">{piece.note}</p>}
+        {piece.note && <p className="mt-6 rounded-2xl bg-mc-raised px-4 py-3 text-[1.1rem] leading-relaxed text-mc-muted">{piece.note}</p>}
       </Sheet>
     </div>
   );

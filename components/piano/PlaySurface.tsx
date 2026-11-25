@@ -502,7 +502,7 @@ export default function PlaySurface({
         )}
       </div>
 
-      <div className="relative flex h-11 shrink-0 items-center justify-between px-6 text-sm text-mc-muted">
+      <div className="relative flex h-11 shrink-0 items-center justify-between px-6 text-[1.05rem] text-mc-muted">
         {lead !== null && (
           <span className="absolute inset-x-6 top-0 h-0.5 overflow-hidden rounded-full bg-mc-line" aria-hidden="true">
             <span key={String(runId)} className="mc-lead block h-full rounded-full bg-mc-accent" style={{ animationDuration: `${lead}ms` }} />
@@ -528,7 +528,7 @@ export default function PlaySurface({
       {anyKey && touch ? (
         <TapPad />
       ) : anyKey ? (
-        <div className="flex h-16 shrink-0 items-center justify-center text-sm text-mc-muted">
+        <div className="flex h-16 shrink-0 items-center justify-center text-[1.05rem] text-mc-muted">
           {sustain ? 'Play the rhythm on any key of your piano, and hold each note for its full length' : 'Tap the rhythm on any key of your piano'}
         </div>
       ) : (

@@ -154,9 +154,9 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
                       <span className="block truncate font-semibold">
                         {i + 1}. {b.title}
                       </span>
-                      <span className="block truncate text-sm text-mc-muted">{waits ? 'Follows on from the lesson before it' : b.detail}</span>
+                      <span className="block truncate text-[1.05rem] text-mc-muted">{waits ? 'Follows on from the lesson before it' : b.detail}</span>
                     </span>
-                    <span className="shrink-0 text-sm tabular-nums text-mc-muted">{b.minutes} min</span>
+                    <span className="shrink-0 text-[1.05rem] tabular-nums text-mc-muted">{b.minutes} min</span>
                   </button>
                 </li>
               );
@@ -178,7 +178,7 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
             <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-mc-line px-4 py-3">
               <div className="min-w-0">
                 <div className="font-semibold">Want something new?</div>
-                <div className="text-sm leading-snug text-mc-muted">
+                <div className="text-[1.05rem] leading-snug text-mc-muted">
                   {whyHeld} The next is <span className="text-mc-ink">{getLesson(upNext).title}</span>, and taking it now is your call.
                 </div>
               </div>
@@ -198,7 +198,7 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
               <div className="font-semibold">
                 {minutesToday} of {profile.minutes} minutes
               </div>
-              <div className="text-sm text-mc-muted">practised today</div>
+              <div className="text-[1.05rem] text-mc-muted">practised today</div>
             </div>
           </Card>
           <Card className="flex items-center gap-4 p-5">
@@ -207,12 +207,12 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
             </span>
             <div>
               <div className="font-semibold">{run === 0 ? 'No streak yet' : run === 1 ? 'One day' : `${run} days in a row`}</div>
-              <div className="text-sm text-mc-muted">{run === 0 ? 'It starts with today' : 'Short and regular wins'}</div>
+              <div className="text-[1.05rem] text-mc-muted">{run === 0 ? 'It starts with today' : 'Short and regular wins'}</div>
             </div>
           </Card>
           <Card className="p-5">
-            <div className="text-xs font-semibold uppercase tracking-widest text-mc-faint">Practice tip</div>
-            <p className="mt-2 text-[15px] leading-relaxed text-mc-muted">{tip}</p>
+            <div className="text-[0.85rem] font-semibold uppercase tracking-widest text-mc-faint">Practice tip</div>
+            <p className="mt-2 text-[1.1rem] leading-relaxed text-mc-muted">{tip}</p>
           </Card>
         </div>
       </div>
@@ -258,7 +258,7 @@ export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
             <section key={stage.id} ref={stage.lessons.includes(nextId ?? '') ? here : undefined} className="scroll-mt-4">
               <div className="mb-3 flex items-end justify-between gap-4">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-widest text-mc-faint">Stage {stage.id}</div>
+                  <div className="text-[0.85rem] font-semibold uppercase tracking-widest text-mc-faint">Stage {stage.id}</div>
                   <h2 className="font-mc-serif text-2xl">{stage.title}</h2>
                   <p className="text-mc-muted">{stage.goal}</p>
                 </div>
@@ -296,13 +296,13 @@ export function LearnScreen({ onStart }: { onStart: (a: Activity) => void }) {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold">{lesson.title}</span>
-                        <span className="line-clamp-2 text-sm text-mc-muted">{lesson.summary}</span>
+                        <span className="line-clamp-2 text-[1.05rem] text-mc-muted">{lesson.summary}</span>
                       </span>
                       {/* A lesson left part way through says so. */}
                       {!done && (lessons[id]?.step ?? 0) > 0 ? (
                         <Pill tone="accent">Started</Pill>
                       ) : (
-                        <span className="shrink-0 text-sm tabular-nums text-mc-muted">{lesson.minutes} min</span>
+                        <span className="shrink-0 text-[1.05rem] tabular-nums text-mc-muted">{lesson.minutes} min</span>
                       )}
                     </button>
                   );
@@ -365,15 +365,15 @@ export function PiecesScreen({ onStart }: { onStart: (a: Activity) => void }) {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="truncate font-semibold">{piece.title}</div>
-                          <div className="truncate text-sm text-mc-muted">{piece.composer ?? 'A study written for this course'}</div>
+                          <div className="truncate text-[1.05rem] text-mc-muted">{piece.composer ?? 'A study written for this course'}</div>
                         </div>
                         <Pill tone={states[id]?.learned ? 'ok' : 'muted'}>{states[id]?.learned ? 'Learned' : `Stage ${piece.stage}`}</Pill>
                       </div>
                       <div className="mt-3 flex items-center gap-3">
                         <ProgressBar value={progress} tone="ok" />
-                        <span className="w-10 shrink-0 text-right text-xs tabular-nums text-mc-muted">{Math.round(progress * 100)}%</span>
+                        <span className="w-10 shrink-0 text-right text-[0.85rem] tabular-nums text-mc-muted">{Math.round(progress * 100)}%</span>
                       </div>
-                      <div className="mt-2 text-xs text-mc-faint">
+                      <div className="mt-2 text-[0.85rem] text-mc-faint">
                         {info.hands.length === 2 ? 'Both hands' : info.hands[0] === 'R' ? 'Right hand' : 'Left hand'}, {info.measures} measures
                       </div>
                     </button>
@@ -455,7 +455,7 @@ export function TrainScreen({ onStart }: { onStart: (a: Activity) => void }) {
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-mc-raised text-mc-ink">{it.icon}</span>
             <div className="mt-4 font-mc-serif text-2xl">{it.title}</div>
             <p className="mt-1 text-mc-muted">{it.text}</p>
-            <div className="mt-auto pt-4 text-sm font-semibold text-mc-faint">{it.meta}</div>
+            <div className="mt-auto pt-4 text-[1.05rem] font-semibold text-mc-faint">{it.meta}</div>
           </button>
         ))}
       </div>
@@ -523,14 +523,14 @@ export function ProgressScreen() {
         {stats.map(([value, label]) => (
           <Card key={label} className="p-5">
             <div className="font-mc-serif text-3xl">{value}</div>
-            <div className="mt-1 text-sm text-mc-muted">{label}</div>
+            <div className="mt-1 text-[1.05rem] text-mc-muted">{label}</div>
           </Card>
         ))}
       </div>
       <Card className="mt-6 p-6">
         <div className="flex items-baseline justify-between">
           <h2 className="font-mc-serif text-2xl">The last two weeks</h2>
-          <span className="text-sm text-mc-muted">minutes a day, goal {profile.minutes}</span>
+          <span className="text-[1.05rem] text-mc-muted">minutes a day, goal {profile.minutes}</span>
         </div>
         <div className="mt-5 flex h-40 items-end gap-2">
           {last14.map((d) => (
@@ -540,7 +540,7 @@ export function ProgressScreen() {
                 style={{ height: `${Math.max(3, (d.minutes / peak) * 100)}%` }}
                 title={`${d.minutes} minutes`}
               />
-              <span className="text-xs text-mc-faint">{d.label}</span>
+              <span className="text-[0.85rem] text-mc-faint">{d.label}</span>
             </div>
           ))}
         </div>
@@ -557,7 +557,7 @@ export function ProgressScreen() {
                 </div>
                 <div className="pb-4">
                   <div className="font-semibold leading-snug">{m.title}</div>
-                  <div className="text-sm text-mc-muted">{dayText(m.on)}</div>
+                  <div className="text-[1.05rem] text-mc-muted">{dayText(m.on)}</div>
                 </div>
               </li>
             ))}
@@ -571,7 +571,7 @@ export function ProgressScreen() {
         <Card className="p-6">
           <h2 className="font-mc-serif text-2xl">Your recordings</h2>
           {kept.length === 0 ? (
-            <p className="mt-3 text-[15px] leading-relaxed text-mc-muted">
+            <p className="mt-3 text-[1.1rem] leading-relaxed text-mc-muted">
               When you learn a piece, your own playing of it is kept here. Later play throughs are kept beside the first, so you can hear how far you have come.
             </p>
           ) : (
@@ -588,7 +588,7 @@ export function ProgressScreen() {
                         <button
                           key={key}
                           onClick={() => hear(key, recording)}
-                          className={`flex h-11 items-center gap-2 rounded-full px-4 text-[15px] font-semibold active:scale-[0.97] ${
+                          className={`flex h-11 items-center gap-2 rounded-full px-4 text-[1.1rem] font-semibold active:scale-[0.97] ${
                             hearing === key ? 'bg-mc-ink text-mc-bg' : 'bg-mc-raised text-mc-ink'
                           }`}
                         >
@@ -612,11 +612,11 @@ export function ProgressScreen() {
           return (
             <div key={stage.id} className="flex items-center gap-4">
               <div className="w-48 shrink-0">
-                <div className="text-xs font-semibold uppercase tracking-widest text-mc-faint">Stage {stage.id}</div>
+                <div className="text-[0.85rem] font-semibold uppercase tracking-widest text-mc-faint">Stage {stage.id}</div>
                 <div className="font-semibold">{stage.title}</div>
               </div>
               <ProgressBar value={n / stage.lessons.length} tone="ok" />
-              <span className="w-14 shrink-0 text-right text-sm tabular-nums text-mc-muted">
+              <span className="w-14 shrink-0 text-right text-[1.05rem] tabular-nums text-mc-muted">
                 {n} of {stage.lessons.length}
               </span>
             </div>
@@ -634,7 +634,7 @@ function Row({ title, text, children }: { title: string; text?: string; children
     <div className="flex items-center justify-between gap-6 py-4">
       <div className="min-w-0">
         <div className="font-semibold">{title}</div>
-        {text && <div className="text-[15px] text-mc-muted">{text}</div>}
+        {text && <div className="text-[1.1rem] text-mc-muted">{text}</div>}
       </div>
       <div className="shrink-0">{children}</div>
     </div>
@@ -822,7 +822,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
 
       <section className="mt-9">
         <h2 className="font-mc-serif text-2xl">About</h2>
-        <Card className="mt-3 p-5 text-[15px] leading-relaxed text-mc-muted">
+        <Card className="mt-3 p-5 text-[1.1rem] leading-relaxed text-mc-muted">
           <p>
             Middle C teaches piano the way studies of learning suggest it should be taught. Every choice, and how strong the evidence for it is, is set
             out on the method page.
@@ -866,11 +866,11 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
             {copied === true ? 'Copied' : 'Copy to the clipboard'}
           </Button>
         </div>
-        {copied === 'failed' && <p className="mt-3 text-sm text-mc-muted">Copying is not allowed here. Select the text below and copy it by hand.</p>}
+        {copied === 'failed' && <p className="mt-3 text-[1.05rem] text-mc-muted">Copying is not allowed here. Select the text below and copy it by hand.</p>}
         {saving && (
           <textarea
             readOnly
-            className="mc-selectable mt-4 h-32 w-full rounded-2xl border border-mc-line bg-mc-bg p-3 font-mono text-xs text-mc-muted"
+            className="mc-selectable mt-4 h-32 w-full rounded-2xl border border-mc-line bg-mc-bg p-3 font-mono text-[0.85rem] text-mc-muted"
             value={exportData()}
             onFocus={(e) => e.currentTarget.select()}
           />
@@ -884,12 +884,12 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
           <input type="file" accept=".json,application/json,text/plain" className="sr-only" onChange={(e) => void restoreFile(e.target.files?.[0])} />
         </label>
         <textarea
-          className="mc-selectable h-40 w-full rounded-2xl border border-mc-line bg-mc-bg p-3 font-mono text-xs text-mc-ink"
+          className="mc-selectable h-40 w-full rounded-2xl border border-mc-line bg-mc-bg p-3 font-mono text-[0.85rem] text-mc-ink"
           value={paste}
           onChange={(e) => setPaste(e.target.value)}
           placeholder="Paste the contents of your backup file"
         />
-        {backupNote && <p className="mt-2 text-sm text-mc-muted">{backupNote}</p>}
+        {backupNote && <p className="mt-2 text-[1.05rem] text-mc-muted">{backupNote}</p>}
         <div className="mt-4 flex justify-end gap-3">
           <Button variant="soft" onClick={() => setBackup(false)}>
             Cancel
@@ -962,8 +962,8 @@ export function MethodScreen({ onGo }: { onGo: (v: View) => void }) {
               <Pill tone={STRENGTH[p.strength].tone}>{STRENGTH[p.strength].label}</Pill>
             </div>
             <p className="mt-2 text-[1.05rem] leading-relaxed text-mc-ink">{p.what}</p>
-            <p className="mt-2 text-[15px] leading-relaxed text-mc-muted">{p.evidence}</p>
-            <p className="mc-selectable mt-3 text-xs leading-relaxed text-mc-faint">{p.sources.join('. ')}.</p>
+            <p className="mt-2 text-[1.1rem] leading-relaxed text-mc-muted">{p.evidence}</p>
+            <p className="mc-selectable mt-3 text-[0.85rem] leading-relaxed text-mc-faint">{p.sources.join('. ')}.</p>
           </Card>
         ))}
       </div>
@@ -972,7 +972,7 @@ export function MethodScreen({ onGo }: { onGo: (v: View) => void }) {
         {NOT_USED.map((n) => (
           <Card key={n.title} className="p-6">
             <h3 className="font-semibold">{n.title}</h3>
-            <p className="mt-1 text-[15px] leading-relaxed text-mc-muted">{n.why}</p>
+            <p className="mt-1 text-[1.1rem] leading-relaxed text-mc-muted">{n.why}</p>
           </Card>
         ))}
       </div>

@@ -6,7 +6,7 @@
   --mc-raised: 238 234 225;
   --mc-ink: 30 28 25;
   --mc-muted: 108 103 94;
-  --mc-faint: 166 160 149;
+  --mc-faint: 128 122 112;
   --mc-line: 224 219 208;
   --mc-accent: 46 84 196;
   --mc-ok: 42 138 88;
@@ -58,6 +58,9 @@ html:has(.mc-root[data-theme='dark']) body {
   overflow: hidden;
   background: rgb(var(--mc-bg));
   color: rgb(var(--mc-ink));
+  /* Read from a music stand at arm's length, not from the hand, so nothing is set small. */
+  font-size: 1.15rem;
+  line-height: 1.45;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;

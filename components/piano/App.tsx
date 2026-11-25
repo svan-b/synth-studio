@@ -164,7 +164,7 @@ function SessionRunner({ blocks: planned, onClose }: { blocks: Block[]; onClose:
       ) : (
         <>
           <div className="mc-fade-up">
-            <div className="text-sm font-semibold uppercase tracking-widest text-mc-muted">
+            <div className="text-[1.05rem] font-semibold uppercase tracking-widest text-mc-muted">
               {index === 0 ? 'First' : 'Next'}, part {index + 1} of {blocks.length}
             </div>
             <h2 className="mt-2 font-mc-serif text-5xl">{blocks[index].title}</h2>
@@ -289,7 +289,7 @@ export default function App() {
                 key={item.view}
                 onClick={() => setView(item.view)}
                 aria-current={active ? 'page' : undefined}
-                className={`flex flex-1 flex-col items-center justify-center gap-1 text-xs font-semibold transition-colors landscape:max-h-[76px] ${
+                className={`flex flex-1 flex-col items-center justify-center gap-1 text-[0.85rem] font-semibold transition-colors landscape:max-h-[76px] ${
                   item.view === 'settings' ? 'landscape:mt-auto landscape:flex-none landscape:py-3' : ''
                 } ${active ? 'text-mc-ink' : 'text-mc-muted'}`}
               >

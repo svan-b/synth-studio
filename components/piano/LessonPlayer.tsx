@@ -25,12 +25,12 @@ function Why({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-5 rounded-2xl border border-mc-line">
-      <button className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-mc-muted" onClick={() => setOpen((o) => !o)}>
+      <button className="flex w-full items-center gap-2 px-4 py-3 text-left text-[1.05rem] font-semibold text-mc-muted" onClick={() => setOpen((o) => !o)}>
         <Icon.Info size={18} />
         Why it is taught this way
-        <span className="ml-auto text-xs">{open ? 'Hide' : 'Show'}</span>
+        <span className="ml-auto text-[0.85rem]">{open ? 'Hide' : 'Show'}</span>
       </button>
-      {open && <p className="px-4 pb-4 text-[15px] leading-relaxed text-mc-muted">{text}</p>}
+      {open && <p className="px-4 pb-4 text-[1.1rem] leading-relaxed text-mc-muted">{text}</p>}
     </div>
   );
 }
@@ -289,7 +289,7 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
       </Brief>
       {step.why && !verdict && (
         <div className="px-7">
-          <details className="text-sm text-mc-muted">
+          <details className="text-[1.05rem] text-mc-muted">
             <summary className="cursor-pointer font-semibold">Why it is taught this way</summary>
             <p className="mt-1 max-w-3xl leading-relaxed">{step.why}</p>
           </details>
@@ -397,7 +397,7 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
       </Brief>
       {step.why && !note && phase === 'listen' && index === 0 && (
         <div className="px-7">
-          <details className="text-sm text-mc-muted">
+          <details className="text-[1.05rem] text-mc-muted">
             <summary className="cursor-pointer font-semibold">Why it is taught this way</summary>
             <p className="mt-1 max-w-3xl leading-relaxed">{step.why}</p>
           </details>
@@ -570,7 +570,7 @@ function Complete({ lesson, onDone }: { lesson: Lesson; onDone: () => void }) {
         <Icon.Check size={44} />
       </div>
       <div className="mc-fade-up">
-        <div className="text-sm font-semibold uppercase tracking-widest text-mc-muted">Lesson complete</div>
+        <div className="text-[1.05rem] font-semibold uppercase tracking-widest text-mc-muted">Lesson complete</div>
         <h2 className="mt-2 font-mc-serif text-4xl">{lesson.title}</h2>
       </div>
       {(lesson.pieces?.length || lesson.cards?.length) && (

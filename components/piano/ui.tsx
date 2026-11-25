@@ -194,7 +194,7 @@ export function Button({ variant = 'primary', size = 'md', hint, icon, className
   const base =
     'inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-[transform,opacity,background-color] duration-150 active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100 select-none';
   // The smallest is still a full finger tall: the iPad is at arm's length on the stand.
-  const sizes = { sm: 'h-11 px-4 text-[15px]', md: 'h-12 px-6 text-base', lg: 'h-14 px-8 text-lg' };
+  const sizes = { sm: 'h-11 px-4 text-[1.1rem]', md: 'h-12 px-6 text-base', lg: 'h-14 px-8 text-lg' };
   const variants = {
     primary: 'bg-mc-ink text-mc-bg',
     soft: 'bg-mc-raised text-mc-ink',
@@ -273,7 +273,7 @@ export function Ring({ value, size = 56, stroke = 5, children }: { value: number
           style={{ transition: 'stroke-dashoffset 600ms ease' }}
         />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-sm font-semibold">{children}</div>
+      <div className="absolute inset-0 flex items-center justify-center text-[1.05rem] font-semibold">{children}</div>
     </div>
   );
 }
@@ -297,7 +297,7 @@ export function Segmented<T extends string | number>({
           role="tab"
           aria-selected={o.value === value}
           onClick={() => onChange(o.value)}
-          className={`h-11 rounded-full px-4 text-[15px] font-semibold transition-colors ${
+          className={`h-11 rounded-full px-4 text-[1.1rem] font-semibold transition-colors ${
             o.value === value ? 'bg-mc-surface text-mc-ink shadow-sm' : 'text-mc-muted'
           }`}
         >
@@ -366,7 +366,7 @@ export function Pill({ children, tone = 'muted' }: { children: ReactNode; tone?:
     hint: 'bg-mc-hint/15 text-mc-hint-ink',
     bad: 'bg-mc-bad/10 text-mc-bad',
   };
-  return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>{children}</span>;
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.85rem] font-semibold ${tones[tone]}`}>{children}</span>;
 }
 
 /** Text with **bold** spans and blank lines as paragraph breaks. */

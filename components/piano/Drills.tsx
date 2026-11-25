@@ -45,7 +45,7 @@ function Shell({ title, progress, onClose, children }: { title: string; progress
         <div className="min-w-0 flex-1">
           <ProgressBar value={progress} tone="ok" />
         </div>
-        <div className="max-w-[18rem] truncate text-right text-sm font-medium text-mc-muted">{title}</div>
+        <div className="max-w-[18rem] truncate text-right text-[1.05rem] font-medium text-mc-muted">{title}</div>
       </header>
       <div className="min-h-0 flex-1">{children}</div>
     </div>
