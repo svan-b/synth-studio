@@ -185,6 +185,11 @@ export class Follower {
   private matched = new Map<number, number>();
   /** Bass notes in strummed music matched by their name, with when they were heard. */
   private namedAt = new Map<number, number>();
+  /** Picked music: when each pluck was heard, and which have stood in for a note. */
+  private plucks: number[] = [];
+  private usedPlucks = new Set<number>();
+  /** Picked music: when wrong notes were named. */
+  private wrongNamedAt: number[] = [];
   private missed = new Set<number>();
   private chordJudged = new Map<number, ChordVerdict>();
   private ticker: ReturnType<typeof setInterval> | null = null;
@@ -603,8 +608,12 @@ export class Follower {
     const t = this.heardAt(ev.time);
     // In strummed music every strike is a strum, or in a pattern such as a
     // waltz, the bass note on the first beat. In picked music the notes are
-    // matched as they come, and strikes only count the dead ones.
-    if (this.score.kind !== 'strum' && !this.options.anyStrike) return;
+    // matched as they come. A pluck is kept, for a step whose note could not
+    // be made out among the strings still ringing.
+    if (this.score.kind !== 'strum' && !this.options.anyStrike) {
+      this.plucks.push(t);
+      return;
+    }
     // A bass note already matched by its name: this strike is the same sound.
     if (Array.from(this.namedAt.values()).some((at) => Math.abs(at - t) < 0.15)) return;
     const hit = this.nearestStep(t, () => true);
@@ -618,7 +627,8 @@ export class Follower {
     }
     this.matched.set(hit.index, hit.err);
     const onTime = Math.abs(hit.err) <= this.onTimeWindow;
-    if (!this.options.anyStrike && this.steps[hit.index].strum) {
+    const strum = this.steps[hit.index].strum;
+    if (!this.options.anyStrike && strum && strum.dir === 'down') {
       const v = this.judge(ev, hit.index);
       this.chordJudged.set(hit.index, v);
       if (!v.dead) {
@@ -651,8 +661,14 @@ export class Follower {
     }
     const hit = this.nearestStep(t, (i) => this.steps[i].notes.some((n) => n.midi === ev.midi));
     if (!hit) {
-      // The note before, still ringing and named again, is no slip.
-      if (this.steps.some((s, i) => this.matched.has(i) && s.notes.some((n) => n.midi === ev.midi) && Math.abs(t - this.transport.timeOfBeat(s.start)) < 0.6)) return;
+      // A note played a moment ago, still ringing and named again, is no
+      // slip. Picked strings ring on for a while. Nor is the octave or the
+      // twelfth of a note just played: that is its own harmonic.
+      const ringing = (s: Step, i: number) => this.matched.has(i) && Math.abs(t - this.transport.timeOfBeat(s.start)) < 1.5;
+      if (this.steps.some((s, i) => ringing(s, i) && s.notes.some((n) => n.midi === ev.midi))) return;
+      const justPlayed = (s: Step, i: number) => this.matched.has(i) && Math.abs(t - this.transport.timeOfBeat(s.start) - (this.matched.get(i) ?? 0)) < 0.2;
+      if (this.steps.some((s, i) => justPlayed(s, i) && s.notes.some((n) => [12, 19, 24].includes(ev.midi - n.midi)))) return;
+      this.wrongNamedAt.push(t);
       this.wrong++;
       const beat = this.transport.beatAt(t);
       const step = this.steps.reduce((a, s) => (s.start <= beat + 0.25 ? s : a), this.steps[0]);
@@ -671,11 +687,31 @@ export class Follower {
     for (let i = 0; i < this.steps.length; i++) {
       if (this.matched.has(i) || this.missed.has(i)) continue;
       if (this.transport.timeOfBeat(this.steps[i].start) + this.matchWindow + 0.45 < now) {
+        if (this.byPluck(i)) continue;
         this.missed.add(i);
         this.addError(this.steps[i].measure);
         this.events.emit({ type: 'mark', index: i, state: 'bad' });
       }
     }
+  }
+
+  /**
+   * Picked music: a step whose note was not named, where a pluck came on
+   * time and no wrong note was named, is taken as played. Among strings
+   * still ringing the detector can miss a note it would hear on its own.
+   * It counts as a little off, never as clean.
+   */
+  private byPluck(index: number): boolean {
+    if (this.score.kind === 'strum' || this.options.anyStrike) return false;
+    const due = this.transport.timeOfBeat(this.steps[index].start);
+    const window = this.matchWindow;
+    const pluck = this.plucks.find((p) => Math.abs(p - due) <= window && !this.usedPlucks.has(p));
+    if (pluck === undefined) return false;
+    if (this.wrongNamedAt.some((w) => Math.abs(w - due) <= window)) return false;
+    this.usedPlucks.add(pluck);
+    this.matched.set(index, pluck - due);
+    this.events.emit({ type: 'mark', index, state: 'warn' });
+    return true;
   }
 
   // ----------------------------------------------------------------- finish
@@ -684,7 +720,7 @@ export class Follower {
     if (this.phase === 'done' || this.phase === 'stopped') return;
     if (this.options.mode === 'tempo') {
       for (let i = 0; i < this.steps.length; i++) {
-        if (!this.matched.has(i) && !this.missed.has(i)) {
+        if (!this.matched.has(i) && !this.missed.has(i) && !this.byPluck(i)) {
           this.missed.add(i);
           this.addError(this.steps[i].measure);
         }

@@ -228,6 +228,42 @@ describe('the follower, with a beat', () => {
     expect(judgeSecond('G | Em', ['E7'])).toBe(false);
   });
 
+  it('judges the chord on down strums, and times the up strums', () => {
+    const score = parseScore({ chart: 'G | G', strum: 'D.DUD.DU', tempo: 80 });
+    const f = new Follower(score, { mode: 'tempo', inputDelay: 0, metronome: false, confusers: ['D'] });
+    const { events, result } = run(f);
+    // Every up strum catches only the top strings, and sounds unclear.
+    playAll(f, (i) => (f.steps[i].strum!.dir === 'up' ? of('D') : of('G')));
+    expect(events.some((e) => e.type === 'wrong')).toBe(false);
+    expect(result()!.accuracy).toBe(1);
+  });
+
+  it('in picked music, does not count a ringing string or a harmonic as a wrong note, and takes a pluck on time for a note not made out', () => {
+    const score = parseScore({ line: 'G3e B3e G4e B3e G3e B3e G4e B3e', tempo: 70 });
+    const f = new Follower(score, { mode: 'tempo', inputDelay: 0, metronome: false });
+    const { events, result } = run(f);
+    for (let i = 0; i < f.steps.length; i++) {
+      const due = f.timeOfStep(i);
+      vi.advanceTimersByTime(Math.max(0, (due - guitar.now()) * 1000));
+      const midi = f.steps[i].notes[0].midi;
+      if (i === 5) {
+        // A pluck on time whose note the detector could not make out.
+        strike(chroma([]), due);
+        continue;
+      }
+      note(midi, due);
+      strike(chroma([midi % 12]), due);
+      // Its octave, named as well, and the string before it, named again.
+      note(midi + 12, due + 0.01);
+      if (i > 0) note(f.steps[i - 1].notes[0].midi, due + 0.05);
+    }
+    vi.advanceTimersByTime(3000);
+    expect(events.some((e) => e.type === 'wrong')).toBe(false);
+    const r = result()!;
+    expect(r.missedSteps).toBe(0);
+    expect(r.detail[5].state).not.toBe('missed');
+  });
+
   it('counts missed and extra strums, and lateness', () => {
     const score = parseScore({ chart: 'Em | Em', strum: 'D.D.D.D.', tempo: 70 });
     const f = new Follower(score, { mode: 'tempo', inputDelay: 0, metronome: false });
