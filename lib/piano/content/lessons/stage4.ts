@@ -16,9 +16,10 @@ export const STAGE4: Lesson[] = [
       {
         kind: 'say',
         title: 'Half steps and whole steps',
-        text: 'A **half step** is the distance from any key to its very nearest neighbour, black or white. A **whole step** is two half steps.\n\nMost white keys have a black key between them, so they are a whole step apart. Two pairs do not, E to F and B to C. Those are half steps.',
+        text: 'A **half step** is the distance from any key to its very nearest neighbour, black or white. A **whole step** is two half steps.\n\nMost white keys have a black key between them, a whole step apart. Two pairs do not, E to F and B to C. Those are half steps.',
         figure: { kind: 'keys', low: 60, high: 72, marks: { 64: 'E', 65: 'F', 71: 'B', 72: 'C' }, labels: 'none', caption: 'E to F and B to C have no black key between them' },
       },
+      { kind: 'play', text: 'Play the two half steps among the white keys. **E to F**, then **B to C**. Feel how close they are.', music: { rh: 'E4h:3 F4h:4 | B4h:4 C5h:5' }, names: true, hints: 'always' },
       {
         kind: 'say',
         title: 'The recipe',
@@ -86,7 +87,7 @@ export const STAGE4: Lesson[] = [
       {
         kind: 'say',
         title: 'Three chords',
-        text: 'Build the same shape on F and on G and you have the three main chords of the key of C. They are named after their bottom notes, **C**, **F** and **G**.\n\nMusicians also number them by their place in the scale, **one, four and five**, written I, IV and V. A huge share of all songs use only these three.',
+        text: 'Build the same shape on F and on G and you have the three main chords of the key of C, named after their bottom notes: **C**, **F** and **G**.\n\nThey are also numbered by their place in the scale, **one, four and five**, written I, IV and V. A great many songs use only these three.',
       },
       {
         kind: 'play',
@@ -148,8 +149,9 @@ export const STAGE4: Lesson[] = [
       { kind: 'play', text: 'Again, keys dark.', music: { rh: 'C4+E4+G4w:135 | C4+F4+A4w:135 | B3+D4+G4w:125 | C4+E4+G4w:135', tempo: 72, chords: 'C | F | G | C' }, hints: 'delay' },
       {
         kind: 'play',
-        text: 'The left hand does the same.',
+        text: 'The left hand does the same. For G its little finger reaches one key below C, to a **B** lower than you have read so far, so the letters are shown.',
         music: { lh: 'C3+E3+G3w:531 | C3+F3+A3w:521 | B2+D3+G3w:531 | C3+E3+G3w:531', tempo: 72, chords: 'C | F | G | C' },
+        names: true,
         hints: 'always',
       },
       {
@@ -174,6 +176,58 @@ export const STAGE4: Lesson[] = [
         choices: ['F major, rearranged', 'C major', 'A new chord called C6'],
         answer: 0,
         explain: 'F, A and C are the notes of F major. Putting C at the bottom changes the order, not the chord.',
+      },
+    ],
+  },
+  {
+    id: 'accidentals',
+    stage: 4,
+    title: 'Sharps and flats',
+    summary: 'The black keys get their names, and the signs that ask for them.',
+    minutes: 8,
+    steps: [
+      {
+        kind: 'say',
+        title: 'Every black key has two names',
+        text: 'A **sharp** is the very next key to the right, a half step up. A **flat** is the very next key to the left, a half step down.\n\nSo the black key between F and G is **F sharp**, and it is also **G flat**. The music around it decides which name it gets.',
+        figure: { kind: 'keys', low: 60, high: 72, marks: { 61: 'C♯', 63: 'E♭', 66: 'F♯', 68: 'A♭', 70: 'B♭' }, labels: 'c', caption: 'The five black keys, each under the name it most often goes by' },
+      },
+      { kind: 'find', text: '**F sharp** is the black key just to the right of F. Play two of them.', pitchClasses: [6], count: 2, labels: 'c' },
+      { kind: 'find', text: '**B flat** is the black key just to the left of B. Play two of them.', pitchClasses: [10], count: 2, labels: 'c' },
+      { kind: 'find', text: '**E flat** is just to the left of E. Play two.', pitchClasses: [3], count: 2, labels: 'c' },
+      {
+        kind: 'say',
+        title: 'On the page',
+        text: 'The sign is written **just before** the note, on its line or space. ♯ is a sharp and ♭ is a flat.\n\nIt lasts to the end of its measure. A **natural**, ♮, cancels it sooner.',
+        figure: {
+          kind: 'staff',
+          music: { rh: 'F4q F#4q A4q Bb4q | F#4q F4q G4h' },
+          names: true,
+          caption: 'F then F sharp, A then B flat. In the second measure a natural turns F sharp back into F.',
+        },
+      },
+      { kind: 'play', text: 'Read and play. Finger 2 goes up onto **F sharp**.', music: { rh: 'E4q:1 F#4q:2 G4q:3 F#4q:2 | E4w:1', tempo: 80 }, hints: 'always' },
+      { kind: 'play', text: 'Now a flat. Finger 4 plays **B flat**.', music: { rh: 'F4q:1 G4q:2 A4q:3 Bb4q:4 | A4h:3 F4h:1', tempo: 80 }, hints: 'delay' },
+      {
+        kind: 'play',
+        text: 'A sign lasts for its measure. In the first measure both Fs are sharp, though only the first has a sign. In the second, the natural brings the white key back.',
+        music: { rh: 'D4q:1 F#4q:3 G4q:4 F#4q:3 | F#4q:3 F4q:2 D4h:1', tempo: 80 },
+        hints: 'delay',
+      },
+      {
+        kind: 'quiz',
+        question: 'A flat sign stands before a note. Which key do you play?',
+        choices: ['The very next key to the left', 'The very next key to the right', 'The same key, more softly'],
+        answer: 0,
+        explain: 'A flat lowers a note by a half step, to the very next key on its left. For B that is the black key B flat.',
+      },
+      {
+        kind: 'quiz',
+        question: 'The first F here has a sharp. What is the last note of the measure?',
+        figure: { kind: 'staff', music: { rh: 'F#4q G4q F#4h' } },
+        choices: ['F sharp again', 'Plain F', 'G'],
+        answer: 0,
+        explain: 'A sharp lasts to the end of its measure, so the second F is sharp as well. Only a natural sign would cancel it.',
       },
     ],
   },
@@ -208,13 +262,14 @@ export const STAGE4: Lesson[] = [
       },
       {
         kind: 'play',
-        text: 'Now add the name of each chord in the left hand, as a single low note.',
+        text: 'Now add the name of each chord in the left hand, as a single low note. These sit lower than you have read so far, so the letters are shown.',
         music: {
           rh: 'C4+E4+G4w:135 | B3+D4+G4w:125 | C4+E4+A4w:125 | C4+F4+A4w:135',
           lh: 'C3w:1 | G2w:4 | A2w:3 | F2w:5',
           tempo: 72,
           chords: 'C | G | Am | F',
         },
+        names: true,
         hints: 'delay',
       },
       {
@@ -232,12 +287,75 @@ export const STAGE4: Lesson[] = [
     ],
   },
   {
+    id: 'keys',
+    stage: 4,
+    title: 'Other keys',
+    summary: 'Why some scales need black keys, and what a key signature tells you.',
+    minutes: 12,
+    pieces: ['canon'],
+    cards: ['read:T:76', 'read:T:77', 'read:T:79', 'read:B:45', 'read:B:47'],
+    steps: [
+      {
+        kind: 'say',
+        title: 'The recipe again',
+        text: 'Follow the major scale recipe from **G** and something new happens. To make the last half step come out right you need **F sharp**, the black key to the right of F.\n\nEvery major scale is the same pattern started somewhere else.',
+        figure: { kind: 'keys', low: 67, high: 79, marks: { 67: 'G', 69: 'A', 71: 'B', 72: 'C', 74: 'D', 76: 'E', 78: 'F♯', 79: 'G' }, labels: 'none', caption: 'The G major scale' },
+      },
+      {
+        kind: 'play',
+        text: 'G major, right hand. The fingering is the same as for C. The top three notes are new on the page, so the letters are shown.',
+        music: { rh: 'G4q:1 A4q:2 B4q:3 C5q:1 | D5q:2 E5q:3 F#5q:4 G5q:5', tempo: 80 },
+        names: true,
+        hints: 'always',
+      },
+      {
+        kind: 'say',
+        title: 'F major, and a flat',
+        text: 'Start the recipe on **F** and you need **B flat**, the black key to the left of B.\n\nThis scale also changes the fingering. The right hand plays 1, 2, 3, 4, then the thumb passes under.',
+      },
+      {
+        kind: 'play',
+        text: 'F major, right hand. The flat is written beside its note.',
+        music: { rh: 'F4q:1 G4q:2 A4q:3 Bb4q:4 | C5q:1 D5q:2 E5q:3 F5q:4', tempo: 80 },
+        names: true,
+        hints: 'always',
+      },
+      {
+        kind: 'say',
+        title: 'Key signatures',
+        text: 'Writing a sharp beside every F would clutter the page. So the sharps or flats are written once, at the start of each line. That is the **key signature**, and it applies to every note of that name.\n\nOne sharp means G major. One flat means F major. Two sharps, F and C, mean D major.',
+      },
+      {
+        kind: 'play',
+        text: '**D major**, right hand. No signs beside the notes now. The key signature makes every F and every C sharp.',
+        music: { rh: 'D4q:1 E4q:2 F#4q:3 G4q:1 | A4q:2 B4q:3 C#5q:4 D5q:5', tempo: 80, key: 'D' },
+        hints: 'always',
+      },
+      {
+        kind: 'say',
+        title: 'Canon in D',
+        text: 'The famous Canon by Pachelbel is in D major, with two sharps. Its left hand repeats the same eight notes from start to finish, while the right hand plays something new over each round.\n\nLearn those eight bass notes first.',
+      },
+      { kind: 'listen', text: 'Listen to the first round.', music: { piece: 'canon', from: 1, to: 4 } },
+      { kind: 'play', text: 'The left hand. Eight notes, two in each measure.', music: { piece: 'canon', from: 1, to: 4 }, hands: ['L'], hints: 'delay' },
+      { kind: 'play', text: 'The right hand. Remember that every F and C is sharp.', music: { piece: 'canon', from: 1, to: 4 }, hands: ['R'], hints: 'delay' },
+      { kind: 'play', text: 'Both hands.', music: { piece: 'canon', from: 1, to: 4 }, hints: 'delay' },
+      {
+        kind: 'quiz',
+        question: 'A piece has one sharp in its key signature. Which note is always sharp?',
+        choices: ['F', 'C', 'B'],
+        answer: 0,
+        explain: 'The first sharp is always F sharp, and one sharp is the signature of G major.',
+      },
+    ],
+  },
+  {
     id: 'lead-sheets',
     stage: 4,
     title: 'Playing from chord symbols',
     summary: 'A melody, a few symbols, and choices about what the left hand does.',
     minutes: 11,
-    pieces: ['amazing-grace'],
+    pieces: ['amazing-grace', 'lullaby'],
     steps: [
       {
         kind: 'say',
@@ -264,64 +382,15 @@ export const STAGE4: Lesson[] = [
       { kind: 'play', text: 'The melody alone.', music: { piece: 'amazing-grace', from: 1, to: 5 }, hands: ['R'], hints: 'delay' },
       { kind: 'play', text: 'Now with the roots in the left hand.', music: { piece: 'amazing-grace', from: 1, to: 5 }, hints: 'delay' },
       {
+        kind: 'listen',
+        text: 'One more for your practice, the **Lullaby** by Brahms. It opens with a pickup too, and its left hand plays roots.',
+        music: { piece: 'lullaby', from: 1, to: 5 },
+      },
+      { kind: 'play', text: 'The first phrase of the Lullaby, both hands. Three beats in a measure.', music: { piece: 'lullaby', from: 1, to: 5 }, hints: 'delay' },
+      {
         kind: 'say',
         title: 'Yours to arrange',
         text: 'Amazing Grace joins your practice with the left hand playing roots. Once that is easy, play it away from the page with broken chords under the tune. Nothing is checking you there, so let your ear be the judge.\n\nThat is arranging, and there is no single right answer.',
-      },
-    ],
-  },
-  {
-    id: 'keys',
-    stage: 4,
-    title: 'Other keys',
-    summary: 'Why some scales need black keys, and what a key signature tells you.',
-    minutes: 12,
-    pieces: ['canon', 'lullaby'],
-    cards: ['read:T:76', 'read:T:77', 'read:T:79', 'read:B:45', 'read:B:47'],
-    steps: [
-      {
-        kind: 'say',
-        title: 'The recipe again',
-        text: 'Follow the major scale recipe from **G** and something new happens. To make the last half step come out right you need **F sharp**, the black key to the right of F.\n\nEvery major scale is the same pattern started somewhere else.',
-        figure: { kind: 'keys', low: 67, high: 79, marks: { 67: 'G', 69: 'A', 71: 'B', 72: 'C', 74: 'D', 76: 'E', 78: 'F♯', 79: 'G' }, labels: 'none', caption: 'The G major scale' },
-      },
-      {
-        kind: 'play',
-        text: 'G major, right hand. The fingering is the same as for C.',
-        music: { rh: 'G4q:1 A4q:2 B4q:3 C5q:1 | D5q:2 E5q:3 F#5q:4 G5q:5', tempo: 80, key: 'G' },
-        hints: 'always',
-      },
-      {
-        kind: 'say',
-        title: 'F major, and a flat',
-        text: 'Start the recipe on **F** and you need **B flat**, the black key to the left of B.\n\nThis scale also changes the fingering. The right hand plays 1, 2, 3, 4, then the thumb passes under.',
-      },
-      {
-        kind: 'play',
-        text: 'F major, right hand.',
-        music: { rh: 'F4q:1 G4q:2 A4q:3 Bb4q:4 | C5q:1 D5q:2 E5q:3 F5q:4', tempo: 80, key: 'F' },
-        hints: 'always',
-      },
-      {
-        kind: 'say',
-        title: 'Key signatures',
-        text: 'Writing a sharp sign on every F would clutter the page. Instead the sharps or flats are written once, at the start of each line. That is the **key signature**, and it applies to every note of that name.\n\nOne sharp means G major. One flat means F major. Two sharps, F and C, mean D major.',
-      },
-      {
-        kind: 'say',
-        title: 'Canon in D',
-        text: 'The famous Canon by Pachelbel is in D major, with two sharps. Its left hand repeats the same eight notes from start to finish, while the right hand plays something new over each round.\n\nLearn those eight bass notes first.',
-      },
-      { kind: 'listen', text: 'Listen to the first round.', music: { piece: 'canon', from: 1, to: 4 } },
-      { kind: 'play', text: 'The left hand. Eight notes, two in each measure.', music: { piece: 'canon', from: 1, to: 4 }, hands: ['L'], hints: 'delay' },
-      { kind: 'play', text: 'The right hand. Remember that every F and C is sharp.', music: { piece: 'canon', from: 1, to: 4 }, hands: ['R'], hints: 'delay' },
-      { kind: 'play', text: 'Both hands.', music: { piece: 'canon', from: 1, to: 4 }, hints: 'delay' },
-      {
-        kind: 'quiz',
-        question: 'A piece has one sharp in its key signature. Which note is always sharp?',
-        choices: ['F', 'C', 'B'],
-        answer: 0,
-        explain: 'The first sharp is always F sharp, and one sharp is the signature of G major.',
       },
     ],
   },
@@ -340,7 +409,7 @@ export const STAGE4: Lesson[] = [
       {
         kind: 'say',
         title: 'Numbers, not letters',
-        text: 'Musicians name the chords of a key by the step of the scale each one is built on. In the key of C, the chord on C is **one**, F is **four**, G is **five** and A minor is **six**.\n\nSo C, G, A minor, F is the progression **one, five, six, four**. It is written I, V, vi, IV, with small letters for a minor chord.\n\nNamed by number, a progression is no longer tied to C. It can be played in any key.',
+        text: 'Chords are numbered by the step of the scale each is built on. In the key of C, the chord on C is **one**, F is **four**, G is **five** and A minor is **six**.\n\nSo C, G, A minor, F is **one, five, six, four**, written I, V, vi, IV. Small letters mean a minor chord.',
         figure: {
           kind: 'keys',
           low: 60,
@@ -364,7 +433,7 @@ export const STAGE4: Lesson[] = [
       {
         kind: 'say',
         title: 'The same thing in G',
-        text: 'Now count up the scale of G. G is one, C is four, D is five and E minor is six.\n\nOne, four, five, one becomes **G, C, D, G**. The D chord takes its F sharp from the key signature.',
+        text: 'Named by number, a progression can be played in any key. Count up the scale of G: G is one, C is four, D is five and E minor is six.\n\nOne, four, five, one becomes **G, C, D, G**. The D chord takes its F sharp from the key signature.',
         figure: {
           kind: 'keys',
           low: 67,
@@ -458,7 +527,7 @@ export const STAGE4: Lesson[] = [
       {
         kind: 'say',
         title: 'Twelve measures',
-        text: 'The **twelve bar blues** is a chord progression that runs for twelve measures and then starts again. It lies under blues, early rock and roll and a great deal of jazz.\n\nIn C it goes: four measures of C, two of F, two of C, then G, F, C, C. In numbers that is one, four, one, then five, four, one.',
+        text: 'The **twelve bar blues** is a chord progression twelve measures long, which then starts again. It lies under blues, early rock and roll and much of jazz.\n\nIn C it is four measures of C, two of F, two of C, then G, F, C, C. In numbers: one, four, one, then five, four, one.',
       },
       {
         kind: 'say',

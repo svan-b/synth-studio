@@ -65,7 +65,7 @@ export const STAGE3: Lesson[] = [
       {
         kind: 'say',
         title: 'Ties and dots',
-        text: 'A curved line joining two notes of the same pitch is a **tie**. You play the first and hold it through the second.\n\nA quarter note tied to an eighth lasts a beat and a half. Because that is so common, it has a shorter spelling, the **dotted quarter note**. A dot always adds half the length of its note.',
+        text: 'A curved line joining two notes of the same pitch is a **tie**. Play the first and hold it through the second.\n\nA quarter note tied to an eighth lasts a beat and a half. That is so common it has a shorter spelling, the **dotted quarter note**.',
         figure: { kind: 'staff', music: { rh: 'G4q~ G4e G4e G4h | G4q. G4e G4h' }, caption: 'These two measures sound exactly the same' },
       },
       {
@@ -115,7 +115,7 @@ export const STAGE3: Lesson[] = [
       {
         kind: 'check',
         title: 'What the best ones did',
-        text: 'The coach in this app practises this way, so watch how it works and copy it when you practise alone.',
+        text: 'The coach in this app practises this way. Copy it when you practise alone.',
         items: [
           'They worked on short passages, not the whole piece.',
           'They slowed down until it came out right, then sped up a little at a time.',
@@ -125,11 +125,12 @@ export const STAGE3: Lesson[] = [
         ],
       },
       {
-        kind: 'say',
-        title: 'Start with the hardest part',
-        text: 'In the full Ode to Joy the left hand now changes note twice in some measures, and the third phrase has those eighth notes.\n\nA good practiser does not start at the beginning every time. They go to the hard part first.',
+        kind: 'play',
+        text: 'Start with the **hardest part**, not the beginning. In the full Ode to Joy that is the third phrase. Left hand alone first. It moves between G and C.',
+        music: { piece: 'ode-to-joy', from: 9, to: 12 },
+        hands: ['L'],
+        hints: 'delay',
       },
-      { kind: 'play', text: 'Left hand alone, third phrase. It moves between G and C.', music: { piece: 'ode-to-joy', from: 9, to: 12 }, hands: ['L'], hints: 'delay' },
       { kind: 'play', text: 'Both hands, third phrase. As slow as it needs to be.', music: { piece: 'ode-to-joy', from: 9, to: 12 }, hints: 'delay', passes: 2 },
       {
         kind: 'say',
@@ -231,7 +232,7 @@ export const STAGE3: Lesson[] = [
       {
         kind: 'say',
         title: 'One sharp',
-        text: 'The next piece has a **sharp sign** on the top line at the start of each staff. That is a **key signature**. It says every F in the piece is F sharp, the black key just to the right of F.\n\nThis piece happens to have no F in it. The sign still tells you something useful, that the music feels at home on G.',
+        text: 'The next piece has a **sharp sign** at the start of each staff. That is a **key signature**, and it says every F is F sharp, the black key just to the right of F.\n\nThis piece has no F in it. The sign still tells you the music feels at home on G.',
       },
       { kind: 'listen', text: 'Listen to **Open Road**.', music: { piece: 'open-road' } },
       { kind: 'play', text: 'The first half, both hands.', music: { piece: 'open-road', from: 1, to: 4 }, hints: 'delay' },
@@ -249,7 +250,7 @@ export const STAGE3: Lesson[] = [
       {
         kind: 'say',
         title: 'Counting the distance',
-        text: 'The distance between two notes is an **interval**. Count the letter names from one to the other, including both ends.\n\nC to D is a **second**. C to E is a **third**. C to F is a **fourth**. C to G is a **fifth**.\n\nYou know two of these already. A step is a second and a skip is a third.',
+        text: 'The distance between two notes is an **interval**. Count the letter names from one to the other, both ends included.\n\nC to D is a **second**, C to E a **third**, C to F a **fourth**, C to G a **fifth**.\n\nA step is a second and a skip is a third.',
         figure: { kind: 'staff', music: { rh: 'C4+D4h C4+E4h | C4+F4h C4+G4h' }, caption: 'A second, a third, a fourth and a fifth above C' },
       },
       {

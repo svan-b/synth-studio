@@ -24,7 +24,7 @@ const FIRSTS: Record<string, string> = {
   'triads': 'Played first chords',
   'progressions': 'Played a chord progression in two keys',
   'pedal': 'Used the pedal',
-  'arpeggios': 'Played arpeggios with both hands',
+  'arpeggios-two-hands': 'Played arpeggios with both hands',
   'improvise': 'Made up music of your own',
 };
 

@@ -291,7 +291,9 @@ export const TECH_LEVELS = TECH_LADDER.length;
 
 /** How far up the ladder the lessons taken so far reach. */
 export function techniqueLevelCap(done: (lessonId: string) => boolean): number {
-  if (done('arpeggios')) return 8;
+  // The arpeggio passed between the hands, and the quick scales after it, wait for the lesson that teaches the pass.
+  if (done('arpeggios-two-hands')) return 8;
+  if (done('arpeggios')) return 6;
   if (done('keys')) return 4;
   return 2;
 }

@@ -20,7 +20,7 @@ export const STAGE5: Lesson[] = [
       {
         kind: 'say',
         title: 'Hands first, then foot',
-        text: 'The skill is in **when** you change it. If the pedal stays down through a chord change, the two chords smear together.\n\nSo the foot moves just **after** the hands. Play the new chord, then let the pedal up and straight back down. The old sound clears and the new one is caught.\n\nSay it as you do it: play, change. Play, change.',
+        text: 'The skill is in **when** you change it. If the pedal stays down through a chord change, the two chords smear together.\n\nSo the foot moves just **after** the hands. Play the new chord, then let the pedal up and straight back down.\n\nSay it as you do it: play, change.',
       },
       {
         kind: 'play',
@@ -241,14 +241,13 @@ export const STAGE5: Lesson[] = [
     id: 'arpeggios',
     stage: 5,
     title: 'Arpeggios',
-    summary: 'Chords spread across the keyboard, in one hand and then both.',
-    minutes: 12,
-    pieces: ['rolling-chords'],
+    summary: 'A chord spread across the keyboard, one hand at a time.',
+    minutes: 8,
     steps: [
       {
         kind: 'say',
         title: 'Up through the chord',
-        text: 'An **arpeggio** is a chord played one note at a time, and it can climb further than a hand can hold at once.\n\nThe right hand plays C, E, G and the C above with fingers **1, 2, 3 and 5**. Let the hand open as it goes, and let the wrist follow the fingers so that nothing has to stretch.',
+        text: 'An **arpeggio** is a chord played one note at a time, and it can climb further than a hand can hold at once.\n\nThe right hand plays C, E, G and the C above with fingers **1, 2, 3 and 5**. Let the hand open as it goes, and let the wrist follow the fingers.',
         figure: { kind: 'keys', low: 60, high: 72, marks: { 60: '1', 64: '2', 67: '3', 72: '5' }, labels: 'c', caption: 'Right hand, the arpeggio of C major' },
       },
       {
@@ -287,9 +286,39 @@ export const STAGE5: Lesson[] = [
         hints: 'always',
       },
       {
+        kind: 'play',
+        text: 'Once more on C, with the beat. Even is what matters, not fast.',
+        music: { rh: 'C4q:1 E4q:2 G4q:3 C5q:5 | G4q:3 E4q:2 C4h:1', tempo: 80 },
+        mode: 'tempo',
+        tempoPct: 85,
+      },
+      {
+        kind: 'quiz',
+        question: 'Which fingers of the right hand play the arpeggio C, E, G and the C above?',
+        choices: ['1, 2, 3 and 5', '1, 2, 3 and 4', '1, 3, 4 and 5'],
+        answer: 0,
+        explain: 'Thumb, index and middle finger, then the little finger on the top C.',
+      },
+    ],
+  },
+  {
+    id: 'arpeggios-two-hands',
+    stage: 5,
+    title: 'Arpeggios in both hands',
+    summary: 'One arpeggio passed from hand to hand, and a piece built on it.',
+    minutes: 11,
+    pieces: ['rolling-chords'],
+    steps: [
+      {
         kind: 'say',
         title: 'From one hand to the other',
-        text: 'Here is the arpeggio that makes a piano sound grand. The left hand plays the three notes of the chord, and the right hand carries straight on with the next four, as if one very large hand were playing.\n\nPut the right pedal down first, so that every note rings on. Aim for a join between the hands that nobody could hear.\n\nTwo rests on the page may be new. A rest lasts as long as the note it is named after. The **eighth rest** lasts half a beat, and the **dotted quarter rest** a beat and a half. Each hand simply waits while the other plays.',
+        text: 'Here is the arpeggio that makes a piano sound grand. The left hand plays three notes of the chord and the right hand carries straight on, as if one very large hand were playing.\n\nPut the right pedal down first, so that every note rings on. Aim for a join nobody could hear.',
+      },
+      {
+        kind: 'say',
+        title: 'Two new rests',
+        text: 'A rest lasts as long as the note it is named after. The **eighth rest** lasts half a beat, and the **dotted quarter rest** a beat and a half.\n\nEach hand simply waits while the other plays.',
+        figure: { kind: 'staff', music: { rh: 're C4e C4q rq. C4e | C4w' }, caption: 'An eighth rest to begin, and a dotted quarter rest in the middle' },
       },
       {
         kind: 'play',
@@ -325,7 +354,7 @@ export const STAGE5: Lesson[] = [
       {
         kind: 'say',
         title: 'Arpeggios over a progression',
-        text: 'Put arpeggios together with a chord progression and you have the sound of a great many songs. The left hand holds the bass note, and the right hand ripples through each chord.\n\n**Rolling Chords** does this over one, five, six, four, with the smooth chord shapes you already know.',
+        text: 'Put arpeggios over a chord progression and you have the sound of a great many songs. The left hand holds the bass note, and the right hand ripples through each chord.\n\n**Rolling Chords** does this over one, five, six, four, with the smooth chord shapes you know.',
       },
       { kind: 'listen', text: 'Listen to the first four measures. One chord in each.', music: { piece: 'rolling-chords', from: 1, to: 4 } },
       { kind: 'play', text: 'The right hand. Each measure is one hand shape, rocked up and down.', music: { piece: 'rolling-chords', from: 1, to: 4 }, hands: ['R'], hints: 'delay' },
@@ -333,14 +362,7 @@ export const STAGE5: Lesson[] = [
       {
         kind: 'say',
         title: 'Yours to use',
-        text: 'This is a pattern to keep. Any progression you know can be played this way, in any key, and with the pedal it fills a room.\n\nWhen Rolling Chords is easy, take the ripple away from the page. Play it over any progression you know, and try it in another order, such as top, middle, bottom, middle. Nothing is checking you there, so let your ear be the judge.',
-      },
-      {
-        kind: 'quiz',
-        question: 'Which fingers of the right hand play the arpeggio C, E, G and the C above?',
-        choices: ['1, 2, 3 and 5', '1, 2, 3 and 4', '1, 3, 4 and 5'],
-        answer: 0,
-        explain: 'Thumb, index and middle finger, then the little finger on the top C.',
+        text: 'This is a pattern to keep. Any progression you know can be played this way, in any key.\n\nWhen Rolling Chords is easy, take the ripple away from the page and try another order, such as top, middle, bottom, middle. Nothing is checking you there, so let your ear be the judge.',
       },
       {
         kind: 'say',

@@ -938,7 +938,9 @@ describe('generated exercises', () => {
     const upTo = (ids: string[]) => (id: string) => ids.includes(id);
     expect(techniqueLevelCap(upTo(['major-scale']))).toBe(2);
     expect(techniqueLevelCap(upTo(['major-scale', 'keys']))).toBe(4);
-    expect(techniqueLevelCap(upTo(['major-scale', 'keys', 'arpeggios']))).toBe(TECH_LEVELS);
+    // One hand arpeggios open with their lesson. The pass between the hands waits for the lesson after it.
+    expect(techniqueLevelCap(upTo(['major-scale', 'keys', 'arpeggios']))).toBe(6);
+    expect(techniqueLevelCap(upTo(['major-scale', 'keys', 'arpeggios', 'arpeggios-two-hands']))).toBe(TECH_LEVELS);
     expect(evenness([10, 10, 10, 10])).toBe(0);
     expect(evenness([-40, 40, -40, 40])).toBe(40);
     expect(evenness([5, 5])).toBeNull();

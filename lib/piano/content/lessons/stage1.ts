@@ -14,6 +14,17 @@ export const STAGE1: Lesson[] = [
     minutes: 8,
     steps: [
       {
+        kind: 'check',
+        title: 'First, how you sit',
+        text: 'Set yourself up well before you touch a key. Tension is the thing to avoid, now and always.',
+        items: [
+          'Sit toward the front half of the seat, facing the middle of the keyboard.',
+          'Forearms about level with the keys, elbows a little in front of your body.',
+          'Shoulders down and loose. Feet flat on the floor.',
+          'Fingers gently curved, as if resting on a ball. Play near the tips.',
+        ],
+      },
+      {
         kind: 'say',
         title: 'One pattern, repeated',
         text: 'A piano looks like a long row of the same thing, and it nearly is. Look at the black keys. They come in groups of **two** and groups of **three**, over and over, all the way along.\n\nThat pattern is your map. Once you can see it, you can find any note without counting.',
@@ -63,17 +74,6 @@ export const STAGE1: Lesson[] = [
       { kind: 'find', text: '**E** is just to the right of the two black keys. Play two different Es.', pitchClasses: [4], count: 2, labels: 'none' },
       { kind: 'find', text: '**F** is just to the left of the three black keys. Play two different Fs.', pitchClasses: [5], count: 2, labels: 'none' },
       { kind: 'find', text: '**G** is the next white key up from F. Play two different Gs.', pitchClasses: [7], count: 2, labels: 'none' },
-      {
-        kind: 'check',
-        title: 'How you sit',
-        text: 'Before you play much more, set yourself up well. Tension is the thing to avoid, now and always.',
-        items: [
-          'Sit toward the front half of the seat, facing middle C.',
-          'Forearms about level with the keys, elbows a little in front of your body.',
-          'Shoulders down and loose. Feet flat on the floor.',
-          'Fingers gently curved, as if resting on a ball. Play near the tips.',
-        ],
-      },
       {
         kind: 'say',
         title: 'That is the whole map',
@@ -325,7 +325,7 @@ export const STAGE1: Lesson[] = [
     title: 'Two hands at once',
     summary: 'One hand holds a note while the other plays a tune.',
     minutes: 12,
-    pieces: ['ode-drone', 'lightly-row'],
+    pieces: ['ode-drone'],
     steps: [
       {
         kind: 'say',
@@ -363,13 +363,6 @@ export const STAGE1: Lesson[] = [
         choices: ['The little finger', 'The thumb', 'The index finger'],
         answer: 1,
         explain: 'The thumb is 1 in both hands, and the little finger is 5.',
-      },
-      {
-        kind: 'quiz',
-        question: 'Where is C on the keyboard?',
-        choices: ['Just left of the two black keys', 'Just left of the three black keys', 'Between the two black keys'],
-        answer: 0,
-        explain: 'C is the white key to the left of each group of two black keys. D sits between them.',
       },
       {
         kind: 'quiz',

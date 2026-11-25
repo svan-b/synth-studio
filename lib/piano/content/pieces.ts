@@ -55,7 +55,8 @@ export const PIECES: Piece[] = [
     id: 'lightly-row',
     title: 'Lightly Row',
     composer: 'Traditional German',
-    stage: 1,
+    // Taught from the page, in the lesson on reading skips.
+    stage: 2,
     key: 'C',
     time: [4, 4],
     tempo: 104,

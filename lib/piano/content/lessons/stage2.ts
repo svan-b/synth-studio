@@ -18,7 +18,7 @@ export const STAGE2: Lesson[] = [
       {
         kind: 'say',
         title: 'Five lines',
-        text: 'Written music sits on a **staff** of five lines. A note is written either **on a line** or **in a space** between lines.\n\nThe higher a note sits on the staff, the higher it sounds, and the further right its key is on the piano. It is the same picture of shape you have been using, drawn more exactly.',
+        text: 'Written music sits on a **staff** of five lines. A note is written **on a line** or **in a space** between lines.\n\nThe higher a note sits, the higher it sounds, and the further right its key is. It is the picture of shape you have been using, drawn more exactly.',
         figure: { kind: 'staff', music: { rh: 'C4q E4q G4q C5q' }, caption: 'Four notes, each higher than the last' },
       },
       {
@@ -27,6 +27,7 @@ export const STAGE2: Lesson[] = [
         text: 'The sign at the start of the staff is the **treble clef**. It is used for the higher notes, usually played by the right hand.\n\nIts curl wraps around the second line from the bottom, and that line is **G**, the G just above middle C. That is your first landmark.',
         figure: { kind: 'staff', music: { rh: 'G4w' }, names: true, caption: 'G, on the line the clef curls around' },
       },
+      { kind: 'play', text: 'Play that **G**, the one just above middle C, with finger 5.', music: { rh: 'G4w:5' }, names: true, hints: 'delay' },
       {
         kind: 'say',
         title: 'Middle C',
@@ -124,6 +125,7 @@ export const STAGE2: Lesson[] = [
     title: 'Reading skips',
     summary: 'Line to line, or space to space, jumps one key.',
     minutes: 8,
+    pieces: ['lightly-row'],
     steps: [
       {
         kind: 'say',
@@ -248,6 +250,7 @@ export const STAGE2: Lesson[] = [
         text: 'Middle C appears here as well, this time on a short line just **above** the staff. It is the same key as before. The two staves meet at middle C.',
         figure: { kind: 'staff', music: { lh: 'C4w' }, names: true, caption: 'Middle C, written in the bass clef' },
       },
+      { kind: 'play', text: 'Play the two landmarks with your left hand, **F** and then **middle C**. Any fingers will do.', music: { lh: 'F3h C4h' }, names: true, hints: 'delay' },
       {
         kind: 'say',
         title: 'Where your left hand rests',
@@ -304,7 +307,8 @@ export const STAGE2: Lesson[] = [
       {
         kind: 'say',
         title: 'A mirror',
-        text: 'In this study both thumbs share middle C. The right hand climbs while the left hand descends, so the **same fingers** play at the same time in each hand.\n\nMoving in opposite directions like this is the easiest way for two hands to move at once.',
+        text: 'In this study both thumbs share middle C. The right hand climbs while the left hand descends, so the **same fingers** play at the same time in each hand.\n\nThe left hand reads two notes that are new on the page, **B** and **A**, by step down from middle C.',
+        figure: { kind: 'staff', music: { lh: 'C4q B3q A3q G3q | F3w' }, names: true, caption: 'Down by step from middle C' },
       },
       { kind: 'listen', text: 'Listen to **Mirror**.', music: { piece: 'two-voices' } },
       { kind: 'play', text: 'Play it. Thumbs together on middle C to begin.', music: { piece: 'two-voices' }, hints: 'delay' },

@@ -15,7 +15,7 @@ export const STAGE6: Lesson[] = [
       {
         kind: 'say',
         title: 'Four notes',
-        text: 'Add one more skip to the top of a triad and you get a **seventh chord**, named for the distance from its bottom note to its top.\n\nOn C that gives C, E, G, B, called **C major seven**. On G it gives G, B, D, F, called **G seven**. On D it gives D, F, A, C, called **D minor seven**.',
+        text: 'Add one more skip to the top of a triad and you get a **seventh chord**, named for the distance from its bottom note to its top.\n\nOn C that is C, E, G, B, called **C major seven**. On G it is **G seven**, and on D it is **D minor seven**.',
         figure: { kind: 'staff', music: { rh: 'C4+E4+G4+B4h D4+F4+A4+C5h | G3+B3+D4+F4w' }, caption: 'C major seven, D minor seven, G seven' },
       },
       {
@@ -37,6 +37,17 @@ export const STAGE6: Lesson[] = [
           lh: 'D3w:1 | G2w:5 | C3w:2',
           chords: 'Dm7 | G7 | Cmaj7',
           tempo: 60,
+        },
+        hints: 'delay',
+      },
+      {
+        kind: 'play',
+        text: 'The same three chords one note at a time, the way the pieces in this stage use them. The left hand holds the root.',
+        music: {
+          rh: 'D4q:1 F4q:2 A4q:3 C5q:5 | D4q:1 F4q:2 G4q:3 B4q:5 | C4q:1 E4q:2 G4q:3 B4q:5 | C4+E4+G4+B4w:1235',
+          lh: 'D3w:1 | G2w:5 | C3w:2 | C3w',
+          chords: 'Dm7 | G7 | Cmaj7 | Cmaj7',
+          tempo: 72,
         },
         hints: 'delay',
       },
@@ -102,10 +113,21 @@ export const STAGE6: Lesson[] = [
       {
         kind: 'play',
         text: 'First get the five notes under your fingers.',
-        music: { rh: 'C4q:1 D4q:2 E4q:3 G4q:1 | A4q:2 G4q:1 E4q:3 D4q:2 | C4w:1', tempo: 80 },
+        music: { rh: 'C4q:1 D4q:2 E4q:3 G4q:4 | A4q:5 G4q:4 E4q:3 D4q:2 | C4w:1', tempo: 80 },
         hints: 'always',
       },
       { kind: 'listen', text: 'Here is the sort of thing you can do with them, over a held fifth in the left hand.', music: { rh: 'E4q G4q A4h | G4q E4q D4h | E4e G4e A4q G4q E4q | D4q C4h.', lh: 'C3+G3w | C3+G3w | C3+G3w | C3+G3w', tempo: 84 } },
+      {
+        kind: 'play',
+        text: 'Play that one yourself. An idea, the same idea with a new ending, then an answer that comes home to C. This is how a line is built.',
+        music: { rh: 'E4q:3 G4q:4 A4h:5 | E4q:3 G4q:4 D4h:2 | E4q:3 G4q:4 A4q:5 G4q:4 | E4q:3 D4q:2 C4h:1', lh: 'C3+G3w:51 | C3+G3w | C3+G3w | C3+G3w', tempo: 84 },
+        hints: 'delay',
+      },
+      {
+        kind: 'echo',
+        text: 'Now catch some ideas by ear. Each uses only the five notes, and each starts on **E**.',
+        motifs: ['E4q G4q A4h', 'E4q D4q C4h', 'E4q G4q A4q G4q | E4h D4h'],
+      },
       {
         kind: 'check',
         title: 'Now you',
@@ -135,7 +157,7 @@ export const STAGE6: Lesson[] = [
       {
         kind: 'say',
         title: 'A method, not magic',
-        text: 'People who play by ear are not guessing. They ask the same two questions of every note.\n\nIs the next note **higher, lower or the same**? And is it a **step or a jump**?\n\nYou have been answering those questions in the listening exercises since the first lesson. Now the patterns get longer.',
+        text: 'People who play by ear are not guessing. They ask the same two questions of every note.\n\nIs the next note **higher, lower or the same**? And is it a **step or a jump**?\n\nYou have answered those in the listening exercises since the first lessons. Now the patterns get longer.',
       },
       {
         kind: 'echo',
@@ -145,7 +167,18 @@ export const STAGE6: Lesson[] = [
       {
         kind: 'say',
         title: 'Finding the chords',
-        text: 'Once you have a tune, the chords are usually easier than you would think. In the key of C, try **C** first. Keep it until it starts to sound wrong, then try **G** or **F**.\n\nA good clue is the melody note on the strong beat. It is very often one of the notes of the chord.',
+        text: 'Once you have a tune, the chords are easier than you would think. In the key of C, try **C** first. Keep it until it sounds wrong, then try **G** or **F**.\n\nA good clue is the melody note on the strong beat. It is very often a note of the chord.',
+      },
+      {
+        kind: 'play',
+        text: 'Hear it work on a tune you know. The left hand holds the chord named above each measure. Listen to how **C** stops fitting when the tune settles on D.',
+        music: {
+          rh: 'E4q:3 D4q:2 C4q:1 D4q:2 | E4q:3 E4q E4h | D4q:2 D4q D4h | E4q:3 G4q:5 G4h',
+          lh: 'C3+E3+G3w:531 | C3+E3+G3w | B2+D3+G3w:531 | C3+E3+G3w:531',
+          chords: 'C | C | G | C',
+          tempo: 84,
+        },
+        hints: 'delay',
       },
       {
         kind: 'quiz',
@@ -162,9 +195,20 @@ export const STAGE6: Lesson[] = [
         explain: 'B belongs to the G chord, G, B, D.',
       },
       {
+        kind: 'play',
+        text: 'The rest of the tune, with only the root of each chord in the left hand. One low note is often all a tune needs.',
+        music: {
+          rh: 'E4q:3 D4q:2 C4q:1 D4q:2 | E4q:3 E4q E4q E4q | D4q:2 D4q E4q:3 D4q:2 | C4w:1',
+          lh: 'C3w:5 | C3w | G3w:1 | C3w:5',
+          chords: 'C | C | G | C',
+          tempo: 84,
+        },
+        hints: 'delay',
+      },
+      {
         kind: 'say',
         title: 'Your own tune',
-        text: 'Pick a song you know well and can sing. Find its first note, work out the tune a few notes at a time, then try the three chords under it.\n\nThis is slow the first few times and it gets quicker with every song. It is one of the most useful things a pianist can do.',
+        text: 'Pick a song you know well and can sing. Find its first note, work out the tune a few notes at a time, then try the three chords under it.\n\nIt is slow the first few times and quicker with every song, and it is among the most useful things a pianist can do.',
       },
     ],
   },
@@ -194,12 +238,12 @@ export const STAGE6: Lesson[] = [
       {
         kind: 'say',
         title: 'Where you are now',
-        text: 'You can read music in both clefs, keep time, play with independent hands, build chords and scales in several keys, use the pedal, play by ear and make music up.\n\nThat is a real foundation. From here, learning a piece is mostly a matter of choosing one you love and practising it the way you now know how.',
+        text: 'You can read music in both clefs, keep time, play with independent hands, build chords and scales in several keys, use the pedal, play by ear and make music up.\n\nThat is a real foundation. From here, learning a piece is mostly choosing one you love and practising it the way you now know how.',
       },
       {
         kind: 'say',
         title: 'What an app cannot do',
-        text: 'This app hears which keys you press and when. It cannot see your hands, your wrists or your posture, and those matter more as the music gets harder.\n\nA few lessons with a good teacher, even now and then, will catch habits that no software can. Keep the daily session going alongside. Short and regular is still the rule.',
+        text: 'This app hears which keys you press and when. It cannot see your hands, your wrists or your posture, and those matter more as the music gets harder.\n\nA few lessons with a good teacher, now and then, will catch habits no software can. Keep the daily session going alongside.',
       },
     ],
   },
