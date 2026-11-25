@@ -868,7 +868,7 @@ export class Follower {
       extraStrikes: this.extra,
       fluency: 1,
       pace: null,
-      clean: accuracy >= 0.95 && this.missed.size === 0 && (shared.chordsRight === null || shared.chordsRight >= 0.9),
+      clean: accuracy >= 0.95 && this.missed.size === 0 && this.usedPlucks.size === 0 && (shared.chordsRight === null || shared.chordsRight >= 0.9),
     };
   }
 }
