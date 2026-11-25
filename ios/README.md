@@ -33,6 +33,18 @@ A piano such as the Yamaha P-525 has two separate Bluetooth links, and they are 
 - **Bluetooth MIDI** carries the keys. This is the one the app needs. It is joined inside the app: Settings, **Pair a Bluetooth piano**, then choose the entry that ends in MIDI, such as P-525 MIDI. Bluetooth has to be switched on at the piano first. This link never appears in the iPad's own Settings.
 - **Bluetooth audio** carries sound from the iPad to the piano's speakers. This is what the iPad's own Settings shows, as P-525 AUDIO. The app does not need it, and it makes the iPad's sound arrive late, so the click lags behind your hands. If the app says the iPad's sound is going over Bluetooth, switch that link off in the iPad's Settings.
 
+### Without touching the screen
+
+The app is driven from the piano, so your hands can stay on the keys.
+
+- The **top key** of the piano always means go on. It starts the day's session, turns a page, skips a step and goes on to the next part.
+- The **bottom key** always means again. On a page of words it means back.
+- On a page with no music, the **right pedal** means go on as well, as long as no key was played a moment before. With a three pedal unit the middle pedal means go on and the left pedal means again, everywhere.
+- A Bluetooth page turning pedal, the kind used with sheet music apps, works too. Forward means go on and back means again.
+- Questions are answered with the keys C, D, E and F, shown beside each answer.
+
+A session can be stopped at any point. The Today page then offers to carry on from where it stopped, for the rest of that day.
+
 ### Demonstrations
 
 When the piano can receive notes, the app plays its demonstrations on the piano itself, as firmly as you tend to play, so they are as loud as your own playing. Settings has the choice between the piano and the iPad's speaker.
