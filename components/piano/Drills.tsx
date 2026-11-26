@@ -31,7 +31,7 @@ import { usePiano } from '@/lib/piano/learn/store';
 import { parseScore } from '@/lib/piano/music/score';
 import { midiLabel, midiName } from '@/lib/piano/music/theory';
 import { shuffle } from '@/lib/piano/util/emitter';
-import { useHints, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
+import { QUIET_AFTER_AUTO, quietRemote, useHints, useInputMode, usePracticeTimer, useQuietRemote, useRemote, useWakeLock } from './hooks';
 import { Keyboard, flashKey, keyboardRange, type KeyMark } from './Keyboard';
 import PlaySurface from './PlaySurface';
 import ScoreView from './ScoreView';
@@ -58,19 +58,23 @@ function Shell({ title, progress, onClose, children }: { title: string; progress
   );
 }
 
-function Summary({ title, lines, onDone }: { title: string; lines: string[]; onDone: () => void }) {
+function Summary({ title, lines, onDone, plain = false }: { title: string; lines: string[]; onDone: () => void; plain?: boolean }) {
   const hints = useHints();
   // Inside the day's session, the way out of a finished exercise is the way on to the next part.
   const { label, session } = useOnward();
   useRemote({ primary: onDone, pedal: true });
+  // An exercise often ends by itself. A press already on its way is not a wish to leave its closing screen.
+  useQuietRemote();
   useEffect(() => {
-    instrument.chime();
-  }, []);
+    if (!plain) instrument.chime();
+  }, [plain]);
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-8 text-center">
-      <div className="mc-pop flex h-20 w-20 items-center justify-center rounded-full bg-mc-ok text-white">
-        <Icon.Check size={44} />
-      </div>
+      {!plain && (
+        <div className="mc-pop flex h-20 w-20 items-center justify-center rounded-full bg-mc-ok text-white">
+          <Icon.Check size={44} />
+        </div>
+      )}
       <h2 className="mc-fade-up font-mc-serif text-5xl">{title}</h2>
       <div className="mc-fade-up max-w-2xl space-y-1 text-[1.3rem] text-mc-muted">
         {lines.map((l, i) => (
@@ -274,6 +278,8 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
   const [note, setNote] = useState<{ ok: boolean; text: string; stand?: string } | null>(null);
   const [good, setGood] = useState(0);
   const [tries, setTries] = useState(0);
+  /** Items of this round that were played, as against passed over. */
+  const attempted = useRef(0);
   const [levelNote, setLevelNote] = useState<string | null>(null);
   const streakRef = useRef(0);
   const seedBase = useRef(daySeed(Math.floor(Math.random() * 1000)));
@@ -312,8 +318,10 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
   const advance = useCallback((auto?: boolean) => {
     // A press that was already on its way when the exercise moved on by itself is not a wish to skip the next one.
     const now = performance.now();
-    if (auto === true) quiet.current = now + 750;
-    else if (now < quiet.current) return;
+    if (auto === true) {
+      quiet.current = now + QUIET_AFTER_AUTO;
+      quietRemote(QUIET_AFTER_AUTO);
+    } else if (now < quiet.current) return;
     if (timer.current) clearTimeout(timer.current);
     setNote(null);
     setTries(0);
@@ -365,6 +373,7 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
         return;
       }
       if (!result) return;
+      attempted.current += 1;
       if (kind === 'ear') {
         if (result.clean) {
           adapt(true);
@@ -464,18 +473,26 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
 
   // As in a lesson: the top key always goes on, and the bottom key hears it again where there is something to hear.
   useRemote({
-    primary: phase === 'look' ? () => setPhase('play') : () => advance(),
+    // The time to look over a new line is not lost to a press that was meant for the one before it.
+    primary: phase === 'look' ? () => performance.now() >= quiet.current && setPhase('play') : () => advance(),
     secondary: hear,
   });
   const hints = useHints();
 
   if (finished) {
+    // Every item passed over with nothing played: the exercise was not done, and does not count as done.
+    const played = attempted.current > 0;
     return (
-      <Shell title={round.title} progress={1} onClose={() => onClose(true)}>
+      <Shell title={round.title} progress={1} onClose={() => onClose(played)}>
         <Summary
-          title={`${round.title} done`}
-          lines={[`${good} of ${round.count} went well.`, levelNote ?? 'The difficulty follows how you do, so it stays just within reach.']}
-          onDone={() => onClose(true)}
+          title={played ? `${round.title} done` : `${round.title} passed over`}
+          lines={
+            played
+              ? [`${good} of ${round.count} went well.`, levelNote ?? 'The difficulty follows how you do, so it stays just within reach.']
+              : ['Nothing was played, so it is not counted as done.']
+          }
+          onDone={() => onClose(played)}
+          plain={!played}
         />
       </Shell>
     );

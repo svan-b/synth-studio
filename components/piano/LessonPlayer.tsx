@@ -13,7 +13,7 @@ import { midi } from '@/lib/piano/input/midi';
 import { usePiano } from '@/lib/piano/learn/store';
 import { pitchClass } from '@/lib/piano/music/theory';
 import FigureView from './Figures';
-import { readingMs, useHints, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
+import { QUIET_AFTER_AUTO, quietRemote, readingMs, useHints, useInputMode, usePracticeTimer, useQuietRemote, useRemote, useWakeLock } from './hooks';
 import { Keyboard, flashKey } from './Keyboard';
 import PlaySurface from './PlaySurface';
 import type { Activity } from './Screens';
@@ -429,6 +429,8 @@ function EchoStep({ step, onNext, onAuto }: { step: StepOf<'echo'>; onNext: () =
       else onNext();
       return;
     }
+    // Moved on by itself: a press already on its way is not a wish to skip the pattern that follows.
+    if (auto === true) quietRemote(QUIET_AFTER_AUTO);
     setIndex((i) => i + 1);
     setTries(0);
     setNote(null);
@@ -684,6 +686,8 @@ function Complete({ lesson, onDone }: { lesson: Lesson; onDone: (then?: Activity
   }, [lesson, lessons, pieces, session]);
   const onward = useCallback(() => onDone(follow?.to), [follow, onDone]);
   useRemote({ primary: onward, pedal: true });
+  // The screen that closes a lesson is there to be seen. A second press hard on the first does not take it away.
+  useQuietRemote();
   useEffect(() => {
     instrument.chime();
   }, []);
@@ -729,9 +733,6 @@ function Complete({ lesson, onDone }: { lesson: Lesson; onDone: (then?: Activity
   );
 }
 
-/** After the lesson moves on by itself, how long a press is taken to be one that was already on its way. */
-const QUIET_AFTER_AUTO = 750;
-
 export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; onClose: (completed: boolean, then?: Activity) => void }) {
   const lesson = useMemo(() => getLesson(lessonId), [lessonId]);
   const stored = usePiano((s) => s.lessons[lessonId]);
@@ -755,6 +756,7 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
     if (auto === true) {
       // The lesson has moved on by itself. A press that was already on its way is not a wish to skip what comes next.
       quiet.current = now + QUIET_AFTER_AUTO;
+      quietRemote(QUIET_AFTER_AUTO);
     } else {
       if (now < quiet.current) return;
       // Two quick taps on Continue are one wish to go on, not two.

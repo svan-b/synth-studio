@@ -59,6 +59,32 @@ export function useInputMode(): InputMode {
  */
 const remoteStack: Array<{ id: number }> = [];
 let remoteSeq = 0;
+/** Until this moment the piano's buttons are not acted on. */
+let remoteQuietUntil = 0;
+
+/** How long after the screen changes hands before a press counts: a press already on its way was meant for what was there before. */
+const QUIET_AFTER_CHANGE = 450;
+/** Longer where the screen moved on by itself, since nobody chose the moment. */
+export const QUIET_AFTER_AUTO = 750;
+
+/**
+ * Have the piano's buttons ignored for a moment. Called where the screen has
+ * just changed under the learner's hands, so that a press meant for the old
+ * screen is not taken by the new one.
+ */
+export function quietRemote(ms: number = QUIET_AFTER_AUTO): void {
+  remoteQuietUntil = Math.max(remoteQuietUntil, performance.now() + ms);
+}
+
+/** How long a screen that closes something stays before a press can take it away: it is there to be seen. */
+export const QUIET_ON_CLOSING = 900;
+
+/** Quiet the piano's buttons for a moment when this screen appears, or when `key` changes. */
+export function useQuietRemote(key: unknown = null, ms: number = QUIET_ON_CLOSING, on = true): void {
+  useEffect(() => {
+    if (on) quietRemote(ms);
+  }, [key, ms, on]);
+}
 
 export function useRemote(
   handlers: {
@@ -75,15 +101,21 @@ export function useRemote(
     if (!enabled) return;
     const entry = { id: ++remoteSeq };
     remoteStack.push(entry);
+    // Something new has come to the front.
+    quietRemote(QUIET_AFTER_CHANGE);
     const unsub = input.remote.subscribe((action: RemoteAction) => {
       if (remoteStack[remoteStack.length - 1] !== entry) return;
+      if (performance.now() < remoteQuietUntil) return;
       if (action === 'primary' || (action === 'pedal' && ref.current.pedal)) ref.current.primary?.();
       else if (action === 'secondary') ref.current.secondary?.();
     });
     return () => {
       unsub();
       const i = remoteStack.indexOf(entry);
+      const wasTop = i === remoteStack.length - 1;
       if (i >= 0) remoteStack.splice(i, 1);
+      // What was behind it is in front again.
+      if (wasTop) quietRemote(QUIET_AFTER_CHANGE);
     };
   }, [enabled]);
 }

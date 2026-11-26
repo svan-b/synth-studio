@@ -157,8 +157,32 @@ export function TodayScreen({
   const left = planMinutes(parts.slice(at));
   // Lessons opened from the course and left part way, which the day's parts would not lead back to.
   const halfway = lessonOrder().filter((id) => stepOf(id) > 0 && !parts.some((b) => b.kind === 'lesson' && b.id === id));
-  const open = (b: Block) =>
+  const alone = (b: Block) =>
     onStart(b.kind === 'lesson' ? { kind: 'lesson', id: b.id } : b.kind === 'piece' ? { kind: 'piece', id: b.id, minutes: b.minutes } : { kind: 'drill', id: b.id });
+  /** A lesson of the day's parts that was finished some other way, as from the course. It is done all the same. */
+  const doneElsewhere = (b: Block) => b.kind === 'lesson' && lessons[b.id]?.done === true && lessons[b.id]?.skipped !== true;
+  /**
+   * A tap on a part of the day's session. The list is the session's own, so a part done from here
+   * counts for the session: the part tapped is taken now, and the session carries on from it with
+   * the others in their order. A part already done is opened by itself, to go over again.
+   */
+  const open = (i: number) => {
+    const b = parts[i];
+    const passedOver = resume?.skipped ?? [];
+    if (doneToday || doneElsewhere(b)) return alone(b);
+    if (i === at) return begin();
+    if (i > at) {
+      const blocks = [...parts.slice(0, at), b, ...parts.slice(at, i), ...parts.slice(i + 1)];
+      return onStart({ kind: 'session', blocks, from: at, skipped: passedOver, base: resume?.base });
+    }
+    if (passedOver.includes(i)) {
+      // Passed over before, and wanted after all. It comes next, and is no longer counted as passed over.
+      const blocks = [...parts.slice(0, i), ...parts.slice(i + 1, at), b, ...parts.slice(at)];
+      const skipped = passedOver.filter((j) => j !== i).map((j) => (j > i ? j - 1 : j));
+      return onStart({ kind: 'session', blocks, from: at - 1, skipped, base: resume?.base });
+    }
+    alone(b);
+  };
 
   return (
     <Page title="Today" subtitle={date} right={<ConnectionChip onClick={() => onGo('settings')} />}>
@@ -219,12 +243,12 @@ export function TodayScreen({
               const behind = !doneToday && i < at;
               // A part that was passed over is behind, and it is not done.
               const passed = behind && (resume?.skipped ?? []).includes(i);
-              const finished = behind && !passed;
+              const finished = (behind && !passed) || (!doneToday && doneElsewhere(b));
               const isNext = !doneToday && i === at;
               return (
                 <li key={`${b.kind}-${b.id}-${i}`}>
                   <button
-                    onClick={() => open(b)}
+                    onClick={() => open(i)}
                     aria-current={isNext ? 'step' : undefined}
                     className={`flex w-full items-center gap-4 rounded-2xl px-4 py-3 text-left active:bg-mc-raised ${isNext ? 'bg-mc-bg ring-2 ring-inset ring-mc-ink/60' : 'bg-mc-bg'}`}
                   >

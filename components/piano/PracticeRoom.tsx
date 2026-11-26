@@ -23,7 +23,7 @@ import { outcomeFromAccuracy } from '@/lib/piano/learn/srs';
 import { usePiano } from '@/lib/piano/learn/store';
 import { sliceScore } from '@/lib/piano/music/score';
 import type { Hand } from '@/lib/piano/music/theory';
-import { readingMs, useHints, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
+import { readingMs, useHints, useInputMode, usePracticeTimer, useQuietRemote, useRemote, useWakeLock } from './hooks';
 import PlaySurface from './PlaySurface';
 import { useOnward } from './session';
 import { Button, Icon, IconButton, Pill, ProgressBar, Segmented, Sheet } from './ui';
@@ -332,11 +332,52 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   const hints = useHints();
   // The first play through of a piece can be declined from the piano: the top key says it is new.
   const declines = trial && stage === 'play' && !modelOnce;
-  useRemote({
-    // At time up the main choice is to stop, so the top key does that.
-    primary: stage === 'verdict' ? proceed : stage === 'timeup' || stage === 'learned' ? finish : declines ? teachFromStart : undefined,
-    secondary: stage === 'timeup' ? proceed : stage === 'learned' ? undefined : hearModel,
-  });
+  // While the plan is open in front, the piano's keys do nothing to what is behind it.
+  useRemote(
+    {
+      // At time up the main choice is to stop, so the top key does that.
+      primary: stage === 'verdict' ? proceed : stage === 'timeup' || stage === 'learned' ? finish : declines ? teachFromStart : undefined,
+      secondary: stage === 'timeup' ? proceed : stage === 'learned' ? undefined : hearModel,
+    },
+    !options,
+  );
+  // The screens that close a piece are there to be seen before a press takes them away.
+  useQuietRemote(stage, undefined, stage === 'learned' || stage === 'timeup');
+
+  /** The close button. What it does depends on where things stand, and nothing played is ever thrown away by it. */
+  const close = useCallback(() => {
+    // A run that has just ended gets its reply first. If it finished the piece, the screen that says so is what to show.
+    if (pending.current) {
+      const result = pending.current;
+      pending.current = null;
+      if (timer.current) clearTimeout(timer.current);
+      if (judgeNow.current(result)) return;
+    }
+    const at = stageRef.current;
+    if (at === 'learned' || at === 'timeup') {
+      // On a closing screen of a part of the day's session, closing means stopping for today. Going on has its own button.
+      if (session) session.stop();
+      else onClose(true);
+      return;
+    }
+    // Once the time for this piece is up, or a learned piece has had its play through, the part is done.
+    // Closing leads to the screen that says so, with the way on, and not to a part marked as left part way.
+    const elapsed = (performance.now() - startedAt.current) / 60000;
+    const timeIsUp = minutes !== undefined && (warned.current || elapsed >= minutes);
+    if (kept1.current || timeIsUp) {
+      if (timer.current) clearTimeout(timer.current);
+      setVerdict(null);
+      setAside(null);
+      setTake(null);
+      setReplay(null);
+      setEnding(kept1.current ? 'kept' : 'time');
+      kept1.current = false;
+      warned.current = true;
+      setStage('timeup');
+      return;
+    }
+    onClose(false);
+  }, [minutes, onClose, session]);
 
   const progress = pieceProgress(info, state);
   const plan = useMemo(() => planOutline(info, state), [info, state]);
@@ -351,7 +392,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
     <div className="absolute inset-0 z-40 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
       <header className="flex h-14 shrink-0 items-center gap-3 px-4">
         {/* On the closing screen of a part of the day's session, closing means stopping for today. Going on has its own button. */}
-        <IconButton label="Close" onClick={() => ((stage === 'learned' || stage === 'timeup') && session ? session.stop() : onClose(stage === 'learned' || stage === 'timeup'))}>
+        <IconButton label="Close" onClick={close}>
           <Icon.Close />
         </IconButton>
         <div className="min-w-0 flex-1">

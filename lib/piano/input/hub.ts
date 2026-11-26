@@ -25,6 +25,9 @@ export type RemoteAction = 'primary' | 'secondary' | 'pedal';
 /** How long the keys must have been still before the right pedal counts as a button. */
 const QUIET_MS = 1200;
 
+/** The longest a key is taken to be held down. Past this, its release is taken to have been lost. */
+const HELD_AT_MOST = 20_000;
+
 /** How far down a pedal must go to count as pressed, and how far up to count as let go, from 0 to 1. */
 const PEDAL_DOWN = 80 / 127;
 const PEDAL_UP = 40 / 127;
@@ -40,16 +43,19 @@ class InputHub {
   remotePedals = true;
   private lastRemote = -Infinity;
   /** Keys held down now, and when one last went down: the right pedal is a button only away from playing. */
-  private held = new Set<number>();
+  private held = new Map<number, number>();
   private lastKey = -Infinity;
+  /** Keys played since music went on the stand to be played. While there are some, every pedal is a pedal. */
+  private keysThisRun = 0;
   private pedalDown: Record<string, boolean> = {};
 
   constructor() {
     noteBus.subscribe((ev) => {
       if (ev.source === 'midi' && !isRemoteKey(ev.midi)) {
         if (ev.type === 'on') {
-          this.held.add(ev.midi);
+          this.held.set(ev.midi, performance.now());
           this.lastKey = performance.now();
+          if (this.expected !== null) this.keysThisRun += 1;
         } else this.held.delete(ev.midi);
       }
       if (ev.type !== 'on' || ev.source !== 'midi' || !this.remoteKeys) return;
@@ -64,11 +70,14 @@ class InputHub {
       const now = was ? ev.value > PEDAL_UP : ev.value >= PEDAL_DOWN;
       this.pedalDown[ev.pedal] = now;
       if (!this.remotePedals || was || !now) return;
+      // In the middle of playing something, a pedal is a pedal: the soft pedal in a quiet passage must not
+      // start the music again, nor the middle one skip it. Before the first note and after the last they are buttons.
+      if (this.holding() || (this.expected !== null && this.keysThisRun > 0)) return;
       // Middle pedal continues, left pedal repeats.
       if (ev.pedal === 'sostenuto') this.fire('primary');
       else if (ev.pedal === 'soft') this.fire('secondary');
       // Someone trying a few notes with the pedal down is playing, not turning the page.
-      else if (ev.pedal === 'sustain' && this.held.size === 0 && performance.now() - this.lastKey > QUIET_MS) this.fire('pedal');
+      else if (ev.pedal === 'sustain' && performance.now() - this.lastKey > QUIET_MS) this.fire('pedal');
     });
     // A Bluetooth page turning pedal, the kind used with sheet music readers,
     // is a keyboard to the iPad: it sends arrow or page keys. Forward means
@@ -84,10 +93,24 @@ class InputHub {
         // Space and Return also mean continue, unless a button has the focus and will take them itself.
         const plain = (e.key === ' ' || e.key === 'Enter') && (tag === 'BODY' || tag === 'HTML' || tag === '');
         if (!forward && !backward && !plain) return;
+        // On a page where these keys do nothing for the app, they scroll it as they always do.
+        if (this.remote.size === 0) return;
         e.preventDefault();
         this.fire(backward ? 'secondary' : 'primary');
       });
     }
+  }
+
+  /**
+   * Whether a key is down. A key whose release never arrived, as when a Bluetooth message is lost,
+   * is not taken to be held for ever: that would switch the pedals off as buttons for good.
+   */
+  private holding(): boolean {
+    const now = performance.now();
+    this.held.forEach((since, key) => {
+      if (now - since > HELD_AT_MOST) this.held.delete(key);
+    });
+    return this.held.size > 0;
   }
 
   private fire(action: RemoteAction): void {
@@ -108,6 +131,8 @@ class InputHub {
 
   /** Tell the listening input which notes the music expects next. */
   expect(notes: number[] | null): void {
+    // Music going on the stand, or coming off it, starts the count of keys played to it afresh.
+    if ((notes === null) !== (this.expected === null)) this.keysThisRun = 0;
     this.expected = notes;
     listener.expect(notes);
   }

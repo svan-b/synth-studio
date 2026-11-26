@@ -13,7 +13,7 @@ import { currentPiece, planDay, planSession, type Block } from '@/lib/piano/lear
 import { saveTrouble, streak, usePiano, type SessionBase } from '@/lib/piano/learn/store';
 import { addDays, dayKey, noonOf } from '@/lib/piano/util/emitter';
 import Drill from './Drills';
-import { useApplySettings, useHints, useRemote, useTheme, useWakeLock } from './hooks';
+import { useApplySettings, useHints, useQuietRemote, useRemote, useTheme, useWakeLock } from './hooks';
 import LessonPlayer from './LessonPlayer';
 import Onboarding from './Onboarding';
 import PracticeRoom from './PracticeRoom';
@@ -94,6 +94,18 @@ function baseOf(parts: Block[]): SessionBase {
   return base;
 }
 
+/**
+ * The part a session comes to from `from` on. A lesson that was finished some
+ * other way since the day was planned, as from the course, is behind the
+ * learner already, so it is not opened again.
+ */
+function partFrom(list: Block[], from: number): number {
+  const lessons = usePiano.getState().lessons;
+  let i = Math.max(0, from);
+  while (i < list.length && list[i].kind === 'lesson' && lessons[list[i].id]?.done === true) i++;
+  return Math.min(i, list.length);
+}
+
 /** Runs the parts of a daily session one after another. */
 function SessionRunner({
   blocks: planned,
@@ -110,7 +122,7 @@ function SessionRunner({
 }) {
   // The parts can grow: when a piece is learned with time to spare, the next piece takes the rest of it.
   const [blocks, setBlocks] = useState(planned);
-  const [index, setIndex] = useState(() => Math.max(0, Math.min(from, planned.length)));
+  const [index, setIndex] = useState(() => partFrom(planned, Math.min(from, planned.length)));
   // Parts that were passed over. They are behind, and they are not done.
   const [skipped, setSkipped] = useState<number[]>(() => passed ?? []);
   // A session goes straight into its first part, and from each finished part straight into the
@@ -171,15 +183,17 @@ function SessionRunner({
       const justLearned = block?.kind === 'piece' && state.pieces[block.id]?.learned === true && base.current.pieces[block.id]?.learned !== true;
       const nextPiece = justLearned && left >= 3 ? currentPiece(state.lessons, state.pieces) : null;
       const extra = nextPiece !== null && !blocks.some((b) => b.kind === 'piece' && b.id === nextPiece);
+      let list = blocks;
       if (extra && nextPiece) {
         const info = pieceInfo(nextPiece);
         const added: Block = { kind: 'piece', id: nextPiece, minutes: left, title: info.title, detail: 'There is time left, so on to the next piece' };
         base.current.pieces[nextPiece] = state.pieces[nextPiece] ?? null;
-        setBlocks((list) => [...list.slice(0, index + 1), added, ...list.slice(index + 1)]);
+        list = [...blocks.slice(0, index + 1), added, ...blocks.slice(index + 1)];
+        setBlocks(list);
         // The parts after it have moved along by one.
-        setSkipped((list) => list.map((i) => (i > index ? i + 1 : i)));
+        setSkipped((was) => was.map((i) => (i > index ? i + 1 : i)));
       }
-      setIndex((i) => i + 1);
+      setIndex(partFrom(list, index + 1));
       blockStarted.current = performance.now();
       // Straight on, when the part ended on its own closing screen, which named what comes next.
       // A part nobody was told about gets a screen to say so first.
@@ -189,19 +203,30 @@ function SessionRunner({
   );
   const skip = useCallback(() => {
     setSkipped((list) => (list.includes(index) ? list : [...list, index]));
-    setIndex((i) => i + 1);
+    setIndex(partFrom(blocks, index + 1));
     setBetween('next');
-  }, [index]);
+  }, [blocks, index]);
   /** Stop from the closing screen of a part: that part is done, so the session is kept from the next one. */
   const stopAfter = useCallback(() => {
-    if (index + 1 >= blocks.length) finishSession();
-    else keepSession({ on: startedOn.current, blocks, index: index + 1, skipped, base: base.current });
+    const next = partFrom(blocks, index + 1);
+    if (next >= blocks.length) {
+      // Nothing is left, so this is the end of the session, and it closes with its account like any other.
+      setIndex(next);
+      return;
+    }
+    keepSession({ on: startedOn.current, blocks, index: next, skipped, base: base.current });
     onClose();
-  }, [blocks, finishSession, index, keepSession, onClose, skipped]);
+  }, [blocks, index, keepSession, onClose, skipped]);
   // The bottom key means again everywhere else, so here it does nothing. Stopping is a deliberate tap.
   useRemote({ primary: done ? onClose : between ? start : undefined, pedal: true }, between !== null || done);
 
-  const link = useMemo<SessionLink>(() => ({ next: blocks[index + 1]?.title ?? null, stop: stopAfter }), [blocks, index, stopAfter]);
+  // `lessons` is read so that what comes next is named afresh when a lesson is finished.
+  const link = useMemo<SessionLink>(() => {
+    void lessons;
+    return { next: blocks[partFrom(blocks, index + 1)]?.title ?? null, stop: stopAfter };
+  }, [blocks, index, lessons, stopAfter]);
+  // A screen between parts, or the one that closes the session, is there to be read before a press takes it away.
+  useQuietRemote(done ? 'done' : between, undefined, done || between !== null);
 
   if (!done && !between) {
     return (
