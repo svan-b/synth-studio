@@ -11,7 +11,7 @@ import { emitNoteOff, emitNoteOn, noteBus } from '@/lib/piano/input/bus';
 import { REMOTE_SECONDARY, input, isRemoteKey } from '@/lib/piano/input/hub';
 import { usePiano } from '@/lib/piano/learn/store';
 import { scoreRange, stepsFor, type Score } from '@/lib/piano/music/score';
-import { pulsesPerMeasure, type Hand } from '@/lib/piano/music/theory';
+import { pulseBeats, pulsesPerMeasure, type Hand } from '@/lib/piano/music/theory';
 import ChordChart from './ChordChart';
 import ContourView from './ContourView';
 import { useInputMode } from './hooks';
@@ -446,6 +446,8 @@ export default function PlaySurface({
   }, [replayKey]);
 
   const pulses = pulsesPerMeasure(score.time);
+  // The number shown is the clicks heard in a minute. The tempo is kept in quarter notes, so in 3/8 or 6/8 they differ.
+  const clicksPerMinute = Math.round(bpm / pulseBeats(score.time));
   const showStaff = display === 'staff';
   const focusHand = score.hands.length === 2 && active.length === 1 ? active[0] : null;
 
@@ -521,10 +523,10 @@ export default function PlaySurface({
                 />
               ))}
             </div>
-            <span className="tabular-nums">{bpm} beats a minute</span>
+            <span className="tabular-nums">{clicksPerMinute} beats a minute</span>
           </div>
         )}
-        {mode === 'listen' && <span className="tabular-nums">{bpm} beats a minute</span>}
+        {mode === 'listen' && <span className="tabular-nums">{clicksPerMinute} beats a minute</span>}
       </div>
 
       {anyKey && touch ? (

@@ -204,6 +204,9 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
   const [run, setRun] = useState(0);
   const [have, setHave] = useState(0);
   const [verdict, setVerdict] = useState<{ ok: boolean; text: string } | null>(null);
+  // Hearing the music played first, between attempts. Not where it is to be played from memory or only tapped.
+  const [hearing, setHearing] = useState(false);
+  const canHear = step.display !== 'hidden' && !step.anyKey;
   const inputMode = useInputMode();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -229,13 +232,27 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
 
   const again = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
+    setHearing(false);
     pedalPresses.current = 0;
     setVerdict(null);
     setRun((r) => r + 1);
   }, []);
 
+  /** Play the music through once, then the learner's turn comes back as it was. */
+  const hear = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    setVerdict(null);
+    setHearing(true);
+    setRun((r) => r + 1);
+  }, []);
+
   const onDone = useCallback(
     (result: FlowResult | null) => {
+      if (hearing) {
+        setHearing(false);
+        setRun((r) => r + 1);
+        return;
+      }
       if (!result) return;
       // A timed run in which no key was touched is not an attempt. It waits at the gate again.
       if (notAttempted(result)) {
@@ -307,7 +324,7 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
         });
       }
     },
-    [again, have, inputMode, mode, need, onAuto, step.hold, step.pedal, step.touch],
+    [again, have, hearing, inputMode, mode, need, onAuto, step.hold, step.pedal, step.touch],
   );
 
   // The same two keys mean the same two things all the way through: the top key goes on, the bottom key plays it again.
@@ -321,6 +338,11 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
           <Pill tone={have > 0 ? 'ok' : 'muted'}>
             {have} of {need}
           </Pill>
+        )}
+        {canHear && !hearing && (
+          <Button variant="soft" onClick={hear} icon={<Icon.Ear size={18} />}>
+            Hear it
+          </Button>
         )}
         {verdict && !verdict.ok ? (
           <>
@@ -354,7 +376,7 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
         <PlaySurface
           score={score}
           hands={step.hands}
-          mode={mode}
+          mode={hearing ? 'listen' : mode}
           tempoPct={step.tempoPct ?? 100}
           display={step.display ?? 'staff'}
           hints={step.hints ?? 'delay'}
