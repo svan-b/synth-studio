@@ -472,7 +472,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
                 <div className="mc-fade-up text-[1.35rem] text-mc-muted">How did that go? Decide for yourself before you look.</div>
               ) : stage === 'verdict' && verdict ? (
                 <div className="mc-fade-up">
-                  <div className={`text-[1.35rem] font-medium leading-snug ${verdict.v.plain ? 'text-mc-ink' : verdict.v.passed ? 'text-mc-ok' : 'text-mc-hint-ink'}`}>
+                  <div className={`text-[1.35rem] font-medium leading-snug ${verdict.v.plain ? 'text-mc-ink' : verdict.v.passed ? 'text-mc-ok-ink' : 'text-mc-hint-ink'}`}>
                     {verdict.v.message}
                   </div>
                   {verdict.v.aside && <div className="text-[1.15rem] leading-snug text-mc-ink">{verdict.v.aside}</div>}
@@ -555,7 +555,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
                       <span
                         key={step.label}
                         className={`inline-flex h-7 items-center gap-1 rounded-full px-3 text-[0.95rem] font-semibold ${
-                          step.state === 'done' ? 'bg-mc-ok/15 text-mc-ok' : step.state === 'now' ? 'bg-mc-ink text-mc-bg' : 'bg-mc-raised text-mc-muted'
+                          step.state === 'done' ? 'bg-mc-ok/15 text-mc-ok-ink' : step.state === 'now' ? 'bg-mc-ink text-mc-bg' : 'bg-mc-raised text-mc-muted'
                         }`}
                       >
                         {step.state === 'done' && <Icon.Check size={13} />}

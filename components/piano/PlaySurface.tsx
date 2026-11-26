@@ -492,7 +492,8 @@ export default function PlaySurface({
                 {notice}
               </div>
             )}
-            {phase === 'gate' && (
+            {/* With keys on the screen the button is what is tapped, so it is large. With a piano it sits under the stand, clear of the music. */}
+            {phase === 'gate' && touch && (
               <button
                 onClick={() => gateRef.current?.()}
                 className="mc-fade-up pointer-events-auto flex h-14 items-center gap-2.5 rounded-full bg-mc-ink px-7 text-[1.3rem] font-semibold text-mc-bg shadow-lg active:scale-[0.97]"
@@ -512,7 +513,18 @@ export default function PlaySurface({
             <span key={String(runId)} className="mc-lead block h-full rounded-full bg-mc-accent" style={{ animationDuration: `${lead}ms` }} />
           </span>
         )}
-        <span className="font-medium">{status}</span>
+        {phase === 'gate' && !touch ? (
+          <button
+            onClick={() => gateRef.current?.()}
+            className="mc-fade-up flex h-10 items-center gap-2 rounded-full bg-mc-ink px-5 text-[1.15rem] font-semibold text-mc-bg active:scale-[0.97]"
+          >
+            <Icon.Play size={16} />
+            {/* A key starts the count, not the music, and the words say so. */}
+            {anyKey && !sustain ? 'Tap any key to start the count' : 'Play any key to start the count'}
+          </button>
+        ) : (
+          <span className="font-medium">{status}</span>
+        )}
         {mode === 'tempo' && (
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2" aria-hidden="true">

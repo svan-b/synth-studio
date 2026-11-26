@@ -71,7 +71,7 @@ const ChordChart = forwardRef<ScoreViewHandle, ChordChartProps>(function ChordCh
                     : 'border-mc-line bg-mc-surface'
               }`}
             >
-              <span className={`font-mc-serif text-[4rem] leading-none ${done ? (slipped ? 'text-mc-hint-ink' : 'text-mc-ok') : current ? 'text-mc-ink' : 'text-mc-muted'}`}>
+              <span className={`font-mc-serif text-[4rem] leading-none ${done ? (slipped ? 'text-mc-hint-ink' : 'text-mc-ok-ink') : current ? 'text-mc-ink' : 'text-mc-muted'}`}>
                 {cell.symbols.join(' ') || ' '}
               </span>
               {/* A chord played one note at a time shows how far through it the learner is. */}
@@ -83,7 +83,7 @@ const ChordChart = forwardRef<ScoreViewHandle, ChordChartProps>(function ChordCh
                 </span>
               )}
               {done && !slipped && (
-                <span className="absolute right-3 top-3 text-mc-ok">
+                <span className="absolute right-3 top-3 text-mc-ok-ink">
                   <Icon.Check size={22} />
                 </span>
               )}

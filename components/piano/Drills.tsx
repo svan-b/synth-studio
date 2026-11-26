@@ -194,7 +194,7 @@ function ReadingDrill({ onClose }: { onClose: (finished?: boolean) => void }) {
       <div className="flex h-full min-h-0 flex-col">
         <div className="px-7 text-[1.35rem] text-mc-ink/85">
           {reveal ? (
-            <span className={reveal.ok ? 'text-mc-ok' : 'text-mc-hint-ink'}>
+            <span className={reveal.ok ? 'text-mc-ok-ink' : 'text-mc-hint-ink'}>
               {reveal.ok ? 'Yes.' : 'Not that one.'} This note is <strong>{midiLabel(reveal.midi)}</strong>.
             </span>
           ) : (
@@ -519,7 +519,7 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
     <Shell title={round.title} progress={index / round.count} onClose={() => onClose(false)}>
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-center gap-4 px-7 pb-2 pt-1">
-          <div className={`min-w-0 flex-1 text-[1.35rem] leading-snug ${note ? (note.ok ? 'text-mc-ok' : 'text-mc-hint-ink') : 'text-mc-ink/85'}`}>
+          <div className={`min-w-0 flex-1 text-[1.35rem] leading-snug ${note ? (note.ok ? 'text-mc-ok-ink' : 'text-mc-hint-ink') : 'text-mc-ink/85'}`}>
             {note ? note.text : brief.split('**').map((part, i) => (i % 2 ? <strong key={i} className="text-mc-ink">{part}</strong> : <span key={i}>{part}</span>))}
           </div>
           <Pill>Level {level}</Pill>

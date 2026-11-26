@@ -649,10 +649,10 @@ export function ProgressScreen() {
   ];
   return (
     <Page title="Progress" subtitle="What you have built so far.">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 landscape:sm:grid-cols-5">
         {stats.map(([value, label]) => (
           <Card key={label} className="p-5">
-            <div className="font-mc-serif text-3xl">{value}</div>
+            <div className="whitespace-nowrap font-mc-serif text-3xl">{value}</div>
             <div className="mt-1 text-[1.05rem] text-mc-muted">{label}</div>
           </Card>
         ))}

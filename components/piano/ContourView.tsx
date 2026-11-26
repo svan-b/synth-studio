@@ -15,6 +15,9 @@ export interface ContourViewProps {
 
 /** The most beats drawn on one line before the tune wraps to the next. */
 const LINE_BEATS = 20;
+/** The least height of a row at which the letters in the bars can still be read, and the most a row grows to on a tall stand. */
+const ROW_LEAST = 24;
+const ROW_MOST = 60;
 
 /**
  * Music before the staff: each note is a bar, higher on the page for a
@@ -28,6 +31,20 @@ const ContourView = forwardRef<ScoreViewHandle, ContourViewProps>(function Conto
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const active = steps ?? score.steps;
+
+  // The size of the stand, which the picture is laid out to fill.
+  const [stand, setStand] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => setStand({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const watcher = new ResizeObserver(measure);
+    watcher.observe(el);
+    return () => watcher.disconnect();
+  }, []);
+  // The height of the stand in the picture's own units, where its width is 1000. Rounded, so a pixel's change redraws nothing.
+  const room = stand.w > 0 && stand.h > 0 ? Math.round(((stand.h / stand.w) * 1000) / 10) * 10 : 0;
 
   const layout = useMemo(() => {
     const notes = score.notes.filter((n) => !n.tied);
@@ -69,21 +86,43 @@ const ContourView = forwardRef<ScoreViewHandle, ContourViewProps>(function Conto
     });
     const gapRows = 0.8;
     const totalRows = bands.reduce((a, b) => a + b.rows, 0) + gapRows * (bands.length - 1);
-    const rowH = Math.min(46, 330 / totalRows);
+    // Rows as tall as the stand allows. On a tall stand the bars and their letters grow to use it. Where
+    // there are several lines, two are shown together if they can still be read at that size. If not,
+    // each line takes the whole stand, so that no line is ever shown cut through the middle.
+    const usual = Math.min(46, 330 / totalRows);
+    const lines = lineStarts.length;
+    let rowH = usual;
+    let lineH = totalRows * rowH + 40;
+    let paged = false;
+    if (room > 0 && lines === 1) {
+      rowH = Math.max(usual, Math.min(ROW_MOST, (room - 60) / totalRows));
+      lineH = totalRows * rowH + 40;
+    } else if (room > 0) {
+      const two = (room / 2 - 40 - 10) / totalRows;
+      if (two >= ROW_LEAST) {
+        rowH = Math.min(ROW_MOST, two);
+        lineH = totalRows * rowH + 40;
+      } else {
+        paged = true;
+        rowH = Math.min(ROW_MOST, (room - 40) / totalRows);
+        lineH = Math.max(totalRows * rowH + 40, room);
+      }
+    }
+    // A line that has the whole stand to itself sits in the middle of it.
+    const inset = (lineH - (totalRows * rowH + 40)) / 2;
     let acc = 0;
     for (const band of bands) {
       band.top = acc;
       acc += (band.rows + gapRows) * rowH;
     }
-    const lineH = totalRows * rowH + 40;
-    const H = lineStarts.length * lineH + 20;
+    const H = paged ? lines * lineH : lines * lineH + 20;
 
     const boxes = notes.map((n) => {
       const band = bands.find((b) => b.hand === n.hand) ?? bands[0];
       const d = diatonicIndex(n.pitch);
       const li = lineOf(n.start);
       const x = padX + (n.start - lineStarts[li]) * beatW;
-      const y = 26 + li * lineH + band.top + (band.hi - d) * rowH + (band.rows - (band.hi - band.lo + 1)) * rowH * 0.5;
+      const y = 26 + inset + li * lineH + band.top + (band.hi - d) * rowH + (band.rows - (band.hi - band.lo + 1)) * rowH * 0.5;
       const h = rowH - 6;
       // Never wider than the room before the next note on the same row, or the end of the line.
       const after = notes
@@ -110,10 +149,10 @@ const ContourView = forwardRef<ScoreViewHandle, ContourViewProps>(function Conto
     starts.forEach((b, i) => {
       const li = lineOf(b);
       if (i === 0 || Math.abs(b - lineStarts[li]) < 1e-6) return;
-      bars.push({ x: padX + (b - lineStarts[li]) * beatW - 3, y1: 16 + li * lineH, y2: 16 + li * lineH + totalRows * rowH + 14 });
+      bars.push({ x: padX + (b - lineStarts[li]) * beatW - 3, y1: 16 + inset + li * lineH, y2: 16 + inset + li * lineH + totalRows * rowH + 14 });
     });
-    return { W, H, boxes, bars, lineH, lines: lineStarts.length };
-  }, [score, label]);
+    return { W, H, boxes, bars, lineH, lines, paged };
+  }, [score, label, room]);
 
   useImperativeHandle(ref, () => ({
     setCursor(stepIndex) {
@@ -132,9 +171,10 @@ const ContourView = forwardRef<ScoreViewHandle, ContourViewProps>(function Conto
       const wrap = wrapRef.current;
       if (wrap && line >= 0 && layout.lines > 1 && wrap.scrollHeight > wrap.clientHeight + 4) {
         const scale = svg.getBoundingClientRect().height / layout.H;
-        const top = Math.max(0, (line * layout.lineH + 6) * scale);
-        const bottom = Math.min(layout.lines, line + 2) * layout.lineH * scale;
-        if (top < wrap.scrollTop || bottom > wrap.scrollTop + wrap.clientHeight) wrap.scrollTo({ top, behavior: 'smooth' });
+        // A line to a page turns like a page, at once. Otherwise the line slides up with the next below it.
+        const top = Math.max(0, (line * layout.lineH + (layout.paged ? 0 : 6)) * scale);
+        const bottom = Math.min(layout.lines, line + (layout.paged ? 1 : 2)) * layout.lineH * scale;
+        if (top < wrap.scrollTop - 2 || bottom > wrap.scrollTop + wrap.clientHeight + 2) wrap.scrollTo({ top, behavior: layout.paged ? 'auto' : 'smooth' });
       }
     },
     mark(noteId: string, state: NoteMark | null) {
@@ -142,6 +182,9 @@ const ContourView = forwardRef<ScoreViewHandle, ContourViewProps>(function Conto
       if (!el) return;
       el.classList.remove('mc-contour-ok', 'mc-contour-warn', 'mc-contour-bad');
       if (state) el.classList.add(`mc-contour-${state}`);
+    },
+    rewind() {
+      if (wrapRef.current) wrapRef.current.scrollTop = 0;
     },
     clearMarks() {
       svgRef.current
@@ -152,16 +195,6 @@ const ContourView = forwardRef<ScoreViewHandle, ContourViewProps>(function Conto
 
   // The tune is fitted to the stand when that costs little size. A longer
   // one keeps its full width and scrolls, a line at a time.
-  const [stand, setStand] = useState({ w: 0, h: 0 });
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const measure = () => setStand({ w: el.clientWidth, h: el.clientHeight });
-    measure();
-    const watcher = new ResizeObserver(measure);
-    watcher.observe(el);
-    return () => watcher.disconnect();
-  }, []);
   const natural = (layout.H / layout.W) * stand.w;
   const single = layout.lines === 1 || (stand.w > 0 && natural <= stand.h * 1.25);
 

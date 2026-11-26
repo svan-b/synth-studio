@@ -131,7 +131,7 @@ function CheckStep({ step, onNext }: { step: StepOf<'check'>; onNext: () => void
 function Brief({ text, children, tone }: { text: string; children?: ReactNode; tone?: 'ok' | 'hint' }) {
   return (
     <div className="flex shrink-0 items-center gap-4 px-7 pb-2 pt-1">
-      <div className={`min-w-0 flex-1 text-[1.45rem] leading-snug ${tone === 'ok' ? 'text-mc-ok' : tone === 'hint' ? 'text-mc-hint-ink' : 'text-mc-ink/85'}`}>
+      <div className={`min-w-0 flex-1 text-[1.45rem] leading-snug ${tone === 'ok' ? 'text-mc-ok-ink' : tone === 'hint' ? 'text-mc-hint-ink' : 'text-mc-ink/85'}`}>
         <Prose text={text} />
       </div>
       <div className="flex shrink-0 items-center gap-2">{children}</div>
@@ -269,6 +269,12 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
         } else if (step.touch === 'loud' && result.velocity < 0.6) {
           ok = false;
           text = 'Right notes, but not yet full. Let the weight of your arm fall into the keys.';
+        }
+        // The notes were right, so there is nothing to slow down for. Only the touch is to be put right.
+        if (!ok) {
+          setHave(0);
+          setVerdict({ ok: false, text });
+          return;
         }
       }
       // Where the step is about the pedal, the notes alone are not the point. Only a piano over MIDI reports its pedal.
@@ -638,7 +644,7 @@ function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }
                     state === 'idle'
                       ? 'border-mc-line bg-mc-surface active:bg-mc-raised'
                       : state === 'right'
-                        ? 'border-mc-ok bg-mc-ok/10 text-mc-ok'
+                        ? 'border-mc-ok bg-mc-ok/10 text-mc-ok-ink'
                         : state === 'wrong'
                           ? 'border-mc-bad bg-mc-bad/10 text-mc-bad'
                           : 'border-mc-line bg-mc-surface opacity-50'

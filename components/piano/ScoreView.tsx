@@ -65,6 +65,8 @@ interface SystemBox {
   bottom: number;
   /** Top of the room kept for this line, with its chord symbols and finger numbers. */
   page: number;
+  /** Bottom of everything that belongs to this line: the lowest notes and the finger numbers under them. */
+  foot: number;
 }
 
 interface SystemPlan {
@@ -72,17 +74,27 @@ interface SystemPlan {
   widths: number[];
   lead: number;
   offsetX: number;
+  /** Where the line starts down the page, and the room it takes. Each line takes only what its own notes need. */
+  y: number;
+  height: number;
+  /** From the top of the line's room to the top line of its upper staff. */
+  staffTop: number;
+  /** From the top line of the upper staff to the top line of the lower. */
+  staffGap: number;
 }
 
 interface Plan {
   systems: SystemPlan[];
-  systemHeight: number;
-  staffTop: number;
-  staffGap: number;
+  /** The room two neighbouring lines take together, at most: the line being played and the one read ahead. */
+  pair: number;
   height: number;
-  /** Extra room above the top staff taken by finger numbers stacked on chords. */
-  fingerRise: number;
 }
+
+/** The size from which music reads easily at the piano. Smaller is used only where it buys something. */
+const COMFORTABLE = 1.3;
+
+/** Empty room left under each line, between it and the next. */
+const LINE_GAP = 14;
 
 const LEFT_PAD = 16;
 const RIGHT_PAD = 8;
@@ -160,47 +172,66 @@ function planLayout(score: Score, width: number, opts: { fingering: boolean; nam
       // A short single line looks best centred.
       if (systems.length === 0) offsetX = (available - lead - rawSum * stretch) / 2;
     }
-    systems.push({ measures, widths: raw.map((w) => w * stretch), lead, offsetX });
+    systems.push({ measures, widths: raw.map((w) => w * stretch), lead, offsetX, y: 0, height: 0, staffTop: 0, staffGap: 0 });
     i += count;
   }
 
-  // Vertical room, from how far the notes travel beyond the staves.
+  // Vertical room, line by line, from how far that line's own notes travel beyond the staves. One
+  // high note or one stacked chord in the last measure does not make every line of the piece taller.
   const two = score.hands.length === 2;
-  let above = 0;
-  let below = 0;
-  let middleExtra = 0;
   const topHand = score.hands[0];
   const bottomHand = score.hands[score.hands.length - 1];
   const topLine = (clef: 'treble' | 'bass') => (clef === 'treble' ? 38 : 26); // F5 or A3
   const bottomLine = (clef: 'treble' | 'bass') => (clef === 'treble' ? 30 : 18); // E4 or G2
-  for (const n of score.notes) {
-    const d = diatonicIndex(n.pitch);
-    const clef = score.clefs[n.hand];
-    if (n.hand === topHand) above = Math.max(above, d - topLine(clef));
-    if (n.hand === bottomHand) below = Math.max(below, bottomLine(clef) - d);
-    if (two) {
-      if (n.hand === topHand) middleExtra = Math.max(middleExtra, bottomLine(clef) - d - 3);
-      else middleExtra = Math.max(middleExtra, d - topLine(clef) - 3);
-    }
-  }
-  // A stem that points up carries its finger number above its tip, which stands
-  // higher than the note itself. Notes below the middle line have such stems.
-  for (const ev of score.staff[topHand]) {
-    if (ev.kind !== 'note' || ev.sym === 'w') continue;
-    const ds = ev.pitches.map(diatonicIndex);
-    const top = topLine(score.clefs[topHand]);
-    if ((Math.min(...ds) + Math.max(...ds)) / 2 < top - 4) above = Math.max(above, Math.max(...ds) + 7 - top);
-  }
   const labelRoom = (opts.fingering ? 16 : 0) + (opts.names ? 14 : 0);
-  // A chord carries one finger number for each of its notes, stacked. Each one past the first needs its own line.
-  const stack = (hand: Hand) => (opts.fingering ? Math.max(0, ...score.staff[hand].map((e) => e.fingers?.length ?? 0)) : 0);
-  const fingerRise = topHand === 'R' ? Math.max(0, stack('R') - 1) * 15 : 0;
-  const fingerDrop = bottomHand === 'L' ? Math.max(0, stack('L') - 1) * 15 : 0;
-  const padTop = 18 + above * 5 + labelRoom + fingerRise + (opts.chords ? 20 : 0);
-  const padBottom = 16 + below * 5 + labelRoom + fingerDrop;
-  const staffGap = two ? 92 + Math.max(0, middleExtra) * 5 + (opts.fingering ? 12 : 0) : 0;
-  const systemHeight = padTop + 40 + staffGap + padBottom + 14;
-  return { systems, systemHeight, staffTop: padTop, staffGap, height: systems.length * systemHeight + 6, fingerRise };
+  let y = 0;
+  for (const sys of systems) {
+    const inLine = new Set(sys.measures);
+    let above = 0;
+    let below = 0;
+    let middleExtra = 0;
+    let stackTop = 0;
+    let stackBottom = 0;
+    for (const hand of score.hands) {
+      const clef = score.clefs[hand];
+      for (const ev of score.staff[hand]) {
+        if (!inLine.has(ev.measure) || ev.kind !== 'note') continue;
+        const ds = ev.pitches.map(diatonicIndex);
+        for (const d of ds) {
+          if (hand === topHand) above = Math.max(above, d - topLine(clef));
+          if (hand === bottomHand) below = Math.max(below, bottomLine(clef) - d);
+          if (two) {
+            if (hand === topHand) middleExtra = Math.max(middleExtra, bottomLine(clef) - d - 3);
+            else middleExtra = Math.max(middleExtra, d - topLine(clef) - 3);
+          }
+        }
+        // A stem that points up carries its finger number above its tip, which stands
+        // higher than the note itself. Notes below the middle line have such stems.
+        if (hand === topHand && ev.sym !== 'w' && ds.length > 0) {
+          const top = topLine(clef);
+          if ((Math.min(...ds) + Math.max(...ds)) / 2 < top - 4) above = Math.max(above, Math.max(...ds) + 7 - top);
+        }
+        // A chord carries one finger number for each of its notes, stacked. Each one past the first needs its own line.
+        if (opts.fingering) {
+          if (hand === 'R' && hand === topHand) stackTop = Math.max(stackTop, (ev.fingers?.length ?? 0) - 1);
+          if (hand === 'L' && hand === bottomHand) stackBottom = Math.max(stackBottom, (ev.fingers?.length ?? 0) - 1);
+        }
+      }
+    }
+    const padTop = 18 + above * 5 + labelRoom + stackTop * 15 + (opts.chords ? 20 : 0);
+    const padBottom = 16 + below * 5 + labelRoom + stackBottom * 15;
+    sys.staffTop = padTop;
+    sys.staffGap = two ? 92 + Math.max(0, middleExtra) * 5 + (opts.fingering ? 12 : 0) : 0;
+    sys.height = padTop + 40 + sys.staffGap + padBottom + LINE_GAP;
+    sys.y = y;
+    y += sys.height;
+  }
+  let pair = 0;
+  systems.forEach((sys, i) => {
+    const next = systems[i + 1];
+    pair = Math.max(pair, (next ? next.y + next.height : sys.y + sys.height) - LINE_GAP - sys.y);
+  });
+  return { systems, pair, height: y + 6 };
 }
 
 function cssColor(el: HTMLElement, name: string, alpha = 1): string {
@@ -307,9 +338,15 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     const lift = innerRef.current ? parseFloat(innerRef.current.style.marginTop || '0') : 0;
     const sysTop = box.page * z + lift;
     const next = systemBoxes.current[system + 1];
-    const wantBottom = (next ? next.bottom : box.bottom) * z + lift + 16;
+    // Down to the last thing that belongs to the next line, the finger numbers under its lower staff included.
+    const wantBottom = (next ? next.foot : box.foot) * z + lift + 4;
     if (sysTop < viewTop || wantBottom > viewBottom) {
-      wrap.scrollTo({ top: Math.max(0, sysTop - 4), behavior: smooth ? 'smooth' : 'auto' });
+      let to = sysTop - 4;
+      // Where the two lines are taller than the stand, the room above this line's upper staff gives way first,
+      // so that the left hand of the next line can still be read ahead. The staff itself always stays in view.
+      const over = wantBottom - (to + wrap.clientHeight);
+      if (over > 0) to = Math.min(to + over, box.top * z + lift - 6);
+      wrap.scrollTo({ top: Math.max(0, to), behavior: smooth ? 'smooth' : 'auto' });
     }
   };
 
@@ -373,31 +410,39 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
       const candidates = [maxZoom, 1.75, 1.6, 1.45, 1.3, 1.18, 1.05, 0.95, minZoom].filter(
         (c, i, all) => c <= maxZoom && c >= minZoom && all.indexOf(c) === i,
       );
-      let whole = false;
-      for (const c of candidates) {
+      const tried = candidates.map((c) => {
         const p = planLayout(score, size.w / c, planOpts);
-        z = c;
-        plan = p;
-        if (p.height * c <= size.h - 4 || size.h < 60) {
-          whole = true;
-          break;
-        }
-      }
-      // Music longer than the page turns pages whatever its size. It is then set as large as still
-      // leaves the line being played and the line after it in view together, not as small as it goes.
-      if (!whole) {
-        for (const c of candidates) {
-          const p = planLayout(score, size.w / c, planOpts);
-          z = c;
-          plan = p;
-          // The space under the lower staff of the second line can run off the page. And a line
-          // has to hold enough of a phrase to read: not one measure to a line, however tall the page.
-          const perLine = score.measureCount / Math.max(1, p.systems.length);
-          if ((2 * p.systemHeight - 14) * c <= size.h && perLine >= 2.5) break;
-        }
-      }
+        return {
+          c,
+          p,
+          whole: p.height * c <= size.h - 4 || size.h < 60,
+          // The line being played and the line after it, in view together.
+          fits: p.pair * c + 8 <= size.h,
+          perLine: score.measureCount / Math.max(1, p.systems.length),
+        };
+      });
+      // The whole of it in view, as large as that allows.
+      const whole = tried.find((t) => t.whole);
+      // Or with pages turned as it is played: as large as still leaves two lines in view. A line also has to
+      // hold enough of a phrase to read, not one measure to a line however tall the page. Where no size
+      // gives such lines, as with wide measures on a narrow page, the largest size that gives the longest
+      // lines to be had, since smaller would gain nothing.
+      const fitting = tried.filter((t) => t.fits);
+      const best = Math.max(0, ...fitting.map((t) => t.perLine));
+      const paged = fitting.find((t) => t.perLine >= 2.5) ?? fitting.find((t) => t.perLine >= best - 1e-6);
+      // Seeing all of a piece at once is worth having, but not at the price of notes too small to read
+      // from the bench. Below a comfortable size, turning pages at a larger one is the better stand.
+      const pick = whole && (whole.c >= COMFORTABLE || !paged || paged.c <= whole.c) ? whole : (paged ?? whole ?? tried[tried.length - 1]);
+      z = pick.c;
+      plan = pick.p;
     }
     zoomRef.current = z;
+    // Labels do not shrink with the music all the way: at the smaller sizes they are set a little larger, to stay readable.
+    const label = (base: number, most: number) => Math.max(base, Math.min(most, Math.round((base * 1.3) / z)));
+    const fingerFont = label(11, 13);
+    const nameFont = label(10, 12);
+    const barFont = label(9, 11);
+    const chordFont = label(13, 15);
     const logicalW = size.w / z;
 
     const ink = cssColor(host, '--mc-ink');
@@ -423,10 +468,10 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     }
 
     plan.systems.forEach((sys, si) => {
-      const sysY = si * plan.systemHeight;
-      const yTop = sysY + plan.staffTop - 40;
+      const sysY = sys.y;
+      const yTop = sysY + sys.staffTop - 40;
       const staveY: Record<Hand, number> = { R: yTop, L: yTop };
-      if (score.hands.length === 2) staveY.L = yTop + plan.staffGap;
+      if (score.hands.length === 2) staveY.L = yTop + sys.staffGap;
       let x = LEFT_PAD + sys.offsetX;
       let firstStaves: Stave[] = [];
       let lastStaves: Stave[] = [];
@@ -488,7 +533,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
                 const order = above ? ev.fingers.slice() : ev.fingers.slice().reverse();
                 for (const f of order) {
                   const a = new Annotation(String(f)).setVerticalJustification(justify);
-                  a.setFont('Arial', 11, 'bold');
+                  a.setFont('Arial', fingerFont, 'bold');
                   note.addModifier(a, 0);
                 }
               }
@@ -497,7 +542,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
                 const a = new Annotation(text).setVerticalJustification(
                   above ? Annotation.VerticalJustify.BOTTOM : Annotation.VerticalJustify.TOP,
                 );
-                a.setFont('Arial', 10, 'normal');
+                a.setFont('Arial', nameFont, 'normal');
                 note.addModifier(a, 0);
               }
             }
@@ -539,7 +584,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
         }
         if (showMeasureNumbers && first && si > 0) {
           ctx.save();
-          ctx.setFont('Arial', 9, 'normal');
+          ctx.setFont('Arial', barFont, 'normal');
           ctx.setFillStyle(mutedColor);
           ctx.fillText(String(m + 1 + score.measureOffset), x + 2, list[0].getYForLine(0) - 8);
           ctx.restore();
@@ -553,7 +598,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
       }
       const topStave = lastStaves[0];
       const bottomStave = lastStaves[lastStaves.length - 1];
-      systemBoxes.current.push({ top: topStave.getYForLine(0) - 16, bottom: bottomStave.getYForLine(4) + 16, page: sysY });
+      systemBoxes.current.push({ top: topStave.getYForLine(0) - 16, bottom: bottomStave.getYForLine(4) + 16, page: sysY, foot: sysY + sys.height - LINE_GAP });
     });
 
     // Ties, including ties that cross from one system to the next.
@@ -590,7 +635,7 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
     if (withChords) {
       const topHand = score.hands[0];
       ctx.save();
-      ctx.setFont('Arial', 13, 'bold');
+      ctx.setFont('Arial', chordFont, 'bold');
       ctx.setFillStyle(ink);
       for (const mark of score.chords) {
         const ev =

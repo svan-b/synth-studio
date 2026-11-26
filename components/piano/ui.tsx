@@ -198,7 +198,7 @@ export function Button({ variant = 'primary', size = 'md', hint, icon, className
   const variants = {
     primary: 'bg-mc-ink text-mc-bg',
     soft: 'bg-mc-raised text-mc-ink',
-    ghost: 'text-mc-muted hover:text-mc-ink',
+    ghost: 'text-mc-ink/75 hover:text-mc-ink',
     danger: 'bg-mc-bad/10 text-mc-bad',
   };
   return (
@@ -206,7 +206,8 @@ export function Button({ variant = 'primary', size = 'md', hint, icon, className
       {icon}
       <span className="flex flex-col items-center leading-tight">
         <span>{children}</span>
-        {hint && <span className="whitespace-nowrap text-[1rem] font-medium opacity-80">{hint}</span>}
+        {/* Which key of the piano does the same. It is what the learner looks for from the bench, so it is not faint. */}
+        {hint && <span className="whitespace-nowrap text-[1.1rem] font-semibold">{hint}</span>}
       </span>
     </button>
   );
@@ -361,12 +362,12 @@ export function Sheet({ open, onClose, title, children, wide }: { open: boolean;
 export function Pill({ children, tone = 'muted' }: { children: ReactNode; tone?: 'muted' | 'ok' | 'accent' | 'hint' | 'bad' }) {
   const tones = {
     muted: 'bg-mc-raised text-mc-muted',
-    ok: 'bg-mc-ok/15 text-mc-ok',
+    ok: 'bg-mc-ok/15 text-mc-ok-ink',
     accent: 'bg-mc-accent/10 text-mc-accent',
     hint: 'bg-mc-hint/15 text-mc-hint-ink',
     bad: 'bg-mc-bad/10 text-mc-bad',
   };
-  return <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[0.9rem] font-semibold ${tones[tone]}`}>{children}</span>;
+  return <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-[0.9rem] font-semibold ${tones[tone]}`}>{children}</span>;
 }
 
 /** Text with **bold** spans and blank lines as paragraph breaks. */
