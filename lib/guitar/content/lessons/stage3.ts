@@ -1,0 +1,275 @@
+import type { Lesson } from '../types';
+
+/**
+ * Stage 3. The campfire chords. G and C, the seventh chords, and the four
+ * chords behind so many songs, with the songbook opening up.
+ */
+export const STAGE3: Lesson[] = [
+  {
+    id: 'g-chord',
+    stage: 3,
+    title: 'G, the big one',
+    summary: 'A chord that rings on all six strings.',
+    minutes: 12,
+    chords: ['G'],
+    songs: ['shady-grove'],
+    steps: [
+      {
+        kind: 'say',
+        title: 'The G chord',
+        text: 'Three fingers spread wide. The **second finger** goes on the low E string at the third fret, the **first finger** on the A string at the second fret, and the **third finger** on the high E string at the third fret.\n\nAll six strings ring. It is a stretch at first, and it gets easier within days.',
+        figure: { kind: 'chord', chord: 'G' },
+      },
+      {
+        kind: 'strings',
+        text: 'Pick each string of G on its own, from the thickest. The middle strings ring open.',
+        chord: 'G',
+      },
+      {
+        kind: 'changes',
+        text: 'Change between G and D, one strum each.',
+        from: 'G',
+        to: 'D',
+        times: 6,
+      },
+      {
+        kind: 'changes',
+        text: 'And between A minor and G.',
+        from: 'Am',
+        to: 'G',
+        times: 6,
+      },
+      {
+        kind: 'listen',
+        text: '**Shady Grove**, an old mountain tune with A minor and G. Two quick beats to a bar.',
+        music: { song: 'shady-grove' },
+        display: 'chart',
+      },
+      {
+        kind: 'play',
+        text: 'Play each new chord once, in your own time.',
+        music: { song: 'shady-grove' },
+        display: 'chart',
+      },
+    ],
+  },
+  {
+    id: 'c-chord',
+    stage: 3,
+    title: 'C, and the campfire three',
+    summary: 'C and D7, and songs with G, C and D7.',
+    minutes: 12,
+    chords: ['C', 'D7'],
+    songs: ['michael-row', 'jingle-bells'],
+    steps: [
+      {
+        kind: 'say',
+        title: 'The C chord',
+        text: 'Three fingers stepping down. The **third finger** goes on the A string at the third fret, the **second finger** on the D string at the second fret, the **first finger** on the B string at the first fret.\n\nArch your fingers so the open G string and high E string can ring. Leave out the low E.',
+        figure: { kind: 'chord', chord: 'C' },
+      },
+      {
+        kind: 'strings',
+        text: 'Pick each string of C on its own, from the A string down. Listen for the open G string in the middle.',
+        chord: 'C',
+      },
+      {
+        kind: 'say',
+        title: 'G to C',
+        text: 'This is one of the famous changes, and it takes a little while. Move all three fingers **together**, as one shape, rather than one at a time. Aim first for the finger on the A string.',
+      },
+      {
+        kind: 'changes',
+        text: 'Change between G and C, one strum each, in your own time.',
+        from: 'G',
+        to: 'C',
+        times: 8,
+      },
+      {
+        kind: 'say',
+        title: 'D7',
+        text: 'D7 is a friendly cousin of D: the **second finger** on the G string at the second fret, the **first finger** on the B string at the first fret, the **third finger** on the high E string at the second fret. Strum from the D string down.',
+        figure: { kind: 'chord', chord: 'D7' },
+      },
+      {
+        kind: 'strings',
+        text: 'Pick the four strings of D7 on their own.',
+        chord: 'D7',
+      },
+      {
+        kind: 'changes',
+        text: 'Change between G and D7.',
+        from: 'G',
+        to: 'D7',
+        times: 6,
+      },
+      {
+        kind: 'listen',
+        text: '**Michael, Row the Boat Ashore**, with G, C and D7.',
+        music: { song: 'michael-row' },
+        display: 'chart',
+      },
+      {
+        kind: 'play',
+        text: 'Play each new chord once, in your own time.',
+        music: { song: 'michael-row' },
+        display: 'chart',
+      },
+      {
+        kind: 'say',
+        title: 'The campfire chords',
+        text: 'With G, C and D you can play a great many songs. **Jingle Bells** has joined your songs as well.',
+      },
+    ],
+  },
+  {
+    id: 'sevens',
+    stage: 3,
+    title: 'Chords that lean forward',
+    summary: 'G7, and songs that use seven chords.',
+    minutes: 10,
+    chords: ['G7'],
+    songs: ['red-river-valley', 'my-bonnie', 'silent-night'],
+    steps: [
+      {
+        kind: 'say',
+        title: 'Seven chords',
+        text: 'A seven chord sounds as if it is leaning toward the next one. You know three already: **E7**, **A7** and **D7**. Each one wants to move on, and the song usually follows.',
+        figure: { kind: 'chords', chords: ['E7', 'A7', 'D7'] },
+      },
+      {
+        kind: 'say',
+        title: 'G7',
+        text: 'G7 is like G turned round. The **third finger** goes on the low E string at the third fret, the **second finger** on the A string at the second fret, and the **first finger** on the high E string at the first fret.',
+        figure: { kind: 'chord', chord: 'G7' },
+      },
+      {
+        kind: 'strings',
+        text: 'Pick each string of G7 on its own.',
+        chord: 'G7',
+      },
+      {
+        kind: 'listen',
+        text: 'G7 leaning into C. Listen to how the second chord feels like arriving home.',
+        music: { line: '[G7]h [C]h | [G7]h [C]h', tempo: 66 },
+        display: 'chord',
+      },
+      {
+        kind: 'changes',
+        text: 'Change between G7 and C.',
+        from: 'G7',
+        to: 'C',
+        times: 6,
+      },
+      {
+        kind: 'listen',
+        text: '**Red River Valley**, with G, D7, C and a moment of G7.',
+        music: { song: 'red-river-valley' },
+        display: 'chart',
+      },
+      {
+        kind: 'play',
+        text: 'Play each new chord once, in your own time.',
+        music: { song: 'red-river-valley' },
+        display: 'chart',
+      },
+      {
+        kind: 'say',
+        title: 'More songs',
+        text: '**My Bonnie Lies over the Ocean** and **Silent Night** have joined your songs too. Open any song from the Songs page whenever you like.',
+      },
+    ],
+  },
+  {
+    id: 'four-chords',
+    stage: 3,
+    title: 'Four chords, a thousand songs',
+    summary: 'G, E minor, C and D, round and round.',
+    minutes: 10,
+    songs: ['evening-song', 'auld-lang-syne'],
+    steps: [
+      {
+        kind: 'say',
+        title: 'Round and round',
+        text: 'Play **G, E minor, C and D**, a bar each, and go round again. That loop sits under a huge number of songs from the last seventy years.',
+        figure: { kind: 'chords', chords: ['G', 'Em', 'C', 'D'] },
+      },
+      {
+        kind: 'changes',
+        text: 'Change between G and E minor.',
+        from: 'G',
+        to: 'Em',
+        times: 6,
+      },
+      {
+        kind: 'changes',
+        text: 'And between C and D.',
+        from: 'C',
+        to: 'D',
+        times: 6,
+      },
+      {
+        kind: 'play',
+        text: 'The four chords in turn, one strum on each beat.',
+        music: { chart: 'G | Em | C | D | G | Em | C | D', strum: 'D.D.D.D.', tempo: 72 },
+        display: 'chart',
+        mode: 'tempo',
+        tempoPct: 80,
+      },
+      {
+        kind: 'listen',
+        text: '**Evening Song**, written on these four chords.',
+        music: { song: 'evening-song' },
+        display: 'chart',
+      },
+      {
+        kind: 'play',
+        text: 'Play each new chord once, in your own time.',
+        music: { song: 'evening-song' },
+        display: 'chart',
+      },
+    ],
+  },
+  {
+    id: 'capo',
+    stage: 3,
+    title: 'The capo',
+    summary: 'The same shapes, higher up, for songs in a key that suits your voice.',
+    minutes: 8,
+    steps: [
+      {
+        kind: 'say',
+        title: 'What a capo does',
+        text: 'A **capo** clamps across all six strings at one fret. Every string becomes higher, and your chord shapes all move up with it.\n\nWith a capo on the second fret, the G shape sounds as A. That lets you sing a song in a key that suits your voice, without learning new chords.',
+      },
+      {
+        kind: 'check',
+        title: 'Putting it on',
+        items: [
+          'Place it just behind the fret, straight across, the way a finger would press.',
+          'Firm enough that every string rings, no tighter.',
+          'Check the tuning afterwards. A capo can pull a string a little sharp.',
+        ],
+      },
+      {
+        kind: 'quiz',
+        question: 'With a capo on the second fret, you play the D shape. Which chord sounds?',
+        choices: ['D', 'E', 'C'],
+        answer: 1,
+        explain: 'Each fret is one step up. Two frets above D is E.',
+      },
+      {
+        kind: 'quiz',
+        question: 'Why use a capo at all?',
+        choices: ['To play louder', 'To put a song where your voice sits comfortably', 'To make chords easier to hold'],
+        answer: 1,
+        explain: 'The shapes stay the same, and the whole song moves higher, to suit your voice.',
+      },
+      {
+        kind: 'say',
+        title: 'Try it when you have one',
+        text: 'When a song feels too low or too high to sing, try a capo on the second or third fret and sing along again. Many songbooks write it at the top: **capo 2**.',
+      },
+    ],
+  },
+];

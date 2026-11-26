@@ -1,0 +1,348 @@
+/* Theme for the guitar app. Colours are RGB channels so Tailwind can apply opacity. */
+
+.os-root {
+  --os-bg: 247 243 235;
+  --os-surface: 255 254 250;
+  --os-raised: 238 233 223;
+  --os-ink: 28 29 27;
+  --os-muted: 104 101 94;
+  --os-faint: 160 155 146;
+  --os-line: 223 217 205;
+  --os-accent: 28 108 116;
+  --os-ok: 40 138 86;
+  --os-bad: 196 72 56;
+  --os-hint: 204 140 30;
+  /* The same amber, dark enough to read as text. */
+  --os-hint-ink: 140 86 4;
+  --os-ok-ink: 24 110 66;
+  --os-wood: 176 112 58;
+  --os-string: 120 112 100;
+  --os-shadow: 28 29 27;
+  color-scheme: light;
+}
+
+.os-root[data-theme='dark'] {
+  --os-bg: 19 20 19;
+  --os-surface: 30 31 29;
+  --os-raised: 41 42 39;
+  --os-ink: 240 238 232;
+  --os-muted: 166 162 152;
+  --os-faint: 112 109 101;
+  --os-line: 54 54 50;
+  --os-accent: 98 196 200;
+  --os-ok: 96 192 138;
+  --os-bad: 238 127 109;
+  --os-hint: 232 182 85;
+  --os-hint-ink: 240 196 110;
+  --os-ok-ink: 120 210 160;
+  --os-wood: 204 146 92;
+  --os-string: 176 168 154;
+  --os-shadow: 0 0 0;
+  color-scheme: dark;
+}
+
+html:has(.os-root),
+html:has(.os-root) body {
+  background: rgb(247 243 235);
+  overscroll-behavior: none;
+}
+
+html:has(.os-root[data-theme='dark']),
+html:has(.os-root[data-theme='dark']) body {
+  background: rgb(19 20 19);
+}
+
+/* Larger text, for reading from the music stand or with tired eyes. Everything sized in rem grows with it. */
+/* Text is read from a chair with a guitar on the lap, an arm's length or more from the iPad. */
+html:has(.os-root[data-size='1']) {
+  font-size: 18px;
+}
+html:has(.os-root[data-size='2']) {
+  font-size: 20px;
+}
+
+.os-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: rgb(var(--os-bg));
+  color: rgb(var(--os-ink));
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.os-root .os-selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.os-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.os-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.os-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.os-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ---------------------------------------------------------------- Motion */
+
+@keyframes os-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.os-fade-up {
+  animation: os-fade-up 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes os-pop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.os-pop {
+  animation: os-pop 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes os-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--os-accent) / 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgb(var(--os-accent) / 0);
+  }
+}
+.os-pulse {
+  animation: os-pulse-ring 1.6s ease-out infinite;
+}
+
+@keyframes os-count {
+  0% {
+    transform: scale(1.35);
+    opacity: 0.2;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.os-count {
+  animation: os-count 260ms ease-out both;
+}
+
+@keyframes os-ring-out {
+  from {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+.os-heard {
+  animation: os-ring-out 420ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .os-fade-up,
+  .os-pop,
+  .os-pulse,
+  .os-count,
+  .os-heard {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------- Beat */
+
+.os-beat-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgb(var(--os-line));
+  transition:
+    background-color 60ms,
+    transform 60ms;
+}
+.os-beat-dot.is-on {
+  background: rgb(var(--os-accent));
+  transform: scale(1.5);
+}
+.os-beat-dot.is-accent.is-on {
+  background: rgb(var(--os-ink));
+}
+
+/* ---------------------------------------------------------------- Sliders */
+
+.os-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(var(--os-line));
+  outline: none;
+}
+.os-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgb(var(--os-surface));
+  border: 1.5px solid rgb(var(--os-ink) / 0.5);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+}
+
+/* ---------------------------------------------------------------- Chart */
+
+.os-measure {
+  transition:
+    background-color 120ms,
+    border-color 120ms;
+}
+.os-measure.is-now {
+  background: rgb(var(--os-accent) / 0.25);
+  border-color: rgb(var(--os-ink));
+  border-width: 4px;
+}
+.os-measure.is-ok {
+  background: rgb(var(--os-ok) / 0.3);
+}
+.os-measure.is-warn {
+  background: rgb(var(--os-hint) / 0.32);
+}
+.os-measure.is-bad {
+  background: rgb(var(--os-bad) / 0.28);
+}
+/* While the learner judges a run for themselves, the marks are kept back. */
+.os-veil .os-measure.is-ok,
+.os-veil .os-measure.is-warn,
+.os-veil .os-measure.is-bad {
+  background: transparent;
+}
+.os-veil .os-mark {
+  opacity: 0;
+}
+
+/* ------------------------------------------------------- Playing screens */
+
+/*
+ * Fluent reading needs letters whose x-height fills about a fifth of a degree
+ * of the eye's view (Legge and Bigelow, 2011). At 70 cm from an iPad that is
+ * a font of about 25 px, so the words read while holding a guitar start there.
+ */
+.os-say {
+  font-size: 1.6rem;
+  line-height: 1.5;
+  color: rgb(var(--os-ink) / 0.82);
+}
+.os-say strong {
+  color: rgb(var(--os-ink));
+}
+.os-brief {
+  font-size: 1.6rem;
+  line-height: 1.3;
+  font-weight: 500;
+}
+
+/* The next thing to do fills itself in as it counts down, then goes by itself. */
+@keyframes os-auto-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.os-auto-fill {
+  transform-origin: left;
+  animation: os-auto-fill linear forwards;
+}
+
+/* The count in, large enough to read without looking for it. */
+@keyframes os-count-big {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+}
+.os-count-big {
+  animation: os-count-big 0.5s ease-out both;
+}
+
+/* A strum heard and judged: the chord in view flashes its colour. */
+@keyframes os-flash-ok {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--os-ok) / 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 22px rgb(var(--os-ok) / 0);
+  }
+}
+@keyframes os-flash-warn {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--os-hint) / 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 22px rgb(var(--os-hint) / 0);
+  }
+}
+.os-flash-ok {
+  animation: os-flash-ok 0.5s ease-out;
+}
+.os-flash-warn {
+  animation: os-flash-warn 0.5s ease-out;
+}
+
+.os-beat-dot {
+  width: 20px;
+  height: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .os-auto-fill,
+  .os-count-big,
+  .os-flash-ok,
+  .os-flash-warn {
+    animation-duration: 0.01ms;
+  }
+}

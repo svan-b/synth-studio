@@ -40,3 +40,5 @@ backup/
 xcuserdata/
 *.xcuserstate
 DerivedData/
+/ios-guitar/OpenString/web/
+/ios-guitar/build/

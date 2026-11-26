@@ -3,7 +3,7 @@ import path from 'node:path';
 
 export default defineConfig({
   test: {
-    include: ['lib/piano/**/*.test.ts'],
+    include: ['lib/piano/**/*.test.ts', 'lib/guitar/**/*.test.ts'],
     environment: 'node',
   },
   resolve: {
