@@ -373,7 +373,7 @@ export default function App() {
           aria-label="Main"
         >
           <div className="mb-5 hidden items-center justify-center landscape:flex">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-mc-ink font-mc-serif text-xl text-mc-bg">C</span>
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-mc-ink font-mc-serif text-xl text-mc-bg">K</span>
           </div>
           {NAV.map((item) => {
             const active = view === item.view || (item.view === 'settings' && view === 'method');

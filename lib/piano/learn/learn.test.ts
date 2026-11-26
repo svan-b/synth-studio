@@ -756,7 +756,7 @@ describe('the path so far', () => {
       '2026-03-06 Played with both hands at once',
       '2026-03-04 Learned Hot Cross Buns',
       '2026-03-02 Played a first tune',
-      '2026-03-01 Started with Middle C',
+      '2026-03-01 Started with Keyward',
     ]);
   });
 

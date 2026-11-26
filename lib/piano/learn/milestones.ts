@@ -29,7 +29,7 @@ const FIRSTS: Record<string, string> = {
 };
 
 export function milestones(startedOn: string, lessons: Record<string, LessonProgress>, pieces: Record<string, PieceState>): Milestone[] {
-  const out: Milestone[] = [{ on: startedOn, title: 'Started with Middle C', kind: 'start' }];
+  const out: Milestone[] = [{ on: startedOn, title: 'Started with Keyward', kind: 'start' }];
   // A lesson marked as known was not taken, so it is no first of this learner's.
   const taken = (id: string) => (lessons[id]?.done && !lessons[id]?.skipped ? lessons[id].doneOn : undefined);
 
