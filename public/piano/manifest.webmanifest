@@ -1,6 +1,6 @@
 {
-  "name": "Middle C",
-  "short_name": "Middle C",
+  "name": "Keyward",
+  "short_name": "Keyward",
   "description": "A piano teacher for your music stand, built on the science of how people learn to play.",
   "start_url": "/piano",
   "scope": "/piano",

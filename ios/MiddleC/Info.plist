@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Middle C</string>
+	<string>Keyward</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -54,9 +54,9 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Middle C can listen to your piano through the microphone when the piano is not connected by cable.</string>
+	<string>Keyward can listen to your piano through the microphone when the piano is not connected by cable.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Middle C uses Bluetooth to connect to a piano that has Bluetooth MIDI.</string>
+	<string>Keyward uses Bluetooth to connect to a piano that has Bluetooth MIDI.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

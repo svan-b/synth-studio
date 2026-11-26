@@ -31,7 +31,7 @@ const FIRSTS: Record<string, string> = {
 const CHANGE_MARKS = [20, 30, 45, 60];
 
 export function milestones(startedOn: string, lessons: Record<string, LessonProgress>, songs: Record<string, SongState>, changes: Record<string, ChangeRecord> = {}): Milestone[] {
-  const out: Milestone[] = [{ on: startedOn, title: 'Started with Open String', kind: 'start' }];
+  const out: Milestone[] = [{ on: startedOn, title: 'Started with Fretward', kind: 'start' }];
   const taken = (id: string) => (lessons[id]?.done && !lessons[id]?.skipped ? lessons[id].doneOn : undefined);
   for (const [id, title] of Object.entries(FIRSTS)) {
     const on = taken(id);

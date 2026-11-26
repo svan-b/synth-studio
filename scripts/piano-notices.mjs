@@ -77,7 +77,7 @@ export async function notices() {
   const packages = await bundledPackages();
   const ofl = fs.readFileSync(path.join(root, 'scripts/notices/OFL-1.1.txt'), 'utf8').trim();
   const parts = [
-    'Middle C',
+    'Keyward',
     'Notices for the work of others that this app contains',
     '',
     RULE,

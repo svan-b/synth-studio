@@ -290,7 +290,7 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
         <p className="rounded-2xl bg-mc-bad/10 px-4 py-3 text-[1.1rem] text-mc-bad">
           {l.state === 'denied'
             ? native
-              ? 'The microphone is switched off for Middle C. Allow it in the iPad Settings app, under Middle C, then try again.'
+              ? 'The microphone is switched off for Keyward. Allow it in the iPad Settings app, under Keyward, then try again.'
               : 'The microphone is blocked for this page. Allow it in the browser settings, then try again.'
             : (l.error ?? 'The microphone could not be started.')}
         </p>
@@ -360,7 +360,7 @@ export function ConnectionReport() {
   ];
   const text = () =>
     [
-      'Middle C connection report',
+      'Keyward connection report',
       new Date().toISOString(),
       isNative() ? 'iPad app' : 'Browser',
       ...rows.map(([k, v]) => `${k}: ${v}`),

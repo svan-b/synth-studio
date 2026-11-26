@@ -64,7 +64,7 @@ final class Reminders {
             if when <= now { continue }
             if offset == 0 && playedToday { continue }
             let content = UNMutableNotificationContent()
-            content.title = "Open String"
+            content.title = "Fretward"
             content.body = offset < 7 ? message : "It has been a little while. A short session picks it straight back up."
             content.sound = .default
             let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: when)

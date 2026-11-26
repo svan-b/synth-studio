@@ -1,7 +1,7 @@
 /**
  * The iPad app.
  *
- * Open String can run inside a native shell that gives it what a web page on
+ * Fretward can run inside a native shell that gives it what a web page on
  * an iPad cannot have: a durable file for progress, recordings saved where
  * the Files app can see them, a daily reminder, and the iPad's own volume.
  * The shell announces itself as `window.__openString` before any of the

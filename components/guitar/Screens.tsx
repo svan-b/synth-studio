@@ -853,7 +853,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
 
       <h2 className="mb-2 mt-8 font-os-serif text-[1.6rem]">Your progress</h2>
       <Card className="divide-y divide-os-line px-6">
-        <Row title="Save a backup" text={native ? 'A copy also goes into the Files app each day you play, under Open String.' : 'A file with all your progress, to keep or move to another device.'}>
+        <Row title="Save a backup" text={native ? 'A copy also goes into the Files app each day you play, under Fretward.' : 'A file with all your progress, to keep or move to another device.'}>
           <Button size="sm" variant="soft" onClick={backup} icon={<Icon.Share size={16} />}>
             Save
           </Button>
@@ -868,7 +868,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (!f) return;
-                void f.text().then((t) => setMessage(importData(t) ? 'Restored.' : 'That file is not an Open String backup.'));
+                void f.text().then((t) => setMessage(importData(t) ? 'Restored.' : 'That file is not an Fretward backup.'));
               }}
             />
             <Button size="sm" variant="soft" onClick={() => fileRef.current?.click()}>
@@ -909,7 +909,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
         </Card>
       </button>
       <p className="mt-6 text-[14px] leading-relaxed text-os-faint">
-        Open String. The guitar sound is made on the device from a model of a plucked string. The note detector was checked against GuitarSet, recordings of real acoustic guitars made by the Music and Audio Research Lab at New York University. All songs are traditional, in the public domain, or written for the course.
+        Fretward. The guitar sound is made on the device from a model of a plucked string. The note detector was checked against GuitarSet, recordings of real acoustic guitars made by the Music and Audio Research Lab at New York University. All songs are traditional, in the public domain, or written for the course.
       </p>
     </Page>
   );

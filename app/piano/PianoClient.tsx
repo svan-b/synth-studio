@@ -7,7 +7,7 @@ const App = dynamic(() => import('@/components/piano/App'), {
   ssr: false,
   loading: () => (
     <div className="mc-root flex items-center justify-center">
-      <div className="font-mc-serif text-2xl text-mc-muted">Middle C</div>
+      <div className="font-mc-serif text-2xl text-mc-muted">Keyward</div>
     </div>
   ),
 });

@@ -4,7 +4,7 @@
  * Recordings of the learner playing, kept so they can be heard again: the
  * first time through a learned song, and the latest. They are kept in the
  * browser's file store. Inside the iPad app each one is also saved as a file
- * in the Files app, under Open String, Recordings, where it can be shared.
+ * in the Files app, under Fretward, Recordings, where it can be shared.
  */
 
 import { saveRecording } from '../native/bridge';

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Recordings of the learner playing, kept where the Files app shows them:
-/// On My iPad, Open String, Recordings. From there they can be played,
+/// On My iPad, Fretward, Recordings. From there they can be played,
 /// shared, or sent to family.
 final class Recordings {
     let folder: URL

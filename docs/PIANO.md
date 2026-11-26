@@ -1,4 +1,4 @@
-# Middle C
+# Keyward
 
 A piano teacher that runs on an iPad on the music stand. It lives at `/piano` in this app and is self contained, so it can be moved to its own project later without untangling anything.
 
@@ -18,7 +18,7 @@ A piano teacher that runs on an iPad on the music stand. It lives at `/piano` in
 
 ## The iPad app
 
-`ios/` holds a native iPad app that carries the piano teacher inside it. It needs no connection, reads the piano over the iPad's own MIDI by USB cable or Bluetooth, keeps progress in a file of its own with a dated copy in the Files app, and holds the whole screen awake on the music stand. This is the way to use Middle C on an iPad. `ios/README.md` has the steps for putting it on an iPad from a Mac.
+`ios/` holds a native iPad app that carries the piano teacher inside it. It needs no connection, reads the piano over the iPad's own MIDI by USB cable or Bluetooth, keeps progress in a file of its own with a dated copy in the Files app, and holds the whole screen awake on the music stand. This is the way to use Keyward on an iPad. `ios/README.md` has the steps for putting it on an iPad from a Mac.
 
 The web app does not know or care which of the two it is running in, with one exception: `lib/piano/native/bridge.ts` asks the shell for the few things only the shell can do.
 

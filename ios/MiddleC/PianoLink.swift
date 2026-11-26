@@ -39,15 +39,15 @@ final class PianoLink {
     /// Start listening. Returns false when the iPad's MIDI could not be opened.
     @discardableResult
     func start() -> Bool {
-        let made = MIDIClientCreateWithBlock("Middle C" as CFString, &client) { [weak self] _ in
+        let made = MIDIClientCreateWithBlock("Keyward" as CFString, &client) { [weak self] _ in
             // Something was plugged in, unplugged or renamed.
             DispatchQueue.main.async { self?.rescan() }
         }
         guard made == noErr else { return false }
-        let listen = MIDIInputPortCreateWithProtocol(client, "Middle C in" as CFString, ._1_0, &inPort) { [weak self] events, source in
+        let listen = MIDIInputPortCreateWithProtocol(client, "Keyward in" as CFString, ._1_0, &inPort) { [weak self] events, source in
             self?.receive(events, source)
         }
-        _ = MIDIOutputPortCreate(client, "Middle C out" as CFString, &outPort)
+        _ = MIDIOutputPortCreate(client, "Keyward out" as CFString, &outPort)
         rescan()
         return listen == noErr
     }

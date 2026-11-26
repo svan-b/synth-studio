@@ -137,7 +137,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-os-ink text-os-bg">
                 <Icon.Guitar size={42} />
               </div>
-              <h1 className="font-os-serif text-6xl">Open String</h1>
+              <h1 className="font-os-serif text-6xl">Fretward</h1>
               <p className="mx-auto mt-4 max-w-lg text-[1.25rem] leading-relaxed text-os-muted">
                 A guitar teacher that listens. It hears your guitar through the iPad, takes you forward one small step at a time, and has you playing songs in your first week.
               </p>

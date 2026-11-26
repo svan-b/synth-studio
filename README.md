@@ -34,13 +34,13 @@ Pixel-perfect digital replicas of hardware synthesizers with real-time teaching 
 - Moog Sub 37
 - Allen & Heath Xone:96
 
-## 🎹 Middle C, a piano teacher
+## 🎹 Keyward, a piano teacher
 
-The same app also holds **Middle C**, a piano course for an iPad on the music stand, at `/piano`. It follows your playing over MIDI or by listening, teaches a six stage course, and coaches practice on real pieces. See [docs/PIANO.md](docs/PIANO.md).
+The same app also holds **Keyward**, a piano course for an iPad on the music stand, at `/piano`. It follows your playing over MIDI or by listening, teaches a six stage course, and coaches practice on real pieces. See [docs/PIANO.md](docs/PIANO.md).
 
-## 🎸 Open String, a guitar teacher
+## 🎸 Fretward, a guitar teacher
 
-And **Open String**, a guitar course for an acoustic guitar and an iPad on a stand, at `/guitar`. It listens through the microphone with no cable, tunes the guitar string by string, teaches a six stage course from a first chord to a song of your own, and coaches chord changes and strumming on real songs. It is built to keep a learner coming back. See [docs/GUITAR.md](docs/GUITAR.md).
+And **Fretward**, a guitar course for an acoustic guitar and an iPad on a stand, at `/guitar`. It listens through the microphone with no cable, tunes the guitar string by string, teaches a six stage course from a first chord to a song of your own, and coaches chord changes and strumming on real songs. It is built to keep a learner coming back. See [docs/GUITAR.md](docs/GUITAR.md).
 
 ## 🚀 Tech Stack
 

@@ -17,6 +17,7 @@
 		BB0000000000000000000008 /* Bridge.js in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000008 /* Bridge.js */; };
 		BB0000000000000000000009 /* web in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000009 /* web */; };
 		BB000000000000000000000C /* Reminders.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000C /* Reminders.swift */; };
+		BB000000000000000000000D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000D /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 		AA000000000000000000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA000000000000000000000B /* OpenString.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenString.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000000000000000000000C /* Reminders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reminders.swift; sourceTree = "<group>"; };
+		AA000000000000000000000D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +69,7 @@
 				AA0000000000000000000009 /* web */,
 				AA0000000000000000000007 /* Assets.xcassets */,
 				AA000000000000000000000A /* Info.plist */,
+				AA000000000000000000000D /* PrivacyInfo.xcprivacy */,
 			);
 			path = OpenString;
 			sourceTree = "<group>";
@@ -141,6 +144,7 @@
 				BB0000000000000000000007 /* Assets.xcassets in Resources */,
 				BB0000000000000000000008 /* Bridge.js in Resources */,
 				BB0000000000000000000009 /* web in Resources */,
+				BB000000000000000000000D /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -253,7 +257,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.openstring.guitar;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scottvanbolhuis.fretward;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
@@ -279,7 +283,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.openstring.guitar;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scottvanbolhuis.fretward;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;

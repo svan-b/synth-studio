@@ -1,19 +1,12 @@
-# Submitting Middle C to the App Store
+# Submitting Keyward to the App Store
 
 Everything App Store Connect asks for, ready to paste, and what is already done in the project.
 
-## Decide the name first
+## The name
 
-Two things already use the name.
+The app is called **Keyward**. It was renamed from Middle C on 25 November 2026, because an iPhone app called *Middle C: Piano Scales & Chords* is already on the App Store and MIDDLE C is a registered US trademark (6014537) in class 41. Searches found no app called Keyward. App Store Connect checks the name when the app record is created; if it is refused there, choose another and change it in the places listed below.
 
-- **An app.** *Middle C: Piano Scales & Chords*, by Sameh Aly, is on the App Store. It teaches beginners piano scales and chords, for iPhone. An app called Middle C would sit beside it, in the same field.
-- **A registered US trademark.** MIDDLE C, registration 6014537 (serial 88158674), owned by Charlotte Music Club, LLC of Charlotte, North Carolina, registered 17 March 2020 in class 41. That class covers education and entertainment, and this registration is for a music venue's services. A second mark, MIDDLE C JAZZ, belongs to the same venue.
-
-A piano teaching app is not a music venue, so this is not a clear conflict. But the name is shared with a piano learning app already in the store, and the mark is in the class that also covers education. Picking a different name now costs nothing. Picking one after launch costs reviews and recognition.
-
-These facts come from search results. Check them yourself before deciding: search App Store Connect for the name you want, and search the USPTO trademark database (tmsearch.uspto.gov) in classes 9 and 41.
-
-The name is in a handful of places in the project: the home screen name in `ios/MiddleC/Info.plist` (`CFBundleDisplayName`), the web app's title in `app/piano/layout.tsx` and `public/piano/manifest.webmanifest`, the welcome screen in `components/piano/Onboarding.tsx`, and the wording of a few screens and documents. The saved progress key `middle-c-v1` must not change, or progress already on an iPad would be lost.
+The name is in a handful of places: the home screen name in `ios/MiddleC/Info.plist` (`CFBundleDisplayName`), the web app's title in `app/piano/layout.tsx` and `public/piano/manifest.webmanifest`, the welcome screen in `components/piano/Onboarding.tsx`, and the wording of a few screens and documents. The project and folder are still called MiddleC, which nobody sees. The saved progress key `middle-c-v1` must not change, or progress already on an iPad would be lost. The musical note middle C in the lessons is not the app's name and stays as it is.
 
 ## What is already done
 
@@ -25,7 +18,7 @@ The name is in a handful of places in the project: the home screen name in `ios/
 
 ## App Store Connect
 
-**Name** (30 characters at most). Middle C, until you decide otherwise.
+**Name** (30 characters at most). Keyward
 
 **Subtitle** (30). A piano teacher for your stand
 
@@ -33,11 +26,11 @@ The name is in a handful of places in the project: the home screen name in `ios/
 
 **Privacy Policy URL.** https://synth-studio.vercel.app/piano/privacy
 
-This address works once this branch is merged into the branch Vercel deploys to production. Before you submit, open it in a browser and check it shows the policy. The site is on Vercel's free Hobby plan, which is meant for non commercial use. If the app will be sold, consider a paid plan or a domain of your own for this page.
+The site is on Vercel's free Hobby plan, which is meant for non commercial use. If the app will be sold, consider a paid plan or a domain of your own for this page and the support page.
 
-**Support URL.** Required, and only you can provide it: a page where people can reach you. A simple page with an email address is enough.
+**Support URL.** https://synth-studio.vercel.app/piano/support
 
-**Copyright.** 2026 followed by your name or company.
+**Copyright.** 2026 Scott Van Bolhuis
 
 **App Privacy** (the privacy label). Answer that you do not collect data from this app. The result shown on the store is "Data Not Collected".
 
@@ -59,7 +52,7 @@ Leave out piano makers' names, such as Yamaha, and other apps' names. Apple reje
 
 **Description** (4000)
 
-> Middle C is a piano teacher that sits on your music stand. Connect a digital piano by cable or Bluetooth MIDI and it follows every key you play, so you learn with your hands on the keys and your eyes on the music.
+> Keyward is a piano teacher that sits on your music stand. Connect a digital piano by cable or Bluetooth MIDI and it follows every key you play, so you learn with your hands on the keys and your eyes on the music.
 >
 > LEARN FROM THE FIRST NOTE
 > A course of 39 short lessons takes you from finding middle C to Bach, Beethoven and Satie. You learn tunes by ear and by shape first, then read them on the staff. Reading, rhythm, sharps and flats, chords, scales, the pedal, playing by ear and making music up each have lessons of their own. If you already play, start further in.
@@ -99,8 +92,8 @@ App Store Connect needs screenshots for the 13 inch iPad, 2752 by 2064 pixels in
 
 ## The submission itself
 
-1. Merge this branch so the privacy page is live, and open the address to check it.
+1. Open the privacy and support addresses and check they show the pages.
 2. Build the web app into the project, `ios/build-web.sh`, then open `ios/MiddleC.xcodeproj` in Xcode.
-3. Under Signing and Capabilities, choose your team. The bundle identifier is `app.middlec.piano`. Change it if you rename the app, before the first upload, since it cannot change after.
+3. Under Signing and Capabilities, choose your team. The bundle identifier is `com.scottvanbolhuis.keyward`. It cannot change after the first upload.
 4. Product, Archive, then Distribute App to App Store Connect.
 5. In App Store Connect, fill in the fields above, add the screenshots, choose the build, and submit for review.

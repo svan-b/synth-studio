@@ -1,5 +1,5 @@
 /*
- * Middle C, the bridge between the page and the iPad app.
+ * Keyward, the bridge between the page and the iPad app.
  *
  * The app injects this before any of the page's own code runs. It gives the
  * page `navigator.requestMIDIAccess`, backed by the iPad's own MIDI, so the

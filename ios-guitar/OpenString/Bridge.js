@@ -1,5 +1,5 @@
 /*
- * Open String, the bridge between the page and the iPad app.
+ * Fretward, the bridge between the page and the iPad app.
  *
  * The app injects this before any of the page's own code runs, after setting
  * window.__openString to { version, saved }. It says the page is inside the

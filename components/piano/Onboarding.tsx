@@ -77,7 +77,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-mc-ink text-mc-bg">
                 <Icon.Piano size={40} />
               </div>
-              <h1 className="font-mc-serif text-6xl">Middle C</h1>
+              <h1 className="font-mc-serif text-6xl">Keyward</h1>
               <p className="mx-auto mt-4 max-w-lg text-[1.25rem] leading-relaxed text-mc-muted">
                 A piano teacher for your music stand. It listens to what you play, takes you forward one small step at a time, and teaches you how to
                 practise as well as what to play.

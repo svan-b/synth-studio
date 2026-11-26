@@ -1,4 +1,4 @@
-# Open String
+# Fretward
 
 A guitar teacher for an acoustic guitar and an iPad on a stand. It lives at `/guitar` in this app and is self contained, like the piano teacher beside it, so it can be moved to its own project later without untangling anything.
 

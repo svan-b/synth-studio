@@ -7,7 +7,7 @@ import Foundation
 /// is handed back to the page when it opens.
 ///
 /// A dated copy also goes into the app's Documents folder, which shows in the
-/// Files app under Middle C. One file a day, the last thirty days. Any of
+/// Files app under Keyward. One file a day, the last thirty days. Any of
 /// them can be restored from Settings in the app.
 final class ProgressFile {
     private let folder: URL

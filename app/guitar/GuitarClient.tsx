@@ -7,7 +7,7 @@ const App = dynamic(() => import('@/components/guitar/App'), {
   ssr: false,
   loading: () => (
     <div className="os-root flex items-center justify-center">
-      <div className="font-os-serif text-2xl text-os-muted">Open String</div>
+      <div className="font-os-serif text-2xl text-os-muted">Fretward</div>
     </div>
   ),
 });

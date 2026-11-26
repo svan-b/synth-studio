@@ -1,9 +1,9 @@
-# Open String for iPad
+# Fretward for iPad
 
 The iPad app is a thin native shell around the guitar teacher. The teacher is a web app (`/guitar` in this repository). The shell carries it inside the app as plain files, so it opens with no connection, and gives it what a web page on an iPad cannot have:
 
-- **A file of its own for progress**, which survives the web view's storage being cleared. A dated copy also goes into the Files app under Open String each day you play.
-- **Recordings in the Files app.** The first time through each learned song is kept, with your latest, under Open String, Recordings, ready to play or send to family.
+- **A file of its own for progress**, which survives the web view's storage being cleared. A dated copy also goes into the Files app under Fretward each day you play.
+- **Recordings in the Files app.** The first time through each learned song is kept, with your latest, under Fretward, Recordings, ready to play or send to family.
 - **A reminder at your time to play**, only on days you have not played yet. After a quiet week it sends two gentler ones and then stops.
 - **The iPad's volume**, so the sound check can tell you when the iPad is too quiet beside your guitar.
 - **The whole screen**, kept awake while it sits on a stand in front of you.
@@ -17,10 +17,10 @@ You need a Mac with Xcode (free from the Mac App Store), your iPad, and a cable 
 1. Get the project onto the Mac, with the web app already inside it. Either use a ready made copy of this folder that already contains `OpenString/web`, or clone this repository and run `./ios-guitar/build-web.sh` in Terminal (that route needs Node.js).
 2. Open `OpenString.xcodeproj` in Xcode.
 3. In the left sidebar click the blue **OpenString** at the top, then the **OpenString** target, then the **Signing & Capabilities** tab. Tick **Automatically manage signing** and choose your name under **Team**. If no team is listed, choose **Add an Account** and sign in with your Apple ID.
-4. If Xcode says the bundle identifier is not available, change `app.openstring.guitar` to anything of your own, i.e. `com.yourname.openstring`.
+4. If Xcode says the bundle identifier is not available, change `com.scottvanbolhuis.fretward` to anything of your own, i.e. `com.yourname.fretward`.
 5. Plug the iPad into the Mac. On the iPad, tap **Trust** if asked. The first time, the iPad also needs **Developer Mode** switched on: Settings, Privacy & Security, Developer Mode, then restart.
 6. At the top of the Xcode window choose your iPad as the place to run, then press the Play button.
-7. The first time, the iPad may refuse to open the app. On the iPad go to Settings, General, VPN & Device Management, tap your Apple ID under Developer App, and tap **Trust**. Then open Open String.
+7. The first time, the iPad may refuse to open the app. On the iPad go to Settings, General, VPN & Device Management, tap your Apple ID under Developer App, and tap **Trust**. Then open Fretward.
 
 With a free Apple ID the app stops opening after 7 days. Plug the iPad in and press Play again to renew it. Progress and recordings are kept. With a paid Apple Developer membership it lasts a year.
 

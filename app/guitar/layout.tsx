@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from 'next';
 import './guitar.css';
 
 export const metadata: Metadata = {
-  title: 'Open String',
+  title: 'Fretward',
   description: 'A guitar teacher that listens, built on the science of how people learn to play.',
   manifest: '/guitar/manifest.webmanifest',
-  applicationName: 'Open String',
+  applicationName: 'Fretward',
   appleWebApp: {
     capable: true,
-    title: 'Open String',
+    title: 'Fretward',
     statusBarStyle: 'default',
   },
   icons: {

@@ -89,7 +89,7 @@ export default function Home() {
               Digital Twin Learning System • Pixel-Perfect Hardware Replicas
             </p>
             <a href="/piano" className="mt-1 inline-block text-sm text-teaching-current hover:underline">
-              Learning piano? Open Middle C
+              Learning piano? Open Keyward
             </a>
           </div>
 

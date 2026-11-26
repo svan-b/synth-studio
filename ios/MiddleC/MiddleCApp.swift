@@ -1,6 +1,6 @@
 import UIKit
 
-/// Middle C for iPad.
+/// Keyward for iPad.
 ///
 /// The piano teacher itself is a web app, carried inside this app as plain
 /// files so it opens with no connection. This shell gives it what a web page

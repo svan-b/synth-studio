@@ -906,7 +906,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
         <h2 className="font-mc-serif text-2xl">Your data</h2>
         <p className="text-mc-muted">
           {native
-            ? 'Progress is kept on this iPad, and a dated copy is put in the Files app under Middle C each day you practise. Save a backup to carry it to another device.'
+            ? 'Progress is kept on this iPad, and a dated copy is put in the Files app under Keyward each day you practise. Save a backup to carry it to another device.'
             : 'Progress is kept in this browser on this device. Save a backup now and then, and use it to move to another browser or device.'}
         </p>
         <div className="mt-3 flex flex-wrap gap-3">
@@ -932,13 +932,13 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
         <h2 className="font-mc-serif text-2xl">About</h2>
         <Card className="mt-3 p-5 text-[1.1rem] leading-relaxed text-mc-muted">
           <p>
-            Middle C teaches piano the way studies of learning suggest it should be taught. Every choice, and how strong the evidence for it is, is set
+            Keyward teaches piano the way studies of learning suggest it should be taught. Every choice, and how strong the evidence for it is, is set
             out on the method page.
           </p>
           <Button variant="soft" size="sm" className="mt-3" onClick={() => onGo('method')}>
             Read the method
           </Button>
-          <p className="mt-4">Middle C collects nothing about you, and the work of others it contains is credited here.</p>
+          <p className="mt-4">Keyward collects nothing about you, and the work of others it contains is credited here.</p>
           <div className="mt-3 flex flex-wrap gap-3">
             <Button variant="soft" size="sm" onClick={() => setAbout('privacy')}>
               Privacy
@@ -1018,7 +1018,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
             disabled={paste.trim().length === 0}
             onClick={() => {
               const ok = importData(paste);
-              setBackupNote(ok ? 'Restored.' : 'That does not look like a Middle C backup.');
+              setBackupNote(ok ? 'Restored.' : 'That does not look like a Keyward backup.');
               if (ok) {
                 setPaste('');
                 setTimeout(() => setBackup(false), 900);

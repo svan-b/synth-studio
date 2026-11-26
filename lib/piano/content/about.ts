@@ -17,7 +17,7 @@ export interface AboutSection {
 export const PRIVACY_UPDATED = '25 November 2026';
 
 export const PRIVACY_INTRO =
-  'Middle C collects nothing about you. It has no accounts, no advertising, no analytics and no tracking, and the iPad app does not connect to the internet.';
+  'Keyward collects nothing about you. It has no accounts, no advertising, no analytics and no tracking, and the iPad app does not connect to the internet.';
 
 export const PRIVACY: AboutSection[] = [
   {

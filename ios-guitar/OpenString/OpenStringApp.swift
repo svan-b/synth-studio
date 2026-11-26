@@ -1,6 +1,6 @@
 import UIKit
 
-/// Open String for iPad.
+/// Fretward for iPad.
 ///
 /// The guitar teacher itself is a web app, carried inside this app as plain
 /// files so it opens with no connection. This shell gives it what a web page

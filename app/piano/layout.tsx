@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from 'next';
 import './piano.css';
 
 export const metadata: Metadata = {
-  title: 'Middle C',
+  title: 'Keyward',
   description: 'A piano teacher built on the science of how people learn to play.',
   manifest: '/piano/manifest.webmanifest',
-  applicationName: 'Middle C',
+  applicationName: 'Keyward',
   appleWebApp: {
     capable: true,
-    title: 'Middle C',
+    title: 'Keyward',
     statusBarStyle: 'default',
   },
   icons: {

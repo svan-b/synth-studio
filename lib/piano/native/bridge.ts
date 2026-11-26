@@ -1,7 +1,7 @@
 /**
  * The iPad app.
  *
- * Middle C can run inside a native shell that gives it what a web page on an
+ * Keyward can run inside a native shell that gives it what a web page on an
  * iPad cannot have: MIDI straight from the piano, and a durable file for
  * progress. The shell announces itself as `window.__middleC` before any of
  * the page's own code runs, and adds `navigator.requestMIDIAccess`, so the

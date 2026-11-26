@@ -1,6 +1,6 @@
 {
-  "name": "Open String",
-  "short_name": "Open String",
+  "name": "Fretward",
+  "short_name": "Fretward",
   "description": "A guitar teacher that listens, built on the science of how people learn to play.",
   "start_url": "/guitar",
   "scope": "/guitar",
