@@ -344,7 +344,8 @@ const ScoreView = forwardRef<ScoreViewHandle, ScoreViewProps>(function ScoreView
       let to = sysTop - 4;
       // Where the two lines are taller than the stand, the room above this line's upper staff gives way first,
       // so that the left hand of the next line can still be read ahead. The staff itself always stays in view.
-      const over = wantBottom - (to + wrap.clientHeight);
+      // It gives way only as far as brings the lower staff of the next line into view, not the numbers under it.
+      const over = (next ? next.bottom : box.bottom) * z + lift + 4 - (to + wrap.clientHeight);
       if (over > 0) to = Math.min(to + over, box.top * z + lift - 6);
       wrap.scrollTo({ top: Math.max(0, to), behavior: smooth ? 'smooth' : 'auto' });
     }

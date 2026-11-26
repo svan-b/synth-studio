@@ -41,7 +41,7 @@ The app is driven from the piano, so your hands can stay on the keys.
 
 - The **top key** of the piano always means go on. It starts the day's session, turns a page, skips a step and goes on to the next part.
 - The **bottom key** always means again. On a page of words it means back.
-- On a page with no music, the **right pedal** means go on as well, as long as no key was played a moment before. With a three pedal unit the middle pedal means go on and the left pedal means again, everywhere.
+- On a page with no music, the **right pedal** means go on as well, as long as no key was played a moment before. With a three pedal unit the middle pedal means go on and the left pedal means again. While you are in the middle of playing something they stay pedals, so the soft pedal in a quiet passage starts nothing over.
 - A Bluetooth page turning pedal, the kind used with sheet music apps, works too. Forward means go on and back means again.
 - A question about notes is answered by playing the note itself. Other questions are answered with the keys C, D, E and F, shown beside each answer.
 - The hints under the buttons name the key or pedal that does the same thing. Settings can switch the end keys or the pedals off as buttons.
