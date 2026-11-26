@@ -61,7 +61,6 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   const keepRecording = usePiano((s) => s.keepRecording);
   const reviewCard = usePiano((s) => s.reviewCard);
   const addCards = usePiano((s) => s.addCards);
-  const logPractice = usePiano((s) => s.logPractice);
   const inputMode = useInputMode();
 
   const [state, setState] = useState<PieceState>(() => stored ?? newPieceState(info));
@@ -83,6 +82,8 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   const encorePlayer = useRef<TakePlayer | null>(null);
   // A learned piece has been played through and is still there. Once is enough.
   const kept1 = useRef(false);
+  /** Whether this visit has graded the review of a learned piece yet. */
+  const graded = useRef(false);
   const [ending, setEnding] = useState<'time' | 'kept'>('time');
   // A timed run that has ended and is waiting out the pause before its reply.
   const pending = useRef<FlowResult | null>(null);
@@ -93,7 +94,7 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
   const warned = useRef(false);
 
   useWakeLock(true);
-  usePracticeTimer((seconds) => logPractice(seconds, notesPlayed.current, 1));
+  usePracticeTimer(() => notesPlayed.current);
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -193,7 +194,12 @@ export default function PracticeRoom({ pieceId, minutes, onClose }: { pieceId: s
       const out = applyResult(info, state, task, result);
       setState(out.state);
       setPiece(pieceId, out.state);
-      if (state.learned) reviewCard(`piece:${pieceId}`, outcomeFromAccuracy(result.accuracy, result.clean));
+      // A learned piece's review is graded once a visit, on its first whole play through: that is the honest
+      // test of what stayed. A miss is graded as forgotten, so the piece comes back soon, not in weeks.
+      if (state.learned && task.scope.type === 'whole' && !result.cutShort && !graded.current) {
+        graded.current = true;
+        reviewCard(`piece:${pieceId}`, out.verdict.passed ? outcomeFromAccuracy(result.accuracy, result.clean) : 'again');
+      }
       // A first play through that was stopped early is not a score to be shown.
       const stats = task.scope.type === 'trial' && result.cutShort ? '' : statsLine(result);
       setVerdict({ v: out.verdict, stats });

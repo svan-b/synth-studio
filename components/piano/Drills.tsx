@@ -14,6 +14,8 @@ import {
   TECH_LEVELS,
   chordExercise,
   chordLevelCap,
+  rhythmLevelCap,
+  sightLevelCap,
   daySeed,
   earExercise,
   evenness,
@@ -248,10 +250,22 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
   const lessons = usePiano((s) => s.lessons);
   const recordDrill = usePiano((s) => s.recordDrill);
   const setDrillLevel = usePiano((s) => s.setDrillLevel);
-  // Chords, scales and arpeggios climb only as far as the lessons have gone: no minor chords before the lesson on them, and so on.
+  // Each exercise climbs only as far as the lessons have gone: no minor chords before the lesson on them,
+  // no eighth notes in a rhythm before the lesson that teaches them, and so on.
   const lessonDone = (id: string) => lessons[id]?.done === true;
-  const top =
-    kind === 'chords' ? Math.min(round.maxLevel, chordLevelCap(lessonDone)) : kind === 'technique' ? Math.min(round.maxLevel, techniqueLevelCap(lessonDone)) : round.maxLevel;
+  const cap =
+    kind === 'chords'
+      ? chordLevelCap(lessonDone)
+      : kind === 'technique'
+        ? techniqueLevelCap(lessonDone)
+        : kind === 'rhythm'
+          ? rhythmLevelCap(lessonDone)
+          : kind === 'sight'
+            ? sightLevelCap(lessonDone)
+            : round.maxLevel;
+  const top = Math.min(round.maxLevel, cap);
+  // Before the lesson on the staff, a rhythm is shown as its shape, each note as long as it lasts.
+  const shapeOnly = kind === 'rhythm' && !lessonDone('the-staff');
   const [level, setLevel] = useState(() => Math.max(1, Math.min(top, stored?.level ?? 1)));
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<'look' | 'listen' | 'play'>(kind === 'ear' ? 'listen' : kind === 'sight' ? 'look' : 'play');
@@ -516,7 +530,8 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
             <PlaySurface
               score={score}
               mode={phase === 'listen' ? 'listen' : kind === 'ear' || kind === 'chords' ? 'wait' : 'tempo'}
-              display={kind === 'ear' ? 'hidden' : kind === 'chords' ? 'chart' : 'staff'}
+              display={kind === 'ear' ? 'hidden' : kind === 'chords' ? 'chart' : shapeOnly ? 'contour' : 'staff'}
+              contourLabel={shapeOnly ? 'none' : undefined}
               // A chord not found in a while is shown, so nobody is left stuck. It then counts as shown.
               hints={kind === 'chords' ? 'delay' : 'never'}
               // Working a chord out from its symbol takes a while. The first one counts like the rest.
@@ -542,9 +557,8 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
 }
 
 export default function Drill({ kind, onClose }: { kind: DrillKind; onClose: (finished?: boolean) => void }) {
-  const logPractice = usePiano((s) => s.logPractice);
   useWakeLock(true);
-  usePracticeTimer((seconds) => logPractice(seconds, 0, 1));
+  usePracticeTimer();
   if (kind === 'reading') return <ReadingDrill onClose={onClose} />;
   return <GeneratedDrill kind={kind} onClose={onClose} />;
 }

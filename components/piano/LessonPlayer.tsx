@@ -738,11 +738,12 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
   const setLessonStep = usePiano((s) => s.setLessonStep);
   const completeLesson = usePiano((s) => s.completeLesson);
   const addCards = usePiano((s) => s.addCards);
-  const logPractice = usePiano((s) => s.logPractice);
-  const [index, setIndex] = useState(() => (stored && !stored.done ? Math.min(stored.step, lesson.steps.length - 1) : 0));
+  // A lesson left part way opens where it was left. So does one marked as known and then opened to look through.
+  const resumable = stored && (!stored.done || stored.skipped);
+  const [index, setIndex] = useState(() => (resumable ? Math.min(stored.step, lesson.steps.length - 1) : 0));
   const [finished, setFinished] = useState(false);
   useWakeLock(true);
-  usePracticeTimer((seconds) => logPractice(seconds, 0, 1));
+  usePracticeTimer();
 
   const indexRef = useRef(index);
   indexRef.current = index;
@@ -791,7 +792,7 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
   const back = useCallback(() => jump(indexRef.current - 1), [jump]);
   const step = lesson.steps[index];
   // How far the lesson has got. Turning back to look at something does not lose the place.
-  const reached = Math.max(index, stored && !stored.done ? stored.step : 0);
+  const reached = Math.max(index, resumable ? stored.step : 0);
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">

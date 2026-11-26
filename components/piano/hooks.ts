@@ -7,8 +7,9 @@ import { input, type InputMode, type RemoteAction } from '@/lib/piano/input/hub'
 import { listener, type ListenStatus } from '@/lib/piano/input/listen';
 import { midi, type MidiStatus } from '@/lib/piano/input/midi';
 import { usePiano } from '@/lib/piano/learn/store';
-import { isNative, keepAwake, onSound, type SoundInfo } from '@/lib/piano/native/bridge';
-import type { Emitter } from '@/lib/piano/util/emitter';
+import { noteBus } from '@/lib/piano/input/bus';
+import { isNative, keepAwake, onSound, onWake, type SoundInfo } from '@/lib/piano/native/bridge';
+import { dayKey, type Emitter } from '@/lib/piano/util/emitter';
 
 /** Follow a status emitter as React state. */
 export function useEmitted<T>(emitter: Emitter<T>, initial: () => T): T {
@@ -195,27 +196,113 @@ export function readingMs(text: string): number {
   return Math.min(6000, Math.max(1500, 400 + text.length * 52));
 }
 
-/** Seconds spent with an activity open, reported when it closes. */
-export function usePracticeTimer(onDone: (seconds: number) => void): void {
-  const ref = useRef(onDone);
-  ref.current = onDone;
+/** How long with no key played and no tap before the time stops counting: the learner has walked away. */
+const IDLE_MS = 150_000;
+/** How often the time is written down, so that a reload, or the app closed, loses no more than this. */
+const SLICE_MS = 30_000;
+
+/**
+ * Count the time spent with an activity open, as practice. It is written
+ * down as it goes, each part on the day it was spent, so time is not lost
+ * when the page goes away and an evening's practice is not put on the next
+ * morning. Time with the app out of sight does not count, nor time after the
+ * learner has stopped playing and gone. `notes` gives the keys played so far.
+ */
+export function usePracticeTimer(notes?: () => number): void {
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
   useEffect(() => {
-    const start = performance.now();
-    let hidden = 0;
-    let hiddenAt: number | null = null;
+    let from = performance.now();
+    let lastSign = from;
+    let visible = typeof document === 'undefined' || document.visibilityState !== 'hidden';
+    let counted = false;
+    let notesLogged = 0;
+    const write = () => {
+      const now = performance.now();
+      // Only time in view, and no more than the idle limit after the last sign of the learner.
+      const until = Math.min(now, lastSign + IDLE_MS);
+      const seconds = visible ? Math.max(0, (until - from) / 1000) : 0;
+      from = now;
+      const played = notesRef.current?.() ?? 0;
+      const more = Math.max(0, played - notesLogged);
+      notesLogged = played;
+      if (seconds <= 0 && more === 0 && counted) return;
+      usePiano.getState().logPractice(seconds, more, counted ? 0 : 1);
+      counted = true;
+    };
+    const sign = () => {
+      const now = performance.now();
+      // Back after a while away: what came before was written down up to the idle limit, and the count starts again now.
+      if (now - lastSign > IDLE_MS) {
+        write();
+        from = now;
+      }
+      lastSign = now;
+    };
     const onVis = () => {
-      if (document.visibilityState === 'hidden') hiddenAt = performance.now();
-      else if (hiddenAt !== null) {
-        hidden += performance.now() - hiddenAt;
-        hiddenAt = null;
+      if (document.visibilityState === 'hidden') {
+        write();
+        visible = false;
+      } else {
+        visible = true;
+        from = performance.now();
+        lastSign = from;
       }
     };
+    const unsubNotes = noteBus.subscribe((ev) => {
+      if (ev.type === 'on') sign();
+    });
+    const timer = setInterval(write, SLICE_MS);
     document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', write);
+    window.addEventListener('pointerdown', sign, true);
+    window.addEventListener('keydown', sign, true);
     return () => {
+      clearInterval(timer);
+      unsubNotes();
       document.removeEventListener('visibilitychange', onVis);
-      ref.current(Math.max(0, (performance.now() - start - hidden) / 1000));
+      window.removeEventListener('pagehide', write);
+      window.removeEventListener('pointerdown', sign, true);
+      window.removeEventListener('keydown', sign, true);
+      write();
     };
   }, []);
+}
+
+/**
+ * Today, as YYYY-MM-DD, kept current. It turns at midnight, and is looked at
+ * again whenever the app comes back to the front, as after a night with the
+ * iPad locked and the app still open.
+ */
+export function useToday(): string {
+  const [today, setToday] = useState(() => dayKey());
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const check = () => {
+      setToday(dayKey());
+      if (timer) clearTimeout(timer);
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 2);
+      // Timers sleep with the page, so an hour at most, and a fresh look on coming back.
+      timer = setTimeout(check, Math.min(midnight.getTime() - now.getTime(), 3_600_000));
+    };
+    check();
+    const onVis = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', check);
+    window.addEventListener('pageshow', check);
+    const offWake = onWake(check);
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', check);
+      window.removeEventListener('pageshow', check);
+      offWake();
+    };
+  }, []);
+  return today;
 }
 
 /** Element size, for layouts that depend on it. */

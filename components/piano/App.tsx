@@ -10,8 +10,8 @@ import { midi } from '@/lib/piano/input/midi';
 import { getLesson, pieceInfo } from '@/lib/piano/content/catalog';
 import { pieceProgress } from '@/lib/piano/learn/coach';
 import { currentPiece, planDay, planSession, type Block } from '@/lib/piano/learn/planner';
-import { streak, usePiano, type SessionBase } from '@/lib/piano/learn/store';
-import { dayKey } from '@/lib/piano/util/emitter';
+import { saveTrouble, streak, usePiano, type SessionBase } from '@/lib/piano/learn/store';
+import { addDays, dayKey, noonOf } from '@/lib/piano/util/emitter';
 import Drill from './Drills';
 import { useApplySettings, useHints, useRemote, useTheme, useWakeLock } from './hooks';
 import LessonPlayer from './LessonPlayer';
@@ -73,7 +73,7 @@ function recap(before: SessionBase, parts: Block[]): Array<[string, string]> {
 /** What tomorrow's session opens with, to give the next visit something to come back to. */
 function tomorrow(): string | null {
   const s = usePiano.getState();
-  const day = planDay({ minutes: s.profile.minutes, lessons: s.lessons, pieces: s.pieces, cards: s.cards, days: s.days, drills: s.drills, now: new Date(Date.now() + 86400000) });
+  const day = planDay({ minutes: s.profile.minutes, lessons: s.lessons, pieces: s.pieces, cards: s.cards, days: s.days, drills: s.drills, now: noonOf(addDays(dayKey(), 1)) });
   const plan = day.blocks;
   const first = plan.find((b) => b.kind === 'lesson') ?? plan.find((b) => b.kind === 'piece') ?? plan[0];
   if (!first) return null;
@@ -126,13 +126,15 @@ function SessionRunner({
   const marked = useRef(false);
   const base = useRef<SessionBase>(began ?? baseOf(planned));
   const blockStarted = useRef(performance.now());
+  // The day the session belongs to. One that runs past midnight is still the day it began.
+  const startedOn = useRef(dayKey());
   const [summary, setSummary] = useState<{ rows: Array<[string, string]>; next: string | null } | null>(null);
   // A session in which nothing was finished has not been done. It is put back as it was.
   const nothingDone = done && skipped.length >= blocks.length;
 
   // Where the session stands is kept as it goes, so that stopping, or the app closing, loses nothing.
   useEffect(() => {
-    if (!done) keepSession({ on: dayKey(), blocks, index, skipped, base: base.current });
+    if (!done) keepSession({ on: startedOn.current, blocks, index, skipped, base: base.current });
   }, [blocks, done, index, keepSession, skipped]);
 
   useEffect(() => {
@@ -193,7 +195,7 @@ function SessionRunner({
   /** Stop from the closing screen of a part: that part is done, so the session is kept from the next one. */
   const stopAfter = useCallback(() => {
     if (index + 1 >= blocks.length) finishSession();
-    else keepSession({ on: dayKey(), blocks, index: index + 1, skipped, base: base.current });
+    else keepSession({ on: startedOn.current, blocks, index: index + 1, skipped, base: base.current });
     onClose();
   }, [blocks, finishSession, index, keepSession, onClose, skipped]);
   // The bottom key means again everywhere else, so here it does nothing. Stopping is a deliberate tap.
@@ -292,6 +294,9 @@ export default function App() {
   const autoMidi = usePiano((s) => s.settings.autoMidi);
   const [view, setView] = useState<View>('today');
   const [activity, setActivity] = useState<Activity | null>(null);
+  // Progress that could not be written down in this browser. Said once a visit, not on every note.
+  const [cannotSave, setCannotSave] = useState<'yes' | 'told' | null>(null);
+  useEffect(() => saveTrouble.subscribe(() => setCannotSave((was) => was ?? 'yes')), []);
   useApplySettings();
 
   // Browsers only let sound start in answer to a deliberate action. On a
@@ -320,11 +325,15 @@ export default function App() {
     if (!isNative()) return;
     void midi.connect();
     void piano.unlock();
-    onWake(() => void piano.unlock());
+    const offWake = onWake(() => void piano.unlock());
     // Hands may never touch the screen. A key played on the piano wakes the sound too.
-    return noteBus.subscribe((ev) => {
+    const offNotes = noteBus.subscribe((ev) => {
       if (ev.type === 'on' && ev.source === 'midi') void piano.unlock();
     });
+    return () => {
+      offWake();
+      offNotes();
+    };
   }, []);
 
   // When the app is put away or the page closes, anything it asked the piano to play stops, so no note
@@ -428,6 +437,18 @@ export default function App() {
       {activity?.kind === 'drill' && <Drill kind={activity.id} onClose={close} />}
       {activity?.kind === 'session' && <SessionRunner blocks={activity.blocks} from={activity.from} skipped={activity.skipped} base={activity.base} onClose={close} />}
       {!onboarded && <Onboarding onDone={() => setView('today')} />}
+      {cannotSave === 'yes' && (
+        <div role="alert" className="absolute inset-x-0 bottom-0 z-[60] flex justify-center px-4 pb-4 mc-safe-bottom">
+          <div className="flex max-w-3xl items-center gap-4 rounded-2xl bg-mc-ink px-5 py-3.5 text-mc-bg shadow-lg">
+            <p className="text-[1.05rem] leading-snug">
+              This browser is not keeping your progress. Private browsing, or a full disk, can do this. Save a backup in Settings before you close the page.
+            </p>
+            <Button variant="soft" onClick={() => setCannotSave('told')}>
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

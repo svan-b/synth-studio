@@ -14,20 +14,20 @@ import {
   dueReadingCards,
   introducedPieces,
   openDrills,
-  PIECES_IN_HAND,
   planDay,
   planMinutes,
   skippedPieces,
   type Block,
   type DrillKind,
 } from '@/lib/piano/learn/planner';
-import { exportData, streak, totalMinutes, usePiano, type Recording, type SessionBase } from '@/lib/piano/learn/store';
+import { COURSE, exportData, streak, totalMinutes, usePiano, type Recording, type SessionBase } from '@/lib/piano/learn/store';
+import { describeBackup, readBackup } from '@/lib/piano/learn/backup';
 import { isNative, shareFile } from '@/lib/piano/native/bridge';
 import { parseScore } from '@/lib/piano/music/score';
-import { dayKey } from '@/lib/piano/util/emitter';
+import { addDays, dayKey, dayNumber, noonOf } from '@/lib/piano/util/emitter';
 import { CreditsText, PrivacyText } from './About';
 import ConnectionPanel, { ConnectionChip, ConnectionReport } from './Connection';
-import { useHints, useInputMode, useRemote, useSound } from './hooks';
+import { useHints, useInputMode, useRemote, useSound, useToday } from './hooks';
 import PlaySurface from './PlaySurface';
 import { Button, Card, Icon, Pill, ProgressBar, Ring, Segmented, Sheet, Toggle } from './ui';
 
@@ -93,17 +93,20 @@ export function TodayScreen({
   const drills = usePiano((s) => s.drills);
   const sound = useSound();
   const hints = useHints();
-  const today = dayKey();
+  // Kept current, so a page left open overnight shows the new day in the morning.
+  const today = useToday();
   const doneToday = sessionDoneOn === today;
   const day = useMemo(
-    () => planDay({ minutes: profile.minutes, lessons, pieces, cards, days, drills, again: doneToday }),
-    [profile.minutes, lessons, pieces, cards, days, drills, doneToday],
+    () => planDay({ minutes: profile.minutes, lessons, pieces, cards, days, drills, again: doneToday, now: new Date() }),
+    // `today` is a dependency so that the plan is made again when the day turns.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profile.minutes, lessons, pieces, cards, days, drills, doneToday, today],
   );
   const plan = day.blocks;
   const minutesToday = Math.round((days[today]?.seconds ?? 0) / 60);
   const run = streak(days);
-  const date = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  const tip = TIPS[Math.floor(new Date(today + 'T12:00:00').getTime() / 86400000) % TIPS.length];
+  const date = noonOf(today).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  const tip = TIPS[dayNumber(today) % TIPS.length];
   const firstTime = Object.keys(lessons).length === 0 && Object.keys(days).length === 0;
   // The next lesson, for a learner who wants more than the day's plan holds, with the reason it is not in the plan.
   const upNext = day.upNext;
@@ -112,7 +115,7 @@ export function TodayScreen({
   const word = (n: number) => ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][n] ?? String(n);
   const count = word(day.waiting.length);
   // How many of them have to be learned before the next lesson comes of itself.
-  const toLearn = Math.max(1, day.waiting.length - PIECES_IN_HAND + 1);
+  const toLearn = day.toLearn;
   const whyHeld =
     day.held === 'pieces'
       ? `You have ${count} pieces still to learn, so today is for them, and what you were taught gets played. A new lesson comes once ${
@@ -136,7 +139,7 @@ export function TodayScreen({
   const at = resume?.at ?? 0;
   const next: Block | undefined = parts[at];
   /** How far a lesson has got, when it was left part way. */
-  const stepOf = (id: string) => (lessons[id]?.done ? 0 : (lessons[id]?.step ?? 0));
+  const stepOf = (id: string) => (lessons[id]?.done && !lessons[id]?.skipped ? 0 : (lessons[id]?.step ?? 0));
   const partDetail = (b: Block) => {
     const step = b.kind === 'lesson' ? stepOf(b.id) : 0;
     return step > 0 ? `Left at step ${step + 1} of ${getLesson(b.id).steps.length}. It opens there` : b.detail;
@@ -604,9 +607,10 @@ export function ProgressScreen() {
   const notes = Object.keys(cards).filter((id) => id.startsWith('read:')).length;
   const last14 = useMemo(() => {
     const out: Array<{ key: string; minutes: number; label: string }> = [];
+    const today = dayKey();
     for (let i = 13; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 86400000);
-      const key = dayKey(d);
+      const key = addDays(today, -i);
+      const d = noonOf(key);
       out.push({ key, minutes: Math.round((days[key]?.seconds ?? 0) / 60), label: d.toLocaleDateString(undefined, { weekday: 'narrow' }) });
     }
     return out;
@@ -778,6 +782,11 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
   const [backup, setBackup] = useState(false);
   const [paste, setPaste] = useState('');
   const [backupNote, setBackupNote] = useState<string | null>(null);
+  // A backup that has been read and is waiting for the learner to say it is the right one.
+  const [checked, setChecked] = useState<string | null>(null);
+  // A restore has just been made, and can be taken back.
+  const [restored, setRestored] = useState(false);
+  const undoImport = usePiano((s) => s.undoImport);
   const [confirmReset, setConfirmReset] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState<boolean | 'failed'>(false);
@@ -796,6 +805,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
     try {
       setPaste(await file.text());
       setBackupNote(null);
+      setChecked(null);
     } catch {
       setBackupNote('That file could not be read.');
     }
@@ -919,7 +929,15 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
           >
             Save a backup
           </Button>
-          <Button variant="soft" onClick={() => setBackup(true)}>
+          <Button
+            variant="soft"
+            onClick={() => {
+              setBackupNote(null);
+              setChecked(null);
+              setRestored(false);
+              setBackup(true);
+            }}
+          >
             Restore from a backup
           </Button>
           <Button variant="danger" onClick={() => setConfirmReset(true)}>
@@ -1006,27 +1024,59 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
         <textarea
           className="mc-selectable h-40 w-full rounded-2xl border border-mc-line bg-mc-bg p-3 font-mono text-[0.85rem] text-mc-ink"
           value={paste}
-          onChange={(e) => setPaste(e.target.value)}
+          onChange={(e) => {
+            setPaste(e.target.value);
+            setChecked(null);
+          }}
           placeholder="Paste the contents of your backup file"
         />
         {backupNote && <p className="mt-2 text-[1.05rem] text-mc-muted">{backupNote}</p>}
+        {checked && (
+          <p className="mt-2 text-[1.05rem] text-mc-ink">
+            This backup holds {checked}. It replaces the progress {native ? 'on this iPad' : 'in this browser'}.
+          </p>
+        )}
         <div className="mt-4 flex justify-end gap-3">
-          <Button variant="soft" onClick={() => setBackup(false)}>
-            Cancel
-          </Button>
-          <Button
-            disabled={paste.trim().length === 0}
-            onClick={() => {
-              const ok = importData(paste);
-              setBackupNote(ok ? 'Restored.' : 'That does not look like a Middle C backup.');
-              if (ok) {
-                setPaste('');
-                setTimeout(() => setBackup(false), 900);
-              }
-            }}
-          >
-            Restore
-          </Button>
+          {restored ? (
+            <>
+              <Button
+                variant="soft"
+                onClick={() => {
+                  undoImport();
+                  setRestored(false);
+                  setBackupNote('Put back as it was before the restore.');
+                }}
+              >
+                Undo the restore
+              </Button>
+              <Button onClick={() => setBackup(false)}>Done</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="soft" onClick={() => setBackup(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={paste.trim().length === 0}
+                onClick={() => {
+                  // First look at what the backup holds, then replace on a second tap.
+                  if (!checked) {
+                    const read = readBackup(paste, COURSE);
+                    setBackupNote(read ? null : 'That does not look like a Middle C backup. Nothing was changed.');
+                    setChecked(read ? describeBackup(read) : null);
+                    return;
+                  }
+                  const ok = importData(paste);
+                  setChecked(null);
+                  setRestored(ok);
+                  setBackupNote(ok ? 'Restored. If it was the wrong backup, Undo puts back what was here.' : 'That does not look like a Middle C backup. Nothing was changed.');
+                  if (ok) setPaste('');
+                }}
+              >
+                {checked ? 'Replace my progress' : 'Restore'}
+              </Button>
+            </>
+          )}
         </div>
       </Sheet>
 

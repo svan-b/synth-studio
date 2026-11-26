@@ -231,7 +231,7 @@ export const PIECES: Piece[] = [
     time: [4, 4],
     tempo: 76,
     rh: 'F#5h:4 E5h:3 | D5h:2 C#5h:1 | B4h:3 A4h:2 | B4h:3 C#5h:4 | D5h:5 C#5h:4 | B4h:3 A4h:2 | G4h:1 F#4h:2 | G4h:3 E4h:1 | D4q:1 F#4q:2 A4q:4 G4q:3 | F#4q:2 D4q:1 F#4q:2 E4q:1 | D4q:2 B3q:1 D4q:2 A4q:5 | G4q:3 B4q:5 A4q:4 G4q:3 | F#4w:2',
-    lh: 'D3h:5 A3h:1 | B3h:1 F#3h:3 | G3h:2 D3h:5 | G3h:2 A3h:1 | D3h:5 A3h:1 | B3h F#3h | G3h D3h | G3h A3h | D3h A3h | B3h F#3h | G3h D3h | G3h A3h | D3w:5',
+    lh: 'D3h:5 A3h:2 | B3h:1 F#3h:3 | G3h:2 D3h:5 | G3h:2 A3h:1 | D3h:5 A3h:1 | B3h F#3h | G3h D3h | G3h A3h | D3h A3h | B3h F#3h | G3h D3h | G3h A3h | D3w:5',
     chords: 'D A | Bm F#m | G D | G A | D A | Bm F#m | G D | G A | D A | Bm F#m | G D | G A | D',
     sections: [
       [1, 4],
@@ -289,7 +289,7 @@ export const PIECES: Piece[] = [
     time: [3, 4],
     tempo: 108,
     rh: 'D5q:5 G4e:1 A4e B4e C5e | D5q:5 G4q:1 G4q | E5q:3 C5e:1 D5e E5e F#5e | G5q:5 G4q:1 G4q | C5q:4 D5e:5 C5e B4e A4e | B4q:3 C5e:4 B4e A4e G4e | F#4q:2 G4e:3 A4e B4e:5 G4e:3 | A4h.:4 | D5q:5 G4e:1 A4e B4e C5e | D5q G4q G4q | E5q:3 C5e:1 D5e E5e F#5e | G5q:5 G4q:1 G4q | C5q:4 D5e:5 C5e B4e A4e | B4q:3 C5e:4 B4e A4e G4e | A4q:2 B4e:3 A4e G4e F#4e:1 | G4h.:2',
-    lh: 'G3h:2 A3q:1 | B3h.:1 | C4h.:1 | B3h.:2 | A3h.:3 | G3h.:4 | D4q:1 B3q:2 G3q:4 | D4q:1 D3e:5 C4e:1 B3e A3e | B3h:2 A3q:3 | G3q:4 B3q:2 G3q:4 | C4h.:1 | B3q:2 C4e:1 B3e A3e G3e | A3h:2 F#3q:4 | G3h:3 B3q:1 | C4q:1 D4q D3q:5 | G3h:2 G2q:5',
+    lh: 'G3h:4 A3q:3 | B3h.:2 | C4h.:1 | B3h.:2 | A3h.:3 | G3h.:4 | D4q:1 B3q:2 G3q:4 | D4q:1 D3e:5 C4e:1 B3e A3e | B3h:2 A3q:3 | G3q:4 B3q:2 G3q:4 | C4h.:1 | B3q:2 C4e:1 B3e A3e G3e | A3h:2 F#3q:4 | G3h:3 B3q:1 | C4q:1 D4q D3q:5 | G3h:2 G2q:5',
     sections: [
       [1, 4],
       [5, 8],
@@ -343,7 +343,7 @@ export const PIECES: Piece[] = [
     time: [3, 8],
     tempo: 66,
     pickup: 0.5,
-    rh: 'E5s:5 D#5s:4 | E5s:5 D#5s:4 E5s:5 B4s:2 D5s:4 C5s:3 | A4e:1 rs C4s:1 E4s:2 A4s:5 | B4e:1 rs E4s:1 G#4s:2 B4s:5 | C5e:1 rs E4s:1 E5s:5 D#5s:4 | E5s:5 D#5s:4 E5s:5 B4s:2 D5s:4 C5s:3 | A4e:1 rs C4s:1 E4s:2 A4s:5 | B4e:1 rs E4s:1 C5s:5 B4s:4 | A4q:1',
+    rh: 'E5s:5 D#5s:4 | E5s:5 D#5s:4 E5s:5 B4s:2 D5s:4 C5s:3 | A4e:1 rs C4s:1 E4s:2 A4s:4 | B4e:5 rs E4s:1 G#4s:3 B4s:4 | C5e:5 rs E4s:1 E5s:5 D#5s:4 | E5s:5 D#5s:4 E5s:5 B4s:2 D5s:4 C5s:3 | A4e:1 rs C4s:1 E4s:2 A4s:4 | B4e:5 rs E4s:1 C5s:4 B4s:3 | A4q:2',
     lh: 're | rq. | A2s:5 E3s:2 A3s:1 rs re | E2s:5 E3s:1 G#3s:2 rs re | A2s:5 E3s:2 A3s:1 rs re | rq. | A2s:5 E3s:2 A3s:1 rs re | E2s:5 E3s:1 G#3s:2 rs re | A2s:5 E3s:2 A3e:1',
     sections: [
       [1, 5],
@@ -359,7 +359,7 @@ export const PIECES: Piece[] = [
     key: 'D',
     time: [3, 4],
     tempo: 72,
-    rh: 'rh. | rh. | rh. | rh. | rq F#5q:3 A5q:5 | G5q:4 F#5q:3 C#5q:1 | B4q:1 C#5q:2 D5q:3 | A4h.:1 | F#4h.:1~ | F#4h.~ | F#4h.~ | F#4h.',
+    rh: 'rh. | rh. | rh. | rh. | rq F#5q:3 A5q:5 | G5q:4 F#5q:3 C#5q:2 | B4q:1 C#5q:2 D5q:3 | A4h.:1 | F#4h.:1~ | F#4h.~ | F#4h.~ | F#4h.',
     lh: 'G2q:5 B3+D4+F#4h:421 | D2q:5 A3+C#4+F#4h:421 | G2q B3+D4+F#4h | D2q A3+C#4+F#4h | G2q B3+D4+F#4h | D2q A3+C#4+F#4h | G2q B3+D4+F#4h | D2q A3+C#4+F#4h | G2q:5 B3+D4h:42 | D2q:5 A3+C#4h:42 | G2q B3+D4h | D2q A3+C#4h',
     chords: 'Gmaj7 | Dmaj7 | Gmaj7 | Dmaj7 | Gmaj7 | Dmaj7 | Gmaj7 | Dmaj7 | Gmaj7 | Dmaj7 | Gmaj7 | Dmaj7',
     sections: [
