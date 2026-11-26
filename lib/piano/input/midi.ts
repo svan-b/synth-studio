@@ -182,8 +182,12 @@ class MidiManager {
   private pedalDown: Record<PedalName, boolean> = { sustain: false, sostenuto: false, soft: false };
   private timers = new Set<ReturnType<typeof setTimeout>>();
   private sounding = new Set<number>();
-  /** Notes handed to the system with a time in the future, and not yet sounded. */
-  private queued = new Map<ReturnType<typeof setTimeout>, { midi: number; at: number }>();
+  /**
+   * Notes handed to the system with their times: when each sounds and when it
+   * is let go, on the page's clock in milliseconds. Kept until it is let go,
+   * so that stopping can release whatever is sounding or still to come.
+   */
+  private scheduled: Array<{ midi: number; on: number; off: number }> = [];
   /** How firmly the learner tends to strike, 0 to 1, as a running average of their own playing. */
   private touch: number | null = null;
   private touchCount = 0;
@@ -578,27 +582,29 @@ class MidiManager {
     const vel = Math.max(1, Math.min(127, Math.round(velocity * 127)));
     const delay = when === undefined ? 0 : (when - piano.now()) * 1000;
     if (delay > 1 && delay < 2000 && this.outputs.length > 0 && !this.bleCharacteristic) {
-      // Stamped with its time and handed over now. The system's MIDI clock then
-      // sounds it, which a timer in a busy page cannot do as evenly.
-      const at = performance.now() + delay;
+      // The key down and the key up are both handed over now, each stamped with its time, and the
+      // system's MIDI clock plays them. A timer in a busy page can be late, and a late key up lands
+      // after the next press of the same key and cuts it short. Nor can a page that has stopped running
+      // leave a note sounding.
+      const now = performance.now();
+      const on = now + delay;
+      const off = on + Math.max(50, seconds * 1000);
       for (const out of this.outputs) {
         try {
-          out.send([0x90, midi, vel], at);
+          out.send([0x90, midi, vel], on);
+          out.send([0x80, midi, 0], off);
         } catch {
           /* a port that went away */
         }
       }
-      const t = setTimeout(() => {
-        this.queued.delete(t);
-        this.sounding.add(midi);
-      }, delay);
-      this.queued.set(t, { midi, at });
-    } else {
-      this.at(when, () => {
-        this.sounding.add(midi);
-        this.send([0x90, midi, vel]);
-      });
+      this.scheduled = this.scheduled.filter((n) => n.off > now);
+      this.scheduled.push({ midi, on, off });
+      return;
     }
+    this.at(when, () => {
+      this.sounding.add(midi);
+      this.send([0x90, midi, vel]);
+    });
     this.at((when ?? piano.now()) + Math.max(0.05, seconds), () => {
       this.sounding.delete(midi);
       this.send([0x80, midi, 0]);
@@ -609,8 +615,7 @@ class MidiManager {
   silence(): void {
     this.timers.forEach((t) => clearTimeout(t));
     this.timers.clear();
-    // Notes already handed over for a moment from now are withdrawn where the system allows it.
-    // Where it does not, each gets a key up just after it sounds, so nothing is left ringing.
+    // Notes handed over with a time to come are withdrawn where the system allows it.
     for (const out of this.outputs) {
       try {
         out.clear?.();
@@ -618,17 +623,21 @@ class MidiManager {
         /* not offered */
       }
     }
-    this.queued.forEach(({ midi, at }, t) => {
-      clearTimeout(t);
+    // Whether or not they were withdrawn, each is let go: one sounding now at once, one still to
+    // come just after it would sound. A key up for a note that never sounded does no harm.
+    const now = performance.now();
+    for (const { midi, on, off } of this.scheduled) {
+      if (off <= now) continue;
       for (const out of this.outputs) {
         try {
-          out.send([0x80, midi, 0], at + 40);
+          if (on <= now) out.send([0x80, midi, 0]);
+          else out.send([0x80, midi, 0], on + 40);
         } catch {
           /* a port that went away */
         }
       }
-    });
-    this.queued.clear();
+    }
+    this.scheduled = [];
     this.sounding.forEach((midi) => this.send([0x80, midi, 0]));
     this.sounding.clear();
   }

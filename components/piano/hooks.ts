@@ -7,7 +7,7 @@ import { input, type InputMode, type RemoteAction } from '@/lib/piano/input/hub'
 import { listener, type ListenStatus } from '@/lib/piano/input/listen';
 import { midi, type MidiStatus } from '@/lib/piano/input/midi';
 import { usePiano } from '@/lib/piano/learn/store';
-import { onSound, type SoundInfo } from '@/lib/piano/native/bridge';
+import { isNative, keepAwake, onSound, type SoundInfo } from '@/lib/piano/native/bridge';
 import type { Emitter } from '@/lib/piano/util/emitter';
 
 /** Follow a status emitter as React state. */
@@ -107,6 +107,12 @@ export function useHints(): { top?: string; bottom?: string; onward?: string } {
 
 /** Keep the screen awake while practising. */
 export function useWakeLock(active: boolean): void {
+  // Inside the iPad app the app itself keeps the screen on, for as long as the page asks.
+  useEffect(() => {
+    if (!active || !isNative()) return;
+    keepAwake(true);
+    return () => keepAwake(false);
+  }, [active]);
   useEffect(() => {
     if (!active) return;
     type Sentinel = { release: () => Promise<void> };

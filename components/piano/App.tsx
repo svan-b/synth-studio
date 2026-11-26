@@ -13,7 +13,7 @@ import { currentPiece, planDay, planSession, type Block } from '@/lib/piano/lear
 import { streak, usePiano, type SessionBase } from '@/lib/piano/learn/store';
 import { dayKey } from '@/lib/piano/util/emitter';
 import Drill from './Drills';
-import { useApplySettings, useHints, useRemote, useTheme } from './hooks';
+import { useApplySettings, useHints, useRemote, useTheme, useWakeLock } from './hooks';
 import LessonPlayer from './LessonPlayer';
 import Onboarding from './Onboarding';
 import PracticeRoom from './PracticeRoom';
@@ -121,6 +121,7 @@ function SessionRunner({
   const keepSession = usePiano((s) => s.keepSession);
   const lessons = usePiano((s) => s.lessons);
   const hints = useHints();
+  useWakeLock(true);
   const done = index >= blocks.length;
   const marked = useRef(false);
   const base = useRef<SessionBase>(began ?? baseOf(planned));
@@ -324,6 +325,21 @@ export default function App() {
     return noteBus.subscribe((ev) => {
       if (ev.type === 'on' && ev.source === 'midi') void piano.unlock();
     });
+  }, []);
+
+  // When the app is put away or the page closes, anything it asked the piano to play stops, so no note
+  // is left sounding while nobody is there to hear it.
+  useEffect(() => {
+    const hidden = () => {
+      if (document.visibilityState === 'hidden') instrument.stop();
+    };
+    const gone = () => instrument.stop();
+    document.addEventListener('visibilitychange', hidden);
+    window.addEventListener('pagehide', gone);
+    return () => {
+      document.removeEventListener('visibilitychange', hidden);
+      window.removeEventListener('pagehide', gone);
+    };
   }, []);
 
   // Once a piano has been connected by hand, later visits reconnect to it by

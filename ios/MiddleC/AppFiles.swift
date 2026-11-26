@@ -48,7 +48,8 @@ final class AppFiles: NSObject, WKURLSchemeHandler {
 
     /// The file for a path. `/piano` is `piano.html`, as a web server would have it.
     private func locate(_ path: String) -> URL? {
-        guard let root = root, !path.contains("..") else { return nil }
+        // A step up out of the app's own files is refused. A name that merely contains two dots is not.
+        guard let root = root, !path.split(separator: "/").contains("..") else { return nil }
         var clean = path
         while clean.hasPrefix("/") { clean.removeFirst() }
         while clean.hasSuffix("/") { clean.removeLast() }
