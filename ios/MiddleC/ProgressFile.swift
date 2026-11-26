@@ -30,6 +30,8 @@ final class ProgressFile {
 
     /// Everything saved, by key, as `{ value, at }` for the page.
     func all() -> [String: [String: Any]] {
+        // Saves still on their way to disk are written first, so the newest progress is what the page gets.
+        queue.sync {}
         var out: [String: [String: Any]] = [:]
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         for file in files where file.pathExtension == "json" {
@@ -74,16 +76,22 @@ final class ProgressFile {
         day.locale = Locale(identifier: "en_US_POSIX")
         day.dateFormat = "yyyy-MM-dd"
         let stamp = day.string(from: Date())
+        // The folder can be deleted in the Files app. It comes back with the next copy.
+        try? FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
         for (name, value) in pending {
             // The page wraps its state as { state, version }. The copy holds
-            // the state itself, which is what Restore in the app reads.
+            // the state itself, which is what Restore in the app reads, with
+            // the version of the course it was saved under, so that restoring
+            // it does not bring older progress forward a second time.
             var text = value
             if let data = value.data(using: .utf8),
                let wrapped = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let state = wrapped["state"] as? [String: Any],
-               let inner = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]),
-               let pretty = String(data: inner, encoding: .utf8) {
-                text = pretty
+               var state = wrapped["state"] as? [String: Any] {
+                if let version = wrapped["version"] as? NSNumber { state["course"] = version }
+                if let inner = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]),
+                   let pretty = String(data: inner, encoding: .utf8) {
+                    text = pretty
+                }
             }
             let file = backups.appendingPathComponent("\(name) \(stamp).json")
             try? text.write(to: file, atomically: true, encoding: .utf8)
@@ -93,12 +101,26 @@ final class ProgressFile {
         prune()
     }
 
+    /// Keep the newest thirty dated copies of each kind. Files the learner put in the folder themselves are left alone.
     private func prune() {
         let files = FileManager.default
-        let all = ((try? files.contentsOfDirectory(at: backups, includingPropertiesForKeys: nil)) ?? [])
-            .filter { $0.pathExtension == "json" }
-            .sorted { $0.lastPathComponent > $1.lastPathComponent }
-        for old in all.dropFirst(30) { try? files.removeItem(at: old) }
+        let dated = ((try? files.contentsOfDirectory(at: backups, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.pathExtension == "json" && Self.datedName($0.deletingPathExtension().lastPathComponent) != nil }
+        let kinds = Dictionary(grouping: dated) { Self.datedName($0.deletingPathExtension().lastPathComponent) ?? "" }
+        for (_, copies) in kinds {
+            let newest = copies.sorted { $0.lastPathComponent > $1.lastPathComponent }
+            for old in newest.dropFirst(30) { try? files.removeItem(at: old) }
+        }
+    }
+
+    /// The key a dated copy belongs to, from a name such as "middle-c-v1 2026-11-25", or nil for any other file.
+    private static func datedName(_ name: String) -> String? {
+        guard let space = name.lastIndex(of: " ") else { return nil }
+        let date = name[name.index(after: space)...]
+        let shape = date.count == 10 && date.enumerated().allSatisfy { index, char in
+            (index == 4 || index == 7) ? char == "-" : char.isASCII && char.isNumber
+        }
+        return shape ? String(name[..<space]) : nil
     }
 
     /// Keys become file names, so only plain characters are kept.

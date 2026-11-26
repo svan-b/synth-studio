@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { piano } from '@/lib/piano/audio/engine';
 import { allStages } from '@/lib/piano/content/catalog';
 import { markKnownThrough } from '@/lib/piano/learn/placement';
-import { usePiano, type Experience } from '@/lib/piano/learn/store';
+import { describeBackup, readBackup } from '@/lib/piano/learn/backup';
+import { COURSE, usePiano, type Experience } from '@/lib/piano/learn/store';
 import { isNative } from '@/lib/piano/native/bridge';
 import ConnectionPanel from './Connection';
-import { useHints, useInputMode, useRemote } from './hooks';
+import { QUIET_ON_CLOSING, quietRemote, useHints, useInputMode, useRemote } from './hooks';
 import { Button, Icon } from './ui';
 
 const LEVELS: Array<{ value: Experience; title: string; text: string }> = [
@@ -41,12 +42,82 @@ function Choice({ selected, title, text, onClick }: { selected: boolean; title: 
   );
 }
 
+/** Where setup had got to, kept for this visit only, so that a reload part way does not start it again. */
+const SETUP_KEY = 'middle-c-setup';
+
+function setupPlace(): { index: number; startStage: number } {
+  try {
+    const kept = JSON.parse(sessionStorage.getItem(SETUP_KEY) ?? 'null') as { index?: unknown; startStage?: unknown } | null;
+    const index = typeof kept?.index === 'number' ? kept.index : 0;
+    const startStage = typeof kept?.startStage === 'number' ? kept.startStage : 1;
+    return { index, startStage };
+  } catch {
+    return { index: 0, startStage: 1 };
+  }
+}
+
+/** For a learner on a new iPad: bring in a backup before setup, rather than setting up and then replacing it all. */
+function RestoreFirst() {
+  const importData = usePiano((s) => s.importData);
+  const [text, setText] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const choose = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const read = await file.text();
+      const backup = readBackup(read, COURSE);
+      if (!backup) {
+        setText(null);
+        setNote('That does not look like a Keyward backup.');
+        return;
+      }
+      setText(read);
+      setNote(`This backup holds ${describeBackup(backup)}.`);
+    } catch {
+      setNote('That file could not be read.');
+    }
+  };
+  return (
+    <div className="mt-8 text-[1.05rem] text-mc-muted">
+      {text ? (
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-mc-ink">{note}</p>
+          <Button
+            onClick={() => {
+              if (!importData(text)) setNote('That does not look like a Keyward backup.');
+              // A backup from a learner who had finished setup opens the app as they left it. Otherwise setup carries on.
+              setText(null);
+            }}
+          >
+            Restore it
+          </Button>
+        </div>
+      ) : (
+        <>
+          <label className="inline-flex cursor-pointer items-center underline underline-offset-4">
+            Coming from another iPad? Restore a backup
+            <input type="file" accept=".json,application/json,text/plain" className="sr-only" onChange={(e) => void choose(e.target.files?.[0])} />
+          </label>
+          {note && <p className="mt-2">{note}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Onboarding({ onDone }: { onDone: () => void }) {
   const profile = usePiano((s) => s.profile);
   const setProfile = usePiano((s) => s.setProfile);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => setupPlace().index);
   // Where the course begins, for a learner who has played before. Nothing is marked until setup ends, so it can be changed freely.
-  const [startStage, setStartStage] = useState(1);
+  const [startStage, setStartStage] = useState(() => setupPlace().startStage);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SETUP_KEY, JSON.stringify({ index, startStage }));
+    } catch {
+      /* without it a reload starts setup again, which is all */
+    }
+  }, [index, startStage]);
   const mode = useInputMode();
   const experienced = profile.experience !== 'new';
   // Someone who has played before is asked where to begin. A beginner is not shown the question.
@@ -60,13 +131,21 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     setIndex((s) => s + 1);
   };
   const finish = () => {
+    try {
+      sessionStorage.removeItem(SETUP_KEY);
+    } catch {
+      /* nothing kept */
+    }
     if (from > 1) markKnownThrough(from - 1);
     setProfile({ onboarded: true });
+    // The page behind setup is the day's session. A second press hard on the first does not start it.
+    quietRemote(QUIET_ON_CLOSING);
     onDone();
   };
   // Once the piano is connected its keys turn these pages too, and nothing behind them can be reached.
   const hints = useHints();
-  useRemote({ primary: last ? finish : next, secondary: index > 0 ? () => setIndex((s) => s - 1) : undefined });
+  // No page of setup has music on it, so the right pedal goes on too, as the last page says.
+  useRemote({ primary: last ? finish : next, secondary: index > 0 ? () => setIndex((s) => s - 1) : undefined, pedal: true });
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
@@ -82,6 +161,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                 A piano teacher for your music stand. It listens to what you play, takes you forward one small step at a time, and teaches you how to
                 practise as well as what to play.
               </p>
+              <RestoreFirst />
             </div>
           )}
           {step === 'level' && (

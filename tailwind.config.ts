@@ -28,6 +28,7 @@ const config: Config = {
           line: 'rgb(var(--mc-line) / <alpha-value>)',
           accent: 'rgb(var(--mc-accent) / <alpha-value>)',
           ok: 'rgb(var(--mc-ok) / <alpha-value>)',
+          'ok-ink': 'rgb(var(--mc-ok-ink) / <alpha-value>)',
           bad: 'rgb(var(--mc-bad) / <alpha-value>)',
           hint: 'rgb(var(--mc-hint) / <alpha-value>)',
           'hint-ink': 'rgb(var(--mc-hint-ink) / <alpha-value>)',

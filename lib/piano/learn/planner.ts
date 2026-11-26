@@ -5,8 +5,8 @@
  */
 
 import { allPieces, getLesson, lessonOrder, lessonUnlocked, pieceInfo } from '../content/catalog';
-import { dayKey } from '../util/emitter';
-import { pieceProgress, type PieceState } from './coach';
+import { dayKey, dayNumber, endOfDay } from '../util/emitter';
+import { isKept, pieceProgress, type PieceState } from './coach';
 import { isDue, type StoredCard } from './srs';
 import type { LessonProgress } from './store';
 
@@ -95,11 +95,24 @@ export function openDrills(lessons: Record<string, LessonProgress>): DrillKind[]
   return order.filter((kind) => lessons[DRILL_LESSON[kind]]?.done === true);
 }
 
+/** A learned piece that slipped at its last play through. A little work brings it back, and until then it is not played for pleasure. */
+export function isRusty(state: PieceState | undefined): boolean {
+  return state !== undefined && state.learned && !isKept(state);
+}
+
+/** Learned pieces in good order, not played today, the one left alone the longest first. */
+function keptPieces(pieces: Record<string, PieceState>, today: string): string[] {
+  return allPieces()
+    .map((p) => p.id)
+    .filter((id) => pieces[id]?.learned && !isRusty(pieces[id]) && pieces[id].lastOn !== today)
+    .sort((a, b) => pieces[a].lastOn.localeCompare(pieces[b].lastOn));
+}
+
 /** A learned piece to end on: the one left alone the longest, and not one played today. */
 export function pieceToEndOn(pieces: Record<string, PieceState>, today: string): string | null {
   const learned = allPieces()
     .map((p) => p.id)
-    .filter((id) => pieces[id]?.learned && pieces[id].lastOn !== today);
+    .filter((id) => pieces[id]?.learned && !isRusty(pieces[id]) && pieces[id].lastOn !== today);
   if (learned.length === 0) return null;
   return learned.sort((a, b) => pieces[a].lastOn.localeCompare(pieces[b].lastOn))[0];
 }
@@ -145,17 +158,28 @@ const MOST_WAITING = 4;
  */
 export type Held = 'taken' | 'pieces' | 'turn';
 
-/** A learned piece whose review has come round. */
+/**
+ * A learned piece to play through today: first one that went rusty, which
+ * comes back with a little work while it is still close, then one whose
+ * review has come round. Reviews count by the day, so one that falls due this
+ * afternoon is in the morning's plan.
+ */
 export function pieceDueForReview(pieces: Record<string, PieceState>, cards: Record<string, StoredCard>, now: Date): string | null {
+  const today = dayKey(now);
+  const rusty = allPieces().find((p) => isRusty(pieces[p.id]) && pieces[p.id].lastOn !== today);
+  if (rusty) return rusty.id;
+  const by = endOfDay(now);
   for (const p of allPieces()) {
-    if (pieces[p.id]?.learned && isDue(cards[`piece:${p.id}`], now)) return p.id;
+    if (pieces[p.id]?.learned && isDue(cards[`piece:${p.id}`], by)) return p.id;
   }
   return null;
 }
 
+/** Notes whose review falls due today, the most overdue first. */
 export function dueReadingCards(cards: Record<string, StoredCard>, now: Date): string[] {
+  const by = endOfDay(now);
   return Object.keys(cards)
-    .filter((id) => id.startsWith('read:') && isDue(cards[id], now))
+    .filter((id) => id.startsWith('read:') && isDue(cards[id], by))
     .sort((a, b) => new Date(cards[a].due).getTime() - new Date(cards[b].due).getTime());
 }
 
@@ -181,7 +205,15 @@ export function planSession(input: PlanInput): Block[] {
  * is. Where it waits on the pieces, `comesIn` is the number of practice days
  * after which it comes anyway, or null when only learning a piece will bring it.
  */
-export function planDay(input: PlanInput): { blocks: Block[]; upNext: string | undefined; held: Held | null; waiting: string[]; comesIn: number | null } {
+export function planDay(input: PlanInput): {
+  blocks: Block[];
+  upNext: string | undefined;
+  held: Held | null;
+  waiting: string[];
+  comesIn: number | null;
+  /** Where the lesson waits on the pieces: how many of them to learn before it comes. */
+  toLearn: number;
+} {
   const now = input.now ?? new Date();
   const today = dayKey(now);
   const isDone = done(input.lessons);
@@ -211,13 +243,20 @@ export function planDay(input: PlanInput): { blocks: Block[]; upNext: string | u
   const onlyTheFirst = takenIds.length === 1 && takenIds[0] === order[0];
   const upNext = order.find((id) => !isDone(id) && lessonUnlocked(id, isDone));
   const lastLesson = taken.map((l) => l.doneOn as string).sort().pop();
+  // A learner who placed themselves and has taken no lesson since counts from the day they placed themselves.
+  const placedOn = Object.values(input.lessons)
+    .filter((l) => l.done && l.skipped && l.doneOn)
+    .map((l) => l.doneOn as string)
+    .sort()
+    .pop();
   const practised = Object.keys(input.days ?? {}).filter((d) => d < today).sort();
 
   // The course moves as fast as the pieces are learned. While enough of them are
   // waiting, the time goes to them and the next lesson waits its turn. It never
   // waits for ever: after some days of practice without one, it comes anyway.
   const waiting = waitingPieces(input.lessons, input.pieces);
-  const daysSince = lastLesson ? practised.filter((d) => d > lastLesson).length : 0;
+  const since = lastLesson ?? placedOn;
+  const daysSince = since ? practised.filter((d) => d > since).length : practised.length;
   let held: Held | null = null;
   if (input.again || (lessonToday && !onlyTheFirst)) held = 'taken';
   else if (waiting.length >= PIECES_IN_HAND && (daysSince < LONGEST_WAIT || waiting.length >= MOST_WAITING)) held = 'pieces';
@@ -227,14 +266,18 @@ export function planDay(input: PlanInput): { blocks: Block[]; upNext: string | u
     return { kind: 'lesson', id, minutes: l.minutes, title: l.title, detail: l.summary };
   };
   let lesson: Block | null = upNext && !held ? lessonBlock(upNext) : null;
-  const second: Block | null = lesson && upNext === order[0] && order.length > 1 ? lessonBlock(order[1]) : null;
+  // The lesson that follows the tour: the next one not already taken, which may have been opened from the course.
+  const afterFirst = order.find((id) => id !== order[0] && !isDone(id) && lessonUnlocked(id, (x) => x === order[0] || isDone(x)));
+  const second: Block | null = lesson && upNext === order[0] && afterFirst ? lessonBlock(afterFirst) : null;
 
   // Work on a piece with the coach.
   // A learner who skipped ahead has met no piece in a lesson yet. Until they have one, the last
   // piece of what they marked as known goes in: the session has music in it from the first day,
   // and playing it shows them whether the skip was right.
+  // Later, whenever no piece is waiting, the pieces of the known part come in turn from the first.
   const fromLessons = currentPiece(input.lessons, input.pieces);
-  const trial = !fromLessons && Object.keys(input.pieces).length === 0 ? skippedPieces(input.lessons, input.pieces).pop() : undefined;
+  const unopened = fromLessons ? [] : skippedPieces(input.lessons, input.pieces);
+  const trial = unopened.length === 0 ? undefined : Object.keys(input.pieces).length === 0 ? unopened[unopened.length - 1] : unopened[0];
   const pieceId = fromLessons ?? trial ?? null;
   let piece: Block | null = null;
   if (pieceId) {
@@ -253,17 +296,24 @@ export function planDay(input: PlanInput): { blocks: Block[]; upNext: string | u
     };
   }
 
-  // Keep a learned piece alive.
+  // Keep a learned piece alive. One that went rusty gets a little longer, to win it back.
   const reviewId = pieceDueForReview(input.pieces, input.cards, now);
+  const rusty = reviewId ? isRusty(input.pieces[reviewId]) : false;
   const review: Block | null =
     reviewId && reviewId !== pieceId
-      ? { kind: 'piece', id: reviewId, minutes: 2, title: pieceInfo(reviewId).title, detail: 'Play it through to keep it in your fingers' }
+      ? {
+          kind: 'piece',
+          id: reviewId,
+          minutes: rusty ? 4 : 2,
+          title: pieceInfo(reviewId).title,
+          detail: rusty ? 'It slipped last time. A little work brings it back' : 'Play it through to keep it in your fingers',
+        }
       : null;
 
   // A different skill for contrast, turning through the kinds day by day.
   // Only kinds a lesson has prepared: an exercise never comes before what it exercises.
   const open = openDrills(input.lessons);
-  const dayIndex = Math.floor(new Date(today + 'T12:00:00').getTime() / 86400000);
+  const dayIndex = dayNumber(today);
   // They take turns by the day. Where it is known when each was last practised,
   // the one left longest comes first, and one never tried comes before any.
   const turn = open.map((_, i) => open[(dayIndex + i) % Math.max(1, open.length)]);
@@ -340,14 +390,45 @@ export function planDay(input: PlanInput): { blocks: Block[]; upNext: string | u
     if (also) also.minutes += toOther;
     spare -= more;
   }
+  // Anything added from here goes before the closing piece, so the session still ends on something that goes well.
+  const beforeEnd = () => (ending && blocks.includes(ending) ? blocks.indexOf(ending) : blocks.length);
   const other = kinds.length > 1 ? kinds[1] : null;
   if (spare >= 3 && drill && other && other !== drill.id && blocks.includes(drill)) {
-    // Before the closing piece, so the session still ends on something that goes well.
-    const at = ending && blocks.includes(ending) ? blocks.indexOf(ending) : blocks.length;
-    blocks.splice(at, 0, drillOf(other));
+    blocks.splice(beforeEnd(), 0, drillOf(other));
+    spare -= 3;
+  }
+  // With nothing to learn, or not enough to fill the time, the pieces already learned have it: a few of them,
+  // the ones left alone the longest. Playing them is what they were learned for.
+  if (spare >= 3) {
+    const inPlan = new Set(blocks.filter((b) => b.kind === 'piece').map((b) => b.id));
+    let added = 0;
+    for (const id of keptPieces(input.pieces, today)) {
+      if (spare < 3 || added >= 3) break;
+      if (inPlan.has(id)) continue;
+      const minutes = Math.min(4, spare);
+      blocks.splice(beforeEnd(), 0, { kind: 'piece', id, minutes, title: pieceInfo(id).title, detail: 'One you know. Play it through for the pleasure of it' });
+      spare -= minutes;
+      added += 1;
+    }
+  }
+  const third = kinds.length > 2 ? kinds[2] : null;
+  if (spare >= 3 && third && drill && blocks.includes(drill)) {
+    blocks.splice(beforeEnd(), 0, drillOf(third));
+    spare -= 3;
+  }
+  // What is left lengthens the exercises a little each.
+  const exercises = blocks.filter((b) => b.kind === 'drill' && b.id !== 'reading');
+  for (let i = 0; spare >= 1 && exercises.some((b) => b.minutes < 8); i++) {
+    const b = exercises[i % exercises.length];
+    if (b.minutes < 8) {
+      b.minutes += 1;
+      spare -= 1;
+    }
   }
   const comesIn = held === 'pieces' && waiting.length < MOST_WAITING ? Math.max(1, LONGEST_WAIT - daysSince) : null;
-  return { blocks, upNext, held: upNext && !blocks.some((b) => b.kind === 'lesson') ? (held ?? 'taken') : null, waiting, comesIn };
+  // Below MOST_WAITING, learning all but one brings the lesson. At it or above, the days count only once fewer are waiting.
+  const toLearn = Math.max(1, waiting.length >= MOST_WAITING ? waiting.length - MOST_WAITING + 1 : waiting.length - PIECES_IN_HAND + 1);
+  return { blocks, upNext, held: upNext && !blocks.some((b) => b.kind === 'lesson') ? (held ?? 'taken') : null, waiting, comesIn, toLearn };
 }
 
 export function planMinutes(blocks: Block[]): number {

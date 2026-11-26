@@ -2,10 +2,11 @@
 
 import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
-import { saveCopy, savedCopy } from '../native/bridge';
-import { dayKey, daysBetween } from '../util/emitter';
+import { isNative, saveCopy, savedCopy } from '../native/bridge';
+import { Emitter, dayKey, daysBetween } from '../util/emitter';
 import { newCard, review, type Outcome, type StoredCard } from './srs';
 import type { PieceState } from './coach';
+import { readBackup } from './backup';
 import type { Take } from '../engine/flow';
 
 export type Experience = 'new' | 'some' | 'returning';
@@ -158,7 +159,10 @@ interface State {
   recordDrill: (id: string, correct: boolean, level?: number) => void;
   setDrillLevel: (id: string, level: number) => void;
   finishSession: () => void;
+  /** Replace all progress with a backup's. False, with nothing changed, when the text is not a backup of this app. */
   importData: (json: string) => boolean;
+  /** Put back what the last restore replaced, during the same visit. */
+  undoImport: () => boolean;
   resetAll: () => void;
 }
 
@@ -183,6 +187,9 @@ const defaultSettings: Settings = {
  * survives the web view's storage being cleared. Each copy carries the time
  * it was written, and the newer one is read back.
  */
+/** Says when progress could not be written down in this browser. */
+export const saveTrouble = new Emitter<boolean>();
+
 const progressStorage: StateStorage = {
   getItem: (name) => {
     let local: string | null = null;
@@ -207,7 +214,8 @@ const progressStorage: StateStorage = {
         localStorage.setItem(`${name}:at`, String(at));
       }
     } catch {
-      /* storage full or switched off: the app's own file still has it */
+      // Storage full or switched off. Inside the iPad app its own file still has it. In a browser nothing does, and the learner is told once.
+      if (!isNative()) saveTrouble.emit(true);
     }
     saveCopy(name, value, at);
   },
@@ -222,6 +230,9 @@ const progressStorage: StateStorage = {
     }
   },
 };
+
+/** What the last restore replaced, kept until the page closes. */
+let beforeImport: Partial<State> | null = null;
 
 export const usePiano = create<State>()(
   persist(
@@ -242,15 +253,22 @@ export const usePiano = create<State>()(
       setLessonStep: (id, step) =>
         set((s) => {
           const had = s.lessons[id];
-          // A lesson already done, or marked as known, can be looked through again without changing that.
-          if (had?.done) return {};
+          // A lesson already taken can be looked through again without changing that.
+          if (had?.done && !had.skipped) return {};
+          // One marked as known stays marked, and keeps its place, so taking it after all picks up where it was left.
+          if (had?.skipped) return had.step >= step ? {} : { lessons: { ...s.lessons, [id]: { ...had, step } } };
           // The place kept is the furthest step reached, so turning back to look at something does not lose it.
           return { lessons: { ...s.lessons, [id]: { done: false, step: Math.max(had?.step ?? 0, step) } } };
         }),
       completeLesson: (id) =>
         set((s) => ({ lessons: { ...s.lessons, [id]: { done: true, doneOn: s.lessons[id]?.doneOn ?? dayKey(), step: 0 } } })),
       skipLesson: (id) =>
-        set((s) => (s.lessons[id]?.done ? {} : { lessons: { ...s.lessons, [id]: { done: true, skipped: true, step: 0 } } })),
+        set((s) => {
+          const had = s.lessons[id];
+          if (had?.done) return {};
+          // The place in a lesson left part way is kept with the mark, so taking the mark back does not lose it.
+          return { lessons: { ...s.lessons, [id]: { done: true, skipped: true, doneOn: dayKey(), step: had?.step ?? 0 } } };
+        }),
       setPiece: (id, state) => set((s) => ({ pieces: { ...s.pieces, [id]: state } })),
       keepRecording: (id, take) =>
         set((s) => {
@@ -306,36 +324,52 @@ export const usePiano = create<State>()(
       keepSession: (session) => set({ session }),
       unskipLesson: (id) =>
         set((s) => {
-          if (!s.lessons[id]?.skipped) return {};
+          const had = s.lessons[id];
+          if (!had?.skipped) return {};
           const lessons = { ...s.lessons };
-          delete lessons[id];
+          if (had.step > 0) lessons[id] = { done: false, step: had.step };
+          else delete lessons[id];
           return { lessons };
         }),
       importData: (json) => {
-        try {
-          const parsed = JSON.parse(json) as Partial<State> & { state?: Partial<State> };
-          // The daily copies the iPad app keeps hold the same things one level down.
-          const data: Partial<State> = parsed?.state?.profile ? parsed.state : parsed;
-          if (!data || typeof data !== 'object' || !data.profile) return false;
-          // A copy made before the course changed is brought up to the course as it is now.
-          const made = (parsed as { course?: number; version?: number }).course ?? (parsed as { version?: number }).version ?? 0;
-          if (made < COURSE) data.lessons = carryOver(data.lessons ?? {});
-          set({
-            profile: { ...defaultProfile, ...data.profile },
-            settings: { ...defaultSettings, ...(data.settings ?? {}) },
-            lessons: data.lessons ?? {},
-            pieces: data.pieces ?? {},
-            cards: data.cards ?? {},
-            days: data.days ?? {},
-            drills: data.drills ?? {},
-            recordings: data.recordings ?? {},
-            sessionDoneOn: data.sessionDoneOn ?? null,
-            session: null,
-          });
-          return true;
-        } catch {
-          return false;
-        }
+        const backup = readBackup(json, COURSE);
+        if (!backup) return false;
+        const s = get();
+        // What is replaced is kept for the rest of this visit, so a restore can be taken back.
+        beforeImport = {
+          profile: s.profile,
+          settings: s.settings,
+          lessons: s.lessons,
+          pieces: s.pieces,
+          cards: s.cards,
+          days: s.days,
+          drills: s.drills,
+          recordings: s.recordings,
+          sessionDoneOn: s.sessionDoneOn,
+          session: s.session,
+        };
+        // A copy made before the course changed is brought up to the course as it is now.
+        const lessons = backup.course < COURSE ? carryOver(backup.lessons) : backup.lessons;
+        set({
+          profile: { ...defaultProfile, ...backup.profile },
+          // Settings that belong to this iPad and this piano stay as they are: the timing check, and how firmly the learner plays here.
+          settings: { ...defaultSettings, ...backup.settings, latencyMs: s.settings.latencyMs, touchLevel: s.settings.touchLevel, autoMidi: s.settings.autoMidi },
+          lessons,
+          pieces: backup.pieces,
+          cards: backup.cards,
+          days: backup.days,
+          drills: backup.drills,
+          recordings: backup.recordings,
+          sessionDoneOn: backup.sessionDoneOn,
+          session: null,
+        });
+        return true;
+      },
+      undoImport: () => {
+        if (!beforeImport) return false;
+        set(beforeImport);
+        beforeImport = null;
+        return true;
       },
       resetAll: () =>
         set({
@@ -424,4 +458,12 @@ export function totalMinutes(days: Record<string, DayLog>): number {
 
 export function daysSince(day: string | undefined, today: string = dayKey()): number {
   return day ? daysBetween(day, today) : Infinity;
+}
+
+// The same progress open in two browser tabs: when one writes, the other reads it in, so that neither
+// overwrites what the other has done with what it had before.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'middle-c-v1') void usePiano.persist.rehydrate();
+  });
 }

@@ -73,13 +73,32 @@ export function saveCopy(key: string, value: string, at: number): void {
   post({ type: 'store.save', key, value, at });
 }
 
-/** Have the app call this each time it comes back to the front. */
-export function onWake(fn: () => void): void {
+const wakers = new Set<() => void>();
+
+/** Have the app call this each time it comes back to the front. Returns a function that stops it. */
+export function onWake(fn: () => void): () => void {
   const app = shell();
-  if (app) app.wake = fn;
+  if (!app) return () => {};
+  wakers.add(fn);
+  app.wake = () => wakers.forEach((f) => f());
+  return () => {
+    wakers.delete(fn);
+  };
 }
 
 /** Hand a backup to the iPad's share sheet: Files, AirDrop, Mail. */
+let awake = 0;
+
+/**
+ * Keep the iPad's screen on while practice is under way, and let it sleep
+ * as usual once nothing asks for it. Calls are counted, so screens that ask
+ * at once keep it on until the last lets go.
+ */
+export function keepAwake(on: boolean): void {
+  awake = Math.max(0, awake + (on ? 1 : -1));
+  post({ type: 'screen.awake', on: awake > 0 });
+}
+
 export function shareFile(name: string, text: string): boolean {
   return post({ type: 'share', name, text });
 }

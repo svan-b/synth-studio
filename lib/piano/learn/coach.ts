@@ -23,6 +23,8 @@ export interface SectionState {
   rung: number;
   streak: number;
   fails: number;
+  /** Attempts at the step the phrase is on. Missing on phrases begun before it was kept. */
+  tries?: number;
 }
 
 export interface PieceState {
@@ -31,6 +33,8 @@ export interface PieceState {
   sections: SectionState[];
   /** Sections 0..joined are linked into one stretch. */
   joined: number;
+  /** Misses in a row at joining the next phrase on. */
+  joinFails?: number;
   /** Position on the whole piece ladder: 0 not started, then 70, 85 and 100 percent. */
   wholeRung: number;
   wholeStreak: number;
@@ -118,7 +122,7 @@ export function newPieceState(info: PieceInfo, today: string = dayKey()): PieceS
   return {
     startedOn: today,
     lastOn: today,
-    sections: info.sections.map(() => ({ rung: 0, streak: 0, fails: 0 })),
+    sections: info.sections.map(() => ({ rung: 0, streak: 0, fails: 0, tries: 0 })),
     joined: 0,
     wholeRung: 0,
     wholeStreak: 0,
@@ -325,6 +329,11 @@ export function steadyLag(result: FlowResult): number | null {
   return result.biasMs;
 }
 
+/** How many notes may wait for a pause in a run without a beat before it does not count. */
+function pauseLimit(result: FlowResult): number {
+  return Math.max(1, Math.round(result.totalSteps * 0.15));
+}
+
 /** Was this attempt good enough to count? */
 export function passes(task: Task, result: FlowResult): boolean {
   // A microphone mishears the odd note, so playing judged by ear gets a little more room.
@@ -332,8 +341,7 @@ export function passes(task: Task, result: FlowResult): boolean {
   if (task.mode === 'wait') {
     // Stopping to think is part of finding the notes, so a few pauses are no failure.
     // Needing a good share of the keys shown is not yet knowing them.
-    const pauses = Math.max(1, Math.round(result.totalSteps * 0.15));
-    return result.accuracy >= 0.9 - room && result.pausedSteps <= pauses;
+    return result.accuracy >= 0.9 - room && result.pausedSteps <= pauseLimit(result);
   }
   // The passes that make a piece count as learned ask for more: hardly a slip, not just most of the notes.
   const last = task.scope.type === 'whole' && task.tempoPct >= 100 && task.need > 1;
@@ -348,7 +356,8 @@ export function cleanPass(task: Task, result: FlowResult): boolean {
   if (result.cutShort) return false;
   if (task.mode === 'wait') return result.clean && result.fluency >= 0.9;
   // Long notes let go early leave something to put right, so the pass is worth repeating.
-  return result.clean && result.onTime >= 0.8 && (result.held === null || result.held >= 0.5);
+  // So does a wrong key, even one among many right notes.
+  return result.clean && result.wrongNotes === 0 && result.onTime >= 0.8 && (result.held === null || result.held >= 0.5);
 }
 
 // ------------------------------------------------------------- what went wrong
@@ -414,14 +423,18 @@ function locate(result: FlowResult, noun: 'slips' | 'pauses' = 'slips'): Where |
     const of = (h: Hand) => {
       const notes = result.detail.filter((d) => d.hand === h);
       const missed = notes.filter((d) => d.state !== 'ok').length;
-      return { notes: notes.length, missed, rate: notes.length > 0 ? missed / notes.length : 0 };
+      // Notes never played at all, as against notes played late or found after a slip.
+      const silent = notes.filter((d) => d.state === 'missed').length;
+      const n = notes.length;
+      return { notes: n, missed, rate: n > 0 ? missed / n : 0, silent: n > 0 ? silent / n : 0 };
     };
     const left = of('L');
     const right = of('R');
     if (left.notes >= 3 && right.notes >= 3) {
       if (left.missed >= 3 && left.rate >= 0.3 && left.rate >= 3 * right.rate) hand = 'left';
       else if (right.missed >= 3 && right.rate >= 0.3 && right.rate >= 3 * left.rate) hand = 'right';
-      absent = (hand === 'left' ? left.rate : hand === 'right' ? right.rate : 0) >= 0.8;
+      // Only a hand whose notes were not played at all was left out. One that played them late was there.
+      absent = (hand === 'left' ? left.silent : hand === 'right' ? right.silent : 0) >= 0.8;
     }
   }
   if (hand && absent) return { measure: null, hand, text: `The ${hand} hand hardly played.` };
@@ -586,6 +599,7 @@ function placeFromTrial(info: PieceInfo, state: PieceState, result: FlowResult):
     const s = next.sections[i];
     s.streak = 0;
     s.fails = 0;
+    s.tries = 0;
     if (level === 'known') s.rung = fluent ? rungs.length : firstTempo;
     else if (level === 'nearly') s.rung = together;
   });
@@ -708,15 +722,19 @@ export function applyResult(
     const s = next.sections[index];
     s.rung = settle(info, index, s.rung);
     const rung = rungs[s.rung];
+    // Only a phrase whose tries are counted can be said to have come right first time.
+    const firstTry = s.tries === 0;
+    s.tries = (s.tries ?? 0) + 1;
     if (ok) {
       // A clean first pass stands for both.
       const once = clean && s.streak === 0 && rung.need > 1;
-      const stumbled = s.fails > 0;
+      const stumbled = s.fails > 0 || !firstTry;
       s.streak = clean ? rung.need : s.streak + 1;
       s.fails = 0;
       if (s.streak >= rung.need) {
         s.rung = settle(info, index, s.rung + 1);
         s.streak = 0;
+        s.tries = 0;
         // The same words at every step would wear thin, so two take turns. Neither claims a first try that was not one.
         const lead = once ? (stumbled ? 'Clean this time, so once is enough.' : s.rung % 2 === 0 ? 'Right first time, so no need to repeat it.' : 'Clean, so once is enough.') : null;
         if (s.rung >= rungs.length) {
@@ -746,8 +764,9 @@ export function applyResult(
               ? `Measure ${m + 1} makes you stop each time. Let us take it on its own.`
               : `Measure ${m + 1} keeps tripping you. Let us fix it on its own.`;
         } else {
-          if (result.wrongNotes === 0) {
-            // No wrong keys at all: the learner stopped to think and the keys were shown. That is not a slip.
+          if (result.wrongNotes === 0 || (result.pausedSteps > pauseLimit(result) && result.accuracy >= 0.9)) {
+            // No wrong keys, or so few that it was the waiting that fell short: the learner stopped to think and
+            // the keys were shown. That is not a slip, and telling them to pause more would be the wrong advice.
             const paused = locate(result, 'pauses');
             message = paused
               ? `${paused.text} Once more, and see if those notes come sooner.`
@@ -761,6 +780,7 @@ export function applyResult(
       } else if (s.fails >= 2 && s.rung > 0 && rungs[s.rung - 1].mode !== 'listen') {
         s.rung -= 1;
         s.fails = 0;
+        s.tries = 0;
         message = 'That tempo is too quick for today. One step back, then up again.';
       } else if (found) {
         message = result.accuracy >= 0.87 ? `The notes were right. ${found}` : `${found} Try again, and keep the pulse going through any slip.`;
@@ -785,9 +805,34 @@ export function applyResult(
   if (task.scope.type === 'join') {
     if (ok) {
       next.joined = Math.max(next.joined, task.scope.upTo);
+      next.joinFails = 0;
       message = 'Joined. The seam is gone.';
     } else {
-      message = 'The join is where it wobbles. Once more, and think ahead to the first note of the second phrase.';
+      const fails = (state.joinFails ?? 0) + 1;
+      next.joinFails = fails;
+      // The seam is the end of one phrase and the start of the next.
+      const seam = info.sections[task.scope.upTo][0];
+      const spot = gathered(result);
+      const spots = troubleSpots(result, 1);
+      const firstTempo = rungs.findIndex((r) => r.mode === 'tempo');
+      const where = locate(result);
+      const atSeam = spot !== null && spot >= seam - 1 && spot <= seam;
+      if (spot !== null && !atSeam && task.to > task.from) {
+        // The trouble is inside a phrase, not at the join. That spot is taken out and fixed.
+        next.focus = { from: spot, to: Math.min(task.to, spot + 1), left: 2, hands: info.hands };
+        next.joinFails = 0;
+        message = `Most of the slips were around measure ${spot + 1}, not at the join. Let us take that out and fix it.`;
+      } else if (fails >= 2 && spots.length > 0 && firstTempo >= 0) {
+        // Two misses in a row: the phrase that gives the trouble goes back to its own slow beat.
+        const i = phraseOf(info, spots[0].measure);
+        next.sections[i] = { rung: firstTempo, streak: 0, fails: 0, tries: 0 };
+        next.joinFails = 0;
+        message = `Phrase ${i + 1} needs its slow beat again before the two will join. Back to that.`;
+      } else if (atSeam || !where) {
+        message = 'The join is where it wobbles. Once more, and think ahead to the first note of the second phrase.';
+      } else {
+        message = `${where.text} Once more, and keep going through the join.`;
+      }
     }
     return { state: next, verdict: { passed: ok, message, learned, aside } };
   }
@@ -845,7 +890,7 @@ export function applyResult(
     } else if (next.wholeFails >= 2 && spots.length > 0 && firstTempo >= 0) {
       // Already at the slowest tempo for the whole piece. The phrase that gives the trouble goes back to its own slow beat.
       const i = phraseOf(info, spots[0].measure);
-      next.sections[i] = { rung: firstTempo, streak: 0, fails: 0 };
+      next.sections[i] = { rung: firstTempo, streak: 0, fails: 0, tries: 0 };
       next.wholeFails = 0;
       message =
         info.sections.length > 1

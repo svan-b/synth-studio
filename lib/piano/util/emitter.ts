@@ -31,6 +31,30 @@ export function dayKey(d: Date = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
+/** The day `n` days after a day, as YYYY-MM-DD. Counted on the calendar, so a clock change makes no difference. */
+export function addDays(key: string, n: number): string {
+  const [y, m, d] = key.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+}
+
+/** A day as a count of days, for turning through things one day at a time. The same on either side of a clock change. */
+export function dayNumber(key: string): number {
+  const [y, m, d] = key.split('-').map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+}
+
+/** Noon on a day, local time: a moment that is safely inside it. */
+export function noonOf(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d, 12);
+}
+
+/** The last moment of the local day that `d` falls on. */
+export function endOfDay(d: Date = new Date()): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+}
+
 export function daysBetween(a: string, b: string): number {
   const [ay, am, ad] = a.split('-').map(Number);
   const [by, bm, bd] = b.split('-').map(Number);

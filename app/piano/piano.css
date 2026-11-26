@@ -14,6 +14,8 @@
   --mc-hint: 201 140 30;
   /* The same amber, dark enough to read as text. */
   --mc-hint-ink: 138 86 4;
+  /* Green dark enough to read as text. */
+  --mc-ok-ink: 22 101 60;
   --mc-key-white: 255 254 250;
   --mc-key-white-edge: 196 190 178;
   --mc-key-black: 34 32 29;
@@ -34,6 +36,7 @@
   --mc-bad: 238 127 109;
   --mc-hint: 232 182 85;
   --mc-hint-ink: 240 196 110;
+  --mc-ok-ink: 112 204 152;
   --mc-key-white: 236 232 224;
   --mc-key-white-edge: 150 144 132;
   --mc-key-black: 12 11 10;
@@ -193,10 +196,10 @@ html:has(.mc-root[data-theme='dark']) body {
   right: 0;
   bottom: 8px;
   text-align: center;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.02em;
-  color: rgb(108 103 94);
+  color: rgb(84 79 71);
   pointer-events: none;
 }
 .mc-key-b .mc-key-label {
@@ -217,9 +220,10 @@ html:has(.mc-root[data-theme='dark']) body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
-  color: white;
+  font-size: 15px;
+  font-weight: 800;
+  /* A dark figure on amber. White on it could not be read. */
+  color: rgb(30 28 25);
   background: rgb(var(--mc-hint));
   box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
   pointer-events: none;
@@ -234,12 +238,20 @@ html:has(.mc-root[data-theme='dark']) body {
 }
 .mc-key-badge.badge-accent {
   background: rgb(var(--mc-accent));
+  color: white;
 }
 .mc-key-badge.badge-ok {
-  background: rgb(var(--mc-ok));
+  background: rgb(var(--mc-ok-ink));
+  color: white;
 }
 .mc-key-badge.badge-ink {
   background: rgb(30 28 25);
+  color: white;
+}
+/* In the dark the blue and the green are light colours, so the figure on them is dark. */
+.mc-root[data-theme='dark'] .mc-key-badge.badge-accent,
+.mc-root[data-theme='dark'] .mc-key-badge.badge-ok {
+  color: rgb(18 17 16);
 }
 /* On a black key every badge is a white disc with a dark figure, whatever its kind, so it can always be read. */
 .mc-key-b .mc-key-badge.badge-accent,

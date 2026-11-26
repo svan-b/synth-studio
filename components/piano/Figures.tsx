@@ -41,7 +41,8 @@ function HandsFigure() {
               fontSize="14"
               fontWeight="700"
               fill="rgb(var(--mc-bg))"
-              transform={mirror ? `translate(${2 * f.x} 0) scale(-1 1)` : undefined}
+              // The number stands upright whichever way its finger leans, and reads the right way round on the mirrored hand.
+              transform={`rotate(${-f.rot} ${f.x} ${f.y + f.w / 2 + 2})${mirror ? ` translate(${2 * f.x} 0) scale(-1 1)` : ''}`}
             >
               {f.n}
             </text>

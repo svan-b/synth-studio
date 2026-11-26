@@ -121,7 +121,7 @@ export default function ConnectionPanel({ compact }: { compact?: boolean }) {
     <div className="space-y-4">
       {mode === 'midi' && (
         <div className="rounded-2xl border border-mc-ok/40 bg-mc-ok/10 px-5 py-4">
-          <div className="flex items-center gap-2 font-semibold text-mc-ok">
+          <div className="flex items-center gap-2 font-semibold text-mc-ok-ink">
             <Icon.Check size={20} />
             Connected to {m.inputs.map((p) => p.name).join(', ')}
           </div>

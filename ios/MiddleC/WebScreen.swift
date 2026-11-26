@@ -10,6 +10,12 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     private let piano = PianoLink()
     private let progress = ProgressFile()
     private var selfTest: SelfTest?
+    /// Whether keys are passed to the page. Not while the app is put away: keys queued then would arrive later as fresh presses.
+    private var inFront = true
+    /// Whether the page wants the screen kept on, as it does during practice. Elsewhere the iPad may sleep as usual.
+    private var wantsAwake = false
+    /// When the system last closed the page, to slow down if it keeps happening.
+    private var closings: [Date] = []
 
     override var prefersStatusBarHidden: Bool { true }
     override var prefersHomeIndicatorAutoHidden: Bool { true }
@@ -48,9 +54,17 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         piano.onBytes = { [weak self] id, bytes, arrived in self?.tell(id: id, bytes: bytes, arrived: arrived) }
         piano.start()
 
-        NotificationCenter.default.addObserver(self, selector: #selector(putAway), name: UIApplication.willResignActiveNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(broughtBack), name: UIApplication.didBecomeActiveNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(soundMoved), name: AVAudioSession.routeChangeNotification, object: nil)
+        // Music that plays with the ring switch on silent, alongside other apps.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(putAway), name: UIApplication.willResignActiveNotification, object: nil)
+        center.addObserver(self, selector: #selector(wentAway), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        center.addObserver(self, selector: #selector(closing), name: UIApplication.willTerminateNotification, object: nil)
+        center.addObserver(self, selector: #selector(broughtBack), name: UIApplication.didBecomeActiveNotification, object: nil)
+        center.addObserver(self, selector: #selector(soundMoved), name: AVAudioSession.routeChangeNotification, object: nil)
+        center.addObserver(self, selector: #selector(soundInterrupted(_:)), name: AVAudioSession.interruptionNotification, object: nil)
+        center.addObserver(self, selector: #selector(soundReset), name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
 
         if SelfTest.wanted {
             selfTest = SelfTest(webView: webView, piano: piano, progress: progress)
@@ -60,12 +74,43 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        // The iPad sits on the music stand untouched for minutes at a time.
-        UIApplication.shared.isIdleTimerDisabled = true
+        UIApplication.shared.isIdleTimerDisabled = wantsAwake
     }
 
     @objc private func putAway() {
         progress.backUpNow()
+    }
+
+    /// The app has gone to the background. Nothing the app asked the piano to play is left sounding,
+    /// and keys played from now until it returns are not passed on.
+    @objc private func wentAway() {
+        inFront = false
+        piano.panic()
+        progress.backUpNow()
+    }
+
+    @objc private func closing() {
+        piano.panic()
+    }
+
+    /// A call, Siri or another app took the sound. When it is given back, sound starts again without a tap.
+    @objc private func soundInterrupted(_ note: Notification) {
+        guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+              AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.webView?.evaluateJavaScript("window.__middleC && __middleC.wake && __middleC.wake();", completionHandler: nil)
+        }
+    }
+
+    /// The system restarted its sound services. The page's sound cannot recover from that, so the page is opened again.
+    /// Progress is saved as it changes, so nothing is lost.
+    @objc private func soundReset() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            self.piano.panic()
+            self.reopen()
+        }
     }
 
     /// The iPad's sound has gone somewhere else: headphones, a Bluetooth speaker, back to its own speaker.
@@ -74,9 +119,12 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     }
 
     @objc private func broughtBack() {
-        UIApplication.shared.isIdleTimerDisabled = true
+        inFront = true
+        UIApplication.shared.isIdleTimerDisabled = wantsAwake
         piano.rescan()
         tellSound()
+        // A page turning pedal or keyboard reaches the page only while it holds the focus.
+        webView?.becomeFirstResponder()
         // Sound stops when the app is put away. Start it again without waiting for a tap.
         webView?.evaluateJavaScript("window.__middleC && __middleC.wake && __middleC.wake();", completionHandler: nil)
     }
@@ -141,6 +189,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             piano.flush(id: id)
         case "sound.ask":
             tellSound()
+        case "screen.awake":
+            wantsAwake = (body["on"] as? Bool) ?? false
+            UIApplication.shared.isIdleTimerDisabled = wantsAwake
         case "bluetooth":
             showBluetoothPianos()
         case "selftest":
@@ -159,6 +210,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     }
 
     private func tell(id: String, bytes: [UInt8], arrived: Double) {
+        guard inFront else { return }
         let numbers = bytes.map { String($0) }.joined(separator: ",")
         let stamp = String(format: "%.3f", arrived)
         webView.evaluateJavaScript("window.__middleC && __middleC.midi && __middleC.midi.rx('\(id)',[\(numbers)],\(stamp));", completionHandler: nil)
@@ -179,7 +231,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
                 route = "headphones"
             }
         }
-        let delay = (session.outputLatency + session.ioBufferDuration) * 1000
+        // The time from the speaker's input to the ear. The page adds its own buffer on top.
+        let delay = session.outputLatency * 1000
         let info: [String: Any] = ["route": route, "name": output?.portName ?? "", "delayMs": delay.isFinite ? delay : 0]
         guard let data = try? JSONSerialization.data(withJSONObject: info), let json = String(data: data, encoding: .utf8) else { return }
         webView?.evaluateJavaScript("window.__middleC && __middleC.sound && __middleC.sound(\(json));", completionHandler: nil)
@@ -260,8 +313,15 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         decisionHandler(.cancel)
     }
 
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        // The page is about to be replaced, and with it whatever would have stopped its notes.
+        piano.panic()
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         tellSound()
+        // So that a page turning pedal works at once, without a tap first.
+        webView.becomeFirstResponder()
         selfTest?.pageLoaded()
     }
 
@@ -274,7 +334,17 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        // The system closed the page to free memory. Open it again where progress was saved.
+        // The system closed the page to free memory. Its notes are stopped, and it opens again where progress was saved.
+        piano.panic()
+        let now = Date()
+        closings = closings.filter { now.timeIntervalSince($0) < 60 } + [now]
+        // A page that keeps being closed is given a pause before the next try, so the app does not spin.
+        let wait = closings.count > 3 ? 10.0 : 0.0
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in self?.reopen() }
+    }
+
+    /// Open the page again from the start, handing it the progress saved so far.
+    private func reopen() {
         let controller = webView.configuration.userContentController
         controller.removeAllUserScripts()
         controller.addUserScript(WKUserScript(source: startScript(), injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -289,7 +359,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         type: WKMediaCaptureType,
         decisionHandler: @escaping @MainActor @Sendable (WKPermissionDecision) -> Void
     ) {
-        decisionHandler(.grant)
+        // The microphone only. The app has no use for the camera.
+        decisionHandler(type == .microphone ? .grant : .deny)
     }
 
     private static let missingPage = """

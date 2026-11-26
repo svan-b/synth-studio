@@ -13,7 +13,7 @@ import { midi } from '@/lib/piano/input/midi';
 import { usePiano } from '@/lib/piano/learn/store';
 import { pitchClass } from '@/lib/piano/music/theory';
 import FigureView from './Figures';
-import { readingMs, useHints, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
+import { QUIET_AFTER_AUTO, quietRemote, readingMs, useHints, useInputMode, usePracticeTimer, useQuietRemote, useRemote, useWakeLock } from './hooks';
 import { Keyboard, flashKey } from './Keyboard';
 import PlaySurface from './PlaySurface';
 import type { Activity } from './Screens';
@@ -131,7 +131,7 @@ function CheckStep({ step, onNext }: { step: StepOf<'check'>; onNext: () => void
 function Brief({ text, children, tone }: { text: string; children?: ReactNode; tone?: 'ok' | 'hint' }) {
   return (
     <div className="flex shrink-0 items-center gap-4 px-7 pb-2 pt-1">
-      <div className={`min-w-0 flex-1 text-[1.45rem] leading-snug ${tone === 'ok' ? 'text-mc-ok' : tone === 'hint' ? 'text-mc-hint-ink' : 'text-mc-ink/85'}`}>
+      <div className={`min-w-0 flex-1 text-[1.45rem] leading-snug ${tone === 'ok' ? 'text-mc-ok-ink' : tone === 'hint' ? 'text-mc-hint-ink' : 'text-mc-ink/85'}`}>
         <Prose text={text} />
       </div>
       <div className="flex shrink-0 items-center gap-2">{children}</div>
@@ -204,6 +204,9 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
   const [run, setRun] = useState(0);
   const [have, setHave] = useState(0);
   const [verdict, setVerdict] = useState<{ ok: boolean; text: string } | null>(null);
+  // Hearing the music played first, between attempts. Not where it is to be played from memory or only tapped.
+  const [hearing, setHearing] = useState(false);
+  const canHear = step.display !== 'hidden' && !step.anyKey;
   const inputMode = useInputMode();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -229,13 +232,27 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
 
   const again = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
+    setHearing(false);
     pedalPresses.current = 0;
     setVerdict(null);
     setRun((r) => r + 1);
   }, []);
 
+  /** Play the music through once, then the learner's turn comes back as it was. */
+  const hear = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    setVerdict(null);
+    setHearing(true);
+    setRun((r) => r + 1);
+  }, []);
+
   const onDone = useCallback(
     (result: FlowResult | null) => {
+      if (hearing) {
+        setHearing(false);
+        setRun((r) => r + 1);
+        return;
+      }
       if (!result) return;
       // A timed run in which no key was touched is not an attempt. It waits at the gate again.
       if (notAttempted(result)) {
@@ -252,6 +269,12 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
         } else if (step.touch === 'loud' && result.velocity < 0.6) {
           ok = false;
           text = 'Right notes, but not yet full. Let the weight of your arm fall into the keys.';
+        }
+        // The notes were right, so there is nothing to slow down for. Only the touch is to be put right.
+        if (!ok) {
+          setHave(0);
+          setVerdict({ ok: false, text });
+          return;
         }
       }
       // Where the step is about the pedal, the notes alone are not the point. Only a piano over MIDI reports its pedal.
@@ -307,7 +330,7 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
         });
       }
     },
-    [again, have, inputMode, mode, need, onAuto, step.hold, step.pedal, step.touch],
+    [again, have, hearing, inputMode, mode, need, onAuto, step.hold, step.pedal, step.touch],
   );
 
   // The same two keys mean the same two things all the way through: the top key goes on, the bottom key plays it again.
@@ -321,6 +344,11 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
           <Pill tone={have > 0 ? 'ok' : 'muted'}>
             {have} of {need}
           </Pill>
+        )}
+        {canHear && !hearing && (
+          <Button variant="soft" onClick={hear} icon={<Icon.Ear size={18} />}>
+            Hear it
+          </Button>
         )}
         {verdict && !verdict.ok ? (
           <>
@@ -354,7 +382,7 @@ function PlayStep({ step, onNext, onAuto }: { step: StepOf<'play'>; onNext: () =
         <PlaySurface
           score={score}
           hands={step.hands}
-          mode={mode}
+          mode={hearing ? 'listen' : mode}
           tempoPct={step.tempoPct ?? 100}
           display={step.display ?? 'staff'}
           hints={step.hints ?? 'delay'}
@@ -407,6 +435,8 @@ function EchoStep({ step, onNext, onAuto }: { step: StepOf<'echo'>; onNext: () =
       else onNext();
       return;
     }
+    // Moved on by itself: a press already on its way is not a wish to skip the pattern that follows.
+    if (auto === true) quietRemote(QUIET_AFTER_AUTO);
     setIndex((i) => i + 1);
     setTries(0);
     setNote(null);
@@ -614,7 +644,7 @@ function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }
                     state === 'idle'
                       ? 'border-mc-line bg-mc-surface active:bg-mc-raised'
                       : state === 'right'
-                        ? 'border-mc-ok bg-mc-ok/10 text-mc-ok'
+                        ? 'border-mc-ok bg-mc-ok/10 text-mc-ok-ink'
                         : state === 'wrong'
                           ? 'border-mc-bad bg-mc-bad/10 text-mc-bad'
                           : 'border-mc-line bg-mc-surface opacity-50'
@@ -662,6 +692,8 @@ function Complete({ lesson, onDone }: { lesson: Lesson; onDone: (then?: Activity
   }, [lesson, lessons, pieces, session]);
   const onward = useCallback(() => onDone(follow?.to), [follow, onDone]);
   useRemote({ primary: onward, pedal: true });
+  // The screen that closes a lesson is there to be seen. A second press hard on the first does not take it away.
+  useQuietRemote();
   useEffect(() => {
     instrument.chime();
   }, []);
@@ -707,20 +739,18 @@ function Complete({ lesson, onDone }: { lesson: Lesson; onDone: (then?: Activity
   );
 }
 
-/** After the lesson moves on by itself, how long a press is taken to be one that was already on its way. */
-const QUIET_AFTER_AUTO = 750;
-
 export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; onClose: (completed: boolean, then?: Activity) => void }) {
   const lesson = useMemo(() => getLesson(lessonId), [lessonId]);
   const stored = usePiano((s) => s.lessons[lessonId]);
   const setLessonStep = usePiano((s) => s.setLessonStep);
   const completeLesson = usePiano((s) => s.completeLesson);
   const addCards = usePiano((s) => s.addCards);
-  const logPractice = usePiano((s) => s.logPractice);
-  const [index, setIndex] = useState(() => (stored && !stored.done ? Math.min(stored.step, lesson.steps.length - 1) : 0));
+  // A lesson left part way opens where it was left. So does one marked as known and then opened to look through.
+  const resumable = stored && (!stored.done || stored.skipped);
+  const [index, setIndex] = useState(() => (resumable ? Math.min(stored.step, lesson.steps.length - 1) : 0));
   const [finished, setFinished] = useState(false);
   useWakeLock(true);
-  usePracticeTimer((seconds) => logPractice(seconds, 0, 1));
+  usePracticeTimer();
 
   const indexRef = useRef(index);
   indexRef.current = index;
@@ -732,6 +762,7 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
     if (auto === true) {
       // The lesson has moved on by itself. A press that was already on its way is not a wish to skip what comes next.
       quiet.current = now + QUIET_AFTER_AUTO;
+      quietRemote(QUIET_AFTER_AUTO);
     } else {
       if (now < quiet.current) return;
       // Two quick taps on Continue are one wish to go on, not two.
@@ -769,7 +800,7 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
   const back = useCallback(() => jump(indexRef.current - 1), [jump]);
   const step = lesson.steps[index];
   // How far the lesson has got. Turning back to look at something does not lose the place.
-  const reached = Math.max(index, stored && !stored.done ? stored.step : 0);
+  const reached = Math.max(index, resumable ? stored.step : 0);
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">

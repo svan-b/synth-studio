@@ -14,6 +14,8 @@ import {
   TECH_LEVELS,
   chordExercise,
   chordLevelCap,
+  rhythmLevelCap,
+  sightLevelCap,
   daySeed,
   earExercise,
   evenness,
@@ -29,17 +31,18 @@ import { usePiano } from '@/lib/piano/learn/store';
 import { parseScore } from '@/lib/piano/music/score';
 import { midiLabel, midiName } from '@/lib/piano/music/theory';
 import { shuffle } from '@/lib/piano/util/emitter';
-import { useHints, useInputMode, usePracticeTimer, useRemote, useWakeLock } from './hooks';
+import { QUIET_AFTER_AUTO, quietRemote, useHints, useInputMode, usePracticeTimer, useQuietRemote, useRemote, useWakeLock } from './hooks';
 import { Keyboard, flashKey, keyboardRange, type KeyMark } from './Keyboard';
 import PlaySurface from './PlaySurface';
 import ScoreView from './ScoreView';
 import { useOnward } from './session';
 import { Button, Icon, IconButton, Pill, ProgressBar } from './ui';
 
-function Shell({ title, progress, onClose, children }: { title: string; progress: number; onClose: () => void; children: ReactNode }) {
+function Shell({ title, progress, onClose, undone = false, children }: { title: string; progress: number; onClose: () => void; undone?: boolean; children: ReactNode }) {
   const { session } = useOnward();
   // On the closing screen of a part of the day's session, closing means stopping for today. Going on has its own button.
-  const close = () => (progress >= 1 && session ? session.stop() : onClose());
+  // An exercise that was passed over is not such a part: closing it leaves it to be done or passed over.
+  const close = () => (progress >= 1 && session && !undone ? session.stop() : onClose());
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
       <header className="flex h-14 shrink-0 items-center gap-3 px-4">
@@ -56,19 +59,25 @@ function Shell({ title, progress, onClose, children }: { title: string; progress
   );
 }
 
-function Summary({ title, lines, onDone }: { title: string; lines: string[]; onDone: () => void }) {
+function Summary({ title, lines, onDone, plain = false }: { title: string; lines: string[]; onDone: () => void; plain?: boolean }) {
   const hints = useHints();
   // Inside the day's session, the way out of a finished exercise is the way on to the next part.
   const { label, session } = useOnward();
-  useRemote({ primary: onDone, pedal: true });
+  // Passed over inside the day's session, it is put down as passed over, and the session goes on.
+  const go = plain && session ? session.pass : onDone;
+  useRemote({ primary: go, pedal: true });
+  // An exercise often ends by itself. A press already on its way is not a wish to leave its closing screen.
+  useQuietRemote();
   useEffect(() => {
-    instrument.chime();
-  }, []);
+    if (!plain) instrument.chime();
+  }, [plain]);
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-8 text-center">
-      <div className="mc-pop flex h-20 w-20 items-center justify-center rounded-full bg-mc-ok text-white">
-        <Icon.Check size={44} />
-      </div>
+      {!plain && (
+        <div className="mc-pop flex h-20 w-20 items-center justify-center rounded-full bg-mc-ok text-white">
+          <Icon.Check size={44} />
+        </div>
+      )}
       <h2 className="mc-fade-up font-mc-serif text-5xl">{title}</h2>
       <div className="mc-fade-up max-w-2xl space-y-1 text-[1.3rem] text-mc-muted">
         {lines.map((l, i) => (
@@ -76,13 +85,13 @@ function Summary({ title, lines, onDone }: { title: string; lines: string[]; onD
         ))}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        {session?.next && (
+        {session?.next && !plain && (
           <Button variant="ghost" size="lg" onClick={session.stop}>
             Stop for today
           </Button>
         )}
-        <Button size="lg" onClick={onDone} className="min-w-[260px]" hint={hints.onward}>
-          {label}
+        <Button size="lg" onClick={go} className="min-w-[260px]" hint={hints.onward}>
+          {plain && session ? 'Go on' : label}
         </Button>
       </div>
     </div>
@@ -188,7 +197,7 @@ function ReadingDrill({ onClose }: { onClose: (finished?: boolean) => void }) {
       <div className="flex h-full min-h-0 flex-col">
         <div className="px-7 text-[1.35rem] text-mc-ink/85">
           {reveal ? (
-            <span className={reveal.ok ? 'text-mc-ok' : 'text-mc-hint-ink'}>
+            <span className={reveal.ok ? 'text-mc-ok-ink' : 'text-mc-hint-ink'}>
               {reveal.ok ? 'Yes.' : 'Not that one.'} This note is <strong>{midiLabel(reveal.midi)}</strong>.
             </span>
           ) : (
@@ -248,10 +257,22 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
   const lessons = usePiano((s) => s.lessons);
   const recordDrill = usePiano((s) => s.recordDrill);
   const setDrillLevel = usePiano((s) => s.setDrillLevel);
-  // Chords, scales and arpeggios climb only as far as the lessons have gone: no minor chords before the lesson on them, and so on.
+  // Each exercise climbs only as far as the lessons have gone: no minor chords before the lesson on them,
+  // no eighth notes in a rhythm before the lesson that teaches them, and so on.
   const lessonDone = (id: string) => lessons[id]?.done === true;
-  const top =
-    kind === 'chords' ? Math.min(round.maxLevel, chordLevelCap(lessonDone)) : kind === 'technique' ? Math.min(round.maxLevel, techniqueLevelCap(lessonDone)) : round.maxLevel;
+  const cap =
+    kind === 'chords'
+      ? chordLevelCap(lessonDone)
+      : kind === 'technique'
+        ? techniqueLevelCap(lessonDone)
+        : kind === 'rhythm'
+          ? rhythmLevelCap(lessonDone)
+          : kind === 'sight'
+            ? sightLevelCap(lessonDone)
+            : round.maxLevel;
+  const top = Math.min(round.maxLevel, cap);
+  // Before the lesson on the staff, a rhythm is shown as its shape, each note as long as it lasts.
+  const shapeOnly = kind === 'rhythm' && !lessonDone('the-staff');
   const [level, setLevel] = useState(() => Math.max(1, Math.min(top, stored?.level ?? 1)));
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<'look' | 'listen' | 'play'>(kind === 'ear' ? 'listen' : kind === 'sight' ? 'look' : 'play');
@@ -260,6 +281,8 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
   const [note, setNote] = useState<{ ok: boolean; text: string; stand?: string } | null>(null);
   const [good, setGood] = useState(0);
   const [tries, setTries] = useState(0);
+  /** Items of this round that were played, as against passed over. */
+  const attempted = useRef(0);
   const [levelNote, setLevelNote] = useState<string | null>(null);
   const streakRef = useRef(0);
   const seedBase = useRef(daySeed(Math.floor(Math.random() * 1000)));
@@ -298,8 +321,10 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
   const advance = useCallback((auto?: boolean) => {
     // A press that was already on its way when the exercise moved on by itself is not a wish to skip the next one.
     const now = performance.now();
-    if (auto === true) quiet.current = now + 750;
-    else if (now < quiet.current) return;
+    if (auto === true) {
+      quiet.current = now + QUIET_AFTER_AUTO;
+      quietRemote(QUIET_AFTER_AUTO);
+    } else if (now < quiet.current) return;
     if (timer.current) clearTimeout(timer.current);
     setNote(null);
     setTries(0);
@@ -351,6 +376,7 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
         return;
       }
       if (!result) return;
+      attempted.current += 1;
       if (kind === 'ear') {
         if (result.clean) {
           adapt(true);
@@ -450,18 +476,26 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
 
   // As in a lesson: the top key always goes on, and the bottom key hears it again where there is something to hear.
   useRemote({
-    primary: phase === 'look' ? () => setPhase('play') : () => advance(),
+    // The time to look over a new line is not lost to a press that was meant for the one before it.
+    primary: phase === 'look' ? () => performance.now() >= quiet.current && setPhase('play') : () => advance(),
     secondary: hear,
   });
   const hints = useHints();
 
   if (finished) {
+    // Every item passed over with nothing played: the exercise was not done, and does not count as done.
+    const played = attempted.current > 0;
     return (
-      <Shell title={round.title} progress={1} onClose={() => onClose(true)}>
+      <Shell title={round.title} progress={1} onClose={() => onClose(played)} undone={!played}>
         <Summary
-          title={`${round.title} done`}
-          lines={[`${good} of ${round.count} went well.`, levelNote ?? 'The difficulty follows how you do, so it stays just within reach.']}
-          onDone={() => onClose(true)}
+          title={played ? `${round.title} done` : `${round.title} passed over`}
+          lines={
+            played
+              ? [`${good} of ${round.count} went well.`, levelNote ?? 'The difficulty follows how you do, so it stays just within reach.']
+              : ['Nothing was played, so it is not counted as done.']
+          }
+          onDone={() => onClose(played)}
+          plain={!played}
         />
       </Shell>
     );
@@ -488,7 +522,7 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
     <Shell title={round.title} progress={index / round.count} onClose={() => onClose(false)}>
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex shrink-0 items-center gap-4 px-7 pb-2 pt-1">
-          <div className={`min-w-0 flex-1 text-[1.35rem] leading-snug ${note ? (note.ok ? 'text-mc-ok' : 'text-mc-hint-ink') : 'text-mc-ink/85'}`}>
+          <div className={`min-w-0 flex-1 text-[1.35rem] leading-snug ${note ? (note.ok ? 'text-mc-ok-ink' : 'text-mc-hint-ink') : 'text-mc-ink/85'}`}>
             {note ? note.text : brief.split('**').map((part, i) => (i % 2 ? <strong key={i} className="text-mc-ink">{part}</strong> : <span key={i}>{part}</span>))}
           </div>
           <Pill>Level {level}</Pill>
@@ -516,7 +550,8 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
             <PlaySurface
               score={score}
               mode={phase === 'listen' ? 'listen' : kind === 'ear' || kind === 'chords' ? 'wait' : 'tempo'}
-              display={kind === 'ear' ? 'hidden' : kind === 'chords' ? 'chart' : 'staff'}
+              display={kind === 'ear' ? 'hidden' : kind === 'chords' ? 'chart' : shapeOnly ? 'contour' : 'staff'}
+              contourLabel={shapeOnly ? 'none' : undefined}
               // A chord not found in a while is shown, so nobody is left stuck. It then counts as shown.
               hints={kind === 'chords' ? 'delay' : 'never'}
               // Working a chord out from its symbol takes a while. The first one counts like the rest.
@@ -542,9 +577,8 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
 }
 
 export default function Drill({ kind, onClose }: { kind: DrillKind; onClose: (finished?: boolean) => void }) {
-  const logPractice = usePiano((s) => s.logPractice);
   useWakeLock(true);
-  usePracticeTimer((seconds) => logPractice(seconds, 0, 1));
+  usePracticeTimer();
   if (kind === 'reading') return <ReadingDrill onClose={onClose} />;
   return <GeneratedDrill kind={kind} onClose={onClose} />;
 }

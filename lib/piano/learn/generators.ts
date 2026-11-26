@@ -24,6 +24,15 @@ const CELLS: string[][] = [
 
 export const RHYTHM_LEVELS = CELLS.length;
 
+/** How far up the rhythm ladder the lessons taken so far reach: rests, eighths, dotted notes and sixteenths each wait for their lesson. */
+export function rhythmLevelCap(done: (lessonId: string) => boolean): number {
+  if (done('sixteenths')) return 6;
+  if (done('dotted-rhythm')) return 5;
+  if (done('eighth-notes')) return 3;
+  if (done('reading-rhythm')) return 2;
+  return 1;
+}
+
 function rhythmMeasure(level: number, rnd: Rnd, pitch: string, last: boolean): string {
   const cells = CELLS[Math.max(0, Math.min(CELLS.length - 1, level - 1))];
   if (last) {
@@ -63,7 +72,9 @@ export function earExercise(level: number, seed: number, hand: 'R' | 'L' = 'R'):
   const rnd = mulberry32(seed * 104729 + level * 17);
   const scale = hand === 'R' ? C_POSITION : C_POSITION_LEFT;
   const count = level <= 1 ? 3 : level <= 3 ? 4 : 5;
-  const maxLeap = level <= 2 ? 1 : level <= 3 ? 2 : 4;
+  // Skips of a third come in from the first level, so that there are patterns enough to tell apart.
+  // Steps are still favoured, below.
+  const maxLeap = level <= 2 ? 2 : level <= 3 ? 3 : 4;
   const idx: number[] = [0];
   for (let i = 1; i < count; i++) {
     const prev = idx[i - 1];
@@ -90,6 +101,15 @@ export function earExercise(level: number, seed: number, hand: 'R' | 'L' = 'R'):
 // ---------------------------------------------------------- sight reading
 
 export const SIGHT_LEVELS = 6;
+
+/** How far up the sight reading ladder the lessons reach: skips, the bass clef, eighths and the key of G each wait for their lesson. */
+export function sightLevelCap(done: (lessonId: string) => boolean): number {
+  if (done('g-position') && done('dotted-rhythm')) return 6;
+  if (done('eighth-notes') && done('bass-clef')) return 4;
+  if (done('bass-clef')) return 3;
+  if (done('skips-on-staff')) return 2;
+  return 1;
+}
 
 interface SightSpec {
   key: string;

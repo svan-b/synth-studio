@@ -92,13 +92,40 @@ final class PianoLink {
         let words = Self.words(from: bytes)
         guard !words.isEmpty, words.count <= 32 else { return }
         var when: MIDITimeStamp = 0
-        if delayMs > 1 {
-            when = mach_absolute_time() + UInt64(delayMs * 1_000_000 / nanosPerTick)
+        // A time from the page is used only when it is sane: never more than ten seconds ahead.
+        if delayMs.isFinite, delayMs > 1 {
+            let ticks = UInt64(min(delayMs, 10_000) * 1_000_000 / nanosPerTick)
+            when = mach_absolute_time() &+ ticks
         }
+        sendWords(words, to: destination, at: when)
+    }
+
+    /// Stop everything the app asked the pianos to play: notes still to come, and notes sounding.
+    /// For the moments the page cannot do it itself: the app put away, the page reloading or closed by the system.
+    func panic() {
+        var words: [UInt32] = [Self.word(0xB0, 64, 0), Self.word(0xB0, 123, 0)]
+        for note in UInt8(21)...UInt8(108) { words.append(Self.word(0x80, note, 0)) }
+        for destination in Set(destinations.values) {
+            _ = MIDIFlushOutput(destination)
+            var start = 0
+            while start < words.count {
+                let end = min(start + 30, words.count)
+                sendWords(Array(words[start..<end]), to: destination, at: 0)
+                start = end
+            }
+        }
+    }
+
+    private func sendWords(_ words: [UInt32], to destination: MIDIEndpointRef, at when: MIDITimeStamp) {
         var list = MIDIEventList()
         let first = MIDIEventListInit(&list, ._1_0)
         _ = MIDIEventListAdd(&list, MemoryLayout<MIDIEventList>.size, first, when, words.count, words)
         _ = MIDISendEventList(outPort, destination, &list)
+    }
+
+    /// One channel message as the 32 bit word the system sends.
+    private static func word(_ status: UInt8, _ first: UInt8, _ second: UInt8) -> UInt32 {
+        (UInt32(0x2) << 28) | (UInt32(status) << 16) | (UInt32(first & 0x7F) << 8) | UInt32(second & 0x7F)
     }
 
     /// Withdraw anything sent to an instrument with a time that has not come yet.

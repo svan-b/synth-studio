@@ -138,6 +138,32 @@ describe('MIDI messages from a piano', () => {
     expect(remote).toEqual(['pedal']);
   });
 
+  it('leaves the left and middle pedals as pedals while music is being played', async () => {
+    // Feet off the pedals to begin with.
+    send(0xb0, 66, 0);
+    send(0xb0, 67, 0);
+    await new Promise((r) => setTimeout(r, 400));
+    // Music on the stand and nothing played yet: they are buttons still, so a step can be passed over.
+    input.expect([60]);
+    send(0xb0, 66, 127);
+    send(0xb0, 66, 0);
+    expect(remote).toEqual(['primary']);
+    // Once the learner is playing it, the soft pedal in a quiet passage starts nothing again, and the middle one skips nothing.
+    send(0x90, 60, 80);
+    send(0x80, 60, 0);
+    await new Promise((r) => setTimeout(r, 400));
+    send(0xb0, 67, 127);
+    send(0xb0, 67, 0);
+    send(0xb0, 66, 127);
+    send(0xb0, 66, 0);
+    expect(remote).toEqual(['primary']);
+    // The music over, they are buttons again at once.
+    input.expect(null);
+    send(0xb0, 67, 127);
+    send(0xb0, 67, 0);
+    expect(remote).toEqual(['primary', 'secondary']);
+  });
+
   it('counts one press of a pedal that reports how far down it is as one press', async () => {
     send(0xb0, 64, 0);
     await new Promise((r) => setTimeout(r, 1300));

@@ -13,6 +13,7 @@
  *                    bluetooth                  show the Bluetooth MIDI list
  *                    midi.flush id              withdraw notes sent with a time still to come
  *                    sound.ask                  say again where the iPad's sound is going
+ *                    screen.awake on            keep the screen on, during practice, or let it sleep
  *
  *   app to page    __middleC.midi.ports([{ id, name, kind, transport }])
  *                  __middleC.midi.rx(id, [bytes], epochMs)
@@ -69,9 +70,38 @@
   };
   Port.prototype.send = function (data, timestamp) {
     var delay = 0;
-    if (typeof timestamp === 'number' && timestamp > 0) delay = Math.max(0, timestamp - performance.now());
+    // A time is used only when it is sane: never more than ten seconds ahead.
+    if (typeof timestamp === 'number' && isFinite(timestamp) && timestamp > 0) delay = Math.min(10000, Math.max(0, timestamp - performance.now()));
     app.post({ type: 'midi.send', id: this.id, bytes: Array.prototype.slice.call(data), delayMs: delay });
   };
+
+  /** Keys reaching the page more than this long after they were played are not taken as new presses. */
+  var STALE_MS = 1000;
+
+  /**
+   * Of a late batch of messages, only the releases: keys up and pedals up.
+   * A key pressed while the app was away must not arrive later as a fresh
+   * press, since the end keys and pedals move the lesson on. Its release is
+   * still let through, so nothing is left held down.
+   */
+  function releasesOnly(bytes) {
+    var out = [];
+    var i = 0;
+    while (i < bytes.length) {
+      var status = bytes[i];
+      if (status < 0x80) {
+        i++;
+        continue;
+      }
+      var family = status & 0xf0;
+      var size = family === 0xc0 || family === 0xd0 ? 2 : 3;
+      var message = bytes.slice(i, i + size);
+      var release = family === 0x80 || (family === 0x90 && message[2] === 0) || (family === 0xb0 && message[2] < 64);
+      if (release && message.length === size) out = out.concat(message);
+      i += size;
+    }
+    return out;
+  }
 
   function reconcile(map, list) {
     var seen = {};
@@ -151,10 +181,16 @@
       if (!port) return;
       var now = performance.now();
       var stamp = now;
-      if (typeof epochMs === 'number') {
-        // The page's clock counts from when it opened. Trust the app's time only when it is plausible.
-        var t = epochMs - performance.timeOrigin;
-        if (t <= now + 2 && now - t < 200) stamp = Math.min(t, now);
+      if (typeof epochMs === 'number' && isFinite(epochMs)) {
+        // How long ago the keys were played, with both times on the wall clock. The page's own clock
+        // can stop while the iPad sleeps, so the two are never mixed.
+        var age = Date.now() - epochMs;
+        if (age > STALE_MS) {
+          bytes = releasesOnly(bytes);
+          if (!bytes.length) return;
+        } else if (age > 0 && age < 200) {
+          stamp = now - age;
+        }
       }
       var event = { type: 'midimessage', target: port, data: new Uint8Array(bytes), timeStamp: stamp, receivedTime: stamp };
       if (typeof port.onmidimessage === 'function') port.onmidimessage(event);

@@ -10,10 +10,10 @@ import { midi } from '@/lib/piano/input/midi';
 import { getLesson, pieceInfo } from '@/lib/piano/content/catalog';
 import { pieceProgress } from '@/lib/piano/learn/coach';
 import { currentPiece, planDay, planSession, type Block } from '@/lib/piano/learn/planner';
-import { streak, usePiano, type SessionBase } from '@/lib/piano/learn/store';
-import { dayKey } from '@/lib/piano/util/emitter';
+import { saveTrouble, streak, usePiano, type SessionBase } from '@/lib/piano/learn/store';
+import { addDays, dayKey, noonOf } from '@/lib/piano/util/emitter';
 import Drill from './Drills';
-import { useApplySettings, useHints, useRemote, useTheme } from './hooks';
+import { useApplySettings, useHints, useQuietRemote, useRemote, useTheme, useWakeLock } from './hooks';
 import LessonPlayer from './LessonPlayer';
 import Onboarding from './Onboarding';
 import PracticeRoom from './PracticeRoom';
@@ -73,7 +73,7 @@ function recap(before: SessionBase, parts: Block[]): Array<[string, string]> {
 /** What tomorrow's session opens with, to give the next visit something to come back to. */
 function tomorrow(): string | null {
   const s = usePiano.getState();
-  const day = planDay({ minutes: s.profile.minutes, lessons: s.lessons, pieces: s.pieces, cards: s.cards, days: s.days, drills: s.drills, now: new Date(Date.now() + 86400000) });
+  const day = planDay({ minutes: s.profile.minutes, lessons: s.lessons, pieces: s.pieces, cards: s.cards, days: s.days, drills: s.drills, now: noonOf(addDays(dayKey(), 1)) });
   const plan = day.blocks;
   const first = plan.find((b) => b.kind === 'lesson') ?? plan.find((b) => b.kind === 'piece') ?? plan[0];
   if (!first) return null;
@@ -94,6 +94,18 @@ function baseOf(parts: Block[]): SessionBase {
   return base;
 }
 
+/**
+ * The part a session comes to from `from` on. A lesson that was finished some
+ * other way since the day was planned, as from the course, is behind the
+ * learner already, so it is not opened again.
+ */
+function partFrom(list: Block[], from: number): number {
+  const lessons = usePiano.getState().lessons;
+  let i = Math.max(0, from);
+  while (i < list.length && list[i].kind === 'lesson' && lessons[list[i].id]?.done === true) i++;
+  return Math.min(i, list.length);
+}
+
 /** Runs the parts of a daily session one after another. */
 function SessionRunner({
   blocks: planned,
@@ -110,7 +122,7 @@ function SessionRunner({
 }) {
   // The parts can grow: when a piece is learned with time to spare, the next piece takes the rest of it.
   const [blocks, setBlocks] = useState(planned);
-  const [index, setIndex] = useState(() => Math.max(0, Math.min(from, planned.length)));
+  const [index, setIndex] = useState(() => partFrom(planned, Math.min(from, planned.length)));
   // Parts that were passed over. They are behind, and they are not done.
   const [skipped, setSkipped] = useState<number[]>(() => passed ?? []);
   // A session goes straight into its first part, and from each finished part straight into the
@@ -121,17 +133,20 @@ function SessionRunner({
   const keepSession = usePiano((s) => s.keepSession);
   const lessons = usePiano((s) => s.lessons);
   const hints = useHints();
+  useWakeLock(true);
   const done = index >= blocks.length;
   const marked = useRef(false);
   const base = useRef<SessionBase>(began ?? baseOf(planned));
   const blockStarted = useRef(performance.now());
+  // The day the session belongs to. One that runs past midnight is still the day it began.
+  const startedOn = useRef(dayKey());
   const [summary, setSummary] = useState<{ rows: Array<[string, string]>; next: string | null } | null>(null);
   // A session in which nothing was finished has not been done. It is put back as it was.
   const nothingDone = done && skipped.length >= blocks.length;
 
   // Where the session stands is kept as it goes, so that stopping, or the app closing, loses nothing.
   useEffect(() => {
-    if (!done) keepSession({ on: dayKey(), blocks, index, skipped, base: base.current });
+    if (!done) keepSession({ on: startedOn.current, blocks, index, skipped, base: base.current });
   }, [blocks, done, index, keepSession, skipped]);
 
   useEffect(() => {
@@ -168,15 +183,17 @@ function SessionRunner({
       const justLearned = block?.kind === 'piece' && state.pieces[block.id]?.learned === true && base.current.pieces[block.id]?.learned !== true;
       const nextPiece = justLearned && left >= 3 ? currentPiece(state.lessons, state.pieces) : null;
       const extra = nextPiece !== null && !blocks.some((b) => b.kind === 'piece' && b.id === nextPiece);
+      let list = blocks;
       if (extra && nextPiece) {
         const info = pieceInfo(nextPiece);
         const added: Block = { kind: 'piece', id: nextPiece, minutes: left, title: info.title, detail: 'There is time left, so on to the next piece' };
         base.current.pieces[nextPiece] = state.pieces[nextPiece] ?? null;
-        setBlocks((list) => [...list.slice(0, index + 1), added, ...list.slice(index + 1)]);
+        list = [...blocks.slice(0, index + 1), added, ...blocks.slice(index + 1)];
+        setBlocks(list);
         // The parts after it have moved along by one.
-        setSkipped((list) => list.map((i) => (i > index ? i + 1 : i)));
+        setSkipped((was) => was.map((i) => (i > index ? i + 1 : i)));
       }
-      setIndex((i) => i + 1);
+      setIndex(partFrom(list, index + 1));
       blockStarted.current = performance.now();
       // Straight on, when the part ended on its own closing screen, which named what comes next.
       // A part nobody was told about gets a screen to say so first.
@@ -186,19 +203,30 @@ function SessionRunner({
   );
   const skip = useCallback(() => {
     setSkipped((list) => (list.includes(index) ? list : [...list, index]));
-    setIndex((i) => i + 1);
+    setIndex(partFrom(blocks, index + 1));
     setBetween('next');
-  }, [index]);
+  }, [blocks, index]);
   /** Stop from the closing screen of a part: that part is done, so the session is kept from the next one. */
   const stopAfter = useCallback(() => {
-    if (index + 1 >= blocks.length) finishSession();
-    else keepSession({ on: dayKey(), blocks, index: index + 1, skipped, base: base.current });
+    const next = partFrom(blocks, index + 1);
+    if (next >= blocks.length) {
+      // Nothing is left, so this is the end of the session, and it closes with its account like any other.
+      setIndex(next);
+      return;
+    }
+    keepSession({ on: startedOn.current, blocks, index: next, skipped, base: base.current });
     onClose();
-  }, [blocks, finishSession, index, keepSession, onClose, skipped]);
+  }, [blocks, index, keepSession, onClose, skipped]);
   // The bottom key means again everywhere else, so here it does nothing. Stopping is a deliberate tap.
   useRemote({ primary: done ? onClose : between ? start : undefined, pedal: true }, between !== null || done);
 
-  const link = useMemo<SessionLink>(() => ({ next: blocks[index + 1]?.title ?? null, stop: stopAfter }), [blocks, index, stopAfter]);
+  // `lessons` is read so that what comes next is named afresh when a lesson is finished.
+  const link = useMemo<SessionLink>(() => {
+    void lessons;
+    return { next: blocks[partFrom(blocks, index + 1)]?.title ?? null, stop: stopAfter, pass: skip };
+  }, [blocks, index, lessons, skip, stopAfter]);
+  // A screen between parts, or the one that closes the session, is there to be read before a press takes it away.
+  useQuietRemote(done ? 'done' : between, undefined, done || between !== null);
 
   if (!done && !between) {
     return (
@@ -291,6 +319,9 @@ export default function App() {
   const autoMidi = usePiano((s) => s.settings.autoMidi);
   const [view, setView] = useState<View>('today');
   const [activity, setActivity] = useState<Activity | null>(null);
+  // Progress that could not be written down in this browser. Said once a visit, not on every note.
+  const [cannotSave, setCannotSave] = useState<'yes' | 'told' | null>(null);
+  useEffect(() => saveTrouble.subscribe(() => setCannotSave((was) => was ?? 'yes')), []);
   useApplySettings();
 
   // Browsers only let sound start in answer to a deliberate action. On a
@@ -319,11 +350,30 @@ export default function App() {
     if (!isNative()) return;
     void midi.connect();
     void piano.unlock();
-    onWake(() => void piano.unlock());
+    const offWake = onWake(() => void piano.unlock());
     // Hands may never touch the screen. A key played on the piano wakes the sound too.
-    return noteBus.subscribe((ev) => {
+    const offNotes = noteBus.subscribe((ev) => {
       if (ev.type === 'on' && ev.source === 'midi') void piano.unlock();
     });
+    return () => {
+      offWake();
+      offNotes();
+    };
+  }, []);
+
+  // When the app is put away or the page closes, anything it asked the piano to play stops, so no note
+  // is left sounding while nobody is there to hear it.
+  useEffect(() => {
+    const hidden = () => {
+      if (document.visibilityState === 'hidden') instrument.stop();
+    };
+    const gone = () => instrument.stop();
+    document.addEventListener('visibilitychange', hidden);
+    window.addEventListener('pagehide', gone);
+    return () => {
+      document.removeEventListener('visibilitychange', hidden);
+      window.removeEventListener('pagehide', gone);
+    };
   }, []);
 
   // Once a piano has been connected by hand, later visits reconnect to it by
@@ -412,6 +462,18 @@ export default function App() {
       {activity?.kind === 'drill' && <Drill kind={activity.id} onClose={close} />}
       {activity?.kind === 'session' && <SessionRunner blocks={activity.blocks} from={activity.from} skipped={activity.skipped} base={activity.base} onClose={close} />}
       {!onboarded && <Onboarding onDone={() => setView('today')} />}
+      {cannotSave === 'yes' && (
+        <div role="alert" className="absolute inset-x-0 bottom-0 z-[60] flex justify-center px-4 pb-4 mc-safe-bottom">
+          <div className="flex max-w-3xl items-center gap-4 rounded-2xl bg-mc-ink px-5 py-3.5 text-mc-bg shadow-lg">
+            <p className="text-[1.05rem] leading-snug">
+              This browser is not keeping your progress. Private browsing, or a full disk, can do this. Save a backup in Settings before you close the page.
+            </p>
+            <Button variant="soft" onClick={() => setCannotSave('told')}>
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
