@@ -38,10 +38,11 @@ import ScoreView from './ScoreView';
 import { useOnward } from './session';
 import { Button, Icon, IconButton, Pill, ProgressBar } from './ui';
 
-function Shell({ title, progress, onClose, children }: { title: string; progress: number; onClose: () => void; children: ReactNode }) {
+function Shell({ title, progress, onClose, undone = false, children }: { title: string; progress: number; onClose: () => void; undone?: boolean; children: ReactNode }) {
   const { session } = useOnward();
   // On the closing screen of a part of the day's session, closing means stopping for today. Going on has its own button.
-  const close = () => (progress >= 1 && session ? session.stop() : onClose());
+  // An exercise that was passed over is not such a part: closing it leaves it to be done or passed over.
+  const close = () => (progress >= 1 && session && !undone ? session.stop() : onClose());
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-mc-bg mc-safe-top mc-safe-bottom">
       <header className="flex h-14 shrink-0 items-center gap-3 px-4">
@@ -62,7 +63,9 @@ function Summary({ title, lines, onDone, plain = false }: { title: string; lines
   const hints = useHints();
   // Inside the day's session, the way out of a finished exercise is the way on to the next part.
   const { label, session } = useOnward();
-  useRemote({ primary: onDone, pedal: true });
+  // Passed over inside the day's session, it is put down as passed over, and the session goes on.
+  const go = plain && session ? session.pass : onDone;
+  useRemote({ primary: go, pedal: true });
   // An exercise often ends by itself. A press already on its way is not a wish to leave its closing screen.
   useQuietRemote();
   useEffect(() => {
@@ -82,13 +85,13 @@ function Summary({ title, lines, onDone, plain = false }: { title: string; lines
         ))}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        {session?.next && (
+        {session?.next && !plain && (
           <Button variant="ghost" size="lg" onClick={session.stop}>
             Stop for today
           </Button>
         )}
-        <Button size="lg" onClick={onDone} className="min-w-[260px]" hint={hints.onward}>
-          {label}
+        <Button size="lg" onClick={go} className="min-w-[260px]" hint={hints.onward}>
+          {plain && session ? 'Go on' : label}
         </Button>
       </div>
     </div>
@@ -483,7 +486,7 @@ function GeneratedDrill({ kind, onClose }: { kind: Generated; onClose: (finished
     // Every item passed over with nothing played: the exercise was not done, and does not count as done.
     const played = attempted.current > 0;
     return (
-      <Shell title={round.title} progress={1} onClose={() => onClose(played)}>
+      <Shell title={round.title} progress={1} onClose={() => onClose(played)} undone={!played}>
         <Summary
           title={played ? `${round.title} done` : `${round.title} passed over`}
           lines={

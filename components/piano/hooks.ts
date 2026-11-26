@@ -63,7 +63,7 @@ let remoteSeq = 0;
 let remoteQuietUntil = 0;
 
 /** How long after the screen changes hands before a press counts: a press already on its way was meant for what was there before. */
-const QUIET_AFTER_CHANGE = 450;
+const QUIET_AFTER_CHANGE = 500;
 /** Longer where the screen moved on by itself, since nobody chose the moment. */
 export const QUIET_AFTER_AUTO = 750;
 

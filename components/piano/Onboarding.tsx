@@ -8,7 +8,7 @@ import { describeBackup, readBackup } from '@/lib/piano/learn/backup';
 import { COURSE, usePiano, type Experience } from '@/lib/piano/learn/store';
 import { isNative } from '@/lib/piano/native/bridge';
 import ConnectionPanel from './Connection';
-import { useHints, useInputMode, useRemote } from './hooks';
+import { QUIET_ON_CLOSING, quietRemote, useHints, useInputMode, useRemote } from './hooks';
 import { Button, Icon } from './ui';
 
 const LEVELS: Array<{ value: Experience; title: string; text: string }> = [
@@ -138,6 +138,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     }
     if (from > 1) markKnownThrough(from - 1);
     setProfile({ onboarded: true });
+    // The page behind setup is the day's session. A second press hard on the first does not start it.
+    quietRemote(QUIET_ON_CLOSING);
     onDone();
   };
   // Once the piano is connected its keys turn these pages too, and nothing behind them can be reached.

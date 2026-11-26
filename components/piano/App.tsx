@@ -223,8 +223,8 @@ function SessionRunner({
   // `lessons` is read so that what comes next is named afresh when a lesson is finished.
   const link = useMemo<SessionLink>(() => {
     void lessons;
-    return { next: blocks[partFrom(blocks, index + 1)]?.title ?? null, stop: stopAfter };
-  }, [blocks, index, lessons, stopAfter]);
+    return { next: blocks[partFrom(blocks, index + 1)]?.title ?? null, stop: stopAfter, pass: skip };
+  }, [blocks, index, lessons, skip, stopAfter]);
   // A screen between parts, or the one that closes the session, is there to be read before a press takes it away.
   useQuietRemote(done ? 'done' : between, undefined, done || between !== null);
 

@@ -12,6 +12,8 @@ export interface SessionLink {
   next: string | null;
   /** Stop for today. The session is kept, and picked up from the next part. */
   stop: () => void;
+  /** Go on without this part having been done. It is put down as passed over. */
+  pass: () => void;
 }
 
 export const SessionContext = createContext<SessionLink | null>(null);
