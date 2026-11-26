@@ -86,7 +86,7 @@ function Gauge({ off, active }: { off: number | null; active: boolean }) {
  */
 export default function Tuner({ onDone, compact = false, bar = false }: { onDone?: () => void; compact?: boolean; /** The screen has a bar of its own to move on with. */ bar?: boolean }) {
   const markTuned = useGuitar((s) => s.markTuned);
-  const { status, start } = useListening(true);
+  const { status, start, ask } = useListening(true);
   const listening = status.state === 'listening';
   const [target, setTarget] = useState<StringNo | 'any'>(6);
   const [done, setDone] = useState<Set<StringNo>>(new Set());
@@ -238,7 +238,7 @@ export default function Tuner({ onDone, compact = false, bar = false }: { onDone
     instrument.reference(OPEN_MIDI[shown], shown);
   };
 
-  if (!listening) {
+  if (ask) {
     return (
       <div className="flex flex-col items-center gap-4 rounded-3xl bg-os-surface p-8 text-center">
         <Icon.Tuner size={40} />

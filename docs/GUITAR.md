@@ -15,7 +15,7 @@ A guitar teacher for an acoustic guitar and an iPad on a stand. It lives at `/gu
 - **Exercises**: a chord check from names (spaced review), one minute changes, strumming with the click, and ear training.
 - **A daily session** sized to the time you have. It starts by tuning up, brings the new lesson early, gives most of the time to songs, and ends on something you already play well. New lessons wait while two songs are still being learned.
 - **Made to keep you playing.** The week shows the days you played, not a run of days that one missed day would wipe out. After a break the app says welcome back and picks up where you were. You choose a time to play, and inside the iPad app a reminder comes at that time on days you have not played yet. Each session ends with what changed, and what tomorrow holds.
-- **A sound check.** The app strums, you strum, and it tells you whether the iPad is loud enough beside your guitar, with the iPad's own volume shown.
+- **A sound check that needs no guitar.** The app plays its guitar, then its click, and you turn the iPad up until each is easy to hear from your chair, with the iPad's own volume shown.
 - **The method page** in the app sets out each teaching choice, the studies behind it, and how strong the evidence is.
 
 ## Made for hands on the guitar
@@ -26,8 +26,11 @@ The learner sits with a guitar on the lap and the iPad on a stand about an arm's
 - **One bar along the bottom** holds every control, in the same places on every screen. Back, again and hearing it sit on one side. The next thing to do sits on the other side and is the largest button on the screen. For a left handed player the sides swap.
 - **The app moves on by itself.** After a step that went well, the next one begins in a few seconds, shown as a count on the button. A touch anywhere else holds it there for as long as the learner wants to read.
 - **A strum starts things.** Where the app waits to begin a run, one strum begins it. Between the parts of a session a strum carries on to the next part.
-- **A foot pedal works.** Bluetooth page turning pedals are small keyboards, so the keys they send are answered: right arrow, down arrow, page down, return and space go forward, and left arrow, up arrow and page up go back or play it again. A keyboard works the same way.
-- **Nobody gets stuck.** Every step can be skipped. A step that is not heard right after three tries is let go and the lesson carries on, and after two failed runs the main button becomes Move on. In a song, the plan opens to show every step, and a tap on any of them goes there.
+- **A foot pedal works.** Bluetooth page turning pedals are small keyboards, so the keys they send are answered: right arrow, down arrow, page down, return and space go forward, and left arrow, up arrow and page up go back or play it again. A keyboard works the same way. The pedal only ever does the plain next thing. It never skips a step, since leaving something undone should take a deliberate touch.
+- **Nobody gets stuck.** Every step can be skipped with a touch. A step that is not heard right after three tries is let go and the lesson carries on, and after two failed runs the main button becomes Move on. In a song, the plan opens to show every step, and a tap on any of them goes there. Going back in the plan asks first, since it gives up steps already held.
+- **Skipping is honest.** A lesson gone through without playing any of it is kept as one you know, not as one taken today: it adds no chords to your reviews and claims no milestone. A session with every part skipped does not count as the day's session. A one minute test that is stopped part way keeps no score.
+- **A stray press does no harm.** For a moment after a screen changes, a press that would move on is taken to be meant for the screen before and is let pass. A strum only carries a session on when it is a real strum of several strings, not one plucked note or a knock on the guitar.
+- **Leaving and coming back.** A lesson closed part way opens at the same step. A session left part way is carried on from the same part later that day. Time at the guitar is saved every half minute and whenever the app is put away, so it is never lost and never lands on the wrong day. A run with the click that is cut into by the iPad being put away is dropped, not judged.
 - **Eyes on the music.** While a run with the click is under way, the words at the top step back and only the chord, the next chord, the strum and the bar stay. The chord to play is the largest thing on the screen, the next chord sits beside it and lights up in the beat before the change, and the count in fills the middle of the screen.
 - **The tuner follows the string that is plucked**, so there is nothing to tap between strings, and it says Tighten or Loosen in large words.
 - **Read aloud**, a setting that is off until asked for, speaks each instruction and result in the iPad's own voice. The app does not take its own voice for the guitar, and it does not move on while it is still speaking.
@@ -46,7 +49,38 @@ In a browser the app works too, including Safari on the iPad. Microphone access 
 
 The app's guitar is made on the device from a model of a plucked string (extended Karplus Strong, in `lib/guitar/audio/synth.ts`), with the body of an acoustic guitar as a few resonances. The pluck was shaped against real recordings: on GuitarSet, the low strings of an acoustic show their second and third harmonics about as strong as the fundamental, so the model's pluck includes the snap of a pick letting go, most on the wound strings.
 
-That matters for loudness. An iPad's speaker gives little below about 150 Hz, where the fundamentals of the low strings sit, so a guitar sound built on its fundamentals sounds thin and quiet beside a real guitar. A sound with the harmonics a real guitar has carries through the iPad speaker. Every note is brought to the same level before it is played, and a limiter at the end lets the whole thing run hot without distorting. The sound check measures what actually leaves the app against what the microphone hears from the guitar.
+The model on its own is much darker than a real guitar. Set beside 72 recordings of strummed acoustic guitar in GuitarSet, it carried about 9 dB more of its energy below 100 Hz, and 6 to 13 dB less in every band above 800 Hz, which is where the ear hears a pick on a string and where a small speaker does its work. Through an iPad that came out dull and quiet, since most of the level sat where the speaker gives nothing. So what the app plays is voiced after the model (`VOICE` and `APP_PLUCK` in `synth.ts`): plucked a little nearer the bridge, with the bottom trimmed and the upper range lifted until the balance matches the recordings. Measured as played, the share of energy in each band is now within about 2 dB of the real guitars from 100 Hz to 6.4 kHz:
+
+| Band | Real strummed guitar | The app before | The app now |
+| --- | --- | --- | --- |
+| below 100 Hz | -19 dB | -11 dB | -14 dB |
+| 100 to 400 Hz | -1 dB | -1 dB | -1 dB |
+| 400 to 800 Hz | -13 dB | -12 dB | -11 dB |
+| 800 Hz to 1.6 kHz | -16 dB | -22 dB | -16 dB |
+| 1.6 to 3.2 kHz | -18 dB | -29 dB | -20 dB |
+| 3.2 to 6.4 kHz | -23 dB | -35 dB | -22 dB |
+| above 6.4 kHz | -30 dB | -42 dB | -27 dB |
+
+A test holds the voicing to this, so it cannot drift back.
+
+For loudness, every note is brought to the same level as a small speaker would give it, so a low string is as easy to hear as a high one. The sound is then evened out by a compressor, the first instant of each pick is rounded off, and a limiter guards the top, so the whole thing sits within a decibel of full scale without distorting. The click is a single tone at nearly full scale, since it has to be heard over the learner's own strumming.
+
+## Sound on an iPad while the microphone is open
+
+This is the main reason the app holds the microphone only while the learner is playing.
+
+While a web page on an iPad or iPhone holds the microphone, the system plays all of that page's sound the way it would for a video call. It uses the call volume, which is lower and is set apart from the ordinary one, and a thin tone made for voices. WebKit sets this up itself and gives neither the page nor the app around the web view a way to change it. Turning echo cancellation off does not avoid it. It has been reported for years and is still so on current iPadOS (WebKit bugs 218012, 236219 and 311451). The web view's sound also lives in a process of its own, with its own audio session, so nothing the iPad shell does to the app's audio session reaches it.
+
+An earlier build opened the microphone once and kept it. Every example was then played at the call volume with the voice tone, which is what made the app sound quiet and wrong.
+
+So now (`lib/guitar/input/listen.ts`):
+
+- **Screens that do not listen do not hold the microphone.** Today, Songs, Progress and Settings play at the iPad's ordinary volume, and the orange microphone dot is off.
+- **The microphone steps aside for anything the learner should hear well.** Before an example, a note to tune to, an ear training sound or a recording plays, the microphone is let go and sound is put back to its ordinary strength. This takes about a third of a second. When the sound ends, listening picks up again.
+- **Only the click, the count in and the chime play while it is open.** Those are short, bright sounds that carry in the call mode.
+- **The sound check plays each the way it will be heard.** The guitar at the ordinary volume, the click with the microphone open, so each can be set with the volume buttons while it sounds.
+
+On a computer, where none of this applies, the microphone stays open as before. For checks, `?osdebug=1&osaside=1` makes a computer behave as an iPad does.
 
 ## How the listening works
 
@@ -82,7 +116,7 @@ These recordings are harder than a beginner's playing: fast jazz, rock and singe
 
 ## Checked end to end
 
-The development robot (`?osdebug=1`) plays the app as a learner would, as sound into the listening input, with its strings damped when played again as on a real guitar. With it, all 24 lessons play through, nine songs of every kind (strummed, waltz, six eight, melody, fingerpicked, the blues) go from the first play through to learned at full speed, the four exercises run, and a simulated learner goes through a week of daily sessions, a break, and the welcome back. These runs found real faults that unit tests had not: bass notes in waltz patterns that could never be matched, plain chords taken for their seventh, every known chord compared with every strum, and fingerpicking judged too harshly. The same web app also runs with a stand in for the iPad app's bridge, which checks that listening starts without a tap, progress and reminders reach the app, and the iPad app's self test passes its page half.
+The development robot (`?osdebug=1`) plays the app as a learner would, as sound into the listening input, with its strings damped when played again as on a real guitar. With it, all 24 lessons play through, the songs of every kind (strummed, waltz, six eight, melody, fingerpicked, the blues) go from the first play through to learned at full speed, the four exercises run, and a simulated learner goes through a week of daily sessions, a break, and the welcome back. The lessons and songs are run with the microphone stepping aside for every example, as it does on an iPad. These runs found real faults that unit tests had not: bass notes in waltz patterns that could never be matched, plain chords taken for their seventh, every known chord compared with every strum, and fingerpicking judged too harshly. The same web app also runs with a stand in for the iPad app's bridge, which checks that listening starts without a tap, progress and reminders reach the app, and the iPad app's self test passes its page half.
 
 ## Code map
 

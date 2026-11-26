@@ -7,6 +7,7 @@
  * in the Files app, under Open String, Recordings, where it can be shared.
  */
 
+import { listener } from '../input/listen';
 import { saveRecording } from '../native/bridge';
 
 const DB = 'open-string-takes';
@@ -30,15 +31,30 @@ export async function saveTake(key: string, blob: Blob): Promise<boolean> {
   const db = await open();
   if (!db) return false;
   return new Promise((resolve) => {
+    const end = (ok: boolean) => {
+      db.close();
+      resolve(ok);
+    };
     try {
       const tx = db.transaction(STORE, 'readwrite');
       tx.objectStore(STORE).put(blob, key);
-      tx.oncomplete = () => resolve(true);
-      tx.onerror = () => resolve(false);
+      tx.oncomplete = () => end(true);
+      tx.onerror = () => end(false);
+      // With no room left the save is called off, not failed, and would otherwise never answer.
+      tx.onabort = () => end(false);
     } catch {
-      resolve(false);
+      end(false);
     }
   });
+}
+
+/** Remove every recording kept here, as when progress is reset. */
+export function clearTakes(): void {
+  try {
+    if (typeof indexedDB !== 'undefined') indexedDB.deleteDatabase(DB);
+  } catch {
+    /* nothing kept */
+  }
 }
 
 export async function loadTake(key: string): Promise<Blob | null> {
@@ -117,20 +133,30 @@ export async function exportTake(title: string, label: string, blob: Blob, share
   return true;
 }
 
-/** Play a recording. Returns a function that stops it. */
+/** Play a recording. The microphone steps aside while it plays, so it is heard at full strength. Returns a function that stops it. */
 export function playTake(blob: Blob, onEnd?: () => void): () => void {
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
   let done = false;
+  let release: (() => void) | null = null;
   const finish = () => {
     if (done) return;
     done = true;
     audio.pause();
     URL.revokeObjectURL(url);
+    release?.();
+    release = null;
     onEnd?.();
   };
   audio.onended = finish;
   audio.onerror = finish;
-  void audio.play().catch(finish);
+  void listener.stepAside().then((r) => {
+    if (done) {
+      r();
+      return;
+    }
+    release = r;
+    void audio.play().catch(finish);
+  });
   return finish;
 }

@@ -13,7 +13,7 @@ import { chordsUsed, parseScore } from '@/lib/guitar/music/score';
 import { OPEN_MIDI, STRING_NAME, noteLetter, noteName, sayLetter, type StringNo } from '@/lib/guitar/music/theory';
 import { ChordDiagram, type StringMark } from './ChordDiagram';
 import FigureView, { StringsFigure } from './Figures';
-import { readingMs, useListening, usePracticeTimer, useWakeLock } from './hooks';
+import { readingMs, useListenStatus, useListening, usePracticeTimer, useWakeLock } from './hooks';
 import PlaySurface from './PlaySurface';
 import { ActionBar, StageMessage, useFocus, useSpoken, type PrimaryAction } from './Stage';
 import Tuner from './Tuner';
@@ -44,19 +44,39 @@ function Why({ text }: { text: string }) {
   );
 }
 
+/** The kinds of step that are played, not read or heard. A lesson counts as taken when at least one of them was played through. */
+const PLAYING = new Set(['play', 'strings', 'find', 'echo', 'changes']);
+
 /** Start listening, when the browser needs a tap for it. Inside the iPad app it starts by itself. */
 function MicStart({ start }: { start: () => void }) {
+  const status = useListenStatus();
+  if (status.state === 'denied' || status.state === 'error')
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-5 px-6 text-center">
+        <Icon.Mic size={34} />
+        <p className="os-say max-w-2xl">
+          {status.state === 'denied'
+            ? "The microphone is switched off for this app, so it cannot hear your guitar. Turn it on in the iPad's Settings, under Privacy and Security, Microphone, then come back."
+            : `The microphone could not start. ${status.error ?? ''}`}
+        </p>
+        {status.state === 'error' && (
+          <Button size="xl" onClick={start} icon={<Icon.Mic size={24} />}>
+            Try again
+          </Button>
+        )}
+      </div>
+    );
   return (
     <div className="flex h-full items-center justify-center">
       <Button size="xl" onClick={start} icon={<Icon.Mic size={24} />}>
-        Start listening
+        {status.state === 'starting' ? 'Starting' : 'Start listening'}
       </Button>
     </div>
   );
 }
 
 /** A page to read: words on one side, a picture on the other where there is one. */
-function TextStep({ title, children, figure, primary, skip, extras, say }: { title?: string; children: ReactNode; figure?: ReactNode; primary: PrimaryAction; skip?: { label: string; onClick: () => void } | null; extras?: Array<{ label: string; onClick: () => void; icon?: ReactNode }>; say?: string }) {
+function TextStep({ title, children, figure, primary, skip, extras, say }: { title?: string; children: ReactNode; figure?: ReactNode; primary: PrimaryAction | null; skip?: { label: string; onClick: () => void } | null; extras?: Array<{ label: string; onClick: () => void; icon?: ReactNode }>; say?: string }) {
   const back = useBack();
   useSpoken(say);
   return (
@@ -161,13 +181,13 @@ export function songMelody(songId: string | null, score: ReturnType<typeof resol
 function describe(result: FollowResult): string {
   if (result.mode === 'wait') {
     if (result.clean) return result.totalSteps === 1 ? 'That is the one.' : result.kind === 'strum' ? 'Every chord right the first time.' : 'Every note right the first time.';
-    if (result.totalSteps === 1) return 'You found it on a later try.';
+    if (result.totalSteps === 1) return result.accuracy > 0 ? 'You found it on a later try.' : 'Not quite yet.';
     return `${waitSummary(result)}.`;
   }
   return `${tempoSummary(result)}.`;
 }
 
-function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }) {
+function PlayStep({ step, onNext, onPass }: { step: StepOf<'play'>; onNext: () => void; onPass: () => void }) {
   const back = useBack();
   const score = useMemo(() => resolveMusic(step.music), [step.music]);
   const song = 'song' in step.music ? getSong(step.music.song) : null;
@@ -200,6 +220,7 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
         setHave(total);
         setFails(0);
         instrument.chime();
+        if (total >= need) onPass();
         setVerdict(total >= need ? { ok: true, text, more: false } : { ok: true, text: `${text} Once more to make it stick.`, more: true });
       } else {
         setHave(0);
@@ -208,7 +229,7 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
         setVerdict({ ok: false, more: false, text: `${text} ${found ?? (mode === 'wait' ? 'Go slowly, and look at each shape before you play it.' : 'Try again, and keep the strumming hand going through any slip.')}` });
       }
     },
-    [again, have, mode, need, score.kind],
+    [again, have, mode, need, onPass, score.kind],
   );
   // Whatever happens next can happen without a touch: a pass moves on, and a miss sets up another try.
   const stuck = verdict !== null && !verdict.ok && fails >= 2;
@@ -227,7 +248,7 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
     <div className="flex h-full min-h-0 flex-col">
       <StageMessage
         text={verdict ? verdict.text : step.text}
-        sub={stuck ? 'It will come. Move on for now and it will be back another day.' : null}
+        sub={stuck ? 'It will come. Move on for now, and open this lesson again another day to try it fresh.' : null}
         tone={verdict ? (verdict.ok ? 'ok' : 'hint') : undefined}
         right={
           need > 1 ? (
@@ -261,18 +282,21 @@ function PlayStep({ step, onNext }: { step: StepOf<'play'>; onNext: () => void }
         again={stuck ? { label: 'Try again', onClick: again } : verdict && !verdict.ok ? null : { label: 'Again', onClick: again }}
         skip={verdict?.ok || stuck ? null : { label: verdict ? 'Move on' : 'Skip', onClick: onNext }}
         primary={primary}
+        retry={verdict && !verdict.ok ? again : null}
       />
     </div>
   );
 }
 
 /** A chord checked one string at a time: the app says which strings rang. */
-function StringsStep({ step, onNext }: { step: StepOf<'strings'>; onNext: () => void }) {
+function StringsStep({ step, onNext, onPass }: { step: StepOf<'strings'>; onNext: () => void; onPass: () => void }) {
+  const passed = useRef(onPass);
+  passed.current = onPass;
   const back = useBack();
   const shape = useMemo(() => shapeFor(step.chord, step.variant), [step.chord, step.variant]);
   const strings = useMemo(() => playedStrings(shape), [shape]);
   const score = useMemo(() => parseScore({ line: strings.map((s) => `${noteName(shapeNoteOn(shape, s) as number)}q@${s}`).join(' '), time: [strings.length, 4] as [number, number], tempo: 60 }), [shape, strings]);
-  const { status, start } = useListening(true);
+  const { status, start, ask } = useListening(true);
   const [marks, setMarks] = useState<Partial<Record<StringNo, StringMark>>>({});
   const [index, setIndex] = useState(0);
   const [note, setNote] = useState<string | null>(null);
@@ -324,6 +348,7 @@ function StringsStep({ step, onNext }: { step: StepOf<'strings'>; onNext: () => 
         );
       } else if (ev.type === 'done') {
         setResult(missed === 0 ? 'all' : 'some');
+        passed.current();
         if (missed === 0) instrument.chime();
       }
     });
@@ -339,7 +364,7 @@ function StringsStep({ step, onNext }: { step: StepOf<'strings'>; onNext: () => 
     <div className="flex h-full min-h-0 flex-col">
       <StageMessage text={message} tone={result === 'all' ? 'ok' : note || result === 'some' ? 'hint' : undefined} />
       <div className="os-scroll min-h-0 flex-1 px-7 pb-2">
-        {status.state !== 'listening' ? (
+        {ask ? (
           <MicStart start={start} />
         ) : (
           <div className="flex min-h-full flex-col items-center justify-center gap-2">
@@ -373,13 +398,15 @@ function StringsStep({ step, onNext }: { step: StepOf<'strings'>; onNext: () => 
 }
 
 /** Strings asked for by name. */
-function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }) {
+function FindStep({ step, onNext, onPass }: { step: StepOf<'find'>; onNext: () => void; onPass: () => void }) {
+  const passed = useRef(onPass);
+  passed.current = onPass;
   const back = useBack();
   const score = useMemo(() => parseScore({ line: step.strings.map((s) => `${noteName(OPEN_MIDI[s])}q@${s}`).join(' '), time: [step.strings.length, 4] as [number, number], tempo: 60 }), [step.strings]);
   const [run, setRun] = useState(0);
   const [at, setAt] = useState(0);
   const [done, setDone] = useState(false);
-  const { status, start } = useListening(true);
+  const { status, start, ask } = useListening(true);
   const [note, setNote] = useState<string | null>(null);
   const [hinted, setHinted] = useState(false);
   useEffect(() => {
@@ -399,6 +426,7 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
         setNote(s ? `That was the ${STRING_NAME[s]} string.` : `That was ${sayLetter(noteLetter(ev.midi))}. Play the string open, with no fingers on it.`);
       } else if (ev.type === 'done') {
         setDone(true);
+        passed.current();
         instrument.chime();
       }
     });
@@ -413,7 +441,7 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
     <div className="flex h-full min-h-0 flex-col">
       <StageMessage text={done ? 'Every string, found by name.' : (note ?? step.text)} tone={done ? 'ok' : note ? 'hint' : undefined} />
       <div className="os-scroll min-h-0 flex-1 px-7 pb-2">
-        {status.state !== 'listening' ? (
+        {ask ? (
           <MicStart start={start} />
         ) : (
           <div className="flex min-h-full flex-col items-center justify-center gap-3">
@@ -434,7 +462,7 @@ function FindStep({ step, onNext }: { step: StepOf<'find'>; onNext: () => void }
 }
 
 /** Hear a short pattern, then play it back. */
-function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }) {
+function EchoStep({ step, onNext, onPass }: { step: StepOf<'echo'>; onNext: () => void; onPass: () => void }) {
   const back = useBack();
   const scores = useMemo(() => step.motifs.map((m) => parseScore({ line: m, tempo: 84 })), [step.motifs]);
   const [index, setIndex] = useState(0);
@@ -458,6 +486,7 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
   const advance = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     if (index + 1 >= scores.length) {
+      onPass();
       onNext();
       return;
     }
@@ -466,7 +495,7 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
     setNote(null);
     setPhase('listen');
     setRun((r) => r + 1);
-  }, [index, onNext, scores.length]);
+  }, [index, onNext, onPass, scores.length]);
   const onDone = useCallback(
     (result: FollowResult | null) => {
       if (phase === 'listen') {
@@ -512,19 +541,21 @@ function EchoStep({ step, onNext }: { step: StepOf<'echo'>; onNext: () => void }
         </div>
         {step.why && <Why text={step.why} />}
       </div>
-      <ActionBar back={back} extras={[{ label: 'Hear it', onClick: hear, icon: <Icon.Ear size={20} /> }]} skip={{ label: 'Skip', onClick: onNext }} />
+      <ActionBar back={back} extras={[{ label: 'Hear it', onClick: hear, icon: <Icon.Ear size={20} /> }]} skip={{ label: 'Skip', onClick: onNext }} retry={hear} />
     </div>
   );
 }
 
 /** Back and forth between two chords, one strum each, with how quick the changes were. */
-function ChangesStep({ step, onNext }: { step: StepOf<'changes'>; onNext: () => void }) {
+function ChangesStep({ step, onNext, onPass }: { step: StepOf<'changes'>; onNext: () => void; onPass: () => void }) {
+  const passed = useRef(onPass);
+  passed.current = onPass;
   const back = useBack();
   const score = useMemo(() => changeScore(step.from, step.to, step.times), [step.from, step.to, step.times]);
   const [run, setRun] = useState(0);
   const [current, setCurrent] = useState(0);
   const [verdict, setVerdict] = useState<string | null>(null);
-  const { status, start } = useListening(true);
+  const { status, start, ask } = useListening(true);
   const [note, setNote] = useState<string | null>(null);
   const [flash, setFlash] = useState(0);
   useEffect(() => {
@@ -545,6 +576,7 @@ function ChangesStep({ step, onNext }: { step: StepOf<'changes'>; onNext: () => 
         const times = ev.result.changes.map((c) => c.seconds ?? 0).filter((x) => x > 0);
         const avg = times.length ? times.reduce((a, x) => a + x, 0) / times.length : 0;
         const best = times.length ? Math.min(...times) : 0;
+        passed.current();
         instrument.chime();
         setVerdict(avg > 0 ? `Your changes took about ${avg.toFixed(1)} seconds each, the quickest ${best.toFixed(1)}. With practice they shrink toward a single beat.` : 'Done.');
       }
@@ -570,7 +602,7 @@ function ChangesStep({ step, onNext }: { step: StepOf<'changes'>; onNext: () => 
         }
       />
       <div className="os-scroll min-h-0 flex-1 px-7 pb-2">
-        {status.state !== 'listening' ? (
+        {ask ? (
           <MicStart start={start} />
         ) : (
           <div className="flex min-h-full flex-col items-center justify-center">
@@ -602,20 +634,35 @@ function ChangesStep({ step, onNext }: { step: StepOf<'changes'>; onNext: () => 
 function QuizStep({ step, onNext }: { step: StepOf<'quiz'>; onNext: () => void }) {
   const [picked, setPicked] = useState<number | null>(null);
   const hear = useMemo(() => (step.hear ? resolveMusic(step.hear) : null), [step.hear]);
+  const stopHear = useRef<(() => void) | null>(null);
   const play = useCallback(() => {
     if (!hear) return;
-    void guitar.unlock().then(() => playScore(hear, {}));
+    stopHear.current?.();
+    let cancelled = false;
+    stopHear.current = () => {
+      cancelled = true;
+    };
+    void guitar.unlock().then(() => {
+      if (cancelled) return;
+      stopHear.current = playScore(hear, {});
+    });
   }, [hear]);
   useEffect(() => {
     if (!hear) return;
     const t = setTimeout(play, 500);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      // The example stops when the lesson moves on.
+      stopHear.current?.();
+      stopHear.current = null;
+    };
   }, [hear, play]);
   const right = picked === step.answer;
   return (
     <TextStep
       title={step.question}
-      primary={picked === null ? { label: 'Skip', onClick: onNext, quiet: true } : { label: 'Continue', onClick: onNext, auto: right ? 4 : undefined }}
+      skip={picked === null ? { label: 'Skip', onClick: onNext } : null}
+      primary={picked === null ? null : { label: 'Continue', onClick: onNext, auto: right ? 4 : undefined }}
       extras={hear ? [{ label: 'Hear it', onClick: play, icon: <Icon.Ear size={20} /> }] : undefined}
       figure={step.figure ? <FigureView figure={step.figure} large /> : undefined}
       say={step.question}
@@ -652,13 +699,16 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
   const progress = useGuitar((s) => s.lessons[lessonId]);
   const setLessonStep = useGuitar((s) => s.setLessonStep);
   const completeLesson = useGuitar((s) => s.completeLesson);
+  const passLessonStep = useGuitar((s) => s.passLessonStep);
   const addCards = useGuitar((s) => s.addCards);
   const logPractice = useGuitar((s) => s.logPractice);
   const [index, setIndex] = useState(() => Math.min(progress?.done ? 0 : (progress?.step ?? 0), lesson.steps.length - 1));
   const [finished, setFinished] = useState(false);
   const away = useFocus();
   useWakeLock(true);
-  usePracticeTimer((seconds) => logPractice(seconds, 0, 1));
+  // The microphone is held for the whole lesson, not opened and closed at each step. It still steps aside for every example.
+  useListening(true);
+  usePracticeTimer((seconds, first) => logPractice(seconds, 0, first ? 1 : 0));
   const step = lesson.steps[index];
   const goTo = useCallback(
     (i: number) => {
@@ -668,16 +718,25 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
     },
     [lessonId, setLessonStep],
   );
+  const onPass = useCallback(() => passLessonStep(lessonId, index), [index, lessonId, passLessonStep]);
   const next = useCallback(() => {
     if (index + 1 >= lesson.steps.length) {
-      completeLesson(lessonId);
-      if (lesson.chords) addCards(lesson.chords.map((c) => `chord:${c}`));
-      instrument.chime();
+      // A lesson is taken by playing it. One whose playing was all skipped, or jumped past, is kept as known:
+      // done, but with no date, no chords put into review, and nothing said to have been learned today.
+      const playing = lesson.steps.map((st, i) => (PLAYING.has(st.kind) ? i : -1)).filter((i) => i >= 0);
+      const passed = useGuitar.getState().lessons[lessonId]?.passed ?? [];
+      const taken = playing.length === 0 || playing.some((i) => passed.includes(i));
+      completeLesson(lessonId, taken);
+      if (taken) {
+        if (lesson.chords) addCards(lesson.chords.map((c) => `chord:${c}`));
+        instrument.chime();
+      }
       setFinished(true);
       return;
     }
     goTo(index + 1);
   }, [addCards, completeLesson, goTo, index, lesson, lessonId]);
+  const known = progress?.skipped === true;
   const back = useMemo(() => (index > 0 && !finished ? () => goTo(index - 1) : null), [finished, goTo, index]);
 
   let body: JSX.Element;
@@ -690,9 +749,10 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
             <Icon.Check size={54} />
           </div>
           <div className="os-fade-up">
-            <div className="text-[1.15rem] font-semibold uppercase tracking-widest text-os-muted">Lesson done</div>
+            <div className="text-[1.15rem] font-semibold uppercase tracking-widest text-os-muted">{known ? 'Kept as known' : 'Lesson done'}</div>
             <h2 className="mt-2 font-os-serif text-[3.4rem] leading-tight">{lesson.title}</h2>
-            {(lesson.chords?.length || songs.length > 0) && (
+            {known && <p className="os-say mx-auto mt-4 max-w-2xl">The playing in this lesson was passed over, so it is kept as one you already know. Open it again any time to play it through.</p>}
+            {!known && (lesson.chords?.length || songs.length > 0) && (
               <p className="os-say mx-auto mt-4 max-w-2xl">
                 {lesson.chords?.length ? `New ${lesson.chords.length === 1 ? 'chord' : 'chords'}: ${lesson.chords.join(', ')}. ` : ''}
                 {songs.length ? `${songs.join(' and ')} ${songs.length === 1 ? 'has' : 'have'} joined your songs.` : ''}
@@ -718,19 +778,19 @@ export default function LessonPlayer({ lessonId, onClose }: { lessonId: string; 
         body = <ListenStep key={index} step={step} onNext={next} />;
         break;
       case 'play':
-        body = <PlayStep key={index} step={step} onNext={next} />;
+        body = <PlayStep key={index} step={step} onNext={next} onPass={onPass} />;
         break;
       case 'strings':
-        body = <StringsStep key={index} step={step} onNext={next} />;
+        body = <StringsStep key={index} step={step} onNext={next} onPass={onPass} />;
         break;
       case 'find':
-        body = <FindStep key={index} step={step} onNext={next} />;
+        body = <FindStep key={index} step={step} onNext={next} onPass={onPass} />;
         break;
       case 'echo':
-        body = <EchoStep key={index} step={step} onNext={next} />;
+        body = <EchoStep key={index} step={step} onNext={next} onPass={onPass} />;
         break;
       case 'changes':
-        body = <ChangesStep key={index} step={step} onNext={next} />;
+        body = <ChangesStep key={index} step={step} onNext={next} onPass={onPass} />;
         break;
       case 'quiz':
         body = <QuizStep key={index} step={step} onNext={next} />;

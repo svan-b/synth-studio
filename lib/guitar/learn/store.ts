@@ -9,9 +9,11 @@
 
 import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
+import { hasSong } from '../content/catalog';
 import { saveCopy, savedCopy } from '../native/bridge';
 import { dayKey, daysBetween } from '../util/emitter';
 import type { SongState } from './coach';
+import type { Block } from './planner';
 import { newCard, review, type Outcome, type StoredCard } from './srs';
 
 export type Experience = 'new' | 'some' | 'returning';
@@ -52,8 +54,22 @@ export interface Settings {
 export interface LessonProgress {
   done: boolean;
   doneOn?: string;
+  /** Marked as known, or gone through without playing any of it. Counted as done, but not as taken. */
   skipped?: boolean;
   step: number;
+  /** The steps with playing in them that were played through, by their place in the lesson. */
+  passed?: number[];
+}
+
+/** Where today's session has got to, so it picks up there if it is left. */
+export interface SessionPlace {
+  day: string;
+  /** The parts of the session as it was begun. */
+  blocks: Block[];
+  /** The part to do next. */
+  index: number;
+  /** Parts that were opened, not skipped. */
+  opened: number;
 }
 
 export interface DayLog {
@@ -102,12 +118,17 @@ interface State {
   /** The day the guitar was last tuned with the app. */
   tunedOn: string | null;
   sessionDoneOn: string | null;
+  sessionAt: SessionPlace | null;
 
   setProfile: (patch: Partial<Profile>) => void;
   setSettings: (patch: Partial<Settings>) => void;
   setLessonStep: (id: string, step: number) => void;
-  completeLesson: (id: string) => void;
+  /** A step with playing in it was played through. */
+  passLessonStep: (id: string, step: number) => void;
+  /** The end of a lesson was reached. `played` is false when all its playing was skipped: it is then kept as known, not as taken. */
+  completeLesson: (id: string, played?: boolean) => void;
   skipLesson: (id: string) => void;
+  setSessionAt: (place: SessionPlace | null) => void;
   setSong: (id: string, state: SongState) => void;
   keepRecording: (id: string, rec: Recording) => Recording[];
   addCards: (ids: string[]) => void;
@@ -148,6 +169,55 @@ export function pairKey(a: string, b: string): string {
   return [a, b].sort().join('|');
 }
 
+/** Is this a saved copy the app can read? */
+function readable(value: string): boolean {
+  try {
+    const parsed = JSON.parse(value) as { state?: unknown } | null;
+    return typeof parsed === 'object' && parsed !== null && typeof parsed.state === 'object' && parsed.state !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** A saved copy that could not be read is put to one side before anything is written over it, so it can still be looked at. */
+function keepAside(name: string, value: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(`${name}:unread`, value);
+  } catch {
+    /* no room to keep it */
+  }
+}
+
+function record<T>(value: Record<string, T> | undefined | null): Record<string, T> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function only<T>(value: Record<string, T>, keep: (key: string) => boolean): Record<string, T> {
+  const out: Record<string, T> = {};
+  for (const key of Object.keys(value)) if (keep(key)) out[key] = value[key];
+  return out;
+}
+
+/**
+ * Read a backup file. It must be one of this app's: a file saved from
+ * Settings, or one of the dated copies the iPad app keeps. The piano
+ * teacher's backups look alike at a glance and are turned away.
+ */
+export function readBackup(json: string): Partial<State> | null {
+  try {
+    const parsed = JSON.parse(json) as (Partial<State> & { state?: Partial<State>; app?: string }) | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const wrapped = parsed.state && typeof parsed.state === 'object' ? parsed.state : null;
+    const data: Partial<State> | null = wrapped ?? (parsed.app === 'open-string' ? parsed : null);
+    if (!data || typeof data.profile !== 'object' || data.profile === null) return null;
+    // The dated copies carry no name, so they are known by what only a guitar teacher keeps.
+    if (wrapped && !('changes' in data) && !('tunedOn' in data)) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 const progressStorage: StateStorage = {
   getItem: (name) => {
     let local: string | null = null;
@@ -161,8 +231,13 @@ const progressStorage: StateStorage = {
       local = null;
     }
     const saved = savedCopy(name);
-    if (saved && (local === null || saved.at >= localAt)) return saved.value;
-    return local;
+    // The newer copy is used, as long as it can be read. If it cannot, the other one is.
+    const first = saved && (local === null || saved.at >= localAt) ? saved.value : local;
+    const second = first === local ? (saved?.value ?? null) : local;
+    if (first !== null && readable(first)) return first;
+    if (first !== null) keepAside(name, first);
+    if (second !== null && readable(second)) return second;
+    return null;
   },
   setItem: (name, value) => {
     const at = Date.now();
@@ -204,12 +279,27 @@ export const useGuitar = create<State>()(
       recordings: {},
       tunedOn: null,
       sessionDoneOn: null,
+      sessionAt: null,
 
       setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch } })),
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
-      setLessonStep: (id, step) => set((s) => ({ lessons: { ...s.lessons, [id]: { done: s.lessons[id]?.done ?? false, doneOn: s.lessons[id]?.doneOn, step } } })),
-      completeLesson: (id) => set((s) => ({ lessons: { ...s.lessons, [id]: { done: true, doneOn: s.lessons[id]?.doneOn ?? dayKey(), step: 0 } } })),
+      setLessonStep: (id, step) => set((s) => ({ lessons: { ...s.lessons, [id]: { ...(s.lessons[id] ?? { done: false }), step } } })),
+      passLessonStep: (id, step) =>
+        set((s) => {
+          const prev = s.lessons[id] ?? { done: false, step: 0 };
+          if (prev.passed?.includes(step)) return {};
+          return { lessons: { ...s.lessons, [id]: { ...prev, passed: [...(prev.passed ?? []), step] } } };
+        }),
+      completeLesson: (id, played = true) =>
+        set((s) => {
+          const prev = s.lessons[id];
+          // A lesson taken properly before stays so, whatever is done with it later.
+          if (prev?.done && !prev.skipped) return { lessons: { ...s.lessons, [id]: { ...prev, step: 0 } } };
+          if (!played) return { lessons: { ...s.lessons, [id]: { done: true, skipped: true, step: 0 } } };
+          return { lessons: { ...s.lessons, [id]: { done: true, doneOn: dayKey(), step: 0, passed: prev?.passed } } };
+        }),
       skipLesson: (id) => set((s) => (s.lessons[id]?.done ? {} : { lessons: { ...s.lessons, [id]: { done: true, skipped: true, step: 0 } } })),
+      setSessionAt: (place) => set({ sessionAt: place }),
       setSong: (id, state) => set((s) => ({ songs: { ...s.songs, [id]: state } })),
       keepRecording: (id, rec) => {
         // The first recording of a learned song is kept for good. Later ones replace each other. Returns what was let go.
@@ -256,29 +346,27 @@ export const useGuitar = create<State>()(
         return { best: count > before && before > 0, before };
       },
       markTuned: () => set({ tunedOn: dayKey() }),
-      finishSession: () => set({ sessionDoneOn: dayKey() }),
+      finishSession: () => set({ sessionDoneOn: dayKey(), sessionAt: null }),
       importData: (json) => {
-        try {
-          const parsed = JSON.parse(json) as Partial<State> & { state?: Partial<State>; app?: string };
-          const data: Partial<State> = parsed?.state?.profile ? parsed.state : parsed;
-          if (!data || typeof data !== 'object' || !data.profile) return false;
-          set({
-            profile: { ...defaultProfile, ...data.profile },
-            settings: { ...defaultSettings, ...(data.settings ?? {}) },
-            lessons: data.lessons ?? {},
-            songs: data.songs ?? {},
-            cards: data.cards ?? {},
-            days: data.days ?? {},
-            drills: data.drills ?? {},
-            changes: data.changes ?? {},
-            recordings: data.recordings ?? {},
-            tunedOn: data.tunedOn ?? null,
-            sessionDoneOn: data.sessionDoneOn ?? null,
-          });
-          return true;
-        } catch {
-          return false;
-        }
+        const data = readBackup(json);
+        if (!data) return false;
+        const here = get().settings;
+        set({
+          profile: { ...defaultProfile, ...data.profile },
+          // How this iPad hears and reminds belongs to this iPad, not to the one the backup came from.
+          settings: { ...defaultSettings, ...(data.settings ?? {}), latencyMs: here.latencyMs, reminder: here.reminder },
+          lessons: record(data.lessons),
+          songs: only(record(data.songs), hasSong),
+          cards: record(data.cards),
+          days: record(data.days),
+          drills: record(data.drills),
+          changes: record(data.changes),
+          recordings: only(record(data.recordings), hasSong),
+          tunedOn: typeof data.tunedOn === 'string' ? data.tunedOn : null,
+          sessionDoneOn: typeof data.sessionDoneOn === 'string' ? data.sessionDoneOn : null,
+          sessionAt: null,
+        });
+        return true;
       },
       resetAll: () =>
         set({
@@ -293,12 +381,32 @@ export const useGuitar = create<State>()(
           recordings: {},
           tunedOn: null,
           sessionDoneOn: null,
+          sessionAt: null,
         }),
     }),
     {
       name: STORE_KEY,
       version: 1,
       storage: createJSONStorage(() => progressStorage),
+      // Progress saved by an older or a newer version is read as it stands, never thrown away.
+      migrate: (saved) => saved as State,
+      // Anything a saved copy lacks takes its usual value, so a setting added later is never missing.
+      merge: (saved, current) => {
+        const old = (saved ?? {}) as Partial<State>;
+        return {
+          ...current,
+          ...old,
+          profile: { ...current.profile, ...(old.profile ?? {}) },
+          settings: { ...current.settings, ...(old.settings ?? {}) },
+          lessons: record(old.lessons),
+          songs: record(old.songs),
+          cards: record(old.cards),
+          days: record(old.days),
+          drills: record(old.drills),
+          changes: record(old.changes),
+          recordings: record(old.recordings),
+        };
+      },
       partialize: (s) => ({
         profile: s.profile,
         settings: s.settings,
@@ -311,10 +419,18 @@ export const useGuitar = create<State>()(
         recordings: s.recordings,
         tunedOn: s.tunedOn,
         sessionDoneOn: s.sessionDoneOn,
+        sessionAt: s.sessionAt,
       }),
     },
   ),
 );
+
+// In a browser, another tab of the app may save progress. Take it in, so this tab does not later write over it with what it knew before.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORE_KEY && e.newValue) void useGuitar.persist.rehydrate();
+  });
+}
 
 export function exportData(): string {
   const s = useGuitar.getState();

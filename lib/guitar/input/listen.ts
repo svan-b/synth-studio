@@ -11,17 +11,33 @@
  * metronome click, which sits between frets.
  *
  * It can also record the learner's playing, so they can hear it back.
+ *
+ * On an iPad the microphone is held only while the learner is playing. While
+ * a web page there holds the microphone, the iPad plays all of its sound the
+ * way it would for a video call: at the call volume, which is lower and set
+ * apart from the ordinary one, and with a thin tone made for voices. Nothing
+ * the page or the app around it can do changes that (WebKit bugs 218012,
+ * 236219 and 311451). So when the app is about to play something for the
+ * learner to hear well, an example or a note to tune to, the microphone
+ * steps aside until it has finished, and screens that do not listen at all
+ * do not hold it. Only the click, the count in and the chime play while it
+ * is open.
  */
 
 import { CLICK_FREQS } from '../audio/click';
 import { guitar } from '../audio/engine';
 import { PitchDetector, type PitchReading } from '../dsp/pitch';
 import { GuitarTracker } from '../dsp/tracker';
+import { isNative } from '../native/bridge';
 import { Emitter } from '../util/emitter';
 import { emitNote, emitStrike } from './bus';
 
 export interface ListenStatus {
-  state: 'idle' | 'starting' | 'listening' | 'denied' | 'error';
+  /**
+   * `resting` is listening that has been agreed to and is wanted, with the
+   * microphone set aside for a moment while the app itself plays.
+   */
+  state: 'idle' | 'starting' | 'listening' | 'resting' | 'denied' | 'error';
   /** Input level in dB below full scale, a few times a second. */
   level: number;
   error: string | null;
@@ -37,6 +53,16 @@ export interface PitchEvent extends PitchReading {
 
 /** Seconds of sound the tuner reads at once. Long enough for several periods of the low E string. */
 const PITCH_SECONDS = 0.09;
+/** How long after the last listening screen has gone the microphone is let go, so moving from one to the next does not open it twice. */
+const IDLE_MS = 1500;
+
+/** Is this a device that plays sound poorly while a page holds the microphone? iPads and iPhones do. */
+function micDimsSound(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  if (isNative()) return true;
+  const ua = navigator.userAgent || '';
+  return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints ?? 0) > 1);
+}
 
 class Listener {
   readonly status = new Emitter<ListenStatus>();
@@ -59,9 +85,20 @@ class Listener {
   private sinceReading = 0;
   private recorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
-  private starting: Promise<boolean> | null = null;
-  /** Listening was asked for and not stopped on purpose, so it comes back after an interruption. */
-  private wanted = false;
+  private opening: Promise<boolean> | null = null;
+  /** The learner has agreed to listening: a tap in a browser, and at once inside the iPad app. */
+  private agreed = false;
+  /** Listening was started with no screen asking for it, as the checks do. It then stays until stopped. */
+  private pinned = false;
+  /** Screens up now that listen. */
+  private users = 0;
+  /** Examples the app is playing now. */
+  private asides = 0;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private workletFor: BaseAudioContext | null = null;
+  private tuning = 0;
+  /** For checks on a computer: behave as an iPad does, where the microphone steps aside for the app's own sound. */
+  forceAside: boolean | null = null;
 
   getStatus(): ListenStatus {
     return this.current;
@@ -69,6 +106,23 @@ class Listener {
 
   get active(): boolean {
     return this.current.state === 'listening';
+  }
+
+  /** Has the learner agreed to listening, so it can start again without a tap? */
+  get agreedTo(): boolean {
+    return this.agreed;
+  }
+
+  /** Does the microphone step aside for the app's own sound on this device? */
+  get stepsAside(): boolean {
+    return this.forceAside ?? micDimsSound();
+  }
+
+  /** Should the microphone be open right now? */
+  private get wanted(): boolean {
+    if (!this.agreed) return false;
+    if (!this.stepsAside) return true;
+    return this.asides === 0 && (this.users > 0 || this.pinned);
   }
 
   /** Where sound enters the detector. The development robot plays straight into it. */
@@ -81,12 +135,90 @@ class Listener {
     this.status.emit(this.current);
   }
 
-  /** Start listening. In a browser, call it from a tap. */
-  start(): Promise<boolean> {
-    this.wanted = true;
-    if (this.active) return Promise.resolve(true);
-    if (!this.starting) this.starting = this.open().finally(() => (this.starting = null));
-    return this.starting;
+  /**
+   * Start listening. In a browser, call it from a tap the first time.
+   *
+   * Called with no screen asking to listen, as the checks do, the microphone
+   * is held until `stop`. A screen calls it with `hold` false: it has said
+   * what it wants through `use`, and this only records that the learner agreed.
+   */
+  start(hold = true): Promise<boolean> {
+    this.agreed = true;
+    if (hold && this.users === 0) this.pinned = true;
+    return this.sync();
+  }
+
+  /**
+   * A screen that listens is up. Returns a function to call when it goes
+   * away. Once no screen listens, the microphone is let go.
+   */
+  use(): () => void {
+    this.users++;
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+    if (this.agreed) void this.sync();
+    let gone = false;
+    return () => {
+      if (gone) return;
+      gone = true;
+      this.users = Math.max(0, this.users - 1);
+      if (this.users > 0) return;
+      if (this.idleTimer) clearTimeout(this.idleTimer);
+      this.idleTimer = setTimeout(() => {
+        this.idleTimer = null;
+        void this.sync();
+      }, IDLE_MS);
+    };
+  }
+
+  /**
+   * The app is about to play something for the learner to hear well. Where
+   * the microphone would spoil it, the microphone steps aside first, and
+   * this resolves once sound is back at full strength. Call what it returns
+   * when the sound has finished, and listening picks up again.
+   */
+  async stepAside(): Promise<() => void> {
+    this.asides++;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      this.asides = Math.max(0, this.asides - 1);
+      if (this.asides === 0) void this.sync();
+    };
+    if (!this.stepsAside) return release;
+    if (this.opening) await this.opening.catch(() => false);
+    if (this.stream) {
+      this.shut();
+      await guitar.toPlayback();
+    }
+    return release;
+  }
+
+  /** Open or close the microphone to match what is wanted now. */
+  private sync(): Promise<boolean> {
+    if (this.wanted) {
+      if (this.stream && this.active) return Promise.resolve(true);
+      if (!this.opening) {
+        this.opening = this.open().finally(() => {
+          this.opening = null;
+          // What was wanted may have changed while the microphone was starting.
+          if (!this.wanted && this.stream) this.shut();
+        });
+      }
+      return this.opening;
+    }
+    if (this.stream && !this.opening) this.shut();
+    else if (!this.stream && !this.opening) this.rest();
+    return Promise.resolve(false);
+  }
+
+  /** The state to show while the microphone is closed. */
+  private rest(): void {
+    const state = this.current.state;
+    if (state === 'denied' || state === 'error') return;
+    const next = this.agreed && this.stepsAside && this.asides > 0 && (this.users > 0 || this.pinned) ? 'resting' : 'idle';
+    if (state !== next || this.current.level !== -100) this.set({ state: next, level: -100 });
   }
 
   private async open(): Promise<boolean> {
@@ -102,9 +234,10 @@ class Listener {
       return false;
     }
     guitar.setSessionType('play-and-record');
+    let stream: MediaStream;
     try {
       // Voice processing is for speech. It would cut and squash a guitar, so ask for the plain signal.
-      this.stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
       });
     } catch (err) {
@@ -114,8 +247,10 @@ class Listener {
       this.set({ state: denied ? 'denied' : 'error', error: err instanceof Error ? err.message : String(err) });
       return false;
     }
+    this.stream = stream;
     await guitar.resume();
     this.tracker = new GuitarTracker(ctx.sampleRate);
+    this.tracker.tuningCents = this.tuning;
     this.tracker.expected = this.expected;
     this.tracker.suppressUntil = this.suppressUntil;
     this.tracker.clicks = CLICK_FREQS;
@@ -133,7 +268,11 @@ class Listener {
     let node: AudioNode | null = null;
     try {
       if (ctx.audioWorklet && typeof AudioWorkletNode !== 'undefined') {
-        await ctx.audioWorklet.addModule('/guitar/capture-worklet.js');
+        // The capture code is loaded once. The microphone opens and closes many times.
+        if (this.workletFor !== ctx) {
+          await ctx.audioWorklet.addModule('/guitar/capture-worklet.js');
+          this.workletFor = ctx;
+        }
         const worklet = new AudioWorkletNode(ctx, 'os-capture', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
         // Blocks from a capture node this listener no longer uses, after a restart, are ignored.
         worklet.port.onmessage = (e: MessageEvent<{ samples: Float32Array; time: number }>) => {
@@ -156,32 +295,41 @@ class Listener {
     this.source.connect(node);
     node.connect(this.sink);
     this.node = node;
-    const track = this.stream.getAudioTracks()[0];
+    const track = stream.getAudioTracks()[0];
     // A phone call, another app or the iPad going to sleep can take the microphone away.
-    if (track) track.onended = () => this.close();
+    if (track)
+      track.onended = () => {
+        if (this.stream === stream) this.shut();
+      };
     this.set({ state: 'listening', heard: 0, source: track?.label ?? '' });
     return true;
   }
 
-  /** Stop listening, on purpose. */
+  /** Stop listening altogether, until it is asked for again. */
   stop(): void {
-    this.wanted = false;
-    this.close();
+    this.agreed = false;
+    this.pinned = false;
+    this.shut();
   }
 
   /**
    * After the app comes back to the front. If the microphone was taken away
-   * meanwhile and listening was still wanted, open it again.
+   * meanwhile and listening is still wanted, open it again.
    */
   revive(): void {
-    if (!this.wanted || this.starting) return;
+    if (this.opening) return;
+    if (!this.wanted) {
+      void this.sync();
+      return;
+    }
     const track = this.stream?.getAudioTracks()[0];
     if (this.active && track && track.readyState === 'live' && !track.muted) return;
-    this.close();
-    void this.start();
+    this.shut();
+    void this.sync();
   }
 
-  private close(): void {
+  /** Let the microphone go. Whether it comes back is for `sync` to say. */
+  private shut(): void {
     void this.stopRecording();
     try {
       this.source?.disconnect();
@@ -190,14 +338,19 @@ class Listener {
     } catch {
       /* already disconnected */
     }
-    this.stream?.getTracks().forEach((t) => t.stop());
+    const had = this.stream !== null;
+    this.stream?.getTracks().forEach((t) => {
+      t.onended = null;
+      t.stop();
+    });
     this.stream = null;
     this.source = null;
     this.node = null;
     this.sink = null;
+    if (this.tracker) this.tuning = this.tracker.tuningCents;
     this.tracker = null;
-    guitar.setSessionType('playback');
-    this.set({ state: 'idle', level: -100 });
+    if (had) guitar.setSessionType('playback');
+    this.rest();
   }
 
   /** Tell the detector which notes the music expects next. */

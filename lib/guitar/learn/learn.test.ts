@@ -4,8 +4,8 @@ import type { FollowResult } from '../engine/follow';
 import { applyResult, isKept, jumpTo, newSongState, nextTask, planOutline, skipTask, songProgress, type SongState } from './coach';
 import { milestones } from './milestones';
 import { DRILL_LESSON, openDrills, planDay } from './planner';
-import { isDue, newCard } from './srs';
-import { daysAway, daysThisWeek } from './store';
+import { isDue, newCard, review } from './srs';
+import { daysAway, daysThisWeek, exportData, readBackup, useGuitar } from './store';
 
 function result(over: Partial<FollowResult> = {}): FollowResult {
   return {
@@ -203,5 +203,86 @@ describe('going through a song at the learner\'s own pace', () => {
     const again = nextTask(info, back)!;
     expect(again.scope).toEqual({ type: 'section', index: 0 });
     expect(again.mode).toBe('wait');
+  });
+});
+
+describe('reviews by the day', () => {
+  it('does not bring a chord back on the day it was checked, however it went', () => {
+    const now = new Date(2026, 10, 26, 9, 0);
+    for (const outcome of ['again', 'hard', 'good', 'easy'] as const) {
+      const card = review(newCard(now), outcome, now);
+      expect(isDue(card, new Date(2026, 10, 26, 21, 0))).toBe(false);
+      expect(isDue(card, new Date(2026, 10, 27, 8, 0)) || outcome !== 'again').toBe(true);
+    }
+  });
+});
+
+describe('what is kept of a lesson', () => {
+  it('keeps a lesson whose playing was all skipped as known, not as taken today', () => {
+    const s = useGuitar.getState();
+    s.resetAll();
+    s.setLessonStep('first-chord', 3);
+    s.completeLesson('first-chord', false);
+    const kept = useGuitar.getState().lessons['first-chord'];
+    expect(kept.done).toBe(true);
+    expect(kept.skipped).toBe(true);
+    expect(kept.doneOn).toBeUndefined();
+  });
+
+  it('counts a lesson as taken once some of it was played, and does not lose that later', () => {
+    const s = useGuitar.getState();
+    s.resetAll();
+    s.passLessonStep('first-chord', 2);
+    s.passLessonStep('first-chord', 2);
+    expect(useGuitar.getState().lessons['first-chord'].passed).toEqual([2]);
+    s.completeLesson('first-chord', true);
+    expect(useGuitar.getState().lessons['first-chord'].doneOn).toBeDefined();
+    // Gone through again another day with everything skipped: it stays taken.
+    s.completeLesson('first-chord', false);
+    const kept = useGuitar.getState().lessons['first-chord'];
+    expect(kept.skipped).toBeUndefined();
+    expect(kept.doneOn).toBeDefined();
+  });
+
+  it('keeps the mark on a lesson marked as known when it is opened again', () => {
+    const s = useGuitar.getState();
+    s.resetAll();
+    s.skipLesson('meet-guitar');
+    s.setLessonStep('meet-guitar', 1);
+    const kept = useGuitar.getState().lessons['meet-guitar'];
+    expect(kept.skipped).toBe(true);
+    expect(kept.done).toBe(true);
+    expect(kept.step).toBe(1);
+  });
+});
+
+describe('restoring from a backup', () => {
+  it("reads the app's own backups, and its dated copies", () => {
+    useGuitar.getState().resetAll();
+    expect(readBackup(exportData())).not.toBeNull();
+    const dated = JSON.stringify({ state: { profile: { onboarded: true }, lessons: {}, changes: {}, tunedOn: null }, version: 1 });
+    expect(readBackup(dated)).not.toBeNull();
+  });
+
+  it('turns away a file that is not one, such as the piano teacher\'s backup', () => {
+    expect(readBackup('not json')).toBeNull();
+    expect(readBackup(JSON.stringify({ app: 'middle-c', profile: { onboarded: true }, lessons: {} }))).toBeNull();
+    expect(readBackup(JSON.stringify({ profile: { onboarded: true }, lessons: {} }))).toBeNull();
+    expect(readBackup(JSON.stringify({ state: { profile: { onboarded: true }, lessons: {} }, version: 3 }))).toBeNull();
+  });
+
+  it('keeps how this iPad hears, and drops songs it does not have', () => {
+    const s = useGuitar.getState();
+    s.resetAll();
+    s.setSettings({ latencyMs: 85 });
+    const backup = JSON.parse(exportData());
+    backup.settings.latencyMs = -40;
+    backup.recordings = { 'no-such-song': { first: { on: '2026-11-01', key: 'k', seconds: 30 } } };
+    backup.lessons = { 'meet-guitar': { done: true, step: 0, doneOn: '2026-11-01' } };
+    expect(s.importData(JSON.stringify(backup))).toBe(true);
+    const now = useGuitar.getState();
+    expect(now.settings.latencyMs).toBe(85);
+    expect(Object.keys(now.recordings)).toEqual([]);
+    expect(now.lessons['meet-guitar'].done).toBe(true);
   });
 });

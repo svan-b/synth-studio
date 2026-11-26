@@ -5,11 +5,24 @@
 const VERSION = 'open-string-v1';
 const CORE = ['/guitar', '/guitar/capture-worklet.js', '/guitar/manifest.webmanifest', '/guitar/icons/icon-192.png'];
 
+// The page names the code it needs. Keeping all of it at once means a copy of
+// the page is never on the device without the code that goes with it.
+function keepCode(cache, html) {
+  const found = html.match(/\/_next\/static\/[^"'\\\s<>)]+/g) || [];
+  const urls = Array.from(new Set(found));
+  return Promise.all(urls.map((url) => cache.match(url).then((hit) => hit || cache.add(url).catch(() => undefined))));
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(VERSION).then((cache) =>
       // One missing file must not stop the rest from being stored.
-      Promise.all(CORE.map((url) => cache.add(url).catch(() => undefined))),
+      Promise.all(CORE.map((url) => cache.add(url).catch(() => undefined))).then(() =>
+        fetch('/guitar')
+          .then((response) => (response.ok ? response.text() : ''))
+          .then((html) => keepCode(cache, html))
+          .catch(() => undefined),
+      ),
     ),
   );
   self.skipWaiting();
@@ -43,7 +56,12 @@ function networkFirst(request, fallbackUrl) {
     .then((response) => {
       if (response.ok) {
         const copy = response.clone();
-        caches.open(VERSION).then((cache) => cache.put(fallbackUrl || request, copy));
+        const page = fallbackUrl ? response.clone() : null;
+        caches.open(VERSION).then((cache) => {
+          cache.put(fallbackUrl || request, copy);
+          // A fresh copy of the page brings its code with it.
+          if (page) page.text().then((html) => keepCode(cache, html)).catch(() => undefined);
+        });
       }
       return response;
     })

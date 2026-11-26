@@ -12,10 +12,10 @@
  *                    recording.save   name data mime share   save a recording (base64) to Files
  *                    remind           on hour minute playedToday message
  *                    volume.watch                            start reporting the iPad's volume
- *                    audio.listening  on                     keep sound on the speaker while listening
  *
  *   app to page    __openString.wake()        the app came back to the front
  *                  __openString.volume(v)     the iPad's output volume, 0 to 1
+ *                  __openString.reminders(ok) false when notifications are switched off for the app
  */
 (function () {
   'use strict';

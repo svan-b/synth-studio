@@ -1,5 +1,6 @@
 import AVFoundation
 import UIKit
+import UserNotifications
 import WebKit
 
 /// The web app, filling the screen, and everything that passes between it and the iPad.
@@ -138,11 +139,10 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             // The self test never asks the learner anything.
             if selfTest == nil {
                 reminders.update(on: on, hour: hour, minute: minute, playedToday: playedToday, message: text)
+                if on { tellIfRemindersAreOff() }
             }
         case "volume.watch":
             watchVolume()
-        case "audio.listening":
-            if body["on"] as? Bool == true { keepSoundOnSpeaker() }
         case "selftest":
             selfTest?.heard(body)
         default:
@@ -168,18 +168,18 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         webView?.evaluateJavaScript("window.__openString && __openString.volume && __openString.volume(\(level));", completionHandler: nil)
     }
 
-    /// While the microphone is in use the sound must still play at full
-    /// strength through the speaker, or through Bluetooth headphones in good
-    /// quality, not routed as for a phone call.
-    private func keepSoundOnSpeaker() {
-        let session = AVAudioSession.sharedInstance()
-        guard session.category == .playAndRecord else { return }
-        let wanted: AVAudioSession.CategoryOptions = [.defaultToSpeaker, .allowBluetoothA2DP]
-        if session.categoryOptions.isSuperset(of: wanted) { return }
-        do {
-            try session.setCategory(.playAndRecord, mode: session.mode, options: session.categoryOptions.union(wanted))
-        } catch {
-            // The web view keeps the arrangement it made itself.
+    // The web view plays and records in a process of its own, with its own
+    // audio session, which this app cannot reach. So how sound is set up while
+    // the microphone is open is not something to arrange from here. The page
+    // deals with it by holding the microphone only while the learner plays.
+
+    /// If the learner has turned notifications off for this app, the page is told, so it can say why no reminder will come.
+    private func tellIfRemindersAreOff() {
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            guard settings.authorizationStatus == .denied else { return }
+            DispatchQueue.main.async {
+                self?.webView?.evaluateJavaScript("window.__openString && __openString.reminders && __openString.reminders(false);", completionHandler: nil)
+            }
         }
     }
 

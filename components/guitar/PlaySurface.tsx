@@ -79,7 +79,7 @@ export default function PlaySurface(props: SurfaceProps) {
   const { score, mode, display = 'chart', tempoPct = 100, hints = 'delay', runId, onDone, held = false } = props;
   const latencyMs = useGuitar((s) => s.settings.latencyMs);
   const metronome = useGuitar((s) => s.settings.metronome);
-  const { status, start: startListening } = useListening(mode !== 'listen');
+  const { status, start: startListening, ask } = useListening(mode !== 'listen');
   const deviceVolume = useDeviceVolume();
   const listening = status.state === 'listening';
   const [current, setCurrent] = useState<number | null>(null);
@@ -104,6 +104,8 @@ export default function PlaySurface(props: SurfaceProps) {
   onTakeRef.current = props.onTake;
   const followRef = useRef<Follower | null>(null);
   const startedRef = useRef(false);
+  const givenRef = useRef<number | null>(null);
+  const phaseRef = useRef<'gate' | 'countin' | 'playing' | 'done' | 'listening'>('gate');
   const [restart, setRestart] = useState(0);
   const carryNote = useRef<Note | null>(null);
 
@@ -229,6 +231,8 @@ export default function PlaySurface(props: SurfaceProps) {
           break;
         }
         case 'given':
+          // Said as the music moves on, and left up until the next thing is played.
+          givenRef.current = ev.index;
           setNote({
             tone: 'hint',
             text: 'Near enough for now. On to the next one.',
@@ -239,7 +243,7 @@ export default function PlaySurface(props: SurfaceProps) {
           setFlash({ key: flashKey.current, tone: ev.state });
           if (ev.state !== 'bad') setHeardAs(null);
           setMarks((m) => new Map(m).set(ev.index, ev.state));
-          if (mode === 'wait' && ev.state !== 'bad') setNote(null);
+          if (mode === 'wait' && ev.state !== 'bad' && givenRef.current !== ev.index) setNote(null);
           break;
         case 'hint':
           setHint(ev.index);
@@ -335,6 +339,19 @@ export default function PlaySurface(props: SurfaceProps) {
     [],
   );
 
+  // A run with the beat that is cut into, by the iPad being put away or another app coming up, is not a run
+  // to be judged. It is dropped, and a fresh one waits for the learner when they come back.
+  phaseRef.current = phase;
+  useEffect(() => {
+    if (mode !== 'tempo') return;
+    const onHide = () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (phaseRef.current === 'countin' || phaseRef.current === 'playing') setRestart((r) => r + 1);
+    };
+    document.addEventListener('visibilitychange', onHide);
+    return () => document.removeEventListener('visibilitychange', onHide);
+  }, [mode]);
+
   // --------------------------------------------------------------- drawing
 
   const pulses = pulsesPerMeasure(score.time);
@@ -344,7 +361,7 @@ export default function PlaySurface(props: SurfaceProps) {
   const notesHint = display !== 'chart' && stepNow && !stepNow.strum && (showHint || hints === 'always') ? stepNow.notes[0] : null;
 
   const micBlock =
-    mode !== 'listen' && !listening ? (
+    mode !== 'listen' && ask ? (
       <div className="flex flex-col items-center gap-3 rounded-3xl bg-os-surface p-6 text-center">
         <Icon.Mic size={30} />
         <div className="max-w-md text-[1.1rem] text-os-muted">
@@ -406,7 +423,7 @@ export default function PlaySurface(props: SurfaceProps) {
             </div>
           )}
           {note && <div className={`os-fade-up text-[1.35rem] font-medium leading-snug ${note.tone === 'ok' ? 'text-os-ok-ink' : note.tone === 'bad' ? 'text-os-bad' : 'text-os-hint-ink'}`}>{note.text}</div>}
-          {!note && mode === 'listen' && deviceVolume !== null && deviceVolume < 0.4 && (
+          {!note && mode === 'listen' && deviceVolume !== null && deviceVolume < 0.5 && (
             <div className="text-[1.25rem] leading-snug text-os-hint-ink">The iPad is turned down low. Turn it up with the buttons on its side to hear this clearly.</div>
           )}
           {!note && mode === 'wait' && notesHint && <div className="text-[1.35rem] text-os-ink">{placeWords(stepNow)}</div>}

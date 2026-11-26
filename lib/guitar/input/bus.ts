@@ -49,3 +49,14 @@ export function emitStrike(ev: StrikeInput): void {
   if (recentStrikes.length > 12) recentStrikes.shift();
   strikeBus.emit(ev);
 }
+
+/**
+ * Was that a strum, and not one plucked string or a knock on the guitar?
+ * A strum sounds several different notes at once.
+ */
+export function isStrum(strike: StrikeInput): boolean {
+  if (strike.strength < 0.25 || strike.chroma.length !== 12) return false;
+  let notes = 0;
+  for (const share of strike.chroma) if (share >= 0.1) notes++;
+  return notes >= 3;
+}

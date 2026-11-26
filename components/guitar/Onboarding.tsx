@@ -56,12 +56,11 @@ function Choice({ selected, title, text, onClick }: { selected: boolean; title: 
 
 /** The microphone, and a first strum heard. */
 function Hearing() {
-  const { status, start } = useListening(true);
+  const { status, start, ask } = useListening(true);
   const [strums, setStrums] = useState(0);
   useEffect(() => strikeBus.subscribe(() => setStrums((n) => n + 1)), []);
-  const listening = status.state === 'listening';
   const level = Math.max(0, Math.min(1, (status.level + 70) / 55));
-  if (!listening)
+  if (ask)
     return (
       <div className="rounded-3xl bg-os-surface p-6">
         <p className="text-[1.1rem] leading-relaxed text-os-muted">
@@ -96,9 +95,7 @@ function Hearing() {
       </div>
       <div className="rounded-3xl bg-os-surface p-6">
         <div className="text-[1.15rem] font-semibold">Is the iPad loud enough?</div>
-        <p className="mb-4 mt-1 text-os-muted">
-          The app plays examples for you to copy, and they need to sit well beside a real guitar. It strums, then you strum, and it tells you whether to turn the iPad up.
-        </p>
+        <p className="mb-4 mt-1 text-os-muted">The app plays examples for you to copy, and a click to play along with. Hear each one now, and turn the iPad up until it is easy to hear from your chair.</p>
         <SoundCheck />
       </div>
     </div>

@@ -19,7 +19,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { speak, speaking, stopSpeaking, whenQuiet } from '@/lib/guitar/audio/speech';
-import { strikeBus } from '@/lib/guitar/input/bus';
+import { isStrum, strikeBus } from '@/lib/guitar/input/bus';
 import { useGuitar } from '@/lib/guitar/learn/store';
 import { Emitter } from '@/lib/guitar/util/emitter';
 import { Button, Icon, Prose } from './ui';
@@ -139,6 +139,9 @@ export function StageMessage({ text, sub, tone, right, spoken = true }: { text: 
 
 // ----------------------------------------------------------- the action bar
 
+/** Milliseconds after the bar changes during which a press that would move on is taken to be meant for the screen before. */
+const SETTLE_MS = 600;
+
 export interface BarAction {
   label: string;
   onClick: () => void;
@@ -157,10 +160,13 @@ export interface PrimaryAction extends BarAction {
   hint?: string;
 }
 
-function Primary({ action }: { action: PrimaryAction }) {
+function Primary({ action, press, moved }: { action: PrimaryAction; /** A tap on the button. */ press: () => void; /** Told when the button acts by itself. */ moved: () => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const fire = useRef(action.onClick);
   fire.current = action.onClick;
+  const movedRef = useRef(moved);
+  movedRef.current = moved;
+  const speaks = useGuitar((s) => s.settings.speak === true);
   const [held, setHeld] = useState(false);
   const [running, setRunning] = useState(false);
   const [left, setLeft] = useState(action.auto ?? 0);
@@ -171,20 +177,25 @@ function Primary({ action }: { action: PrimaryAction }) {
     if (!auto) return;
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
-    void whenQuiet().then(() => {
-      if (cancelled) return;
-      setRunning(true);
-      const ends = Date.now() + auto * 1000;
-      setLeft(auto);
-      timer = setInterval(() => {
-        const s = Math.max(0, (ends - Date.now()) / 1000);
-        setLeft(s);
-        if (s <= 0) {
-          if (timer) clearInterval(timer);
-          fire.current();
-        }
-      }, 100);
-    });
+    const count = () =>
+      void whenQuiet().then(() => {
+        if (cancelled) return;
+        setRunning(true);
+        const ends = Date.now() + auto * 1000;
+        setLeft(auto);
+        timer = setInterval(() => {
+          const s = Math.max(0, (ends - Date.now()) / 1000);
+          setLeft(s);
+          if (s <= 0) {
+            if (timer) clearInterval(timer);
+            movedRef.current();
+            fire.current();
+          }
+        }, 100);
+      });
+    // Where the line is read aloud, the voice begins a moment after the words appear. Wait for it to begin before waiting for it to end.
+    const lead = speaks ? setTimeout(count, 500) : null;
+    if (!speaks) count();
     // A touch anywhere but the button means: wait, I am still reading.
     const hold = (e: PointerEvent) => {
       if (ref.current && e.target instanceof Node && ref.current.contains(e.target)) return;
@@ -193,24 +204,26 @@ function Primary({ action }: { action: PrimaryAction }) {
     window.addEventListener('pointerdown', hold, true);
     return () => {
       cancelled = true;
+      if (lead) clearTimeout(lead);
       if (timer) clearInterval(timer);
       setRunning(false);
       window.removeEventListener('pointerdown', hold, true);
     };
-  }, [auto]);
+  }, [auto, speaks]);
 
-  // On a strum, after a moment for the last one to die away.
+  // On a strum, after a moment for the last one to die away. One plucked string or a knock does not count.
   useEffect(() => {
     if (!action.strum || action.disabled) return;
     let off: (() => void) | null = null;
     const t = setTimeout(() => {
-      off = strikeBus.subscribe(() => {
-        if (speaking()) return;
+      off = strikeBus.subscribe((strike) => {
+        if (speaking() || !isStrum(strike)) return;
         off?.();
         off = null;
+        movedRef.current();
         fire.current();
       });
-    }, 900);
+    }, 1500);
     return () => {
       clearTimeout(t);
       off?.();
@@ -221,7 +234,7 @@ function Primary({ action }: { action: PrimaryAction }) {
   return (
     <button
       ref={ref}
-      onClick={action.onClick}
+      onClick={press}
       disabled={action.disabled}
       className={`relative inline-flex h-[4.5rem] min-w-[15rem] shrink-0 select-none items-center justify-center gap-3 overflow-hidden rounded-full px-9 text-[1.45rem] font-semibold transition-transform duration-150 active:scale-[0.97] disabled:opacity-40 ${
         action.quiet ? 'bg-os-raised text-os-ink' : 'bg-os-ink text-os-bg'
@@ -250,6 +263,7 @@ export function ActionBar({
   extras = [],
   skip,
   primary,
+  retry,
   children,
 }: {
   /** To the step before. */
@@ -261,12 +275,30 @@ export function ActionBar({
   /** Leave this one and go on. Always offered while playing, so a learner is never stuck. */
   skip?: BarAction | null;
   primary?: PrimaryAction | null;
+  /** What the pedal's back key does where there is no Again button to press, such as trying a missed run once more. */
+  retry?: (() => void) | null;
   children?: ReactNode;
 }) {
   const leftHanded = useGuitar((s) => s.settings.leftHanded);
-  const forward = primary && !primary.disabled ? primary.onClick : skip && !skip.disabled ? skip.onClick : null;
-  useRemoteKey('forward', forward);
-  useRemoteKey('back', again && !again.disabled ? again.onClick : (back ?? null));
+  // A press meant for the screen before can land just after this one appears, most of all when the app has
+  // moved on by itself. For a moment after the bar changes, presses that would move on are let pass.
+  const quietUntil = useRef(0);
+  const face = `${primary?.label ?? ''}|${skip?.label ?? ''}|${again?.label ?? ''}`;
+  const seen = useRef('');
+  if (seen.current !== face) {
+    seen.current = face;
+    quietUntil.current = (typeof performance !== 'undefined' ? performance.now() : 0) + SETTLE_MS;
+  }
+  const moved = () => {
+    quietUntil.current = performance.now() + SETTLE_MS;
+  };
+  const guard = (fn: () => void) => () => {
+    if (performance.now() < quietUntil.current) return;
+    fn();
+  };
+  // The pedal goes forward only to the plain next thing. It never skips: leaving a step undone takes a touch.
+  useRemoteKey('forward', primary && !primary.disabled ? guard(primary.onClick) : null);
+  useRemoteKey('back', again && !again.disabled ? guard(again.onClick) : retry ? guard(retry) : (back ?? null));
   const more = extras.filter((x): x is BarAction => Boolean(x));
   // Two groups, so that where the screen is narrow the next thing to do keeps its own side on a row of its own.
   return (
@@ -291,11 +323,11 @@ export function ActionBar({
       </div>
       <div className={`flex items-center gap-2.5 ${leftHanded ? 'mr-auto flex-row-reverse' : 'ml-auto'}`}>
         {skip && (
-          <Button variant="ghost" size="lg" onClick={skip.onClick} disabled={skip.disabled} icon={skip.icon} className="border border-os-line px-6 text-os-ink">
+          <Button variant="ghost" size="lg" onClick={guard(skip.onClick)} disabled={skip.disabled} icon={skip.icon} className="border border-os-line px-6 text-os-ink">
             {skip.label}
           </Button>
         )}
-        {primary && <Primary key={`${primary.label}|${primary.auto ?? 0}|${primary.strum ? 1 : 0}`} action={primary} />}
+        {primary && <Primary key={`${primary.label}|${primary.auto ?? 0}|${primary.strum ? 1 : 0}`} action={primary} press={guard(primary.onClick)} moved={moved} />}
       </div>
     </div>
   );

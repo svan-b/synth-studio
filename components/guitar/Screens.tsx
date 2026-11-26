@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { guitar } from '@/lib/guitar/audio/engine';
-import { instrument } from '@/lib/guitar/audio/instrument';
-import { allSongs, allStages, chordsKnown, getLesson, getSong, lessonForSong, lessonUnlocked, songChords, songInfo } from '@/lib/guitar/content/catalog';
+import { instrument, playScore } from '@/lib/guitar/audio/instrument';
+import { allSongs, allStages, chordsKnown, getLesson, getSong, hasSong, lessonForSong, lessonUnlocked, songChords, songInfo } from '@/lib/guitar/content/catalog';
 import { NOT_USED, PRINCIPLES, TIPS, type Strength } from '@/lib/guitar/content/method';
 import { Follower } from '@/lib/guitar/engine/follow';
 import { listener } from '@/lib/guitar/input/listen';
@@ -11,12 +11,12 @@ import { songProgress } from '@/lib/guitar/learn/coach';
 import { milestones } from '@/lib/guitar/learn/milestones';
 import { DRILL_LABEL, DRILL_LESSON, SONGS_IN_HAND, planDay, planMinutes, type Block, type DrillKind } from '@/lib/guitar/learn/planner';
 import { canSpeak, speak, stopSpeaking } from '@/lib/guitar/audio/speech';
-import { daysAway, daysPlayed, daysThisWeek, exportData, textSizeOf, totalMinutes, useGuitar, type ThemeChoice } from '@/lib/guitar/learn/store';
-import { exportTake, loadTake, playTake } from '@/lib/guitar/learn/takes';
-import { isNative, onVolume, setReminder, shareFile } from '@/lib/guitar/native/bridge';
+import { daysAway, daysPlayed, daysThisWeek, exportData, readBackup, textSizeOf, totalMinutes, useGuitar, type ThemeChoice } from '@/lib/guitar/learn/store';
+import { clearTakes, exportTake, loadTake, playTake } from '@/lib/guitar/learn/takes';
+import { isNative, onRemindersOff, setReminder, shareFile } from '@/lib/guitar/native/bridge';
 import { parseScore } from '@/lib/guitar/music/score';
 import { dayKey } from '@/lib/guitar/util/emitter';
-import { useListening, useToday } from './hooks';
+import { useDeviceVolume, useListening, useToday } from './hooks';
 import Tuner from './Tuner';
 import { Button, Card, Icon, Pill, ProgressBar, Ring, Segmented, Toggle } from './ui';
 
@@ -27,7 +27,7 @@ export type Activity =
   | { kind: 'song'; id: string; minutes?: number }
   | { kind: 'drill'; id: DrillKind }
   | { kind: 'tune' }
-  | { kind: 'session'; blocks: Block[] };
+  | { kind: 'session'; blocks: Block[]; /** The part to pick up at, when a session begun earlier today is carried on. */ from?: number; opened?: number };
 
 function Page({ title, subtitle, right, children }: { title: string; subtitle?: string; right?: ReactNode; children: ReactNode }) {
   return (
@@ -79,7 +79,10 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
   const days = useGuitar((s) => s.days);
   const drills = useGuitar((s) => s.drills);
   const sessionDoneOn = useGuitar((s) => s.sessionDoneOn);
+  const sessionAt = useGuitar((s) => s.sessionAt);
   const doneToday = sessionDoneOn === today;
+  // A session begun earlier today and left part way is carried on from where it stopped.
+  const resume = !doneToday && sessionAt && sessionAt.day === today && sessionAt.index > 0 && sessionAt.index < sessionAt.blocks.length ? sessionAt : null;
   // The plan is made again when the day changes, as when the iPad has sat overnight with the app open.
   const day = useMemo(
     () => planDay({ minutes: profile.minutes, lessons, songs, cards, days, drills, again: doneToday, now: new Date(today + 'T12:00:00') }),
@@ -167,8 +170,13 @@ export function TodayScreen({ onStart, onGo }: { onStart: (a: Activity) => void;
             })}
           </ol>
           {plan.length > 0 && (
-            <Button size="lg" className="mt-6 w-full" onClick={() => onStart({ kind: 'session', blocks: plan })} icon={<Icon.Play size={22} />}>
-              {doneToday ? 'Practise some more' : firstTime ? 'Begin' : 'Start session'}
+            <Button
+              size="lg"
+              className="mt-6 w-full"
+              onClick={() => onStart(resume ? { kind: 'session', blocks: resume.blocks, from: resume.index, opened: resume.opened } : { kind: 'session', blocks: plan })}
+              icon={<Icon.Play size={22} />}
+            >
+              {doneToday ? 'Practise some more' : resume ? `Carry on, part ${resume.index + 1} of ${resume.blocks.length}` : firstTime ? 'Begin' : 'Start session'}
             </Button>
           )}
           {offerLesson && upNext && (
@@ -529,7 +537,10 @@ export function ProgressScreen() {
           <h2 className="font-os-serif text-[1.5rem]">Hear how far you have come</h2>
           <p className="mt-1 text-[15px] text-os-muted">The first time through each learned song, kept with your latest.</p>
           <div className="mt-3 divide-y divide-os-line">
-            {Object.entries(recordings).map(([id, r]) => (
+            {Object.entries(recordings)
+              // A recording of a song this version does not have is passed over, not allowed to stop the page.
+              .filter(([id]) => hasSong(id))
+              .map(([id, r]) => (
               <div key={id} className="py-2">
                 <div className="text-[1.1rem] font-semibold">{getSong(id).title}</div>
                 <RecordingRow songId={id} label="The first time" rec={r.first} />
@@ -570,73 +581,90 @@ function Row({ title, text, children }: { title: string; text?: string; children
 }
 
 /**
- * Compare the app's guitar with the learner's, as the microphone hears them,
- * so the demonstrations can be set to sit beside a real guitar in the room.
+ * Is the iPad loud enough? The app plays its guitar, then its click, and the
+ * learner turns the iPad up until both are easy to hear from the chair. It
+ * needs no guitar, so it can be done before the first lesson.
+ *
+ * An iPad keeps two volumes. Examples play with the microphone set aside, at
+ * the ordinary volume. The click plays while the app is listening, and the
+ * iPad gives that its own, separate volume. So each is played here the way it
+ * will be heard in a lesson, to be set while it sounds.
  */
 export function SoundCheck() {
-  const { status, start } = useListening(true);
-  const [phase, setPhase] = useState<'idle' | 'app' | 'you' | 'done'>('idle');
-  const [result, setResult] = useState<{ app: number; you: number } | null>(null);
-  const [ipadVolume, setIpadVolume] = useState<number | null>(null);
-  useEffect(() => onVolume(setIpadVolume), []);
-  const run = useCallback(async () => {
-    await guitar.unlock();
-    setResult(null);
-    setPhase('app');
-    const peak = (ms: number) =>
-      new Promise<number>((resolve) => {
-        let best = -100;
-        const off = listener.status.subscribe((s) => (best = Math.max(best, s.level)));
-        setTimeout(() => {
-          off();
-          resolve(best);
-        }, ms);
+  const volume = useDeviceVolume();
+  const [playing, setPlaying] = useState<'guitar' | 'click' | null>(null);
+  const [heardGuitar, setHeardGuitar] = useState(false);
+  const stop = useRef<(() => void) | null>(null);
+  const example = useMemo(() => parseScore({ chart: 'Em | G | D | Em', strum: 'D.DU.UDU', tempo: 84 }), []);
+  useEffect(() => () => stop.current?.(), []);
+  const halt = () => {
+    stop.current?.();
+    stop.current = null;
+    setPlaying(null);
+  };
+  const playGuitar = () => {
+    halt();
+    setPlaying('guitar');
+    setHeardGuitar(true);
+    void guitar.unlock().then(() => {
+      const end = playScore(example, { onDone: () => setPlaying((p) => (p === 'guitar' ? null : p)) });
+      stop.current = end;
+    });
+  };
+  const playClick = () => {
+    halt();
+    setPlaying('click');
+    // The click is heard in lessons with the microphone open, so it is played that way here.
+    const release = listener.use();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+    stop.current = () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      release();
+    };
+    void guitar
+      .unlock()
+      .then(() => listener.start(false))
+      .then(() => {
+        if (cancelled) return;
+        const t = guitar.now() + 0.25;
+        const beats = 12;
+        for (let i = 0; i < beats; i++) guitar.click(t + i * 0.6, i % 4 === 0);
+        listener.suppress(t + beats * 0.6);
+        timer = setTimeout(
+          () => {
+            release();
+            stop.current = null;
+            setPlaying((p) => (p === 'click' ? null : p));
+          },
+          beats * 600 + 400,
+        );
       });
-    // The app strums G twice, and the microphone hears it.
-    const notes = [
-      { string: 6 as const, midi: 43 },
-      { string: 5 as const, midi: 47 },
-      { string: 4 as const, midi: 50 },
-      { string: 3 as const, midi: 55 },
-      { string: 2 as const, midi: 59 },
-      { string: 1 as const, midi: 67 },
-    ];
-    guitar.strum(notes, guitar.now() + 0.1);
-    guitar.strum(notes, guitar.now() + 1.1);
-    const app = await peak(2200);
-    setPhase('you');
-    const you = await peak(5000);
-    setResult({ app, you });
-    setPhase('done');
-  }, []);
-  const diff = result ? result.you - result.app : 0;
-  const advice = !result
-    ? null
-    : result.you < -50
-      ? 'Your guitar was not heard. Strum firmly, close to the iPad, and try again.'
-      : diff > 10
-        ? `Your guitar is much louder than the iPad${ipadVolume !== null ? `, whose volume is at ${Math.round(ipadVolume * 100)} percent` : ''}. Turn the iPad up with the volume buttons on its side, or move it closer, and check again.`
-        : diff > 4
-          ? 'Your guitar is a little louder than the iPad. Turning the iPad up a step or two will make the examples easier to play along with.'
-          : diff < -6
-            ? 'The iPad is louder than your guitar. You may like it a little quieter.'
-            : 'They are about as loud as each other. Just right.';
-  if (status.state !== 'listening')
-    return (
-      <Button size="sm" variant="soft" onClick={start} icon={<Icon.Mic size={16} />}>
-        Start listening
-      </Button>
-    );
+  };
+  const low = volume !== null && volume < 0.55;
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <Button size="sm" variant={phase === 'idle' || phase === 'done' ? 'primary' : 'soft'} disabled={phase === 'app' || phase === 'you'} onClick={() => void run()} icon={<Icon.Volume size={16} />}>
-          {phase === 'app' ? 'Listen to the iPad' : phase === 'you' ? 'Now strum your guitar' : phase === 'done' ? 'Check again' : 'Check the sound'}
+    <div className="max-w-md space-y-3">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Button size="sm" variant={playing === 'guitar' ? 'soft' : 'primary'} onClick={playing === 'guitar' ? halt : playGuitar} icon={<Icon.Volume size={16} />}>
+          {playing === 'guitar' ? 'Stop' : 'Play the guitar'}
         </Button>
-        {ipadVolume !== null && <span className="text-[14px] text-os-muted">iPad volume {Math.round(ipadVolume * 100)} percent</span>}
+        <Button size="sm" variant="soft" onClick={playing === 'click' ? halt : playClick}>
+          {playing === 'click' ? 'Stop' : 'Play the click'}
+        </Button>
+        {volume !== null && <span className="text-[14px] text-os-muted">iPad volume {Math.round(volume * 100)} percent</span>}
       </div>
-      {phase === 'you' && <div className="text-[1.1rem] font-medium">Strum your guitar a few times now, as you normally play.</div>}
-      {advice && <div className="max-w-md text-[15px] leading-snug text-os-muted">{advice}</div>}
+      <div className="text-[15px] leading-snug text-os-muted">
+        {playing === 'click'
+          ? listener.stepsAside
+            ? 'This is the click you play along with. The iPad keeps a separate volume for it, so if it is quiet, press volume up now, while it clicks.'
+            : 'This is the click you play along with. It should be easy to hear over your own strumming.'
+          : low
+            ? `The iPad is turned down to ${Math.round((volume ?? 0) * 100)} percent. Press the volume up button on its side while the guitar plays. Near the top works best beside a real guitar.`
+            : heardGuitar
+              ? 'It should be easy to hear from your chair, about as loud as someone talking across the table. If not, press volume up on the side of the iPad while it plays.'
+              : 'Play each one, and turn the iPad up with the buttons on its side until it is easy to hear from your chair.'}
+      </div>
     </div>
   );
 }
@@ -647,16 +675,17 @@ type TimingOutcome = { biasMs: number } | { problem: 'too-few' | 'early' };
 /**
  * Strum along with clicks, and find how far behind the microphone hears it.
  * The run hears with no allowance at all, so what it finds is the whole delay.
+ * The microphone is held only while the check runs.
  */
 function TimingCheck({ onDone }: { onDone: (outcome: TimingOutcome) => void }) {
-  const { status, start } = useListening(true);
-  const [state, setState] = useState<'idle' | 'running'>('idle');
+  const [state, setState] = useState<'idle' | 'opening' | 'running'>('idle');
+  const { status, start, ask } = useListening(state !== 'idle');
   const follower = useRef<Follower | null>(null);
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
   useEffect(() => () => follower.current?.stop(), []);
-  const go = () => {
-    void guitar.unlock();
+  useEffect(() => {
+    if (state !== 'opening' || status.state !== 'listening') return;
     follower.current?.stop();
     setState('running');
     const score = parseScore({ chart: 'Em | Em | Em', strum: 'D.D.D.D.', tempo: 80 });
@@ -673,16 +702,17 @@ function TimingCheck({ onDone }: { onDone: (outcome: TimingOutcome) => void }) {
       }
     });
     f.start();
+  }, [state, status.state]);
+  const go = () => {
+    void guitar.unlock();
+    setState('opening');
+    start();
   };
-  if (status.state !== 'listening')
-    return (
-      <Button size="sm" variant="soft" onClick={start}>
-        Start listening
-      </Button>
-    );
+  if (state !== 'idle' && ask && status.state === 'denied')
+    return <span className="max-w-xs text-[14px] text-os-muted">The microphone is switched off for this app. Turn it on in the iPad&apos;s Settings, under Privacy and Security, Microphone.</span>;
   return (
-    <Button size="sm" variant="soft" disabled={state === 'running'} onClick={go}>
-      {state === 'running' ? 'Four clicks, then strum' : 'Run the timing check'}
+    <Button size="sm" variant="soft" disabled={state !== 'idle'} onClick={go}>
+      {state === 'running' ? 'Four clicks, then strum' : state === 'opening' ? 'Getting ready' : 'Run the timing check'}
     </Button>
   );
 }
@@ -698,6 +728,11 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
   const [timing, setTiming] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  // The iPad says when a reminder was asked for but notifications are switched off for the app.
+  const [remindersOff, setRemindersOff] = useState(false);
+  useEffect(() => onRemindersOff(() => setRemindersOff(true)), []);
+  // A backup that has been chosen and read, waiting for a yes before it replaces what is here.
+  const [restore, setRestore] = useState<{ text: string; about: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const native = isNative();
 
@@ -751,7 +786,14 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
           />
         </Row>
         {native && (
-          <Row title="Remind me" text="A gentle note on the iPad at your time to play, only on days you have not played yet.">
+          <Row
+            title="Remind me"
+            text={
+              remindersOff && settings.reminder
+                ? "Notifications are switched off for Open String, so no reminder can be shown. Turn them on in the iPad's Settings, under Notifications, Open String."
+                : 'A gentle note on the iPad at your time to play, only on days you have not played yet.'
+            }
+          >
             <Toggle
               label="Remind me"
               value={settings.reminder}
@@ -773,7 +815,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
         <Row title="Click" text="The metronome.">
           <input type="range" className="os-range w-56" min={0.1} max={1} step={0.05} value={settings.clickVolume} onChange={(e) => setSettings({ clickVolume: Number(e.target.value) })} />
         </Row>
-        <Row title="Sound check" text="The app plays, then you strum, and it tells you whether the iPad is loud enough beside your guitar.">
+        <Row title="Sound check" text="Hear the app's guitar and its click, and set the iPad's volume. No guitar needed.">
           <SoundCheck />
         </Row>
         <Row title="Timing check" text={timing ?? 'Four clicks count in, then strum once on each click. The app allows for any delay in hearing you.'}>
@@ -858,7 +900,7 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
             Save
           </Button>
         </Row>
-        <Row title="Restore from a backup" text={message ?? 'Replace your progress with a saved copy.'}>
+        <Row title="Restore from a backup" text={restore ? `${restore.about} Everything here now will be replaced by it.` : (message ?? 'Replace your progress with a saved copy.')}>
           <>
             <input
               ref={fileRef}
@@ -867,13 +909,43 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
+                // Cleared, so the same file can be chosen again.
+                e.target.value = '';
                 if (!f) return;
-                void f.text().then((t) => setMessage(importData(t) ? 'Restored.' : 'That file is not an Open String backup.'));
+                void f.text().then((t) => {
+                  const data = readBackup(t);
+                  if (!data) {
+                    setRestore(null);
+                    setMessage('That file is not an Open String backup. Nothing was changed.');
+                    return;
+                  }
+                  const lessons = Object.values(data.lessons ?? {}).filter((l) => l?.done).length;
+                  const days = Object.keys(data.days ?? {}).length;
+                  setRestore({ text: t, about: `This backup holds ${lessons} ${lessons === 1 ? 'lesson' : 'lessons'} done and ${days} ${days === 1 ? 'day' : 'days'} of playing.` });
+                });
               }}
             />
-            <Button size="sm" variant="soft" onClick={() => fileRef.current?.click()}>
-              Restore
-            </Button>
+            {restore ? (
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setRestore(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => {
+                    setMessage(importData(restore.text) ? 'Restored.' : 'That file could not be read. Nothing was changed.');
+                    setRestore(null);
+                  }}
+                >
+                  Yes, replace
+                </Button>
+              </div>
+            ) : (
+              <Button size="sm" variant="soft" onClick={() => fileRef.current?.click()}>
+                Restore
+              </Button>
+            )}
           </>
         </Row>
         <Row title="Start again" text="Clear all progress. Your settings stay.">
@@ -883,6 +955,8 @@ export function SettingsScreen({ onGo }: { onGo: (v: View) => void }) {
               variant="danger"
               onClick={() => {
                 resetAll();
+                // The recordings go too, not only the list of them.
+                clearTakes();
                 setConfirmReset(false);
               }}
             >
