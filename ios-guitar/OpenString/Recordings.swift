@@ -18,6 +18,8 @@ final class Recordings {
     func save(name: String, base64: String) -> URL? {
         guard let data = Data(base64Encoded: base64, options: .ignoreUnknownCharacters), !data.isEmpty else { return nil }
         let file = folder.appendingPathComponent(Self.safe(name))
+        // The folder is made again if it was removed in the Files app.
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         do {
             try data.write(to: file, options: .atomic)
         } catch {

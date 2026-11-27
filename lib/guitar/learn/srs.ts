@@ -24,6 +24,9 @@ export type Outcome = 'again' | 'hard' | 'good' | 'easy';
 const scheduler = fsrs(
   generatorParameters({
     enable_fuzz: false,
+    // Reviews are by the day. With the short steps of a flash card app, measured in minutes, a chord
+    // checked this morning would still count as due all day and keep coming back into today's plan.
+    enable_short_term: false,
     // Chords and songs at the guitar fade faster than facts if left
     // for months, so reviews never drift further apart than this.
     maximum_interval: 60,

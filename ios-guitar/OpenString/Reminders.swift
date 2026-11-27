@@ -20,6 +20,8 @@ final class Reminders {
     private var generation = 0
 
     func update(on: Bool, hour: Int, minute: Int, playedToday: Bool, message: String) {
+        // Reminders already shown have done their work once the app is open.
+        center.removeAllDeliveredNotifications()
         queue.async {
             self.generation += 1
             let mine = self.generation

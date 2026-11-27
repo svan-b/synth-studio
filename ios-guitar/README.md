@@ -26,7 +26,9 @@ With a free Apple ID the app stops opening after 7 days. Plug the iPad in and pr
 
 ## Using it
 
-Set the iPad on a stand or a table in front of you, about an arm's length away, and sit with the guitar. The first time, the iPad asks whether the app may use the microphone: say yes. The welcome screens then check that it can hear you, and whether the iPad is loud enough beside your guitar. Turn the iPad up with the buttons on its side if the sound check says so. While the microphone is in use the iPad keeps a volume of its own, so set it with the app open.
+Set the iPad on a stand or a table in front of you, about an arm's length away, and sit with the guitar. The first time, the iPad asks whether the app may use the microphone: say yes. The welcome screens then check that it can hear you, and whether the iPad is loud enough beside your guitar. The sound check there needs no guitar: it plays the app's guitar and then its click, and you turn the iPad up with the buttons on its side until each is easy to hear. Near the top works best beside a real guitar.
+
+An iPad keeps two volumes, one for ordinary sound and one for when an app is listening through the microphone. The app's examples play at the ordinary volume, with the microphone set aside. The click you play along with sounds while the app is listening, so it follows the other one. That is why the sound check plays both, and why the click is best turned up while it is clicking. Settings in the app has the same check.
 
 Your hands can stay on the guitar. The welcome screens ask which text size you can read from your chair. After a step that goes well the app moves on by itself, and where it waits to begin, one strum begins it. Everything else is in one bar along the bottom of the screen, with the next thing to do as the largest button. A Bluetooth page turning pedal works too: forward for the next thing, back for again. Settings has the text size, and a choice to have the instructions read aloud.
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { guitar } from '@/lib/guitar/audio/engine';
 import { instrument, playScore } from '@/lib/guitar/audio/instrument';
 import { allLessons, changeScore, chordsKnown, songScore } from '@/lib/guitar/content/catalog';
-import { Follower, type FollowResult } from '@/lib/guitar/engine/follow';
+import { Follower, notAttempted, type FollowResult } from '@/lib/guitar/engine/follow';
 import { DRILL_LABEL, dueChords, introducedSongs, type DrillKind } from '@/lib/guitar/learn/planner';
 import { outcomeFromAnswer } from '@/lib/guitar/learn/srs';
 import { pairKey, useGuitar } from '@/lib/guitar/learn/store';
@@ -84,7 +84,7 @@ function ChangesDrill({ onClose }: { onClose: () => void }) {
     best: boolean;
     before: number;
   } | null>(null);
-  const { status, start } = useListening(true);
+  const { status, start, ask } = useListening(true);
   const follower = useRef<Follower | null>(null);
   useWakeLock(true);
 
@@ -138,16 +138,19 @@ function ChangesDrill({ onClose }: { onClose: () => void }) {
   }, [phase]);
 
   useEffect(() => () => follower.current?.stop(), []);
+  // A minute that is stopped part way is not a score. Nothing is kept, and the pair waits to be started again.
   const stopEarly = useCallback(() => {
     follower.current?.stop();
-    setPhase('done');
+    setCount(0);
+    setAt(0);
+    setPhase('ready');
   }, []);
 
   const rec = records[pairKey(...pair)];
   const now = at % 2 === 0 ? pair[0] : pair[1];
   return (
     <Frame title="One minute changes" onClose={onClose}>
-      {status.state !== 'listening' ? (
+      {ask ? (
         <MicNeeded start={start} denied={status.state === 'denied'} />
       ) : (
         <>
@@ -215,7 +218,6 @@ function ChangesDrill({ onClose }: { onClose: () => void }) {
                 label: 'Start the minute',
                 onClick: begin,
                 icon: <Icon.Play size={22} />,
-                strum: true,
               }}
             />
           )}
@@ -226,7 +228,7 @@ function ChangesDrill({ onClose }: { onClose: () => void }) {
                 label: 'Another minute',
                 onClick: () => setPhase('ready'),
               }}
-              primary={{ label: 'Done', onClick: onClose }}
+              primary={{ label: 'Done', onClick: onClose, auto: 12 }}
             />
           )}
         </>
@@ -287,23 +289,47 @@ const RHYTHMS: Array<{
   },
 ];
 
+/** Runs of the strumming exercise in one sitting. With the count in, that is about three minutes. */
+const RHYTHM_RUNS = 5;
+
 function RhythmDrill({ onClose }: { onClose: () => void }) {
   const drill = useGuitar((s) => s.drills.rhythm);
   const recordDrill = useGuitar((s) => s.recordDrill);
+  const setDrillLevel = useGuitar((s) => s.setDrillLevel);
   const known = useKnownChords();
   const [level, setLevel] = useState(() => Math.min(RHYTHMS.length, Math.max(1, drill?.level ?? 1)));
   const [run, setRun] = useState(0);
+  const [runs, setRuns] = useState(0);
   const [streak, setStreak] = useState(0);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [finished, setFinished] = useState(false);
   const chord = known.includes('G') ? 'G' : known.includes('Em') ? 'Em' : 'Em';
   const [gate, setGate] = useState<(() => void) | null>(null);
   const onGate = useCallback((start: (() => void) | null) => setGate(() => start), []);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearTimer = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  };
+  useEffect(() => clearTimer, []);
+  // A harder pattern is tried for this sitting. It is kept only once it has been played steadily.
   const nextPattern = useCallback(() => {
+    clearTimer();
     setNote(null);
     setStreak(0);
     setLevel((l) => Math.min(RHYTHMS.length, l + 1));
     setRun((x) => x + 1);
   }, []);
+  // An easier one is a choice, and is kept.
+  const easierPattern = useCallback(() => {
+    clearTimer();
+    setNote(null);
+    setStreak(0);
+    const lower = Math.max(1, level - 1);
+    setLevel(lower);
+    setDrillLevel('rhythm', lower);
+    setRun((x) => x + 1);
+  }, [level, setDrillLevel]);
   const r = RHYTHMS[level - 1];
   const score = useMemo(
     () =>
@@ -319,17 +345,25 @@ function RhythmDrill({ onClose }: { onClose: () => void }) {
   const onDone = useCallback(
     (result: FollowResult | null) => {
       if (!result) return;
+      // A run nobody played is not a miss. It waits to be started again.
+      if (notAttempted(result)) {
+        setNote(null);
+        setRun((x) => x + 1);
+        return;
+      }
       const ok = result.accuracy >= 0.85 && result.onTime >= 0.7 && result.extraStrikes <= 2;
-      recordDrill('rhythm', ok, level);
+      const played = runs + 1;
+      setRuns(played);
+      let earned = false;
       if (ok) {
         const s = streak + 1;
         setStreak(s);
         instrument.chime();
         if (s >= 2 && level < RHYTHMS.length) {
+          // The next pattern comes up with the next run, not before, so nothing starts and is then cut off.
+          earned = true;
           setNote({ ok: true, text: 'Steady twice. On to the next pattern.' });
-          setLevel(level + 1);
           setStreak(0);
-          recordDrill('rhythm', true, level + 1);
         } else
           setNote({
             ok: true,
@@ -349,10 +383,40 @@ function RhythmDrill({ onClose }: { onClose: () => void }) {
                   : 'Some strums came early and some late. Feel each click.',
         });
       }
-      setTimeout(() => setRun((x) => x + 1), 2600);
+      // The level kept is the one earned: it goes up only after two steady runs, never by trying a harder pattern.
+      const kept = Math.max(1, Math.min(RHYTHMS.length, drill?.level ?? 1));
+      recordDrill('rhythm', ok, earned ? Math.max(kept, level + 1) : undefined);
+      clearTimer();
+      timer.current = setTimeout(() => {
+        timer.current = null;
+        if (earned) setLevel(level + 1);
+        if (played >= RHYTHM_RUNS) setFinished(true);
+        else setRun((x) => x + 1);
+      }, 2600);
     },
-    [level, recordDrill, streak],
+    [drill?.level, level, recordDrill, runs, streak],
   );
+  if (finished)
+    return (
+      <Frame title="Strumming" onClose={onClose}>
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 px-8 text-center">
+          <h2 className="os-fade-up font-os-serif text-[3.2rem] leading-tight">That is the strumming for today</h2>
+          <p className="os-say os-fade-up max-w-2xl">A few minutes with the click, most days, is what makes a strumming hand steady. It keeps settling after you stop.</p>
+        </div>
+        <ActionBar
+          again={{
+            label: 'Keep going',
+            onClick: () => {
+              setRuns(0);
+              setNote(null);
+              setFinished(false);
+              setRun((x) => x + 1);
+            },
+          }}
+          primary={{ label: 'Done', onClick: onClose, auto: 8 }}
+        />
+      </Frame>
+    );
   return (
     <Frame title={`Strumming, pattern ${level} of ${RHYTHMS.length}`} onClose={onClose}>
       <StageMessage text={note?.text ?? `${r.say} Hold ${sayChord(chord)}. Only the timing counts.`} tone={note ? (note.ok ? 'ok' : 'hint') : undefined} />
@@ -360,7 +424,8 @@ function RhythmDrill({ onClose }: { onClose: () => void }) {
         <PlaySurface score={score} mode="tempo" display="chart" anyStrike tempoPct={100} runId={`${level}-${run}`} onDone={onDone} onGate={onGate} pattern={r.pattern} />
       </div>
       <ActionBar
-        skip={level < RHYTHMS.length ? { label: 'Next pattern', onClick: nextPattern } : null}
+        extras={[level > 1 && { label: 'Easier pattern', onClick: easierPattern }, level < RHYTHMS.length && { label: 'Harder pattern', onClick: nextPattern }]}
+        skip={{ label: 'Stop', onClick: () => setFinished(true) }}
         primary={
           gate
             ? {
@@ -399,7 +464,7 @@ function RecallDrill({ onClose }: { onClose: () => void }) {
   const [shown, setShown] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  const { status, start } = useListening(true);
+  const { status, start, ask } = useListening(true);
   const t0 = useRef(performance.now());
   // Looking at the picture before playing is help, and the chord comes back sooner for it.
   const peeked = useRef(false);
@@ -413,14 +478,23 @@ function RecallDrill({ onClose }: { onClose: () => void }) {
     t0.current = performance.now();
     peeked.current = false;
     let wrong = 0;
+    let given = false;
+    let after: ReturnType<typeof setTimeout> | null = null;
     const f = new Follower(score, {
       mode: 'wait',
       hintDelayMs: 7000,
       hintAfterWrong: 2,
       confusers: known,
+      // A chord that will not ring, or that the microphone keeps mishearing, is left after three tries. It comes back soon.
+      giveAfter: 3,
     });
     const off = f.events.subscribe((ev) => {
-      if (ev.type === 'hint') setShown(true);
+      if (ev.type === 'hint') {
+        // The picture has been shown, so what is played next is not from memory.
+        peeked.current = true;
+        setShown(true);
+      }
+      if (ev.type === 'given') given = true;
       if (ev.type === 'wrong') {
         wrong++;
         setNote(ev.heard ? `That sounded like ${sayChord(ev.heard)}.` : 'Not quite. Try again.');
@@ -431,24 +505,33 @@ function RecallDrill({ onClose }: { onClose: () => void }) {
       }
       if (ev.type === 'done') {
         const seconds = (performance.now() - t0.current) / 1000;
-        const helped = ev.result.hintedSteps > 0 || peeked.current;
+        const helped = ev.result.hintedSteps > 0 || peeked.current || given;
         const clean = wrong === 0 && !helped;
         reviewCard(`chord:${chord}`, helped ? 'again' : outcomeFromAnswer(clean, seconds, 4, 10));
         recordDrill('recall', clean);
-        instrument.chime();
-        setNote(clean ? (seconds < 4 ? 'Quick and clean.' : 'Right.') : 'Got it.');
-        setTimeout(() => {
-          if (i + 1 >= queue.length) setDone(true);
-          else setI(i + 1);
-        }, 1300);
+        if (!given) instrument.chime();
+        setNote(given ? 'Left for now. It will come back soon.' : clean ? (seconds < 4 ? 'Quick and clean.' : 'Right.') : 'Got it.');
+        after = setTimeout(
+          () => {
+            if (i + 1 >= queue.length) setDone(true);
+            else setI(i + 1);
+          },
+          given ? 2200 : 1300,
+        );
       }
     });
     f.start();
     return () => {
       off();
       f.stop();
+      if (after) clearTimeout(after);
     };
   }, [chord, i, known, queue.length, recordDrill, reviewCard, score, status.state]);
+  // Leave this chord for now. Nothing is said of how well it is known, so it comes up again as it would have.
+  const skipChord = () => {
+    if (i + 1 >= queue.length) setDone(true);
+    else setI(i + 1);
+  };
   return (
     <Frame
       title="Chord check"
@@ -461,19 +544,19 @@ function RecallDrill({ onClose }: { onClose: () => void }) {
         ) : undefined
       }
     >
-      {status.state !== 'listening' ? (
+      {ask ? (
         <MicNeeded start={start} denied={status.state === 'denied'} />
       ) : done || !chord ? (
-        <div className="flex h-full flex-col items-center justify-center gap-5 px-8 text-center">
-          <div className="os-pop flex h-20 w-20 items-center justify-center rounded-full bg-os-ok text-white">
-            <Icon.Check size={44} />
+        <>
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 px-8 text-center">
+            <div className="os-pop flex h-20 w-20 items-center justify-center rounded-full bg-os-ok text-white">
+              <Icon.Check size={44} />
+            </div>
+            <h2 className="font-os-serif text-[3.2rem]">{chord ? 'All checked' : 'Nothing to check yet'}</h2>
+            <p className="os-say max-w-xl">Each chord comes back on a schedule that stretches as you get it right.</p>
           </div>
-          <h2 className="font-os-serif text-[3.2rem]">{chord ? 'All checked' : 'Nothing to check yet'}</h2>
-          <p className="os-say max-w-xl">Each chord comes back on a schedule that stretches as you get it right.</p>
-          <Button size="xl" onClick={onClose} className="min-w-[15rem]">
-            Done
-          </Button>
-        </div>
+          <ActionBar primary={{ label: 'Done', onClick: onClose, auto: 8 }} />
+        </>
       ) : (
         <>
           <StageMessage
@@ -500,6 +583,7 @@ function RecallDrill({ onClose }: { onClose: () => void }) {
                     },
                   ]
             }
+            skip={{ label: 'Skip', onClick: skipChord }}
           />
         </>
       )}
@@ -538,18 +622,13 @@ function EarDrill({ onClose }: { onClose: () => void }) {
   const [listenRun, setListenRun] = useState(0);
   const [phase, setPhase] = useState<'hear' | 'answer'>('hear');
   const q = questions[i];
-  const { status, start } = useListening(q?.kind === 'string');
-  usePracticeTimer(() => undefined);
+  const { status, start, ask } = useListening(q?.kind === 'string');
 
+  const after = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hear = useCallback(() => {
     if (!q) return;
     void guitar.unlock().then(() => {
-      if (q.kind === 'string')
-        instrument.pluck(OPEN_MIDI[q.string], undefined, {
-          string: q.string,
-          velocity: 0.85,
-          seconds: 2,
-        });
+      if (q.kind === 'string') instrument.reference(OPEN_MIDI[q.string], q.string, 2);
       else playScore(parseScore({ line: `[${q.chord}]w`, tempo: 60 }), {});
     });
     setPhase('answer');
@@ -570,12 +649,20 @@ function EarDrill({ onClose }: { onClose: () => void }) {
         setRight((r) => r + 1);
         instrument.chime();
       }
-      setTimeout(() => {
+      if (after.current) clearTimeout(after.current);
+      after.current = setTimeout(() => {
+        after.current = null;
         if (i + 1 >= questions.length) setFinished(true);
         else setI(i + 1);
       }, 1500);
     },
     [i, questions.length, recordDrill],
+  );
+  useEffect(
+    () => () => {
+      if (after.current) clearTimeout(after.current);
+    },
+    [],
   );
 
   const stringScore = useMemo(
@@ -602,17 +689,17 @@ function EarDrill({ onClose }: { onClose: () => void }) {
       }
     >
       {finished ? (
-        <div className="flex h-full flex-col items-center justify-center gap-5 px-8 text-center">
-          <h2 className="font-os-serif text-[4rem]">
-            {right} of {questions.length}
-          </h2>
-          <p className="os-say max-w-xl">Your ear grows with every session, the same way your fingers do.</p>
-          <Button size="xl" onClick={onClose} className="min-w-[15rem]">
-            Done
-          </Button>
-        </div>
+        <>
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 px-8 text-center">
+            <h2 className="font-os-serif text-[4rem]">
+              {right} of {questions.length}
+            </h2>
+            <p className="os-say max-w-xl">Your ear grows with every session, the same way your fingers do.</p>
+          </div>
+          <ActionBar primary={{ label: 'Done', onClick: onClose, auto: 8 }} />
+        </>
       ) : q.kind === 'string' ? (
-        status.state !== 'listening' ? (
+        ask ? (
           <MicNeeded start={start} denied={status.state === 'denied'} />
         ) : (
           <div className="flex h-full min-h-0 flex-col">
@@ -633,7 +720,8 @@ function EarDrill({ onClose }: { onClose: () => void }) {
                     hints="never"
                     runId={`${i}-${listenRun}`}
                     onDone={(r) => {
-                      if (r) next(r.wrongTries === 0);
+                      // Right is the string found with no wrong one tried. A step let go after three unclear plucks was not found.
+                      if (r) next(r.wrongTries === 0 && r.unclearTries < 3);
                     }}
                   />
                 )}
@@ -687,7 +775,7 @@ function EarDrill({ onClose }: { onClose: () => void }) {
 
 export default function Drill({ kind, onClose }: { kind: DrillKind; onClose: () => void }) {
   const logPractice = useGuitar((s) => s.logPractice);
-  usePracticeTimer((seconds) => logPractice(seconds, 0, 1));
+  usePracticeTimer((seconds, first) => logPractice(seconds, 0, first ? 1 : 0));
   if (kind === 'changes') return <ChangesDrill onClose={onClose} />;
   if (kind === 'rhythm') return <RhythmDrill onClose={onClose} />;
   if (kind === 'recall') return <RecallDrill onClose={onClose} />;

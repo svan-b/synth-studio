@@ -19,14 +19,13 @@ import {
   waitSummary,
   type SongState,
   type Task,
-  type Verdict,
-} from '@/lib/guitar/learn/coach';
+  type Verdict, type PlanPlace } from '@/lib/guitar/learn/coach';
 import { outcomeFromAccuracy } from '@/lib/guitar/learn/srs';
 import { useGuitar } from '@/lib/guitar/learn/store';
 import { deleteTake, exportTake, loadTake, playTake, saveTake } from '@/lib/guitar/learn/takes';
 import { sliceScore } from '@/lib/guitar/music/score';
 import { dayKey } from '@/lib/guitar/util/emitter';
-import { readingMs, usePracticeTimer, useWakeLock } from './hooks';
+import { readingMs, useListening, usePracticeTimer, useWakeLock } from './hooks';
 import { songMelody } from './LessonPlayer';
 import PlaySurface from './PlaySurface';
 import { ActionBar, StageMessage, useFocus } from './Stage';
@@ -74,6 +73,8 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
   const onGate = useCallback((start: (() => void) | null) => setGate(() => start), []);
   const [free, setFree] = useState<Free | null>(null);
   const [options, setOptions] = useState(false);
+  // A step of the plan behind the place reached, tapped in the plan: going back to it is asked about first.
+  const [goBack, setGoBack] = useState<{ place: PlanPlace; name: string } | null>(null);
   const [modelOnce, setModelOnce] = useState(false);
   const [words, setWords] = useState(Boolean(song.lyrics));
   const [aside, setAside] = useState<string | null>(null);
@@ -86,6 +87,7 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
   const judgeNow = useRef<(result: FollowResult) => boolean>(() => false);
   const startedAt = useRef(performance.now());
   const played = useRef(0);
+  const reported = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warned = useRef(false);
   const latestTake = useRef<Blob | null>(null);
@@ -95,11 +97,24 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
 
   const away = useFocus();
   useWakeLock(true);
-  usePracticeTimer((seconds) => logPractice(seconds, played.current, 1));
+  // The microphone is held while the song is open. It still steps aside for every example.
+  useListening(true);
+  usePracticeTimer((seconds, first) => {
+    // Strums and notes heard since the last report.
+    const heard = played.current - reported.current;
+    reported.current = played.current;
+    logPractice(seconds, heard, first ? 1 : 0);
+  });
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
       stopPlay.current?.();
+      // A run that ended a moment before the song was closed still counts: it is judged and saved on the way out.
+      if (pending.current) {
+        const result = pending.current;
+        pending.current = null;
+        judgeNow.current(result);
+      }
     },
     [],
   );
@@ -202,11 +217,12 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
       const day = dayKey();
       const key = `${songId}:${Date.now()}`;
       const first = !useGuitar.getState().recordings[songId];
+      // In the Files app: the first time through under its date, and the latest, which replaces the one before.
+      // This copy is made whether or not the one inside the app can be, so a full store does not lose the recording.
+      void exportTake(song.title, first ? `first time, ${day}` : 'latest', blob, false);
       if (!(await saveTake(key, blob))) return;
       // The latest recording replaces the one before it. The first is kept for good.
       for (const old of keepRecording(songId, { on: day, key, seconds: Math.round(seconds) })) void deleteTake(old.key);
-      // In the Files app too: the first time through under its date, and the latest, which replaces the one before.
-      void exportTake(song.title, first ? `first time, ${day}` : 'latest', blob, false);
     },
     [keepRecording, song.title, songId],
   );
@@ -217,9 +233,10 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
       const out = applyResult(info, state, task, result);
       setState(out.state);
       setSong(songId, out.state);
-      if (state.learned) reviewCard(`song:${songId}`, outcomeFromAccuracy(result.accuracy, result.clean));
+      // How well a learned song is remembered is told by playing the whole of it, not by a short drill on one change.
+      if (state.learned && task.scope.type === 'whole') reviewCard(`song:${songId}`, out.verdict.passed ? outcomeFromAccuracy(result.accuracy, result.clean) : 'again');
       const stats = task.scope.type === 'trial' && result.cutShort ? '' : statsLine(result);
-      setVerdict({ v: out.verdict, stats, auto: readTime(`${out.verdict.message} ${out.verdict.aside ?? ''}`, out.verdict.passed) / 1000 });
+      setVerdict({ v: out.verdict, stats, auto: readTime(`${out.verdict.message} ${out.verdict.aside ?? ''} ${stats}`, out.verdict.passed) / 1000 });
       const blob = takeRun.current === runRef.current ? latestTake.current : null;
       if (out.verdict.learned) {
         addCards([`song:${songId}`]);
@@ -403,7 +420,7 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
           </div>
           <ActionBar
             extras={kept ? [{ label: playing2 === 'kept' ? 'Stop' : 'Hear yours', onClick: () => void hearKept(), icon: <Icon.Ear size={20} /> }, { label: 'Share it', onClick: () => void shareKept(), icon: <Icon.Share size={20} /> }] : []}
-            primary={{ label: 'Done', onClick: onClose }}
+            primary={{ label: 'Done', onClick: onClose, auto: 15 }}
           />
         </>
       ) : stage === 'timeup' ? (
@@ -416,7 +433,7 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
                 : 'That is the time set aside for this song today. What you practised keeps settling after you stop, and a night of sleep helps it along. It will be easier tomorrow.'}
             </p>
           </div>
-          <ActionBar again={{ label: ending === 'kept' ? 'Play it again' : 'Keep going', onClick: proceed }} primary={{ label: 'Finish', onClick: onClose }} />
+          <ActionBar again={{ label: ending === 'kept' ? 'Play it again' : 'Keep going', onClick: proceed }} primary={{ label: 'Finish', onClick: onClose, auto: 10 }} />
         </>
       ) : (
         <>
@@ -510,7 +527,15 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
                       <button
                         key={st.label}
                         disabled={!st.place || state.learned}
-                        onClick={() => st.place && goOn(jumpTo(info, state, st.place))}
+                        onClick={() => {
+                          if (!st.place) return;
+                          // Forward is taken at once. Back gives up steps already held, so it is asked about first.
+                          if (st.state === 'done') setGoBack({ place: st.place, name: `${row.title}, ${st.label}` });
+                          else {
+                            setGoBack(null);
+                            goOn(jumpTo(info, state, st.place));
+                          }
+                        }}
                         className={`inline-flex h-12 items-center gap-1.5 rounded-full px-4 text-[1.05rem] font-semibold ${
                           st.state === 'done' ? 'bg-os-ok/15 text-os-ok-ink' : st.state === 'now' ? 'bg-os-ink text-os-bg' : 'bg-os-raised text-os-muted'
                         }`}
@@ -523,7 +548,25 @@ export default function SongRoom({ songId, minutes, onClose }: { songId: string;
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-[1.1rem] leading-relaxed text-os-muted">The coach moves you along this as each step holds. A clean run moves on at once. Tap any step to go straight to it: what comes before it is taken as known.</p>
+            {goBack ? (
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-os-raised px-5 py-4">
+                <p className="min-w-0 flex-1 text-[1.15rem] leading-snug">Go back to {goBack.name}? The steps after it will be played again.</p>
+                <Button variant="soft" onClick={() => setGoBack(null)}>
+                  Stay here
+                </Button>
+                <Button
+                  onClick={() => {
+                    const place = goBack.place;
+                    setGoBack(null);
+                    goOn(jumpTo(info, state, place));
+                  }}
+                >
+                  Go back
+                </Button>
+              </div>
+            ) : (
+              <p className="mt-4 text-[1.1rem] leading-relaxed text-os-muted">The coach moves you along this as each step holds. A clean run moves on at once. Tap any step to go straight to it: what comes before it is taken as known.</p>
+            )}
           </>
         )}
         <div className={free ? '' : 'mt-6 border-t border-os-line pt-5'}>

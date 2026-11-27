@@ -5,7 +5,7 @@ import { guitar, type AudioStatus } from '@/lib/guitar/audio/engine';
 import { chordsKnown } from '@/lib/guitar/content/catalog';
 import { listener, type ListenStatus } from '@/lib/guitar/input/listen';
 import { useGuitar } from '@/lib/guitar/learn/store';
-import { audioListening, isNative, onVolume } from '@/lib/guitar/native/bridge';
+import { isNative, onVolume } from '@/lib/guitar/native/bridge';
 import { dayKey, type Emitter } from '@/lib/guitar/util/emitter';
 
 /** Follow a status emitter as React state. */
@@ -28,20 +28,27 @@ export function useListenStatus(): ListenStatus {
 }
 
 /**
- * Listen through the microphone while this screen is up. Inside the iPad app
- * it starts by itself. In a browser it needs a tap the first time, so the
- * caller shows a button when `state` is idle.
+ * Listen through the microphone while this screen is up, and let it go when
+ * the screen goes. Inside the iPad app it starts by itself. In a browser it
+ * needs a tap the first time, so the caller shows a button while `ask` is true.
+ *
+ * `status.state` is `listening` only while the microphone is open. It is
+ * `resting` while the app plays an example, when the microphone steps aside.
  */
-export function useListening(active = true): { status: ListenStatus; start: () => void } {
+export function useListening(active = true): { status: ListenStatus; start: () => void; ask: boolean } {
   const status = useListenStatus();
   useEffect(() => {
     if (!active) return;
-    if (isNative() || listener.getStatus().state === 'listening') void listener.start();
+    const release = listener.use();
+    if (isNative()) void listener.start(false);
+    return release;
   }, [active]);
-  useEffect(() => {
-    if (status.state === 'listening') audioListening(true);
-  }, [status.state]);
-  return { status, start: () => void listener.start() };
+  return { status, start: () => void listener.start(false), ask: micAsks(status) };
+}
+
+/** Must the learner do something before the app can listen: tap to start, or allow the microphone? Not while it is only starting, or resting for an example. */
+export function micAsks(status: ListenStatus): boolean {
+  return status.state === 'denied' || status.state === 'error' || (status.state === 'idle' && !listener.agreedTo);
 }
 
 /** Keep the screen awake while practising. */
@@ -106,25 +113,45 @@ export function readingMs(text: string): number {
   return Math.min(6000, Math.max(1500, 400 + text.length * 52));
 }
 
-/** Seconds spent with an activity open, reported when it closes. Time with the app hidden is left out. */
-export function usePracticeTimer(onDone: (seconds: number) => void): void {
-  const ref = useRef(onDone);
-  ref.current = onDone;
+/**
+ * Time spent with an activity open. It is reported as it goes, not only at
+ * the end: every half minute, whenever the app is put away, and when the
+ * activity closes. So minutes played are kept even if the iPad is closed in
+ * the middle of a song and the app never comes back, and they land on the
+ * day they were played. Time with the app hidden is left out.
+ *
+ * `first` is true for the first report of an activity, for counting it once.
+ */
+export function usePracticeTimer(onReport: (seconds: number, first: boolean) => void): void {
+  const ref = useRef(onReport);
+  ref.current = onReport;
   useEffect(() => {
-    const start = performance.now();
-    let hidden = 0;
-    let hiddenAt: number | null = null;
-    const onVis = () => {
-      if (document.visibilityState === 'hidden') hiddenAt = performance.now();
-      else if (hiddenAt !== null) {
-        hidden += performance.now() - hiddenAt;
-        hiddenAt = null;
-      }
+    let since: number | null = document.visibilityState === 'hidden' ? null : performance.now();
+    let first = true;
+    const report = () => {
+      if (since === null) return;
+      const now = performance.now();
+      const seconds = Math.max(0, (now - since) / 1000);
+      since = now;
+      ref.current(seconds, first);
+      first = false;
     };
+    const away = () => {
+      report();
+      since = null;
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') away();
+      else if (since === null) since = performance.now();
+    };
+    const tick = setInterval(report, 30000);
     document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', away);
     return () => {
+      clearInterval(tick);
       document.removeEventListener('visibilitychange', onVis);
-      ref.current(Math.max(0, (performance.now() - start - hidden) / 1000));
+      window.removeEventListener('pagehide', away);
+      report();
     };
   }, []);
 }

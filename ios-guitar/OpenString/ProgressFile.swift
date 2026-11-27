@@ -13,7 +13,9 @@ final class ProgressFile {
     private let folder: URL
     private let backups: URL
     private let queue = DispatchQueue(label: "app.openstring.progress")
-    private var lastBackup = Date.distantPast
+    /// The dated copy is first brought up to date a couple of minutes into a visit, or when the app is put away,
+    /// not on the very first save. So a start that went wrong cannot at once write over the day's good copy.
+    private var lastBackup = Date()
     private var pending: [String: String] = [:]
 
     init() {
@@ -74,6 +76,8 @@ final class ProgressFile {
         day.locale = Locale(identifier: "en_US_POSIX")
         day.dateFormat = "yyyy-MM-dd"
         let stamp = day.string(from: Date())
+        // The folder is made again if it was removed in the Files app.
+        try? FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
         for (name, value) in pending {
             // The page wraps its state as { state, version }. The copy holds
             // the state itself, which is what Restore in the app reads.
@@ -95,10 +99,17 @@ final class ProgressFile {
 
     private func prune() {
         let files = FileManager.default
+        // Only the app's own dated copies are thinned out. A backup the learner saved here by hand is theirs to keep.
         let all = ((try? files.contentsOfDirectory(at: backups, includingPropertiesForKeys: nil)) ?? [])
-            .filter { $0.pathExtension == "json" }
+            .filter { $0.pathExtension == "json" && Self.isDatedCopy($0) }
             .sorted { $0.lastPathComponent > $1.lastPathComponent }
         for old in all.dropFirst(30) { try? files.removeItem(at: old) }
+    }
+
+    /// The app's own copies are named with the key, a space, and the day, as in "open-string-v1 2026-11-26".
+    private static func isDatedCopy(_ file: URL) -> Bool {
+        let parts = file.deletingPathExtension().lastPathComponent.split(separator: " ")
+        return parts.count == 2 && parts[1].count == 10
     }
 
     /// Keys become file names, so only plain characters are kept.

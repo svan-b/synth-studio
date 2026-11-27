@@ -16,7 +16,7 @@
 import { firstPosition, type StringNo } from '../music/theory';
 import { Emitter, clamp } from '../util/emitter';
 import { CLICK_HZ } from './click';
-import { BODY, pluck, rmsDb, ringSeconds, strumTiming } from './synth';
+import { APP_PLUCK, BODY, Biquad, VOICE, pluck, rmsDb, ringSeconds, snapFor, strumTiming } from './synth';
 
 export interface AudioStatus {
   state: 'idle' | 'ready' | 'error';
@@ -36,8 +36,34 @@ function contextCtor(): typeof AudioContext | undefined {
   return window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 }
 
-/** RMS each note is brought to before velocity, in dB below full scale. */
+/** Level each note is brought to before velocity, in dB below full scale, as a small speaker would give it. */
 const NOTE_LEVEL_DB = -19;
+/**
+ * An iPad's speaker gives little below a couple of hundred hertz. A note's
+ * level is read above that, so the low strings come out as loud to the ear
+ * as the high ones. The lift this gives a low note is held to a few dB, so
+ * through headphones the bass strings do not boom.
+ */
+const SPEAKER_HZ = 190;
+const LOW_NOTE_LIFT_DB = 6;
+
+/** Milliseconds an iPad takes to bring sound back to full strength once the microphone is let go. */
+const SETTLE_MS = 280;
+/** How hard the guitar is pushed into the stage that holds its level steady. */
+const DRIVE = 1.6;
+
+/** A curve that leaves quiet sound alone and rounds the loudest moments off below full scale, so the pick's first instant does not set the level for the whole note. */
+function roundOff(knee = 0.8, top = 0.98): Float32Array {
+  const n = 2049;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    const a = Math.abs(x);
+    const y = a <= knee ? a : knee + (top - knee) * Math.tanh((a - knee) / (top - knee));
+    curve[i] = Math.sign(x) * y;
+  }
+  return curve;
+}
 /** Notes the course plays most, made ready ahead of time so the first strum is not late. */
 const COMMON = [40, 42, 43, 45, 47, 48, 50, 52, 54, 55, 56, 57, 59, 60, 61, 62, 64, 65, 66, 67, 69];
 
@@ -46,6 +72,7 @@ class GuitarEngine {
   private master: GainNode | null = null;
   private guitarBus: GainNode | null = null;
   private clickBus: GainNode | null = null;
+  private mix: GainNode | null = null;
   private meter: AnalyserNode | null = null;
   private meterBuf: Float32Array | null = null;
   private buffers = new Map<string, AudioBuffer>();
@@ -55,6 +82,9 @@ class GuitarEngine {
   private knownLatency = 0;
   private warmed = false;
   private variant = 0;
+  private recording = false;
+  private pausing = false;
+  private recovering: ReturnType<typeof setTimeout> | null = null;
 
   readonly status = new Emitter<AudioStatus>();
   private current: AudioStatus = { state: 'idle', running: false };
@@ -98,9 +128,14 @@ class GuitarEngine {
       return;
     }
     if (!this.ctx) {
+      // Before any sound: play as a music app does, at the ordinary volume and whatever the silent switch says.
+      if (!this.recording) this.setSessionType('playback');
       this.ctx = new Ctor({ latencyHint: 'interactive' });
       this.build();
-      this.ctx.onstatechange = () => this.setStatus({ running: this.running() });
+      this.ctx.onstatechange = () => {
+        this.setStatus({ running: this.running() });
+        this.recover();
+      };
     } else if (this.running()) {
       this.warm();
       return;
@@ -142,15 +177,66 @@ class GuitarEngine {
   }
 
   /**
+   * The iPad stops sound for a moment when what it is used for changes, and
+   * when another app or a call takes it. Unless the page was put away, start
+   * it again without waiting for a tap.
+   */
+  private recover(): void {
+    const ctx = this.ctx;
+    if (!ctx || this.running() || this.pausing) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    if (this.recovering) return;
+    this.recovering = setTimeout(() => {
+      this.recovering = null;
+      if (!this.ctx || this.running() || this.pausing) return;
+      void this.ctx.resume().catch(() => undefined);
+    }, 150);
+  }
+
+  /**
    * iPad: say whether the microphone is in use as well. With it, sound plays
    * and records at once. Without it, sound plays even with the silent switch on.
+   * Returns whether the iPad could be told.
    */
-  setSessionType(type: 'playback' | 'play-and-record'): void {
+  setSessionType(type: 'playback' | 'play-and-record'): boolean {
+    this.recording = type === 'play-and-record';
     try {
       const nav = navigator as Navigator & { audioSession?: { type: string } };
-      if (nav.audioSession && nav.audioSession.type !== type) nav.audioSession.type = type;
+      if (!nav.audioSession) return false;
+      if (nav.audioSession.type !== type) nav.audioSession.type = type;
+      return true;
     } catch {
-      /* not supported */
+      return false;
+    }
+  }
+
+  /**
+   * The microphone has just been let go, on a device that plays sound poorly
+   * while it is held. Put sound back to its ordinary strength, and wait until
+   * it has settled, so what plays next is not caught in the change.
+   */
+  async toPlayback(): Promise<void> {
+    const told = this.setSessionType('playback');
+    const ctx = this.ctx;
+    if (!ctx) return;
+    this.stopAll();
+    const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+    if (!told) {
+      // An older iPad cannot be told. Stopping sound for an instant makes it look again at what the page is doing.
+      this.pausing = true;
+      try {
+        await Promise.race([ctx.suspend(), wait(400)]);
+        await wait(120);
+        await Promise.race([ctx.resume(), wait(600)]);
+      } catch {
+        /* carry on as it is */
+      }
+      this.pausing = false;
+    }
+    await wait(SETTLE_MS);
+    for (let i = 0; i < 8 && !this.running(); i++) {
+      await this.resume();
+      if (!this.running()) await wait(120);
     }
   }
 
@@ -159,35 +245,54 @@ class GuitarEngine {
     this.guitarBus = ctx.createGain();
     this.guitarBus.gain.value = this.volume * this.volume;
     let node: AudioNode = this.guitarBus;
-    for (const f of BODY) {
+    for (const f of [...BODY, ...VOICE]) {
       const bq = ctx.createBiquadFilter();
       bq.type = f.type;
       bq.frequency.value = f.freq;
       if (f.type === 'peaking') {
         bq.Q.value = f.q;
         bq.gain.value = f.gain;
-      } else if (f.type === 'highshelf') {
-        bq.gain.value = f.gain;
-      } else {
+      } else if (f.type === 'highpass') {
         bq.Q.value = f.q;
+      } else {
+        bq.gain.value = f.gain;
       }
       node.connect(bq);
       node = bq;
     }
-    // A limiter: it touches only the loudest moments, so everything else can sit near the top.
-    const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -9;
-    limiter.knee.value = 4;
-    limiter.ratio.value = 14;
-    limiter.attack.value = 0.002;
-    limiter.release.value = 0.14;
-    node.connect(limiter);
-    this.master = ctx.createGain();
-    this.master.gain.value = 0.98;
-    limiter.connect(this.master);
+    // Loudness. A plucked string is a sharp instant followed by a much quieter ring, and it is the ring the ear takes for
+    // how loud a guitar is. So the sound is pushed up, a compressor evens the ring out, the first instant of each pick is
+    // rounded off, and a limiter guards the top. A small speaker can then be driven close to its limit without distortion.
+    const drive = ctx.createGain();
+    drive.gain.value = DRIVE;
+    node.connect(drive);
+    const even = ctx.createDynamicsCompressor();
+    even.threshold.value = -20;
+    even.knee.value = 8;
+    even.ratio.value = 4;
+    even.attack.value = 0.005;
+    even.release.value = 0.18;
+    drive.connect(even);
+    const round = ctx.createWaveShaper();
+    round.curve = roundOff() as Float32Array<ArrayBuffer>;
+    round.oversample = '4x';
+    even.connect(round);
+    this.mix = ctx.createGain();
+    round.connect(this.mix);
     this.clickBus = ctx.createGain();
-    this.clickBus.gain.value = this.clickVolume;
-    this.clickBus.connect(this.master);
+    this.clickBus.gain.value = Math.sqrt(this.clickVolume);
+    this.clickBus.connect(this.mix);
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -2;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.001;
+    limiter.release.value = 0.1;
+    this.mix.connect(limiter);
+    this.master = ctx.createGain();
+    // A little short of full scale, for the peaks that fall between samples.
+    this.master.gain.value = 0.94;
+    limiter.connect(this.master);
     this.meter = ctx.createAnalyser();
     this.meter.fftSize = 2048;
     this.meterBuf = new Float32Array(this.meter.fftSize);
@@ -211,7 +316,7 @@ class GuitarEngine {
 
   setClickVolume(v: number): void {
     this.clickVolume = clamp(v, 0, 1);
-    if (this.clickBus && this.ctx) this.clickBus.gain.setTargetAtTime(this.clickVolume, this.ctx.currentTime, 0.02);
+    if (this.clickBus && this.ctx) this.clickBus.gain.setTargetAtTime(Math.sqrt(this.clickVolume), this.ctx.currentTime, 0.02);
   }
 
   /** A rendered note, made the first time it is asked for. Two takes of each note keep repeated notes from sounding mechanical. */
@@ -222,9 +327,19 @@ class GuitarEngine {
     let buf = this.buffers.get(key);
     if (!buf) {
       const rate = ctx.sampleRate;
-      const data = pluck(midi, rate, { velocity: 0.75, seconds: Math.min(4, ringSeconds(midi) * 0.75), seed: midi * 31 + (take % 2) * 7 + 1 });
-      // Each note is brought to the same level over its first fifth of a second.
-      const level = rmsDb(data, 0, Math.round(0.2 * rate));
+      const data = pluck(midi, rate, {
+        velocity: APP_PLUCK.velocity,
+        position: APP_PLUCK.position,
+        snap: Math.min(1, snapFor(midi) + APP_PLUCK.snapLift),
+        seconds: Math.min(4, ringSeconds(midi) * 0.75),
+        seed: midi * 31 + (take % 2) * 7 + 1,
+      });
+      // Each note is brought to the same level over its first quarter of a second, as a small speaker would give it.
+      const span = Math.round(0.25 * rate);
+      const whole = rmsDb(data, 0, span);
+      const heard = data.slice(0, span);
+      Biquad.highpass(rate, SPEAKER_HZ, 0.6).process(heard);
+      const level = Math.max(rmsDb(heard), whole - LOW_NOTE_LIFT_DB);
       const gain = Math.pow(10, (NOTE_LEVEL_DB - level) / 20);
       for (let i = 0; i < data.length; i++) data[i] *= gain;
       buf = ctx.createBuffer(1, data.length, rate);
@@ -344,7 +459,11 @@ class GuitarEngine {
     for (const key of Array.from(this.voices.keys())) this.damp(key, t);
   }
 
-  /** The metronome. Its pitch sits between frets, so the note detector can tell it from a string. */
+  /**
+   * The metronome. Its pitch sits between frets, so the note detector can tell it from a string.
+   * It has to be heard over the learner's own guitar, and it plays while the microphone is open,
+   * when an iPad gives sound less volume, so it is as strong as a single tone can be.
+   */
   click(when?: number, accent = false, level = 1): void {
     const ctx = this.ctx;
     if (!ctx || !this.clickBus) return;
@@ -354,12 +473,13 @@ class GuitarEngine {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(accent ? CLICK_HZ.accent : CLICK_HZ.beat, t);
     gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime((accent ? 0.8 : 0.55) * level, t + 0.002);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
+    gain.gain.exponentialRampToValueAtTime((accent ? 1 : 0.8) * level, t + 0.0015);
+    gain.gain.setValueAtTime((accent ? 1 : 0.8) * level, t + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.075);
     osc.connect(gain);
     gain.connect(this.clickBus);
     osc.start(t);
-    osc.stop(t + 0.08);
+    osc.stop(t + 0.1);
     osc.onended = () => {
       try {
         gain.disconnect();

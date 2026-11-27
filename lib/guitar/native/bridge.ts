@@ -22,6 +22,8 @@ interface NativeApp {
   volume?: (v: number) => void;
   /** The last output volume the app reported. */
   lastVolume?: number;
+  /** Called by the app with false when notifications are switched off for it in the iPad's Settings. */
+  reminders?: (ok: boolean) => void;
 }
 
 function shell(): NativeApp | null {
@@ -101,7 +103,14 @@ export function setReminder(on: boolean, hour: number, minute: number, playedTod
   return post({ type: 'remind', on, hour, minute, playedToday, message });
 }
 
-/** Keep the iPad's sound on the speaker while the microphone is in use. */
-export function audioListening(on: boolean): boolean {
-  return post({ type: 'audio.listening', on });
+/** Be told when a reminder was asked for but the iPad will not show it, because notifications are switched off for the app. */
+export function onRemindersOff(fn: () => void): () => void {
+  const app = shell();
+  if (!app) return () => undefined;
+  app.reminders = (ok: boolean) => {
+    if (!ok) fn();
+  };
+  return () => {
+    if (app.reminders) app.reminders = undefined;
+  };
 }

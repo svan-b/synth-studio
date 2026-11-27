@@ -196,6 +196,23 @@ export class Biquad {
     return f;
   }
 
+  static lowshelf(sampleRate: number, freq: number, gainDb: number): Biquad {
+    const f = new Biquad();
+    const A = Math.pow(10, gainDb / 40);
+    const w = (2 * Math.PI * freq) / sampleRate;
+    const s = Math.sin(w);
+    const c = Math.cos(w);
+    const alpha = (s / 2) * Math.SQRT2;
+    const sq = 2 * Math.sqrt(A) * alpha;
+    const a0 = A + 1 + (A - 1) * c + sq;
+    f.b0 = (A * (A + 1 - (A - 1) * c + sq)) / a0;
+    f.b1 = (2 * A * (A - 1 - (A + 1) * c)) / a0;
+    f.b2 = (A * (A + 1 - (A - 1) * c - sq)) / a0;
+    f.a1 = (-2 * (A - 1 + (A + 1) * c)) / a0;
+    f.a2 = (A + 1 + (A - 1) * c - sq) / a0;
+    return f;
+  }
+
   static highpass(sampleRate: number, freq: number, q = Math.SQRT1_2): Biquad {
     const f = new Biquad();
     const w = (2 * Math.PI * freq) / sampleRate;
@@ -229,7 +246,9 @@ export class Biquad {
  * the box near 100 Hz, the top plate near 200 Hz and a broad one near 400
  * Hz, and a softer top end. The app applies the same filters live.
  */
-export const BODY: Array<{ type: 'peaking'; freq: number; q: number; gain: number } | { type: 'highshelf'; freq: number; gain: number } | { type: 'highpass'; freq: number; q: number }> = [
+export type FilterSpec = { type: 'peaking'; freq: number; q: number; gain: number } | { type: 'highshelf' | 'lowshelf'; freq: number; gain: number } | { type: 'highpass'; freq: number; q: number };
+
+export const BODY: FilterSpec[] = [
   { type: 'highpass', freq: 75, q: 0.9 },
   { type: 'peaking', freq: 102, q: 2.2, gain: 6 },
   { type: 'peaking', freq: 205, q: 2.5, gain: 4 },
@@ -238,16 +257,48 @@ export const BODY: Array<{ type: 'peaking'; freq: number; q: number; gain: numbe
   { type: 'highshelf', freq: 6000, gain: -7 },
 ];
 
-export function applyBody(buf: Float32Array, sampleRate: number): void {
-  for (const f of BODY) {
+/**
+ * The guitar as the app plays it to the learner, after the body. Set beside
+ * recordings of strummed acoustic guitars (GuitarSet), the model on its own
+ * is far darker than the real thing: it carries much more below 100 Hz and
+ * some ten decibels less between 1.5 and 6 kHz, where the ear hears a pick
+ * on a string and where a small speaker does its work. These filters bring
+ * the balance back to that of a real guitar, with a little less at the
+ * bottom, which an iPad's speaker cannot give and which only uses up room.
+ *
+ * The note detector is tested on the model and the body alone, not on this.
+ */
+export const VOICE: FilterSpec[] = [
+  { type: 'highpass', freq: 105, q: 0.6 },
+  { type: 'highpass', freq: 105, q: 1.1 },
+  { type: 'lowshelf', freq: 220, gain: -7 },
+  { type: 'peaking', freq: 620, q: 0.9, gain: -5 },
+  { type: 'highshelf', freq: 1700, gain: 10 },
+  { type: 'highshelf', freq: 5600, gain: 3 },
+];
+
+/**
+ * How the app plucks: a firm stroke a little nearer the bridge than the
+ * middle of the soundhole, where a pick gives a clear, bright note.
+ */
+export const APP_PLUCK = { velocity: 0.95, position: 0.14, snapLift: 0.1 } as const;
+
+export function applyFilters(buf: Float32Array, sampleRate: number, filters: FilterSpec[]): void {
+  for (const f of filters) {
     const bq =
       f.type === 'peaking'
         ? Biquad.peaking(sampleRate, f.freq, f.q, f.gain)
-        : f.type === 'highshelf'
-          ? Biquad.highshelf(sampleRate, f.freq, f.gain)
-          : Biquad.highpass(sampleRate, f.freq, f.q);
+        : f.type === 'highpass'
+          ? Biquad.highpass(sampleRate, f.freq, f.q)
+          : f.type === 'highshelf'
+            ? Biquad.highshelf(sampleRate, f.freq, f.gain)
+            : Biquad.lowshelf(sampleRate, f.freq, f.gain);
     bq.process(buf);
   }
+}
+
+export function applyBody(buf: Float32Array, sampleRate: number): void {
+  applyFilters(buf, sampleRate, BODY);
 }
 
 /** Root mean square level of a stretch, in dB below full scale. */

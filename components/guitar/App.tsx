@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { guitar } from '@/lib/guitar/audio/engine';
 import { instrument } from '@/lib/guitar/audio/instrument';
-import { getLesson, songInfo } from '@/lib/guitar/content/catalog';
+import { getLesson, lessonUnlocked, songInfo } from '@/lib/guitar/content/catalog';
 import { listener } from '@/lib/guitar/input/listen';
 import { songProgress } from '@/lib/guitar/learn/coach';
 import { currentSong, planDay, type Block } from '@/lib/guitar/learn/planner';
@@ -35,7 +35,7 @@ const REMINDER = 'A few minutes with your guitar? Your session is ready.';
 function TuneActivity({ onClose }: { onClose: () => void }) {
   const logPractice = useGuitar((s) => s.logPractice);
   useWakeLock(true);
-  usePracticeTimer((seconds) => logPractice(seconds, 0, 1));
+  usePracticeTimer((seconds, first) => logPractice(seconds, 0, first ? 1 : 0));
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-os-bg os-safe-top os-safe-bottom">
       <header className="flex h-16 shrink-0 items-center gap-2 px-3">
@@ -115,13 +115,21 @@ function tomorrow(): string | null {
 }
 
 /** Runs the parts of a daily session one after another. */
-function SessionRunner({ blocks: planned, onClose }: { blocks: Block[]; onClose: () => void }) {
+function SessionRunner({ blocks: planned, from = 0, opened: openedBefore = 0, onClose }: { blocks: Block[]; from?: number; opened?: number; onClose: () => void }) {
   // The parts can grow: when a song is learned with time to spare, the next song takes the rest of it.
   const [blocks, setBlocks] = useState(planned);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => Math.max(0, Math.min(from, planned.length - 1)));
   // The tune up needs no introduction: the session opens straight onto it.
-  const [between, setBetween] = useState(planned[0]?.kind !== 'tune');
+  const [between, setBetween] = useState(from > 0 || planned[0]?.kind !== 'tune');
   const finishSession = useGuitar((s) => s.finishSession);
+  const setSessionAt = useGuitar((s) => s.setSessionAt);
+  const lessons = useGuitar((s) => s.lessons);
+  // The day the session was begun, and how many of its parts were opened and not skipped. Tuning up does not
+  // count: a session is something played, and tuning alone is not that.
+  const startDay = useRef(dayKey());
+  const opened = useRef(openedBefore);
+  // The screen stays awake between parts too: this is where the learner rests with the guitar on their lap.
+  useWakeLock(true);
   const done = index >= blocks.length;
   const marked = useRef(false);
   const before = useRef(useGuitar.getState());
@@ -130,22 +138,39 @@ function SessionRunner({ blocks: planned, onClose }: { blocks: Block[]; onClose:
   const closed = useRef(false);
   const [summary, setSummary] = useState<{ rows: Array<[string, string]>; next: string | null } | null>(null);
 
+  // The place is kept as it moves, so a session left part way, or cut off, picks up there later today.
+  useEffect(() => {
+    if (!done) setSessionAt({ day: startDay.current, blocks, index, opened: opened.current });
+  }, [blocks, done, index, setSessionAt]);
+
   useEffect(() => {
     if (done && !marked.current) {
       marked.current = true;
+      // A session counts as done when some of it was played, on the day it was begun. One with every part
+      // skipped, or one left open overnight and ended the next day, just closes: that day is still to play.
+      if (opened.current === 0 || dayKey() !== startDay.current) {
+        setSessionAt(null);
+        onClose();
+        return;
+      }
       finishSession();
       instrument.chime();
       setSummary({ rows: recap(before.current, blocks), next: tomorrow() });
     }
-  }, [blocks, done, finishSession]);
+  }, [blocks, done, finishSession, onClose, setSessionAt]);
 
   const start = useCallback(() => {
     blockStarted.current = performance.now();
     closed.current = false;
+    if (blocks[index]?.kind !== 'tune') opened.current += 1;
+    setSessionAt({ day: startDay.current, blocks, index, opened: opened.current });
     setBetween(false);
-  }, []);
+  }, [blocks, index, setSessionAt]);
   /** Leave a part out and look at the next. */
   const skipPart = useCallback(() => setIndex((i) => i + 1), []);
+  // A lesson that follows on from one not yet done cannot be reached by skipping the one before it.
+  const after = blocks[index + 1];
+  const canSkip = !after || after.kind !== 'lesson' || lessonUnlocked(after.id, (id) => lessons[id]?.done === true);
   // Inside the iPad app the microphone is already open here, so a strum can carry the session on.
   const { status: hearing } = useListening(true);
 
@@ -220,7 +245,7 @@ function SessionRunner({ blocks: planned, onClose }: { blocks: Block[]; onClose:
           {/* The place to rest between parts. A strum carries on, so the hands can stay where they are. */}
           <ActionBar
             extras={[{ label: 'Stop for today', onClick: onClose }]}
-            skip={index + 1 < blocks.length ? { label: 'Skip this part', onClick: skipPart } : null}
+            skip={canSkip ? { label: 'Skip this part', onClick: skipPart } : null}
             primary={{ label: index === 0 ? 'Start' : 'Continue', onClick: start, strum: hearing.state === 'listening' }}
           />
         </>
@@ -286,6 +311,8 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.search.includes('osdebug')) {
+      // For checks on a computer: have the microphone step aside for the app's own sound, as it does on an iPad.
+      if (window.location.search.includes('osaside')) listener.forceAside = true;
       // Development tools, loaded only when asked for in the address.
       void Promise.all([import('@/lib/guitar/dev/robot'), import('@/lib/guitar/content/catalog'), import('@/lib/guitar/engine/follow'), import('@/lib/guitar/input/bus')]).then(
         ([robot, catalog, follow, bus]) => {
@@ -359,7 +386,7 @@ export default function App() {
       {activity?.kind === 'song' && <SongRoom songId={activity.id} minutes={activity.minutes} onClose={close} />}
       {activity?.kind === 'drill' && <Drill kind={activity.id} onClose={close} />}
       {activity?.kind === 'tune' && <TuneActivity onClose={close} />}
-      {activity?.kind === 'session' && <SessionRunner blocks={activity.blocks} onClose={close} />}
+      {activity?.kind === 'session' && <SessionRunner blocks={activity.blocks} from={activity.from} opened={activity.opened} onClose={close} />}
       {!onboarded && <Onboarding onDone={() => setView('today')} />}
     </div>
   );

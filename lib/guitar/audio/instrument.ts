@@ -2,6 +2,11 @@
  * The app playing guitar for the learner to hear: demonstrations, reference
  * notes for tuning, and the chime. The microphone hears all of it too, so
  * the listener is told to let each sound pass.
+ *
+ * Anything played for the learner to hear well, an example or a note to
+ * tune to, is played with the microphone set aside where the microphone
+ * would spoil the sound (see input/listen.ts). Short sounds made while the
+ * learner is playing, such as the chime, are not.
  */
 
 import type { Score, Step } from '../music/score';
@@ -12,6 +17,37 @@ import { Transport, playStep, scoreEvents, type TimedEvent } from './transport';
 
 /** How long after the app plays something the microphone keeps ignoring new sounds. The note rings on, but a ringing note starts nothing new. */
 const QUIET = 0.3;
+
+/**
+ * Play something for the learner to hear well. The microphone steps aside
+ * first. `play` makes the sound and returns the audio time at which it ends,
+ * or takes charge of the ending itself by calling `finished`. Returns a
+ * function that stops waiting and gives the microphone back at once.
+ */
+function example(play: (finished: () => void) => number | void): () => void {
+  let stopped = false;
+  let release: (() => void) | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const finish = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    release?.();
+    release = null;
+  };
+  void listener.stepAside().then((r) => {
+    if (stopped) {
+      r();
+      return;
+    }
+    release = r;
+    const ends = play(finish);
+    if (typeof ends === 'number') timer = setTimeout(finish, Math.max(0, (ends - guitar.now()) * 1000) + 120);
+  });
+  return () => {
+    stopped = true;
+    finish();
+  };
+}
 
 export const instrument = {
   pluck(midi: number, when?: number, opts: { velocity?: number; string?: StringNo | null; seconds?: number } = {}): number {
@@ -34,12 +70,14 @@ export const instrument = {
     return ends;
   },
 
-  /** A held reference note for tuning by ear. The tuner ignores it while it sounds. */
-  reference(midi: number, string: StringNo): number {
-    const t = guitar.now() + 0.02;
-    const ends = guitar.pluck(midi, t, { velocity: 0.85, string, seconds: 2.5 });
-    listener.suppress(ends);
-    return ends;
+  /** A held note for the learner to hear well: one to tune to, or one to find by ear. Returns a function that cuts it short. */
+  reference(midi: number, string: StringNo, seconds = 2.5): () => void {
+    return example(() => {
+      const t = guitar.now() + 0.02;
+      const ends = guitar.pluck(midi, t, { velocity: 0.85, string, seconds });
+      listener.suppress(ends);
+      return ends;
+    });
   },
 
   chime(): void {
@@ -70,9 +108,20 @@ export function playScore(score: Score, opts: { bpm?: number; onStep?: (index: n
       }
     },
   });
-  // Let the last chord ring a moment before saying it is done.
-  transport.start(events, score.totalBeats + 0.5, { bpm, fromBeat: 0, lead: opts.lead ?? 0.15, onDone: () => opts.onDone?.() });
+  const give = example((finished) => {
+    // Let the last chord ring a moment before saying it is done.
+    transport.start(events, score.totalBeats + 0.5, {
+      bpm,
+      fromBeat: 0,
+      lead: opts.lead ?? 0.15,
+      onDone: () => {
+        finished();
+        opts.onDone?.();
+      },
+    });
+  });
   return () => {
+    give();
     transport.stop();
     timers.forEach((t) => clearTimeout(t));
     guitar.stopAll();
@@ -108,8 +157,19 @@ export function playSong(chords: Score, melody: Score | null, opts: { bpm?: numb
       },
     })),
   ];
-  transport.start(events, Math.max(chords.totalBeats + offset, melody.totalBeats) + 0.5, { bpm, fromBeat: 0, lead: opts.lead ?? 0.15, onDone: () => opts.onDone?.() });
+  const give = example((finished) => {
+    transport.start(events, Math.max(chords.totalBeats + offset, melody.totalBeats) + 0.5, {
+      bpm,
+      fromBeat: 0,
+      lead: opts.lead ?? 0.15,
+      onDone: () => {
+        finished();
+        opts.onDone?.();
+      },
+    });
+  });
   return () => {
+    give();
     transport.stop();
     timers.forEach((t) => clearTimeout(t));
     guitar.stopAll();
