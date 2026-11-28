@@ -1,5 +1,5 @@
 SCREEN RECORDING
-A screen recording made on an iPad running the latest iPadOS is attached to this submission. It starts with launching the app from the Home Screen and shows the day's session, a lesson, practising a piece, a Train exercise, Progress and Settings. The app was already set up on this iPad, so first run setup is not in the recording. It is described in step 1 below.
+A screen recording made on an iPad running the latest iPadOS: https://github.com/svan-b/synth-studio/blob/store-assets/store-assets/keyward/review-recording.mp4 (open the link and press play, or use Download). It starts with launching the app from the Home Screen and shows the day's session, a lesson, practising a piece, a Train exercise, Progress and Settings. The app was already set up on this iPad, so first run setup is not in the recording. It is described in step 1 below.
 
 PURPOSE AND AUDIENCE
 Keyward teaches piano to adult and teenage beginners, and to returning players, who own a digital piano or keyboard. The iPad sits on the music stand and reads what is played over MIDI. It tells the learner which note, hand or rhythm went wrong, plans practice around the passages that need work, and moves on without the learner taking their hands off the keys. It gives structure and feedback between lessons, or in place of them.
