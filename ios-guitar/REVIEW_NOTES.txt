@@ -1,5 +1,5 @@
 SCREEN RECORDING
-A screen recording made on an iPad running the latest iPadOS is attached to this submission. It starts with launching the app from the Home Screen and shows first run setup and the microphone permission, the tuner, a lesson, a song, a practice exercise and the settings.
+A screen recording made on an iPad running the latest iPadOS is attached to this submission. It starts with launching the app from the Home Screen and shows the day's session, the tuner, a lesson, a song, Progress and Settings. The app was already set up on this iPad, so first run setup and the microphone permission prompt are not in the recording. They are described in step 1 below.
 
 PURPOSE AND AUDIENCE
 Fretward teaches acoustic guitar to adult and teenage beginners. The iPad sits on a stand and listens through its microphone, so there is nothing to plug in. It hears which chord was strummed and which strings did not ring, counts clean chord changes, and keeps time with a click, so a beginner gets feedback between lessons, or without a teacher, and is playing songs in the first week.
