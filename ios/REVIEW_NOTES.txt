@@ -1,0 +1,27 @@
+SCREEN RECORDING
+A screen recording made on an iPad running the latest iPadOS is attached to this submission. It starts with launching the app from the Home Screen and shows first run setup, a lesson, practising a piece, an exercise, playback and the settings.
+
+PURPOSE AND AUDIENCE
+Keyward teaches piano to adult and teenage beginners, and to returning players, who own a digital piano or keyboard. The iPad sits on the music stand and reads what is played over MIDI. It tells the learner which note, hand or rhythm went wrong, plans practice around the passages that need work, and moves on without the learner taking their hands off the keys. It gives structure and feedback between lessons, or in place of them.
+
+SETUP AND MAIN FEATURES
+No account, login or sample files are needed, and the app works offline.
+1. First launch asks about experience and practice time. On the Connect your piano page, connect a MIDI piano by USB or Bluetooth, or tap Not now to play on the keys on the screen. Every feature works with the on screen keys.
+2. Today: the planned session for the day, with a lesson, a piece and an exercise. Tap Start.
+3. Learn: 39 lessons in order. Each step asks for notes to be played on the keys.
+4. Pieces: choose any piece. The coach works through it phrase by phrase, then hands together, then up to tempo.
+5. Train: note reading, rhythm, playing by ear, sight reading, scales and chords.
+6. Progress: practice history and recordings of finished pieces.
+7. Settings: the piano connection (Your piano), the optional microphone mode for an acoustic piano, which asks for permission only when chosen, sound, and About, with credits and licences.
+
+EXTERNAL SERVICES
+None. The app has no server, account, analytics, advertising, AI service or payment processor, and makes no network requests. All content, including the piano sound, is inside the app. It uses Apple frameworks only: CoreMIDI and Bluetooth MIDI to connect the piano, and AVFoundation for sound and the optional microphone. Progress is stored on the iPad.
+
+REGIONAL DIFFERENCES
+None. The app works the same in every region. The interface is in English.
+
+THIRD PARTY MATERIAL
+Piano sound: Salamander Grand Piano V3, recorded by Alexander Holm, under Creative Commons Attribution 3.0. Music symbols: the Bravura font by Steinberg, under the SIL Open Font License 1.1. The music is traditional, in the public domain (Bach, Beethoven, Satie and others) or written for the app. Credits and full licence text are in the app under Settings, About. The app is not in a regulated industry.
+
+PAID CONTENT
+Keyward is a one time paid download. There are no in-app purchases, subscriptions or locked features.

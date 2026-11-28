@@ -1,0 +1,28 @@
+SCREEN RECORDING
+A screen recording made on an iPad running the latest iPadOS is attached to this submission. It starts with launching the app from the Home Screen and shows first run setup and the microphone permission, the tuner, a lesson, a song, a practice exercise and the settings.
+
+PURPOSE AND AUDIENCE
+Fretward teaches acoustic guitar to adult and teenage beginners. The iPad sits on a stand and listens through its microphone, so there is nothing to plug in. It hears which chord was strummed and which strings did not ring, counts clean chord changes, and keeps time with a click, so a beginner gets feedback between lessons, or without a teacher, and is playing songs in the first week.
+
+SETUP AND MAIN FEATURES
+No account, login or sample files are needed, and the app works offline.
+1. First launch asks about experience and practice time, then asks for microphone permission, which the app needs to hear the guitar.
+2. Today: the planned session for the day, starting with tuning. Tap Start.
+3. Lessons: 24 lessons in six stages. Each step listens for the chord or note asked for.
+4. Songs: choose a song. The coach takes it from chord changes in your own time, to one strum per beat, to the full strum, to full speed.
+5. Practice: the tuner, chord change drills and strumming patterns.
+6. Progress: practice history and the recordings of learned songs, which are also in the Files app under Fretward.
+7. Settings: text size, appearance and practice reminders.
+Without a guitar, every screen can still be reviewed. Each step has Skip this part, and after two runs that are not heard the main button becomes Move on.
+
+EXTERNAL SERVICES
+None. The app has no server, account, analytics, advertising, AI service or payment processor, and makes no network requests. Listening and chord recognition run on the iPad. It uses Apple frameworks only: AVFoundation for the microphone and sound, and UserNotifications for the optional practice reminder. Progress and recordings are stored on the iPad.
+
+REGIONAL DIFFERENCES
+None. The app works the same in every region. The interface is in English.
+
+THIRD PARTY MATERIAL
+None. The guitar sound is generated on the device, the songs are traditional, in the public domain or written for the course, and the text uses the system font. The app is not in a regulated industry.
+
+PAID CONTENT
+Fretward is a one time paid download. There are no in-app purchases, subscriptions or locked features.
